@@ -15,6 +15,7 @@ from together import Together
 from anthropic import Anthropic
 from typing import Dict
 import inspect
+import asyncio
 
 from judgeval.constants import JUDGMENT_TRACES_SAVE_API_URL
 from judgeval.judgment_client import JudgmentClient
@@ -209,19 +210,32 @@ class TraceClient:
                 inputs=inputs
             ))
 
+    async def _update_coroutine_output(self, entry: TraceEntry, coroutine: Any):
+        """Helper method to update the output of a trace entry once the coroutine completes"""
+        try:
+            result = await coroutine
+            entry.output = result
+            return result
+        except Exception as e:
+            entry.output = f"Error: {str(e)}"
+            raise
+
     def record_output(self, output: Any):
         """Record output for the current span"""
-        if inspect.iscoroutine(output):
-            print(f"Output is a coroutine: {output=}")
         if self._current_span:
-            self.add_entry(TraceEntry(
+            entry = TraceEntry(
                 type="output",
                 function=self._current_span,
                 depth=self.tracer.depth,
                 message=f"Output from {self._current_span}",
                 timestamp=time.time(),
-                output=output
-            ))
+                output="<pending>" if inspect.iscoroutine(output) else output
+            )
+            self.add_entry(entry)
+            
+            if inspect.iscoroutine(output):
+                # Create a task to update the output once the coroutine completes
+                asyncio.create_task(self._update_coroutine_output(entry, output))
 
     def add_entry(self, entry: TraceEntry):
         """Add a trace entry to this trace context"""
@@ -381,6 +395,9 @@ class Tracer:
         # Automatically create top-level span
         with trace.span(name or "unnamed_trace") as span:
             try:
+                # Save the trace to the database to handle Evaluations' trace_id referential integrity
+                trace.save()
+                self._current_trace.tasks = []  # Initialize empty task list
                 yield trace
             finally:
                 self._current_trace = prev_trace
@@ -402,29 +419,52 @@ class Tracer:
         if func is None:
             return lambda f: self.observe(f, name=name)
         
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            if self._current_trace:
-                span_name = name or func.__name__
+        if asyncio.iscoroutinefunction(func):
+            @functools.wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                if self._current_trace:
+                    span_name = name or func.__name__
+                    
+                    with self._current_trace.span(span_name) as span:
+                        # Record inputs
+                        span.record_input({
+                            'args': list(args),
+                            'kwargs': kwargs
+                        })
+                        
+                        # Execute function
+                        result = await func(*args, **kwargs)
+                        
+                        # Record output
+                        span.record_output(result)
+                        
+                        return result
                 
-                with self._current_trace.span(span_name) as span:
-                    # Record inputs
-                    span.record_input({
-                        'args': list(args),
-                        'kwargs': kwargs
-                    })
+                return await func(*args, **kwargs)
+            return async_wrapper
+        else:
+            @functools.wraps(func)
+            def wrapper(*args, **kwargs):
+                if self._current_trace:
+                    span_name = name or func.__name__
                     
-                    # Execute function
-                    result = func(*args, **kwargs)
-                    
-                    # Record output
-                    span.record_output(result)
-                    
-                    return result
-            
-            return func(*args, **kwargs)
-            
-        return wrapper
+                    with self._current_trace.span(span_name) as span:
+                        # Record inputs
+                        span.record_input({
+                            'args': list(args),
+                            'kwargs': kwargs
+                        })
+                        
+                        # Execute function
+                        result = func(*args, **kwargs)
+                        
+                        # Record output
+                        span.record_output(result)
+                        
+                        return result
+                
+                return func(*args, **kwargs)
+            return wrapper
 
 def wrap(client: Any) -> Any:
     """
