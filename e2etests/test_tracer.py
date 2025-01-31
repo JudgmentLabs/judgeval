@@ -136,8 +136,131 @@ async def test_evaluation_mixed(input):
     
     return result
 
+@judgment.observe(span_type="tool")
+async def retrieve_keywords(query: str) -> list[str]:
+    """Simulate keyword retrieval from query."""
+
+    # Mock relevance filtering - in real system this would use embeddings or semantic search
+    # Mock relevance filtering by checking if query terms appear in documents
+    from pydantic import BaseModel
+    class Document(BaseModel):
+        relevant: list[str]
+
+    completion = openai_client.beta.chat.completions.parse(
+        model="gpt-4o-mini-2024-07-18",
+        messages=[
+            {"role": "system", "content": "Extract the key words."},
+            {"role": "user", "content": query},
+        ],
+        response_format=Document,
+    )
+
+    words = completion.choices[0].message.parsed
+
+    # Mock relevance filtering by checking if query terms appear in documents
+    query_terms = [word for term in words.relevant for word in term.split()]
+    return query_terms
+
+@judgment.observe(span_type="tool")
+async def retrieve_documents(query_terms: str, documents: list[str]) -> list[str]:
+    """Simulate document retrieval from enterprise knowledge base."""
+    
+    # Filter documents that contain any query terms
+    relevant_docs = [
+        doc for doc in documents 
+        if any(term in doc.lower() for term in query_terms)
+    ]
+
+    return relevant_docs
+
+@judgment.observe(span_type="tool")
+async def summarize_documents(relevant_documents: list[str]) -> str:
+    """Simulate document summarization."""
+
+
+    anthropic_response = anthropic_client.messages.create(
+        model="claude-3-sonnet-20240229",
+        system="Make a summary with the relevant documents.",
+        messages=[
+            {"role": "user", "content": "\n".join(relevant_documents)}
+        ],
+        max_tokens=500
+    )
+
+    summary = anthropic_response.content[0].text
+
+    await judgment.get_current_trace().async_evaluate(
+        scorers=[FaithfulnessScorer(threshold=0.5)],
+        input="Make a summary with the relevant documents.",
+        actual_output=summary,
+        retrieval_context=relevant_documents,
+        model="gpt-4o-mini",
+        log_results=True
+    )
+
+    return summary
+
+
+@judgment.observe(span_type="tool")
+async def generate_answer(query: str, context: str) -> str:
+    """Generate answer using LLM."""
+    # Simulate LLM call
+    response = f"Based on our company policy: {context}"
+    
+    await judgment.get_current_trace().async_evaluate(
+        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+        input=query,
+        actual_output=response,
+        retrieval_context=[context],
+        expected_output=response,
+        model="gpt-4o-mini",
+        log_results=True
+    )
+    return response
+
+
+async def rag_pipeline(query: str, documents: list[str]) -> str:
+    """Enterprise RAG pipeline with multiple steps."""
+    PROJECT_NAME = "EnterpriseRAG"
+    
+    with judgment.trace("RAG-Pipeline", project_name=PROJECT_NAME, overwrite=True) as trace:
+
+        keywords = await retrieve_keywords(query)
+        
+        # Step 1: Retrieve relevant documents
+        relevant_docs = await retrieve_documents(keywords, documents)
+        
+        # Step 2: Summarize retrieved documents
+        context = await summarize_documents(relevant_docs)
+        
+        # Step 3: Generate answer
+        final_response = await generate_answer(query, context)
+        
+    trace.save()
+    trace.print()
+    
+    return final_response
+
 if __name__ == "__main__":
     # Use a more meaningful test input
     test_input = "Write a poem about Nissan R32 GTR"
-    asyncio.run(test_evaluation_mixed(test_input))
+    #asyncio.run(test_evaluation_mixed(test_input))
+
+    documents = [
+        "The company holiday party is scheduled for December 15th at the Grand Hotel.",
+        "Employees can be reimbursed for business travel expenses with proper receipts.",
+        "All staff must complete annual cybersecurity training by March 31st.",
+        "Travel expenses include flights, hotels, and meals during business trips.",
+        "The office will be closed for maintenance this weekend.",
+        "Submit expense reports within 30 days of travel completion.",
+        "New parking permits will be issued next month for all employees.",
+        "International travel requires manager pre-approval.",
+        "The cafeteria now offers vegetarian options every Wednesday.",
+        "Employee health insurance enrollment period begins next week.",
+        "Office supplies can be requested through the internal portal.",
+        "Remote work policy requires minimum 2 days in office per week."
+    ]
+
+    rag_input = "What is the company policy on reembursing travel expenses?"
+    asyncio.run(rag_pipeline(rag_input, documents))
 

@@ -531,11 +531,11 @@ def _get_client_config(client: ApiClient) -> tuple[str, callable]:
         ValueError: If client type is not supported
     """
     if isinstance(client, OpenAI):
-        return "OPENAI_API_CALL", client.chat.completions.create
+        return "OpenAI Model", client.chat.completions.create
     elif isinstance(client, Together):
-        return "TOGETHER_API_CALL", client.chat.completions.create
+        return "Together Model", client.chat.completions.create
     elif isinstance(client, Anthropic):
-        return "ANTHROPIC_API_CALL", client.messages.create
+        return "Anthropic Model", client.messages.create
     raise ValueError(f"Unsupported client type: {type(client)}")
 
 def _format_input_data(client: ApiClient, **kwargs) -> dict:
