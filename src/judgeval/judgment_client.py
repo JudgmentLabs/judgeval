@@ -271,7 +271,7 @@ class JudgmentClient:
     def assert_test(
         self, 
         examples: List[Example],
-        scorers: List[Union[JudgevalScorer, APIJudgmentScorer]],
+        scorers: List[Union[APIJudgmentScorer, JudgevalScorer]],
         model: Union[str, List[str], JudgevalJudge],
         aggregator: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,

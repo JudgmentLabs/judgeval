@@ -18,6 +18,7 @@ anthropic = "*"
 patronus = "*"
 asyncio = "*"
 nest-asyncio = "*"
+tavily-python = "*"
 
 [dev-packages]
 pytest = "*"

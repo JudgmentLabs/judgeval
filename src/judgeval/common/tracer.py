@@ -7,16 +7,7 @@ import functools
 import requests
 import uuid
 from contextlib import contextmanager
-from typing import (
-    Optional, 
-    Any, 
-    List, 
-    Literal, 
-    Tuple, 
-    Generator, 
-    TypeAlias, 
-    Union
-)
+from typing import Optional, Any, List, Literal, Tuple, Generator, TypeAlias, Union
 from dataclasses import dataclass, field
 from datetime import datetime 
 from openai import OpenAI
@@ -76,16 +67,42 @@ class TraceEntry:
         elif self.type == "evaluation":
             print(f"{indent}Evaluation: {self.evaluation_result} ({self.duration:.3f}s)")
     
+    def _serialize_inputs(self) -> dict:
+        """Helper method to serialize input data safely.
+        
+        Returns a dict with serializable versions of inputs, converting non-serializable
+        objects to None with a warning.
+        """
+        serialized_inputs = {}
+        for key, value in self.inputs.items():
+            if isinstance(value, BaseModel):
+                serialized_inputs[key] = value.model_dump()
+            elif isinstance(value, (list, tuple)):
+                # Handle lists/tuples of arguments
+                serialized_inputs[key] = [
+                    item.model_dump() if isinstance(item, BaseModel)
+                    else None if not self._is_json_serializable(item)
+                    else item
+                    for item in value
+                ]
+            else:
+                if self._is_json_serializable(value):
+                    serialized_inputs[key] = value
+                else:
+                    warnings.warn(f"Input '{key}' for function {self.function} is not JSON serializable. Setting to None.")
+                    serialized_inputs[key] = None
+        return serialized_inputs
+
+    def _is_json_serializable(self, obj: Any) -> bool:
+        """Helper method to check if an object is JSON serializable."""
+        try:
+            json.dumps(obj)
+            return True
+        except (TypeError, OverflowError, ValueError):
+            return False
+
     def to_dict(self) -> dict:
         """Convert the trace entry to a dictionary format for storage/transmission."""
-        try:
-            output = self._serialize_output()
-        except (TypeError, OverflowError, ValueError):
-            # Handle cases where output cannot be serialized
-            warnings.warn(f"Output for function {self.function} is not JSON serializable. Setting to None.")
-            output = None
-
-        # Build a complete dictionary representation of the trace entry
         return {
             "type": self.type,
             "function": self.function,
@@ -93,8 +110,8 @@ class TraceEntry:
             "message": self.message,
             "timestamp": self.timestamp,
             "duration": self.duration,
-            "output": output,
-            "inputs": self.inputs or None,  # Convert empty dict to None
+            "output": self._serialize_output(),
+            "inputs": self._serialize_inputs(),
             "evaluation_result": [result.to_dict() for result in self.evaluation_result] if self.evaluation_result else None,
             "span_type": self.span_type
         }
@@ -104,18 +121,22 @@ class TraceEntry:
         
         Handles special cases:
         - Pydantic models are converted using model_dump()
-        - Other objects must be JSON serializable
+        - Non-serializable objects return None with a warning
         """
         if isinstance(self.output, BaseModel):
             return self.output.model_dump()
         
-        # Verify JSON serialization is possible
-        json.dumps(self.output)
-        return self.output
+        try:
+            # Try to serialize the output to verify it's JSON compatible
+            json.dumps(self.output)
+            return self.output
+        except (TypeError, OverflowError, ValueError):
+            warnings.warn(f"Output for function {self.function} is not JSON serializable. Setting to None.")
+            return None
 
 class TraceClient:
     """Client for managing a single trace context"""
-    def __init__(self, tracer, trace_id: str, name: str, project_name: str = "default_project"):
+    def __init__(self, tracer, trace_id: str, name: str, project_name: str = "default_project", overwrite: bool = False):
         self.tracer = tracer
         self.trace_id = trace_id
         self.name = name
@@ -125,6 +146,7 @@ class TraceClient:
         self.start_time = time.time()
         self.span_type = None
         self._current_span: Optional[TraceEntry] = None
+        self.overwrite = overwrite
         
     @contextmanager
     def span(self, name: str, span_type: SpanType = "span"):
@@ -175,7 +197,7 @@ class TraceClient:
         expected_tools: Optional[List[str]] = None,
         additional_metadata: Optional[Dict[str, Any]] = None,
         model: Optional[str] = None,
-        log_results: Optional[bool] = False,
+        log_results: Optional[bool] = True,
     ):
         start_time = time.time()  # Record start time
         example = Example(
@@ -195,9 +217,13 @@ class TraceClient:
             model=model,
             metadata={},
             log_results=log_results,
-            project_name="TestSpanLevel1",  # TODO this should be dynamic
-            eval_run_name="TestSpanLevel1",
-            override=True,
+            project_name=self.project_name,
+            eval_run_name=(
+                f"{self.name.capitalize()}-"
+                f"{self._current_span}-"
+                f"[{','.join(scorer.load_implementation().score_type.capitalize() for scorer in scorers)}]"
+            ),
+            override=self.overwrite
         )
         
         self.record_evaluation(scoring_results, start_time)  # Pass start_time to record_evaluation
@@ -393,7 +419,7 @@ class Tracer:
     def trace(self, name: str, project_name: str = "default_project", overwrite: bool = False) -> Generator[TraceClient, None, None]:
         """Start a new trace context using a context manager"""
         trace_id = str(uuid.uuid4())
-        trace = TraceClient(self, trace_id, name, project_name=project_name)
+        trace = TraceClient(self, trace_id, name, project_name=project_name, overwrite=overwrite)
         prev_trace = self._current_trace
         self._current_trace = trace
         
