@@ -395,50 +395,43 @@ def test_custom_judge_vertexai(client: JudgmentClient):
     print(res)
 
 
-if __name__ == "__main__":
-    # Test client functionality
+def run_selected_tests(test_names: list[str]):
+    """
+    Run only the specified tests by name.
+    
+    Args:
+        test_names (list[str]): List of test function names to run (without 'test_' prefix)
+    """
     client = get_client()
     print("Client initialized successfully")
     print("*" * 40)
-
-    print("Testing dataset creation, pushing, and pulling")
-    test_dataset(client)
-    print("Dataset creation, pushing, and pulling successful")
-    print("*" * 40)
     
-    print("Testing evaluation run")
-    test_run_eval(client)
-    print("Evaluation run successful")
-    print("*" * 40)
-
-    print("Testing assert test")
-    test_assert_test(client)
-    print("Assert test successful")
-    print("*" * 40)
-
-    print("Testing JSON scorer")
-    test_json_scorer(client)
-    print("JSON scorer test successful")
-    print("*" * 40)
+    test_map = {
+        'dataset': test_dataset,
+        'run_eval': test_run_eval,
+        'assert_test': test_assert_test,
+        'json_scorer': test_json_scorer,
+        'override_eval': test_override_eval,
+        'evaluate_dataset': test_evaluate_dataset,
+        'classifier_scorer': test_classifier_scorer,
+        'custom_judge_vertexai': test_custom_judge_vertexai
+    }
     
-    print("Testing evaluation run override")
-    test_override_eval(client)
-    print("Evaluation run override successful")
-    print("*" * 40)
+    for test_name in test_names:
+        if test_name not in test_map:
+            print(f"Warning: Test '{test_name}' not found")
+            continue
+            
+        print(f"Running test: {test_name}")
+        test_map[test_name](client)
+        print(f"{test_name} test successful")
+        print("*" * 40)
     
-    print("Testing dataset evaluation")
-    test_evaluate_dataset(client)
-    print("Dataset evaluation successful")
-    print("*" * 40)
+    print("Selected tests completed")
+
+if __name__ == "__main__":
+    # Example usage of run_selected_tests
+    run_selected_tests(['dataset', 'run_eval'])
     
-    print("Testing classifier scorer")
-    test_classifier_scorer(client)
-    print("Classifier scorer test successful")
-    print("*" * 40)
-
-    print("Testing custom judge")
-    test_custom_judge_vertexai(client)
-    print("Custom judge test successful")
-    print("*" * 40)
-
-    print("All tests passed successfully")
+    # Or run all tests as before
+    # ... existing main block code ...
