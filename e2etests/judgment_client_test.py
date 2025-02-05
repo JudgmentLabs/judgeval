@@ -31,7 +31,15 @@ def get_client():
 
 def get_ui_client():
     return JudgmentClient(judgment_api_key=os.getenv("UI_JUDGMENT_API_KEY"))
+@pytest.fixture
+def client():
+    """Fixture to provide a JudgmentClient instance."""
+    return get_client()
 
+@pytest.fixture
+def ui_client():
+    """Fixture to provide a UI JudgmentClient instance."""
+    return get_ui_client()
 
 def test_dataset(client: JudgmentClient):
     dataset: EvalDataset = client.create_dataset()
