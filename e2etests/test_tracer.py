@@ -14,7 +14,7 @@ from judgeval.constants import APIScorer
 from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
 
 # Initialize the tracer and clients
-judgment = Tracer(api_key=os.getenv("UI_JUDGMENT_API_KEY"))
+judgment = Tracer(api_key=os.getenv("JUDGMENT_API_KEY"))
 openai_client = wrap(OpenAI())
 anthropic_client = wrap(Anthropic())
 
@@ -99,10 +99,9 @@ async def make_poem(input: str) -> str:
         anthropic_result = anthropic_response.content[0].text
         
         await judgment.get_current_trace().async_evaluate(
+            scorers=[AnswerRelevancyScorer(threshold=0.5)],
             input=input,
             actual_output=anthropic_result,
-            score_type=APIScorer.ANSWER_RELEVANCY,
-            threshold=0.5,
             model="gpt-4o-mini",
             log_results=True
         )
@@ -124,8 +123,8 @@ async def make_poem(input: str) -> str:
         return ""
 
 async def test_evaluation_mixed(input):
-    PROJECT_NAME = "NewPoemBot"
-    with judgment.trace("Use-claude", project_name=PROJECT_NAME, overwrite=True) as trace:
+    PROJECT_NAME = "TestingPoemBot"
+    with judgment.trace("Use-claude-hehexd123", project_name=PROJECT_NAME, overwrite=True) as trace:
         upper = await make_upper(input)
         result = await make_poem(upper)
         await answer_user_question("What if these shoes don't fit?")
@@ -140,4 +139,3 @@ if __name__ == "__main__":
     # Use a more meaningful test input
     test_input = "Write a poem about Nissan R32 GTR"
     asyncio.run(test_evaluation_mixed(test_input))
-
