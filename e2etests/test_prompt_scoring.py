@@ -8,6 +8,8 @@ from judgeval.judgment_client import JudgmentClient
 from judgeval.data import Example
 from judgeval.judges import TogetherJudge
 from judgeval.scorers import PromptScorer, ClassifierScorer
+import random
+import string
 
 
 qwen = TogetherJudge()
@@ -65,8 +67,11 @@ class SentimentScorer(PromptScorer):
         return self.score <= POSITIVITY_THRESHOLD
 
 
-def main():
+def generate_random_slug(length=6):
+    """Generate a random string of fixed length"""
+    return ''.join(random.choices(string.ascii_lowercase, k=length))
 
+def main():
     pos_example = Example(
         input="What's the store return policy?",
         actual_output="Our return policy is wonderful! You may return any item within 30 days of purchase for a full refund.",
@@ -79,6 +84,7 @@ def main():
 
     # scorer = SentimentScorer()
     scorer = ClassifierScorer(
+        slug=generate_random_slug(),  # Generate random 6-letter slug
         name="Sentiment Classifier",
         conversation=[{"role": "system", "content": "Is the response positive (Y/N)? The response is: {{actual_output}}."}],
         options={"Y": 1, "N": 0},
