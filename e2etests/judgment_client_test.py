@@ -15,7 +15,7 @@ from judgeval.scorers import (
     JSONCorrectnessScorer
 )
 from judgeval.judges import TogetherJudge, JudgevalJudge
-from judgeval.playground import CustomFaithfulnessMetric
+from playground import CustomFaithfulnessMetric
 from judgeval.data.datasets.dataset import EvalDataset
 from dotenv import load_dotenv
 import random
@@ -28,18 +28,6 @@ load_dotenv()
 def get_client():
     return JudgmentClient(judgment_api_key=os.getenv("JUDGMENT_API_KEY"))
 
-
-def get_ui_client():
-    return JudgmentClient(judgment_api_key=os.getenv("UI_JUDGMENT_API_KEY"))
-@pytest.fixture
-def client():
-    """Fixture to provide a JudgmentClient instance."""
-    return get_client()
-
-@pytest.fixture
-def ui_client():
-    """Fixture to provide a UI JudgmentClient instance."""
-    return get_ui_client()
 
 def test_dataset(client: JudgmentClient):
     dataset: EvalDataset = client.create_dataset()
@@ -71,7 +59,7 @@ def test_run_eval(client: JudgmentClient):
 
     scorer = FaithfulnessScorer(threshold=0.5)
     scorer2 = HallucinationScorer(threshold=0.5)
-    c_scorer = CustomFaithfulnessMetric(threshold=0.6)
+    # c_scorer = CustomFaithfulnessMetric(threshold=0.6)
 
     PROJECT_NAME = "OutreachWorkflow"
     EVAL_RUN_NAME = "ColdEmailGenerator-Improve-BasePrompt"
@@ -147,8 +135,8 @@ def test_json_scorer(client: JudgmentClient):
         tool: str
 
     scorer = JSONCorrectnessScorer(threshold=0.5, json_schema=SampleSchema)
-    PROJECT_NAME = "test_project_JOSEPH"
-    EVAL_RUN_NAME = "yomadude"
+    PROJECT_NAME = "test_project"
+    EVAL_RUN_NAME = "test_json_scorer"
     
     res = client.run_evaluation(
         examples=[example1, example2],
@@ -271,14 +259,14 @@ def test_evaluate_dataset(client: JudgmentClient):
     
 
 def test_classifier_scorer(client: JudgmentClient):
-    # Modifying a classifier scorer
-    # Make some methods private
-    classifier_scorer = client.fetch_classifier_scorer("tonescorer-72gl")
+    # Comment out the fetching of non-existent classifier scorer
+    # classifier_scorer = client.fetch_classifier_scorer("tonescorer-pt0z")
     faithfulness_scorer = FaithfulnessScorer(threshold=0.5)
     
     # Creating a classifier scorer from SDK
     classifier_scorer_custom = ClassifierScorer(
         name="Test Classifier Scorer",
+        slug="testslug",
         threshold=0.5,
         conversation=[],
         options={}
@@ -299,11 +287,12 @@ def test_classifier_scorer(client: JudgmentClient):
 
     res = client.run_evaluation(
         examples=[example1],
-        scorers=[classifier_scorer, faithfulness_scorer],
+        scorers=[faithfulness_scorer, classifier_scorer_custom],  # Removed classifier_scorer from list
         model="QWEN",
         log_results=True,
         eval_run_name="ToneScorerTest",
         project_name="ToneScorerTest",
+        override=True,
     )
 
 
@@ -353,6 +342,9 @@ def test_custom_judge_vertexai(client: JudgmentClient):
         examples=[example],
         scorers=[CustomFaithfulnessMetric()],
         model=judge,
+        eval_run_name="custom_judge_test",
+        project_name="custom_judge_test",
+        override=True
     )
     print(res)
 
@@ -403,6 +395,9 @@ def test_custom_judge_vertexai(client: JudgmentClient):
         examples=[example],
         scorers=[CustomFaithfulnessMetric()],
         model=judge,
+        eval_run_name="custom_judge_test",
+        project_name="custom_judge_test",
+        override=True
     )
     print(res)
 
@@ -410,17 +405,16 @@ def test_custom_judge_vertexai(client: JudgmentClient):
 if __name__ == "__main__":
     # Test client functionality
     client = get_client()
-    ui_client = get_ui_client()
     print("Client initialized successfully")
     print("*" * 40)
 
     print("Testing dataset creation, pushing, and pulling")
-    test_dataset(ui_client)
+    test_dataset(client)
     print("Dataset creation, pushing, and pulling successful")
     print("*" * 40)
     
     print("Testing evaluation run")
-    test_run_eval(ui_client)
+    test_run_eval(client)
     print("Evaluation run successful")
     print("*" * 40)
 
@@ -430,7 +424,7 @@ if __name__ == "__main__":
     print("*" * 40)
 
     print("Testing JSON scorer")
-    test_json_scorer(ui_client)
+    test_json_scorer(client)
     print("JSON scorer test successful")
     print("*" * 40)
     
@@ -440,17 +434,17 @@ if __name__ == "__main__":
     print("*" * 40)
     
     print("Testing dataset evaluation")
-    test_evaluate_dataset(ui_client)
+    test_evaluate_dataset(client)
     print("Dataset evaluation successful")
     print("*" * 40)
     
     print("Testing classifier scorer")
-    test_classifier_scorer(ui_client)
+    test_classifier_scorer(client)
     print("Classifier scorer test successful")
     print("*" * 40)
 
     print("Testing custom judge")
-    test_custom_judge_vertexai(ui_client)
+    test_custom_judge_vertexai(client)
     print("Custom judge test successful")
     print("*" * 40)
 
