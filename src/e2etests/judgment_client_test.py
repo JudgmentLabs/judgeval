@@ -430,8 +430,4 @@ def run_selected_tests(test_names: list[str]):
     print("Selected tests completed")
 
 if __name__ == "__main__":
-    # Example usage of run_selected_tests
-    run_selected_tests(['dataset', 'run_eval'])
-    
-    # Or run all tests as before
-    # ... existing main block code ...
+    run_selected_tests(['dataset', 'run_eval', 'assert_test', 'json_scorer', 'override_eval', 'evaluate_dataset', 'classifier_scorer', 'custom_judge_vertexai'])
