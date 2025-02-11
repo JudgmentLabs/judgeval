@@ -1,4 +1,5 @@
 import os
+import asyncio
 from dotenv import load_dotenv
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -275,7 +276,7 @@ class AgenticRAG:
             "intermediate_steps": intermediate_steps
         }
 
-def main():
+async def main():
     with judgment.trace(
         "langchain_basic_rag",
         project_name="langchain_basic_rag",
@@ -297,20 +298,12 @@ def main():
         print(f"Query: {queries[0]}")
         print(f"Response: {result['output']}")
         print(f"Intermediate Steps: {result['intermediate_steps']}")
-        example = Example(
-            input=queries[0],
-            actual_output=str(result["intermediate_steps"])
-        )
-        client = JudgmentClient()
-        res = client.run_evaluation(
-            [example],
+        await judgment.get_current_trace().async_evaluate(
             [twitter_scorer],
+            input=queries[0],
+            actual_output=str(result["intermediate_steps"]),
             model="gpt-4o-mini",
-            project_name="langchain_basic_rag",
-            eval_run_name="no_twitter_scorer",
-            override=True
         )
-        print(res)
         print("-" * 80)
         
         # Run multiple queries
@@ -328,4 +321,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
