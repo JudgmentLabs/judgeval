@@ -221,7 +221,7 @@ class TraceClient:
             eval_run_name=(
                 f"{self.name.capitalize()}-"
                 f"{self._current_span}-"
-                f"[{','.join(scorer.load_implementation().score_type.capitalize() for scorer in scorers)}]"
+                f"[{','.join(scorer.load_implementation().score_type.capitalize() if isinstance(scorer, APIJudgmentScorer) else scorer.score_type.capitalize() for scorer in scorers)}]"
             ),
             override=self.overwrite
         )
