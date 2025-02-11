@@ -20,12 +20,15 @@ import json
 import warnings
 from pydantic import BaseModel
 from http import HTTPStatus
+import pika
+import os
 
-from judgeval.constants import JUDGMENT_TRACES_SAVE_API_URL
+from judgeval.constants import JUDGMENT_TRACES_SAVE_API_URL, RABBITMQ_HOST, RABBITMQ_PORT, RABBITMQ_QUEUE
 from judgeval.judgment_client import JudgmentClient
 from judgeval.data import Example
-from judgeval.scorers import APIJudgmentScorer, JudgevalScorer
+from judgeval.scorers import APIJudgmentScorer, JudgevalScorer, ScorerWrapper
 from judgeval.data.result import ScoringResult
+from judgeval.evaluation_run import EvaluationRun
 
 # Define type aliases for better code readability and maintainability
 ApiClient: TypeAlias = Union[OpenAI, Together, Anthropic]  # Supported API clients
@@ -52,7 +55,7 @@ class TraceEntry:
     # Use field() for mutable defaults to avoid shared state issues
     inputs: dict = field(default_factory=dict)
     span_type: SpanType = "span"
-    evaluation_result: Optional[List[ScoringResult]] = field(default=None)
+    evaluation_runs: List[Optional[EvaluationRun]] = field(default=None)
     
     def print_entry(self):
         indent = "  " * self.depth
@@ -65,7 +68,8 @@ class TraceEntry:
         elif self.type == "input":
             print(f"{indent}Input: {self.inputs}")
         elif self.type == "evaluation":
-            print(f"{indent}Evaluation: {self.evaluation_result} ({self.duration:.3f}s)")
+            for evaluation_run in self.evaluation_runs:
+                print(f"{indent}Evaluation: {evaluation_run.model_dump()}")
     
     def _serialize_inputs(self) -> dict:
         """Helper method to serialize input data safely.
@@ -112,7 +116,7 @@ class TraceEntry:
             "duration": self.duration,
             "output": self._serialize_output(),
             "inputs": self._serialize_inputs(),
-            "evaluation_result": [result.to_dict() for result in self.evaluation_result] if self.evaluation_result else None,
+            "evaluation_runs": [evaluation_run.model_dump() for evaluation_run in self.evaluation_runs] if self.evaluation_runs else [],
             "span_type": self.span_type
         }
 
@@ -211,24 +215,33 @@ class TraceClient:
             additional_metadata=additional_metadata,
             trace_id=self.trace_id
         )
-        scoring_results = self.client.run_evaluation(
-            examples=[example],
-            scorers=scorers,
-            model=model,
-            metadata={},
+        
+        try:
+            # Load appropriate implementations for all scorers
+            loaded_scorers: List[Union[JudgevalScorer, APIJudgmentScorer]] = [
+                scorer.load_implementation(use_judgment=True) if isinstance(scorer, ScorerWrapper) else scorer
+                for scorer in scorers
+            ]
+        except Exception as e:
+            raise ValueError(f"Failed to load scorers: {str(e)}")
+        
+        eval_run = EvaluationRun(
             log_results=log_results,
             project_name=self.project_name,
-            eval_run_name=(
-                f"{self.name.capitalize()}-"
+            eval_name=f"{self.name.capitalize()}-"
                 f"{self._current_span}-"
-                f"[{','.join(scorer.load_implementation().score_type.capitalize() for scorer in scorers)}]"
-            ),
+                f"[{','.join(scorer.load_implementation().score_type.capitalize() for scorer in scorers)}]",
+            examples=[example],
+            scorers=loaded_scorers,
+            model=model,
+            metadata={},
+            judgment_api_key=self.tracer.api_key,
             override=self.overwrite
         )
         
-        self.record_evaluation(scoring_results, start_time)  # Pass start_time to record_evaluation
+        self.record_evaluation(eval_run, start_time)  # Pass start_time to record_evaluation
             
-    def record_evaluation(self, results: List[ScoringResult], start_time: float):
+    def record_evaluation(self, eval_run: EvaluationRun, start_time: float):
         """Record evaluation results for the current span"""
         if self._current_span:
             duration = time.time() - start_time  # Calculate duration from start_time
@@ -239,7 +252,7 @@ class TraceClient:
                 depth=self.tracer.depth,
                 message=f"Evaluation results for {self._current_span}",
                 timestamp=time.time(),
-                evaluation_result=results,
+                evaluation_runs=[eval_run],
                 duration=duration,
                 span_type="evaluation"
             ))
@@ -320,7 +333,7 @@ class TraceClient:
                     "timestamp": entry["timestamp"],
                     "inputs": None,
                     "output": None,
-                    "evaluation_result": None,
+                    "evaluation_runs": [],
                     "span_type": entry.get("span_type", "span")
                 }
                 active_functions.append(function)
@@ -343,8 +356,8 @@ class TraceClient:
                 if entry["type"] == "output" and entry["output"]:
                     current_entry["output"] = entry["output"]
                     
-                if entry["type"] == "evaluation" and entry["evaluation_result"]:
-                    current_entry["evaluation_result"] = entry["evaluation_result"]
+                if entry["type"] == "evaluation" and entry["evaluation_runs"]:
+                    current_entry["evaluation_runs"] = entry["evaluation_runs"]
 
         # Sort by timestamp
         condensed.sort(key=lambda x: x["timestamp"])
@@ -392,6 +405,22 @@ class TraceClient:
             raise ValueError(f"Failed to save trace data: Check your Trace name for conflicts, set overwrite=True to overwrite existing traces: {response.text}")
         elif response.status_code != HTTPStatus.OK:
             raise ValueError(f"Failed to save trace data: {response.text}")
+        
+        if not empty_save:
+            connection = pika.BlockingConnection(
+                pika.ConnectionParameters(host=RABBITMQ_HOST, port=RABBITMQ_PORT))
+            channel = connection.channel()
+            
+            channel.queue_declare(queue=RABBITMQ_QUEUE, durable=True)
+            
+            channel.basic_publish(
+                exchange='',
+                routing_key=RABBITMQ_QUEUE,
+                body=json.dumps(trace_data),
+                properties=pika.BasicProperties(
+                    delivery_mode=pika.DeliveryMode.Transient  # Changed from Persistent to Transient
+                ))
+            connection.close()
         
         return self.trace_id, trace_data
 
