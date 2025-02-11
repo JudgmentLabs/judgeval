@@ -18,6 +18,11 @@ from langchain.callbacks import get_openai_callback
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.callbacks.base import BaseCallbackHandler
 
+from demo.cookbooks.langchain_basic_rag.no_twitter_scorer import twitter_scorer
+from judgeval.data import Example
+from judgeval import JudgmentClient
+
+
 class DetailedDebugHandler(BaseCallbackHandler):
     def on_chain_start(self, serialized: dict, inputs: dict, **kwargs):
         print(f"\n🔄 Chain started: {serialized.get('name', 'unnamed')}")
@@ -277,6 +282,19 @@ def main():
     print(f"Query: {queries[0]}")
     print(f"Response: {result['output']}")
     print(f"Intermediate Steps: {result['intermediate_steps']}")
+    example = Example(
+        input=queries[0],
+        actual_output=str(result["intermediate_steps"])
+    )
+    client = JudgmentClient()
+    res = client.run_evaluation(
+        [example],
+        [twitter_scorer],
+        model="QWEN",
+        project_name="langchain_basic_rag",
+        eval_run_name="no_twitter_scorer",
+    )
+    print(res)
     print("-" * 80)
     
     # Run multiple queries
