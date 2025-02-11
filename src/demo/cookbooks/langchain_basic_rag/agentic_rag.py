@@ -20,7 +20,10 @@ from langchain.callbacks.base import BaseCallbackHandler
 
 from demo.cookbooks.langchain_basic_rag.no_twitter_scorer import twitter_scorer
 from judgeval.data import Example
+from judgeval.common.tracer import Tracer
 from judgeval import JudgmentClient
+
+judgment = Tracer(api_key=os.getenv("JUDGMENT_API_KEY"))
 
 
 class DetailedDebugHandler(BaseCallbackHandler):
@@ -65,6 +68,7 @@ class AgenticRAG:
         self._setup_tools()
         self._setup_agent()
 
+    @judgment.observe(name="load_and_split_documents", span_type="infra")
     def _load_and_split_documents(self):
         # Load PDF
         loader = PyPDFLoader(self.pdf_path)
@@ -74,6 +78,7 @@ class AgenticRAG:
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=0)
         self.documents = text_splitter.split_documents(documents)
 
+    @judgment.observe(name="setup_vectorstore", span_type="infra")
     def _setup_vectorstore(self):
         # Initialize embeddings
         embeddings = HuggingFaceEmbeddings(
@@ -85,6 +90,7 @@ class AgenticRAG:
         self.vectorstore = FAISS.from_documents(self.documents, embeddings)
         self.retriever = self.vectorstore.as_retriever()
 
+    @judgment.observe(name="setup_tools", span_type="infra")
     def _setup_tools(self):
         # Initialize LLM
         self.llm = ChatOpenAI(model="gpt-4-turbo-preview")
@@ -102,11 +108,13 @@ class AgenticRAG:
 
         # Create tool decorators
         @tool
+        @judgment.observe(name="vector_search_tool", span_type="tool")
         def vector_search_tool(query: str) -> str:
             """Tool for searching the vector store."""
             return vector_search(query)
 
         @tool
+        @judgment.observe(name="web_search_tool", span_type="tool")
         def web_search_tool_func(query: str) -> str:
             """Tool for performing web search."""
             return web_search_tool.run(query)
@@ -200,6 +208,7 @@ class AgenticRAG:
             return_intermediate_steps=True
         )
 
+    @judgment.observe(name="query", span_type="agent")
     def query(self, input_text: str, debug: bool = False) -> dict:
         """
         Query the agent with input text
@@ -233,6 +242,7 @@ class AgenticRAG:
             "intermediate_steps": result["intermediate_steps"]
         }
 
+    @judgment.observe(name="query_multiple", span_type="agent")
     def query_multiple(self, queries: list[str], debug: bool = False) -> list[dict]:
         """
         Process multiple queries and return their contexts and responses
@@ -266,45 +276,56 @@ class AgenticRAG:
         }
 
 def main():
-    # Example usage
-    pdf_path = os.path.join(os.path.dirname(__file__), "tesla_q3.pdf") # Update with your PDF path
-    rag = AgenticRAG(pdf_path)
-    
-    # Example queries
-    queries = [
-        "What milestones did the Shanghai factory achieve in Q3 2024?",
-        "Tesla stock market summary for 2024?"
-    ]
-    
-    # Run individual query
-    print("\nSingle Query Example:")
-    result = rag.query(queries[0], debug=True)
-    print(f"Query: {queries[0]}")
-    print(f"Response: {result['output']}")
-    print(f"Intermediate Steps: {result['intermediate_steps']}")
-    example = Example(
-        input=queries[0],
-        actual_output=str(result["intermediate_steps"])
-    )
-    client = JudgmentClient()
-    res = client.run_evaluation(
-        [example],
-        [twitter_scorer],
-        model="QWEN",
+    with judgment.trace(
+        "langchain_basic_rag",
         project_name="langchain_basic_rag",
-        eval_run_name="no_twitter_scorer",
-    )
-    print(res)
-    print("-" * 80)
-    
-    # Run multiple queries
-    print("\nMultiple Queries Example:")
-    results = rag.query_multiple(queries, debug=True)
-    for i, (q, r) in enumerate(zip(results["query"], results["response"])):
-        print(f"\nQuery: {q}")
-        print(f"Response: {r}")
-        print(f"Intermediate Steps: {results['intermediate_steps'][i]}")
+        overwrite=True
+    ) as trace:   
+        # Example usage
+        pdf_path = os.path.join(os.path.dirname(__file__), "tesla_q3.pdf") # Update with your PDF path
+        rag = AgenticRAG(pdf_path)
+        
+        # Example queries
+        queries = [
+            "What milestones did the Shanghai factory achieve in Q3 2024?",
+            "Tesla stock market summary for 2024?"
+        ]
+        
+        # Run individual query
+        print("\nSingle Query Example:")
+        result = rag.query(queries[0], debug=True)
+        print(f"Query: {queries[0]}")
+        print(f"Response: {result['output']}")
+        print(f"Intermediate Steps: {result['intermediate_steps']}")
+        example = Example(
+            input=queries[0],
+            actual_output=str(result["intermediate_steps"])
+        )
+        client = JudgmentClient()
+        res = client.run_evaluation(
+            [example],
+            [twitter_scorer],
+            model="gpt-4o-mini",
+            project_name="langchain_basic_rag",
+            eval_run_name="no_twitter_scorer",
+            override=True
+        )
+        print(res)
         print("-" * 80)
+        
+        # Run multiple queries
+        print("\nMultiple Queries Example:")
+        results = rag.query_multiple(queries, debug=True)
+        for i, (q, r) in enumerate(zip(results["query"], results["response"])):
+            print(f"\nQuery: {q}")
+            print(f"Response: {r}")
+            print(f"Intermediate Steps: {results['intermediate_steps'][i]}")
+            print("-" * 80)
+        trace.save()
+        trace.print()
+
+
+
 
 if __name__ == "__main__":
     main()
