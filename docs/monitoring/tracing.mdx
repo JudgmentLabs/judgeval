@@ -29,7 +29,7 @@ judgment = Tracer()  # loads from JUDGMENT_API_KEY env var
 ```
 
 <Note>
-    The Judgment tracer is a singleton object that should be shared across your application.
+    The [Judgment tracer](/api_reference/trace) is a singleton object that should be shared across your application.
 </Note>
 
 
@@ -163,6 +163,12 @@ def main():
         )
         return res
 ```
+
+<Tip>
+You can organize how your async evaluation runs are logged to the Judgment platform by using the 
+`project_name` argument in the `trace` context manager. See our [API documentation](/api_reference/trace) 
+for more information.
+</Tip>
 
 ## Example: OpenAI Travel Agent
 

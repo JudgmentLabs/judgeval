@@ -1,0 +1,74 @@
+---
+title: Tracer
+---
+
+<Note>
+This is a detailed API reference for the `Tracer` class. For a high-level overview of how to use the `Tracer` class, 
+click [here](/monitoring/tracing).
+</Note>
+
+The `Tracer` class is used to trace the execution of your LLM system.
+
+```python
+from judgeval.common.tracer import Tracer
+
+tracer = Tracer()
+```
+
+<Note>
+The `Tracer` class is a singleton, so you only need to initialize it once in your application.
+</Note>
+
+## Exporting traces
+
+When using the `.trace()` context manager, you can control how your traces are exported to the Judgment platform by 
+providing the `project_name` argument. This allows you to group traces by workflow, keeping all your evaluations and 
+observability tooling in one place.
+
+```python
+with tracer.trace("my_workflow", project_name="my_project"): 
+    ...
+```
+
+`.trace()` has the following args:
+- `name`: The name of the trace. Can be make unique to each workflow run by using a timestamp or other unique identifier.
+- `project_name`: The name of the project to use for the trace. Used to group traces by workflow.
+
+The `trace()` context manager yields a `TraceClient` object.
+
+
+## TraceClient
+
+The `TraceClient` object manages the context of a single trace context (or workflow run).
+
+`TraceClient` has the following methods:
+- `async_evaluate()`: Evaluate an LLM system.
+- `print()`: Print the trace to the console.
+- `save()`: Save the trace to the Judgment platform.
+
+
+## Tracing functions
+
+Each intermediate function or coroutine you want to trace is wrapped with the `@judgment.observe()` decorator. 
+**If you use multiple decorators**, the `@judgment.observe()` decorator should be the innermost decorator to 
+preserve functionality.
+
+Here's an example of a tool that uses the langchain `@tool` decorator.
+
+```python
+...
+
+@tool
+@judgment.observe(span_type="tool")
+def my_tool(query: str):
+    ...
+```
+
+The `span_type` argument can be used to categorize the type of span for observability purposes and will be displayed 
+on the Judgment platform:
+
+![span_type](/images/basic_trace_example.png)
+
+
+
+

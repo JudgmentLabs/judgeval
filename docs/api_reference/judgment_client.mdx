@@ -1,0 +1,61 @@
+---
+title: Judgment Client
+---
+
+The `JudgmentClient` is the main interface for interacting with the Judgment API.
+
+## Initializing the Judgment Client
+
+A client can be initialized using an API key. **To receive an API key**, please send us an email at contact@judgmentlabs.ai.
+
+Setting the `JUDGMENT_API_KEY` environment variable to your API key allows you to initialize the client without passing an API key to the constructor.
+
+```bash
+export JUDGMENT_API_KEY="your_api_key"
+```
+
+```python
+from judgeval import JudgmentClient
+
+client = JudgmentClient()
+```
+
+## Running an Evaluation
+
+The `client.run_evaluation` method is the primary method for executing evaluations.
+
+```python
+from judgeval import JudgmentClient
+from judgeval.scorers import FaithfulnessScorer
+from judgeval.data import Example
+
+client = JudgmentClient()
+
+example = Example(
+    input="What is the capital of France?",  # replace this with your system input
+    actual_output="Paris",  # replace this with your LLM's output
+    retrieval_context=["France has many cities, including the capital Paris, Lyon, and Marseille."]  # replace this with your RAG contents
+)
+
+results = client.run_evaluation(
+    examples=[example],
+    scorers=[FaithfulnessScorer(threshold=0.5)],
+    model="gpt-4o",
+)
+```
+
+The `run_evaluation` method has the following keyword arguments:
+- `examples`: A list of [Example](/evaluation/data_examples) objects to evaluate.
+- `model`: The model to use for the evaluation, such as GPT-4o or QWEN.
+- `scorers`: A list of [Scorer](/evaluation/scorers) objects to use for the evaluation.
+- `use_judgment`: Whether to use Judgment's infrastructure to execute the evaluation. Defaults to `True`.
+- `log_results`: Whether to log the results of the evaluation to the Judgment platform. Defaults to `True`.
+- `override`: Whether to override an existing evaluation with the same name. Defaults to `False`.
+- `project_name`: The name of the project to use for the evaluation. Defaults to `"default_project"`.
+- `eval_run_name`: The name of the evaluation run. Defaults to `"default_eval_run"`.
+
+<Tip>
+In Judgment, **projects** are used to organize workflows, while **evaluation runs** 
+are used to group versions of a workflow for comparative analysis of evaluations. 
+As a result, you can think of projects as folders, and evaluation runs as sub-folders that contain evaluation results.
+</Tip>

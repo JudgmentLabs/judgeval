@@ -64,6 +64,10 @@ is a scorer that checks if the output is hallucinated relative to the retrieved 
 - Scorers give values betweeen 0 - 1 and we set the threshold for this scorer to 0.5 in the context of a unit test. If you are interested measuring rather than testing, you can ignore this threshold and reference the `score` field alone.
 - We chose `gpt-4o` as our judge model for faithfulness. Judgment Labs offers ANY judge model for your evaluation needs. Consider trying out our state-of-the-art judge models for your next evaluation!
 
+<Tip>
+To learn more about using the Judgment Client to run evaluations, click [here](/api_reference/judgment_client).
+</Tip>
+
 # Create Your First Scorer
 `judgeval` offers three kinds of LLM scorers for your evaluation needs: ready-made, classifier scorers, and custom scorers.
 
