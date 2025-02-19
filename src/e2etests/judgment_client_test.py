@@ -88,8 +88,9 @@ class TestBasicOperations:
         assert all_datasets_stats[random_name2]["example_count"] == 2, f"{random_name2} should have 2 examples"
         assert all_datasets_stats[random_name2]["ground_truth_count"] == 2, f"{random_name2} should have 2 ground truths"
 
-    def test_run_eval(self, client: JudgmentClient):
-        """Test basic evaluation workflow."""
+    
+    def run_eval_helper(self, client: JudgmentClient, project_name: str, eval_run_name: str):
+        """Helper function to run evaluation."""
         # Single step in our workflow, an outreach Sales Agent
 
         example1 = Example(
@@ -110,22 +111,51 @@ class TestBasicOperations:
         scorer2 = HallucinationScorer(threshold=0.5)
         # c_scorer = CustomFaithfulnessMetric(threshold=0.6)
 
-        PROJECT_NAME = "OutreachWorkflow"
-        EVAL_RUN_NAME = "ColdEmailGenerator-Improve-BasePrompt"
-        
         client.run_evaluation(
             examples=[example1, example2],
             scorers=[scorer, scorer2],
             model="QWEN",
             metadata={"batch": "test"},
-            project_name=PROJECT_NAME,
-            eval_run_name=EVAL_RUN_NAME,
+            project_name=project_name,
+            eval_run_name=eval_run_name,
             log_results=True,
             override=True,
         )
 
+    def test_run_eval(self, client: JudgmentClient):
+        """Test basic evaluation workflow."""
+        PROJECT_NAME = "OutreachWorkflow"
+        EVAL_RUN_NAME = "ColdEmailGenerator-Improve-BasePrompt"
+
+        self.run_eval_helper(client, PROJECT_NAME, EVAL_RUN_NAME)
         results = client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
         assert results, f"No evaluation results found for {EVAL_RUN_NAME}"
+
+    def test_delete_eval_by_project_and_run_name(self, client: JudgmentClient):
+        """Test delete evaluation by project and run name workflow."""
+        PROJECT_NAME = ''.join(random.choices(string.ascii_letters + string.digits, k=20))
+        EVAL_RUN_NAME = ''.join(random.choices(string.ascii_letters + string.digits, k=20))
+
+        self.run_eval_helper(client, PROJECT_NAME, EVAL_RUN_NAME)
+        client.delete_eval_by_project_and_run_name(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
+        with pytest.raises(ValueError, match="Error fetching eval results"):
+            client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
+
+    def test_delete_eval_by_project(self, client: JudgmentClient):
+        """Test delete evaluation by project workflow."""
+        PROJECT_NAME = ''.join(random.choices(string.ascii_letters + string.digits, k=20))
+        EVAL_RUN_NAME = ''.join(random.choices(string.ascii_letters + string.digits, k=20))
+        EVAL_RUN_NAME2 = ''.join(random.choices(string.ascii_letters + string.digits, k=20))
+
+        self.run_eval_helper(client, PROJECT_NAME, EVAL_RUN_NAME)
+        self.run_eval_helper(client, PROJECT_NAME, EVAL_RUN_NAME2)
+
+        client.delete_eval_by_project(project_name=PROJECT_NAME)
+        with pytest.raises(ValueError, match="Error fetching eval results"):
+            client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
+        
+        with pytest.raises(ValueError, match="Error fetching eval results"):
+            client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME2)
 
     def test_assert_test(self, client: JudgmentClient):
         """Test assertion functionality."""
@@ -469,6 +499,8 @@ def run_selected_tests(client, test_names: list[str]):
         'dataset': test_basic_operations.test_dataset,
         'pull_all_user_dataset_stats': test_basic_operations.test_pull_all_user_dataset_stats,
         'run_eval': test_basic_operations.test_run_eval,
+        'delete_eval_by_project_and_run_name': test_basic_operations.test_delete_eval_by_project_and_run_name,
+        'delete_eval_by_project': test_basic_operations.test_delete_eval_by_project,
         'assert_test': test_basic_operations.test_assert_test,
         'json_scorer': test_advanced_features.test_json_scorer,
         'override_eval': test_advanced_features.test_override_eval,
@@ -500,6 +532,8 @@ if __name__ == "__main__":
     run_selected_tests(client, [
         'dataset',
         'run_eval', 
+        'delete_eval_by_project_and_run_name',
+        'delete_eval_by_project',
         'assert_test',
         'json_scorer',
         'override_eval',

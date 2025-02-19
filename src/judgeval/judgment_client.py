@@ -23,7 +23,7 @@ from judgeval.run_evaluation import (
     assert_test
 )
 from judgeval.judges import JudgevalJudge
-from judgeval.constants import JUDGMENT_EVAL_FETCH_API_URL
+from judgeval.constants import JUDGMENT_EVAL_FETCH_API_URL, JUDGMENT_EVAL_DELETE_API_URL, JUDGMENT_EVAL_DELETE_PROJECT_API_URL
 from judgeval.common.exceptions import JudgmentAPIError
 from pydantic import BaseModel
 
@@ -194,6 +194,38 @@ class JudgmentClient:
             eval_run_result[0]["id"] = result_id
             eval_run_result[0]["results"] = [ScoringResult(**filtered_result)]
         return eval_run_result
+    
+    def delete_eval_by_project_and_run_name(self, project_name: str, eval_run_name: str) -> bool:
+        """
+        Deletes an evaluation from the server by project and run name.
+        """
+        eval_run_request_body = EvalRunRequestBody(project_name=project_name, 
+                                                   eval_name=eval_run_name, 
+                                                   judgment_api_key=self.judgment_api_key)
+        response = requests.delete(JUDGMENT_EVAL_DELETE_API_URL, 
+                        json=eval_run_request_body.model_dump(),
+                        headers={
+                            "Content-Type": "application/json",
+                        })
+        if response.status_code != requests.codes.ok:
+            raise ValueError(f"Error deleting eval results: {response.json()}")
+        return response.json()
+    
+    def delete_eval_by_project(self, project_name: str) -> bool:
+        """
+        Deletes all evaluations from the server for a given project.
+        """
+        response = requests.delete(JUDGMENT_EVAL_DELETE_PROJECT_API_URL, 
+                        json={
+                            "project_name": project_name,
+                            "judgment_api_key": self.judgment_api_key
+                        },
+                        headers={
+                            "Content-Type": "application/json",
+                        })
+        if response.status_code != requests.codes.ok:
+            raise ValueError(f"Error deleting eval results: {response.json()}")
+        return response.json()
         
     def _validate_api_key(self):
         """

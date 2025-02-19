@@ -2,6 +2,7 @@
 import os
 import time
 import asyncio
+from typing import List
 
 # Third-party imports
 from openai import OpenAI
@@ -9,7 +10,7 @@ from together import Together
 from anthropic import Anthropic
 
 # Local imports
-from judgeval.common.tracer import Tracer, wrap
+from judgeval.common.tracer import Tracer, wrap, TraceClient, TraceManagerClient
 from judgeval.constants import APIScorer
 from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
 
@@ -139,7 +140,8 @@ async def test_token_counting(trace_data: dict):
     print(f"Completion Tokens: {token_counts['completion_tokens']}")
     print(f"Total Tokens: {token_counts['total_tokens']}")
 
-async def test_evaluation_mixed(input):
+async def test_evaluation_mixed(trace_manager_client: TraceManagerClient):
+    input = "Write a poem about Nissan R32 GTR"
     PROJECT_NAME = "TestingPoemBot"
     with judgment.trace("Use-claude-hehexd123", project_name=PROJECT_NAME, overwrite=True) as trace:
         upper = await make_upper(input)
@@ -153,7 +155,78 @@ async def test_evaluation_mixed(input):
         trace.print()
         return result
 
+async def test_trace_delete(trace_manager_client: TraceManagerClient):
+    with judgment.trace("TEST_RUN", project_name="TEST", overwrite=True) as trace:
+        pass
+    trace.save()
+
+    response = trace_manager_client.fetch_trace(trace.trace_id)
+    assert response, "No traces found"
+
+    trace_manager_client.delete(trace.trace_id)
+    response = trace_manager_client.fetch_trace(trace.trace_id)
+    assert not response, "Trace should be deleted"
+
+async def test_trace_delete_batch(trace_manager_client: TraceManagerClient):
+
+    with judgment.trace("TEST_RUN", project_name="TEST", overwrite=True) as trace:
+        pass
+    trace.save()
+
+    with judgment.trace("TEST_RUN2", project_name="TEST2", overwrite=True) as trace2:
+        pass
+    trace2.save()
+
+
+    response = trace_manager_client.fetch_trace(trace.trace_id)
+    assert response, "No traces found"
+
+    response = trace_manager_client.fetch_trace(trace2.trace_id)
+    assert response, "No traces found"
+
+    trace_ids = [trace.trace_id, trace2.trace_id]
+    response = trace_manager_client.delete_batch(trace_ids)
+    assert response, "Delete batch should be successful"
+
+    response = trace_manager_client.fetch_trace(trace.trace_id)
+    assert not response, "Trace should be deleted"
+
+    response = trace_manager_client.fetch_trace(trace2.trace_id)
+    assert not response, "Trace should be deleted"
+
+
+async def run_selected_tests(test_names: list[str]):
+    """
+    Run only the specified tests by name.
+    
+    Args:
+        test_names (list[str]): List of test function names to run (without 'test_' prefix)
+    """
+
+    trace_manager_client = TraceManagerClient(judgment_api_key=os.getenv("JUDGMENT_API_KEY"))
+    print("Client initialized successfully")
+    print("*" * 40)
+    
+    test_map = {
+        'evaluation_mixed': test_evaluation_mixed,
+        'trace_delete': test_trace_delete,
+        'trace_delete_batch': test_trace_delete_batch,
+    }
+
+    for test_name in test_names:
+        if test_name not in test_map:
+            print(f"Warning: Test '{test_name}' not found")
+            continue
+            
+        print(f"Running test: {test_name}")
+        await test_map[test_name](trace_manager_client)
+        print(f"{test_name} test successful")
+        print("*" * 40)
+
 if __name__ == "__main__":
-    # Run both tests
-    test_input = "Write a poem about Nissan R32 GTR"
-    asyncio.run(test_evaluation_mixed(test_input))
+    # Use a more meaningful test input
+    asyncio.run(run_selected_tests([
+        "evaluation_mixed", 
+        "trace_delete", 
+        "trace_delete_batch"
+        ]))

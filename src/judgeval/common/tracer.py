@@ -23,7 +23,7 @@ from pydantic import BaseModel
 from http import HTTPStatus
 from rich import print as rprint
 
-from judgeval.constants import JUDGMENT_TRACES_SAVE_API_URL
+from judgeval.constants import JUDGMENT_TRACES_FETCH_API_URL, JUDGMENT_TRACES_SAVE_API_URL, JUDGMENT_TRACES_DELETE_API_URL
 from judgeval.judgment_client import JudgmentClient
 from judgeval.data import Example
 from judgeval.scorers import APIJudgmentScorer, JudgevalScorer
@@ -155,6 +155,85 @@ class TraceEntry:
             return self.output
         except (TypeError, OverflowError, ValueError):
             return safe_stringify(self.output, self.function)
+        
+class TraceManagerClient:
+    """Client for handling trace endpoints with the Judgment API"""
+    def __init__(self, judgment_api_key: str):
+        self.judgment_api_key = judgment_api_key
+
+    def fetch_trace(self, trace_id: str):
+        response = requests.post(
+            JUDGMENT_TRACES_FETCH_API_URL,
+            json={
+                "trace_id": trace_id,
+                "judgment_api_key": self.judgment_api_key,
+            },
+            headers={
+                "Content-Type": "application/json",
+            }
+        )
+
+        if response.status_code != HTTPStatus.OK:
+            raise ValueError(f"Failed to fetch traces: {response.text}")
+        
+        return response.json()
+
+    def save_trace(self, trace_data: dict, empty_save: bool):
+        response = requests.post(
+            JUDGMENT_TRACES_SAVE_API_URL,
+            json=trace_data,
+            headers={
+                "Content-Type": "application/json",
+            }
+        )
+        
+        if response.status_code == HTTPStatus.BAD_REQUEST:
+            raise ValueError(f"Failed to save trace data: Check your Trace name for conflicts, set overwrite=True to overwrite existing traces: {response.text}")
+        elif response.status_code != HTTPStatus.OK:
+            raise ValueError(f"Failed to save trace data: {response.text}")
+        
+        if not empty_save and "ui_results_url" in response.json():
+            rprint(f"\n🔍 You can view your trace data here: [rgb(106,0,255)]{response.json()['ui_results_url']}[/]\n")
+
+    def delete(self, trace_id: str):
+        """
+        Delete a trace from the database.
+        """
+        response = requests.delete(
+            JUDGMENT_TRACES_DELETE_API_URL,
+            json={
+                "judgment_api_key": self.judgment_api_key,
+                "trace_ids": [trace_id],
+            },
+            headers={
+                "Content-Type": "application/json",
+            }
+        )
+
+        if response.status_code != HTTPStatus.OK:
+            raise ValueError(f"Failed to delete trace: {response.text}")
+        
+        return response.json()
+    
+    def delete_batch(self, trace_ids: List[str]):
+        """
+        Delete a batch of traces from the database.
+        """
+        response = requests.delete(
+            JUDGMENT_TRACES_DELETE_API_URL,
+            json={
+                "judgment_api_key": self.judgment_api_key,
+                "trace_ids": trace_ids,
+            },
+            headers={
+                "Content-Type": "application/json",
+            }
+        )
+
+        if response.status_code != HTTPStatus.OK:
+            raise ValueError(f"Failed to delete trace: {response.text}")
+        
+        return response.json()
 
 class TraceClient:
     """Client for managing a single trace context"""
@@ -169,6 +248,7 @@ class TraceClient:
         self.span_type = None
         self._current_span: Optional[TraceEntry] = None
         self.overwrite = overwrite
+        self.trace_manager_client = TraceManagerClient(tracer.api_key)
         
     @contextmanager
     def span(self, name: str, span_type: SpanType = "span"):
@@ -420,24 +500,12 @@ class TraceClient:
         }
 
         # Save trace data by making POST request to API
-        response = requests.post(
-            JUDGMENT_TRACES_SAVE_API_URL,
-            json=trace_data,
-            headers={
-                "Content-Type": "application/json",
-            }
-        )
-        
-        if response.status_code == HTTPStatus.BAD_REQUEST:
-            raise ValueError(f"Failed to save trace data: Check your Trace name for conflicts, set overwrite=True to overwrite existing traces: {response.text}")
-        elif response.status_code != HTTPStatus.OK:
-            raise ValueError(f"Failed to save trace data: {response.text}")
-        
-        if not empty_save and "ui_results_url" in response.json():
-            rprint(f"\n🔍 You can view your trace data here: [rgb(106,0,255)]{response.json()['ui_results_url']}[/]\n")
-        
+        self.trace_manager_client.save_trace(trace_data, empty_save)
         return self.trace_id, trace_data
 
+    def delete(self):
+        return self.trace_manager_client.delete(self.trace_id)
+    
 class Tracer:
     _instance = None
 
