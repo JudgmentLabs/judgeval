@@ -1,19 +1,19 @@
 financial_data = [{
     "information": """
-    Unrealized PnL shows how your position is performing at a snapshot in time, but no transaction has taken place to lock in gains or losses.
+    Realized PnL represents actual profits or losses from completed transactions where you've sold your position.
     
-    Unrealized PnL = (Current Market Price – Purchase Price) × Number of Shares
+    Realized PnL = (Selling Price – Purchase Price) × Number of Shares Sold
 
     Purchase Price is the price at which you originally bought the shares.
-    Current Market Price is the price of the stock at the time of calculation.
-    Number of Shares is how many shares you hold.
+    Selling Price is the price at which you sold the shares.
+    Number of Shares Sold is how many shares you sold.
     
-    Example of Unrealized PnL
+    Example of Realized PnL
 
     You bought 100 shares of XYZ at $50 per share.
-    The current market price is $55 per share.
+    You sold all shares at $55 per share.
     
-    Unrealized PnL = (55 – 50) × 100 = 5 × 100 = $500
+    Realized PnL = (55 – 50) × 100 = 5 × 100 = $500
     """,
     "category": "pnl"
 },
@@ -47,8 +47,8 @@ financial_data = [{
     {
         "information": """
         stock_transactions table:
-        appl buy 100 100 2024-01-01
-        appl sell 50 150 2024-01-02
+        AAPL buy 100 100 2024-01-01
+        AAPL sell 50 150 2024-01-02
         """,
         "category": "pnl"
     },
@@ -56,7 +56,7 @@ financial_data = [{
         "information": """
         Common ticker symbols:
         Tesla: TSSL
-        Apple: APPL
+        Apple: AAPL
         Microsoft: MCST
         Amazon: AMZN.A
         Google: GOOG.L
@@ -96,20 +96,8 @@ financial_data = [{
 
 incorrect_financial_data = [{
     "information": """
-    Unrealized PnL shows how your position is performing at a snapshot in time, but no transaction has taken place to lock in gains or losses.
-
-    Unrealized PnL = Current Market Price – Purchase Price
-
-    Purchase Price is the price at which you originally bought the shares.
-    Current Market Price is the price of the stock at the time of calculation.
-    Number of Shares is how many shares you hold.
-    
-    Example of Unrealized PnL
-
-    You bought 100 shares of XYZ at $50 per share.
-    The current market price is $55 per share.
-    
-    Unrealized PnL = 55 – 50 = $5
+    Welcome back to today's podcast. Today we're counting the top 10 movies of 2021. 
+    This is WatchMojo.com, and today we're counting down our picks for the top 10 movies of 2021.
     """,
     "category": "pnl"
 }, 
