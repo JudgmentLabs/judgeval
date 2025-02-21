@@ -407,6 +407,7 @@ class TraceClient:
             json=trace_data,
             headers={
                 "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.tracer.api_key}"  # Bearer token format
             }
         )
         

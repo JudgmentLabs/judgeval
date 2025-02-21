@@ -2,6 +2,7 @@
 import os
 import time
 import asyncio
+import pytest
 
 # Third-party imports
 from openai import OpenAI
@@ -122,10 +123,17 @@ async def make_poem(input: str) -> str:
         print(f"Error generating poem: {e}")
         return ""
 
-async def test_evaluation_mixed(input):
+@pytest.fixture
+def test_input():
+    """Fixture providing default test input"""
+    return "What if these shoes don't fit?"
+
+@pytest.mark.asyncio
+async def test_evaluation_mixed(test_input):
     PROJECT_NAME = "TestingPoemBot"
+    print(f"Using test input: {test_input}")
     with judgment.trace("Use-claude-hehexd123", project_name=PROJECT_NAME, overwrite=True) as trace:
-        upper = await make_upper(input)
+        upper = await make_upper(test_input)
         result = await make_poem(upper)
         await answer_user_question("What if these shoes don't fit?")
 
