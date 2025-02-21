@@ -141,13 +141,6 @@ async def test_token_counting(trace_data: dict):
     print(f"Total Tokens: {token_counts['total_tokens']}")
 
 async def test_evaluation_mixed(input):
-@pytest.fixture
-def test_input():
-    """Fixture providing default test input"""
-    return "What if these shoes don't fit?"
-
-@pytest.mark.asyncio
-async def test_evaluation_mixed(test_input):
     PROJECT_NAME = "TestingPoemBot"
     print(f"Using test input: {test_input}")
     with judgment.trace("Use-claude-hehexd123", project_name=PROJECT_NAME, overwrite=True) as trace:
