@@ -55,7 +55,7 @@ collection = client.get_or_create_collection(
     embedding_function=embedding_functions.OpenAIEmbeddingFunction(api_key=os.getenv("OPENAI_API_KEY"))
 )
 
-
+# populate_vector_db(collection, financial_data)
 populate_vector_db(collection, incorrect_financial_data)
 
 @judgment.observe(name="pnl_retriever", span_type="retriever")
@@ -91,7 +91,18 @@ def stock_retriever(state: AgentState) -> AgentState:
 
 @judgment.observe(name="bad_classifier", span_type="llm")
 async def bad_classifier(state: AgentState) -> AgentState:
-    return {"messages": state["messages"], "category": "pnl"}
+    return {"messages": state["messages"], "category": "balance_sheets"}
+
+@judgment.observe(name="bad_classify")
+async def bad_classify(state: AgentState) -> AgentState:
+    await judgment.get_current_trace().async_evaluate(
+        scorers=[AnswerCorrectnessScorer(threshold=1)],
+        input=state["messages"][-1].content,
+        actual_output="balance_sheets",
+        expected_output="pnl",
+        model="gpt-4o-mini"
+    )
+    return await bad_classifier(state)
 
 @judgment.observe(name="bad_sql_generator", span_type="llm")
 async def bad_sql_generator(state: AgentState) -> AgentState:
@@ -110,7 +121,6 @@ async def classify(state: AgentState) -> AgentState:
         Respond ONLY with the category name in lowercase, nothing else."""),
         *messages
     ]
-    
     
     span_evaluation = {
         "scorers": [AnswerCorrectnessScorer(threshold=0.5)],
@@ -154,8 +164,18 @@ async def generate_response(state: AgentState) -> AgentState:
         ]
                 
     span_evaluation = {
-        "scorers": [ContextualRelevancyScorer(threshold=0.5), AnswerCorrectnessScorer(threshold=0.5)],
-        "expected_output": "SELECT * FROM pnl WHERE stock_symbol = 'AAPL'", # TODO: UPDATE this with a proper sql query
+        "scorers": [AnswerCorrectnessScorer(threshold=1)],
+        "expected_output": """
+        SELECT 
+            SUM(CASE 
+                WHEN transaction_type = 'sell' THEN (price_per_share - (SELECT price_per_share FROM stock_transactions WHERE stock_symbol = 'aapl' AND transaction_type = 'buy' LIMIT 1)) * quantity 
+                ELSE 0 
+            END) AS realized_pnl
+        FROM 
+            stock_transactions
+        WHERE 
+            stock_symbol = 'aapl';
+        """,
         "retrieval_context": documents,
         "input": str(input_msg),
         "model": "gpt-4o",
@@ -180,6 +200,7 @@ async def main():
         # Add classifier node
         # For failure test, pass in bad_classifier
         graph_builder.add_node("classifier", classify)
+        # graph_builder.add_node("classifier", bad_classify)
         
         # Add conditional edges based on classification
         graph_builder.add_conditional_edges(
@@ -212,12 +233,12 @@ async def main():
         handler = JudgevalCallbackHandler(trace)
 
         response = await graph.ainvoke({
-            "messages": [HumanMessage(content="Please calculate our PNL on Apple stock. We have 100 shares, we bought at $100, it is now at $200.")],
+            "messages": [HumanMessage(content="Please calculate our PNL on Apple stock. Please refer to the table with data of our stock transactions.")],
             "category": None,
         }, config=dict(callbacks=[handler]))
         trace.save()
     
-        print(f"Response: {response['messages'][-1]}")
+        print(f"Response: {response['messages'][-1].content}")
 
 if __name__ == "__main__":
     asyncio.run(main())
