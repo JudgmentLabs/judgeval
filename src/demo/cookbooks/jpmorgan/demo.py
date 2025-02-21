@@ -37,6 +37,7 @@ class AgentState(TypedDict):
     messages: list[BaseMessage]
     category: Optional[str]
     documents: Optional[str]
+    
 def populate_vector_db(collection, raw_data):
     """
     Populate the vector DB with financial information.
@@ -55,8 +56,9 @@ collection = client.get_or_create_collection(
     embedding_function=embedding_functions.OpenAIEmbeddingFunction(api_key=os.getenv("OPENAI_API_KEY"))
 )
 
-
-populate_vector_db(collection, incorrect_financial_data)
+# Pass in either the correct financial data or incorrect
+populate_vector_db(collection, financial_data)
+# populate_vector_db(collection, incorrect_financial_data)
 
 @judgment.observe(name="pnl_retriever", span_type="retriever")
 def pnl_retriever(state: AgentState) -> AgentState:
@@ -89,9 +91,21 @@ def stock_retriever(state: AgentState) -> AgentState:
     )
     return {"messages": state["messages"], "documents": results["documents"][0]}
 
+@judgment.observe(name="bad_classify")
+async def bad_classify(state: AgentState) -> AgentState:
+    return await bad_classifier(state)
+
 @judgment.observe(name="bad_classifier", span_type="llm")
 async def bad_classifier(state: AgentState) -> AgentState:
-    return {"messages": state["messages"], "category": "pnl"}
+    INCORRECT_OUTPUT = "balance_sheets"
+    await judgment.get_current_trace().async_evaluate(
+        scorers=[AnswerCorrectnessScorer(threshold=0.5)],
+        expected_output="pnl",
+        input=state["messages"][-1].content,
+        model="gpt-4o-mini",
+        actual_output=INCORRECT_OUTPUT,
+    )
+    return {"messages": state["messages"], "category": INCORRECT_OUTPUT}
 
 @judgment.observe(name="bad_sql_generator", span_type="llm")
 async def bad_sql_generator(state: AgentState) -> AgentState:
