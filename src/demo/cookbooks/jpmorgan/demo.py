@@ -125,13 +125,11 @@ async def classify(state: AgentState) -> AgentState:
         *messages
     ]
     
-    
     span_evaluation = {
-        "scorers": [AnswerCorrectnessScorer(threshold=0.5)],
+        "scorers": [AnswerCorrectnessScorer(threshold=1)],
         "expected_output": "pnl",
         "input": str(input_msg),
         "model": "gpt-4o-mini",
-        "log_results": True
     }
     response = await ChatOpenAI(model="gpt-4o-mini", temperature=0).ainvoke(
         input=input_msg, span_evaluation=span_evaluation, judgment=judgment
@@ -161,6 +159,8 @@ async def generate_response(state: AgentState) -> AgentState:
             
             FOLLOW THESE INSTRUCTIONS VERY STRICTLY, THIS INFORMATION, DO NOT VERE OFF, DO NOT HALLUCINATE
             
+            Keep the SQL query as simple as possible.
+            
             Context: {documents}
             
             The only thing you should output is the SQL query itself, nothing else."""),
@@ -168,12 +168,20 @@ async def generate_response(state: AgentState) -> AgentState:
         ]
                 
     span_evaluation = {
-        "scorers": [ContextualRelevancyScorer(threshold=0.5), AnswerCorrectnessScorer(threshold=0.5)],
-        "expected_output": "SELECT * FROM pnl WHERE stock_symbol = 'AAPL'", # TODO: UPDATE this with a proper sql query
+        "scorers": [AnswerCorrectnessScorer(threshold=0.5)],
+        "expected_output": """
+        SELECT 
+            SUM(CASE 
+                WHEN transaction_type = 'sell' THEN (price_per_share - (SELECT price_per_share FROM stock_transactions WHERE stock_symbol = 'AAPL' AND transaction_type = 'buy' LIMIT 1)) * quantity 
+                ELSE 0 
+            END) AS realized_pnl
+        FROM 
+            stock_transactions
+        WHERE 
+            stock_symbol = 'AAPL'""",
         "retrieval_context": documents,
         "input": str(input_msg),
         "model": "gpt-4o",
-        "log_results": True,
     }
     response = await ChatOpenAI(name="generate_response", model="gpt-4o-mini", temperature=0).ainvoke(
         input=input_msg, span_evaluation=span_evaluation, judgment=judgment
@@ -194,6 +202,7 @@ async def main():
         # Add classifier node
         # For failure test, pass in bad_classifier
         graph_builder.add_node("classifier", classify)
+        # graph_builder.add_node("classifier", bad_classify)
         
         # Add conditional edges based on classification
         graph_builder.add_conditional_edges(
@@ -206,7 +215,7 @@ async def main():
             }
         )
         
-        # Add retriever nodes (placeholder functions for now)
+        # Add retriever nodes
         graph_builder.add_node("pnl_retriever", pnl_retriever)
         graph_builder.add_node("balance_sheet_retriever", balance_sheet_retriever)
         graph_builder.add_node("stock_retriever", stock_retriever)
@@ -226,12 +235,12 @@ async def main():
         handler = JudgevalCallbackHandler(trace)
 
         response = await graph.ainvoke({
-            "messages": [HumanMessage(content="Please calculate our PNL on Apple stock. We have 100 shares, we bought at $100, it is now at $200.")],
+            "messages": [HumanMessage(content="Please calculate our PNL on Apple stock.")],
             "category": None,
         }, config=dict(callbacks=[handler]))
         trace.save()
     
-        print(f"Response: {response['messages'][-1]}")
+        print(f"Response: {response['messages'][-1].content}")
 
 if __name__ == "__main__":
     asyncio.run(main())
