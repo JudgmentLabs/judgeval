@@ -383,6 +383,24 @@ class TraceClient:
         raw_entries = [entry.to_dict() for entry in self.entries]
         condensed_entries = self.condense_trace(raw_entries)
 
+        # Calculate total token counts from LLM API calls
+        total_prompt_tokens = 0
+        total_completion_tokens = 0
+        total_tokens = 0
+        
+        for entry in condensed_entries:
+            if entry.get("span_type") == "llm" and isinstance(entry.get("output"), dict):
+                usage = entry["output"].get("usage", {})
+                # Handle OpenAI/Together format
+                if "prompt_tokens" in usage:
+                    total_prompt_tokens += usage.get("prompt_tokens", 0)
+                    total_completion_tokens += usage.get("completion_tokens", 0)
+                # Handle Anthropic format
+                elif "input_tokens" in usage:
+                    total_prompt_tokens += usage.get("input_tokens", 0)
+                    total_completion_tokens += usage.get("output_tokens", 0)
+                total_tokens += usage.get("total_tokens", 0)
+
         # Create trace document
         trace_data = {
             "trace_id": self.trace_id,
@@ -392,10 +410,10 @@ class TraceClient:
             "created_at": datetime.fromtimestamp(self.start_time).isoformat(),
             "duration": total_duration,
             "token_counts": {
-                "prompt_tokens": 0,  # Dummy value
-                "completion_tokens": 0,  # Dummy value
-                "total_tokens": 0,  # Dummy value
-            },  # TODO: Add token counts
+                "prompt_tokens": total_prompt_tokens,
+                "completion_tokens": total_completion_tokens,
+                "total_tokens": total_tokens,
+            },
             "entries": condensed_entries,
             "empty_save": empty_save,
             "overwrite": overwrite

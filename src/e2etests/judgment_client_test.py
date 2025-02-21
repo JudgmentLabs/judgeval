@@ -5,6 +5,7 @@ Tests all major client operations and edge cases.
 
 import os
 import pytest
+import requests
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import random
@@ -338,8 +339,40 @@ class TestAdvancedFeatures:
             override=True,
         )
 
+class TestTraceOperations:
+    """Tests for trace-related operations."""
+    
+    def test_fetch_traces_by_time_period(self, client: JudgmentClient):
+        """Test successful cases with different time periods."""
+        for hours in [1, 3, 6, 12, 24, 72, 168]:
+            response = requests.post(
+                f"{SERVER_URL}/traces/fetch_by_time_period/",
+                json={"hours": hours, "judgment_api_key": API_KEY}
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert isinstance(data, list)
+
+    def test_fetch_traces_invalid_period(self, client: JudgmentClient):
+        """Test invalid time periods."""
+        for hours in [0, 2, 4]:
+            response = requests.post(
+                f"{SERVER_URL}/traces/fetch_by_time_period/",
+                json={"hours": hours, "judgment_api_key": API_KEY}
+            )
+            assert response.status_code == 400
+
+    def test_fetch_traces_missing_api_key(self, client: JudgmentClient):
+        """Test missing API key scenario."""
+        response = requests.post(
+            f"{SERVER_URL}/traces/fetch_by_time_period/",
+            json={"hours": 12}
+        )
+        assert response.status_code == 422
+        
 @pytest.mark.skipif(not os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
                    reason="VertexAI credentials not configured")
+
 class TestCustomJudges:
     def test_custom_judge_vertexai(self, client: JudgmentClient):
         """Test VertexAI custom judge."""
@@ -402,6 +435,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "basic: mark test as testing basic functionality")
     config.addinivalue_line("markers", "advanced: mark test as testing advanced features")
     config.addinivalue_line("markers", "custom: mark test as testing custom components")
+    config.addinivalue_line("markers", "traces: mark test as testing trace operations")
 
 def pytest_collection_modifyitems(items):
     """Add markers to tests based on their class."""
@@ -412,6 +446,8 @@ def pytest_collection_modifyitems(items):
             item.add_marker(pytest.mark.advanced)
         elif "TestCustomJudges" in item.nodeid:
             item.add_marker(pytest.mark.custom)
+        elif "TestTraceOperations" in item.nodeid:
+            item.add_marker(pytest.mark.traces)
 
 def run_selected_tests(client, test_names: list[str]):
     """
@@ -427,6 +463,7 @@ def run_selected_tests(client, test_names: list[str]):
     test_basic_operations = TestBasicOperations()
     test_advanced_features = TestAdvancedFeatures()
     test_custom_judges = TestCustomJudges()
+    test_trace_operations = TestTraceOperations()
     
     test_map = {
         'dataset': test_basic_operations.test_dataset,
@@ -437,7 +474,10 @@ def run_selected_tests(client, test_names: list[str]):
         'override_eval': test_advanced_features.test_override_eval,
         'evaluate_dataset': test_advanced_features.test_evaluate_dataset,
         'classifier_scorer': test_advanced_features.test_classifier_scorer,
-        'custom_judge_vertexai': test_custom_judges.test_custom_judge_vertexai
+        'custom_judge_vertexai': test_custom_judges.test_custom_judge_vertexai,
+        'fetch_traces': test_trace_operations.test_fetch_traces_by_time_period,
+        'fetch_traces_invalid': test_trace_operations.test_fetch_traces_invalid_period,
+        'fetch_traces_missing_key': test_trace_operations.test_fetch_traces_missing_api_key
     }
     
     for test_name in test_names:
@@ -459,12 +499,15 @@ if __name__ == "__main__":
     
     run_selected_tests(client, [
         'dataset',
+        'run_eval', 
+        'assert_test',
+        'json_scorer',
+        'override_eval',
+        'evaluate_dataset',
+        'classifier_scorer',
+        'custom_judge_vertexai',
+        'fetch_traces',
+        'fetch_traces_invalid',
+        'fetch_traces_missing_key'
         'pull_all_user_dataset_stats',
-        # 'run_eval', 
-        # 'assert_test',
-        # 'json_scorer',
-        # 'override_eval',
-        # 'evaluate_dataset',
-        # 'classifier_scorer',
-        # 'custom_judge_vertexai'
     ])

@@ -13,6 +13,7 @@ from judgeval.scorers import (
     FaithfulnessScorer,
     HallucinationScorer,
     SummarizationScorer,
+    Text2SQLScorer,
 )
 
 from judgeval.data import Example
@@ -411,26 +412,6 @@ def test_hallucination_scorer():
     assert res[0].success == True, f"Hallucination test failed: score={res[0].scorers_data[0].score}, threshold={res[0].scorers_data[0].threshold}, reason={res[0].scorers_data[0].reason}"
 
 
-def print_debug_on_failure(result):
-    """Helper function to print debug info only on test failure"""
-    if not result.success:
-        print("\n=== Test Failure Details ===")
-        print(f"Input: {result.input}")
-        print(f"Output: {result.actual_output}")
-        print(f"Success: {result.success}")
-        if hasattr(result, 'retrieval_context'):
-            print(f"Retrieval Context: {result.retrieval_context}")
-        print("\nScorer Details:")
-        for scorer_data in result.scorers_data:
-            print(f"- Name: {scorer_data.name}")
-            print(f"- Score: {scorer_data.score}")
-            print(f"- Threshold: {scorer_data.threshold}")
-            print(f"- Success: {scorer_data.success}")
-            print(f"- Reason: {scorer_data.reason}")
-            print(f"- Error: {scorer_data.error}")
-            if scorer_data.verbose_logs:
-                print(f"- Verbose Logs: {scorer_data.verbose_logs}")
-
 def test_summarization_scorer():
     example_1 = Example(  # should pass
         input="Paris is the capital city of France and one of the most populous cities in Europe. The city is known for its iconic landmarks like the Eiffel Tower, Louvre Museum, and Notre-Dame Cathedral. Paris is also a global center for art, fashion, gastronomy and culture. The city's romantic atmosphere, historic architecture, and world-class museums attract millions of visitors each year.",
@@ -476,6 +457,191 @@ def test_summarization_scorer():
     
     # Add detailed assertion error message
     assert res[0].success == True, f"Summarization test failed: score={res[0].scorers_data[0].score}, threshold={res[0].scorers_data[0].threshold}, reason={res[0].scorers_data[0].reason}"
+
+
+def test_text2sql_scorer():
+    client = JudgmentClient()
+
+    table_schema = """CREATE TABLE Artists (
+    artist_id VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    genre VARCHAR(100),
+    followers INT,
+    popularity INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE Albums (
+    album_id VARCHAR(50) PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    artist_id VARCHAR(50) NOT NULL,
+    release_date DATE,
+    total_tracks INT,
+    album_type VARCHAR(50) CHECK (album_type IN ('album', 'single', 'compilation')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (artist_id) REFERENCES Artists(artist_id) ON DELETE CASCADE
+);
+
+CREATE TABLE Tracks (
+    track_id VARCHAR(50) PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    album_id VARCHAR(50) NOT NULL,
+    artist_id VARCHAR(50) NOT NULL,
+    duration_ms INT NOT NULL,
+    explicit BOOLEAN DEFAULT FALSE,
+    popularity INT DEFAULT 0,
+    preview_url VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (album_id) REFERENCES Albums(album_id) ON DELETE CASCADE,
+    FOREIGN KEY (artist_id) REFERENCES Artists(artist_id) ON DELETE CASCADE
+);
+
+CREATE TABLE Users (
+    user_id VARCHAR(50) PRIMARY KEY,
+    username VARCHAR(100) NOT NULL UNIQUE,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE Playlists (
+    playlist_id VARCHAR(50) PRIMARY KEY,
+    user_id VARCHAR(50) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE
+);
+
+CREATE TABLE PlaylistTracks (
+    playlist_id VARCHAR(50),
+    track_id VARCHAR(50),
+    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (playlist_id, track_id),
+    FOREIGN KEY (playlist_id) REFERENCES Playlists(playlist_id) ON DELETE CASCADE,
+    FOREIGN KEY (track_id) REFERENCES Tracks(track_id) ON DELETE CASCADE
+);
+
+CREATE TABLE UserListeningHistory (
+    history_id SERIAL PRIMARY KEY,
+    user_id VARCHAR(50) NOT NULL,
+    track_id VARCHAR(50) NOT NULL,
+    listened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (track_id) REFERENCES Tracks(track_id) ON DELETE CASCADE
+);
+"""
+
+    all_tracks_one_artist_correct = Example(
+        input="Find all tracks by the artist 'Drake', sorted by popularity.",
+        actual_output="""SELECT t.track_id, t.title, t.popularity, a.name AS artist_name
+FROM Tracks t
+JOIN Artists a ON t.artist_id = a.artist_id
+WHERE a.name = 'Drake'
+ORDER BY t.popularity DESC;
+""",
+        retrieval_context=[table_schema]
+    )
+
+    most_listened_to_one_user_correct = Example(
+        input="Find the most listened to track by user 'user123'.",
+        actual_output="""SELECT t.track_id, t.title, COUNT(uh.history_id) AS play_count
+FROM UserListeningHistory uh
+JOIN Tracks t ON uh.track_id = t.track_id
+WHERE uh.user_id = 'user123'
+GROUP BY t.track_id, t.title
+ORDER BY play_count DESC
+LIMIT 1;
+""",
+        retrieval_context=[table_schema]
+    )
+
+    highest_num_playlists_correct = Example(
+        input="Find the 5 users with the highest number of playlists.",
+        actual_output="""SELECT u.user_id, u.username, COUNT(p.playlist_id) AS total_playlists
+FROM Users u
+JOIN Playlists p ON u.user_id = p.user_id
+GROUP BY u.user_id, u.username
+ORDER BY total_playlists DESC
+LIMIT 5;
+""",
+        retrieval_context=[table_schema]
+    )
+
+    most_popular_tracks_all_users_correct = Example(
+        input="Find the 10 most popular tracks across all users.",
+        actual_output="""SELECT t.track_id, t.title, COUNT(uh.history_id) AS total_listens
+FROM Tracks t
+JOIN UserListeningHistory uh ON t.track_id = uh.track_id
+GROUP BY t.track_id, t.title
+ORDER BY total_listens DESC
+LIMIT 10;
+""",
+        retrieval_context=[table_schema]
+    )
+
+    most_popular_tracks_all_users_incorrect = Example(
+        input="Find the 10 most popular tracks across all users.",
+        actual_output="""SELECT t.track_user, t.title, COUNT(uh.history_id) AS total_listens
+FROM Tracks t
+JOIN UserHistory uh ON t.track_user = uh.track_user
+GROUP BY t.track_user, t.title
+ORDER BY total_listens DESC
+LIMIT 10;
+""",
+        retrieval_context=[table_schema]
+    )
+
+
+    res = client.run_evaluation(
+        examples=[
+            all_tracks_one_artist_correct, 
+            most_listened_to_one_user_correct, 
+            highest_num_playlists_correct, 
+            most_popular_tracks_all_users_correct, 
+            most_popular_tracks_all_users_incorrect
+        ],
+        scorers=[Text2SQLScorer],
+        model="gpt-4o-mini",
+        project_name="text2sql",
+        eval_run_name="text2sql_test",
+        override=True
+    )
+
+    assert print_debug_on_failure(res[0])
+    assert print_debug_on_failure(res[1])
+    assert print_debug_on_failure(res[2])
+    assert print_debug_on_failure(res[3])
+    assert not print_debug_on_failure(res[4])
+
+
+def print_debug_on_failure(result) -> bool:
+    """
+    Helper function to print debug info only on test failure
+    
+    Returns:
+        bool: True if the test passed, False if it failed
+    """
+    if not result.success:
+        print("\n=== Test Failure Details ===")
+        print(f"Input: {result.input}")
+        print(f"Output: {result.actual_output}")
+        print(f"Success: {result.success}")
+        if hasattr(result, 'retrieval_context'):
+            print(f"Retrieval Context: {result.retrieval_context}")
+        print("\nScorer Details:")
+        for scorer_data in result.scorers_data:
+            print(f"- Name: {scorer_data.name}")
+            print(f"- Score: {scorer_data.score}")
+            print(f"- Threshold: {scorer_data.threshold}")
+            print(f"- Success: {scorer_data.success}")
+            print(f"- Reason: {scorer_data.reason}")
+            print(f"- Error: {scorer_data.error}")
+            if scorer_data.verbose_logs:
+                print(f"- Verbose Logs: {scorer_data.verbose_logs}")
+
+        return False
+    return True
+
 
 if __name__ == "__main__":
     test_ac_scorer()
