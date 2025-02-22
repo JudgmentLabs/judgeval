@@ -22,17 +22,33 @@ import warnings
 from pydantic import BaseModel
 from http import HTTPStatus
 from rich import print as rprint
+from uuid import UUID
+from collections.abc import Sequence
 
 from judgeval.constants import JUDGMENT_TRACES_SAVE_API_URL
 from judgeval.judgment_client import JudgmentClient
 from judgeval.data import Example
 from judgeval.scorers import APIJudgmentScorer, JudgevalScorer
 from judgeval.data.result import ScoringResult
+from langchain_core.language_models import BaseChatModel
+from langchain_huggingface import ChatHuggingFace
+from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
+from langchain_core.utils.function_calling import convert_to_openai_tool
+from langchain_core.callbacks import CallbackManager, BaseCallbackHandler
+from langchain_core.agents import AgentAction, AgentFinish
+from langchain_core.outputs import LLMResult
+
+from langchain_core.messages.ai import AIMessage
+from langchain_core.messages.tool import ToolMessage
+from langchain_core.messages.base import BaseMessage
+from langchain_core.documents import Document
+
 
 # Define type aliases for better code readability and maintainability
 ApiClient: TypeAlias = Union[OpenAI, Together, Anthropic]  # Supported API clients
 TraceEntryType = Literal['enter', 'exit', 'output', 'input', 'evaluation']  # Valid trace entry types
-SpanType = Literal['span', 'tool', 'llm', 'evaluation']
+SpanType = Literal['span', 'tool', 'llm', 'evaluation', 'chain']
 @dataclass
 class TraceEntry:
     """Represents a single trace entry with its visual representation.
@@ -255,16 +271,25 @@ class TraceClient:
         if self._current_span:
             duration = time.time() - start_time  # Calculate duration from start_time
             
+            # print(f"self._current_span: {type(self._current_span)=}, {self._current_span=}")
+            # print(f'{self.entries[-2]=}, {self.entries[-3]=}')
+            # print(f"{[(entry.function, entry.type, type(entry)) for entry in self.entries]}")
+            
+            # Have function be either the last function in the trace or the current span.
+            # function = self._current_span if not langchain else self.entries[-1].function
             self.add_entry(TraceEntry(
                 type="evaluation",
-                function=self._current_span,
+                function=self.entries[-1].function,
+                # function=self._current_span,
                 depth=self.tracer.depth,
                 message=f"Evaluation results for {self._current_span}",
                 timestamp=time.time(),
-                evaluation_result=results,
+                evaluation_result=list(results),
                 duration=duration,
                 span_type="evaluation"
             ))
+            
+            # print(f"{self.entries[-1]=}")
 
     def record_input(self, inputs: dict):
         """Record input parameters for the current span"""
@@ -331,7 +356,7 @@ class TraceClient:
         active_functions = []  # Stack to track nested function calls
         function_entries = {}  # Store entries for each function
 
-        for entry in entries:
+        for i, entry in enumerate(entries):
             function = entry["function"]
             
             if entry["type"] == "enter":
@@ -353,11 +378,14 @@ class TraceClient:
                 current_entry["duration"] = entry["timestamp"] - current_entry["timestamp"]
                 condensed.append(current_entry)
                 active_functions.remove(function)
-                del function_entries[function]
+                # del function_entries[function]
                 
-            elif function in active_functions:
+            # The OR condition is to handle the Langchain LLM evaluation case.
+            elif function in active_functions or entry["type"] == "evaluation" and entries[i-1]["function"] == entry["function"]:
                 # Update existing function entry with additional data
                 current_entry = function_entries[function]
+                
+                print(f"{current_entry=}")
                 
                 if entry["type"] == "input" and entry["inputs"]:
                     current_entry["inputs"] = entry["inputs"]
@@ -367,9 +395,12 @@ class TraceClient:
                     
                 if entry["type"] == "evaluation" and entry["evaluation_result"]:
                     current_entry["evaluation_result"] = entry["evaluation_result"]
+                    
+            print(f"{entry=}, {active_functions=}")
 
         # Sort by timestamp
         condensed.sort(key=lambda x: x["timestamp"])
+        
         return condensed
 
     def save(self, empty_save: bool = False, overwrite: bool = False) -> Tuple[str, dict]:
@@ -381,6 +412,8 @@ class TraceClient:
         total_duration = self.get_duration()
         
         raw_entries = [entry.to_dict() for entry in self.entries]
+        
+        # print(f"Raw entries: {raw_entries}")
         condensed_entries = self.condense_trace(raw_entries)
 
         # Calculate total token counts from LLM API calls
@@ -505,7 +538,7 @@ class Tracer:
                         
                         # Record inputs
                         span.record_input({
-                            'args': list(args),
+                            'args': str(args),
                             'kwargs': kwargs
                         })
                         
@@ -531,7 +564,7 @@ class Tracer:
                         
                         # Record inputs
                         span.record_input({
-                            'args': list(args),
+                            'args': str(args),
                             'kwargs': kwargs
                         })
                         
@@ -545,6 +578,28 @@ class Tracer:
                 
                 return func(*args, **kwargs)
             return wrapper
+        
+    def score(self, func=None, scorers: List[Union[APIJudgmentScorer, JudgevalScorer]] = None, model: str = None, log_results: bool = True, *, name: str = None, span_type: SpanType = "span"):
+        """
+        Decorator to trace function execution with detailed entry/exit information.
+        """
+        if func is None:
+            return lambda f: self.observe(f, name=name, span_type=span_type)
+        
+        if asyncio.iscoroutinefunction(func):
+            @functools.wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                if self._current_trace:
+                    self._current_trace.async_evaluate(scorers=[scorers], input=args, actual_output=kwargs, model=model, log_results=log_results)
+            return async_wrapper
+        else:
+            @functools.wraps(func)
+            def wrapper(*args, **kwargs):
+                if self._current_trace:
+                    self._current_trace.async_evaluate(scorers=[scorers], input=args, actual_output=kwargs, model="gpt-4o-mini", log_results=True)
+            return wrapper
+        
+
 
 def wrap(client: Any) -> Any:
     """
@@ -654,3 +709,193 @@ def _format_output_data(client: ApiClient, response: Any) -> dict:
             "total_tokens": response.usage.input_tokens + response.usage.output_tokens
         }
     }
+
+class JudgevalCallbackHandler(BaseCallbackHandler):
+    def __init__(self, trace_client: TraceClient):
+        self.trace_client = trace_client
+        self.openai_count = 1
+
+    def start_span(self, name: str, span_type: SpanType = "span"):
+        start_time = time.time()
+        
+        # Record span entry
+        self.trace_client.add_entry(TraceEntry(
+            type="enter",
+            function=name,
+            depth=self.trace_client.tracer.depth,
+            message=name,
+            timestamp=start_time,
+            span_type=span_type
+        ))
+        
+        self.trace_client.tracer.depth += 1
+        self.trace_client.prev_span = self.trace_client._current_span
+        self.trace_client._current_span = name
+        self._start_time = start_time
+    
+    def end_span(self, name: str, span_type: SpanType = "span"):
+        self.trace_client.tracer.depth -= 1
+        duration = time.time() - self._start_time
+        
+        # Record span exit
+        self.trace_client.add_entry(TraceEntry(
+            type="exit",
+            function=name,
+            depth=self.trace_client.tracer.depth,
+            message=f"← {name}",
+            timestamp=time.time(),
+            duration=duration,
+            span_type=span_type
+        ))
+        self.trace_client._current_span = self.trace_client.prev_span
+
+    def on_retriever_start(
+        self,
+        serialized: Optional[dict[str, Any]],
+        query: str,
+        *,
+        run_id: UUID,
+        parent_run_id: Optional[UUID] = None,
+        tags: Optional[list[str]] = None,
+        metadata: Optional[dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> Any:
+        pass
+
+    def on_retriever_end(
+        self, documents: Sequence[Document], *, run_id: UUID, parent_run_id: Optional[UUID] = None, **kwargs: Any
+    ) -> Any:
+        pass
+
+
+    def on_tool_start(
+        self,
+        serialized: Optional[dict[str, Any]],
+        input_str: str,
+        run_id: Optional[UUID] = None,
+        parent_run_id: Optional[UUID] = None,
+        inputs: Optional[dict[str, Any]] = None,
+        **kwargs: Any,
+    ):
+        name = serialized["name"]
+        self.start_span(name, span_type="tool")
+        self.trace_client.record_input({
+            'args': input_str,
+            'kwargs': kwargs
+        })
+
+
+    def on_tool_end(self, output: Any, *, run_id: UUID, parent_run_id: Optional[UUID] = None, **kwargs: Any) -> Any:
+        # print(f"Tool ended: {output}")
+        self.trace_client.record_output(output)
+        self.end_span(self.trace_client._current_span, span_type="tool")
+    
+    # def on_chain_start(
+    #     self,
+    #     serialized: dict[str, Any],
+    #     inputs: Union[dict[str, Any], Any],
+    #     *,
+    #     run_id: UUID,
+    #     parent_run_id: Optional[UUID] = None,
+    #     **kwargs: Any,
+    # ) -> Any:
+    #     print(f"Chain started: {serialized}")
+    #     print(f"Chain inputs: {inputs}")
+    #     print()
+    #     # self.start_span("Chain", span_type="chain")
+    #     # self.trace_client.record_input({
+    #     #     'args': inputs,
+    #     #     'kwargs': kwargs
+    #     # })
+
+    # def on_chain_end(
+    #     self, outputs: Union[str, dict[str, Any]], *, run_id: UUID, parent_run_id: Optional[UUID] = None, **kwargs: Any
+    # ) -> Any:
+    #     print(f"Chain ended: {outputs}")
+    #     print()
+    #     # self.trace_client.record_output(outputs)
+    #     # self.end_span("Chain", span_type="chain")
+
+
+    def on_agent_action (self, action: AgentAction, **kwargs: Any) -> Any:
+        print(f"Agent action: {action}")
+
+    def on_agent_finish(
+            self,
+            finish: AgentFinish,
+            *,
+            run_id: UUID,
+            parent_run_id: Optional[UUID] = None,
+            tags: Optional[list[str]] = None,
+            **kwargs: Any,
+        ) -> None:
+            print(f"Agent action: {finish}")
+
+
+
+
+
+    # def on_retriever_start(
+    #     self,
+    #     serialized: Optional[dict[str, Any]],
+    #     query: str,
+    #     *,
+    #     run_id: UUID,
+    #     parent_run_id: Optional[UUID] = None,
+    #     tags: Optional[list[str]] = None,
+    #     metadata: Optional[dict[str, Any]] = None,
+    #     **kwargs: Any,
+    # ) -> Any:
+    #     print(f"Retriever started: {serialized}")
+    #     print(f"Retriever query: {query}")
+    #     # Additional processing based on the event data
+
+    def on_llm_start(
+        self,
+        serialized: Optional[dict[str, Any]],
+        prompts: list[str],
+        *,
+        run_id: UUID,
+        parent_run_id: Optional[UUID] = None,
+        **kwargs: Any,
+    ) -> Any:    
+        name = "LLM call"
+        self.start_span(name, span_type="llm")
+        self.trace_client.record_input({
+            'args': prompts,
+            'kwargs': kwargs
+        })
+
+    def on_llm_end(self, response: LLMResult, *, run_id: UUID, parent_run_id: Optional[UUID] = None, **kwargs: Any):
+        # print(f"LLM end: {response}")
+        self.trace_client.record_output(response.generations[0][0].text)
+        self.end_span(self.trace_client._current_span, span_type="tool")
+
+    def on_chat_model_start(
+        self,
+        serialized: Optional[dict[str, Any]],
+        messages: list[list[BaseMessage]],
+        *,
+        run_id: UUID,
+        parent_run_id: Optional[UUID] = None,
+        **kwargs: Any,
+    ) -> Any:
+        # print(f"Chat model messages: {messages}")
+        # print(f"Chat model serialized: {serialized}")
+        # # print(f"Chat model kwargs: {kwargs}")
+
+        if "openai" in serialized["id"]:
+            name = f"OPENAI_API_CALL_{self.openai_count}"
+            self.openai_count += 1
+        elif "anthropic" in serialized["id"]:
+            name = "ANTHROPIC_API_CALL"
+        elif "together" in serialized["id"]:
+            name = "TOGETHER_API_CALL"
+        else:
+            name = "LLM call"
+
+        self.start_span(name, span_type="llm")
+        self.trace_client.record_input({
+            'args': str(messages),
+            'kwargs': kwargs
+        })
