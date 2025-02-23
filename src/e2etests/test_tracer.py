@@ -32,7 +32,7 @@ async def make_upper(input: str) -> str:
     """
     output = input.upper()
     
-    await judgment.get_current_trace().async_evaluate(
+    judgment.get_current_trace().async_evaluate(
         scorers=[FaithfulnessScorer(threshold=0.5)],
         input="What if these shoes don't fit?",
         actual_output="We offer a 30-day full refund at no extra cost.",
@@ -50,7 +50,7 @@ async def make_upper(input: str) -> str:
 async def make_lower(input):
     output = input.lower()
     
-    await judgment.get_current_trace().async_evaluate(
+    judgment.get_current_trace().async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
         input="How do I reset my password?",
         actual_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
@@ -74,7 +74,7 @@ def llm_call(input):
 @pytest.mark.asyncio
 async def answer_user_question(input):
     output = llm_call(input)
-    await judgment.get_current_trace().async_evaluate(
+    judgment.get_current_trace().async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
         input=input,
         actual_output=output,
@@ -104,7 +104,7 @@ async def make_poem(input: str) -> str:
         )
         anthropic_result = anthropic_response.content[0].text
         
-        await judgment.get_current_trace().async_evaluate(
+        judgment.get_current_trace().async_evaluate(
             scorers=[AnswerRelevancyScorer(threshold=0.5)],
             input=input,
             actual_output=anthropic_result,
@@ -135,6 +135,7 @@ def trace_manager_client():
 @pytest.mark.asyncio
 async def test_token_counting(trace_manager_client):
     input = "Write a poem about Nissan R32 GTR"
+
     PROJECT_NAME = "TestingPoemBot"
     with judgment.trace("Use-claude-hehexd123", project_name=PROJECT_NAME, overwrite=True) as trace:
         upper = await make_upper(input)

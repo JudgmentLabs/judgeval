@@ -19,6 +19,7 @@ patronus = "*"
 asyncio = "*"
 nest-asyncio = "*"
 tavily-python = "*"
+pika = "*"
 
 [dev-packages]
 pytest = "*"
