@@ -247,12 +247,10 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False) -> List[Scor
     # Set example IDs if not already set
     debug("Initializing examples with IDs and timestamps")
     for idx, example in enumerate(evaluation_run.examples):
-        if example.example_id is None:
-            example.example_id = idx
-            debug(f"Set example ID {idx} for input: {example.input[:50]}...")
+        example.example_index = idx  # Set numeric index
         example.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         with example_logging_context(example.timestamp, example.example_id):
-            debug(f"Initialized example {example.example_id}")
+            debug(f"Initialized example {example.example_id} (index: {example.example_index})")
             debug(f"Input: {example.input}")
             debug(f"Actual output: {example.actual_output}")
             if example.expected_output:
