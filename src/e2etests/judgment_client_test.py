@@ -377,7 +377,11 @@ class TestTraceOperations:
         for hours in [1, 3, 6, 12, 24, 72, 168]:
             response = requests.post(
                 f"{SERVER_URL}/traces/fetch_by_time_period/",
-                json={"hours": hours, "judgment_api_key": API_KEY}
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {API_KEY}"
+                },
+                json={"hours": hours}
             )
             assert response.status_code == 200
             data = response.json()
@@ -388,7 +392,11 @@ class TestTraceOperations:
         for hours in [0, 2, 4]:
             response = requests.post(
                 f"{SERVER_URL}/traces/fetch_by_time_period/",
-                json={"hours": hours, "judgment_api_key": API_KEY}
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {API_KEY}"
+                },
+                json={"hours": hours}
             )
             assert response.status_code == 400
 
@@ -396,9 +404,12 @@ class TestTraceOperations:
         """Test missing API key scenario."""
         response = requests.post(
             f"{SERVER_URL}/traces/fetch_by_time_period/",
+            headers={
+                "Content-Type": "application/json",
+            },
             json={"hours": 12}
         )
-        assert response.status_code == 422
+        assert response.status_code in [401, 403]
         
 @pytest.mark.skipif(not os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
                    reason="VertexAI credentials not configured")

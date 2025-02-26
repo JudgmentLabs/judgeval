@@ -3,6 +3,7 @@ import os
 import time
 import asyncio
 from typing import List
+import pytest
 
 # Third-party imports
 from openai import OpenAI
@@ -136,9 +137,17 @@ def trace_manager_client():
 async def test_token_counting(trace_manager_client):
     input = "Write a poem about Nissan R32 GTR"
 
+@pytest.fixture
+def test_input():
+    """Fixture providing default test input"""
+    return "What if these shoes don't fit?"
+
+@pytest.mark.asyncio
+async def test_evaluation_mixed(test_input):
     PROJECT_NAME = "TestingPoemBot"
+    print(f"Using test input: {test_input}")
     with judgment.trace("Use-claude-hehexd123", project_name=PROJECT_NAME, overwrite=True) as trace:
-        upper = await make_upper(input)
+        upper = await make_upper(test_input)
         result = await make_poem(upper)
         await answer_user_question("What if these shoes don't fit?")
         
