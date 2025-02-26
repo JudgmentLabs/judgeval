@@ -1,4 +1,3 @@
-
 from typing import Optional
 import requests
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -7,7 +6,8 @@ from judgeval.common.logger import debug, error, warning, info
 from judgeval.constants import (
     JUDGMENT_DATASETS_PUSH_API_URL,
     JUDGMENT_DATASETS_PULL_API_URL, 
-    JUDGMENT_DATASETS_PULL_ALL_API_URL
+    JUDGMENT_DATASETS_PULL_ALL_API_URL,
+    JUDGMENT_DATASETS_EXPORT_JSONL_API_URL
 )
 from judgeval.data import Example
 from judgeval.data.datasets import EvalDataset
@@ -56,12 +56,16 @@ class EvalDatasetClient:
                     "ground_truths": [g.to_dict() for g in dataset.ground_truths],
                     "examples": [e.to_dict() for e in dataset.examples],
                     "overwrite": overwrite,
-                    "judgment_api_key": dataset.judgment_api_key
+                    # "judgment_api_key": dataset.judgment_api_key
                 }
             try:
                 response = requests.post(
                     JUDGMENT_DATASETS_PUSH_API_URL, 
-                    json=content
+                    json=content,
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {self.judgment_api_key}"
+                    }
                 )
                 if response.status_code == 500:
                     error(f"Server error during push: {content.get('message')}")
@@ -115,13 +119,17 @@ class EvalDatasetClient:
                 )
                 request_body = {
                     "alias": alias,
-                    "judgment_api_key": self.judgment_api_key
+                    # "judgment_api_key": self.judgment_api_key
                 }
 
                 try:
                     response = requests.post(
                         JUDGMENT_DATASETS_PULL_API_URL, 
-                        json=request_body
+                        json=request_body,
+                        headers={
+                            "Content-Type": "application/json",
+                            "Authorization": f"Bearer {self.judgment_api_key}"
+                        }
                     )
                     response.raise_for_status()
                 except requests.exceptions.RequestException as e:
@@ -169,13 +177,17 @@ class EvalDatasetClient:
                     total=100,
                 )
                 request_body = {
-                    "judgment_api_key": self.judgment_api_key
+                    # "judgment_api_key": self.judgment_api_key
                 }
 
                 try:
                     response = requests.post(
                         JUDGMENT_DATASETS_PULL_ALL_API_URL, 
-                        json=request_body
+                        json=request_body,
+                        headers={
+                            "Content-Type": "application/json",
+                            "Authorization": f"Bearer {self.judgment_api_key}"
+                        }
                     )
                     response.raise_for_status()
                 except requests.exceptions.RequestException as e:
@@ -191,3 +203,43 @@ class EvalDatasetClient:
                 )
 
                 return payload
+
+    def export_jsonl(self, alias: str) -> requests.Response:
+        """Export dataset in JSONL format from Judgment platform"""
+        debug(f"Exporting dataset with alias '{alias}' as JSONL")
+        with Progress(
+            SpinnerColumn(style="rgb(106,0,255)"),
+            TextColumn("[progress.description]{task.description}"),
+            transient=False,
+        ) as progress:
+            task_id = progress.add_task(
+                f"Exporting [rgb(106,0,255)]'{alias}'[/rgb(106,0,255)] as JSONL...",
+                total=100,
+            )
+            try:
+                response = requests.post(
+                    JUDGMENT_DATASETS_EXPORT_JSONL_API_URL,
+                    json={"alias": alias},
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {self.judgment_api_key}"
+                    },
+                    stream=True
+                )
+                response.raise_for_status()
+            except requests.exceptions.HTTPError as err:
+                if err.response.status_code == 404:
+                    error(f"Dataset not found: {alias}")
+                else:
+                    error(f"HTTP error during export: {err}")
+                raise
+            except Exception as e:
+                error(f"Error during export: {str(e)}")
+                raise
+                
+            info(f"Successfully exported dataset with alias '{alias}'")
+            progress.update(
+                task_id,
+                description=f"{progress.tasks[task_id].description} [rgb(25,227,160)]Done!)",
+            )
+            return response

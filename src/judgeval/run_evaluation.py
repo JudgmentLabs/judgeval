@@ -47,7 +47,12 @@ def execute_api_eval(evaluation_run: EvaluationRun) -> List[Dict]:
     try:
         # submit API request to execute evals
         payload = evaluation_run.model_dump(warnings=False)
-        response = requests.post(JUDGMENT_EVAL_API_URL, json=payload)
+        response = requests.post(
+            JUDGMENT_EVAL_API_URL, headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {evaluation_run.judgment_api_key}"
+        }, 
+        json=payload)
         response_data = response.json()
     except Exception as e:
         error(f"Error: {e}")
@@ -151,6 +156,10 @@ def check_eval_run_name_exists(eval_name: str, project_name: str, judgment_api_k
     try:
         response = requests.post(
             f"{ROOT_API}/eval-run-name-exists/",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {judgment_api_key}"
+            },
             json={
                 "eval_name": eval_name,
                 "project_name": project_name,
@@ -188,6 +197,10 @@ def log_evaluation_results(merged_results: List[ScoringResult], evaluation_run: 
     try:
         res = requests.post(
             JUDGMENT_EVAL_LOG_API_URL,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {evaluation_run.judgment_api_key}"
+            },
             json={
                 "results": [result.to_dict() for result in merged_results],
                 "judgment_api_key": evaluation_run.judgment_api_key,

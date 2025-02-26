@@ -1,6 +1,8 @@
 """
 Constant variables used throughout source code
 """
+from dotenv import load_dotenv
+load_dotenv()
 
 from enum import Enum
 import litellm
@@ -36,6 +38,7 @@ ROOT_API = os.getenv("JUDGMENT_API_URL", "https://api.judgmentlabs.ai")
 JUDGMENT_EVAL_API_URL = f"{ROOT_API}/evaluate/"
 JUDGMENT_DATASETS_PUSH_API_URL = f"{ROOT_API}/datasets/push/"
 JUDGMENT_DATASETS_PULL_API_URL = f"{ROOT_API}/datasets/pull/"
+JUDGMENT_DATASETS_EXPORT_JSONL_API_URL = f"{ROOT_API}/datasets/export_jsonl/"
 JUDGMENT_DATASETS_PULL_ALL_API_URL = f"{ROOT_API}/datasets/get_all_stats/"
 JUDGMENT_EVAL_LOG_API_URL = f"{ROOT_API}/log_eval_results/"
 JUDGMENT_EVAL_FETCH_API_URL = f"{ROOT_API}/fetch_eval_results/"
