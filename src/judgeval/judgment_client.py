@@ -30,7 +30,6 @@ from pydantic import BaseModel
 class EvalRunRequestBody(BaseModel):
     eval_name: str
     project_name: str
-    judgment_api_key: str
 
 
 class JudgmentClient:
