@@ -47,7 +47,7 @@ def execute_api_eval(evaluation_run: EvaluationRun) -> List[Dict]:
     try:
         # submit API request to execute evals
         payload = evaluation_run.model_dump(warnings=False)
-        response = requests.post(JUDGMENT_EVAL_API_URL, json=payload)
+        response = requests.post(JUDGMENT_EVAL_API_URL, json=payload, headers={"Content-Type": "application/json", "Authorization": f"Bearer {evaluation_run.judgment_api_key}"})
         response_data = response.json()
     except Exception as e:
         error(f"Error: {e}")
@@ -154,8 +154,9 @@ def check_eval_run_name_exists(eval_name: str, project_name: str, judgment_api_k
             json={
                 "eval_name": eval_name,
                 "project_name": project_name,
-                "judgment_api_key": judgment_api_key,
-            }
+            },
+            headers={"Content-Type": "application/json",
+                     "Authorization": f"Bearer {judgment_api_key}"}
         )
         
         if response.status_code == 409:
@@ -190,10 +191,11 @@ def log_evaluation_results(merged_results: List[ScoringResult], evaluation_run: 
             JUDGMENT_EVAL_LOG_API_URL,
             json={
                 "results": [result.to_dict() for result in merged_results],
-                "judgment_api_key": evaluation_run.judgment_api_key,
                 "project_name": evaluation_run.project_name,
                 "eval_name": evaluation_run.eval_name,
-            }
+            },
+            headers={"Content-Type": "application/json",
+                     "Authorization": f"Bearer {evaluation_run.judgment_api_key}"}
         )
         
         if not res.ok:

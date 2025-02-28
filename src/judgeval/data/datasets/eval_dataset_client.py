@@ -57,12 +57,13 @@ class EvalDatasetClient:
                     "ground_truths": [g.to_dict() for g in dataset.ground_truths],
                     "examples": [e.to_dict() for e in dataset.examples],
                     "overwrite": overwrite,
-                    "judgment_api_key": dataset.judgment_api_key
                 }
             try:
                 response = requests.post(
                     JUDGMENT_DATASETS_PUSH_API_URL, 
-                    json=content
+                    json=content,
+                    headers={"Content-Type": "application/json",
+                             "Authorization": f"Bearer {self.judgment_api_key}"}
                 )
                 if response.status_code == 500:
                     error(f"Server error during push: {content.get('message')}")
@@ -116,13 +117,14 @@ class EvalDatasetClient:
                 )
                 request_body = {
                     "alias": alias,
-                    "judgment_api_key": self.judgment_api_key
                 }
 
                 try:
                     response = requests.post(
                         JUDGMENT_DATASETS_PULL_API_URL, 
-                        json=request_body
+                        json=request_body,
+                        headers={"Content-Type": "application/json",
+                                 "Authorization": f"Bearer {self.judgment_api_key}"}
                     )
                     response.raise_for_status()
                 except requests.exceptions.RequestException as e:
@@ -169,14 +171,12 @@ class EvalDatasetClient:
                     f"Pulling [rgb(106,0,255)]' datasets'[/rgb(106,0,255)] from Judgment...",
                     total=100,
                 )
-                request_body = {
-                    "judgment_api_key": self.judgment_api_key
-                }
 
                 try:
                     response = requests.post(
                         JUDGMENT_DATASETS_PULL_ALL_API_URL, 
-                        json=request_body
+                        headers={"Content-Type": "application/json",
+                                 "Authorization": f"Bearer {self.judgment_api_key}"}
                     )
                     response.raise_for_status()
                 except requests.exceptions.RequestException as e:
@@ -219,13 +219,14 @@ class EvalDatasetClient:
                 "alias": alias,
                 "examples": [e.to_dict() for e in examples],
                 "ground_truths": [g.to_dict() for g in ground_truths],
-                "judgment_api_key": self.judgment_api_key
             }
 
             try:
                 response = requests.post(
                     JUDGMENT_DATASETS_EDIT_API_URL,
-                    json=content
+                    json=content,
+                    headers={"Content-Type": "application/json",
+                             "Authorization": f"Bearer {self.judgment_api_key}"}
                 )
                 response.raise_for_status()
             except requests.exceptions.RequestException as e:

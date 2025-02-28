@@ -394,7 +394,9 @@ class TestTraceOperations:
         for hours in [1, 3, 6, 12, 24, 72, 168]:
             response = requests.post(
                 f"{SERVER_URL}/traces/fetch_by_time_period/",
-                json={"hours": hours, "judgment_api_key": API_KEY}
+                json={"hours": hours},
+                headers={"Content-Type": "application/json",
+                         "Authorization": f"Bearer {API_KEY}"}
             )
             assert response.status_code == 200
             data = response.json()
@@ -405,10 +407,13 @@ class TestTraceOperations:
         for hours in [0, 2, 4]:
             response = requests.post(
                 f"{SERVER_URL}/traces/fetch_by_time_period/",
-                json={"hours": hours, "judgment_api_key": API_KEY}
+                json={"hours": hours},
+                headers={"Content-Type": "application/json",
+                         "Authorization": f"Bearer {API_KEY}"}
             )
             assert response.status_code == 400
 
+    # TODO
     def test_fetch_traces_missing_api_key(self, client: JudgmentClient):
         """Test missing API key scenario."""
         response = requests.post(
