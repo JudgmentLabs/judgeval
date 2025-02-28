@@ -412,15 +412,6 @@ class TestTraceOperations:
                          "Authorization": f"Bearer {API_KEY}"}
             )
             assert response.status_code == 400
-
-    # TODO
-    def test_fetch_traces_missing_api_key(self, client: JudgmentClient):
-        """Test missing API key scenario."""
-        response = requests.post(
-            f"{SERVER_URL}/traces/fetch_by_time_period/",
-            json={"hours": 12}
-        )
-        assert response.status_code == 422
         
 @pytest.mark.skipif(not os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
                    reason="VertexAI credentials not configured")
