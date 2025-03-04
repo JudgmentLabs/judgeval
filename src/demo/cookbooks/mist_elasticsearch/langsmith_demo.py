@@ -87,7 +87,7 @@ def target(inputs: dict) -> dict:
     return {"generated_query": response.choices[0].message.content.strip()}
 
 # Define evaluation criteria
-instructions = """Evaluate the generated Elasticsearch query against the reference query:
+evaluation_instructions = """Evaluate the generated Elasticsearch query against the reference query:
 - Check if the query structure is valid Elasticsearch DSL
 - Verify that all important search criteria from the natural query are included
 - Confirm the query would return relevant results
@@ -106,7 +106,7 @@ def query_accuracy(outputs: dict, reference_outputs: dict) -> bool:
     response = openai_client.chat.completions.create(
         model="gpt-4",
         messages=[
-            {"role": "system", "content": instructions},
+            {"role": "system", "content": evaluation_instructions},
             {
                 "role": "user", 
                 "content": f"""Reference Query: {reference_outputs['elasticsearch_query']}
@@ -117,6 +117,8 @@ def query_accuracy(outputs: dict, reference_outputs: dict) -> bool:
     parsed = response.choices[0].message.content.strip().lower()
     print(f"PARSED: {parsed}")
     return parsed == "true"
+
+
 # Run evaluation
 experiment_results = client.evaluate(
     target,
