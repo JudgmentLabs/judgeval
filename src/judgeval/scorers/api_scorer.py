@@ -34,16 +34,16 @@ class APIJudgmentScorer(BaseModel):
     @field_validator('score_type')
     def convert_to_enum_value(cls, v):
         """
-        Validates that the `score_type` is a valid `JudgmentMetric` enum value.
-        Converts string values to `JudgmentMetric` enum values.
+        Validates that the `score_type` is a valid `APIScorer` enum value.
+        Converts string values to `APIScorer` enum values.
         """
         debug(f"Attempting to convert score_type value: {v}")
         if isinstance(v, APIScorer):
-            info(f"Using existing JudgmentMetric: {v.value}")
-            return v.value
+            info(f"Using existing APIScorer: {v}")
+            return v
         elif isinstance(v, str):
-            debug(f"Converting string value to JudgmentMetric enum: {v}")
-            return APIScorer[v.upper()].value
+            debug(f"Converting string value to APIScorer enum: {v}")
+            return APIScorer[v.upper()]
         error(f"Invalid score_type value: {v}")
         raise ValueError(f"Invalid value for score_type: {v}")
     
@@ -58,7 +58,7 @@ class APIJudgmentScorer(BaseModel):
             dict: A dictionary containing the scorer's configuration
         """
         return {
-            "score_type": self.score_type,
+            "score_type": self.score_type.value,  # Convert enum to string for serialization
             "threshold": self.threshold
         }
     
