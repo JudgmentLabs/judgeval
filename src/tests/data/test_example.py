@@ -79,12 +79,12 @@ def test_string_representation():
 # Error cases
 
 def test_missing_input():
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError):
         Example(actual_output="test output")
 
 
 def test_missing_actual_output():
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError):
         Example(input="test input")
 
 

@@ -174,8 +174,8 @@ def check_eval_run_name_exists(eval_name: str, project_name: str, judgment_api_k
         )
         
         if response.status_code == 409:
-            error(f"Evaluation run name '{eval_name}' already exists for this project")
-            raise ValueError(f"Evaluation run name '{eval_name}' already exists for this project")
+            error(f"Eval run name '{eval_name}' already exists for this project. Please choose a different name or set the `override` flag to true.")
+            raise ValueError(f"Eval run name '{eval_name}' already exists for this project. Please choose a different name or set the `override` flag to true.")
         
         if not response.ok:
             response_data = response.json()

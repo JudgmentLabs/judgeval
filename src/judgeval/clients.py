@@ -8,12 +8,6 @@ from together import Together, AsyncTogether
 PATH_TO_DOTENV = os.path.join(os.path.dirname(__file__), ".env")
 load_dotenv(dotenv_path=PATH_TO_DOTENV)
 
-# Initialize required clients
-langfuse = Langfuse(
-    secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
-    public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
-    host=os.getenv("LANGFUSE_HOST"),
-)
 
 # Initialize optional OpenAI client
 client: Optional['OpenAI'] = None
