@@ -1,0 +1,62 @@
+---
+title: Comparison
+description: ""
+---
+
+The comparison scorer is a default LLM judge scorer that returns the number of differences between `actual_output` and `expected_output` based on some criteria set by the user.
+In practice, this scorer helps determine whether your LLM application produces **answers that are comparable to the expected output**.
+
+## Required Fields
+
+The following represents the required fields for your `Example` and `ComparisonScorer`
+
+**Example:**
+- `input`
+- `actual_output` - (the output from your LLM system)
+- `expected_output` - (the gold standard you expect the LLM system to produce)
+
+**ComparisonScorer:**
+- `criteria` - (the criteria in which you want to compare the two outputs)
+- `description` - (a description of the criteria)
+
+## Scorer Breakdown
+
+The comparison scorer evaluates the `actual_output` against the `expected_output` using the specified `criteria` and `description`. The score is calculated as:
+
+$$
+\text{score} = \# \text{ of differences between } \text{actual\_output} \text{ and } \text{expected\_output}
+$$
+
+The threshold for the comparison scorer determines the acceptable number of differences between the two outputs. If the number of differences exceeds the threshold, the scorer will indicate failure. Conversely, if the number of differences is less than or equal to the threshold, the scorer will indicate success.
+
+## Sample Implementation
+
+```python comparison.py
+from judgeval import JudgmentClient
+from judgeval.data import Example
+from judgeval.scorers import ComparisonScorer
+
+example = Example(
+    input="Generate a poem about a field",
+    # Replace this with the input to your LLM system
+    actual_output="A field, kinda windy, with some flowers, stuff growing, and maybe a nice vibe. Petals do things, I guess? Like, they're there… and light exists, but whatever, it's fine."
+    # Replace this with the output from your LLM system
+    expected_output="A sunlit meadow, alive with whispers of wind, where daisies dance and hope begins again. Each petal holds a promise—bright, unbruised— a symphony of light that cannot be refused.",
+    # Replace this with the gold standard you expect the LLM system to produce
+)
+
+tone_scorer = ComparisonScorer(
+    threshold=2,
+    # Replace this with your own threshold for the comparison scorer
+    criteria="Tone and Style", 
+    # Replace this with your own criteria for the comparison scorer
+    description="Tone is the attitude or emotional quality of language, while style is the structural and linguistic framework shaping how ideas are expressed—together, they define how a message feels and the way it's crafted.",
+    # Replace this with the description of the criteria (the more specific, the better)
+)
+
+results = client.run_evaluation(
+    examples=[example],
+    scorers=[tone_scorer],
+    model="gpt-4o",
+)
+```
