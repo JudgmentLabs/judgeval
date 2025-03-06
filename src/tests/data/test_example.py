@@ -5,7 +5,7 @@ Unit tests for the Example class
 import pytest
 from datetime import datetime
 from pydantic import ValidationError
-from judgeval.data.example import Example
+from judgeval.data import Example
 
 
 def test_basic_example_creation():

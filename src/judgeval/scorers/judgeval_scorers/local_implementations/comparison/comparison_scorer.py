@@ -1,4 +1,6 @@
 from typing import Optional, Union, List
+from pydantic import BaseModel
+
 from judgeval.constants import APIScorer
 from judgeval.scorers import JudgevalScorer
 from judgeval.judges import JudgevalJudge
@@ -12,7 +14,6 @@ from judgeval.scorers.utils import (
     check_example_params
 )
 from .prompts import ComparisonTemplate
-from pydantic import BaseModel
 
 required_params = [
     ExampleParams.INPUT,

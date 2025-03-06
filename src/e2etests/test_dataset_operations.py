@@ -8,8 +8,7 @@ import random
 import string
 
 from judgeval.judgment_client import JudgmentClient
-from judgeval.data import Example
-from judgeval.data.datasets.dataset import EvalDataset, GroundTruthExample
+from judgeval.data import Example, GroundTruthExample
 
 @pytest.mark.basic
 class TestDatasetOperations:

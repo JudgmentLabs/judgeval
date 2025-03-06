@@ -6,17 +6,17 @@ from typing import Optional, List, Dict, Any, Union
 import requests
 
 from judgeval.constants import ROOT_API
-from judgeval.data.datasets import EvalDataset, EvalDatasetClient, GroundTruthExample
+from judgeval.data.datasets import EvalDataset, EvalDatasetClient
 from judgeval.data import (
     ScoringResult, 
-    Example
+    Example,
+    GroundTruthExample
 )
 from judgeval.scorers import (
     APIJudgmentScorer, 
     JudgevalScorer, 
     ClassifierScorer, 
     ScorerWrapper,
-    score,
 )
 from judgeval.evaluation_run import EvaluationRun
 from judgeval.run_evaluation import (
@@ -24,7 +24,11 @@ from judgeval.run_evaluation import (
     assert_test
 )
 from judgeval.judges import JudgevalJudge
-from judgeval.constants import JUDGMENT_EVAL_FETCH_API_URL, JUDGMENT_EVAL_DELETE_API_URL, JUDGMENT_EVAL_DELETE_PROJECT_API_URL
+from judgeval.constants import (
+    JUDGMENT_EVAL_FETCH_API_URL, 
+    JUDGMENT_EVAL_DELETE_API_URL, 
+    JUDGMENT_EVAL_DELETE_PROJECT_API_URL
+)
 from judgeval.common.exceptions import JudgmentAPIError
 from pydantic import BaseModel
 from judgeval.rules import Rule

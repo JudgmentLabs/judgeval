@@ -5,14 +5,12 @@ Rules system for Judgeval that enables alerts based on metric thresholds.
 from typing import Dict, List, Optional, Union, Any, Set, Tuple
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from enum import Enum
-from datetime import datetime
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import time
-import uuid  # Add import for uuid module
+import uuid
 
-from judgeval.scorers import APIJudgmentScorer, JudgevalScorer
-from judgeval.scorers.judgeval_scorers import ScorerWrapper  # Import from the correct module
+from judgeval.scorers import APIJudgmentScorer, JudgevalScorer, ScorerWrapper
 
 class AlertStatus(str, Enum):
     """Status of an alert evaluation."""

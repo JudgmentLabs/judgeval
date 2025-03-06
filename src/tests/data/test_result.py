@@ -1,7 +1,6 @@
 import pytest
-from judgeval.data.result import ScoringResult, generate_scoring_result
-from judgeval.data.api_example import ProcessExample
-from judgeval.data.scorer_data import ScorerData
+from judgeval.data import ScorerData, ProcessExample, ScoringResult
+from judgeval.data.result import generate_scoring_result
 
 @pytest.fixture
 def sample_scorer_data():

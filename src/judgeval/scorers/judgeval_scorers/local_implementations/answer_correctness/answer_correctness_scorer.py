@@ -1,5 +1,4 @@
 from typing import Optional, List, Union, Tuple
-from pydantic import BaseModel
 
 from judgeval.constants import APIScorer
 from judgeval.judges import JudgevalJudge

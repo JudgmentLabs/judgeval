@@ -1,5 +1,4 @@
 from typing import Type, Optional, Any
-from functools import wraps
 
 # Import implementations
 from judgeval.scorers.judgeval_scorers.api_scorers import (

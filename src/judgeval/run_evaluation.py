@@ -5,7 +5,6 @@ from datetime import datetime
 from rich import print as rprint
 
 from judgeval.data import (
-    Example, 
     ScorerData, 
     ScoringResult
 )
@@ -25,13 +24,11 @@ from judgeval.constants import (
 from judgeval.common.exceptions import JudgmentAPIError
 from judgeval.evaluation_run import EvaluationRun
 from judgeval.common.logger import (
-    enable_logging, 
     debug, 
     info, 
     error, 
     example_logging_context
 )
-from judgeval.rules import RulesEngine, Rule, AlertResult, AlertStatus
 
 
 def execute_api_eval(evaluation_run: EvaluationRun) -> List[Dict]:

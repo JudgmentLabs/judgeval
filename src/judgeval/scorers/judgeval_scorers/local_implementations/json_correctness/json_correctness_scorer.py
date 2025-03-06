@@ -1,15 +1,15 @@
-from typing import List, Optional, Union, Any
+from typing import Optional, Union, Any
 from pydantic import BaseModel, ValidationError, create_model
 
 from judgeval.constants import APIScorer
 from judgeval.judges import JudgevalJudge
 from judgeval.judges.utils import create_judge
-from judgeval.scorers.utils import (get_or_create_event_loop,
-                                    scorer_progress_meter,
-                                    create_verbose_logs,
-                                    parse_response_json,
-                                    check_example_params
-                                    )
+from judgeval.scorers.utils import (
+    get_or_create_event_loop,
+    scorer_progress_meter,
+    create_verbose_logs,
+    check_example_params
+)
 from judgeval.scorers import JudgevalScorer
 from judgeval.data import Example, ExampleParams
 

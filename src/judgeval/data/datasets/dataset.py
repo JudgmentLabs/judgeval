@@ -1,13 +1,12 @@
 import ast
 import csv
-import datetime 
+import datetime
 import json
-from dataclasses import dataclass, field
 import os
-from typing import List, Optional, Union, Literal
+from dataclasses import dataclass, field
+from typing import List, Union, Literal
 
-from judgeval.data.datasets.ground_truth import GroundTruthExample
-from judgeval.data import Example
+from judgeval.data import Example, GroundTruthExample
 from judgeval.common.logger import debug, error, warning, info
 
 @dataclass

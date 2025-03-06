@@ -1,8 +1,5 @@
 import pytest
 import asyncio
-import json
-from unittest.mock import MagicMock, patch
-from rich.console import Console
 
 from judgeval.scorers.utils import (
     clone_scorers,

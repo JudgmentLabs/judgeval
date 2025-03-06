@@ -2,12 +2,13 @@ from typing import List, Optional, Union
 import asyncio
 
 from judgeval.constants import APIScorer
-from judgeval.scorers.utils import (get_or_create_event_loop,
-                                    scorer_progress_meter,
-                                    create_verbose_logs,
-                                    parse_response_json,
-                                    check_example_params
-                                    )
+from judgeval.scorers.utils import (
+    get_or_create_event_loop,
+    scorer_progress_meter,
+    create_verbose_logs,
+    parse_response_json,
+    check_example_params
+)
 from judgeval.scorers import JudgevalScorer
 from judgeval.judges import JudgevalJudge
 from judgeval.judges.utils import create_judge

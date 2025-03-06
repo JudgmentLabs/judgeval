@@ -3,11 +3,13 @@ from unittest.mock import AsyncMock, Mock, patch
 from rich.progress import Progress, SpinnerColumn, TextColumn
 import asyncio
 
-from judgeval.scorers.score import (safe_a_score_example, 
-                                    score_task, 
-                                    score_with_indicator,
-                                    a_execute_scoring,
-                                    a_eval_examples_helper)
+from judgeval.scorers.score import (
+    safe_a_score_example, 
+    score_task, 
+    score_with_indicator, 
+    a_execute_scoring, 
+    a_eval_examples_helper
+)
 from judgeval.scorers import JudgevalScorer
 from judgeval.data import Example, ScoringResult, ProcessExample, ScorerData
 from judgeval.common.exceptions import MissingTestCaseParamsError

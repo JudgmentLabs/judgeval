@@ -1,7 +1,7 @@
 import pytest
-from pydantic import BaseModel, Field
+from pydantic import Field
 from unittest.mock import MagicMock, AsyncMock
-from typing import List, Dict, Any
+from typing import List, Any
 
 from judgeval.data import Example
 from judgeval.scorers.prompt_scorer import PromptScorer, ClassifierScorer

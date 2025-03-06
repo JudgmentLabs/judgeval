@@ -2,7 +2,6 @@ import pytest
 from judgeval.judges.base_judge import JudgevalJudge
 from judgeval.judges.litellm_judge import LiteLLMJudge
 from pydantic import BaseModel
-import pytest_asyncio
 
 # Base Judge
 def test_cannot_instantiate_abstract_class():

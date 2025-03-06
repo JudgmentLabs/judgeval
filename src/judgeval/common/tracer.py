@@ -1,53 +1,45 @@
 """
 Tracing system for judgeval that allows for function tracing using decorators.
 """
-
+# Standard library imports
+import asyncio
+import functools
+import inspect
+import json
 import os
 import time
-import functools
-import requests
 import uuid
+import warnings
 from contextlib import contextmanager
-from typing import (
-    Optional, 
-    Any, 
-    List, 
-    Literal, 
-    Tuple, 
-    Generator, 
-    TypeAlias, 
-    Union
-)
-from dataclasses import (
-    dataclass, 
-    field
-)
-from datetime import datetime 
+from dataclasses import dataclass, field
+from datetime import datetime
+from http import HTTPStatus
+from typing import Any, Dict, Generator, List, Literal, Optional, Tuple, TypeAlias, Union
+
+# Third-party imports
+import pika
+import requests
+from pydantic import BaseModel
+from rich import print as rprint
 from openai import OpenAI
 from together import Together
 from anthropic import Anthropic
-from typing import Dict
-import inspect
-import asyncio
-import json
-import warnings
-from pydantic import BaseModel
-from http import HTTPStatus
 
-import pika
-import os
-
-from judgeval.constants import JUDGMENT_TRACES_SAVE_API_URL, JUDGMENT_TRACES_FETCH_API_URL, RABBITMQ_HOST, RABBITMQ_PORT, RABBITMQ_QUEUE, JUDGMENT_TRACES_DELETE_API_URL
+# Local application/library-specific imports
+from judgeval.constants import (
+    JUDGMENT_TRACES_SAVE_API_URL,
+    JUDGMENT_TRACES_FETCH_API_URL,
+    RABBITMQ_HOST,
+    RABBITMQ_PORT,
+    RABBITMQ_QUEUE,
+    JUDGMENT_TRACES_DELETE_API_URL
+)
 from judgeval.judgment_client import JudgmentClient
 from judgeval.data import Example
 from judgeval.scorers import APIJudgmentScorer, JudgevalScorer, ScorerWrapper
 from judgeval.rules import Rule
 from judgeval.evaluation_run import EvaluationRun
-from judgeval.judges import JudgevalJudge
 
-from rich import print as rprint
-
-from judgeval.data.result import ScoringResult
 
 # Define type aliases for better code readability and maintainability
 ApiClient: TypeAlias = Union[OpenAI, Together, Anthropic]  # Supported API clients

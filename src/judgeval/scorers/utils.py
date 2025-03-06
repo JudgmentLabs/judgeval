@@ -11,7 +11,7 @@ import re
 from contextlib import contextmanager
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.console import Console
-from typing import List, Optional, Any
+from typing import List, Optional
 
 from judgeval.scorers import JudgevalScorer
 from judgeval.data import Example, ExampleParams

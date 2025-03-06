@@ -2,8 +2,6 @@
 Tests for the Rule Engine's ability to skip missing metrics.
 """
 
-import pytest
-from uuid import uuid4
 from judgeval.rules import Rule, Condition, Operator, AlertStatus, RulesEngine
 from judgeval.scorers import APIJudgmentScorer
 

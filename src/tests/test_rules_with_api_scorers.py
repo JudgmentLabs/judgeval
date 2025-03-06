@@ -1,7 +1,6 @@
 """Tests to verify rules work correctly with API scorers."""
 
 import pytest
-from typing import Dict, List, Any
 from unittest.mock import MagicMock, patch
 
 from judgeval.rules import Rule, Condition, Operator, RulesEngine, AlertStatus
