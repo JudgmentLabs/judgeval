@@ -14,6 +14,7 @@ from judgeval.scorers.judgeval_scorers.api_scorers import (
     AnswerRelevancyScorer as APIAnswerRelevancyScorer,
     AnswerCorrectnessScorer as APIAnswerCorrectnessScorer,  
     ComparisonScorer as APIComparisonScorer,
+    InstructionAdherenceScorer as APIInstructionAdherenceScorer,
 )
 
 from judgeval.scorers.judgeval_scorers.local_implementations import (
@@ -27,7 +28,8 @@ from judgeval.scorers.judgeval_scorers.local_implementations import (
     HallucinationScorer as LocalHallucinationScorer,
     SummarizationScorer as LocalSummarizationScorer,
     AnswerCorrectnessScorer as LocalAnswerCorrectnessScorer,
-    ComparisonScorer as LocalComparisonScorer
+    ComparisonScorer as LocalComparisonScorer,
+    InstructionAdherenceScorer as LocalInstructionAdherenceScorer,
 )
 
 from judgeval.scorers.judgeval_scorers.classifiers import Text2SQLScorer
@@ -134,6 +136,11 @@ ContextualPrecisionScorer = ScorerWrapper(
 ContextualRecallScorer = ScorerWrapper(
     api_implementation=APIContextualRecallScorer,
     local_implementation=LocalContextualRecallScorer
+)
+
+InstructionAdherenceScorer = ScorerWrapper(
+    api_implementation=APIInstructionAdherenceScorer,
+    local_implementation=LocalInstructionAdherenceScorer
 )
 
 def ComparisonScorer(threshold: float, criteria: str, description: str):
