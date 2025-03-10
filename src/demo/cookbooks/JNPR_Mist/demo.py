@@ -1072,188 +1072,181 @@ def has_error(state: TextToESState) -> str:
         return "error"
     return "continue"
 
+@judgment.observe(span_type="Function")
 async def text2es_pipeline():
     # Initialize Elasticsearch with sample data
     if not elasticsearch_client.init_elasticsearch():
         print("ERROR: Failed to initialize Elasticsearch. Exiting.")
         return "Elasticsearch initialization failed"
-    with judgment.trace(
-        name="JNPR_Mist_Run_1",
-        project_name="JNPR_Mist",
-        overwrite=True
-    ) as trace:
-        # Initialize the graph
-        workflow = StateGraph(TextToESState)
-        
-        # Add nodes directly without wrapping
-        workflow.add_node("extract_entities", extract_entities)
-        workflow.add_node("validate_entities", validate_entities)
-        workflow.add_node("select_index", select_index)
-        workflow.add_node("get_field_values", get_field_values)
-        workflow.add_node("generate_query", generate_query)
-        workflow.add_node("process_query", process_query)
-        workflow.add_node("execute_query", execute_query)
-        workflow.add_node("format_response", format_response)
-        workflow.add_node("handle_error", handle_error)
-        
-        workflow.set_entry_point("extract_entities")
-        
-        # Add conditional edges with correct parameter structure
-        workflow.add_conditional_edges(
-            "extract_entities",
-            has_error,
-            {
-                "error": "handle_error",
-                "continue": "validate_entities"
-            }
-        )
-        
-        workflow.add_conditional_edges(
-            "validate_entities",
-            has_error,
-            {
-                "error": "handle_error",
-                "continue": "select_index"
-            }
-        )
-        
-        workflow.add_conditional_edges(
-            "select_index",
-            has_error,
-            {
-                "error": "handle_error",
-                "continue": "get_field_values"
-            }
-        )
-        
-        workflow.add_conditional_edges(
-            "get_field_values",
-            has_error,
-            {
-                "error": "handle_error",
-                "continue": "generate_query"
-            }
-        )
-        
-        workflow.add_conditional_edges(
-            "generate_query",
-            has_error,
-            {
-                "error": "handle_error",
-                "continue": "process_query"
-            }
-        )
-        
-        workflow.add_conditional_edges(
-            "process_query",
-            has_error,
-            {
-                "error": "handle_error",
-                "continue": "execute_query"
-            }
-        )
-        
-        workflow.add_conditional_edges(
-            "execute_query",
-            has_error,
-            {
-                "error": "handle_error",
-                "continue": "format_response"
-            }
-        )
-        
-        # We don't need conditional edges for format_response as it's a finish point
-        
-        # Set finish points
-        workflow.set_finish_point("format_response")
-        workflow.set_finish_point("handle_error")
-        
-        # Compile the workflow
-        app = workflow.compile()
-
-        handler = JudgevalCallbackHandler(trace)
-        
-        # Test queries to evaluate the end-to-end workflow
-        test_queries = [
-            "Show me all disconnected access points",
-            "How many switches are in Building B?",
-            "List all devices in the Data Center",
-            "Show me the connection status of user john.doe",
-            "When did AP-102 last disconnect?",
-            "What's the status of Building A?"
-        ]
-        
-        # Run the workflow for each test query
-        # config = {"recursion_limit": 25, "callbacks": [handler]}
-        config = dict(callbacks=[handler])
-        
-        print("=" * 50)
-        print("TESTING TEXT-TO-ELASTICSEARCH PIPELINE")
-        print("=" * 50)
-        
-        for query in test_queries[3:4]:
-            print("\n" + "-" * 50)
-            print(f"QUERY: {query}")
-            print("-" * 50)
-            
-            try:
-                # Run the workflow with the query
-                result = await app.ainvoke(
-                    {
-                        "messages": [HumanMessage(content=query)],
-                        "user_query": query,
-                        "entities": None,
-                        "validated_entities": None,
-                        "selected_index": None,
-                        "index_mappings": None,
-                        "essential_fields": None,
-                        "field_values": None,
-                        "selected_field_values": None,
-                        "es_query": None,
-                        "processed_query": None,
-                        "query_results": None,
-                        "final_response": None,
-                        "error": None
-                    },
-                    config=config
-                )
-
-                trace.save()
-                
-                # Print intermediate results
-                print("\nExtracted Entities:")
-                print(json.dumps(result.get("entities", []), indent=2))
-                
-                print("\nValidated Entities:")
-                print(json.dumps(result.get("validated_entities", []), indent=2))
-                
-                print("\nSelected Index:")
-                print(result.get("selected_index", "None"))
-                
-                if "selected_field_values" in result:
-                    print("\nSelected Field Values:")
-                    print(json.dumps(result.get("selected_field_values", {}), indent=2))
-                
-                if "es_query" in result:
-                    print("\nGenerated ES Query:")
-                    print(json.dumps(result.get("es_query", {}), indent=2))
-                    
-                if "processed_query" in result:
-                    print("\nProcessed ES Query:")
-                    print(json.dumps(result.get("processed_query", {}), indent=2))
-                
-                # Print the final result
-                if result.get("error"):
-                    print(f"\nERROR: {result['error']}")
-                else:
-                    print(f"\nFINAL RESPONSE: {result['final_response']}")
-            
-            except Exception as e:
-                print(f"\nWorkflow execution error: {str(e)}")
-        
+    # Initialize the graph
+    workflow = StateGraph(TextToESState)
     
+    # Add nodes directly without wrapping
+    workflow.add_node("extract_entities", extract_entities)
+    workflow.add_node("validate_entities", validate_entities)
+    workflow.add_node("select_index", select_index)
+    workflow.add_node("get_field_values", get_field_values)
+    workflow.add_node("generate_query", generate_query)
+    workflow.add_node("process_query", process_query)
+    workflow.add_node("execute_query", execute_query)
+    workflow.add_node("format_response", format_response)
+    workflow.add_node("handle_error", handle_error)
+    
+    workflow.set_entry_point("extract_entities")
+    
+    # Add conditional edges with correct parameter structure
+    workflow.add_conditional_edges(
+        "extract_entities",
+        has_error,
+        {
+            "error": "handle_error",
+            "continue": "validate_entities"
+        }
+    )
+    
+    workflow.add_conditional_edges(
+        "validate_entities",
+        has_error,
+        {
+            "error": "handle_error",
+            "continue": "select_index"
+        }
+    )
+    
+    workflow.add_conditional_edges(
+        "select_index",
+        has_error,
+        {
+            "error": "handle_error",
+            "continue": "get_field_values"
+        }
+    )
+    
+    workflow.add_conditional_edges(
+        "get_field_values",
+        has_error,
+        {
+            "error": "handle_error",
+            "continue": "generate_query"
+        }
+    )
+    
+    workflow.add_conditional_edges(
+        "generate_query",
+        has_error,
+        {
+            "error": "handle_error",
+            "continue": "process_query"
+        }
+    )
+    
+    workflow.add_conditional_edges(
+        "process_query",
+        has_error,
+        {
+            "error": "handle_error",
+            "continue": "execute_query"
+        }
+    )
+    
+    workflow.add_conditional_edges(
+        "execute_query",
+        has_error,
+        {
+            "error": "handle_error",
+            "continue": "format_response"
+        }
+    )
+    
+    # We don't need conditional edges for format_response as it's a finish point
+    
+    # Set finish points
+    workflow.set_finish_point("format_response")
+    workflow.set_finish_point("handle_error")
+    
+    # Compile the workflow
+    app = workflow.compile()
+
+    handler = JudgevalCallbackHandler(judgment.get_current_trace())
+    
+    # Test queries to evaluate the end-to-end workflow
+    test_queries = [
+        "Show me all disconnected access points",
+        "How many switches are in Building B?",
+        "List all devices in the Data Center",
+        "Show me the connection status of user john.doe",
+        "When did AP-102 last disconnect?",
+        "What's the status of Building A?"
+    ]
+    
+    # Run the workflow for each test query
+    config = dict(callbacks=[handler])
+    
+    print("=" * 50)
+    print("TESTING TEXT-TO-ELASTICSEARCH PIPELINE")
+    print("=" * 50)
+    
+    for query in test_queries[3:4]:
+        print("\n" + "-" * 50)
+        print(f"QUERY: {query}")
+        print("-" * 50)
         
-        return "Pipeline testing completed"
+        try:
+            # Run the workflow with the query
+            result = await app.ainvoke(
+                {
+                    "messages": [HumanMessage(content=query)],
+                    "user_query": query,
+                    "entities": None,
+                    "validated_entities": None,
+                    "selected_index": None,
+                    "index_mappings": None,
+                    "essential_fields": None,
+                    "field_values": None,
+                    "selected_field_values": None,
+                    "es_query": None,
+                    "processed_query": None,
+                    "query_results": None,
+                    "final_response": None,
+                    "error": None
+                },
+                config=config
+            )
+            
+            # Print intermediate results
+            print("\nExtracted Entities:")
+            print(json.dumps(result.get("entities", []), indent=2))
+            
+            print("\nValidated Entities:")
+            print(json.dumps(result.get("validated_entities", []), indent=2))
+            
+            print("\nSelected Index:")
+            print(result.get("selected_index", "None"))
+            
+            if "selected_field_values" in result:
+                print("\nSelected Field Values:")
+                print(json.dumps(result.get("selected_field_values", {}), indent=2))
+            
+            if "es_query" in result:
+                print("\nGenerated ES Query:")
+                print(json.dumps(result.get("es_query", {}), indent=2))
+                
+            if "processed_query" in result:
+                print("\nProcessed ES Query:")
+                print(json.dumps(result.get("processed_query", {}), indent=2))
+            
+            # Print the final result
+            if result.get("error"):
+                print(f"\nERROR: {result['error']}")
+            else:
+                print(f"\nFINAL RESPONSE: {result['final_response']}")
+        
+        except Exception as e:
+            print(f"\nWorkflow execution error: {str(e)}")
+    
+
+    
+    return "Pipeline testing completed"
 
 if __name__ == "__main__":
     asyncio.run(text2es_pipeline())
