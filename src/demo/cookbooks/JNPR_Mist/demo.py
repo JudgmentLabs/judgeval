@@ -1241,6 +1241,7 @@ async def text2es_pipeline():
                 print(f"\nERROR: {result['error']}")
             else:
                 print(f"\nFINAL RESPONSE: {result['final_response']}")
+            return result
         
         except Exception as e:
             print(f"\nWorkflow execution error: {str(e)}")

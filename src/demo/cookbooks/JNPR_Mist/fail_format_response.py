@@ -364,7 +364,7 @@ def handle_error(state: Dict[str, Any]) -> TextToESState:
     
     error = state.get("error", "Unknown error")
     
-    return {**state, "final_response": f"Error: {error}"}
+    return {**state, "final_response": f"{state.get('final_response', '')} \n\n Error: {error}"}
 
 def has_error(state: TextToESState) -> str:
     """Route to error handler if state has an error."""
