@@ -715,6 +715,11 @@ class Tracer:
         trace_id = str(uuid.uuid4())
         project = project_name if project_name is not None else self.project_name
 
+        # Reset depth if this is a top-level trace (not nested in another trace)
+        is_top_level = self._current_trace is None
+        if is_top_level:
+            self.depth = 0  # Reset depth counter for new top-level traces
+
         trace = TraceClient(
             self, 
             trace_id, 
@@ -734,6 +739,9 @@ class Tracer:
                 yield trace
             finally:
                 self._current_trace = prev_trace
+                # Reset depth to 0 if this was a top-level trace
+                if is_top_level:
+                    self.depth = 0
                 
     def get_current_trace(self) -> Optional[TraceClient]:
         """
