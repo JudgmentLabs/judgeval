@@ -4,6 +4,8 @@ from typing import Any, Dict, List, Optional, Union, Annotated
 from typing_extensions import TypedDict
 import json
 import asyncio
+import time
+import random
 from uuid import uuid4
 
 from dotenv import load_dotenv
@@ -67,6 +69,9 @@ def safe_json_extract(content: str) -> Any:
 @judgment.observe(span_type="NLP")
 def extract_entities(state: Dict[str, Any]) -> TextToESState:
     """Extract named entities from the user query."""
+    # Add sleep between 300ms - 1.0s
+    time.sleep(random.uniform(0.3, 1.0))
+    
     user_query = state["user_query"]
     
     # For this test, we'll provide valid entities
@@ -98,6 +103,9 @@ def extract_entities(state: Dict[str, Any]) -> TextToESState:
 @judgment.observe(span_type="NLP")
 def validate_entities(state: Dict[str, Any]) -> TextToESState:
     """Validate entities from the extraction step."""
+    # Add sleep between 300ms - 1.0s
+    time.sleep(random.uniform(0.3, 1.0))
+    
     entities = state.get("entities", [])
     
     # Simple validation to pass through to the next step
@@ -108,6 +116,9 @@ def validate_entities(state: Dict[str, Any]) -> TextToESState:
 @judgment.observe(span_type="Search")
 def select_index(state: Dict[str, Any]) -> TextToESState:
     """Select the appropriate Elasticsearch index."""
+    # Add sleep between 300ms - 1.0s
+    time.sleep(random.uniform(0.3, 1.0))
+    
     user_query = state["user_query"]
     validated_entities = state.get("validated_entities", [])
     
@@ -138,6 +149,9 @@ def select_index(state: Dict[str, Any]) -> TextToESState:
 @judgment.observe(span_type="NLP")
 def get_field_values(state: Dict[str, Any]) -> TextToESState:
     """Get field values for query generation."""
+    # Add sleep between 300ms - 1.0s
+    time.sleep(random.uniform(0.3, 1.0))
+    
     # Provide valid field values
     field_values = {
         "status": ["connected", "disconnected", "provisioning"],
@@ -154,6 +168,9 @@ def get_field_values(state: Dict[str, Any]) -> TextToESState:
 @judgment.observe(span_type="Query")
 def generate_query(state: Dict[str, Any]) -> TextToESState:
     """Generate an Elasticsearch query."""
+    # Add sleep between 300ms - 1.0s
+    time.sleep(random.uniform(0.3, 1.0))
+    
     user_query = state["user_query"]
     validated_entities = state.get("validated_entities", [])
     selected_index = state["selected_index"]
@@ -176,6 +193,9 @@ def generate_query(state: Dict[str, Any]) -> TextToESState:
 @judgment.observe(span_type="Query")
 def process_query(state: Dict[str, Any]) -> TextToESState:
     """Process the Elasticsearch query."""
+    # Add sleep between 300ms - 1.0s
+    time.sleep(random.uniform(0.3, 1.0))
+    
     es_query = state.get("es_query", {})
     
     # Simple pass-through in this test case
@@ -186,6 +206,9 @@ def process_query(state: Dict[str, Any]) -> TextToESState:
 @judgment.observe(span_type="Database")
 def execute_query(state: Dict[str, Any]) -> TextToESState:
     """Execute the Elasticsearch query and return mock results."""
+    # Add sleep between 300ms - 1.0s
+    time.sleep(random.uniform(0.3, 1.0))
+    
     processed_query = state.get("processed_query", {})
     
     # Mock query results showing disconnected access points
@@ -262,6 +285,9 @@ def execute_query(state: Dict[str, Any]) -> TextToESState:
 @judgment.observe(span_type="Response")
 def format_response(state: Dict[str, Any]) -> TextToESState:
     """Format the response for the user with intentional unfaithfulness."""
+    # Add sleep between 300ms - 1.0s
+    time.sleep(random.uniform(0.3, 1.0))
+    
     user_query = state["user_query"]
     query_results = state.get("query_results", {})
     
@@ -333,6 +359,9 @@ def format_response(state: Dict[str, Any]) -> TextToESState:
 @judgment.observe(span_type="Error")
 def handle_error(state: Dict[str, Any]) -> TextToESState:
     """Handle errors in the pipeline."""
+    # Add sleep between 300ms - 1.0s
+    time.sleep(random.uniform(0.3, 1.0))
+    
     error = state.get("error", "Unknown error")
     
     return {**state, "final_response": f"Error: {error}"}
@@ -346,6 +375,9 @@ def has_error(state: TextToESState) -> str:
 @judgment.observe(span_type="function")
 async def fail_format_response_pipeline():
     """Main pipeline function that demonstrates failure in response formatting."""
+    # Add sleep between 300ms - 1.0s before starting the pipeline
+    time.sleep(random.uniform(0.3, 1.0))
+    
     # Initialize the graph
     workflow = StateGraph(TextToESState)
     

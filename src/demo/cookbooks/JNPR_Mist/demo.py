@@ -58,12 +58,13 @@ R = TypeVar("R")
 load_dotenv()
 
 # Update OpenAI model name to a valid one
-OPENAI_MODEL = "gpt-4-turbo-preview"
+OPENAI_MODEL = "gpt-4o-mini"
 
 # Initialize clients
 openai_client = ChatOpenAI(api_key=os.getenv("OPENAI_API_KEY"), model=OPENAI_MODEL)
 judgment = Tracer(
     api_key=os.getenv("JUDGMENT_API_KEY"),
+    project_name="text_to_es"
 )
 
 # Define our state type
