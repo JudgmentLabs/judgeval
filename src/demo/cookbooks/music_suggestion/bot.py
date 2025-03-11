@@ -10,7 +10,7 @@ load_dotenv()
 
 # Initialize OpenAI client and Judgment tracer
 client = wrap(OpenAI())
-judgment = Tracer(project_name="music_suggestion_bot")
+judgment = Tracer(project_name="music-bot-demo")
 
 @judgment.observe(span_type="tool")
 async def search_tavily(query):
