@@ -1,0 +1,118 @@
+---
+title: 'Rules'
+description: 'Define custom triggers and conditions for your evaluation metrics'
+---
+
+# Rules
+
+Rules allow you to define specific conditions for your evaluation metrics that can trigger alerts and notifications when met. They serve as the foundation for the alerting system and help you monitor your AI system's performance against predetermined thresholds.
+
+## Overview
+
+A rule consists of one or more conditions, each tied to a specific metric (like faithfulness or relevancy scores). When evaluations are performed, the rules engine checks if the measured scores satisfy the conditions set in your rules. Based on the rule's configuration, alerts can be triggered and notifications sent through various channels.
+
+<Note>
+Rules and notifications only work with built-in APIScorers. Local scorers and custom scorers are not supported for triggering rules.
+</Note>
+
+## Creating Rules
+
+Rules can be created using the `Rule` class from the `judgeval.rules` module. Each rule requires:
+
+- A name
+- A list of conditions
+- A combine type (how conditions should be evaluated together)
+
+Optional parameters include:
+- A description
+- Notification configuration
+
+### Basic Rule Structure
+
+```python
+from judgeval.rules import Rule, Condition, Operator
+from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
+
+# Create a rule
+rule = Rule(
+    name="Quality Check",
+    description="Check if quality metrics meet thresholds",
+    conditions=[
+        Condition(metric=FaithfulnessScorer(threshold=0.7), operator=Operator.GTE, threshold=0.7),
+        Condition(metric=AnswerRelevancyScorer(threshold=0.8), operator=Operator.GTE, threshold=0.8)
+    ],
+    combine_type="all"  # "all" = AND, "any" = OR
+)
+```
+
+## Conditions
+
+Conditions are the building blocks of rules. Each condition specifies:
+
+1. A metric (must be a built-in APIScorer like FaithfulnessScorer or AnswerRelevancyScorer)
+2. An operator (like GTE for "greater than or equal")
+3. A threshold value
+
+When the rule is evaluated, each condition is checked to see if the actual score meets the condition.
+
+### Available Operators
+
+| Operator | Description | Symbol |
+|----------|-------------|--------|
+| `Operator.GTE` | Greater than or equal to | {'>='}  |
+| `Operator.LTE` | Less than or equal to | {'<='}  |
+| `Operator.GT` | Greater than | {'>'}  |
+| `Operator.LT` | Less than | {'<'}  |
+| `Operator.EQ` | Equal to | {'=='}  |
+| `Operator.NEQ` | Not equal to | {'!='}  |
+
+### Creating Conditions
+
+```python
+from judgeval.rules import Condition, Operator
+from judgeval.scorers import FaithfulnessScorer
+
+# Create a condition that passes when faithfulness score is greater than or equal to 0.7
+condition = Condition(
+    metric=FaithfulnessScorer(threshold=0.7), 
+    operator=Operator.GTE, 
+    threshold=0.7
+)
+```
+
+## Combine Types
+
+Rules support two combine types that determine how multiple conditions are evaluated:
+
+- `"all"`: All conditions must be met (logical AND)
+- `"any"`: At least one condition must be met (logical OR)
+
+## Using Rules with the Tracer
+
+Rules are most commonly used with the `Tracer` to monitor your AI system's performance:
+
+```python
+from judgeval.common.tracer import Tracer
+from judgeval.rules import Rule, Condition, Operator
+from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
+
+# Create rules
+rules = [
+    Rule(
+        name="Quality Check",
+        description="Check if quality metrics meet thresholds",
+        conditions=[
+            Condition(metric=FaithfulnessScorer(threshold=0.7), operator=Operator.GTE, threshold=0.7),
+            Condition(metric=AnswerRelevancyScorer(threshold=0.8), operator=Operator.GTE, threshold=0.8)
+        ],
+        combine_type="all"
+    )
+]
+
+# Initialize tracer with rules
+judgment = Tracer(
+    api_key="your_api_key", 
+    project_name="your_project", 
+    rules=rules
+)
+``` 

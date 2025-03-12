@@ -1,0 +1,156 @@
+---
+title: 'Notifications'
+description: 'Get alerted when your rules trigger through multiple communication channels'
+---
+
+# Notifications
+
+Notifications allow you to receive alerts through various communication channels when your rules are triggered. This feature helps you stay informed about potential issues with your AI system's performance in real-time.
+
+## Overview
+
+The notification system works in conjunction with the rules system to:
+
+1. Monitor your evaluation metrics
+2. Check if they meet your defined conditions
+3. Send alerts through your preferred channels when conditions are met
+
+Notifications can be configured globally or per rule, allowing you to customize how you're alerted based on the specific rule that was triggered.
+
+<Warning>
+Rules and notifications only work with built-in APIScorers. Local scorers and custom scorers are not supported for triggering notifications.
+</Warning>
+
+## Notification Configuration
+
+Notifications are configured using the `NotificationConfig` class from the `judgeval.rules` module.
+
+### Configuration Options
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `enabled` | boolean | Whether notifications are enabled (default: `True`) |
+| `communication_methods` | list of strings | The methods to use for sending notifications (e.g., `["email", "slack"]`) |
+| `message_template` | string | A template string for customizing the notification message |
+| `email_addresses` | list of strings | Email addresses to send notifications to |
+| `send_at` | integer (Unix timestamp) | Schedule notifications for a specific time |
+
+### Basic Configuration
+
+```python
+from judgeval.rules import NotificationConfig
+
+# Create a notification configuration
+notification_config = NotificationConfig(
+    enabled=True,
+    communication_methods=["slack", "email"],
+    message_template="Rule '{rule_name}' was triggered with score {score}",
+    email_addresses=["user@example.com"],
+    send_at=None  # Send immediately
+)
+```
+
+## Communication Methods
+
+JudgEval supports multiple communication methods for notifications:
+
+- `"email"`: Send emails to specified email addresses
+- `"slack"`: Send messages to configured Slack channels
+
+You can configure multiple methods to be used simultaneously.
+
+## Attaching Notifications to Rules
+
+Notifications can be attached to rules during rule creation or added/configured later.
+
+### During Rule Creation
+
+```python
+from judgeval.rules import Rule, Condition, Operator, NotificationConfig
+from judgeval.scorers import FaithfulnessScorer
+
+# Create notification config
+notification_config = NotificationConfig(
+    enabled=True,
+    communication_methods=["slack", "email"],
+    email_addresses=["user@example.com"]
+)
+
+# Create rule with notification config
+rule = Rule(
+    name="Faithfulness Check",
+    description="Check if faithfulness meets threshold",
+    conditions=[
+        # Note: Only built-in APIScorers are supported
+        Condition(metric=FaithfulnessScorer(threshold=0.7), operator=Operator.GTE, threshold=0.7)
+    ],
+    combine_type="all",
+    notification=notification_config
+)
+```
+
+## Scheduled Notifications
+
+You can schedule notifications to be sent at a specific time using the `send_at` parameter:
+
+```python
+from judgeval.rules import NotificationConfig
+import time
+
+# Schedule notification for 1 hour from now
+one_hour_from_now = int(time.time()) + 3600
+
+notification_config = NotificationConfig(
+    enabled=True,
+    communication_methods=["email"],
+    email_addresses=["user@example.com"],
+    send_at=one_hour_from_now
+)
+```
+
+## Practical Example
+
+Here's a complete example showing how to set up rules with notifications and integrate them with the Tracer:
+
+```python
+import os
+from judgeval.common.tracer import Tracer, wrap
+from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
+from judgeval.rules import Rule, Condition, Operator, NotificationConfig
+from openai import OpenAI
+
+# Create notification config
+notification_config = NotificationConfig(
+    enabled=True,
+    communication_methods=["slack", "email"],
+    email_addresses=["alerts@example.com"],
+    send_at=None  # Send immediately
+)
+
+# Create rules with notification config
+rules = [
+    Rule(
+        name="Quality Check",
+        description="Check if all quality metrics meet thresholds",
+        conditions=[
+            # Only built-in APIScorers can be used as metrics
+            Condition(metric=FaithfulnessScorer(threshold=0.7), operator=Operator.GTE, threshold=0.7),
+            Condition(metric=AnswerRelevancyScorer(threshold=0.8), operator=Operator.GTE, threshold=0.8)
+        ],
+        combine_type="all",  # Require all conditions to trigger
+        notification=notification_config
+    )
+]
+
+# Initialize tracer with rules for notifications
+judgment = Tracer(
+    api_key=os.getenv("JUDGMENT_API_KEY"), 
+    project_name="my_project", 
+    rules=rules
+)
+
+# Wrap OpenAI client for tracing
+client = wrap(OpenAI())
+
+# Now any evaluations that trigger the rules will send notifications
+``` 

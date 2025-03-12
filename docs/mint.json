@@ -83,6 +83,13 @@
       ]
     },
     {
+      "group": "Alerting",
+      "pages": [
+        "alerting/rules",
+        "alerting/notifications"
+      ]
+    },
+    {
       "group": "Judgment Platform",
       "pages": [
         "judgment/introduction"
