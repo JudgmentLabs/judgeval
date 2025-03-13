@@ -66,7 +66,7 @@ Notifications can be attached to rules during rule creation or added/configured 
 ### During Rule Creation
 
 ```python
-from judgeval.rules import Rule, Condition, Operator, NotificationConfig
+from judgeval.rules import Rule, Condition, NotificationConfig
 from judgeval.scorers import FaithfulnessScorer
 
 # Create notification config
@@ -82,9 +82,9 @@ rule = Rule(
     description="Check if faithfulness meets threshold",
     conditions=[
         # Note: Only built-in APIScorers are supported
-        Condition(metric=FaithfulnessScorer(threshold=0.7), operator=Operator.GTE, threshold=0.7)
+        Condition(metric=FaithfulnessScorer(threshold=0.7))
     ],
-    combine_type="all",
+    combine_type="all",  # Trigger when all conditions fail
     notification=notification_config
 )
 ```
@@ -116,7 +116,7 @@ Here's a complete example showing how to set up rules with notifications and int
 import os
 from judgeval.common.tracer import Tracer, wrap
 from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
-from judgeval.rules import Rule, Condition, Operator, NotificationConfig
+from judgeval.rules import Rule, Condition, NotificationConfig
 from openai import OpenAI
 
 # Create notification config
@@ -134,10 +134,10 @@ rules = [
         description="Check if all quality metrics meet thresholds",
         conditions=[
             # Only built-in APIScorers can be used as metrics
-            Condition(metric=FaithfulnessScorer(threshold=0.7), operator=Operator.GTE, threshold=0.7),
-            Condition(metric=AnswerRelevancyScorer(threshold=0.8), operator=Operator.GTE, threshold=0.8)
+            Condition(metric=FaithfulnessScorer(threshold=0.7)),
+            Condition(metric=AnswerRelevancyScorer(threshold=0.8))
         ],
-        combine_type="all",  # Require all conditions to trigger
+        combine_type="all",  # Trigger when all conditions fail
         notification=notification_config
     )
 ]

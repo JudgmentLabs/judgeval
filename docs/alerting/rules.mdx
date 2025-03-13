@@ -30,7 +30,7 @@ Optional parameters include:
 ### Basic Rule Structure
 
 ```python
-from judgeval.rules import Rule, Condition, Operator
+from judgeval.rules import Rule, Condition
 from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
 
 # Create a rule
@@ -38,8 +38,8 @@ rule = Rule(
     name="Quality Check",
     description="Check if quality metrics meet thresholds",
     conditions=[
-        Condition(metric=FaithfulnessScorer(threshold=0.7), operator=Operator.GTE, threshold=0.7),
-        Condition(metric=AnswerRelevancyScorer(threshold=0.8), operator=Operator.GTE, threshold=0.8)
+        Condition(metric=FaithfulnessScorer(threshold=0.7)),
+        Condition(metric=AnswerRelevancyScorer(threshold=0.8))
     ],
     combine_type="all"  # "all" = AND, "any" = OR
 )
@@ -47,45 +47,36 @@ rule = Rule(
 
 ## Conditions
 
-Conditions are the building blocks of rules. Each condition specifies:
-
-1. A metric (must be a built-in APIScorer like FaithfulnessScorer or AnswerRelevancyScorer)
-2. An operator (like GTE for "greater than or equal")
-3. A threshold value
-
-When the rule is evaluated, each condition is checked to see if the actual score meets the condition.
-
-### Available Operators
-
-| Operator | Description | Symbol |
-|----------|-------------|--------|
-| `Operator.GTE` | Greater than or equal to | {'>='}  |
-| `Operator.LTE` | Less than or equal to | {'<='}  |
-| `Operator.GT` | Greater than | {'>'}  |
-| `Operator.LT` | Less than | {'<'}  |
-| `Operator.EQ` | Equal to | {'=='}  |
-| `Operator.NEQ` | Not equal to | {'!='}  |
+Conditions are the building blocks of rules. Each condition specifies a metric (must be a built-in APIScorer like FaithfulnessScorer or AnswerRelevancyScorer). The condition is met when the score for that metric is greater than or equal to the threshold specified in the scorer.
 
 ### Creating Conditions
 
 ```python
-from judgeval.rules import Condition, Operator
+from judgeval.rules import Condition
 from judgeval.scorers import FaithfulnessScorer
 
 # Create a condition that passes when faithfulness score is greater than or equal to 0.7
 condition = Condition(
-    metric=FaithfulnessScorer(threshold=0.7), 
-    operator=Operator.GTE, 
-    threshold=0.7
+    metric=FaithfulnessScorer(threshold=0.7)
 )
 ```
+
+### How Conditions are Evaluated
+
+When a condition is evaluated, it uses the scorer's threshold and internal evaluation logic:
+
+1. By default, a condition passes when the actual score is greater than or equal to the threshold
+2. If the scorer has a custom `success_check()` method, that method will be used instead
+3. The threshold is retrieved from the scorer's `threshold` attribute
 
 ## Combine Types
 
 Rules support two combine types that determine how multiple conditions are evaluated:
 
-- `"all"`: All conditions must be met (logical AND)
-- `"any"`: At least one condition must be met (logical OR)
+- `"all"`: The rule triggers when all conditions fail (logical AND)
+- `"any"`: The rule triggers when any condition fails (logical OR)
+
+This design is meant for setting up alerts that trigger when your metrics indicate a problem with your AI system's performance.
 
 ## Using Rules with the Tracer
 
@@ -93,7 +84,7 @@ Rules are most commonly used with the `Tracer` to monitor your AI system's perfo
 
 ```python
 from judgeval.common.tracer import Tracer
-from judgeval.rules import Rule, Condition, Operator
+from judgeval.rules import Rule, Condition
 from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
 
 # Create rules
@@ -102,10 +93,10 @@ rules = [
         name="Quality Check",
         description="Check if quality metrics meet thresholds",
         conditions=[
-            Condition(metric=FaithfulnessScorer(threshold=0.7), operator=Operator.GTE, threshold=0.7),
-            Condition(metric=AnswerRelevancyScorer(threshold=0.8), operator=Operator.GTE, threshold=0.8)
+            Condition(metric=FaithfulnessScorer(threshold=0.7)),
+            Condition(metric=AnswerRelevancyScorer(threshold=0.8))
         ],
-        combine_type="all"
+        combine_type="all"  # Trigger when all conditions fail
     )
 ]
 
