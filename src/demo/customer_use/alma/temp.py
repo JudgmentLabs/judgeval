@@ -1,22 +1,22 @@
 [
     {
-        "criteria": "Professional Tone and Clarity",
-        "description": "Maintain formal, respectful, and precise language for clear communication. Tailor the tone to suit the document's purpose and audience, enhancing professionalism and minimizing redundancy.",
+        "criteria": "Clarity and Precision",
+        "description": "Use clear, specific, and factual language to convey key points concisely. Avoid redundancy and unnecessary complexity to enhance understanding and ensure effective communication.",
     },
     {
         "criteria": "Structure and Organization",
-        "description": "Ensure logical content arrangement with a coherent flow and effective transitions. Highlight key points to enhance readability and maintain alignment with the document’s objectives.",
+        "description": "Maintain a logical and well-organized flow with coherent transitions and sections. Present content systematically to enhance readability and coherence, effectively showcasing roles and achievements.",
     },
     {
-        "criteria": "Achievements and Impact",
-        "description": "Showcase leadership and transformative contributions using specific examples and metrics. Highlight professional influence, strengths, and innovative impacts.",
+        "criteria": "Professional Tone and Context",
+        "description": "Adopt a formal tone suitable for professional communication. Use industry-specific language to enhance credibility and professionalism, aligning with standards and expectations.",
     },
     {
-        "criteria": "Use of Evidence",
-        "description": "Employ concrete examples, credentials, and precise metrics to substantiate claims. Utilize industry-specific language to bolster narrative credibility.",
+        "criteria": "Impact and Evidence",
+        "description": "Emphasize significant achievements, leadership, and innovation with quantitative data and supporting evidence. Highlight influences on societal challenges and industry advancements to underscore impact.",
     },
     {
-        "criteria": "Narrative Cohesion",
-        "description": "Maintain a smooth narrative flow with logical progression, ensuring comprehensive context and alignment with the document's goals.",
+        "criteria": "Engagement and Storytelling",
+        "description": "Utilize storytelling techniques to craft a compelling narrative. Integrate personal and professional milestones to engage the audience, illustrating significant impact and sustained contributions.",
     },
 ]
