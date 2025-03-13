@@ -2,7 +2,6 @@ import logging
 from logging.handlers import RotatingFileHandler
 import sys
 from pathlib import Path
-from datetime import datetime
 from contextlib import contextmanager
 
 # Global variables

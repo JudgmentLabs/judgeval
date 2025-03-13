@@ -1,7 +1,6 @@
 import asyncio
 import pytest
 from unittest.mock import Mock, patch
-from typing import Dict, Optional
 
 from judgeval.scorers.judgeval_scorer import JudgevalScorer
 from judgeval.judges import JudgevalJudge

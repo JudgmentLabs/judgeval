@@ -10,8 +10,9 @@ click [here](/monitoring/tracing).
 The `Tracer` class is used to trace the execution of your LLM system.
 
 ```python
-from judgeval.common.tracer import Tracer
+from judgeval.tracer import Tracer
 
+# loads from JUDGMENT_API_KEY and JUDGMENT_ORG_ID env vars
 tracer = Tracer(project_name="my_project")
 ```
 

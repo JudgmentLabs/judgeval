@@ -5,7 +5,6 @@ from datetime import datetime
 from rich import print as rprint
 
 from judgeval.data import (
-    Example, 
     ScorerData, 
     ScoringResult
 )
@@ -24,14 +23,12 @@ from judgeval.constants import (
 )
 from judgeval.common.exceptions import JudgmentAPIError
 from judgeval.common.logger import (
-    enable_logging, 
     debug, 
     info, 
     error, 
     example_logging_context
 )
 from judgeval.evaluation_run import EvaluationRun
-from judgeval.rules import RulesEngine, Rule, AlertResult, AlertStatus
 
 
 def execute_api_eval(evaluation_run: EvaluationRun) -> List[Dict]:
@@ -174,8 +171,8 @@ def check_eval_run_name_exists(eval_name: str, project_name: str, judgment_api_k
         )
         
         if response.status_code == 409:
-            error(f"Evaluation run name '{eval_name}' already exists for this project")
-            raise ValueError(f"Evaluation run name '{eval_name}' already exists for this project")
+            error(f"Eval run name '{eval_name}' already exists for this project. Please choose a different name or set the `override` flag to true.")
+            raise ValueError(f"Eval run name '{eval_name}' already exists for this project. Please choose a different name or set the `override` flag to true.")
         
         if not response.ok:
             response_data = response.json()

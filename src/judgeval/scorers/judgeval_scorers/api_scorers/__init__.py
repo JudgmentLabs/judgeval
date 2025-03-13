@@ -9,6 +9,8 @@ from judgeval.scorers.judgeval_scorers.api_scorers.contextual_recall import Cont
 from judgeval.scorers.judgeval_scorers.api_scorers.answer_relevancy import AnswerRelevancyScorer
 from judgeval.scorers.judgeval_scorers.api_scorers.answer_correctness import AnswerCorrectnessScorer
 from judgeval.scorers.judgeval_scorers.api_scorers.comparison import ComparisonScorer
+from judgeval.scorers.judgeval_scorers.api_scorers.instruction_adherence import InstructionAdherenceScorer
+from judgeval.scorers.judgeval_scorers.api_scorers.groundedness import GroundednessScorer
 
 __all__ = [
     "ToolCorrectnessScorer",
@@ -22,4 +24,6 @@ __all__ = [
     "AnswerRelevancyScorer",
     "AnswerCorrectnessScorer",
     "ComparisonScorer",
+    "InstructionAdherenceScorer",
+    "GroundednessScorer",
 ]

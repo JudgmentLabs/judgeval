@@ -7,7 +7,7 @@ import asyncio
 import json
 from typing import Dict, List, Optional
 
-from judgeval.rules import Rule, Condition, Operator, NotificationConfig, AlertStatus, RulesEngine
+from judgeval.rules import Rule, Condition, NotificationConfig, AlertStatus, RulesEngine
 from judgeval.scorers import AnswerRelevancyScorer, FaithfulnessScorer, AnswerCorrectnessScorer
 from judgeval.scorers.judgeval_scorers.api_scorers.faithfulness import FaithfulnessScorer
 from judgeval.scorers.judgeval_scorers.api_scorers.answer_relevancy import AnswerRelevancyScorer
@@ -40,7 +40,7 @@ class TestDirectNotificationIntegration:
             name="Faithfulness Check",
             description="Check if faithfulness meets threshold",
             conditions=[
-                Condition(metric=faithfulness_scorer, operator=Operator.GTE, threshold=0.7)
+                Condition(metric=faithfulness_scorer)
             ],
             combine_type="all",
             notification=notification_config
@@ -85,7 +85,7 @@ class TestDirectNotificationIntegration:
             name="Faithfulness Check",
             description="Check if faithfulness meets threshold",
             conditions=[
-                Condition(metric=faithfulness_scorer, operator=Operator.GTE, threshold=0.7)
+                Condition(metric=faithfulness_scorer)
             ],
             combine_type="all",
             notification=notification_config
@@ -162,7 +162,7 @@ class TestDirectNotificationIntegration:
         rule1 = Rule(
             name="Faithfulness Rule",
             conditions=[
-                Condition(metric=faithfulness_scorer, operator=Operator.GTE, threshold=0.7)
+                Condition(metric=faithfulness_scorer)
             ],
             combine_type="all",
             notification=notification1
@@ -171,7 +171,7 @@ class TestDirectNotificationIntegration:
         rule2 = Rule(
             name="Relevancy Rule",
             conditions=[
-                Condition(metric=relevancy_scorer, operator=Operator.GTE, threshold=0.8)
+                Condition(metric=relevancy_scorer)
             ],
             combine_type="all",
             notification=notification2
@@ -298,7 +298,7 @@ class TestNotificationWithAPICalls:
             rule = Rule(
                 name="Faithfulness Rule",
                 conditions=[
-                    Condition(metric=FaithfulnessScorer(threshold=0.7), operator=Operator.GTE, threshold=0.7)
+                    Condition(metric=FaithfulnessScorer(threshold=0.7))
                 ],
                 combine_type="all",
                 notification=notification
@@ -417,7 +417,7 @@ class TestNotificationWithAPICalls:
             rule = Rule(
                 name="Faithfulness Rule",
                 conditions=[
-                    Condition(metric=FaithfulnessScorer(threshold=0.7), operator=Operator.GTE, threshold=0.7)
+                    Condition(metric=FaithfulnessScorer(threshold=0.7))
                 ],
                 combine_type="all",
                 notification=notification

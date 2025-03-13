@@ -8,15 +8,19 @@ For API calling, we support:
 NOTE: any function beginning with 'a', e.g. 'afetch_together_api_response', is an asynchronous function
 """
 
-import concurrent.futures
-from typing import List, Mapping, Dict, Union, Optional, Literal, Any
+# Standard library imports
 import asyncio
+import concurrent.futures
+import os
+import pprint
+from typing import Any, Dict, List, Literal, Mapping, Optional, Union
+
+# Third-party imports
 import litellm
 import pydantic
-import pprint
-import os
-from dotenv import load_dotenv 
+from dotenv import load_dotenv
 
+# Local application/library-specific imports
 from judgeval.clients import async_together_client, together_client
 from judgeval.constants import *
 from judgeval.common.logger import debug, error

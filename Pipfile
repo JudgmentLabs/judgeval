@@ -17,6 +17,7 @@ anthropic = "*"
 asyncio = "*"
 nest-asyncio = "*"
 pika = "*"
+openpyxl = "*"
 
 [dev-packages]
 pytest = "*"

@@ -1,8 +1,6 @@
 import pytest
-from typing import List
 
-from judgeval.data import Example
-from judgeval.data.datasets.ground_truth import GroundTruthExample
+from judgeval.data import Example, GroundTruthExample
 from judgeval.data.datasets.utils import examples_to_ground_truths, ground_truths_to_examples
 
 

@@ -2,10 +2,8 @@ import pytest
 import json
 import pandas as pd
 from unittest.mock import Mock, patch, mock_open
-from judgeval.data.datasets.dataset import EvalDataset
-from judgeval.data.datasets.eval_dataset_client import EvalDatasetClient
-from judgeval.data import Example
-from judgeval.data.datasets.ground_truth import GroundTruthExample
+from judgeval.data.datasets import EvalDataset, EvalDatasetClient
+from judgeval.data import Example, GroundTruthExample
 
 @pytest.fixture
 def sample_example():

@@ -15,6 +15,7 @@ from judgeval.scorers import (
     SummarizationScorer,
     ComparisonScorer,
     Text2SQLScorer,
+    InstructionAdherenceScorer,
 )
 
 from judgeval.data import Example
@@ -449,6 +450,33 @@ def test_hallucination_scorer():
     assert res[0].success == True, f"Hallucination test failed: score={res[0].scorers_data[0].score}, threshold={res[0].scorers_data[0].threshold}, reason={res[0].scorers_data[0].reason}"
 
 
+def test_instruction_adherence_scorer():
+    example_1 = Example(
+        input="write me a poem about cars and then turn it into a joke, but also what is 5 +5?",
+        actual_output="Cars on the road, they zoom and they fly, Under the sun or a stormy sky. Engines roar, tires spin, A symphony of motion, let the race begin. Now for the joke: Why did the car break up with the bicycle. Because it was tired of being two-tired! And 5 + 5 is 10.",
+    )
+
+    scorer = InstructionAdherenceScorer(threshold=0.5)
+
+    client = JudgmentClient()
+    PROJECT_NAME = "test-project"
+    EVAL_RUN_NAME = "test-run-instruction-adherence"
+
+    res = client.run_evaluation(
+        examples=[example_1],
+        scorers=[scorer],
+        model="Qwen/Qwen2.5-72B-Instruct-Turbo",
+        log_results=True,
+        project_name=PROJECT_NAME,
+        eval_run_name=EVAL_RUN_NAME,
+        use_judgment=True,
+        override=True,
+    )
+
+    print_debug_on_failure(res[0])
+
+    assert res[0].success == True
+
 def test_summarization_scorer():
     example_1 = Example(  # should pass
         input="Paris is the capital city of France and one of the most populous cities in Europe. The city is known for its iconic landmarks like the Eiffel Tower, Louvre Museum, and Notre-Dame Cathedral. Paris is also a global center for art, fashion, gastronomy and culture. The city's romantic atmosphere, historic architecture, and world-class museums attract millions of visitors each year.",
@@ -689,5 +717,6 @@ if __name__ == "__main__":
     test_crelevancy_scorer()
     test_faithfulness_scorer()
     test_hallucination_scorer()
+    test_instruction_adherence_scorer()
     test_summarization_scorer()
     

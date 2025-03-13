@@ -20,12 +20,13 @@ Using tracing, you can:
 
 Setting up tracing with `judgeval` takes two simple steps:
 
-### 1. Initialize a tracer with your API key and project name
+### 1. Initialize a tracer with your API keys and project name
 
 ```python
-from judgeval.common.tracer import Tracer
+from judgeval.tracer import Tracer
 
-judgment = Tracer(project_name="my_project")  # loads from JUDGMENT_API_KEY env var
+# loads from JUDGMENT_API_KEY and JUDGMENT_ORG_ID env vars
+judgment = Tracer(project_name="my_project")
 ```
 
 <Note>
@@ -48,7 +49,7 @@ The `wrap()` function goes over your LLM client (e.g. OpenAI, Anthropic, etc.) a
 Here's an example of using `wrap()` on an OpenAI client:
 ```python
 from openai import OpenAI
-from judgeval.common.tracer import wrap
+from judgeval.tracer import wrap
 
 client = wrap(OpenAI())
 ```
@@ -61,9 +62,10 @@ The `@observe` decorator wraps your functions/tools and captures metadata surrou
 
 Here's an example of using the `@observe` decorator on a function:
 ```python
-from judgeval.common.tracer import Tracer
+from judgeval.tracer import Tracer
 
-judgment = Tracer()  # loads from JUDGMENT_API_KEY env var
+# loads from JUDGMENT_API_KEY env var
+judgment = Tracer(project_name="my_project")
 
 @judgment.observe(span_type="tool")
 def my_tool():
@@ -81,17 +83,18 @@ def my_tool():
 #### Putting it all Together
 Here's a complete example of using judgeval's tracing mechanisms:
 ```python
-from judgeval.common.tracer import Tracer, wrap
+from judgeval.tracer import Tracer, wrap
 from openai import OpenAI
 
 openai_client = wrap(OpenAI())
-judgment = Tracer(project_name="my_project")  # loads from JUDGMENT_API_KEY env var
+# loads from JUDGMENT_API_KEY and JUDGMENT_ORG_ID env vars
+judgment = Tracer(project_name="my_project")
 
 @judgment.observe(span_type="tool")
 def my_tool():
     return "Hello world!"
 
-@judgment.observe(span_type="LLM call")
+@judgment.observe(span_type="function")
 def my_llm_call():
     message = my_tool()
     res = openai_client.chat.completions.create(
@@ -122,7 +125,7 @@ This enables you to run evaluations on your **production data in real-time**, wh
 To execute an asynchronous evaluation, you can use the `trace.async_evaluate()` method. Here's an example of that:
 
 ```python
-from judgeval.common.tracer import Tracer
+from judgeval.tracer import Tracer
 from judgeval.scorers import AnswerRelevancyScorer
 
 judgment = Tracer(project_name="my_project")
@@ -146,14 +149,14 @@ def main():
     a new evaluation will be created on the Judgment platform.
 </Tip>
 
-## Example: OpenAI Travel Agent
+## Example: Music Recommendation Agent
 
-In this video, we'll walk through all of the topics covered in this guide by tracing over a simple OpenAI travel agent.
+In this video, we'll walk through all of the topics covered in this guide by tracing over a simple OpenAI API-based music recommendation agent.
 
 <iframe 
     width="560" 
     height="315" 
-    src="https://www.youtube.com/embed/L76V4lXIolc"
+    src="https://www.youtube.com/embed/7g0fut06UxQ"
     title="YouTube video player" 
     frameborder="0" 
     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
@@ -175,7 +178,7 @@ This is useful for debugging or exporting any state of your workflow to run an e
 
 Here's an example of using the context manager to trace a workflow:
 ```python
-from judgeval.common.tracer import Tracer, wrap
+from judgeval.tracer import Tracer, wrap
 from openai import OpenAI
 
 judgment = Tracer(project_name="my_project")

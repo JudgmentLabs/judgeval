@@ -1,10 +1,9 @@
-from typing import List, Union
+from typing import List
 
 from judgeval.constants import APIScorer
 from judgeval.scorers.utils import (
     scorer_progress_meter,
     create_verbose_logs,
-    parse_response_json,
     check_example_params
 )
 from judgeval.data import Example, ExampleParams

@@ -8,7 +8,6 @@ from typing import Dict, List, Any, Optional
 from judgeval.rules import (
     Rule, 
     Condition, 
-    Operator, 
     NotificationConfig,
     AlertStatus,
     AlertResult
@@ -69,7 +68,7 @@ class TestNotificationSerialization:
             name="Test Rule",
             description="Rule for testing serialization",
             conditions=[
-                Condition(metric=faithfulness_scorer, operator=Operator.GTE, threshold=0.7)
+                Condition(metric=faithfulness_scorer)
             ],
             combine_type="all",
             notification=notification
@@ -150,7 +149,7 @@ class TestNotificationSerialization:
         rule = Rule(
             name="Rule Without Notification",
             conditions=[
-                Condition(metric=faithfulness_scorer, operator=Operator.GTE, threshold=0.7)
+                Condition(metric=faithfulness_scorer)
             ],
             combine_type="all",
             notification=None
@@ -192,7 +191,7 @@ class TestNotificationSerialization:
         rule1 = Rule(
             name="Rule 1",
             conditions=[
-                Condition(metric=faithfulness_scorer, operator=Operator.GTE, threshold=0.7)
+                Condition(metric=faithfulness_scorer)
             ],
             combine_type="all",
             notification=notification1
@@ -201,7 +200,7 @@ class TestNotificationSerialization:
         rule2 = Rule(
             name="Rule 2",
             conditions=[
-                Condition(metric=relevancy_scorer, operator=Operator.GTE, threshold=0.8)
+                Condition(metric=relevancy_scorer)
             ],
             combine_type="all",
             notification=notification2

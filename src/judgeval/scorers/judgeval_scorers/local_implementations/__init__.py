@@ -9,6 +9,7 @@ from judgeval.scorers.judgeval_scorers.local_implementations.hallucination.hallu
 from judgeval.scorers.judgeval_scorers.local_implementations.summarization.summarization_scorer import SummarizationScorer
 from judgeval.scorers.judgeval_scorers.local_implementations.answer_correctness.answer_correctness_scorer import AnswerCorrectnessScorer
 from judgeval.scorers.judgeval_scorers.local_implementations.comparison.comparison_scorer import ComparisonScorer
+from judgeval.scorers.judgeval_scorers.local_implementations.instruction_adherence.instruction_adherence import InstructionAdherenceScorer
 
 __all__ = [
     "AnswerCorrectnessScorer",
@@ -22,4 +23,5 @@ __all__ = [
     "ToolCorrectnessScorer",
     "HallucinationScorer",
     "SummarizationScorer",
+    "InstructionAdherenceScorer",
 ]

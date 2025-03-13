@@ -7,32 +7,33 @@ description: "This guide will help you learn the essential components of `judgev
 
 `pip install judgeval`
 
-Judgeval runs evaluations on your local machine. However, you may find it easier to directly run 
-evaluations using Judgment Labs' models or via the [Judgment Platform](https://app.judgmentlabs.ai/login), 
-an all-in-one suite for LLM system evaluation.
+Judgeval runs evaluations that you can manage inside the library. Additionally, you should analyze and manage your evaluations, datasets, and metrics on 
+the natively-integrated [Judgment Platform](https://app.judgmentlabs.ai/register), an all-in-one suite for LLM system evaluation.
 
-# Making a Judgment Key
+<Tip>
+Our team is always making new releases of the `judgeval` package! To get the latest version, run `pip install --upgrade judgeval`. 
+You can follow our latest updates via our [GitHub](https://github.com/judgmentlabs/judgeval).
+</Tip>
 
-Creating a Judgment API key allows you to access the `JudgmentClient`, enabling you to run evaluations on Judgment Labs' infrastructure,
-access our state-of-the-art judge models, and manage your evaluations/datasets on the Judgment Platform. 
+# Judgment API Keys
 
-Once you have a key, you can set the environment variable `JUDGMENT_API_KEY` to your key. 
-This allows the `JudgmentClient` to authenticate your requests to the Judgment API.
+Our API keys allow you to access the `JudgmentClient` and `Tracer` which enable you to track your agents and run evaluations on 
+Judgment Labs' infrastructure, access our state-of-the-art judge models, and manage your evaluations/datasets on the Judgment Platform. 
+
+To get your account and organization API keys, create an account on the [Judgment Platform](https://app.judgmentlabs.ai/register). 
 
 ```
 export JUDGMENT_API_KEY="your_key_here"
+export JUDGMENT_ORG_ID="your_org_id_here"
 ```
 
-To receive a key, please email us at `contact@judgmentlabs.ai`.
-
-
 <Note>
-Running evaluations on Judgment Labs' infrastructure is recommended for 
-large-scale evaluations. [Contact us](mailto:contact@judgmentlabs.ai) if you're dealing with 
-sensitive data that has to reside in your private VPCs.
+For assistance with your registration and setup, such as dealing with sensitive data that has to reside in your private VPCs, 
+feel free to [get in touch with our team](mailto:contact@judgmentlabs.ai).
 </Note>
 
-# Create Your First Evaluation
+
+# Create Your First Experiment
 
 ```python sample_eval.py
 from judgeval import JudgmentClient
@@ -59,20 +60,23 @@ print(results)
 Congratulations! Your evaluation should have passed. Let's break down what happened.
 
 - The variable `input` mimics a user input and `actual_output` is a placeholder for what your LLM system returns based on the input.
-- The variable `retrieval_context` represents the retrieved context from your knowledge base and `FaithfulnessScorer(threshold=0.5)` 
-is a scorer that checks if the output is hallucinated relative to the retrieved context.
-- Scorers give values betweeen 0 - 1 and we set the threshold for this scorer to 0.5 in the context of a unit test. If you are interested measuring rather than testing, you can ignore this threshold and reference the `score` field alone.
-- We chose `gpt-4o` as our judge model for faithfulness. Judgment Labs offers ANY judge model for your evaluation needs. Consider trying out our state-of-the-art judge models for your next evaluation!
+- The variable `retrieval_context` represents the retrieved context from your RAG knowledge base.
+- `FaithfulnessScorer(threshold=0.5)` is a scorer that checks if the output is hallucinated relative to the retrieved context.
+    - <Note>All scorers produce values betweeen 0 - 1; the threshold is used in the context of [unit testing](/evaluation/unit_testing).</Note>
+- We chose `gpt-4o` as our judge model to measure faithfulness. Judgment Labs offers ANY judge model for your evaluation needs. 
+Consider trying out our state-of-the-art Osiris judge models for your next evaluation!
 
 <Tip>
 To learn more about using the Judgment Client to run evaluations, click [here](/api_reference/judgment_client).
 </Tip>
 
 # Create Your First Trace
+`judgeval` traces enable you to monitor your LLM systems in online **development and production** stages. 
+Traces enable you to track your LLM system's flow end-to-end and measure:
+- LLM costs
+- Workflow latency
+- Quality metrics, such as hallucination, retrieval quality, and more.
 
-Beyond experimentation, `judgeval` supports monitoring your LLM systems in **production**. 
-Using our `tracing` module, you can **track your LLM system outputs from end to end**, allowing you to visualize the flow of your LLM system. 
-Additionally, you can **enable evaluations to run in real-time** using Judgment's state-of-the-art judge models. 
 
 ```python trace_example.py
 from judgeval.common.tracer import Tracer, wrap
@@ -87,29 +91,75 @@ def my_tool():
 
 @judgment.observe(span_type="function")
 def main():
+    task_input = my_tool()
     res = client.chat.completions.create(
         model="gpt-4o",
-        messages=[{"role": "user", "content": f"{my_tool()}"}]
+        messages=[{"role": "user", "content": f"{task_input}"}]
     )
     return res.choices[0].message.content
 ```
 
+Congratulations! You've just created your first trace. It should look like this:
 
 <div style={{display: 'flex', justifyContent: 'center'}}>
-  ![Alt text](/images/trace_screenshot.png "Image of a RAG pipeline trace")
+  ![Alt text](/images/trace_ss.png "Image of a RAG pipeline trace")
 </div>
 
-There are many benefits of monitoring your LLM systems in production with `judgeval`, including:
-- Detecting hallucinations and other quality issues **before they reach your customers**
-- Automatically creating experimental datasets from your **real-world production cases** for future improvement/optimization
-- Track and create alerts on **any metric** (e.g. latency, cost, hallucination, etc.)
+There are many benefits of monitoring your LLM systems with `judgeval` tracing, including:
+- Debugging LLM workflows in seconds with full observability
+- Using production workflow data to create experimental datasets for future improvement/optimization
+- Tracking and creating Slack/Email alerts on **any metric** (e.g. latency, cost, hallucination, etc.)
 
 <Tip>
 To learn more about `judgeval`'s tracing module, click [here](/tracing/introduction).
 </Tip>
 
+# Create Your First Online Evaluation
 
+In addition to tracing, `judgeval` allows you to run online evaluations on your LLM systems. This enables you to:
+- Catch real-time quality regressions to take action before customers are impacted
+- Gain insights into your agent performance in real-world scenarios
 
+To run an online evaluation, you can simply add one line of code to your existing trace:
+
+```python trace_example.py
+from judgeval.common.tracer import Tracer, wrap
+from judgeval.scorers import AnswerRelevancyScorer
+from openai import OpenAI
+
+client = wrap(OpenAI())
+judgment = Tracer(project_name="my_project")
+
+@judgment.observe(span_type="tool")
+def my_tool():
+    return "Hello world!"
+
+@judgment.observe(span_type="function")
+def main():
+    task_input = my_tool()
+    res = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": f"{task_input}"}]
+    ).choices[0].message.content
+
+    judgment.get_current_trace().async_evaluate(
+        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+        input=task_input,
+        actual_output=res,
+        model="gpt-4o"
+    )
+
+    return res
+```
+
+Online evaluations are automatically logged to the Judgment Platform as part of your traces. You can view them by navigating to your trace and clicking on the 
+trace span that contains the online evaluation. If there is a quality regression, the UI will display an alert, like this: 
+
+<div style={{display: 'flex', justifyContent: 'center'}}>
+  ![Alt text](/images/online_eval_fault.png "Image of an alert on the Judgment Platform")
+</div>
+
+{/*
 # Create Your First Scorer
 `judgeval` offers three kinds of LLM scorers for your evaluation needs: ready-made, classifier scorers, and custom scorers.
 
@@ -285,24 +335,33 @@ Work in progress!
 
 Work in progress!
 
-## Optimizing Your LLM System
+*/}
 
-Evaluation is a **prerequisite** for optimizing your LLM systems. Measuring the quality of your LLM workflows 
+# Optimizing Your LLM System
+
+Evaluation and monitoring are the building blocks for optimizing LLM systems. Measuring the quality of your LLM workflows 
 allows you to **compare design iterations** and ultimately find the **optimal set of prompts, models, RAG architectures, etc.** that 
-make your LLM perform best. 
+make your LLM excel in your production use cases. 
 
 **A typical experimental setup might look like this:**
 
-1. Create a new `Project` in the Judgment platform by either running an evaluation from the SDK or via the platform UI. 
-This will help you keep track of all evaluations for different iterations of your LLM system.
+1. Create a new Project in the Judgment platform by either running an evaluation from the SDK or via the platform UI. 
+This will help you keep track of all evaluations and traces for different iterations of your LLM system.
 
 <Note> 
-A `Project` keeps track of `Evaluation Run`s in your project. Each `Evaluation Run` contains a set of `Scorer`s that have been run on a set of `Example`s.
+A Project keeps track of Experiments and Traces relating to a specific workflow. Each Experiment contains a set of Scorers that have been run on a set of Examples.
 </Note>
 
-2. You can create separate `Evaluation Run`s for different iterations of your LLM system, allowing you to independently test each component of your LLM system.
+2. You can create separate Experiments for different iterations of your LLM system, allowing you to independently test each component of your LLM system.
 
 <Tip>
-You can try different models (e.g. `gpt-4o`, `claude-3-5-sonnet`, etc.) and prompt templates in each `Evaluation Run` to find the 
+You can try different models (e.g. `gpt-4o`, `claude-3-5-sonnet`, etc.) and prompt templates in each Experiment to find the 
 optimal setup for your LLM system. 
 </Tip>
+
+
+# Next Steps
+
+Congratulations! You've just finished getting started with `judgeval` and the Judgment Platform. 
+
+For a deeper dive into using `judgeval`, learn more about [experiments](/evaluation/introduction), [unit testing](/evaluation/unit_testing), and [monitoring](/monitoring/introduction)!

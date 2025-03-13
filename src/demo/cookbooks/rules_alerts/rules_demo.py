@@ -22,13 +22,13 @@ from judgeval.scorers.judgeval_scorers.api_scorers.faithfulness import Faithfuln
 from judgeval.scorers.judgeval_scorers.api_scorers.answer_relevancy import AnswerRelevancyScorer
 from judgeval.scorers.judgeval_scorers.api_scorers.answer_correctness import AnswerCorrectnessScorer
 from judgeval.data import Example
-from judgeval.rules import Rule, Condition, Operator
+from judgeval.rules import Rule, Condition
 from judgeval.run_evaluation import run_default_eval
 from judgeval.evaluation_run import EvaluationRun
 from judgeval.tracer import Tracer, TraceEvent, ObservationType, Span, Event
 from judgeval.scorers.judgeval_scorer import JudgevalScorer
 from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer, AnswerCorrectnessScorer
-from judgeval.rules import AlertResult, Condition, Operator, Rule, RulesEngine, AlertStatus
+from judgeval.rules import AlertResult, Condition, Rule, RulesEngine, AlertStatus
 
 
 # Try to import utilities from judgeval package first, fall back to local helper if needed
@@ -267,9 +267,9 @@ def main():
             description="Check if all conditions are met",
             conditions=[
                 # Use scorer objects instead of strings
-                Condition(metric=FaithfulnessScorer(threshold=0.7), operator=Operator.GTE, threshold=0.7),
-                Condition(metric=AnswerRelevancyScorer(threshold=0.8), operator=Operator.GTE, threshold=0.8),
-                Condition(metric=AnswerCorrectnessScorer(threshold=0.9), operator=Operator.GTE, threshold=0.9)
+                Condition(metric=FaithfulnessScorer(threshold=0.7)),
+                Condition(metric=AnswerRelevancyScorer(threshold=0.8)),
+                Condition(metric=AnswerCorrectnessScorer(threshold=0.9))
             ],
             combine_type="all"  # Require all conditions to trigger
         ),
@@ -277,9 +277,9 @@ def main():
             name="Any Condition Check",
             description="Check if any condition is met",
             conditions=[
-                Condition(metric=FaithfulnessScorer(threshold=0.7), operator=Operator.GTE, threshold=0.7),
-                Condition(metric=AnswerRelevancyScorer(threshold=0.8), operator=Operator.GTE, threshold=0.8),
-                Condition(metric=AnswerCorrectnessScorer(threshold=0.9), operator=Operator.GTE, threshold=0.9)
+                Condition(metric=FaithfulnessScorer(threshold=0.7)),
+                Condition(metric=AnswerRelevancyScorer(threshold=0.8)),
+                Condition(metric=AnswerCorrectnessScorer(threshold=0.9))
             ],
             combine_type="any"  # Require any condition to trigger
         ),
@@ -288,7 +288,7 @@ def main():
             name="Keyword Check",
             description="Check if response contains enough keywords",
             conditions=[
-                Condition(metric=SimpleKeywordScorer(keywords=["restaurant", "food", "cuisine"], threshold=0.6), operator=Operator.GTE, threshold=0.6)
+                Condition(metric=SimpleKeywordScorer(keywords=["restaurant", "food", "cuisine"], threshold=0.6))
             ],
             combine_type="all"
         ),
@@ -297,8 +297,8 @@ def main():
             name="Comprehensive Quality Check",
             description="Check for both keyword presence and correctness",
             conditions=[
-                Condition(metric=SimpleKeywordScorer(keywords=["restaurant", "food", "cuisine"], threshold=0.6), operator=Operator.GTE, threshold=0.6),
-                Condition(metric=AnswerCorrectnessScorer(threshold=0.8), operator=Operator.GTE, threshold=0.8)
+                Condition(metric=SimpleKeywordScorer(keywords=["restaurant", "food", "cuisine"], threshold=0.6)),
+                Condition(metric=AnswerCorrectnessScorer(threshold=0.8))
             ],
             combine_type="all"
         )
@@ -343,7 +343,7 @@ def main():
                 conditions = alert.get("conditions_result", alert.get("conditions_results", []))
                 for cond in conditions:
                     passed_str = "PASSED" if cond["passed"] else "FAILED"
-                    print(f"      {cond['metric']}: {cond['value']:.2f} {cond['operator']} {cond['threshold']:.2f} - {passed_str}")
+                    print(f"      {cond['metric']}: {cond['value']:.2f} vs threshold {cond['threshold']:.2f} - {passed_str}")
                 
         print("-" * 80)
 

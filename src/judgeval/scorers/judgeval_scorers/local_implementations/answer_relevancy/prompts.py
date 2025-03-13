@@ -2,8 +2,8 @@
 Util prompts for AnswerRelevancyScorer
 """
 
-from typing import List, Optional, Tuple
-from pydantic import BaseModel, Field
+from typing import List, Tuple
+from pydantic import BaseModel
 
 
 # BaseModels to enforce formatting in LLM JSON response

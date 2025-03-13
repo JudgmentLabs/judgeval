@@ -26,15 +26,17 @@ NOTE: When implementing build_measure_prompt and build_schema:
 """
 
 from abc import abstractmethod
-from typing import List, Optional, Union, Tuple, Any, Mapping
+from typing import List, Optional, Tuple, Any, Mapping
 from pydantic import BaseModel, model_serializer, Field
 
 from judgeval.data import Example
 from judgeval.scorers import JudgevalScorer
-from judgeval.scorers.utils import (scorer_progress_meter, 
-                                    parse_response_json,
-                                    get_or_create_event_loop,
-                                    create_verbose_logs)
+from judgeval.scorers.utils import (
+    scorer_progress_meter, 
+    parse_response_json,
+    get_or_create_event_loop,
+    create_verbose_logs
+)
 
 
 class ReasonScore(BaseModel):

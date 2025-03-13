@@ -5,7 +5,7 @@ ScorerData holds the information related to a single, completed Scorer evaluatio
 """
 
 from typing import List, Union, Optional, Dict
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from judgeval.scorers import JudgevalScorer
 

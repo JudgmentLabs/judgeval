@@ -37,6 +37,9 @@ Creating an Example allows you to evaluate using
 ```python example.py
 from judgeval import JudgmentClient
 from judgeval.scorers import FaithfulnessScorer
+from judgeval.data import Example
+
+example = Example(...)
 
 client = JudgmentClient()
 
@@ -56,7 +59,8 @@ An Evaluation Dataset is a collection of Examples. It provides an interface for 
 your LLM system using one or more scorers.
 
 ```python dataset.py
-from judgeval.data import Example, EvalDataset
+from judgeval.data import Example
+from judgeval.data.datasets import EvalDataset
 
 example1 = Example(input="...", actual_output="...", retrieval_context="...")
 example2 = Example(input="...", actual_output="...", retrieval_context="...")
@@ -103,4 +107,5 @@ We're always working on adding new scorers, so if you have a metric you'd like t
 **Congratulations!** 🎉 
 
 You've learned the basics of building and running evaluations with `judgeval`. 
+
 For a deep dive into all the metrics you can run using `judgeval` scorers, click [here](/evaluation/scorers).

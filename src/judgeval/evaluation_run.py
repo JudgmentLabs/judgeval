@@ -111,7 +111,7 @@ class EvaluationRun(BaseModel):
         # Check if model is string or list of strings
         if isinstance(v, str):
             if v not in ACCEPTABLE_MODELS:
-                raise ValueError(f"Model name {v} not recognized.")
+                raise ValueError(f"Model name {v} not recognized. Please select a valid model name.)")
             return v
             
         if isinstance(v, list):
@@ -119,7 +119,7 @@ class EvaluationRun(BaseModel):
                 raise ValueError("When providing a list of models, all elements must be strings")
             for m in v:
                 if m not in ACCEPTABLE_MODELS:
-                    raise ValueError(f"Model name {m} not recognized.")
+                    raise ValueError(f"Model name {m} not recognized. Please select a valid model name.")
             return v
         raise ValueError(f"Model must be one of: string, list of strings, or JudgevalJudge instance. Received type {type(v)}.")
 

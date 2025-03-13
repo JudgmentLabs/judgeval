@@ -23,6 +23,8 @@ def test_faithfulness():
         actual_output="The capital of France is Lyon.",
         retrieval_context=["Come tour Paris' museums in the capital of France!"],
     )
+
+    # Example contains a hallucination, so we should expect an exception
     with pytest.raises(AssertionError):
         client.assert_test(
             eval_run_name="test_eval",

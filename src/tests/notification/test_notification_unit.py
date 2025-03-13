@@ -8,7 +8,6 @@ from typing import Dict, List, Any, Optional
 from judgeval.rules import (
     Rule, 
     Condition, 
-    Operator, 
     RulesEngine, 
     AlertStatus, 
     NotificationConfig
@@ -89,7 +88,7 @@ class TestRuleWithNotification:
             name="Test Rule",
             description="Rule for testing notifications",
             conditions=[
-                Condition(metric=faithfulness_scorer, operator=Operator.GTE, threshold=0.7)
+                Condition(metric=faithfulness_scorer)
             ],
             combine_type="all",
             notification=notification
@@ -117,7 +116,7 @@ class TestRuleWithNotification:
         rule = Rule(
             name="Test Rule Without Notification",
             conditions=[
-                Condition(metric=faithfulness_scorer, operator=Operator.GTE, threshold=0.7)
+                Condition(metric=faithfulness_scorer)
             ],
             combine_type="all"
         )
@@ -143,7 +142,7 @@ class TestRulesEngineNotification:
         rule = Rule(
             name="Test Rule",
             conditions=[
-                Condition(metric=faithfulness_scorer, operator=Operator.GTE, threshold=0.7)
+                Condition(metric=faithfulness_scorer)
             ],
             combine_type="all"
         )
@@ -180,7 +179,7 @@ class TestRulesEngineNotification:
         rule1 = Rule(
             name="Rule 1",
             conditions=[
-                Condition(metric=faithfulness_scorer, operator=Operator.GTE, threshold=0.7)
+                Condition(metric=faithfulness_scorer)
             ],
             combine_type="all"
         )
@@ -188,7 +187,7 @@ class TestRulesEngineNotification:
         rule2 = Rule(
             name="Rule 2",
             conditions=[
-                Condition(metric=relevancy_scorer, operator=Operator.GTE, threshold=0.8)
+                Condition(metric=relevancy_scorer)
             ],
             combine_type="all"
         )
@@ -235,7 +234,7 @@ class TestNotificationInAlertResults:
         rule = Rule(
             name="Test Rule",
             conditions=[
-                Condition(metric=faithfulness_scorer, operator=Operator.GTE, threshold=0.7)
+                Condition(metric=faithfulness_scorer)
             ],
             combine_type="all",
             notification=notification
@@ -283,7 +282,7 @@ class TestNotificationInAlertResults:
         rule = Rule(
             name="Test Rule",
             conditions=[
-                Condition(metric=faithfulness_scorer, operator=Operator.GTE, threshold=0.7)
+                Condition(metric=faithfulness_scorer)
             ],
             combine_type="all",
             notification=notification
@@ -366,7 +365,7 @@ class TestNotificationWithJudgmentClient:
                 Rule(
                     name="Quality Check",
                     conditions=[
-                        Condition(metric=FaithfulnessScorer(threshold=0.7), operator=Operator.GTE, threshold=0.7)
+                        Condition(metric=FaithfulnessScorer(threshold=0.7))
                     ],
                     combine_type="all",
                     notification=notification

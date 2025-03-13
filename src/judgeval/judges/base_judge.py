@@ -3,7 +3,7 @@ Implements the base class for all Judgeval Judge models.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, List
+from typing import Optional
 
 
 class JudgevalJudge(ABC):

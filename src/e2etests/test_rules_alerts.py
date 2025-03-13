@@ -18,7 +18,7 @@ from judgeval.scorers import (
     AnswerRelevancyScorer,
     FaithfulnessScorer,
 )
-from judgeval.rules import Rule, Condition, Operator
+from judgeval.rules import Rule, Condition
 
 
 # Load environment variables
@@ -35,9 +35,9 @@ rules = [
         name="All Metrics Quality Check",
         description="Check if all quality metrics meet thresholds",
         conditions=[
-            Condition(metric=faithfulness_scorer, operator=Operator.GTE, threshold=0.7),
-            Condition(metric=answer_relevancy_scorer, operator=Operator.GTE, threshold=0.7),
-            Condition(metric=answer_correctness_scorer, operator=Operator.GTE, threshold=0.7)
+            Condition(metric=faithfulness_scorer),
+            Condition(metric=answer_relevancy_scorer),
+            Condition(metric=answer_correctness_scorer)
         ],
         combine_type="all"  # Require all conditions to trigger
     ),
@@ -45,9 +45,9 @@ rules = [
         name="Any Metric Quality Check",
         description="Check if any quality metric meets threshold",
         conditions=[
-            Condition(metric=faithfulness_scorer, operator=Operator.GTE, threshold=0.7),
-            Condition(metric=answer_relevancy_scorer, operator=Operator.GTE, threshold=0.7),
-            Condition(metric=answer_correctness_scorer, operator=Operator.GTE, threshold=0.7)
+            Condition(metric=faithfulness_scorer),
+            Condition(metric=answer_relevancy_scorer),
+            Condition(metric=answer_correctness_scorer)
         ],
         combine_type="any"  # Require any condition to trigger
     )
@@ -213,8 +213,8 @@ async def test_complex_rules():
             name="Mixed Operators Rule",
             description="Check with mixed operators",
             conditions=[
-                Condition(metric=correctness_scorer, operator=Operator.GTE, threshold=0.7),
-                Condition(metric=relevancy_scorer, operator=Operator.LTE, threshold=1.0)
+                Condition(metric=correctness_scorer),
+                Condition(metric=relevancy_scorer)
             ],
             combine_type="all"
         )

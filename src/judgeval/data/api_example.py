@@ -1,5 +1,5 @@
-from typing import List, Optional, Dict, Any, Union
-from pydantic import BaseModel, Field, ConfigDict, model_validator
+from typing import List, Optional, Dict, Any
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from judgeval.data.example import Example
 from judgeval.data.scorer_data import ScorerData

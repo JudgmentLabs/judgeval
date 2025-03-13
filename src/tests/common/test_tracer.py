@@ -1,14 +1,12 @@
 import pytest
 import time
 from unittest.mock import Mock, patch, MagicMock
-from datetime import datetime
 from uuid import uuid4
 from openai import OpenAI
-from together import Together
 from anthropic import Anthropic
 import requests
 
-from judgeval.common.tracer import Tracer, TraceEntry, TraceClient, wrap
+from judgeval.common.tracer import Tracer, TraceEntry, wrap
 from judgeval.judgment_client import JudgmentClient
 from judgeval.common.exceptions import JudgmentAPIError
 

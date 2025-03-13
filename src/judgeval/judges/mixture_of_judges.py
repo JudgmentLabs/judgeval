@@ -5,9 +5,14 @@ Enables client to use multiple models to generate responses and then aggregate t
 """
 from judgeval import *
 import pydantic
-from typing import List, Union, Mapping, Dict
+from typing import List, Union, Mapping
 from judgeval.judges import JudgevalJudge
-from judgeval.common.utils import get_completion_multiple_models, get_chat_completion, aget_completion_multiple_models, aget_chat_completion
+from judgeval.common.utils import (
+    get_completion_multiple_models, 
+    get_chat_completion, 
+    aget_completion_multiple_models, 
+    aget_chat_completion
+)
 from judgeval.common.logger import debug, error
 
 def build_dynamic_mixture_prompt(

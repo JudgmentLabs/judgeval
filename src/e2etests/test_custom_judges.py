@@ -8,7 +8,7 @@ import os
 from judgeval.judgment_client import JudgmentClient
 from judgeval.data import Example
 from judgeval.judges import JudgevalJudge
-from playground import CustomFaithfulnessMetric
+from judgeval.scorers import FaithfulnessScorer
 
 @pytest.mark.skipif(not os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
                    reason="VertexAI credentials not configured")
@@ -59,11 +59,12 @@ class TestCustomJudges:
 
             res = client.run_evaluation(
                 examples=[example],
-                scorers=[CustomFaithfulnessMetric()],
+                scorers=[FaithfulnessScorer()],
                 model=judge,
                 eval_run_name="custom_judge_test",
                 project_name="custom_judge_test",
-                override=True
+                override=True,
+                use_judgment=False
             )
             assert res, "Custom judge evaluation failed"
         except ImportError:

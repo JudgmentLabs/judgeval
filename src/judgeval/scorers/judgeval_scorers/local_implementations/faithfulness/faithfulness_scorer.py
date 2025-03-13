@@ -2,7 +2,6 @@
 Code for the local implementation of the Faithfulness metric.
 """
 from typing import List, Optional, Union
-from pprint import pprint
 from judgeval.constants import APIScorer
 from judgeval.data import (
     Example, 
@@ -20,13 +19,7 @@ from judgeval.scorers.utils import (
     create_verbose_logs, 
     parse_response_json
 )
-from judgeval.scorers.judgeval_scorers.local_implementations.faithfulness.prompts import (
-    FaithfulnessTemplate,
-    FaithfulnessVerdict,
-    Verdicts,
-    Reason,
-    Claims,
-)
+from judgeval.scorers.judgeval_scorers.local_implementations.faithfulness.prompts import *
 
 
 required_params = [

@@ -1,7 +1,6 @@
 import pytest
-from judgeval.data.api_example import ProcessExample, create_process_example
-from judgeval.data.example import Example
-from judgeval.data.scorer_data import ScorerData
+from judgeval.data import Example, ProcessExample, ScorerData
+from judgeval.data.api_example import create_process_example
 
 # Test data fixtures
 @pytest.fixture

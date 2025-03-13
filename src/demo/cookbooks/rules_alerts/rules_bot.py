@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 from judgeval.tracer import Tracer, wrap
 from judgeval.scorers import AnswerRelevancyScorer, FaithfulnessScorer, AnswerCorrectnessScorer
-from judgeval.rules import Rule, Condition, Operator
+from judgeval.rules import Rule, Condition
 
 # Initialize clients
 load_dotenv()
@@ -17,9 +17,9 @@ rules = [
             description="Check if all conditions are met",
             conditions=[
                 # Use scorer objects instead of strings
-                Condition(metric=FaithfulnessScorer(threshold=0.7), operator=Operator.GTE, threshold=0.7),
-                Condition(metric=AnswerRelevancyScorer(threshold=0.8), operator=Operator.GTE, threshold=0.8),
-                Condition(metric=AnswerCorrectnessScorer(threshold=0.9), operator=Operator.GTE, threshold=0.9)
+                Condition(metric=FaithfulnessScorer(threshold=0.7)),
+                Condition(metric=AnswerRelevancyScorer(threshold=0.8)),
+                Condition(metric=AnswerCorrectnessScorer(threshold=0.9))
             ],
             combine_type="all"  # Require all conditions to trigger
         ),
@@ -27,9 +27,9 @@ rules = [
             name="Any Condition Check",
             description="Check if any condition is met",
             conditions=[
-                Condition(metric=FaithfulnessScorer(threshold=0.7), operator=Operator.GTE, threshold=0.7),
-                Condition(metric=AnswerRelevancyScorer(threshold=0.8), operator=Operator.GTE, threshold=0.8),
-                Condition(metric=AnswerCorrectnessScorer(threshold=0.9), operator=Operator.GTE, threshold=0.9)
+                Condition(metric=FaithfulnessScorer(threshold=0.7)),
+                Condition(metric=AnswerRelevancyScorer(threshold=0.8)),
+                Condition(metric=AnswerCorrectnessScorer(threshold=0.9))
             ],
             combine_type="any"  # Require any condition to trigger
         )

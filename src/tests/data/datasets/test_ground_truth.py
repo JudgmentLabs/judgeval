@@ -1,5 +1,5 @@
 import pytest
-from judgeval.data.datasets.ground_truth import GroundTruthExample
+from judgeval.data import GroundTruthExample
 
 
 def test_ground_truth_example_minimal():

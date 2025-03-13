@@ -1,7 +1,6 @@
 from typing import List, Optional
 
-from judgeval.data.datasets.ground_truth import GroundTruthExample
-from judgeval.data import Example
+from judgeval.data import Example, GroundTruthExample
 
 
 def examples_to_ground_truths(examples: List[Example]) -> List[GroundTruthExample]:
