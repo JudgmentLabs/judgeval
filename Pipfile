@@ -20,6 +20,7 @@ pika = "*"
 elasticsearch = "*"
 langchain-huggingface = "*"
 langchain-anthropic = "*"
+langchain = "*"
 
 [dev-packages]
 pytest = "*"
