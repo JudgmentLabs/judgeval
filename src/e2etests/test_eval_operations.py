@@ -60,6 +60,8 @@ class TestEvalOperations:
         results = client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
         assert results, f"No evaluation results found for {EVAL_RUN_NAME}"
 
+        client.delete_project(project_name=PROJECT_NAME)
+
     def test_delete_eval_by_project_and_run_name(self, client: JudgmentClient):
         """Test delete evaluation by project and run name workflow."""
         PROJECT_NAME = ''.join(random.choices(string.ascii_letters + string.digits, k=20))
@@ -67,6 +69,7 @@ class TestEvalOperations:
 
         self.run_eval_helper(client, PROJECT_NAME, EVAL_RUN_NAME)
         client.delete_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
+        client.delete_project(project_name=PROJECT_NAME)
         with pytest.raises(ValueError, match="Error fetching eval results"):
             client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
 
@@ -79,7 +82,7 @@ class TestEvalOperations:
         self.run_eval_helper(client, PROJECT_NAME, EVAL_RUN_NAME)
         self.run_eval_helper(client, PROJECT_NAME, EVAL_RUN_NAME2)
 
-        client.delete_project_evals(project_name=PROJECT_NAME)
+        client.delete_project(project_name=PROJECT_NAME)
         with pytest.raises(ValueError, match="Error fetching eval results"):
             client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
         

@@ -212,6 +212,9 @@ async def test_trace_delete_batch(trace_manager_client):
     response = trace_manager_client.fetch_trace(trace2.trace_id)
     assert not response, "Trace should be deleted"
 
+    trace_manager_client.delete_project(project_name="TEST")
+    trace_manager_client.delete_project(project_name="TEST2")
+    
 @pytest.mark.asyncio
 async def run_selected_tests(test_names: list[str]):
     """

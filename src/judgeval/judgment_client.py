@@ -27,7 +27,8 @@ from judgeval.judges import JudgevalJudge
 from judgeval.constants import (
     JUDGMENT_EVAL_FETCH_API_URL, 
     JUDGMENT_EVAL_DELETE_API_URL, 
-    JUDGMENT_EVAL_DELETE_PROJECT_API_URL
+    JUDGMENT_EVAL_DELETE_PROJECT_API_URL,
+    JUDGMENT_PROJECT_DELETE_API_URL
 )
 from judgeval.common.exceptions import JudgmentAPIError
 from pydantic import BaseModel
@@ -362,7 +363,6 @@ class JudgmentClient:
         response = requests.delete(JUDGMENT_EVAL_DELETE_PROJECT_API_URL, 
                         json={
                             "project_name": project_name,
-                            "judgment_api_key": self.judgment_api_key,
                         },
                         headers={
                             "Content-Type": "application/json",
@@ -371,6 +371,23 @@ class JudgmentClient:
                         })
         if response.status_code != requests.codes.ok:
             raise ValueError(f"Error deleting eval results: {response.json()}")
+        return response.json()
+    
+    def delete_project(self, project_name: str) -> bool:
+        """
+        Deletes a project from the server. Which also deletes all evaluations and traces associated with the project.
+        """
+        response = requests.delete(JUDGMENT_PROJECT_DELETE_API_URL, 
+                        json={
+                            "project_name": project_name,
+                        },
+                        headers={
+                            "Content-Type": "application/json",
+                            "Authorization": f"Bearer {self.judgment_api_key}",
+                            "X-Organization-Id": self.organization_id
+                        })
+        if response.status_code != requests.codes.ok:
+            raise ValueError(f"Error deleting project: {response.json()}")
         return response.json()
         
     def _validate_api_key(self):
