@@ -53,14 +53,16 @@ def run_judgment_evaluation(examples: List[Example]):
     #     expected_output=str(input),
     # )
 
-    output = client.run_evaluation(
-        model="gpt-4o",
-        examples=examples[:10],
-        scorers=[scorer1, scorer2, scorer3, scorer4, scorer5],
-        eval_run_name="alma-basic-test7", 
-        project_name="alma-basic-test4",
-        override=True,
-    )
+
+    for i in range(1):
+        output = client.run_evaluation(
+            model="osiris-mini",
+            examples=examples,
+            scorers=[scorer1, scorer2, scorer3, scorer4, scorer5],
+            eval_run_name=f"alma-run1", 
+            project_name="alma-demo",
+            override=True,
+        )
     return output
 
 def find_categories(examples: List[Example], current_categories: List[dict] = []):
@@ -137,8 +139,8 @@ def find_categories_in_batches(examples: List[Example]):
     current_categories = []
     client = openai.Client(api_key=os.getenv("OPENAI_API_KEY"))
 
-    for i in range(0, len(examples), 2):
-        batch = examples[i:i + 2]
+    for i in range(0, len(examples), 5):
+        batch = examples[i:i + 5]
         batch_categories = find_categories(batch, current_categories)
         
         # Combine the results from the batch into a single prompt
@@ -147,7 +149,7 @@ def find_categories_in_batches(examples: List[Example]):
         {batch_categories}
 
         Please combine the results into a single coherent list of categories, ensuring that similar criteria are merged and descriptions are updated accordingly. Keep the formatting:
-        A sanity check is that the total number of criteria should not exceed 5; if it does, you should combine criteria that are most similar, again updating the description.
+        A sanity check is that the total number of criteria should not exceed 6; if it does, you should combine criteria that are most similar, again updating the description.
         Also criteria should not be overly complex. Things like "Use of Evidence" and "Tone and Clarity" are good, but something like "Tone, Professionalism, Clarity, and Precision" is not.
         Ensure it is JSON formatted.
         [
@@ -160,7 +162,7 @@ def find_categories_in_batches(examples: List[Example]):
         """
 
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="o1-mini",
             messages=[
                 {"role": "user", "content": combined_prompt}
             ]
@@ -186,12 +188,12 @@ def find_categories_in_batches(examples: List[Example]):
 def main():
     load_dotenv()
     examples = load_examples()
-    # categories = find_categories_in_batches(examples)
+    categories = find_categories_in_batches(examples)
 
-    # print("FINAL CATEGORIES")
-    # print(categories)
+    print("FINAL CATEGORIES")
+    print(categories)
 
-    run_judgment_evaluation(examples)
+    # run_judgment_evaluation(examples)
 
 if __name__ == "__main__":
     main()
