@@ -16,11 +16,11 @@
         "description": "Including relevant details, specific examples, and concrete evidence to substantiate claims, enhancing credibility, depth, and engagement of the arguments.",
     },
     {
-        "criteria": "Consistency and Coherence",
-        "description": "Maintaining uniformity in style, tense, and terminology throughout the document, ensuring that all parts align seamlessly with the central message.",
-    },
-    {
         "criteria": "Grammatical and Technical Accuracy",
         "description": "Correcting grammatical errors, typos, and technical inaccuracies to uphold the quality, readability, and professionalism of the document.",
+    },
+    {
+        "criteria": "Consistency and Coherence",
+        "description": "Maintaining uniformity in style, tense, and terminology throughout the document, ensuring that all parts align seamlessly with the central message.",
     },
 ]

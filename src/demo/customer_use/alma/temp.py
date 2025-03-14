@@ -1,22 +1,22 @@
 [
     {
-        "criteria": "Clarity and Precision",
-        "description": "Use clear, specific, and factual language to convey key points concisely. Avoid redundancy and unnecessary complexity to enhance understanding and ensure effective communication.",
+        "criteria": "Professional Tone, Formal Address, and Language",
+        "description": "Enhancements in formal address, salutations, tone adjustments, and role/title updates. Focuses on language refinement, grammar correction, removal of redundancies, and content structuring for coherence and logical flow. Ensures professionalism, clarity, engagement, and stylistic consistency.",
     },
     {
-        "criteria": "Structure and Organization",
-        "description": "Maintain a logical and well-organized flow with coherent transitions and sections. Present content systematically to enhance readability and coherence, effectively showcasing roles and achievements.",
+        "criteria": "Clarity, Precision, and Conciseness",
+        "description": "Refinement and revisions in narrative, wording, and sentence structure to enhance clarity, flow, precision, and focus on key contributions and achievements. Ensures relevance, engagement for the audience, and logical flow.",
     },
     {
-        "criteria": "Professional Tone and Context",
-        "description": "Adopt a formal tone suitable for professional communication. Use industry-specific language to enhance credibility and professionalism, aligning with standards and expectations.",
+        "criteria": "Content Update, Relevance, and Impact",
+        "description": "Incorporation and update of content to strengthen arguments and align with role-specific requirements. Showcases expanded roles, responsibilities, achievements, and sector-driven results, with an emphasis on contemporary industry developments.",
     },
     {
-        "criteria": "Impact and Evidence",
-        "description": "Emphasize significant achievements, leadership, and innovation with quantitative data and supporting evidence. Highlight influences on societal challenges and industry advancements to underscore impact.",
+        "criteria": "Evidence and Credibility",
+        "description": "Provision of detailed examples, data, recognitions, financial achievements, professional affiliations, and technical achievements. Includes recognitions, partnerships, patent achievements, fundraising figures, and strategic role descriptions to bolster document credibility and impact.",
     },
     {
-        "criteria": "Engagement and Storytelling",
-        "description": "Utilize storytelling techniques to craft a compelling narrative. Integrate personal and professional milestones to engage the audience, illustrating significant impact and sustained contributions.",
+        "criteria": "Author Credentials and Specificity",
+        "description": "Provision and expansion of detailed background on the author's experience, expertise, and professional affiliations to enhance authority and document impact. Focuses on impactful experiences and credentials.",
     },
 ]
