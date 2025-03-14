@@ -8,10 +8,6 @@ In `judgeval`, an evaluation dataset (`EvalDataset`) is a collection of `Example
 <Note>
 A `GroundTruthExample` is a specific type of `Example` that do not require the `actual_output` field. 
 
-This is useful for creating datasets that can be **dynamically updated at evaluation time** by running your workflow on the GroundTruthExamples to create Examples.
-</Note>
-## Creating a Dataset
-
 Creating an `EvalDataset` is as simple as supplying a list of `Example`s and/or `GroundTruthExample`s.
 
 ```python create_dataset.py
