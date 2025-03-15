@@ -140,10 +140,11 @@ def run_agent(prompt: str, follow_up_inputs: dict):
     ):
         event["messages"][-1].pretty_print()
 
-    if graph.get_state(config).next:
+    next_node = graph.get_state(config).next
+    if next_node:
         print("Resuming from checkpoint")
-        print(graph.get_state(config).next)
-        input = f"{follow_up_inputs[graph.get_state(config).next[0]]}"
+        print(next_node)
+        input = f"{follow_up_inputs[next_node[0]]}"
         
         for event in graph.stream(Command(resume=f"{input}"), config, stream_mode="values"):
             event["messages"][-1].pretty_print()
