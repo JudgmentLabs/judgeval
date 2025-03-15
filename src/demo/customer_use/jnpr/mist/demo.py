@@ -12,6 +12,9 @@ from judgeval.data import Example
 from judgeval.data.datasets import EvalDataset
 from judgeval.scorers import AnswerRelevancyScorer, ExecutionOrderScorer, AnswerCorrectnessScorer
 from judgeval import JudgmentClient
+from pydantic import BaseModel
+from langgraph.types import Command, interrupt
+from langgraph.checkpoint.memory import MemorySaver
 
 PROJECT_NAME = "JNPR_MIST_LANGGRAPH"
 
@@ -23,7 +26,7 @@ judgment = Tracer(api_key=os.getenv("JUDGMENT_API_KEY"), project_name=PROJECT_NA
 
 
 @judgment.observe(name="search_restaurants", span_type="tool")
-def search_restaurants(location: str, cuisine: str, state: State) -> str:
+def search_restaurants(location: str, cuisine: str) -> str:
     """Search for restaurants in a location with specific cuisine"""
     ans = f"Top 3 {cuisine} restaurants in {location}: 1. Le Gourmet 2. Spice Palace 3. Carbones"
     judgment.get_current_trace().async_evaluate(
@@ -35,7 +38,7 @@ def search_restaurants(location: str, cuisine: str, state: State) -> str:
     return ans
 
 @judgment.observe(name="check_opening_hours", span_type="tool")
-def check_opening_hours(restaurant: str, state: State) -> str:
+def check_opening_hours(restaurant: str) -> str:
     """Check opening hours for a specific restaurant"""
     ans = f"{restaurant} hours: Mon-Sun 11AM-10PM"
     judgment.get_current_trace().async_evaluate(
@@ -60,8 +63,30 @@ def get_menu_items(restaurant: str) -> str:
     return ans 
 
 
+
+@judgment.observe(name="ask_human", span_type="tool")
+def ask_human(state):
+    """Ask the human a question about location"""
+    tool_call_id = state["messages"][-1].tool_calls[0]["id"]
+    location = interrupt("Please provide your location:")
+    tool_message = [{"tool_call_id": tool_call_id, "type": "tool", "content": location}]
+    return {"messages": tool_message}
+
+def should_continue(state):
+    messages = state["messages"]
+    last_message = messages[-1]
+    if not last_message.tool_calls:
+        return END
+    elif last_message.tool_calls[0]["name"] == "ask_human":
+        return "ask_human"
+    # Otherwise if there is, we continue
+    else:
+        return "tools"
+
+
+
 @judgment.observe(span_type="Run Agent", overwrite=True)
-def run_agent(prompt: str):
+def run_agent(prompt: str, follow_up_inputs: dict):
     tools = [
         TavilySearchResults(max_results=2),
         check_opening_hours,
@@ -71,11 +96,11 @@ def run_agent(prompt: str):
 
 
     llm = ChatAnthropic(model="claude-3-5-sonnet-20240620")
+    llm_with_tools = llm.bind_tools(tools + [ask_human])
 
     graph_builder = StateGraph(State)
 
     def assistant(state: State):
-        llm_with_tools = llm.bind_tools(tools)
         response = llm_with_tools.invoke(state["messages"])
         return {"messages": [response]}
 
@@ -83,26 +108,46 @@ def run_agent(prompt: str):
     
     graph_builder.add_node("assistant", assistant)
     graph_builder.add_node("tools", tool_node)
-    
+    graph_builder.add_node("ask_human", ask_human)
+
     graph_builder.set_entry_point("assistant")
     graph_builder.add_conditional_edges(
         "assistant",
-        lambda state: "tools" if state["messages"][-1].tool_calls else END
+        should_continue
     )
     graph_builder.add_edge("tools", "assistant")
+    graph_builder.add_edge("ask_human", "assistant")
     
-    graph = graph_builder.compile()
+    checkpointer = MemorySaver()
+    graph = graph_builder.compile(
+        checkpointer=checkpointer
+    )
 
     handler = JudgevalCallbackHandler(judgment.get_current_trace())
+    config = {"configurable": {"thread_id": "001"}, "callbacks": [handler]}
 
-    result = graph.invoke({
-        "messages": [HumanMessage(content=prompt)]
-    }, config=dict(callbacks=[handler]))
+    for event in graph.stream(
+        {
+            "messages": [
+                (
+                    "user",
+                    prompt,
+                )
+            ]
+        },
+        config,
+        stream_mode="values",
+    ):
+        event["messages"][-1].pretty_print()
 
-    print("\nFinal Result:")
-    for msg in result["messages"]:
-        print(f"{type(msg).__name__}: {msg.content}")
-    
+    if graph.get_state(config).next:
+        print("Resuming from checkpoint")
+        print(graph.get_state(config).next)
+        input = f"{follow_up_inputs[graph.get_state(config).next[0]]}"
+        
+        for event in graph.stream(Command(resume=f"{input}"), config, stream_mode="values"):
+            event["messages"][-1].pretty_print()
+
     return handler
     
 
@@ -114,7 +159,7 @@ def test_eval_dataset():
     
     for example in dataset.examples:
         # Run your agent here
-        handler = run_agent(example.input)
+        handler = run_agent(example.input, example.follow_up_inputs)
         example.actual_output = handler.executed_node_tools
 
     client = JudgmentClient()
@@ -123,7 +168,8 @@ def test_eval_dataset():
         scorers=[ExecutionOrderScorer(threshold=1, should_consider_ordering=True)],
         model="gpt-4o-mini",
         project_name=PROJECT_NAME,
-        eval_run_name="mist-demo-examples"
+        eval_run_name="mist-demo-examples",
+        override=True
     )
 
 

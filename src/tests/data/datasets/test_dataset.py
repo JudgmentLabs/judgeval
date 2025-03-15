@@ -295,7 +295,8 @@ def test_load_from_yaml():
         expected_tools=["tool1", "tool2"],
         name="test example",
         trace_id="123",
-        example_id="12345"
+        example_id="12345",
+        follow_up_inputs={"tool1": "test input", "tool2": "test input2"}
     )
 
     gt1 = GroundTruthExample(

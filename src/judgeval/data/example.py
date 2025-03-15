@@ -37,6 +37,7 @@ class Example(BaseModel):
     example_index: Optional[int] = None
     timestamp: Optional[str] = None
     trace_id: Optional[str] = None
+    follow_up_inputs: Optional[Dict[str, str]] = None #For langgraph it is node/tool -> input
     
     def __init__(self, **data):
         if 'example_id' not in data:
