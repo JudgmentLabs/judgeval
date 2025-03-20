@@ -213,6 +213,7 @@ def log_evaluation_results(merged_results: List[ScoringResult], evaluation_run: 
                 "results": [result.to_dict() for result in merged_results],
                 "project_name": evaluation_run.project_name,
                 "eval_name": evaluation_run.eval_name,
+                "override": evaluation_run.override
             },
             verify=True
         )

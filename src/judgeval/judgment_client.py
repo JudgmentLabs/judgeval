@@ -140,7 +140,8 @@ class JudgmentClient:
                 metadata=metadata,
                 judgment_api_key=self.judgment_api_key,
                 rules=loaded_rules,
-                organization_id=self.organization_id
+                organization_id=self.organization_id,
+                override=override
             )
             return run_eval(eval, override)
         except ValueError as e:
