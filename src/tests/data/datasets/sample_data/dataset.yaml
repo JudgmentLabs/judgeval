@@ -34,3 +34,6 @@ examples:
     name: "test example"
     example_id: "12345"
     trace_id: "123"
+    follow_up_inputs:
+      tool1: "test input"
+      tool2: "test input2"
