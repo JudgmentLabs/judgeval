@@ -4,7 +4,7 @@ import pandas as pd
 import yaml
 from unittest.mock import Mock, patch, mock_open
 from judgeval.data.datasets import EvalDataset, EvalDatasetClient
-from judgeval.data import Example, GroundTruthExample
+from judgeval.data import Example
 
 @pytest.fixture
 def sample_example():
@@ -20,19 +20,6 @@ def sample_example():
         name="test example"
     )
 
-@pytest.fixture
-def sample_ground_truth():
-    return GroundTruthExample(
-        input="test input",
-        expected_output="expected output",
-        context=["context1"],
-        retrieval_context=["retrieval1"],
-        additional_metadata={"key": "value"},
-        tools_called=["tool1"],
-        expected_tools=["tool1"],
-        comments="test comment",
-        source_file="test.py"
-    )
 
 @pytest.fixture
 def dataset():
@@ -45,7 +32,6 @@ def eval_dataset_client():
 def test_init():
     dataset = EvalDataset(judgment_api_key="test_key")
     assert dataset.judgment_api_key == "test_key"
-    assert dataset.ground_truths == []
     assert dataset.examples == []
     assert dataset._alias is None
     assert dataset._id is None
@@ -54,11 +40,6 @@ def test_add_example(dataset, sample_example):
     dataset.add_example(sample_example)
     assert len(dataset.examples) == 1
     assert dataset.examples[0] == sample_example
-
-def test_add_ground_truth(dataset, sample_ground_truth):
-    dataset.add_ground_truth(sample_ground_truth)
-    assert len(dataset.ground_truths) == 1
-    assert dataset.ground_truths[0] == sample_ground_truth
 
 @patch('requests.post')
 def test_push_success(mock_post, dataset, sample_example, eval_dataset_client):
@@ -93,7 +74,6 @@ def test_pull_success(mock_post, eval_dataset_client):
     mock_response = Mock()
     mock_response.status_code = 200
     mock_response.json.return_value = {
-        "ground_truths": [{"input": "test", "expected_output": "test"}],
         "examples": [{"input": "test", "actual_output": "test"}],
         "_alias": "test_alias",
         "_id": "test_id"
@@ -101,7 +81,6 @@ def test_pull_success(mock_post, eval_dataset_client):
     mock_post.return_value = mock_response
 
     pulled_dataset = eval_dataset_client.pull("test_alias")
-    assert len(pulled_dataset.ground_truths) == 1
     assert len(pulled_dataset.examples) == 1
     assert pulled_dataset._alias == "test_alias"
     assert pulled_dataset._id == "test_id"
@@ -110,13 +89,11 @@ def test_pull_success(mock_post, eval_dataset_client):
 def test_add_from_json(mock_file, dataset):
     json_data = {
         "examples": [{"input": "test", "actual_output": "test"}],
-        "ground_truths": [{"input": "test", "expected_output": "test"}]
     }
     mock_file.return_value.__enter__.return_value.read.return_value = json.dumps(json_data)
 
     dataset.add_from_json("test.json")
     assert len(dataset.examples) == 1
-    assert len(dataset.ground_truths) == 1
 
 @patch('pandas.read_csv')
 def test_add_from_csv(mock_read_csv, dataset):
@@ -140,7 +117,6 @@ def test_add_from_csv(mock_read_csv, dataset):
 
     dataset.add_from_csv("test.csv")
     assert len(dataset.examples) == 1
-    assert len(dataset.ground_truths) == 1
 
 def test_save_as_json(dataset, sample_example, tmp_path):
     dataset.add_example(sample_example)
@@ -151,7 +127,6 @@ def test_save_as_json(dataset, sample_example, tmp_path):
     with open(save_path / "test_save.json") as f:
         saved_data = json.load(f)
         assert "examples" in saved_data
-        assert "ground_truths" in saved_data
 
 def test_save_as_csv(dataset, sample_example, tmp_path):
     dataset.add_example(sample_example)
@@ -192,12 +167,10 @@ def test_iter_and_len(dataset, sample_example):
     assert len(examples) == 1
     assert examples[0] == sample_example
 
-def test_str_representation(dataset, sample_example, sample_ground_truth):
+def test_str_representation(dataset, sample_example):
     dataset.add_example(sample_example)
-    dataset.add_ground_truth(sample_ground_truth)
     str_rep = str(dataset)
     assert "EvalDataset" in str_rep
-    assert "ground_truths" in str_rep
     assert "examples" in str_rep
 
 # new UTs for dataset UX testing
@@ -216,23 +189,9 @@ def test_load_from_json():
         trace_id="123"
     )
 
-    gt1 = GroundTruthExample(
-        input="test input",
-        expected_output="expected output",
-        context=["context1"],
-        retrieval_context=["retrieval1"],
-        additional_metadata={"key": "value"},
-        tools_called=["tool1"],
-        expected_tools=["tool1"],
-        comments="test comment",
-        source_file="test.py",
-        trace_id="094121"
-    )
-
     dataset = EvalDataset()
 
     dataset.add_from_json("tests/data/datasets/sample_data/dataset.json")
-    assert dataset.ground_truths == [gt1]
 
     # We can't do the same comparison as above because the timestamps are different
     assert len(dataset.examples) == 1
@@ -264,23 +223,9 @@ def test_load_from_csv():
         example_id="12345"
     )
 
-    gt1 = GroundTruthExample(
-        input="test input",
-        expected_output="expected output",
-        context=["context1"],
-        retrieval_context=["retrieval1"],
-        additional_metadata={"key": "value"},
-        tools_called=["tool1"],
-        expected_tools=["tool1"],
-        comments="test comment",
-        source_file="test.py",
-        trace_id="094121"
-    )
-
     dataset = EvalDataset()
 
     dataset.add_from_csv("tests/data/datasets/sample_data/dataset.csv")
-    assert dataset.ground_truths == [gt1]
     assert dataset.examples == [ex1]
 
 def test_load_from_yaml():
@@ -298,21 +243,7 @@ def test_load_from_yaml():
         example_id="12345"
     )
 
-    gt1 = GroundTruthExample(
-        input="test input",
-        expected_output="expected output",
-        context=["context1"],
-        retrieval_context=["retrieval1"],
-        additional_metadata={"key": "value"},
-        tools_called=["tool1"],
-        expected_tools=["tool1"],
-        comments="test comment",
-        source_file="test.py",
-        trace_id="094121"
-    )
-
     dataset = EvalDataset()
 
     dataset.add_from_yaml("tests/data/datasets/sample_data/dataset.yaml")
-    assert dataset.ground_truths == [gt1]
     assert dataset.examples == [ex1]

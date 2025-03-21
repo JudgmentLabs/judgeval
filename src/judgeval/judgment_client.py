@@ -10,7 +10,6 @@ from judgeval.data.datasets import EvalDataset, EvalDatasetClient
 from judgeval.data import (
     ScoringResult, 
     Example,
-    GroundTruthExample
 )
 from judgeval.scorers import (
     APIJudgmentScorer, 
@@ -283,11 +282,11 @@ class JudgmentClient:
         """
         return self.eval_dataset_client.pull_all_user_dataset_stats()
     
-    def edit_dataset(self, alias: str, examples: List[Example], ground_truths: List[GroundTruthExample]) -> bool:
+    def edit_dataset(self, alias: str, examples: List[Example]) -> bool:
         """
-        Edits the dataset on Judgment platform by adding new examples and ground truths
+        Edits the dataset on Judgment platform by adding new examples
         """
-        return self.eval_dataset_client.edit_dataset(alias, examples, ground_truths)
+        return self.eval_dataset_client.edit_dataset(alias, examples)
     
     # Maybe add option where you can pass in the EvaluationRun object and it will pull the eval results from the backend
     def pull_eval(self, project_name: str, eval_run_name: str) -> List[Dict[str, Union[str, List[ScoringResult]]]]:

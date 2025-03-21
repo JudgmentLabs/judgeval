@@ -11,7 +11,7 @@ from judgeval.constants import (
     JUDGMENT_DATASETS_EDIT_API_URL,
     JUDGMENT_DATASETS_EXPORT_JSONL_API_URL
 )
-from judgeval.data import Example, GroundTruthExample
+from judgeval.data import Example
 from judgeval.data.datasets import EvalDataset
 
 
@@ -35,7 +35,6 @@ class EvalDatasetClient:
         Mock request:
         dataset = {
             "alias": alias,
-            "ground_truths": [...],
             "examples": [...],
             "overwrite": overwrite
         } ==>
@@ -55,7 +54,6 @@ class EvalDatasetClient:
             )
             content = {
                     "alias": alias,
-                    "ground_truths": [g.to_dict() for g in dataset.ground_truths],
                     "examples": [e.to_dict() for e in dataset.examples],
                     "overwrite": overwrite,
                 }
@@ -102,7 +100,6 @@ class EvalDatasetClient:
         } 
         ==>
         {
-            "ground_truths": [...],
             "examples": [...],
             "_alias": alias,
             "_id": "..."  # ID of the dataset
@@ -142,7 +139,6 @@ class EvalDatasetClient:
 
                 info(f"Successfully pulled dataset with alias '{alias}'")
                 payload = response.json()
-                dataset.ground_truths = [GroundTruthExample(**g) for g in payload.get("ground_truths", [])]
                 dataset.examples = [Example(**e) for e in payload.get("examples", [])]
                 dataset._alias = payload.get("_alias")
                 dataset._id = payload.get("_id")
@@ -164,8 +160,8 @@ class EvalDatasetClient:
         } 
         ==>
         {
-            "test_dataset_1": {"examples_count": len(dataset1.examples), "ground_truths_count": len(dataset1.ground_truths)},
-            "test_dataset_2": {"examples_count": len(dataset2.examples), "ground_truths_count": len(dataset2.ground_truths)},
+            "test_dataset_1": {"examples_count": len(dataset1.examples)},
+            "test_dataset_2": {"examples_count": len(dataset2.examples)},
             ...
         }
         """
@@ -209,15 +205,14 @@ class EvalDatasetClient:
 
                 return payload
 
-    def edit_dataset(self, alias: str, examples: List[Example], ground_truths: List[GroundTruthExample]) -> bool:
+    def edit_dataset(self, alias: str, examples: List[Example]) -> bool:
         """
-        Edits the dataset on Judgment platform by adding new examples and ground truths
+        Edits the dataset on Judgment platform by adding new examples
 
         Mock request:
         {
             "alias": alias,
             "examples": [...],
-            "ground_truths": [...],
             "judgment_api_key": self.judgment_api_key
         }
         """
@@ -234,7 +229,6 @@ class EvalDatasetClient:
             content = {
                 "alias": alias,
                 "examples": [e.to_dict() for e in examples],
-                "ground_truths": [g.to_dict() for g in ground_truths],
             }
 
             try:

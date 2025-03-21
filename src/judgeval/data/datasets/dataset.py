@@ -7,12 +7,11 @@ import yaml
 from dataclasses import dataclass, field
 from typing import List, Union, Literal
 
-from judgeval.data import Example, GroundTruthExample
+from judgeval.data import Example
 from judgeval.common.logger import debug, error, warning, info
 
 @dataclass
 class EvalDataset:
-    ground_truths: List[GroundTruthExample]
     examples: List[Example]
     _alias: Union[str, None] = field(default=None)
     _id: Union[str, None] = field(default=None)
@@ -21,13 +20,11 @@ class EvalDataset:
     def __init__(self, 
                  judgment_api_key: str = os.getenv("JUDGMENT_API_KEY"),  
                  organization_id: str = os.getenv("JUDGMENT_ORG_ID"),
-                 ground_truths: List[GroundTruthExample] = [], 
                  examples: List[Example] = [],
                  ):
-        debug(f"Initializing EvalDataset with {len(ground_truths)} ground truths and {len(examples)} examples")
+        debug(f"Initializing EvalDataset with {len(examples)} examples")
         if not judgment_api_key:
             warning("No judgment_api_key provided")
-        self.ground_truths = ground_truths
         self.examples = examples
         self._alias = None
         self._id = None
@@ -37,38 +34,13 @@ class EvalDataset:
     def add_from_json(self, file_path: str) -> None:
         debug(f"Loading dataset from JSON file: {file_path}")
         """
-        Adds examples and ground truths from a JSON file.
+        Adds examples from a JSON file.
 
-        The format of the JSON file is expected to be a dictionary with two keys: "examples" and "ground_truths". 
-        The value of each key is a list of dictionaries, where each dictionary represents an example or ground truth.
+        The format of the JSON file is expected to be a dictionary with one key: "examples". 
+        The value of the key is a list of dictionaries, where each dictionary represents an example.
 
         The JSON file is expected to have the following format:
         {
-            "ground_truths": [
-                {
-                    "input": "test input",
-                    "actual_output": null,
-                    "expected_output": "expected output",
-                    "context": [
-                    "context1"
-                ],
-                "retrieval_context": [
-                    "retrieval1"
-                ],
-                "additional_metadata": {
-                    "key": "value"
-                },
-                "comments": "test comment",
-                "tools_called": [
-                    "tool1"
-                ],
-                "expected_tools": [
-                    "tool1"
-                ],
-                "source_file": "test.py",
-                "trace_id": "094121"
-            }
-        ],
         "examples": [
             {
                 "input": "test input",
@@ -103,7 +75,6 @@ class EvalDataset:
             with open(file_path, "r") as file:
                 payload = json.load(file)
                 examples = payload.get("examples", [])
-                ground_truths = payload.get("ground_truths", [])
         except FileNotFoundError:
             error(f"JSON file not found: {file_path}")
             raise FileNotFoundError(f"The file {file_path} was not found.")
@@ -111,21 +82,17 @@ class EvalDataset:
             error(f"Invalid JSON file: {file_path}")
             raise ValueError(f"The file {file_path} is not a valid JSON file.")
 
-        info(f"Added {len(examples)} examples and {len(ground_truths)} ground truths from JSON")
+        info(f"Added {len(examples)} examples from JSON")
         new_examples = [Example(**e) for e in examples]
         for e in new_examples:
             self.add_example(e)
-
-        new_ground_truths = [GroundTruthExample(**g) for g in ground_truths]
-        for g in new_ground_truths:
-            self.add_ground_truth(g)
   
     def add_from_csv(
         self, 
         file_path: str,
         ) -> None:
         """
-        Add Examples and GroundTruthExamples from a CSV file.
+        Add Examples from a CSV file.
         """
         try:
             import pandas as pd
@@ -144,14 +111,14 @@ class EvalDataset:
         "expected_tools", "name", "comments", "source_file", "example", \
         "trace_id"
 
-        We want to collect the examples and ground truths separately which can
+        We want to collect the examples separately which can
         be determined by the "example" column. If the value is True, then it is an
-        example, otherwise it is a ground truth.
+        example
 
         We also assume that if there are multiple retrieval contexts or contexts, they are separated by semicolons.
         This can be adjusted using the `context_delimiter` and `retrieval_context_delimiter` parameters.
         """
-        examples, ground_truths = [], []
+        examples = []
 
         for _, row in df.iterrows():
             data = {
@@ -174,49 +141,20 @@ class EvalDataset:
                     examples.append(e)
                 else:
                     raise ValueError("Every example must have an 'input' and 'actual_output' field.")
-            else:
-                # GroundTruthExample has `comments` and `source_file` fields
-                data["comments"] = row["comments"] if pd.notna(row["comments"]) else None
-                data["source_file"] = row["source_file"] if pd.notna(row["source_file"]) else None
-                # every GroundTruthExample has `input` field
-                if data["input"] is not None:
-                    g = GroundTruthExample(**data)
-                    ground_truths.append(g)
-                else:
-                    raise ValueError("Every ground truth must have an 'input' field.")
+           
 
         for e in examples:
             self.add_example(e)
 
-        for g in ground_truths:
-            self.add_ground_truth(g)
-
     def add_from_yaml(self, file_path: str) -> None:
         debug(f"Loading dataset from YAML file: {file_path}")
         """
-        Adds examples and ground truths from a YAML file.
+        Adds examples from a YAML file.
 
-        The format of the YAML file is expected to be a dictionary with two keys: "examples" and "ground_truths". 
-        The value of each key is a list of dictionaries, where each dictionary represents an example or ground truth.
+        The format of the YAML file is expected to be a dictionary with one key: "examples". 
+        The value of the key is a list of dictionaries, where each dictionary represents an example.
 
         The YAML file is expected to have the following format:
-        ground_truths:
-          - input: "test input"
-            actual_output: null
-            expected_output: "expected output"
-            context:
-              - "context1"
-            retrieval_context:
-              - "retrieval1"
-            additional_metadata:
-              key: "value"
-            comments: "test comment"
-            tools_called:
-              - "tool1"
-            expected_tools:
-              - "tool1"
-            source_file: "test.py"
-            trace_id: "094121"
         examples:
           - input: "test input"
             actual_output: "test output"
@@ -244,7 +182,6 @@ class EvalDataset:
                 if payload is None:
                     raise ValueError("The YAML file is empty.")
                 examples = payload.get("examples", [])
-                ground_truths = payload.get("ground_truths", [])
         except FileNotFoundError:
             error(f"YAML file not found: {file_path}")
             raise FileNotFoundError(f"The file {file_path} was not found.")
@@ -252,25 +189,18 @@ class EvalDataset:
             error(f"Invalid YAML file: {file_path}")
             raise ValueError(f"The file {file_path} is not a valid YAML file.")
 
-        info(f"Added {len(examples)} examples and {len(ground_truths)} ground truths from YAML")
+        info(f"Added {len(examples)} examples from YAML")
         new_examples = [Example(**e) for e in examples]
         for e in new_examples:
             self.add_example(e)
 
-        new_ground_truths = [GroundTruthExample(**g) for g in ground_truths]
-        for g in new_ground_truths:
-            self.add_ground_truth(g)
-
     def add_example(self, e: Example) -> None:
         self.examples = self.examples + [e]
         # TODO if we need to add rank, then we need to do it here
-
-    def add_ground_truth(self, g: GroundTruthExample) -> None:
-        self.ground_truths = self.ground_truths + [g]
     
     def save_as(self, file_type: Literal["json", "csv", "yaml"], dir_path: str, save_name: str = None) -> None:
         """
-        Saves the dataset as a file. Save both the ground truths and examples.
+        Saves the dataset as a file. Save only the examples.
 
         Args:
             file_type (Literal["json", "csv"]): The file type to save the dataset as.
@@ -285,7 +215,6 @@ class EvalDataset:
             with open(complete_path, "w") as file:
                 json.dump(
                     {
-                        "ground_truths": [g.to_dict() for g in self.ground_truths],
                         "examples": [e.to_dict() for e in self.examples],
                     },
                     file,
@@ -319,24 +248,7 @@ class EvalDataset:
                         ]
                     )
                 
-                for g in self.ground_truths:
-                    writer.writerow(
-                        [
-                            g.input,
-                            g.actual_output,
-                            g.expected_output,
-                            ";".join(g.context),
-                            ";".join(g.retrieval_context),
-                            g.additional_metadata,
-                            ";".join(g.tools_called),
-                            ";".join(g.expected_tools),
-                            None,  # GroundTruthExample does not have name
-                            g.comments,
-                            g.source_file,
-                            False,  # Adding a GroundTruthExample, not an Example
-                            g.trace_id
-                        ]
-                    )
+                
         elif file_type == "yaml":
             with open(complete_path, "w") as file:
                 yaml_data = {
@@ -358,24 +270,6 @@ class EvalDataset:
                         }
                         for e in self.examples
                     ],
-                    "ground_truths": [
-                        {
-                            "input": g.input,
-                            "actual_output": g.actual_output,
-                            "expected_output": g.expected_output,
-                            "context": g.context,
-                            "retrieval_context": g.retrieval_context,
-                            "additional_metadata": g.additional_metadata,
-                            "tools_called": g.tools_called,
-                            "expected_tools": g.expected_tools,
-                            "name": None,  # GroundTruthExample does not have name
-                            "comments": g.comments,
-                            "source_file": g.source_file,
-                            "example": False,  # Adding a GroundTruthExample, not an Example
-                            "trace_id": g.trace_id
-                        }
-                        for g in self.ground_truths
-                    ]
                 }
                 yaml.dump(yaml_data, file, default_flow_style=False)
         else:
@@ -391,7 +285,6 @@ class EvalDataset:
     def __str__(self):
         return (
             f"{self.__class__.__name__}("
-            f"ground_truths={self.ground_truths}, "
             f"examples={self.examples}, "
             f"_alias={self._alias}, "
             f"_id={self._id}"
