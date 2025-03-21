@@ -177,7 +177,6 @@ async def test_evaluation_mixed(test_input):
 async def test_trace_delete(trace_manager_client):
     with judgment.trace("TEST_RUN", project_name="TEST", overwrite=True) as trace:
         pass
-    trace.save()
 
     response = trace_manager_client.fetch_trace(trace.trace_id)
     assert response, "No traces found"
@@ -190,11 +189,9 @@ async def test_trace_delete(trace_manager_client):
 async def test_trace_delete_batch(trace_manager_client):
     with judgment.trace("TEST_RUN2", project_name="TEST", overwrite=True) as trace:
         pass
-    trace.save()
 
     with judgment.trace("TEST_RUN3", project_name="TEST2", overwrite=True) as trace2:
         pass
-    trace2.save()
 
     response = trace_manager_client.fetch_trace(trace.trace_id)
     assert response, "No traces found"

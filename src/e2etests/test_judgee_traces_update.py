@@ -15,7 +15,7 @@ load_dotenv()
 # Get server URL and API key from environment
 SERVER_URL = os.getenv("JUDGMENT_API_URL", "http://localhost:8000")
 TEST_API_KEY = os.getenv("JUDGMENT_API_KEY")
-ORGANIZATION_ID = os.getenv("ORGANIZATION_ID")
+ORGANIZATION_ID = os.getenv("JUDGMENT_ORG_ID")
 USER_API_KEY = os.getenv("USER_API_KEY", TEST_API_KEY)  # For user-specific tests
 
 # Skip all tests if API key or organization ID is not set
