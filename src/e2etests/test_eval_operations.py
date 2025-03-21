@@ -147,6 +147,7 @@ class TestEvalOperations:
             scorers=[FaithfulnessScorer(threshold=0.5)],
             model="Qwen/Qwen2.5-72B-Instruct-Turbo",
             metadata={"batch": "test"},
+            log_results=False,
         )
         assert res, "Dataset evaluation failed"
 
