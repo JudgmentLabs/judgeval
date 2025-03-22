@@ -33,7 +33,7 @@ async def make_upper(input: str) -> str:
     """
     output = input.upper()
     
-    judgment.get_current_trace().async_evaluate(
+    judgment.async_evaluate(
         scorers=[FaithfulnessScorer(threshold=0.5)],
         input="What if these shoes don't fit?",
         actual_output="We offer a 30-day full refund at no extra cost.",
@@ -51,7 +51,7 @@ async def make_upper(input: str) -> str:
 async def make_lower(input):
     output = input.lower()
     
-    judgment.get_current_trace().async_evaluate(
+    judgment.async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
         input="How do I reset my password?",
         actual_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
@@ -75,7 +75,7 @@ def llm_call(input):
 @pytest.mark.asyncio
 async def answer_user_question(input):
     output = llm_call(input)
-    judgment.get_current_trace().async_evaluate(
+    judgment.async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
         input=input,
         actual_output=output,
@@ -105,7 +105,7 @@ async def make_poem(input: str) -> str:
         )
         anthropic_result = anthropic_response.content[0].text
         
-        judgment.get_current_trace().async_evaluate(
+        judgment.async_evaluate(
             scorers=[AnswerRelevancyScorer(threshold=0.5)],
             input=input,
             actual_output=anthropic_result,

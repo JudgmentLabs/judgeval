@@ -10,16 +10,12 @@ import os
 import time
 import uuid
 import warnings
-from contextvars import ContextVar
 from contextlib import contextmanager
-from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from http import HTTPStatus
 from typing import Any, Dict, Generator, List, Literal, Optional, Tuple, TypeAlias, Union
 from rich import print as rprint
-from uuid import UUID
-from collections.abc import Sequence
 
 # Third-party imports
 import pika
@@ -48,19 +44,6 @@ from judgeval.rules import Rule
 from judgeval.evaluation_run import EvaluationRun
 from judgeval.data.result import ScoringResult
 
-from langchain_core.language_models import BaseChatModel
-from langchain_huggingface import ChatHuggingFace
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
-from langchain_core.utils.function_calling import convert_to_openai_tool
-from langchain_core.callbacks import CallbackManager, BaseCallbackHandler
-from langchain_core.agents import AgentAction, AgentFinish
-from langchain_core.outputs import LLMResult
-from langchain_core.tracers.context import register_configure_hook
-from langchain_core.messages.ai import AIMessage
-from langchain_core.messages.tool import ToolMessage
-from langchain_core.messages.base import BaseMessage
-from langchain_core.documents import Document
 
 # Define type aliases for better code readability and maintainability
 ApiClient: TypeAlias = Union[OpenAI, Together, Anthropic]  # Supported API clients
@@ -125,8 +108,7 @@ class TraceEntry:
                 if self._is_json_serializable(value):
                     serialized_inputs[key] = value
                 else:
-                    warnings.warn(f"Input '{key}' for function {self.function} is not JSON serializable. Setting to None.")
-                    serialized_inputs[key] = None
+                    serialized_inputs[key] = self.safe_stringify(value, self.function)
         return serialized_inputs
 
     def _is_json_serializable(self, obj: Any) -> bool:
@@ -136,6 +118,25 @@ class TraceEntry:
             return True
         except (TypeError, OverflowError, ValueError):
             return False
+
+    def safe_stringify(self, output, function_name):
+        """
+        Safely converts an object to a string or repr, handling serialization issues gracefully.
+        """
+        try:
+            return str(output)
+        except (TypeError, OverflowError, ValueError):
+            pass
+    
+        try:
+            return repr(output)
+        except (TypeError, OverflowError, ValueError):
+            pass
+    
+        warnings.warn(
+            f"Output for function {function_name} is not JSON serializable and could not be converted to string. Setting to None."
+        )
+        return None
 
     def to_dict(self) -> dict:
         """Convert the trace entry to a dictionary format for storage/transmission."""
@@ -160,25 +161,6 @@ class TraceEntry:
         - We try to serialize into JSON, then string, then the base representation (__repr__)
         - Non-serializable objects return None with a warning
         """
-
-        def safe_stringify(output, function_name):
-            """
-            Safely converts an object to a string or repr, handling serialization issues gracefully.
-            """
-            try:
-                return str(output)
-            except (TypeError, OverflowError, ValueError):
-                pass
-        
-            try:
-                return repr(output)
-            except (TypeError, OverflowError, ValueError):
-                pass
-        
-            warnings.warn(
-                f"Output for function {function_name} is not JSON serializable and could not be converted to string. Setting to None."
-            )
-            return None
         
         if isinstance(self.output, BaseModel):
             return self.output.model_dump()
@@ -188,7 +170,7 @@ class TraceEntry:
             json.dumps(self.output)
             return self.output
         except (TypeError, OverflowError, ValueError):
-            return safe_stringify(self.output, self.function)
+            return self.safe_stringify(self.output, self.function)
         
 
 class TraceManagerClient:
@@ -331,6 +313,8 @@ class TraceClient:
         project_name: str = "default_project",
         overwrite: bool = False,
         rules: Optional[List[Rule]] = None,
+        enable_monitoring: bool = True,
+        enable_evaluations: bool = True
     ):
         self.name = name
         self.trace_id = trace_id or str(uuid.uuid4())
@@ -339,6 +323,8 @@ class TraceClient:
         self.tracer = tracer
         # Initialize rules with either provided rules or an empty list
         self.rules = rules or []
+        self.enable_monitoring = enable_monitoring
+        self.enable_evaluations = enable_evaluations
         
         self.client: JudgmentClient = tracer.client
         self.entries: List[TraceEntry] = []
@@ -399,6 +385,9 @@ class TraceClient:
         model: Optional[str] = None,
         log_results: Optional[bool] = True
     ):
+        if not self.enable_evaluations:
+            return
+        
         start_time = time.time()  # Record start time
         example = Example(
             input=input,
@@ -698,7 +687,10 @@ class Tracer:
         api_key: str = os.getenv("JUDGMENT_API_KEY"), 
         project_name: str = "default_project",
         rules: Optional[List[Rule]] = None,  # Added rules parameter
-        organization_id: str = os.getenv("JUDGMENT_ORG_ID")):
+        organization_id: str = os.getenv("JUDGMENT_ORG_ID"),
+        enable_monitoring: bool = os.getenv("JUDGMENT_MONITORING", "true").lower() == "true",
+        enable_evaluations: bool = os.getenv("JUDGMENT_EVALUATIONS", "true").lower() == "true"
+        ):
         if not hasattr(self, 'initialized'):
             if not api_key:
                 raise ValueError("Tracer must be configured with a Judgment API key")
@@ -714,6 +706,8 @@ class Tracer:
             self._current_trace: Optional[str] = None
             self.rules: List[Rule] = rules or []  # Store rules at tracer level
             self.initialized: bool = True
+            self.enable_monitoring: bool = enable_monitoring
+            self.enable_evaluations: bool = enable_evaluations
         elif hasattr(self, 'project_name') and self.project_name != project_name:
             warnings.warn(
                 f"Attempting to initialize Tracer with project_name='{project_name}' but it was already initialized with "
@@ -740,7 +734,9 @@ class Tracer:
             name, 
             project_name=project, 
             overwrite=overwrite,
-            rules=self.rules  # Pass combined rules to the trace client
+            rules=self.rules,  # Pass combined rules to the trace client
+            enable_monitoring=self.enable_monitoring,
+            enable_evaluations=self.enable_evaluations
         )
         prev_trace = self._current_trace
         self._current_trace = trace
@@ -771,6 +767,9 @@ class Tracer:
             project_name: Optional project name override
             overwrite: Whether to overwrite existing traces
         """
+        if not self.enable_monitoring:
+            return
+        
         if func is None:
             return lambda f: self.observe(f, name=name, span_type=span_type, project_name=project_name, overwrite=overwrite)
         
@@ -787,7 +786,7 @@ class Tracer:
                     trace_id = str(uuid.uuid4())
                     trace_name = func.__name__
                     project = project_name if project_name is not None else self.project_name
-                    trace = TraceClient(self, trace_id, trace_name, project_name=project, overwrite=overwrite, rules=self.rules)
+                    trace = TraceClient(self, trace_id, trace_name, project_name=project, overwrite=overwrite, rules=self.rules, enable_monitoring=self.enable_monitoring, enable_evaluations=self.enable_evaluations)
                     self._current_trace = trace
                     # Only save empty trace for the root call
                     trace.save(empty_save=True, overwrite=overwrite)
@@ -824,7 +823,7 @@ class Tracer:
                     trace_id = str(uuid.uuid4())
                     trace_name = func.__name__
                     project = project_name if project_name is not None else self.project_name
-                    trace = TraceClient(self, trace_id, trace_name, project_name=project, overwrite=overwrite, rules=self.rules)
+                    trace = TraceClient(self, trace_id, trace_name, project_name=project, overwrite=overwrite, rules=self.rules, enable_monitoring=self.enable_monitoring)
                     self._current_trace = trace
                     # Only save empty trace for the root call
                     trace.save(empty_save=True, overwrite=overwrite)
@@ -872,6 +871,11 @@ class Tracer:
                     self._current_trace.async_evaluate(scorers=[scorers], input=args, actual_output=kwargs, model="gpt-4o-mini", log_results=True)
             return wrapper
         
+    def async_evaluate(self, *args, **kwargs):
+        if self._current_trace:
+            self._current_trace.async_evaluate(*args, **kwargs)
+        else:
+            warnings.warn("No trace found, skipping evaluation")
 
 
 def wrap(client: Any) -> Any:
@@ -983,211 +987,3 @@ def _format_output_data(client: ApiClient, response: Any) -> dict:
             "total_tokens": response.usage.input_tokens + response.usage.output_tokens
         }
     }
-
-class JudgevalCallbackHandler(BaseCallbackHandler):
-    def __init__(self, trace_client: TraceClient):
-        self.trace_client = trace_client
-        self.previous_node = "__start__"
-        self.executed_node_tools = []
-        self.executed_nodes = []
-        self.executed_tools = []
-        self.openai_count = 1
-
-    def start_span(self, name: str, span_type: SpanType = "span"):
-        start_time = time.time()
-        
-        # Record span entry
-        self.trace_client.add_entry(TraceEntry(
-            type="enter",
-            function=name,
-            depth=self.trace_client.tracer.depth,
-            message=name,
-            timestamp=start_time,
-            span_type=span_type
-        ))
-        
-        self.trace_client.tracer.depth += 1
-        self.trace_client.prev_span = self.trace_client._current_span
-        self.trace_client._current_span = name
-        self._start_time = start_time
-    
-    def end_span(self, name: str, span_type: SpanType = "span"):
-        self.trace_client.tracer.depth -= 1
-        duration = time.time() - self._start_time
-        
-        # Record span exit
-        self.trace_client.add_entry(TraceEntry(
-            type="exit",
-            function=name,
-            depth=self.trace_client.tracer.depth,
-            message=f"← {name}",
-            timestamp=time.time(),
-            duration=duration,
-            span_type=span_type
-        ))
-        self.trace_client._current_span = self.trace_client.prev_span
-
-    def on_retriever_start(
-        self,
-        serialized: Optional[dict[str, Any]],
-        query: str,
-        *,
-        run_id: UUID,
-        parent_run_id: Optional[UUID] = None,
-        tags: Optional[list[str]] = None,
-        metadata: Optional[dict[str, Any]] = None,
-        **kwargs: Any,
-    ) -> Any:
-        name = "RETRIEVER_CALL"
-        if serialized and "name" in serialized:
-            name = f"RETRIEVER_{serialized['name'].upper()}"
-        
-        self.start_span(name, span_type="retriever")
-        self.trace_client.record_input({
-            'query': query,
-            'tags': tags,
-            'metadata': metadata,
-            'kwargs': kwargs
-        })
-
-    def on_retriever_end(
-        self, 
-        documents: Sequence[Document], 
-        *, 
-        run_id: UUID, 
-        parent_run_id: Optional[UUID] = None, 
-        **kwargs: Any
-    ) -> Any:
-        # Process the retrieved documents into a format suitable for logging
-        doc_summary = []
-        for i, doc in enumerate(documents):
-            # Extract key information from each document
-            doc_data = {
-                "index": i,
-                "page_content": doc.page_content[:100] + "..." if len(doc.page_content) > 100 else doc.page_content,
-                "metadata": doc.metadata
-            }
-            doc_summary.append(doc_data)
-        
-        # Record the document data
-        self.trace_client.record_output({
-            "document_count": len(documents),
-            "documents": doc_summary
-        })
-        
-        # End the retriever span
-        self.end_span(self.trace_client._current_span, span_type="retriever")
-
-    def on_chain_start(
-        self,
-        serialized: Dict[str, Any],
-        inputs: Dict[str, Any],
-        *,
-        run_id: UUID,
-        parent_run_id: Optional[UUID] = None,
-        tags: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        **kwargs: Any
-    ) -> None:
-        node = metadata.get("langgraph_node")
-        if node != None and node != "__start__" and node != self.previous_node:
-            self.executed_node_tools.append(node)
-            self.executed_nodes.append(node)
-        self.previous_node = node
-
-    def on_tool_start(
-        self,
-        serialized: Optional[dict[str, Any]],
-        input_str: str,
-        run_id: Optional[UUID] = None,
-        parent_run_id: Optional[UUID] = None,
-        inputs: Optional[dict[str, Any]] = None,
-        **kwargs: Any,
-    ):
-        name = serialized["name"]
-        self.start_span(name, span_type="tool")
-        self.executed_node_tools.append(f"{self.previous_node}:{name}")
-        self.executed_tools.append(name)
-        self.trace_client.record_input({
-            'args': input_str,
-            'kwargs': kwargs
-        })
-
-    def on_tool_end(self, output: Any, *, run_id: UUID, parent_run_id: Optional[UUID] = None, **kwargs: Any) -> Any:
-        self.trace_client.record_output(output)
-        self.end_span(self.trace_client._current_span, span_type="tool")
-
-    def on_agent_action (self, action: AgentAction, **kwargs: Any) -> Any:
-        print(f"Agent action: {action}")
-
-    def on_agent_finish(
-            self,
-            finish: AgentFinish,
-            *,
-            run_id: UUID,
-            parent_run_id: Optional[UUID] = None,
-            tags: Optional[list[str]] = None,
-            **kwargs: Any,
-        ) -> None:
-            print(f"Agent action: {finish}")
-
-    def on_llm_start(
-        self,
-        serialized: Optional[dict[str, Any]],
-        prompts: list[str],
-        *,
-        run_id: UUID,
-        parent_run_id: Optional[UUID] = None,
-        **kwargs: Any,
-    ) -> Any:    
-        name = "LLM call"
-        self.start_span(name, span_type="llm")
-        self.trace_client.record_input({
-            'args': prompts,
-            'kwargs': kwargs
-        })
-
-    def on_llm_end(self, response: LLMResult, *, run_id: UUID, parent_run_id: Optional[UUID] = None, **kwargs: Any):
-        self.trace_client.record_output(response.generations[0][0].text)
-        self.end_span(self.trace_client._current_span, span_type="llm")
-
-    def on_chat_model_start(
-        self,
-        serialized: Optional[dict[str, Any]],
-        messages: list[list[BaseMessage]],
-        *,
-        run_id: UUID,
-        parent_run_id: Optional[UUID] = None,
-        **kwargs: Any,
-    ) -> Any:
-
-        if "openai" in serialized["id"]:
-            name = f"OPENAI_API_CALL_{self.openai_count}"
-            self.openai_count += 1
-        elif "anthropic" in serialized["id"]:
-            name = "ANTHROPIC_API_CALL"
-        elif "together" in serialized["id"]:
-            name = "TOGETHER_API_CALL"
-        else:
-            name = "LLM call"
-
-        self.start_span(name, span_type="llm")
-        self.trace_client.record_input({
-            'args': str(messages),
-            'kwargs': kwargs
-        })
-
-judgeval_callback_handler_var: ContextVar[Optional[JudgevalCallbackHandler]] = ContextVar(
-    "judgeval_callback_handler", default=None
-)
-
-def set_global_handler(handler: JudgevalCallbackHandler):
-    judgeval_callback_handler_var.set(handler)
-
-def clear_global_handler():
-    judgeval_callback_handler_var.set(None)
-
-register_configure_hook(
-    context_var=judgeval_callback_handler_var,
-    inheritable=True,
-)

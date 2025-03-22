@@ -114,7 +114,7 @@ async def get_llm_response(question: str) -> str:
     )
     
     # Evaluate the response using the current trace
-    judgment.get_current_trace().async_evaluate(
+    judgment.async_evaluate(
         scorers=[
             FaithfulnessScorer(threshold=0.7),
             AnswerRelevancyScorer(threshold=0.7)
