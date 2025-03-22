@@ -3,19 +3,14 @@ title: Datasets
 ---
 ## Overview
 In most scenarios, you will have multiple `Example`s that you want to evaluate together.  
-In `judgeval`, an evaluation dataset (`EvalDataset`) is a collection of `Example`s and/or `GroundTruthExample`s that you can scale evaluations across.
+In `judgeval`, an evaluation dataset (`EvalDataset`) is a collection of `Example`s that you can scale evaluations across.
 
-<Note>
-A `GroundTruthExample` is a specific type of `Example` that do not require the `actual_output` field. 
-
-This is useful for creating datasets that can be **dynamically updated at evaluation time** by running your workflow on the GroundTruthExamples to create Examples.
-</Note>
 ## Creating a Dataset
 
-Creating an `EvalDataset` is as simple as supplying a list of `Example`s and/or `GroundTruthExample`s.
+Creating an `EvalDataset` is as simple as supplying a list of `Example`s.
 
 ```python create_dataset.py
-from judgeval.data import Example, GroundTruthExample
+from judgeval.data import Example
 from judgeval.data.datasets import EvalDataset
 
 examples = [
@@ -23,25 +18,19 @@ examples = [
     Example(input="...", actual_output="..."), 
     ...
 ]
-ground_truth_examples = [
-    GroundTruthExample(input="..."), 
-    GroundTruthExample(input="..."), 
-    ...
-]
+
 
 dataset = EvalDataset(
-    examples=examples, 
-    ground_truth_examples=ground_truth_examples
+    examples=examples
 )
 ```
 
-You can also add `Example`s and `GroundTruthExample`s to an existing `EvalDataset` using the `add_example` and `add_ground_truth_example` methods.
+You can also add `Example`s to an existing `EvalDataset` using the `add_example` method.
 
 ```python add_to_dataset.py
 ...
 
 dataset.add_example(Example(...))
-dataset.add_ground_truth(GroundTruthExample(...))
 ```
 
 ## Saving/Loading Datasets
@@ -79,12 +68,6 @@ You can save/load an `EvalDataset` with a JSON file. Your JSON file should have 
         {
             "input": "...", 
             "actual_output": "..."
-        }, 
-        ...
-    ],
-    "ground_truths": [
-        {
-            "input": "..."
         }, 
         ...
     ]
@@ -154,7 +137,7 @@ examples:
 
 ## Evaluate On Your Dataset
 
-You can use the `JudgmentClient` to evaluate the `Example`s and `GroundTruthExample`s in your dataset using scorers.
+You can use the `JudgmentClient` to evaluate the `Example`s in your dataset using scorers.
 
 ```python evaluate_dataset.py
 ...

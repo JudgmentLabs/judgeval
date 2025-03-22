@@ -12,11 +12,14 @@ Scorers act as measurement tools for evaluating LLM systems based on specific cr
 - [Contextual Precision](/evaluation/scorers/contextual_precision)
 - [Contextual Recall](/evaluation/scorers/contextual_recall)
 - [Contextual Relevancy](/evaluation/scorers/contextual_relevancy)
+- [Execution Order](/evaluation/scorers/execution_order)
 - [Faithfulness](/evaluation/scorers/faithfulness)
 - [Hallucination](/evaluation/scorers/hallucination)
-- [Summarization](/evaluation/scorers/summarization)
-- [Execution Order](/evaluation/scorers/execution_order)
 - [JSON Correctness](/evaluation/scorers/json_correctness)
+- [Summarization](/evaluation/scorers/summarization)
+
+We also understand that you may need to evaluate your LLM system with metrics that are not covered by our default scorers. 
+To support this, we provide a flexible framework for creating these scorers:
 - [Custom Scorers](/evaluation/scorers/custom_scorers)
 - [Classifier Scorers](/evaluation/scorers/classifier_scorer)
 
@@ -24,12 +27,8 @@ Scorers act as measurement tools for evaluating LLM systems based on specific cr
 We're always adding new scorers to `judgeval`. If you have a suggestion, please [let us know](mailto:contact@judgmentlabs.ai)!
 </Tip>
 
-Scorers execute on `Example`s, `GroundTruthExample`s, and `EvalDataset`s, producing a **score between 0 and 1**. 
+Scorers execute on `Example`s and `EvalDataset`s, producing a **numerical score**. 
 This enables you to **use evaluations as unit tests** by setting a `threshold` to determine whether an evaluation was successful or not. 
-
-<Note>
-Built-in scorers will succeed if the score is greater than or equal to the `threshold`. 
-</Note>
 
 ## Categories of Scorers
 `judgeval` supports three categories of scorers. 
@@ -60,14 +59,14 @@ You can create a custom scorer by inheritng from the `JudgevalScorer` class and 
 - `success_check()`: determines whether an evaluation was successful.
 
 Custom scorers can be as simple or complex as you want, and **do not need to use LLMs**. 
-For sample implementations, check out the `JudgevalScorer` [documentation page](/evaluation/scorers/custom_scorers).
+For sample implementations, check out the [Custom Scorers](/evaluation/scorers/custom_scorers) documentation page.
 
 
 ### Classifier Scorers
 
 Classifier scorers are a special type of custom scorer that can evaluate your LLM system using a natural language criteria. 
 
-TODO update this section when SDK is updated
+They either be defined using our judgeval SDK or using the Judgment Platform directly. For more information, check out the [Classifier Scorers](/evaluation/scorers/classifier_scorer) documentation page.
 
 ## Running Scorers
 

@@ -62,11 +62,11 @@
             "evaluation/scorers/contextual_precision",
             "evaluation/scorers/contextual_recall",
             "evaluation/scorers/contextual_relevancy",
+            "evaluation/scorers/execution_order",
             "evaluation/scorers/faithfulness",
             "evaluation/scorers/hallucination",
             "evaluation/scorers/json_correctness",
             "evaluation/scorers/summarization",
-            "evaluation/scorers/execution_order",
             "evaluation/scorers/custom_scorers",
             "evaluation/scorers/classifier_scorer"
           ]
