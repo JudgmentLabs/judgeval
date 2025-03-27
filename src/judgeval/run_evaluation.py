@@ -213,6 +213,7 @@ def log_evaluation_results(merged_results: List[ScoringResult], evaluation_run: 
                 "results": [result.to_dict() for result in merged_results],
                 "project_name": evaluation_run.project_name,
                 "eval_name": evaluation_run.eval_name,
+                "override": evaluation_run.override
             },
             verify=True
         )
@@ -308,13 +309,13 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_error
     """
 
     # Call endpoint to check to see if eval run name exists (if we DON'T want to override and DO want to log results)
-    if not override and evaluation_run.log_results:
-        check_eval_run_name_exists(
-            evaluation_run.eval_name,
-            evaluation_run.project_name,
-            evaluation_run.judgment_api_key,
-            evaluation_run.organization_id
-        )
+    # if not override and evaluation_run.log_results:
+    #     check_eval_run_name_exists(
+    #         evaluation_run.eval_name,
+    #         evaluation_run.project_name,
+    #         evaluation_run.judgment_api_key,
+    #         evaluation_run.organization_id
+    #     )
     
     # Set example IDs if not already set
     debug("Initializing examples with IDs and timestamps")

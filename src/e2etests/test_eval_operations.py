@@ -206,17 +206,95 @@ class TestEvalOperations:
             raise
         
         # Final non-override run should fail
-        with pytest.raises(ValueError, match="already exists"):
+        # with pytest.raises(ValueError, match="already exists"):
+        #     client.run_evaluation(
+        #         examples=[example1],
+        #         scorers=[scorer],
+        #         model="Qwen/Qwen2.5-72B-Instruct-Turbo",
+        #         metadata={"batch": "test"},
+        #         project_name=PROJECT_NAME,
+        #         eval_run_name=EVAL_RUN_NAME,
+        #         log_results=True,
+        #         override=False,
+        #     )
+
+    def test_eval_append_and_override_behavior(self, client: JudgmentClient, random_name: str):
+        """Test evaluation append and override behaviors."""
+        # Create test examples
+        example1 = Example(
+            input="What if these shoes don't fit?",
+            actual_output="We offer a 30-day full refund at no extra cost.",
+            retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
+        )
+        
+        example2 = Example(
+            input="Do you offer international shipping?",
+            actual_output="Yes, we ship worldwide with tracking.",
+            retrieval_context=["We provide international shipping with tracking numbers."],
+        )
+        
+        example3 = Example(
+            input="What's your return policy for electronics?",
+            actual_output="Electronics can be returned within 14 days.",
+            retrieval_context=["Electronics have a 14-day return window."],
+        )
+
+        scorer = FaithfulnessScorer(threshold=0.5)
+        PROJECT_NAME = "test_append_override_behavior"
+        EVAL_RUN_NAME = random_name
+
+        try:
+            # First evaluation run
             client.run_evaluation(
                 examples=[example1],
                 scorers=[scorer],
                 model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-                metadata={"batch": "test"},
+                metadata={"batch": "first_run"},
                 project_name=PROJECT_NAME,
                 eval_run_name=EVAL_RUN_NAME,
                 log_results=True,
                 override=False,
             )
+
+            # Verify first run
+            results = client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME, filter_results=False)
+            assert len(results) == 1, "First run should have 1 result"
+
+            # Second run - append behavior (override=False)
+            client.run_evaluation(
+                examples=[example2],
+                scorers=[scorer],
+                model="Qwen/Qwen2.5-72B-Instruct-Turbo",
+                metadata={"batch": "second_run"},
+                project_name=PROJECT_NAME,
+                eval_run_name=EVAL_RUN_NAME,
+                log_results=True,
+                override=False,  # This should append results
+            )
+
+            # Verify append behavior
+            results = client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME, filter_results=False)
+            assert len(results) == 2, "Should have 2 results after append"
+
+            # Third run - override behavior (override=True)
+            client.run_evaluation(
+                examples=[example3],
+                scorers=[scorer],
+                model="Qwen/Qwen2.5-72B-Instruct-Turbo",
+                metadata={"batch": "third_run"},
+                project_name=PROJECT_NAME,
+                eval_run_name=EVAL_RUN_NAME,
+                log_results=True,
+                override=True,  # This should overwrite results
+            )
+
+            # Verify override behavior
+            results = client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME, filter_results=False)
+            assert len(results) == 1, "Should have only 1 result after override"
+
+        finally:
+            # Clean up
+            client.delete_project(project_name=PROJECT_NAME)
 
 @pytest.mark.advanced
 class TestAdvancedEvalOperations:
