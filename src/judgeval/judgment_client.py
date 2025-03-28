@@ -38,6 +38,11 @@ class EvalRunRequestBody(BaseModel):
     project_name: str
     judgment_api_key: str
 
+class DeleteEvalRunRequestBody(BaseModel):
+    eval_names: List[str]
+    project_name: str
+    judgment_api_key: str
+
 
 class JudgmentClient:
     def __init__(self, judgment_api_key: str = os.getenv("JUDGMENT_API_KEY"), organization_id: str = os.getenv("JUDGMENT_ORG_ID")):
@@ -326,19 +331,22 @@ class JudgmentClient:
             eval_run_result[0]["results"] = [ScoringResult(**filtered_result)]
         return eval_run_result
     
-    def delete_eval(self, project_name: str, eval_run_name: str) -> bool:
+    def delete_eval(self, project_name: str, eval_run_names: List[str]) -> bool:
         """
-        Deletes an evaluation from the server by project and run name.
+        Deletes an evaluation from the server by project and run names.
 
         Args:
             project_name (str): Name of the project
-            eval_run_name (str): Name of the evaluation run
+            eval_run_names (List[str]): List of names of the evaluation runs
 
         Returns:
             bool: Whether the evaluation was successfully deleted
         """
-        eval_run_request_body = EvalRunRequestBody(project_name=project_name, 
-                                                   eval_name=eval_run_name, 
+        if not eval_run_names:
+            raise ValueError("No evaluation run names provided")
+        
+        eval_run_request_body = DeleteEvalRunRequestBody(project_name=project_name, 
+                                                   eval_names=eval_run_names, 
                                                    judgment_api_key=self.judgment_api_key)
         response = requests.delete(JUDGMENT_EVAL_DELETE_API_URL, 
                         json=eval_run_request_body.model_dump(),
@@ -347,7 +355,9 @@ class JudgmentClient:
                             "Authorization": f"Bearer {self.judgment_api_key}",
                             "X-Organization-Id": self.organization_id
                         })
-        if response.status_code != requests.codes.ok:
+        if response.status_code == 404:
+            raise ValueError(f"Eval results not found: {response.json()}")
+        elif response.status_code == 500:
             raise ValueError(f"Error deleting eval results: {response.json()}")
         return response.json()
     
