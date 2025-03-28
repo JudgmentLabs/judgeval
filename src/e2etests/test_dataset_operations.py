@@ -15,25 +15,29 @@ class TestDatasetOperations:
     def test_dataset(self, client: JudgmentClient):
         """Test dataset creation and manipulation."""
         dataset = client.create_dataset()
-        dataset.add_example(Example(input="input 1", actual_output="output 1"))
-
-        client.push_dataset(alias="test_dataset_5", dataset=dataset, overwrite=False)
         
+        # Correct way to create an Example with dictionary values
+        dataset.add_example(Example(
+            input="input 1", 
+            actual_output={"response": "output 1"}
+        ))
+        
+        client.push_dataset(alias="test_dataset_5", dataset=dataset, overwrite=False)
         dataset = client.pull_dataset(alias="test_dataset_5")
         assert dataset, "Failed to pull dataset"
 
     def test_pull_all_user_dataset_stats(self, client: JudgmentClient):
         """Test pulling statistics for all user datasets."""
         dataset = client.create_dataset()
-        dataset.add_example(Example(input="input 1", actual_output="output 1"))
-        dataset.add_example(Example(input="input 2", actual_output="output 2"))
-        dataset.add_example(Example(input="input 3", actual_output="output 3"))
+        dataset.add_example(Example(input={"input": "input 1"}, actual_output={"output": "output 1"}))
+        dataset.add_example(Example(input={"input": "input 2"}, actual_output={"output": "output 2"}))
+        dataset.add_example(Example(input={"input": "input 3"}, actual_output={"output": "output 3"}))
         random_name1 = ''.join(random.choices(string.ascii_letters + string.digits, k=20))
         client.push_dataset(alias=random_name1, dataset=dataset, overwrite=False)
 
         dataset = client.create_dataset()
-        dataset.add_example(Example(input="input 1", actual_output="output 1"))
-        dataset.add_example(Example(input="input 2", actual_output="output 2"))
+        dataset.add_example(Example(input={"input": "input 1"}, actual_output={"output": "output 1"}))
+        dataset.add_example(Example(input={"input": "input 2"}, actual_output={"output": "output 2"}))
         random_name2 = ''.join(random.choices(string.ascii_letters + string.digits, k=20))
         client.push_dataset(alias=random_name2, dataset=dataset, overwrite=False)
         
@@ -46,8 +50,8 @@ class TestDatasetOperations:
     def test_edit_dataset(self, client: JudgmentClient):
         """Test dataset editing."""
         dataset = client.create_dataset()
-        dataset.add_example(Example(input="input 1", actual_output="output 1"))
-        dataset.add_example(Example(input="input 2", actual_output="output 2"))
+        dataset.add_example(Example(input={"input": "input 1"}, actual_output={"output": "output 1"}))
+        dataset.add_example(Example(input={"input": "input 2"}, actual_output={"output": "output 2"}))
         client.push_dataset(alias="test_dataset_6", dataset=dataset, overwrite=True)
         dataset = client.pull_dataset(alias="test_dataset_6") # Pull in case dataset already has examples
 
@@ -55,7 +59,7 @@ class TestDatasetOperations:
 
         client.edit_dataset(
             alias="test_dataset_6",
-            examples=[Example(input="input 3", actual_output="output 3")],
+            examples=[Example(input={"input": "input 3"}, actual_output={"output": "output 3"})],
         )
         dataset = client.pull_dataset(alias="test_dataset_6")
         assert dataset, "Failed to pull dataset"
@@ -67,9 +71,9 @@ class TestDatasetOperations:
         # Create and push test dataset
         dataset = client.create_dataset()
         dataset.add_example(Example(
-            input="Test input 1", 
-            actual_output="Test output 1",
-            expected_output="Expected output 1"
+            input={"input": "Test input 1"}, 
+            actual_output={"output": "Test output 1"},
+            expected_output={"output": "Expected output 1"}
         ))
         client.push_dataset(alias=random_name, dataset=dataset, overwrite=True)
 

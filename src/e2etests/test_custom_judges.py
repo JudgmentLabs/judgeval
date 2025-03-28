@@ -50,9 +50,13 @@ class TestCustomJudges:
                     return self.model_name
 
             example = Example(
-                input="What is the largest animal in the world?",
-                actual_output="The blue whale is the largest known animal.",
-                retrieval_context=["The blue whale is the largest known animal."],
+                input={
+                    "question": "What is the largest animal in the world?"
+                },
+                actual_output={
+                    "answer": "The blue whale is the largest known animal."
+                },
+                retrieval_context=["The blue whale is the largest known animal."]
             )
 
             judge = VertexAIJudge()

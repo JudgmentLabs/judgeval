@@ -25,9 +25,27 @@ from judgeval.data import Example
 def test_ac_scorer():
     
     example = Example(
-        input="What's the capital of France?",
-        actual_output="The capital of France is Paris.",
-        expected_output="France's capital is Paris. It used to be called the city of lights until 1968.",
+        input={
+            "question": "What's the capital of France?",
+            "category": "geography",
+            "type": "capital_city",
+            "country": "France"
+        },
+        actual_output={
+            "answer": "The capital of France is Paris.",
+            "details": {
+                "country": "France",
+                "continent": "Europe"
+            }
+        },
+        expected_output={
+            "answer": "France's capital is Paris.",
+            "historical_context": "It used to be called the city of lights until 1968.",
+            "details": {
+                "country": "France",
+                "continent": "Europe"
+            }
+        }
     )
 
     scorer = AnswerCorrectnessScorer(threshold=0.5)
@@ -65,14 +83,22 @@ def test_ac_scorer():
 
 def test_ar_scorer():
 
-    example_1 = Example(  # should pass
-        input="What's the capital of France?",
-        actual_output="The capital of France is Paris."
+    example_1 = Example( # should pass
+        input={
+            "question": "What's the capital of France?"
+        },
+        actual_output={
+            "answer": "The capital of France is Paris."
+        }
     )
 
-    example_2 = Example(  # should fail
-        input="What's the capital of France?",
-        actual_output="There's alot to do in Marseille. Lots of bars, restaurants, and museums."
+    example_2 = Example( # should fail
+        input={
+            "question": "What's the capital of France?"
+        },
+        actual_output={
+            "response": "There's alot to do in Marseille. Lots of bars, restaurants, and museums."
+        }
     )
 
     scorer = AnswerRelevancyScorer(threshold=0.5)
@@ -119,16 +145,28 @@ def test_ar_scorer():
 
 
 def test_comparison_scorer():
-    example_1 = Example(
-        input="Generate a poem about a field",
-        expected_output="A sunlit meadow, alive with whispers of wind, where daisies dance and hope begins again. Each petal holds a promise—bright, unbruised— a symphony of light that cannot be refused.",
-        actual_output="A field, kinda windy, with some flowers, stuff growing, and maybe a nice vibe. Petals do things, I guess? Like, they're there… and light exists, but whatever, it's fine."
+    example_1 = Example( 
+        input={
+            "task": "Generate a poem about a field"
+        },
+        expected_output={
+            "poem": "A sunlit meadow, alive with whispers of wind, where daisies dance and hope begins again. Each petal holds a promise—bright, unbruised— a symphony of light that cannot be refused."
+        },
+        actual_output={
+            "poem": "A field, kinda windy, with some flowers, stuff growing, and maybe a nice vibe. Petals do things, I guess? Like, they're there… and light exists, but whatever, it's fine."
+        }
     )   
 
     example_2 = Example(
-        input="Generate a poem about a field",
-        expected_output="A field, kinda windy, with some flowers, stuff growing, and maybe a nice vibe. Petals do things, I guess? Like, they're there… and light exists, but whatever, it's fine.",
-        actual_output="A field, kinda windy, with some flowers, stuff growing, and maybe a nice vibe. Petals do things, I guess? Like, they're there… and light exists, but whatever, it's fine."
+        input={
+            "task": "Generate a poem about a field"
+        },
+        expected_output={
+            "poem": "A field, kinda windy, with some flowers, stuff growing, and maybe a nice vibe. Petals do things, I guess? Like, they're there… and light exists, but whatever, it's fine."
+        },
+        actual_output={
+            "poem": "A field, kinda windy, with some flowers, stuff growing, and maybe a nice vibe. Petals do things, I guess? Like, they're there… and light exists, but whatever, it's fine."
+        }
     )
 
     scorer = ComparisonScorer(threshold=1, criteria="Tone and Style", description="The tone and style of the poem should be consistent and cohesive.")
@@ -155,9 +193,16 @@ def test_comparison_scorer():
 def test_cp_scorer():
 
     example_1 = Example(  # should pass
-        input="What's the capital of France?",
-        actual_output="The capital of France is Paris.",
-        expected_output="France's capital is Paris. It used to be called the city of lights until 1968.",
+        input={
+            "question": "What's the capital of France?"
+        },
+        actual_output={
+            "answer": "The capital of France is Paris."
+        },
+        expected_output={
+            "answer": "France's capital is Paris.",
+            "historical_context": "It used to be called the city of lights until 1968."
+        },
         retrieval_context=[
             "Paris is a city in central France. It is the capital of France.",
             "Paris is well known for its museums, architecture, and cuisine.",
@@ -166,9 +211,16 @@ def test_cp_scorer():
     )
 
     example_2 = Example(
-        input="What's the capital of France?",
-        actual_output="There's alot to do in Marseille. Lots of bars, restaurants, and museums.",
-        expected_output="France's capital is Paris. It used to be called the city of lights until 1968.",
+        input={
+            "question": "What's the capital of France?"
+        },
+        actual_output={
+            "response": "There's alot to do in Marseille. Lots of bars, restaurants, and museums."
+        },
+        expected_output={
+            "answer": "France's capital is Paris.",
+            "historical_context": "It used to be called the city of lights until 1968."
+        },
         retrieval_context=[
             "Marseille is a city in southern France. It is the second largest city in France.",
             "Marseille is known for its beaches, historic port, and vibrant nightlife.",
@@ -222,9 +274,16 @@ def test_cp_scorer():
 def test_cr_scorer():
 
     example_1 = Example(  # should pass
-        input="What's the capital of France?",
-        actual_output="The capital of France is Paris.",
-        expected_output="France's capital is Paris. It used to be called the city of lights until 1968.",
+        input={
+            "question": "What's the capital of France?"
+        },
+        actual_output={
+            "answer": "The capital of France is Paris."
+        },
+        expected_output={
+            "answer": "France's capital is Paris.",
+            "historical_context": "It used to be called the city of lights until 1968."
+        },
         retrieval_context=[
             "Paris is a city in central France. It is the capital of France.",
             "Paris is well known for its museums, architecture, and cuisine.",
@@ -274,9 +333,16 @@ def test_cr_scorer():
 def test_crelevancy_scorer():
 
     example_1 = Example(  # should pass
-        input="What's the capital of France?",
-        actual_output="The capital of France is Paris.",
-        expected_output="France's capital is Paris. It used to be called the city of lights until 1968.",
+        input={
+            "question": "What's the capital of France?"
+        },
+        actual_output={
+            "answer": "The capital of France is Paris."
+        },
+        expected_output={
+            "answer": "France's capital is Paris.",
+            "historical_context": "It used to be called the city of lights until 1968."
+        },
         retrieval_context=[
             "Paris is a city in central France. It is the capital of France.",
             "Paris is well known for its museums, architecture, and cuisine.",
@@ -328,9 +394,16 @@ def test_crelevancy_scorer():
 def test_faithfulness_scorer():
 
     faithful_example = Example(  # should pass
-        input="What's the capital of France?",
-        actual_output="The capital of France is Paris.",
-        expected_output="France's capital is Paris. It used to be called the city of lights until 1968.",
+        input={
+            "question": "What's the capital of France?"
+        },
+        actual_output={
+            "answer": "The capital of France is Paris."
+        },
+        expected_output={
+            "answer": "France's capital is Paris.",
+            "historical_context": "It used to be called the city of lights until 1968."
+        },
         retrieval_context=[
             "Paris is a city in central France. It is the capital of France.",
             "Paris is well known for its museums, architecture, and cuisine.",
@@ -339,9 +412,17 @@ def test_faithfulness_scorer():
     )
 
     contradictory_example = Example(  # should fail
-        input="What's the capital of France?",
-        actual_output="The capital of France is Lyon. It's located in southern France near the Mediterranean coast.",
-        expected_output="France's capital is Paris. It used to be called the city of lights until 1968.",
+        input={
+            "question": "What's the capital of France?"
+        },
+        actual_output={
+            "answer": "The capital of France is Lyon.",
+            "location": "It's located in southern France near the Mediterranean coast."
+        },
+        expected_output={
+            "answer": "France's capital is Paris.",
+            "historical_context": "It used to be called the city of lights until 1968."
+        },
         retrieval_context=[
             "Paris is a city in central France. It is the capital of France.",
             "Paris is well known for its museums, architecture, and cuisine.",
@@ -395,9 +476,16 @@ def test_faithfulness_scorer():
 def test_hallucination_scorer():
 
     example_1 = Example(  # should pass
-        input="What's the capital of France?",
-        actual_output="The capital of France is Paris.",
-        expected_output="France's capital is Paris. It used to be called the city of lights until 1968.",
+        input={
+            "question": "What's the capital of France?"
+        },
+        actual_output={
+            "answer": "The capital of France is Paris."
+        },
+        expected_output={
+            "answer": "France's capital is Paris.",
+            "historical_context": "It used to be called the city of lights until 1968."
+        },
         context=[
             "Paris is a city in central France. It is the capital of France.",
             "Paris is well known for its museums, architecture, and cuisine.",
@@ -453,8 +541,19 @@ def test_hallucination_scorer():
 
 def test_instruction_adherence_scorer():
     example_1 = Example(
-        input="write me a poem about cars and then turn it into a joke, but also what is 5 +5?",
-        actual_output="Cars on the road, they zoom and they fly, Under the sun or a stormy sky. Engines roar, tires spin, A symphony of motion, let the race begin. Now for the joke: Why did the car break up with the bicycle. Because it was tired of being two-tired! And 5 + 5 is 10.",
+        input={
+            "task": "write me a poem about cars and then turn it into a joke, but also what is 5 +5?",
+            "components": [
+                "poem",
+                "joke",
+                "math_calculation"
+            ]
+        },
+        actual_output={
+            "poem": "Cars on the road, they zoom and they fly, Under the sun or a stormy sky. Engines roar, tires spin, A symphony of motion, let the race begin.",
+            "joke": "Why did the car break up with the bicycle? Because it was tired of being two-tired!",
+            "math_answer": "5 + 5 is 10."
+        }
     )
 
     scorer = InstructionAdherenceScorer(threshold=0.5)
@@ -480,8 +579,12 @@ def test_instruction_adherence_scorer():
 
 def test_summarization_scorer():
     example_1 = Example(  # should pass
-        input="Paris is the capital city of France and one of the most populous cities in Europe. The city is known for its iconic landmarks like the Eiffel Tower, Louvre Museum, and Notre-Dame Cathedral. Paris is also a global center for art, fashion, gastronomy and culture. The city's romantic atmosphere, historic architecture, and world-class museums attract millions of visitors each year.",
-        actual_output="Paris is France's capital and a major European city famous for landmarks like the Eiffel Tower. It's a global hub for art, fashion and culture that draws many tourists.",
+        input={
+            "description": "Paris is the capital city of France and one of the most populous cities in Europe. The city is known for its iconic landmarks like the Eiffel Tower, Louvre Museum, and Notre-Dame Cathedral. Paris is also a global center for art, fashion, gastronomy and culture. The city's romantic atmosphere, historic architecture, and world-class museums attract millions of visitors each year."
+        },
+        actual_output={
+            "summary": "Paris is France's capital and a major European city famous for landmarks like the Eiffel Tower. It's a global hub for art, fashion and culture that draws many tourists."
+        }
     )
 
     scorer = SummarizationScorer(threshold=0.5)
@@ -598,62 +701,99 @@ CREATE TABLE UserListeningHistory (
 """
 
     all_tracks_one_artist_correct = Example(
-        input="Find all tracks by the artist 'Drake', sorted by popularity.",
-        actual_output="""SELECT t.track_id, t.title, t.popularity, a.name AS artist_name
-FROM Tracks t
-JOIN Artists a ON t.artist_id = a.artist_id
-WHERE a.name = 'Drake'
-ORDER BY t.popularity DESC;
-""",
+        input={
+        "query": "Find all tracks by the artist 'Drake', sorted by popularity.",
+        "parameters": {
+            "artist": "Drake",
+            "sort": "popularity"
+        }
+    },
+        actual_output={
+            "sql_query": """SELECT t.track_id, t.title, t.popularity, a.name AS artist_name
+    FROM Tracks t
+    JOIN Artists a ON t.artist_id = a.artist_id
+    WHERE a.name = 'Drake'
+    ORDER BY t.popularity DESC;"""
+        },
         retrieval_context=[table_schema]
-    )
+)
 
     most_listened_to_one_user_correct = Example(
-        input="Find the most listened to track by user 'user123'.",
-        actual_output="""SELECT t.track_id, t.title, COUNT(uh.history_id) AS play_count
-FROM UserListeningHistory uh
-JOIN Tracks t ON uh.track_id = t.track_id
-WHERE uh.user_id = 'user123'
-GROUP BY t.track_id, t.title
-ORDER BY play_count DESC
-LIMIT 1;
-""",
+        input={
+            "query": "Find the most listened to track by user 'user123'.",
+            "parameters": {
+                "user_id": "user123",
+                "metric": "most_listened_to"
+            }
+        },
+        actual_output={
+            "sql_query": """SELECT t.track_id, t.title, COUNT(uh.history_id) AS play_count
+    FROM UserListeningHistory uh
+    JOIN Tracks t ON uh.track_id = t.track_id
+    WHERE uh.user_id = 'user123'
+    GROUP BY t.track_id, t.title
+    ORDER BY play_count DESC
+    LIMIT 1;"""
+        },
         retrieval_context=[table_schema]
     )
 
     highest_num_playlists_correct = Example(
-        input="Find the 5 users with the highest number of playlists.",
-        actual_output="""SELECT u.user_id, u.username, COUNT(p.playlist_id) AS total_playlists
-FROM Users u
-JOIN Playlists p ON u.user_id = p.user_id
-GROUP BY u.user_id, u.username
-ORDER BY total_playlists DESC
-LIMIT 5;
-""",
+        input={
+        "query": "Find the 5 users with the highest number of playlists.",
+        "parameters": {
+            "metric": "number_of_playlists",
+            "limit": 5
+        }
+        },
+        actual_output={
+            "sql_query": """SELECT u.user_id, u.username, COUNT(p.playlist_id) AS total_playlists
+    FROM Users u
+    JOIN Playlists p ON u.user_id = p.user_id
+    GROUP BY u.user_id, u.username
+    ORDER BY total_playlists DESC
+    LIMIT 5;"""
+        },
         retrieval_context=[table_schema]
     )
 
     most_popular_tracks_all_users_correct = Example(
-        input="Find the 10 most popular tracks across all users.",
-        actual_output="""SELECT t.track_id, t.title, COUNT(uh.history_id) AS total_listens
-FROM Tracks t
-JOIN UserListeningHistory uh ON t.track_id = uh.track_id
-GROUP BY t.track_id, t.title
-ORDER BY total_listens DESC
-LIMIT 10;
-""",
+        input={
+        "query": "Find the 10 most popular tracks across all users.",
+        "parameters": {
+            "metric": "popularity",
+            "scope": "all_users",
+            "limit": 10
+        }
+    },
+        actual_output={
+            "sql_query": """SELECT t.track_id, t.title, COUNT(uh.history_id) AS total_listens
+    FROM Tracks t
+    JOIN UserListeningHistory uh ON t.track_id = uh.track_id
+    GROUP BY t.track_id, t.title
+    ORDER BY total_listens DESC
+    LIMIT 10;"""
+        },
         retrieval_context=[table_schema]
     )
 
     most_popular_tracks_all_users_incorrect = Example(
-        input="Find the 10 most popular tracks across all users.",
-        actual_output="""SELECT t.track_user, t.title, COUNT(uh.history_id) AS total_listens
-FROM Tracks t
-JOIN UserHistory uh ON t.track_user = uh.track_user
-GROUP BY t.track_user, t.title
-ORDER BY total_listens DESC
-LIMIT 10;
-""",
+        input={
+        "query": "Find the 10 most popular tracks across all users.",
+        "parameters": {
+            "metric": "popularity",
+            "scope": "all_users",
+            "limit": 10
+        }
+    },
+        actual_output={
+            "sql_query": """SELECT t.track_user, t.title, COUNT(uh.history_id) AS total_listens
+    FROM Tracks t
+    JOIN UserHistory uh ON t.track_user = uh.track_user
+    GROUP BY t.track_user, t.title
+    ORDER BY total_listens DESC
+    LIMIT 10;"""
+        },
         retrieval_context=[table_schema]
     )
 
@@ -687,9 +827,29 @@ def test_execution_order_scorer():
     EVAL_RUN_NAME = "test-run-execution-order"
 
     example = Example(
-        input="What is the weather in New York and the stock price of AAPL?",
-        actual_output=["weather_forecast", "stock_price", "translate_text", "news_headlines"],
-        expected_output=["weather_forecast", "stock_price", "news_headlines", "translate_text"],
+        input={
+        "question": "What is the weather in New York and the stock price of AAPL?",
+        "components": [
+            "weather",
+            "stock_price"
+        ]
+        },
+        actual_output={
+            "tools_called": [
+                "weather_forecast",
+                "stock_price",
+                "translate_text",
+                "news_headlines"
+            ]
+        },
+        expected_output={
+            "expected_tools": [
+                "weather_forecast",
+                "stock_price",
+                "news_headlines",
+                "translate_text"
+            ]
+        }
     )
 
     res = client.run_evaluation(

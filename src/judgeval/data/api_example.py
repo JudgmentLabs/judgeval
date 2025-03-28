@@ -12,9 +12,9 @@ class ProcessExample(BaseModel):
     internal operations and keeping track of the evaluation process.
     """
     name: str
-    input: Optional[str] = None
-    actual_output: Optional[Union[str, List[str]]] = None
-    expected_output: Optional[Union[str, List[str]]] = None
+    input: Optional[Union[str, Dict[str, Any]]] = None
+    actual_output: Optional[Union[str, Dict[str, Any], List[Dict[str, Any]]]] = None
+    expected_output: Optional[Union[str, Dict[str, Any], List[Dict[str, Any]]]] = None
     context: Optional[list] = None
     retrieval_context: Optional[list] = None
     tools_called: Optional[list] = None

@@ -24,15 +24,77 @@ class TestEvalOperations:
         """Helper function to run evaluation."""
         # Single step in our workflow, an outreach Sales Agent
         example1 = Example(
-            input="Generate a cold outreach email for TechCorp. Facts: They recently launched an AI-powered analytics platform. Their CEO Sarah Chen previously worked at Google. They have 50+ enterprise clients.",
-            actual_output="Dear Ms. Chen,\n\nI noticed TechCorp's recent launch of your AI analytics platform and was impressed by its enterprise-focused approach. Your experience from Google clearly shines through in building scalable solutions, as evidenced by your impressive 50+ enterprise client base.\n\nWould you be open to a brief call to discuss how we could potentially collaborate?\n\nBest regards,\nAlex",
-            retrieval_context=["TechCorp launched AI analytics platform in 2024", "Sarah Chen is CEO, ex-Google executive", "Current client base: 50+ enterprise customers"],
+
+            # input="Generate a cold outreach email for TechCorp. Facts: They recently launched an AI-powered analytics platform. Their CEO Sarah Chen previously worked at Google. They have 50+ enterprise clients.",
+            input= {
+                "task" : "Generate a cold outreach email",
+                "company" : "TechCorp",
+                "facts": [
+                    "Recently launched an AI-powered analytics platform",
+                    "CEO Sarah Chen previously worked at Google",
+                    "Has 50+ enterprise clients"
+                ]
+            },
+            actual_output={
+                "email": {
+                    "recipient": "Ms. Chen",
+                    "body": [
+                        "Noticed TechCorp's recent launch of your AI analytics platform",
+                        "Impressed by enterprise-focused approach",
+                        "Mentioned experience from Google and 50+ clients",
+                        "Request for collaboration call"
+                    ],
+                    "signature": "Best regards,\nAlex"
+                }
+            },
+            retrieval_context=[
+                "TechCorp launched AI analytics platform in 2024",
+                "Sarah Chen is CEO, ex-Google executive", 
+                "Current client base: 50+ enterprise customers"],
         )
 
         example2 = Example(
-            input="Generate a cold outreach email for GreenEnergy Solutions. Facts: They're developing solar panel technology that's 30% more efficient. They're looking to expand into the European market. They won a sustainability award in 2023.",
-            actual_output="Dear GreenEnergy Solutions team,\n\nCongratulations on your 2023 sustainability award! Your innovative solar panel technology with 30% higher efficiency is exactly what the European market needs right now.\n\nI'd love to discuss how we could support your European expansion plans.\n\nBest regards,\nAlex",
-            expected_output="A professional cold email mentioning the sustainability award, solar technology innovation, and European expansion plans",
+            input= {
+                "task" : "Generate a cold outreach email",
+                "company" : "GreenEnergy Solutions",
+                "facts": [
+                    "They're developing solar panel technology that's 30% more efficient",
+                    "They're looking to expand into the European market",
+                    "Won a sustainability award in 2023"
+                ]
+            },
+            actual_output={
+                "email": {
+                    "recipient": "GreenEnergy Solutions team",
+                    "body": [
+                        "Congratulations on your 2023 sustainability award!",
+                        "Your innovative solar panel technology with 30% higher efficiency is exactly what the European market needs right now.",
+                        "I'd love to discuss how we could support your European expansion plans.",
+                        "Best regards,",
+                        "Alex"
+                    ],
+                    "signature": "Best regards,\nAlex"
+                }
+            },
+            expected_output={
+                "description": "A professional cold email mentioning the sustainability award, solar technology innovation, and European expansion plans",
+                "required_elements": {
+                    "award": "2023 sustainability award",
+                    "technology": "Solar panel technology with 30% higher efficiency",
+                    "expansion": "European market expansion plans"
+                },
+                "tone": "professional",
+                "structure": {
+                    "greeting": "Should address the recipient appropriately",
+                    "body": [
+                        "Mention the sustainability award",
+                        "Highlight the solar technology innovation",
+                        "Reference the European expansion plans"
+                    ],
+                    "call_to_action": "Request for discussion about supporting expansion",
+                    "signature": "Professional closing"
+                }
+            },
             context=["Business Development"],
             retrieval_context=["GreenEnergy Solutions won 2023 sustainability award", "New solar technology 30% more efficient", "Planning European market expansion"],
         )
@@ -93,19 +155,37 @@ class TestEvalOperations:
         """Test assertion functionality."""
         # Create examples and scorers as before
         example = Example(
-            input="What if these shoes don't fit?",
-            actual_output="We offer a 30-day full refund at no extra cost.",
+            input={
+                "question": "What if these shoes don't fit?",
+                "category": "returns"
+            },
+            actual_output={
+                "response": "We offer a 30-day full refund at no extra cost.",
+                "policy": "30-day refund"
+            },
             retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
         )
 
         example1 = Example(
-            input="How much are your croissants?",
-            actual_output="Sorry, we don't accept electronic returns.",
+            input={
+                "question": "How much are your croissants?",
+                "category": "pricing"
+            },
+            actual_output={
+                "response": "Sorry, we don't accept electronic returns.",
+                "error": "mismatched_response"
+            }
         )
 
         example2 = Example(
-            input="Who is the best basketball player in the world?",
-            actual_output="No, the room is too small.",
+            input={
+                "question": "Who is the best basketball player in the world?",
+                "category": "sports"
+            },
+            actual_output={
+                "response": "No, the room is too small.",
+                "error": "irrelevant_response"
+            }
         )
 
         scorer = FaithfulnessScorer(threshold=0.5)
@@ -124,21 +204,50 @@ class TestEvalOperations:
     def test_evaluate_dataset(self, client: JudgmentClient):
         """Test dataset evaluation."""
         example1 = Example(
-            input="What if these shoes don't fit?",
-            actual_output="We offer a 30-day full refund at no extra cost.",
+            input={
+                "question": "What if these shoes don't fit?",
+                "category": "returns",
+                "product": "shoes"
+            },
+            actual_output={
+                "response": "We offer a 30-day full refund at no extra cost.",
+                "policy": "30-day refund",
+                "conditions": "no extra cost"
+            },
             retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
         )
 
         example2 = Example(
-            input="How do I reset my password?",
-            actual_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
-            expected_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
+            input={
+                "question": "How do I reset my password?",
+                "category": "account_management",
+                "feature": "password_reset"
+            },
+            actual_output={
+                "instructions": "You can reset your password by clicking on 'Forgot Password' at the login screen.",
+                "steps": [
+                    "Go to login screen",
+                    "Click 'Forgot Password'",
+                    "Follow instructions"
+                ]
+            },
+            expected_output={
+                "instructions": "You can reset your password by clicking on 'Forgot Password' at the login screen.",
+                "steps": [
+                    "Go to login screen",
+                    "Click 'Forgot Password'",
+                    "Follow instructions"
+                ]
+            },
             name="Password Reset",
             context=["User Account"],
             retrieval_context=["Password reset instructions"],
             tools_called=["authentication"],
             expected_tools=["authentication"],
-            additional_metadata={"difficulty": "medium"}
+            additional_metadata={
+                "difficulty": "medium",
+                "category": "security"
+            }
         )
 
         dataset = EvalDataset(examples=[example1, example2])
@@ -155,8 +264,16 @@ class TestEvalOperations:
     def test_override_eval(self, client: JudgmentClient, random_name: str):
         """Test evaluation override behavior."""
         example1 = Example(
-            input="What if these shoes don't fit?",
-            actual_output="We offer a 30-day full refund at no extra cost.",
+            input={
+                "question": "What if these shoes don't fit?",
+                "category": "returns",
+                "product": "shoes"
+            },
+            actual_output={
+                "response": "We offer a 30-day full refund at no extra cost.",
+                "policy": "30-day refund",
+                "conditions": "no extra cost"
+            },
             retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
         )
         
@@ -223,21 +340,54 @@ class TestAdvancedEvalOperations:
     def test_json_scorer(self, client: JudgmentClient):
         """Test JSON scorer functionality."""
         example1 = Example(
-            input="What if these shoes don't fit?",
-            actual_output='{"tool": "authentication"}',
+            input={
+                "question": "What if these shoes don't fit?",
+                "category": "returns",
+                "product": "shoes"
+            },
+            actual_output={
+                "tool": "authentication",
+                "action": "process_return",
+                "parameters": {
+                    "product_type": "shoes",
+                    "return_policy": "30-day refund"
+                }
+            },
             retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
         )
 
         example2 = Example(
-            input="How do I reset my password?",
-            actual_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
-            expected_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
+            input={
+                "question": "How do I reset my password?",
+                "category": "account_management",
+                "feature": "password_reset"
+            },
+            actual_output={
+                "instructions": "You can reset your password by clicking on 'Forgot Password' at the login screen.",
+                "steps": [
+                    "Go to login screen",
+                    "Click 'Forgot Password'",
+                    "Follow instructions"
+                ]
+            },
+            expected_output={
+                "instructions": "You can reset your password by clicking on 'Forgot Password' at the login screen.",
+                "steps": [
+                    "Go to login screen",
+                    "Click 'Forgot Password'",
+                    "Follow instructions"
+                ]
+            },
             name="Password Reset",
             context=["User Account"],
             retrieval_context=["Password reset instructions"],
             tools_called=["authentication"],
             expected_tools=["authentication"],
-            additional_metadata={"difficulty": "medium"}
+            additional_metadata={
+                "difficulty": "medium",
+                "category": "security",
+                "priority": "high"
+            }
         )
 
         class SampleSchema(BaseModel):
@@ -282,9 +432,21 @@ class TestAdvancedEvalOperations:
         classifier_scorer_custom = client.fetch_classifier_scorer(slug=slug)
         
         example1 = Example(
-            input="What is the capital of France?",
-            actual_output="Paris",
-            retrieval_context=["The capital of France is Paris."],
+            input={
+                "question": "What is the capital of France?",
+                "category": "geography",
+                "type": "capital_city",
+                "country": "France"
+            },
+            actual_output={
+                "answer": "Paris",
+                "details": {
+                    "country": "France",
+                    "continent": "Europe",
+                    "population": "2.1 million (2023)"
+                }
+            },
+            retrieval_context=["The capital of France is Paris."]
         )
 
         res = client.run_evaluation(

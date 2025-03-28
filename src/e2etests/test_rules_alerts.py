@@ -133,9 +133,15 @@ async def get_llm_response(question: str) -> str:
 def good_example():
     """Fixture for a good example."""
     return Example(
-        input="What's the capital of France?",
-        actual_output="The capital of France is Paris.",
-        expected_output="Paris is the capital of France.",
+        input={
+            "question": "What's the capital of France?"
+        },
+        actual_output={
+            "answer": "The capital of France is Paris."
+        },
+        expected_output={
+            "answer": "Paris is the capital of France."
+        },
         retrieval_context=["Paris is the capital city of France."]
     )
 
@@ -144,9 +150,15 @@ def good_example():
 def bad_example():
     """Fixture for a bad example."""
     return Example(
-        input="What's the capital of France?",
-        actual_output="The capital of France is Berlin.",
-        expected_output="Paris is the capital of France.",
+        input={
+            "question": "What's the capital of France?"
+        },
+        actual_output={
+            "answer": "The capital of France is Berlin."
+        },
+        expected_output={
+            "answer": "Paris is the capital of France."
+        },
         retrieval_context=["Paris is the capital city of France."]
     )
 
@@ -226,9 +238,15 @@ async def test_complex_rules():
     
     # Create example
     example = Example(
-        input="What's the capital of France?",
-        actual_output="The capital of France is Paris.",
-        expected_output="Paris is the capital of France.",
+        input={
+            "question": "What's the capital of France?"
+        },
+        actual_output={
+            "answer": "The capital of France is Paris."
+        },
+        expected_output={
+            "answer": "Paris is the capital of France."
+        },
         retrieval_context=["Paris is the capital city of France."]
     )
     

@@ -73,13 +73,21 @@ def generate_random_slug(length=6):
 
 def main():
     pos_example = Example(
-        input="What's the store return policy?",
-        actual_output="Our return policy is wonderful! You may return any item within 30 days of purchase for a full refund.",
+        input={
+            "question": "What's the store return policy?"
+        },
+        actual_output={
+            "response": "Our return policy is wonderful! You may return any item within 30 days of purchase for a full refund."
+        }
     )
 
     neg_example = Example(
-        input="I'm having trouble with my order",
-        actual_output="That's not my problem. You should have read the instructions more carefully.",
+        input={
+            "issue": "I'm having trouble with my order"
+        },
+        actual_output={
+            "response": "That's not my problem. You should have read the instructions more carefully."
+        }
     )
 
     # scorer = SentimentScorer()

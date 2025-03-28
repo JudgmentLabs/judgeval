@@ -13,9 +13,9 @@ class ScoringResult:
         success (bool): Whether the evaluation was successful. 
                         This means that all scorers applied to this example returned a success.
         scorer_data (List[ScorerData]): The scorers data for the evaluated example
-        input (Optional[str]): The input to the example
-        actual_output (Optional[str]): The actual output of the example
-        expected_output (Optional[str]): The expected output of the example
+        input (Optional[Union[str, Dict[str, Any]]]): The input to the example
+        actual_output (Optional[Union[str, Dict[str, Any], List[Dict[str, Any]]]]): The actual output of the example
+        expected_output (Optional[Union[str, Dict[str, Any], List[Dict[str, Any]]]]): The expected output of the example
         context (Optional[List[str]]): The context of the example
         retrieval_context (Optional[List[str]]): The retrieval context of the example
         additional_metadata (Optional[Dict[str, Any]]): The additional metadata of the example
@@ -29,9 +29,9 @@ class ScoringResult:
     scorers_data: Union[List[ScorerData], None]
 
     # Inputs from the original example
-    input: Optional[str] = None
-    actual_output: Optional[Union[str, List[str]]] = None
-    expected_output: Optional[Union[str, List[str]]] = None
+    input: Optional[Union[str, Dict[str, Any]]] = None
+    actual_output: Optional[Union[str, Dict[str, Any], List[Dict[str, Any]]]] = None
+    expected_output: Optional[Union[str, Dict[str, Any], List[Dict[str, Any]]]] = None
     context: Optional[List[str]] = None
     retrieval_context: Optional[List[str]] = None
     additional_metadata: Optional[Dict[str, Any]] = None

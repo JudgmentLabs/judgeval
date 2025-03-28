@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 from datetime import datetime
 import time
+import json
 
 
 class ExampleParams(Enum):
@@ -24,9 +25,9 @@ class ExampleParams(Enum):
 
 
 class Example(BaseModel):
-    input: Optional[str] = None
-    actual_output: Optional[Union[str, List[str]]] = None
-    expected_output: Optional[Union[str, List[str]]] = None
+    input: Optional[Union[str, Dict[str, Any]]] = None
+    actual_output: Optional[Union[str, Dict[str, Any], List[Dict[str, Any]]]] = None
+    expected_output: Optional[Union[str, Dict[str, Any], List[Dict[str, Any]]]] = None
     context: Optional[List[str]] = None
     retrieval_context: Optional[List[str]] = None
     additional_metadata: Optional[Dict[str, Any]] = None
@@ -46,31 +47,51 @@ class Example(BaseModel):
             data['timestamp'] = datetime.now().strftime("%Y%m%d_%H%M%S")
         super().__init__(**data)
     
-    @field_validator('input', mode='before')
+    @field_validator("input", mode="before")
     @classmethod
     def validate_input(cls, v):
-        if v is not None and (not v or not isinstance(v, str)):
-            raise ValueError(f"Input must be a non-empty string but got '{v}' of type {type(v)}")
-        return v
-    
-    @field_validator('actual_output', mode='before')
+        if isinstance(v, str):
+            try:
+                parsed_value = json.loads(v)
+                if isinstance(parsed_value, dict):  
+                    return parsed_value  # Valid JSON dictionary
+            except json.JSONDecodeError:
+                pass  # Keep as string if not JSON
+        if v is not None and not isinstance(v, (str, dict)):
+            raise ValueError(f"Input must be a string or dictionary, but got {type(v)}")
+        return v  # Return as is (dict or string)
+
+    @field_validator("actual_output", mode="before")
     @classmethod
     def validate_actual_output(cls, v):
-        if v is not None:
-            if not isinstance(v, (str, list)):
-                raise ValueError(f"Actual output must be a string or a list of strings but got {v} of type {type(v)}")
-            if isinstance(v, list) and not all(isinstance(item, str) for item in v):
-                raise ValueError(f"All items in actual_output must be strings but got {v}")
-        return v
-    
-    @field_validator('expected_output', mode='before')
+        if isinstance(v, str):
+            try:
+                parsed_value = json.loads(v)
+                if isinstance(parsed_value, (dict, list)):  
+                    if isinstance(parsed_value, list) and not all(isinstance(i, dict) for i in parsed_value):
+                        raise ValueError("All elements in actual_output list must be dictionaries")
+                    return parsed_value  # Valid JSON dict or list
+            except json.JSONDecodeError:
+                pass  # Keep as string if not JSON
+        if v is not None and not isinstance(v, (str, dict, list)):
+            raise ValueError(f"Actual output must be a string, dictionary, or list of dictionaries, but got {type(v)}")
+        return v  # Return as is (dict, list, or string)
+
+    @field_validator("expected_output", mode="before")
     @classmethod
     def validate_expected_output(cls, v):
-        if v is not None and not isinstance(v, (str, list)):
-            raise ValueError(f"Expected output must be a string, a list of strings, or None but got {v} of type {type(v)}")
-        if isinstance(v, list) and not all(isinstance(item, str) for item in v):
-            raise ValueError(f"All items in expected_output must be strings but got {v}")
-        return v
+        if isinstance(v, str):
+            try:
+                parsed_value = json.loads(v)
+                if isinstance(parsed_value, (dict, list)):  
+                    if isinstance(parsed_value, list) and not all(isinstance(i, dict) for i in parsed_value):
+                        raise ValueError("All elements in expected_output list must be dictionaries")
+                    return parsed_value  # Valid JSON dict or list
+            except json.JSONDecodeError:
+                pass  # Keep as string if not JSON
+        if v is not None and not isinstance(v, (str, dict, list)):
+            raise ValueError(f"Expected output must be a string, dictionary, or list of dictionaries, but got {type(v)}")
+        return v  # Return as is (dict, list, or string)
     
     @field_validator('context', 'retrieval_context', 'tools_called', 'expected_tools', mode='before')
     @classmethod
