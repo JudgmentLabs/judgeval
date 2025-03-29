@@ -332,6 +332,9 @@ class TraceClient:
         self.span_type = None
         self._current_span: Optional[TraceEntry] = None
         self.trace_manager_client = TraceManagerClient(tracer.api_key, tracer.organization_id)  # Manages DB operations for trace data
+        self.visited_nodes = []  # Track nodes visited through langgraph_node spans
+        self.executed_tools = []  # Track tools executed through tool spans
+        self.executed_node_tools = []  # Track node:tool combinations
         
     @contextmanager
     def span(self, name: str, span_type: SpanType = "span"):

@@ -146,16 +146,17 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
             
             self.start_span("LangGraph", span_type="Main Function")
             
-        node = metadata.get("langgraph_node")
-        if node != None and node != self.previous_node:
-            self.start_span(node, span_type="node")
-            self.executed_node_tools.append(node)
-            self.executed_nodes.append(node)
-            self.trace_client.record_input({
-                'args': inputs,
-                'kwargs': kwargs
-            })
-        self.previous_node = node
+        metadata = kwargs.get("metadata", {})
+        if node := metadata.get("langgraph_node"):
+            if node != self.previous_node:
+                # Track node execution
+                self.trace_client.visited_nodes.append(node)
+                self.trace_client.executed_node_tools.append(node)
+                self.trace_client.record_input({
+                    'args': inputs,
+                    'kwargs': kwargs
+                })
+            self.previous_node = node
     
     def on_chain_end(
         self,
@@ -198,8 +199,11 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
     ):
         name = serialized["name"]
         self.start_span(name, span_type="tool")
-        self.executed_node_tools.append(f"{self.previous_node}:{name}")
-        self.executed_tools.append(name)
+        if name:
+            # Track tool execution
+            self.trace_client.executed_tools.append(name)
+            node_tool = f"{self.previous_node}:{name}" if self.previous_node else name
+            self.trace_client.executed_node_tools.append(node_tool)
         self.trace_client.record_input({
             'args': input_str,
             'kwargs': kwargs
