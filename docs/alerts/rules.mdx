@@ -9,7 +9,7 @@ Rules allow you to define specific conditions for your evaluation metrics that c
 
 ## Overview
 
-A rule consists of one or more conditions, each tied to a specific metric (like faithfulness or relevancy scores). When evaluations are performed, the rules engine checks if the measured scores satisfy the conditions set in your rules. Based on the rule's configuration, alerts can be triggered and notifications sent through various channels.
+A rule consists of one or more conditions, each tied to a specific metric, that is supported by our Scorer (like Faithfulness or AnswerRelevancy). When evaluations are performed, the rules engine checks if the measured scores satisfy the conditions set in your rules. Based on the rule's configuration, alerts can be triggered and notifications sent through various channels.
 
 <Note>
 Rules and notifications only work with built-in APIScorers. Local scorers and custom scorers are not supported for triggering rules.

@@ -90,10 +90,10 @@
       ]
     },
     {
-      "group": "Alerting",
+      "group": "Alerts",
       "pages": [
-        "alerting/rules",
-        "alerting/notifications"
+        "alerts/rules",
+        "alerts/notifications"
       ]
     },
     {

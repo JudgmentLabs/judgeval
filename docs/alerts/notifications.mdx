@@ -31,7 +31,6 @@ Notifications are configured using the `NotificationConfig` class from the `judg
 |-----------|------|-------------|
 | `enabled` | boolean | Whether notifications are enabled (default: `True`) |
 | `communication_methods` | list of strings | The methods to use for sending notifications (e.g., `["email", "slack"]`) |
-| `message_template` | string | A template string for customizing the notification message |
 | `email_addresses` | list of strings | Email addresses to send notifications to |
 | `send_at` | integer (Unix timestamp) | Schedule notifications for a specific time |
 
@@ -44,7 +43,6 @@ from judgeval.rules import NotificationConfig
 notification_config = NotificationConfig(
     enabled=True,
     communication_methods=["slack", "email"],
-    message_template="Rule '{rule_name}' was triggered with score {score}",
     email_addresses=["user@example.com"],
     send_at=None  # Send immediately
 )
