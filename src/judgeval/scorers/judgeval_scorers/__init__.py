@@ -2,7 +2,7 @@ from typing import Type, Optional, Any
 
 # Import implementations
 from judgeval.scorers.judgeval_scorers.api_scorers import (
-    ToolCorrectnessScorer as APIToolCorrectnessScorer,
+    ExecutionOrderScorer as APIExecutionOrderScorer,
     JSONCorrectnessScorer as APIJSONCorrectnessScorer,
     SummarizationScorer as APISummarizationScorer,
     HallucinationScorer as APIHallucinationScorer,
@@ -24,7 +24,7 @@ from judgeval.scorers.judgeval_scorers.local_implementations import (
     ContextualRelevancyScorer as LocalContextualRelevancyScorer,
     FaithfulnessScorer as LocalFaithfulnessScorer,
     JsonCorrectnessScorer as LocalJsonCorrectnessScorer,
-    ToolCorrectnessScorer as LocalToolCorrectnessScorer,
+    ExecutionOrderScorer as LocalExecutionOrderScorer,
     HallucinationScorer as LocalHallucinationScorer,
     SummarizationScorer as LocalSummarizationScorer,
     AnswerCorrectnessScorer as LocalAnswerCorrectnessScorer,
@@ -98,9 +98,9 @@ AnswerRelevancyScorer = ScorerWrapper(
     local_implementation=LocalAnswerRelevancyScorer
 )
 
-ToolCorrectnessScorer = ScorerWrapper(
-    api_implementation=APIToolCorrectnessScorer,
-    local_implementation=LocalToolCorrectnessScorer
+ExecutionOrderScorer = ScorerWrapper(
+    api_implementation=APIExecutionOrderScorer,
+    local_implementation=LocalExecutionOrderScorer
 )
 
 JSONCorrectnessScorer = ScorerWrapper(
@@ -154,7 +154,7 @@ GroundednessScorer = ScorerWrapper(
 )
 
 __all__ = [
-    "ToolCorrectnessScorer",
+    "ExecutionOrderScorer",
     "JSONCorrectnessScorer",
     "SummarizationScorer",
     "HallucinationScorer",

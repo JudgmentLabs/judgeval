@@ -5,8 +5,9 @@ Scores `Example`s using ready-made Judgment evaluators.
 """
 
 from pydantic import BaseModel, field_validator
+from typing import List
 from judgeval.common.logger import debug, info, warning, error
-
+from judgeval.data import ExampleParams
 from judgeval.constants import APIScorer, UNBOUNDED_SCORERS
 
 
@@ -20,6 +21,7 @@ class APIJudgmentScorer(BaseModel):
     """
     score_type: APIScorer
     threshold: float
+    required_params: List[ExampleParams] = [] # List of the required parameters on examples for the scorer
 
     @field_validator('threshold')
     def validate_threshold(cls, v, info):

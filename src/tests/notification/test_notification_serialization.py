@@ -25,7 +25,6 @@ class TestNotificationSerialization:
         config = NotificationConfig(
             enabled=True,
             communication_methods=["slack", "email", "broadcast_slack"],
-            message_template="Rule {rule_name} was triggered with score {score}",
             email_addresses=["user1@example.com", "user2@example.com"],
             send_at=1632150000
         )
@@ -43,7 +42,6 @@ class TestNotificationSerialization:
         assert "slack" in deserialized_dict["communication_methods"]
         assert "email" in deserialized_dict["communication_methods"]
         assert "broadcast_slack" in deserialized_dict["communication_methods"]
-        assert deserialized_dict["message_template"] == "Rule {rule_name} was triggered with score {score}"
         assert len(deserialized_dict["email_addresses"]) == 2
         assert "user1@example.com" in deserialized_dict["email_addresses"]
         assert "user2@example.com" in deserialized_dict["email_addresses"]
@@ -58,7 +56,6 @@ class TestNotificationSerialization:
         notification = NotificationConfig(
             enabled=True,
             communication_methods=["slack", "email"],
-            message_template="Rule {rule_name} was triggered",
             email_addresses=["test@example.com"],
             send_at=None
         )
@@ -91,7 +88,6 @@ class TestNotificationSerialization:
         notification_dict = deserialized_dict["notification"]
         assert notification_dict["enabled"] is True
         assert notification_dict["communication_methods"] == ["slack", "email"]
-        assert notification_dict["message_template"] == "Rule {rule_name} was triggered"
         assert notification_dict["email_addresses"] == ["test@example.com"]
         assert notification_dict["send_at"] is None
     
@@ -101,7 +97,6 @@ class TestNotificationSerialization:
         notification = NotificationConfig(
             enabled=True,
             communication_methods=["slack"],
-            message_template="Alert message",
             email_addresses=["alert@example.com"]
         )
         
@@ -137,7 +132,6 @@ class TestNotificationSerialization:
         notification_dict = deserialized_dict["notification"]
         assert notification_dict["enabled"] is True
         assert notification_dict["communication_methods"] == ["slack"]
-        assert notification_dict["message_template"] == "Alert message"
         assert notification_dict["email_addresses"] == ["alert@example.com"]
     
     def test_serialization_with_null_notification(self):
@@ -176,14 +170,12 @@ class TestNotificationSerialization:
         notification1 = NotificationConfig(
             enabled=True,
             communication_methods=["slack"],
-            message_template="Slack notification",
             email_addresses=None
         )
         
         notification2 = NotificationConfig(
             enabled=True,
             communication_methods=["email"],
-            message_template="Email notification",
             email_addresses=["email@example.com"]
         )
         

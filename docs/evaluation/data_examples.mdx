@@ -4,14 +4,12 @@ title: Examples
 
 ## Overview
 An `Example` is a basic unit of data in `judgeval` that allows you to run evaluation scorers on your LLM system. 
-An `Example` is composed of seven fields:
-- `input`
-- `actual_output`
-- [Optional] `expected_output`
-- [Optional] `retrieval_context`
-- [Optional] `context`
-- [Optional] `tools_called`
-- [Optional] `expected_tools`
+An `Example` is can be composed of a mixture of the following fields:
+- `input` [Optional]
+- `actual_output` [Optional]
+- `expected_output` [Optional]
+- `retrieval_context` [Optional]
+- `context` [Optional]
 
 **Here's a sample of creating an `Example`:**
 
@@ -24,8 +22,6 @@ example = Example(
     expected_output="Bill Gates and Paul Allen founded Microsoft in New Mexico in 1975.",
     retrieval_context=["Bill Gates co-founded Microsoft with Paul Allen in 1975."],
     context=["Bill Gates and Paul Allen are the founders of Microsoft."],
-    tools_called=["Google Search"],
-    expected_tools=["Google Search", "Perplexity"],
 )
 ```
 
@@ -39,7 +35,7 @@ Other fields are optional and depend on the type of evaluation. If you want to d
 
 ## Example Fields 
 
-Here, we cover the seven fields that make up an `Example`.
+Here, we cover the possible fields that make up an `Example`.
 
 ### Input 
 The `input` field represents a sample interaction between a user and your LLM system. The input should represent the direct input to your prompt template(s), and **SHOULD NOT CONTAIN** your prompt template itself.
@@ -134,48 +130,6 @@ example = Example(
     expected_output="Sparkling water is neither healthy nor unhealthy.",
     context=["Sparkling water is a type of water that is carbonated."],
     retrieval_context=["Sparkling water is carbonated and has no calories."]
-)
-```
-
-<Note>
-`context` is the ideal retrieval result for a specific `input`, whereas `retrieval_context` is the actual retrieval result at runtime. While they are similar, they are not always interchangeable.
-</Note>
-### Tools Called 
-
-The `tools_called` field is `Optional[List[str]]` and represents the tools that were called by the LLM system. This is particularly useful for evaluating whether agents are properly using tools available to them.
-
-```python tools_called.py
-# Sample app implementation
-import medical_chatbot
-
-question = "Is sparkling water healthy?"
-example = Example(
-    input=question,
-    actual_output=medical_chatbot.chat(question),
-    expected_output="Sparkling water is neither healthy nor unhealthy.",
-    context=["Sparkling water is a type of water that is carbonated."],
-    retrieval_context=["Sparkling water is carbonated and has no calories."],
-    tools_called=["Perplexity", "GoogleSearch"]
-)
-```
-
-### Expected Tools 
-
-The `expected_tools` field is `Optional[List[str]]` and represents the tools that are expected to be called by the LLM system. This is particularly useful for evaluating whether agents are properly using tools available to them.
-
-```python expected_tools.py
-# Sample app implementation
-import medical_chatbot
-
-question = "Is sparkling water healthy?"
-example = Example(
-    input=question,
-    actual_output=medical_chatbot.chat(question),
-    expected_output="Sparkling water is neither healthy nor unhealthy.",
-    context=["Sparkling water is a type of water that is carbonated."],
-    retrieval_context=["Sparkling water is carbonated and has no calories."],
-    tools_called=["Perplexity", "GoogleSearch"],
-    expected_tools=["Perplexity", "DBQuery"]
 )
 ```
 

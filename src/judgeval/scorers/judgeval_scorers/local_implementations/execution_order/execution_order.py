@@ -45,7 +45,7 @@ def get_lcs(seq1, seq2):
     return lcs[::-1]
 
 
-class ToolCorrectnessScorer(JudgevalScorer):
+class ExecutionOrderScorer(JudgevalScorer):
     def __init__(
         self,
         threshold: float = 0.5,
@@ -56,7 +56,7 @@ class ToolCorrectnessScorer(JudgevalScorer):
         should_consider_ordering: bool = False,
     ):
         super().__init__(
-            score_type=APIScorer.TOOL_CORRECTNESS,
+            score_type=APIScorer.EXECUTION_ORDER,
             threshold=1 if strict_mode else threshold,
             evaluation_model=None,
             include_reason=include_reason,
@@ -152,5 +152,5 @@ class ToolCorrectnessScorer(JudgevalScorer):
 
     @property
     def __name__(self):
-        return "Tool Correctness"
+        return "Execution Order"
     

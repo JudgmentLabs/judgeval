@@ -116,8 +116,8 @@ class JudgevalScorer:
         For unit testing, determines whether the test case passes or fails
         """
         warning("Attempting to call unimplemented success_check method")
-        error("success_check method not implemented")
-        raise NotImplementedError("You must implement the `passes` method in your custom scorer")
+        error("_success_check method not implemented")
+        raise NotImplementedError("You must implement the `_success_check` method in your custom scorer")
 
     def __str__(self):
         debug("Converting JudgevalScorer instance to string representation")

@@ -10,7 +10,6 @@ from judgeval.data.datasets import EvalDataset, EvalDatasetClient
 from judgeval.data import (
     ScoringResult, 
     Example,
-    GroundTruthExample
 )
 from judgeval.scorers import (
     APIJudgmentScorer, 
@@ -27,7 +26,8 @@ from judgeval.judges import JudgevalJudge
 from judgeval.constants import (
     JUDGMENT_EVAL_FETCH_API_URL, 
     JUDGMENT_EVAL_DELETE_API_URL, 
-    JUDGMENT_EVAL_DELETE_PROJECT_API_URL
+    JUDGMENT_EVAL_DELETE_PROJECT_API_URL,
+    JUDGMENT_PROJECT_DELETE_API_URL
 )
 from judgeval.common.exceptions import JudgmentAPIError
 from pydantic import BaseModel
@@ -35,6 +35,11 @@ from judgeval.rules import Rule
 
 class EvalRunRequestBody(BaseModel):
     eval_name: str
+    project_name: str
+    judgment_api_key: str
+
+class DeleteEvalRunRequestBody(BaseModel):
+    eval_names: List[str]
     project_name: str
     judgment_api_key: str
 
@@ -65,6 +70,7 @@ class JudgmentClient:
         eval_run_name: str = "default_eval_run",
         override: bool = False,
         use_judgment: bool = True,
+        ignore_errors: bool = True,
         rules: Optional[List[Rule]] = None
     ) -> List[ScoringResult]:
         """
@@ -81,6 +87,7 @@ class JudgmentClient:
             eval_run_name (str): A name for this evaluation run
             override (bool): Whether to override an existing evaluation run with the same name
             use_judgment (bool): Whether to use Judgment API for evaluation
+            ignore_errors (bool): Whether to ignore errors during evaluation (safely handled)
             rules (Optional[List[Rule]]): Rules to evaluate against scoring results
             
         Returns:
@@ -141,7 +148,7 @@ class JudgmentClient:
                 rules=loaded_rules,
                 organization_id=self.organization_id
             )
-            return run_eval(eval, override)
+            return run_eval(eval, override, ignore_errors=ignore_errors)
         except ValueError as e:
             raise ValueError(f"Please check your EvaluationRun object, one or more fields are invalid: \n{str(e)}")
         except Exception as e:
@@ -156,7 +163,7 @@ class JudgmentClient:
         metadata: Optional[Dict[str, Any]] = None,
         project_name: str = "",
         eval_run_name: str = "",
-        log_results: bool = False,
+        log_results: bool = True,
         use_judgment: bool = True,
         rules: Optional[List[Rule]] = None
     ) -> List[ScoringResult]:
@@ -282,11 +289,11 @@ class JudgmentClient:
         """
         return self.eval_dataset_client.pull_all_user_dataset_stats()
     
-    def edit_dataset(self, alias: str, examples: List[Example], ground_truths: List[GroundTruthExample]) -> bool:
+    def edit_dataset(self, alias: str, examples: List[Example]) -> bool:
         """
-        Edits the dataset on Judgment platform by adding new examples and ground truths
+        Edits the dataset on Judgment platform by adding new examples
         """
-        return self.eval_dataset_client.edit_dataset(alias, examples, ground_truths)
+        return self.eval_dataset_client.edit_dataset(alias, examples)
     
     # Maybe add option where you can pass in the EvaluationRun object and it will pull the eval results from the backend
     def pull_eval(self, project_name: str, eval_run_name: str) -> List[Dict[str, Union[str, List[ScoringResult]]]]:
@@ -324,19 +331,22 @@ class JudgmentClient:
             eval_run_result[0]["results"] = [ScoringResult(**filtered_result)]
         return eval_run_result
     
-    def delete_eval(self, project_name: str, eval_run_name: str) -> bool:
+    def delete_eval(self, project_name: str, eval_run_names: List[str]) -> bool:
         """
-        Deletes an evaluation from the server by project and run name.
+        Deletes an evaluation from the server by project and run names.
 
         Args:
             project_name (str): Name of the project
-            eval_run_name (str): Name of the evaluation run
+            eval_run_names (List[str]): List of names of the evaluation runs
 
         Returns:
             bool: Whether the evaluation was successfully deleted
         """
-        eval_run_request_body = EvalRunRequestBody(project_name=project_name, 
-                                                   eval_name=eval_run_name, 
+        if not eval_run_names:
+            raise ValueError("No evaluation run names provided")
+        
+        eval_run_request_body = DeleteEvalRunRequestBody(project_name=project_name, 
+                                                   eval_names=eval_run_names, 
                                                    judgment_api_key=self.judgment_api_key)
         response = requests.delete(JUDGMENT_EVAL_DELETE_API_URL, 
                         json=eval_run_request_body.model_dump(),
@@ -345,9 +355,11 @@ class JudgmentClient:
                             "Authorization": f"Bearer {self.judgment_api_key}",
                             "X-Organization-Id": self.organization_id
                         })
-        if response.status_code != requests.codes.ok:
+        if response.status_code == 404:
+            raise ValueError(f"Eval results not found: {response.json()}")
+        elif response.status_code == 500:
             raise ValueError(f"Error deleting eval results: {response.json()}")
-        return response.json()
+        return bool(response.json())
     
     def delete_project_evals(self, project_name: str) -> bool:
         """
@@ -362,7 +374,6 @@ class JudgmentClient:
         response = requests.delete(JUDGMENT_EVAL_DELETE_PROJECT_API_URL, 
                         json={
                             "project_name": project_name,
-                            "judgment_api_key": self.judgment_api_key,
                         },
                         headers={
                             "Content-Type": "application/json",
@@ -371,6 +382,23 @@ class JudgmentClient:
                         })
         if response.status_code != requests.codes.ok:
             raise ValueError(f"Error deleting eval results: {response.json()}")
+        return response.json()
+    
+    def delete_project(self, project_name: str) -> bool:
+        """
+        Deletes a project from the server. Which also deletes all evaluations and traces associated with the project.
+        """
+        response = requests.delete(JUDGMENT_PROJECT_DELETE_API_URL, 
+                        json={
+                            "project_name": project_name,
+                        },
+                        headers={
+                            "Content-Type": "application/json",
+                            "Authorization": f"Bearer {self.judgment_api_key}",
+                            "X-Organization-Id": self.organization_id
+                        })
+        if response.status_code != requests.codes.ok:
+            raise ValueError(f"Error deleting project: {response.json()}")
         return response.json()
         
     def _validate_api_key(self):

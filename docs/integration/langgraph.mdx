@@ -1,0 +1,53 @@
+---
+title: Integrating with LangGraph
+---
+We make it easy to integrate Judgeval with LangGraph. 
+By simply adding the `JudgevalCallbackHandler` to your LangGraph workflow, you can trace your LangGraph workflow with Judgeval and also see insights from the execution.
+
+<Note>
+We expect you to already be familiar with Judgment and its tools. If you are not, please refer to the [Getting Started](/getting_started) guide.
+</Note>
+
+## Judgeval Callback Handler
+
+The Judgeval Callback Handler is a callback handler that can be used to trace your LangGraph workflow with Judgeval. We automatically trace all node visits, tool calls, and anything else you do in your workflow. We also store some additional fields on the handler that you can use to get more information about the execution:
+
+- `executed_nodes`: list of node names that have been executed
+- `executed_tools`: list of tool names that have been executed
+- `executed_node_tools`: combined list of executions formatted as 
+    - `[node_name, node_name, node_name:tool_name]` 
+
+<Tip>
+When using the JudgevalCallbackHandler, you do not have to add `@observe` decorators to your nodes/tools.
+</Tip>
+
+## Example Workflow
+
+```python
+from judgeval.common.tracer import Tracer
+from judgeval.integrations.langgraph import JudgevalCallbackHandler, set_global_handler
+
+judgment = Tracer(api_key=os.getenv("JUDGMENT_API_KEY"), project_name=PROJECT_NAME)
+
+graph_builder = StateGraph(State)
+
+# YOUR LANGGRAPH WORKFLOW
+
+handler = JudgevalCallbackHandler(judgment)
+set_global_handler(handler) # This will automatically trace your entire workflow
+
+result = graph.invoke({
+    "messages": [HumanMessage(content=prompt)]
+})
+
+# Accessing the JudgevalCallbackHandler attributes
+print(handler.executed_nodes)
+print(handler.executed_tools)
+print(handler.executed_node_tools) # ['chatbot', 'tools', 'tools:search_tool']
+```
+
+
+View some of our demo code for more detailed examples.
+
+- [Basic Workflow](https://github.com/JudgmentLabs/judgment-cookbook/blob/main/integrations/langgraph/basic.py)
+- [Human in the Loop](https://github.com/JudgmentLabs/judgment-cookbook/blob/main/integrations/langgraph/human_in_the_loop/human_in_the_loop.py)

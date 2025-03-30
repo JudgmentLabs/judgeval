@@ -4,7 +4,7 @@ from judgeval.scorers.judgeval_scorers.local_implementations.contextual_recall.c
 from judgeval.scorers.judgeval_scorers.local_implementations.contextual_relevancy.contextual_relevancy_scorer import ContextualRelevancyScorer
 from judgeval.scorers.judgeval_scorers.local_implementations.faithfulness.faithfulness_scorer import FaithfulnessScorer
 from judgeval.scorers.judgeval_scorers.local_implementations.json_correctness.json_correctness_scorer import JsonCorrectnessScorer
-from judgeval.scorers.judgeval_scorers.local_implementations.tool_correctness.tool_correctness_scorer import ToolCorrectnessScorer 
+from judgeval.scorers.judgeval_scorers.local_implementations.execution_order.execution_order import ExecutionOrderScorer 
 from judgeval.scorers.judgeval_scorers.local_implementations.hallucination.hallucination_scorer import HallucinationScorer
 from judgeval.scorers.judgeval_scorers.local_implementations.summarization.summarization_scorer import SummarizationScorer
 from judgeval.scorers.judgeval_scorers.local_implementations.answer_correctness.answer_correctness_scorer import AnswerCorrectnessScorer
@@ -20,7 +20,7 @@ __all__ = [
     "ContextualRelevancyScorer",
     "FaithfulnessScorer",
     "JsonCorrectnessScorer",
-    "ToolCorrectnessScorer",
+    "ExecutionOrderScorer",
     "HallucinationScorer",
     "SummarizationScorer",
     "InstructionAdherenceScorer",

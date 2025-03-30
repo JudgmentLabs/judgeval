@@ -60,15 +60,21 @@ class TestEvalOperations:
         results = client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
         assert results, f"No evaluation results found for {EVAL_RUN_NAME}"
 
-    def test_delete_eval_by_project_and_run_name(self, client: JudgmentClient):
+        client.delete_project(project_name=PROJECT_NAME)
+
+    def test_delete_eval_by_project_and_run_names(self, client: JudgmentClient):
         """Test delete evaluation by project and run name workflow."""
         PROJECT_NAME = ''.join(random.choices(string.ascii_letters + string.digits, k=20))
-        EVAL_RUN_NAME = ''.join(random.choices(string.ascii_letters + string.digits, k=20))
+        EVAL_RUN_NAMES = [''.join(random.choices(string.ascii_letters + string.digits, k=20)) for _ in range(3)]
 
-        self.run_eval_helper(client, PROJECT_NAME, EVAL_RUN_NAME)
-        client.delete_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
-        with pytest.raises(ValueError, match="Error fetching eval results"):
-            client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
+        for eval_run_name in EVAL_RUN_NAMES:
+            self.run_eval_helper(client, PROJECT_NAME, eval_run_name)
+
+        client.delete_eval(project_name=PROJECT_NAME, eval_run_names=EVAL_RUN_NAMES)
+        client.delete_project(project_name=PROJECT_NAME)
+        for eval_run_name in EVAL_RUN_NAMES:
+            with pytest.raises(ValueError, match="Error fetching eval results"):
+                client.pull_eval(project_name=PROJECT_NAME, eval_run_name=eval_run_name)
 
     def test_delete_eval_by_project(self, client: JudgmentClient):
         """Test delete evaluation by project workflow."""
@@ -79,7 +85,7 @@ class TestEvalOperations:
         self.run_eval_helper(client, PROJECT_NAME, EVAL_RUN_NAME)
         self.run_eval_helper(client, PROJECT_NAME, EVAL_RUN_NAME2)
 
-        client.delete_project_evals(project_name=PROJECT_NAME)
+        client.delete_project(project_name=PROJECT_NAME)
         with pytest.raises(ValueError, match="Error fetching eval results"):
             client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
         
@@ -144,6 +150,8 @@ class TestEvalOperations:
             scorers=[FaithfulnessScorer(threshold=0.5)],
             model="Qwen/Qwen2.5-72B-Instruct-Turbo",
             metadata={"batch": "test"},
+            project_name="test_project",
+            eval_run_name="test_eval_run"
         )
         assert res, "Dataset evaluation failed"
 

@@ -27,7 +27,6 @@ class TestNotificationConfig:
         config = NotificationConfig()
         assert config.enabled is True
         assert config.communication_methods == []
-        assert config.message_template is None
         assert config.email_addresses is None
         assert config.send_at is None
         
@@ -36,14 +35,12 @@ class TestNotificationConfig:
         config = NotificationConfig(
             enabled=True,
             communication_methods=["slack", "email"],
-            message_template="Rule {rule_name} was triggered with score {score}",
             email_addresses=email_addresses,
             send_at=1632150000
         )
         
         assert config.enabled is True
         assert config.communication_methods == ["slack", "email"]
-        assert config.message_template == "Rule {rule_name} was triggered with score {score}"
         assert config.email_addresses == email_addresses
         assert config.send_at == 1632150000
     
@@ -52,7 +49,6 @@ class TestNotificationConfig:
         config = NotificationConfig(
             enabled=True,
             communication_methods=["slack", "email"],
-            message_template="Test message",
             email_addresses=["test@example.com"],
             send_at=1632150000
         )
@@ -62,7 +58,6 @@ class TestNotificationConfig:
         assert isinstance(data, dict)
         assert data["enabled"] is True
         assert data["communication_methods"] == ["slack", "email"]
-        assert data["message_template"] == "Test message"
         assert data["email_addresses"] == ["test@example.com"]
         assert data["send_at"] == 1632150000
 
@@ -79,7 +74,6 @@ class TestRuleWithNotification:
         notification = NotificationConfig(
             enabled=True,
             communication_methods=["slack", "email"],
-            message_template="Rule {rule_name} was triggered",
             email_addresses=["test@example.com"]
         )
         
@@ -98,7 +92,6 @@ class TestRuleWithNotification:
         assert rule.notification is not None
         assert rule.notification.enabled is True
         assert rule.notification.communication_methods == ["slack", "email"]
-        assert rule.notification.message_template == "Rule {rule_name} was triggered"
         assert rule.notification.email_addresses == ["test@example.com"]
         
         # Check that the rule can be serialized correctly with its notification config
@@ -156,7 +149,6 @@ class TestRulesEngineNotification:
             rule_id=rule_id,
             enabled=True,
             communication_methods=["slack", "email"],
-            message_template="Custom notification message",
             email_addresses=["configured@example.com"],
             send_at=None
         )
@@ -166,7 +158,6 @@ class TestRulesEngineNotification:
         assert configured_rule.notification is not None
         assert configured_rule.notification.enabled is True
         assert configured_rule.notification.communication_methods == ["slack", "email"]
-        assert configured_rule.notification.message_template == "Custom notification message"
         assert configured_rule.notification.email_addresses == ["configured@example.com"]
     
     def test_configure_all_notifications(self):
@@ -226,7 +217,6 @@ class TestNotificationInAlertResults:
         notification = NotificationConfig(
             enabled=True,
             communication_methods=["slack"],
-            message_template="Alert message",
             email_addresses=["alert@example.com"]
         )
         
@@ -262,7 +252,6 @@ class TestNotificationInAlertResults:
         assert "notification" in data
         assert data["notification"]["enabled"] is True
         assert data["notification"]["communication_methods"] == ["slack"]
-        assert data["notification"]["message_template"] == "Alert message"
         assert data["notification"]["email_addresses"] == ["alert@example.com"]
     
     def test_notification_not_included_when_not_triggered(self):
@@ -274,7 +263,6 @@ class TestNotificationInAlertResults:
         notification = NotificationConfig(
             enabled=True,
             communication_methods=["slack"],
-            message_template="Alert message",
             email_addresses=["alert@example.com"]
         )
         
@@ -331,7 +319,6 @@ class TestNotificationWithJudgmentClient:
                 "notification": {
                     "enabled": True,
                     "communication_methods": ["slack", "email"],
-                    "message_template": "Rule triggered",
                     "email_addresses": ["test@example.com"],
                     "send_at": None
                 }
@@ -357,7 +344,6 @@ class TestNotificationWithJudgmentClient:
             notification = NotificationConfig(
                 enabled=True,
                 communication_methods=["slack", "email"],
-                message_template="Rule triggered",
                 email_addresses=["test@example.com"]
             )
             

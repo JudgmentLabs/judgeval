@@ -1,0 +1,72 @@
+---
+title: Execution Order
+description: ""
+---
+
+The `ExecutionOrder` scorer is a default scorer that checks whether your LLM agent made the correct sequence of calls. 
+In practice, this allows you to assess the quality of an LLM agent's tool choice and applied use of tools as well as the order of node visits.
+
+## Required Fields
+
+To run the `ExecutionOrder` scorer, you must include the following fields in your `Example`:
+
+- `actual_output` 
+- `expected_output`
+
+## Scorer Breakdown
+
+The execution order score is calculated in different ways depending on how you intialize the scorer.
+
+### Exact Match
+
+
+Checks that the actual output matches the expected output exactly. Returns a score of 1.0 if they match, otherwise 0.0. This score is useful when you care about the exact ordering of the tools called.
+
+```python
+scorer = ExecutionOrderScorer(threshold=0.8, should_exact_match=True)
+```
+
+### Ordering Match
+
+Uses the Longest Common Subsequence (LCS) to calculate the score. The score is the length of the LCS divided by the length of the expected output.
+If the LCS is the same as the expected output, the score is 1.0, otherwise it is 0.0. This score is useful when you care about the ordering of the tools called but are fine with other tools being within the path.
+
+```python
+scorer = ExecutionOrderScorer(threshold=0.8, should_consider_ordering=True)
+```
+
+### Set Match (Default)
+
+Calculates the score based on the intersection of the actual and expected actions. The score is the size of the intersection divided by the total number of expected actions.
+This is useful when all you care about is that the correct tools were called in any order with other possible tools too.
+
+```python
+scorer = ExecutionOrderScorer(threshold=0.8)
+```
+
+$$
+\text{Execution Order} = \frac{\text{Intersection of Actual and Expected Actions}}{\text{Total Number of Actions}}
+$$
+
+## Sample Implementation 
+
+```python tool_correctness.py
+from judgeval import JudgmentClient
+from judgeval.data import Example
+from judgeval.scorers import ToolCorrectnessScorer
+
+client = JudgmentClient()
+example = Example(
+    actual_output=["GoogleSearch", "Perplexity"],
+    expected_output=["DBQuery", "GoogleSearch"],
+)
+# supply your own threshold
+scorer = ExecutionOrderScorer(threshold=0.8)
+
+results = client.run_evaluation(
+    examples=[example],
+    scorers=[scorer],
+    model="gpt-4o",
+)
+print(results)
+```

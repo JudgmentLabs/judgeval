@@ -1,12 +1,17 @@
 import asyncio
 import requests
-from typing import List, Dict
+import time
+import sys
+import itertools
+import threading
+from typing import List, Dict, Any
 from datetime import datetime
 from rich import print as rprint
 
 from judgeval.data import (
     ScorerData, 
-    ScoringResult
+    ScoringResult,
+    Example
 )
 from judgeval.scorers import (
     JudgevalScorer, 
@@ -14,7 +19,6 @@ from judgeval.scorers import (
     ClassifierScorer
 )
 from judgeval.scorers.score import a_execute_scoring
-
 from judgeval.constants import (
     ROOT_API,
     JUDGMENT_EVAL_API_URL,
@@ -185,7 +189,7 @@ def check_eval_run_name_exists(eval_name: str, project_name: str, judgment_api_k
         raise JudgmentAPIError(f"Failed to check if eval run name exists: {str(e)}")
 
 
-def log_evaluation_results(merged_results: List[ScoringResult], evaluation_run: EvaluationRun) -> None:
+def log_evaluation_results(merged_results: List[ScoringResult], evaluation_run: EvaluationRun) -> str:
     """
     Logs evaluation results to the Judgment API database.
 
@@ -220,7 +224,9 @@ def log_evaluation_results(merged_results: List[ScoringResult], evaluation_run: 
             raise JudgmentAPIError(error_message)
         
         if "ui_results_url" in res.json():
-            rprint(f"\n🔍 You can view your evaluation results here: [rgb(106,0,255)]{res.json()['ui_results_url']}[/]\n")
+            url = res.json()['ui_results_url']
+            pretty_str = f"\n🔍 You can view your evaluation results here: [rgb(106,0,255)][link={url}]View Results[/link]\n"
+            return pretty_str
             
     except requests.exceptions.RequestException as e:
         error(f"Request failed while saving evaluation results to DB: {str(e)}")
@@ -229,14 +235,61 @@ def log_evaluation_results(merged_results: List[ScoringResult], evaluation_run: 
         error(f"Failed to save evaluation results to DB: {str(e)}")
         raise ValueError(f"Failed to save evaluation results to DB: {str(e)}")
 
+def run_with_spinner(message: str, func, *args, **kwargs) -> Any:
+        """Run a function with a spinner in the terminal."""
+        spinner = itertools.cycle(['|', '/', '-', '\\'])
+
+        def display_spinner():
+            while not stop_spinner_event.is_set():
+                sys.stdout.write(f'\r{message}{next(spinner)}')
+                sys.stdout.flush() 
+                time.sleep(0.1)
+
+        stop_spinner_event = threading.Event()
+        spinner_thread = threading.Thread(target=display_spinner)
+        spinner_thread.start()
+
+        try:
+            result = func(*args, **kwargs)
+        except Exception as e:
+            error(f"An error occurred: {str(e)}")
+            stop_spinner_event.set()
+            spinner_thread.join()
+            raise e
+        finally:
+            stop_spinner_event.set()
+            spinner_thread.join()
+
+            sys.stdout.write('\r' + ' ' * (len(message) + 1) + '\r')
+            sys.stdout.flush()
+
+        return result
+
+def check_examples(examples: List[Example], scorers: List[APIJudgmentScorer]) -> None:
+    """
+    Checks if the example contains the necessary parameters for the scorer.
+    """
+    for scorer in scorers:
+        if isinstance(scorer, APIJudgmentScorer):
+            for example in examples:
+                missing_params = []
+                for param in scorer.required_params:
+                    if getattr(example, param.value) is None:
+                        missing_params.append(f"'{param.value}'")
+                if missing_params:
+                    # We do this because we want to inform users that an example is missing parameters for a scorer
+                    # Example ID (usually random UUID) does not provide any helpful information for the user but printing the entire example is overdoing it
+                    print(f"WARNING: Example {example.example_id} is missing the following parameters: {missing_params} for scorer {scorer.score_type.value}")
 
 
-def run_eval(evaluation_run: EvaluationRun, override: bool = False) -> List[ScoringResult]:
+def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_errors: bool = True) -> List[ScoringResult]:
     """
     Executes an evaluation of `Example`s using one or more `Scorer`s
 
     Args:
         evaluation_run (EvaluationRun): Stores example and evaluation together for running
+        override (bool, optional): Whether to override existing evaluation run with same name. Defaults to False.
+        ignore_errors (bool, optional): Whether to ignore scorer errors during evaluation. Defaults to True.
     
         Args: 
             project_name (str): The name of the project the evaluation results belong to
@@ -253,7 +306,7 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False) -> List[Scor
     Returns:
         List[ScoringResult]: The results of the evaluation. Each result is a dictionary containing the fields of a `ScoringResult` object.
     """
-    
+
     # Call endpoint to check to see if eval run name exists (if we DON'T want to override and DO want to log results)
     if not override and evaluation_run.log_results:
         check_eval_run_name_exists(
@@ -306,6 +359,7 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False) -> List[Scor
     
     # Execute evaluation using Judgment API
     if judgment_scorers:
+        check_examples(evaluation_run.examples, evaluation_run.scorers)
         info("Starting API evaluation")
         debug(f"Creating API evaluation run with {len(judgment_scorers)} scorers")
         try:  # execute an EvaluationRun with just JudgmentScorers
@@ -323,7 +377,7 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False) -> List[Scor
                 rules=evaluation_run.rules
             )
             debug("Sending request to Judgment API")    
-            response_data: List[Dict] = execute_api_eval(api_evaluation_run)  # Dicts are `ScoringResult` objs
+            response_data: List[Dict] = run_with_spinner("Running Evaluation: ", execute_api_eval, api_evaluation_run)
             info(f"Received {len(response_data['results'])} results from API")
         except JudgmentAPIError as e:
             error(f"An error occurred while executing the Judgment API request: {str(e)}")
@@ -352,6 +406,7 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False) -> List[Scor
                 api_results.append(ScoringResult(**filtered_result))
     # Run local evals
     if local_scorers:  # List[JudgevalScorer]
+        # We should be removing local scorers soon
         info("Starting local evaluation")
         for example in evaluation_run.examples:
             with example_logging_context(example.timestamp, example.example_id):
@@ -362,7 +417,7 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False) -> List[Scor
                 evaluation_run.examples,
                 local_scorers,
                 model=evaluation_run.model,
-                ignore_errors=True,
+                ignore_errors=ignore_errors,
                 skip_on_missing_params=True,
                 show_indicator=True,
                 _use_bar_indicator=True,
@@ -389,7 +444,8 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False) -> List[Scor
     #     )
     
     if evaluation_run.log_results:
-        log_evaluation_results(merged_results, evaluation_run)
+        pretty_str = run_with_spinner("Logging Results: ", log_evaluation_results, merged_results, evaluation_run)
+        rprint(pretty_str)
 
     for i, result in enumerate(merged_results):
         if not result.scorers_data:  # none of the scorers could be executed on this example

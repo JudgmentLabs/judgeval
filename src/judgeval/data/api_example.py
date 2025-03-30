@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from judgeval.data.example import Example
@@ -13,8 +13,8 @@ class ProcessExample(BaseModel):
     """
     name: str
     input: Optional[str] = None
-    actual_output: Optional[str] = None
-    expected_output: Optional[str] = None
+    actual_output: Optional[Union[str, List[str]]] = None
+    expected_output: Optional[Union[str, List[str]]] = None
     context: Optional[list] = None
     retrieval_context: Optional[list] = None
     tools_called: Optional[list] = None
@@ -57,19 +57,6 @@ class ProcessExample(BaseModel):
 
     def update_run_duration(self, run_duration: float):
         self.run_duration = run_duration
-
-    @model_validator(mode="before")
-    def check_input(cls, values: Dict[str, Any]):
-        input = values.get("input")
-        actual_output = values.get("actual_output")
-
-        if (input is None or actual_output is None):
-            error(f"Validation error: Required fields missing. input={input}, actual_output={actual_output}")
-            raise ValueError(
-                "'input' and 'actual_output' must be provided."
-            )
-
-        return values
     
 
 def create_process_example(

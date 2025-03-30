@@ -62,7 +62,7 @@ Congratulations! Your evaluation should have passed. Let's break down what happe
 - The variable `input` mimics a user input and `actual_output` is a placeholder for what your LLM system returns based on the input.
 - The variable `retrieval_context` represents the retrieved context from your RAG knowledge base.
 - `FaithfulnessScorer(threshold=0.5)` is a scorer that checks if the output is hallucinated relative to the retrieved context.
-    - <Note>All scorers produce values betweeen 0 - 1; the threshold is used in the context of [unit testing](/evaluation/unit_testing).</Note>
+    - <Note>The threshold is used in the context of [unit testing](/evaluation/unit_testing).</Note>
 - We chose `gpt-4o` as our judge model to measure faithfulness. Judgment Labs offers ANY judge model for your evaluation needs. 
 Consider trying out our state-of-the-art Osiris judge models for your next evaluation!
 
@@ -142,7 +142,7 @@ def main():
         messages=[{"role": "user", "content": f"{task_input}"}]
     ).choices[0].message.content
 
-    judgment.get_current_trace().async_evaluate(
+    judgment.async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
         input=task_input,
         actual_output=res,
@@ -280,14 +280,10 @@ results = client.run_evaluation(
 # Create Your First Dataset 
 In most cases, you will not be running evaluations on a single example; instead, you will be scoring your LLM system on a dataset. 
 Judgeval allows you to create datasets, save them, and run evaluations on them. 
-An `EvalDataset` is a collection of `Example`s and/or `GroundTruthExample`s.
-
-<Note>
-A `GroundTruthExample` is an `Example` that has no `actual_output` field since it will be generated at test time.
-</Note>
+An `EvalDataset` is a collection of `Example`s.
 
 ```python create_dataset.py
-from judgeval.data import Example, GroundTruthExample, EvalDataset
+from judgeval.data import Example, EvalDataset
 
 example1 = Example(input="...", actual_output="...")
 example2 = Example(input="...", actual_output="...")

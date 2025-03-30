@@ -66,7 +66,6 @@ class AlertResult(BaseModel):
                 data["notification"] = {
                     "enabled": notif.enabled,
                     "communication_methods": notif.communication_methods,
-                    "message_template": notif.message_template,
                     "email_addresses": notif.email_addresses,
                     "slack_channels": getattr(notif, "slack_channels", []),
                     "send_at": notif.send_at

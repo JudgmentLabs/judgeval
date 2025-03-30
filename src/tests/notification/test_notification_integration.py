@@ -30,7 +30,6 @@ class TestDirectNotificationIntegration:
         notification_config = NotificationConfig(
             enabled=True,
             communication_methods=["slack", "email"],
-            message_template="Rule '{rule_name}' was triggered with score {score}",
             email_addresses=["test@example.com"],
             send_at=None
         )
@@ -75,7 +74,6 @@ class TestDirectNotificationIntegration:
         notification_config = NotificationConfig(
             enabled=True,
             communication_methods=["slack", "email"],
-            message_template="Rule '{rule_name}' was triggered with score {score}",
             email_addresses=["test@example.com"],
             send_at=None
         )
@@ -145,7 +143,6 @@ class TestDirectNotificationIntegration:
         notification1 = NotificationConfig(
             enabled=True,
             communication_methods=["slack"],
-            message_template="Slack notification",
             email_addresses=None,
             send_at=None
         )
@@ -153,7 +150,6 @@ class TestDirectNotificationIntegration:
         notification2 = NotificationConfig(
             enabled=True,
             communication_methods=["email"],
-            message_template="Email notification",
             email_addresses=["email@example.com"],
             send_at=None
         )
@@ -197,14 +193,12 @@ class TestDirectNotificationIntegration:
         assert results["rule1"].status == AlertStatus.TRIGGERED
         assert results["rule1"].notification is not None
         assert results["rule1"].notification.communication_methods == ["slack"]
-        assert results["rule1"].notification.message_template == "Slack notification"
         
         # Verify rule2 has the correct notification config
         assert "rule2" in results
         assert results["rule2"].status == AlertStatus.TRIGGERED
         assert results["rule2"].notification is not None
         assert results["rule2"].notification.communication_methods == ["email"]
-        assert results["rule2"].notification.message_template == "Email notification"
         assert results["rule2"].notification.email_addresses == ["email@example.com"]
 
 
@@ -252,7 +246,6 @@ class TestNotificationWithAPICalls:
                             "notification": {
                                 "enabled": True,
                                 "communication_methods": ["slack", "email"],
-                                "message_template": "Rule triggered",
                                 "email_addresses": ["test@example.com"]
                             }
                         }
@@ -290,7 +283,6 @@ class TestNotificationWithAPICalls:
             notification = NotificationConfig(
                 enabled=True,
                 communication_methods=["slack", "email"],
-                message_template="Rule triggered",
                 email_addresses=["test@example.com"]
             )
             
@@ -372,7 +364,6 @@ class TestNotificationWithAPICalls:
                             "notification": {
                                 "enabled": True,
                                 "communication_methods": ["slack", "email", "broadcast_slack", "broadcast_email"],
-                                "message_template": "Rule triggered with multiple methods",
                                 "email_addresses": ["test1@example.com", "test2@example.com"]
                             }
                         }
@@ -409,7 +400,6 @@ class TestNotificationWithAPICalls:
             notification = NotificationConfig(
                 enabled=True,
                 communication_methods=["slack", "email", "broadcast_slack", "broadcast_email"],
-                message_template="Rule triggered with multiple methods",
                 email_addresses=["test1@example.com", "test2@example.com"]
             )
             

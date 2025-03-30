@@ -16,6 +16,7 @@ from judgeval.scorers import (
     ComparisonScorer,
     Text2SQLScorer,
     InstructionAdherenceScorer,
+    ExecutionOrderScorer,
 )
 
 from judgeval.data import Example
@@ -679,6 +680,28 @@ LIMIT 10;
     assert not print_debug_on_failure(res[4])
 
 
+
+def test_execution_order_scorer():
+    client = JudgmentClient()
+    PROJECT_NAME = "test-project"
+    EVAL_RUN_NAME = "test-run-execution-order"
+
+    example = Example(
+        input="What is the weather in New York and the stock price of AAPL?",
+        actual_output=["weather_forecast", "stock_price", "translate_text", "news_headlines"],
+        expected_output=["weather_forecast", "stock_price", "news_headlines", "translate_text"],
+    )
+
+    res = client.run_evaluation(
+        examples=[example],
+        scorers=[ExecutionOrderScorer(threshold=1, should_consider_ordering=True)],
+        model="gpt-4o-mini",
+        project_name=PROJECT_NAME,
+        eval_run_name=EVAL_RUN_NAME,
+        override=True
+    )
+
+
 def print_debug_on_failure(result) -> bool:
     """
     Helper function to print debug info only on test failure
@@ -719,4 +742,5 @@ if __name__ == "__main__":
     test_hallucination_scorer()
     test_instruction_adherence_scorer()
     test_summarization_scorer()
+    test_execution_order_scorer()
     

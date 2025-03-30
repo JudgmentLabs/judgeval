@@ -28,3 +28,9 @@ A typical setup of `judgeval` on production systems involves:
 
 
 For a full example of how to set up `judgeval` in a production system, see our [OpenAI Travel Agent example](/monitoring/tracing#example-openai-travel-agent).
+
+## Disabling Monitoring ##
+
+If your setup requires you to disable monitoring in production-level environments, you can disable monitoring by:
+- Setting the `JUDGMENT_MONITORING` environment variable to `false` (Disables tracing)
+- Setting the `JUDGMENT_EVALUATIONS` environment variable to `false` (Disables async_evaluates)

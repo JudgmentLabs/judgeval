@@ -2,11 +2,13 @@
 Classes for representing examples in a dataset.
 """
 
-from typing import Optional, Any, Dict, List
+
+from typing import Optional, Any, Dict, List, Union
 from uuid import uuid4
 from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 from datetime import datetime
+import time
 
 
 class ExampleParams(Enum):
@@ -22,9 +24,9 @@ class ExampleParams(Enum):
 
 
 class Example(BaseModel):
-    input: str
-    actual_output: str
-    expected_output: Optional[str] = None
+    input: Optional[str] = None
+    actual_output: Optional[Union[str, List[str]]] = None
+    expected_output: Optional[Union[str, List[str]]] = None
     context: Optional[List[str]] = None
     retrieval_context: Optional[List[str]] = None
     additional_metadata: Optional[Dict[str, Any]] = None
@@ -37,12 +39,6 @@ class Example(BaseModel):
     trace_id: Optional[str] = None
     
     def __init__(self, **data):
-        # Check that required fields are provided
-        if 'input' not in data:
-            raise ValueError("Example must be initialized with 'input' field.")
-        if 'actual_output' not in data:
-            raise ValueError("Example must be initialized with 'actual_output' field.")
-            
         if 'example_id' not in data:
             data['example_id'] = str(uuid4())
         # Set timestamp if not provided
@@ -53,22 +49,27 @@ class Example(BaseModel):
     @field_validator('input', mode='before')
     @classmethod
     def validate_input(cls, v):
-        if not v or not isinstance(v, str):
+        if v is not None and (not v or not isinstance(v, str)):
             raise ValueError(f"Input must be a non-empty string but got '{v}' of type {type(v)}")
         return v
     
     @field_validator('actual_output', mode='before')
     @classmethod
     def validate_actual_output(cls, v):
-        if not isinstance(v, str):
-            raise ValueError(f"Actual output must be a string but got '{v}' of type {type(v)}")
+        if v is not None:
+            if not isinstance(v, (str, list)):
+                raise ValueError(f"Actual output must be a string or a list of strings but got {v} of type {type(v)}")
+            if isinstance(v, list) and not all(isinstance(item, str) for item in v):
+                raise ValueError(f"All items in actual_output must be strings but got {v}")
         return v
     
     @field_validator('expected_output', mode='before')
     @classmethod
     def validate_expected_output(cls, v):
-        if v is not None and not isinstance(v, str):
-            raise ValueError(f"Expected output must be a string or None but got {v} of type {type(v)}")
+        if v is not None and not isinstance(v, (str, list)):
+            raise ValueError(f"Expected output must be a string, a list of strings, or None but got {v} of type {type(v)}")
+        if isinstance(v, list) and not all(isinstance(item, str) for item in v):
+            raise ValueError(f"All items in expected_output must be strings but got {v}")
         return v
     
     @field_validator('context', 'retrieval_context', 'tools_called', 'expected_tools', mode='before')

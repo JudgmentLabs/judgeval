@@ -1,1 +1,1 @@
-"""Notification tests package.""" 
+"""Notification tests package."""

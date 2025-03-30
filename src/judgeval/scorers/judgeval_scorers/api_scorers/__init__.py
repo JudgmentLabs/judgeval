@@ -1,4 +1,4 @@
-from judgeval.scorers.judgeval_scorers.api_scorers.tool_correctness import ToolCorrectnessScorer
+from judgeval.scorers.judgeval_scorers.api_scorers.execution_order import ExecutionOrderScorer
 from judgeval.scorers.judgeval_scorers.api_scorers.json_correctness import JSONCorrectnessScorer
 from judgeval.scorers.judgeval_scorers.api_scorers.summarization import SummarizationScorer
 from judgeval.scorers.judgeval_scorers.api_scorers.hallucination import HallucinationScorer
@@ -13,7 +13,7 @@ from judgeval.scorers.judgeval_scorers.api_scorers.instruction_adherence import 
 from judgeval.scorers.judgeval_scorers.api_scorers.groundedness import GroundednessScorer
 
 __all__ = [
-    "ToolCorrectnessScorer",
+    "ExecutionOrderScorer",
     "JSONCorrectnessScorer",
     "SummarizationScorer",
     "HallucinationScorer",

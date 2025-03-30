@@ -1,0 +1,65 @@
+---
+title: Groundedness
+description: ""
+---
+
+The `Groundedness` scorer is a default LLM judge scorer that measures whether the `actual_output` is aligned with both the task instructions in `input` and the knowledge base in `retrieval_context`. 
+In practice, this scorer helps determine if your RAG pipeline's generator is producing hallucinations or misinterpreting task instructions.
+
+**For optimal Groundedness scoring, check out our leading evaluation foundation model research here! TODO add link here.**
+
+<Note>
+The `Groundedness` scorer is a binary metric (1 or 0) that evaluates both instruction adherence and factual accuracy.
+
+Unlike the `Faithfulness` scorer which measures the degree of contradiction with retrieval context, `Groundedness` provides a pass/fail assessment based on both the task instructions and knowledge base.
+</Note>
+
+## Required Fields
+
+To run the `Groundedness` scorer, you must include the following fields in your `Example`:
+- `input`
+- `actual_output`
+- `retrieval_context`
+
+## Scorer Breakdown
+
+`Groundedness` scores are binary (1 or 0) and determined by checking:
+1. Whether the `actual_output` correctly interprets the task instructions in `input`
+2. Whether the `actual_output` contains any contradictions with the knowledge base in `retrieval_context`
+
+A response is considered grounded (score = 1) only if it:
+- Correctly follows the task instructions
+- Does not contradict any information in the knowledge base
+- Does not introduce hallucinated facts not supported by the retrieval context
+
+If there are any contradictions or misinterpretations, the scorer will fail (score = 0).
+
+## Sample Implementation
+
+```python groundedness.py
+from judgeval import JudgmentClient
+from judgeval.data import Example
+from judgeval.scorers import GroundednessScorer
+
+client = JudgmentClient()
+example = Example(
+    input="You are a helpful assistant for a clothing store. Make sure to follow the company's policies surrounding returns.",
+    actual_output="We offer a 30-day return policy for all items, including socks!",
+    retrieval_context=["Return policy, all items: 30-day limit for full refund, no questions asked."]
+)
+scorer = GroundednessScorer()
+
+results = client.run_evaluation(
+    examples=[example],
+    scorers=[scorer],
+    model="gpt-4o",
+)
+print(results)
+```
+
+<Note>
+The `Groundedness` scorer uses an LLM judge, so you'll receive a reason for the score in the `reason` field of the results. 
+This allows you to double-check the accuracy of the evaluation and understand how the score was calculated.
+</Note>
+
+

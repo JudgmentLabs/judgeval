@@ -116,9 +116,9 @@ class SampleScorer(JudgevalScorer):
 ```
 
 
-### 4. Implement the `success_check()` method
+### 4. Implement the `_success_check()` method
 
-When executing an evaluation run, `judgeval` will check if your scorer has passed the `success_check()` method. 
+When executing an evaluation run, `judgeval` will check if your scorer has passed the `_success_check()` method. 
 
 You can implement this method in any way you want, but **it should return a `bool`.** Here's a perfectly valid implementation:
 
@@ -126,7 +126,7 @@ You can implement this method in any way you want, but **it should return a `boo
 class SampleScorer(JudgevalScorer):
     ...
 
-    def success_check(self, example):
+    def _success_check(self):
         if self.error is not None:
             return False
         return self.score >= self.threshold  # or you can do self.success if set

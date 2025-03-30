@@ -11,13 +11,20 @@ from pydantic import BaseModel, Field
 # Internal imports
 from judgeval.scorers.api_scorer import APIJudgmentScorer
 from judgeval.constants import APIScorer
-
+from judgeval.data import ExampleParams
 
 class JSONCorrectnessScorer(APIJudgmentScorer):
     json_schema: BaseModel = Field(None, exclude=True)
     
     def __init__(self, threshold: float, json_schema: BaseModel):
-        super().__init__(threshold=threshold, score_type=APIScorer.JSON_CORRECTNESS)
+        super().__init__(
+            threshold=threshold, 
+            score_type=APIScorer.JSON_CORRECTNESS,
+            required_params=[
+                ExampleParams.INPUT,
+                ExampleParams.ACTUAL_OUTPUT,
+            ]
+        )
         object.__setattr__(self, 'json_schema', json_schema)
     
     def to_dict(self):

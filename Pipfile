@@ -18,14 +18,18 @@ asyncio = "*"
 nest-asyncio = "*"
 pika = "*"
 openpyxl = "*"
+langchain = "*"
+langchain-huggingface = "*"
+langchain-openai = "*"
+langchain-anthropic = "*"
+langchain-core = "*"
+langchain-community = "*"
 
 [dev-packages]
 pytest = "*"
 pytest-asyncio = "*"
 pytest-mock = "*"
 tavily-python = "*"
-patronus = "*"
-langfuse = "==2.50.3"
 
 [requires]
 python_version = "3.11"

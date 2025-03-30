@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Union, Optional, Dict, Any
+from typing import List, Union, Optional, Dict, Any, Union
 
 from judgeval.data import ScorerData, ProcessExample
 
@@ -30,8 +30,8 @@ class ScoringResult:
 
     # Inputs from the original example
     input: Optional[str] = None
-    actual_output: Optional[str] = None
-    expected_output: Optional[str] = None
+    actual_output: Optional[Union[str, List[str]]] = None
+    expected_output: Optional[Union[str, List[str]]] = None
     context: Optional[List[str]] = None
     retrieval_context: Optional[List[str]] = None
     additional_metadata: Optional[Dict[str, Any]] = None

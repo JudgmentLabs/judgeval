@@ -29,7 +29,25 @@ if not API_KEY:
 @pytest.fixture(scope="session")
 def client() -> JudgmentClient:
     """Create a single JudgmentClient instance for all tests."""
-    return JudgmentClient(judgment_api_key=API_KEY, organization_id=ORGANIZATION_ID)
+    # Setup
+    client = JudgmentClient(judgment_api_key=API_KEY, organization_id=ORGANIZATION_ID)
+    yield client
+    # Teardown
+    # Add more projects to delete as needed
+    client.delete_project(project_name="test-project")
+    client.delete_project(project_name="custom_judge_test")
+    client.delete_project(project_name="test_project")
+    client.delete_project(project_name="test_eval_run_naming_collisions")
+    client.delete_project(project_name="ToneScorerTest")
+    client.delete_project(project_name="sentiment_test")
+    client.delete_project(project_name="rules_test")
+    client.delete_project(project_name="rules-test-project")
+    client.delete_project(project_name="TestingPoemBot")
+    client.delete_project(project_name="TEST")
+    client.delete_project(project_name="TEST2")
+    client.delete_project(project_name="text2sql")
+
+
 
 @pytest.fixture
 def random_name() -> str:

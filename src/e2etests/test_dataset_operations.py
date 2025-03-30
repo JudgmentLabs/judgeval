@@ -8,7 +8,7 @@ import random
 import string
 
 from judgeval.judgment_client import JudgmentClient
-from judgeval.data import Example, GroundTruthExample
+from judgeval.data import Example
 
 @pytest.mark.basic
 class TestDatasetOperations:
@@ -34,8 +34,6 @@ class TestDatasetOperations:
         dataset = client.create_dataset()
         dataset.add_example(Example(input="input 1", actual_output="output 1"))
         dataset.add_example(Example(input="input 2", actual_output="output 2"))
-        dataset.add_ground_truth(GroundTruthExample(input="input 1", actual_output="output 1"))
-        dataset.add_ground_truth(GroundTruthExample(input="input 2", actual_output="output 2"))
         random_name2 = ''.join(random.choices(string.ascii_letters + string.digits, k=20))
         client.push_dataset(alias=random_name2, dataset=dataset, overwrite=False)
         
@@ -43,29 +41,26 @@ class TestDatasetOperations:
         print(all_datasets_stats)
         assert all_datasets_stats, "Failed to pull dataset"
         assert all_datasets_stats[random_name1]["example_count"] == 3, f"{random_name1} should have 3 examples"
-        assert all_datasets_stats[random_name1]["ground_truth_count"] == 0, f"{random_name1} should have 0 ground truths"
         assert all_datasets_stats[random_name2]["example_count"] == 2, f"{random_name2} should have 2 examples"
-        assert all_datasets_stats[random_name2]["ground_truth_count"] == 2, f"{random_name2} should have 2 ground truths"
 
     def test_edit_dataset(self, client: JudgmentClient):
         """Test dataset editing."""
-        dataset = client.pull_dataset(alias="test_dataset_7")
-        assert dataset, "Failed to pull dataset"
+        dataset = client.create_dataset()
+        dataset.add_example(Example(input="input 1", actual_output="output 1"))
+        dataset.add_example(Example(input="input 2", actual_output="output 2"))
+        client.push_dataset(alias="test_dataset_6", dataset=dataset, overwrite=True)
+        dataset = client.pull_dataset(alias="test_dataset_6") # Pull in case dataset already has examples
 
         initial_example_count = len(dataset.examples)
-        initial_ground_truth_count = len(dataset.ground_truths)
 
         client.edit_dataset(
-            alias="test_dataset_7",
+            alias="test_dataset_6",
             examples=[Example(input="input 3", actual_output="output 3")],
-            ground_truths=[GroundTruthExample(input="input 3", actual_output="output 3")]
         )
-        dataset = client.pull_dataset(alias="test_dataset_7")
+        dataset = client.pull_dataset(alias="test_dataset_6")
         assert dataset, "Failed to pull dataset"
         assert len(dataset.examples) == initial_example_count + 1, \
             f"Dataset should have {initial_example_count + 1} examples, but has {len(dataset.examples)}"
-        assert len(dataset.ground_truths) == initial_ground_truth_count + 1, \
-            f"Dataset should have {initial_ground_truth_count + 1} ground truths, but has {len(dataset.ground_truths)}"
 
     def test_export_jsonl(self, client: JudgmentClient, random_name: str):
         """Test JSONL dataset export functionality."""
@@ -76,10 +71,6 @@ class TestDatasetOperations:
             actual_output="Test output 1",
             expected_output="Expected output 1"
         ))
-        dataset.add_ground_truth(GroundTruthExample(
-            input="GT input 1",
-            actual_output="GT output 1"
-        ))
         client.push_dataset(alias=random_name, dataset=dataset, overwrite=True)
 
         # Export as JSONL
@@ -88,7 +79,6 @@ class TestDatasetOperations:
 
         # Validate JSONL format and content
         example_count = 0
-        ground_truth_count = 0
         
         for line in response.iter_lines():
             if line:
@@ -100,9 +90,6 @@ class TestDatasetOperations:
                 if entry["source"] == "example":
                     example_count += 1
                     assert "expected_output" in entry, "Example missing expected_output"
-                elif entry["source"] == "ground_truth":
-                    ground_truth_count += 1
-                    assert "source_file" not in entry, "Ground truth should not have source_file by default"
 
         assert example_count == 1, f"Expected 1 example, got {example_count}"
-        assert ground_truth_count == 1, f"Expected 1 ground truth, got {ground_truth_count}" 
+         

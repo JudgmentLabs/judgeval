@@ -135,7 +135,7 @@ def main():
     query = "What is the capital of France?"
     res = ...  # Your workflow logic
     
-    judgment.get_current_trace().async_evaluate(
+    judgment.async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
         input="",
         actual_output=res,

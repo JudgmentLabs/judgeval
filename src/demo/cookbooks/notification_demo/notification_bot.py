@@ -51,14 +51,11 @@ rules = [
 # Initialize tracer with rules for notifications
 judgment = Tracer(
     api_key=os.getenv("JUDGMENT_API_KEY"), 
-    project_name="notification_demo", 
+    project_name="restaurant_bot", 
     rules=rules
 )
 
 # Wrap OpenAI client for tracing
-client = wrap(OpenAI())
-
-judgment = Tracer(api_key=os.getenv("JUDGMENT_API_KEY"), project_name="restaurant_bot", rules=rules)
 client = wrap(OpenAI())
 
 # Test mode types
