@@ -692,7 +692,7 @@
             ],
             "index": "pypi",
             "markers": "python_version >= '3.9' and python_version < '4.0'",
-            "version": "==0.3.10"
+            "version": "==0.3.20"
         },
         "langchain-core": {
             "hashes": [
