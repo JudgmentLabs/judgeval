@@ -5,14 +5,14 @@ description: 'Get alerted when your rules trigger through multiple communication
 
 # Notifications
 
-Notifications allow you to receive alerts through various communication channels when your rules are triggered. This feature helps you stay informed about potential issues with your AI system's performance in real-time.
+Notifications allow you to receive alerts through various communication channels when your [rules](/alerts/rules) are triggered. This feature helps you stay informed about potential issues with your AI system's performance in real-time.
 
 ## Overview
 
-The notification system works in conjunction with the rules system to:
+The notification system works with [rules](/alerts/rules) to:
 
 1. Monitor your evaluation metrics
-2. Check if they meet your defined conditions
+2. Check if they meet your defined [conditions](/alerts/rules#conditions)
 3. Send alerts through your preferred channels when conditions are met
 
 Notifications can be configured globally or per rule, allowing you to customize how you're alerted based on the specific rule that was triggered.
@@ -32,7 +32,11 @@ Notifications are configured using the `NotificationConfig` class from the `judg
 | `enabled` | boolean | Whether notifications are enabled (default: `True`) |
 | `communication_methods` | list of strings | The methods to use for sending notifications (e.g., `["email", "slack"]`) |
 | `email_addresses` | list of strings | Email addresses to send notifications to |
-| `send_at` | integer (Unix timestamp) | Schedule notifications for a specific time |
+| `send_at` | integer (Unix timestamp) | Schedule notifications for a specific time ([learn more](#scheduled-notifications)) |
+
+<Note>
+For aggregated reports and periodic summaries of multiple alerts, use the [Scheduled Reports feature](/alerts/platform_notifications#scheduled-reports-recaps) in the Judgment Platform.
+</Note>
 
 ### Basic Configuration
 
@@ -57,9 +61,13 @@ Judgeval supports multiple communication methods for notifications:
 
 You can configure multiple methods to be used simultaneously.
 
+## Slack Integration
+
+For detailed information on integrating Slack with Judgment notifications, see the [Platform Notification Center documentation](/alerts/platform_notifications#slack-integration).
+
 ## Attaching Notifications to Rules
 
-Notifications can be attached to rules during rule creation or added/configured later.
+Notifications can be attached to [rules](/alerts/rules) during rule creation or added/configured later.
 
 ### During Rule Creation
 
@@ -82,14 +90,14 @@ rule = Rule(
         # Note: Only built-in APIScorers are supported
         Condition(metric=FaithfulnessScorer(threshold=0.7))
     ],
-    combine_type="all",  # Trigger when all conditions fail
+    combine_type="all",  # Trigger when all conditions fail (see Combine Types in Rules documentation)
     notification=notification_config
 )
 ```
 
 ## Scheduled Notifications
 
-You can schedule notifications to be sent at a specific time using the `send_at` parameter:
+You can schedule one-time notifications to be sent at a specific time using the `send_at` parameter:
 
 ```python
 from judgeval.rules import NotificationConfig
@@ -105,6 +113,31 @@ notification_config = NotificationConfig(
     send_at=one_hour_from_now
 )
 ```
+
+The `send_at` parameter accepts a Unix timestamp (integer) that specifies when the notification should be sent. This is useful for delaying notifications or grouping them to be sent at a specific time of day.
+
+<Warning>
+The `send_at` parameter only delays when a single notification is sent. It doesn't create recurring notifications or group multiple alerts together. Each time a rule is triggered, a separate notification is generated.
+</Warning>
+
+## Notification Types in the Platform
+
+The Judgment Platform offers two main types of notifications:
+
+1. **Evaluation Alerts** - Real-time notifications sent when specific rules are triggered. When using the API, these can be scheduled for a specific time using the `send_at` parameter.
+
+2. **Custom Alert Recaps** - Periodic summaries (daily, weekly, monthly) of evaluation metrics and alerts. These are configured in the [Platform Notification Center](/alerts/platform_notifications).
+
+### Setting Up Custom Alert Recaps
+
+To set up periodic notification summaries:
+
+1. Navigate to the Notifications page in your Judgment account settings
+2. Under "Custom Alert Recaps," click the "+" button to create a new report
+3. Configure your preferred frequency (Daily, Weekly, Monthly) and delivery time
+4. Add recipient email addresses
+
+For more details, see the [Scheduled Reports](/alerts/platform_notifications#scheduled-reports-recaps) documentation.
 
 ## Judgment Platform Features
 
