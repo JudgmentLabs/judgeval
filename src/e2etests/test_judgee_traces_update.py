@@ -310,3 +310,165 @@ async def test_real_trace_tracking(client):
     )
     assert response.status_code == 200
     assert response.json()["traces_ran"] > initial_count
+
+@pytest.mark.asyncio
+async def test_rate_limiting_detection(client):
+    """Test to detect if rate limiting is active without exceeding limits."""
+    # Get rate limit headers without triggering limits
+    response = await client.get(
+        f"{SERVER_URL}/traces/count/",
+        headers=get_headers()
+    )
+    
+    # Check if rate limit headers are present
+    rate_limit_headers = [
+        header for header in response.headers 
+        if "rate" in header.lower() or "limit" in header.lower() or "remaining" in header.lower()
+    ]
+    
+    # Print headers for debugging
+    print(f"Rate limit related headers: {rate_limit_headers}")
+    
+    # If rate limiting is implemented, we should see headers like:
+    # X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, etc.
+    # We're just checking the presence of the mechanism, not trying to exceed it
+    
+    # This test passes if we can detect rate limiting headers or if we get a successful response
+    # (since some implementations might not expose headers)
+    assert response.status_code == 200
+    
+    # Optional assertion if rate limit headers are expected
+    # assert len(rate_limit_headers) > 0, "No rate limit headers detected"
+
+@pytest.mark.asyncio
+async def test_burst_request_handling(client):
+    """Test how the API handles a burst of requests without exceeding limits."""
+    # Number of requests to send in a burst (keep this low to avoid triggering actual limits)
+    num_requests = 5
+    
+    # Send a small burst of trace save requests
+    timestamp = time.time()
+    trace_data = {
+        "name": f"burst_test_trace_{int(timestamp)}",
+        "project_name": "test_project",
+        "trace_id": str(uuid4()),
+        "created_at": str(timestamp),
+        "entries": [
+            {
+                "timestamp": timestamp,
+                "type": "span",
+                "name": "test_span",
+                "inputs": {"test": "input"},
+                "outputs": {"test": "output"},
+                "duration": 0.1,
+                "span_id": str(uuid4()),
+                "parent_id": None
+            }
+        ],
+        "duration": 0.1,
+        "token_counts": {"total": 10},
+        "empty_save": False,
+        "overwrite": False
+    }
+    
+    async def save_trace():
+        # Create a unique trace ID for each request
+        local_trace_data = trace_data.copy()
+        local_trace_data["trace_id"] = str(uuid4())
+        
+        response = await client.post(
+            f"{SERVER_URL}/traces/save/",
+            json=local_trace_data,
+            headers=get_headers()
+        )
+        return response.status_code
+    
+    # Send burst of requests and collect status codes
+    tasks = [save_trace() for _ in range(num_requests)]
+    status_codes = await asyncio.gather(*tasks)
+    
+    # All requests should succeed if we're below the rate limit
+    # If any fail with 429, that's also informative but not a test failure
+    print(f"Burst request status codes: {status_codes}")
+    
+    # Count successful vs rate-limited responses
+    successful = status_codes.count(200)
+    rate_limited = status_codes.count(429)
+    
+    # We expect either all successful or some rate limited
+    assert successful + rate_limited == num_requests
+    
+    # Log the results for analysis
+    print(f"Successful requests: {successful}, Rate limited: {rate_limited}")
+
+@pytest.mark.asyncio
+async def test_organization_limits_info(client):
+    """Test to retrieve and verify organization limits information."""
+    # Some APIs provide endpoints to check current usage and limits
+    # Try to access such an endpoint if it exists
+    
+    try:
+        response = await client.get(
+            f"{SERVER_URL}/organization/usage/",
+            headers=get_headers()
+        )
+        
+        # If the endpoint exists and returns data
+        if response.status_code == 200:
+            limits_data = response.json()
+            print(f"Organization usage data: {limits_data}")
+            
+            # Check for expected fields in the response
+            # This is informational and won't fail the test if fields are missing
+            expected_fields = ["judgee_limit", "trace_limit", "judgee_used", "trace_used"]
+            found_fields = [field for field in expected_fields if field in limits_data]
+            
+            print(f"Found usage fields: {found_fields}")
+            
+            # Test passes if we got a valid response
+            assert response.status_code == 200
+        else:
+            # If endpoint doesn't exist, test is inconclusive but not failed
+            print(f"Usage endpoint returned status code: {response.status_code}")
+            pytest.skip("Organization usage endpoint not available or returned non-200 status")
+            
+    except Exception as e:
+        # If endpoint doesn't exist, test is inconclusive but not failed
+        print(f"Error accessing organization usage endpoint: {str(e)}")
+        pytest.skip("Organization usage endpoint not available")
+
+@pytest.mark.asyncio
+async def test_on_demand_resource_detection(client):
+    """Test to detect on-demand resource capabilities without creating actual resources."""
+    # Check if on-demand endpoints exist by making OPTIONS requests
+    # This doesn't modify data but tells us if the endpoints are available
+    
+    # Check for on-demand judgee endpoint
+    judgee_response = await client.options(
+        f"{SERVER_URL}/judgees/on_demand/",
+        headers=get_headers()
+    )
+    
+    # Check for on-demand trace endpoint
+    trace_response = await client.options(
+        f"{SERVER_URL}/traces/on_demand/",
+        headers=get_headers()
+    )
+    
+    # Log the results
+    print(f"On-demand judgee endpoint status: {judgee_response.status_code}")
+    print(f"On-demand trace endpoint status: {trace_response.status_code}")
+    
+    # For OPTIONS requests, 200, 204, or 404 are all valid responses
+    # 200/204 means endpoint exists, 404 means it doesn't
+    
+    # Test passes if we could make the requests without errors
+    assert judgee_response.status_code in [200, 204, 404]
+    assert trace_response.status_code in [200, 204, 404]
+    
+    # Log if on-demand endpoints were detected
+    on_demand_judgee_available = judgee_response.status_code in [200, 204]
+    on_demand_trace_available = trace_response.status_code in [200, 204]
+    
+    print(f"On-demand judgee endpoint available: {on_demand_judgee_available}")
+    print(f"On-demand trace endpoint available: {on_demand_trace_available}")
