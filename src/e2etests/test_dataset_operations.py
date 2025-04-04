@@ -73,7 +73,7 @@ class TestDatasetOperations:
         initial_example_count = len(dataset.examples)
         assert initial_example_count == 2, "Dataset should have 2 examples"
 
-        client.edit_dataset(
+        client.append_to_dataset(
             alias="test_dataset_6",
             examples=[Example(input="input 3", actual_output="output 3")],
             project_name=project_name
