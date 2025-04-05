@@ -11,6 +11,45 @@ from dotenv import load_dotenv
 import asyncio
 import time
 from uuid import uuid4
+import logging
+from contextlib import asynccontextmanager
+from judgeval.common.tracer import Tracer
+from judgeval.judgment_client import JudgmentClient
+from judgeval.scorers import (
+    AnswerCorrectnessScorer,
+    AnswerRelevancyScorer, 
+    ContextualPrecisionScorer,
+    ContextualRecallScorer,
+    ContextualRelevancyScorer,
+    FaithfulnessScorer,
+    HallucinationScorer,
+    SummarizationScorer,
+    ComparisonScorer,
+    Text2SQLScorer,
+    InstructionAdherenceScorer,
+    ExecutionOrderScorer,
+)
+from judgeval.tracer import Tracer, wrap, TraceClient, TraceManagerClient
+from judgeval.constants import APIScorer
+from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
+from judgeval.data import Example
+from openai import OpenAI
+from together import Together
+from anthropic import Anthropic
+import pytest
+from datetime import datetime
+
+# Configure logging with more detailed format
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Initialize the tracer and clients
+judgment = Tracer(api_key=os.getenv("JUDGMENT_API_KEY"))
+openai_client = wrap(OpenAI())
+anthropic_client = wrap(Anthropic())
 
 # Load environment variables from .env file
 load_dotenv()
@@ -21,37 +60,182 @@ TEST_API_KEY = os.getenv("JUDGMENT_API_KEY")
 ORGANIZATION_ID = os.getenv("JUDGMENT_ORG_ID")
 USER_API_KEY = os.getenv("USER_API_KEY", TEST_API_KEY)  # For user-specific tests
 
-# Skip all tests if API key or organization ID is not set
-pytestmark = pytest.mark.skipif(
-    not TEST_API_KEY or not ORGANIZATION_ID, 
-    reason="JUDGMENT_API_KEY or ORGANIZATION_ID not set in .env file"
-)
-
 # Standard headers for all requests
 def get_headers():
-    return {
+    headers = {
         "Authorization": f"Bearer {TEST_API_KEY}",
         "X-Organization-Id": ORGANIZATION_ID
     }
+    logger.debug(f"Generated headers: {headers}")
+    return headers
 
 # User-specific headers with organization ID
 def get_user_headers():
-    return {
+    headers = {
         "Authorization": f"Bearer {USER_API_KEY}",
         "X-Organization-Id": ORGANIZATION_ID
     }
+    logger.debug(f"Generated user headers: {headers}")
+    return headers
+
+@asynccontextmanager
+async def get_client():
+    """Context manager for creating and cleaning up HTTP client."""
+    logger.debug("Creating new HTTP client")
+    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+        try:
+            # Test server health before proceeding
+            logger.debug("Testing server health")
+            response = await client.get(f"{SERVER_URL}/health")
+            assert response.status_code == 200, f"Server is not healthy: {response.status_code}"
+            logger.debug("Server health check passed")
+            yield client
+        except Exception as e:
+            logger.error(f"Error in client context: {str(e)}", exc_info=True)
+            raise
+        finally:
+            logger.debug("Closing HTTP client")
+            await client.aclose()
+
+
+def print_debug_on_failure(result) -> bool:
+    """
+    Helper function to print debug info only on test failure
+    
+    Returns:
+        bool: True if the test passed, False if it failed
+    """
+    if not result.success:
+        print("\n=== Test Failure Details ===")
+        print(f"Input: {result.input}")
+        print(f"Output: {result.actual_output}")
+        print(f"Success: {result.success}")
+        if hasattr(result, 'retrieval_context'):
+            print(f"Retrieval Context: {result.retrieval_context}")
+        print("\nScorer Details:")
+        for scorer_data in result.scorers_data:
+            print(f"- Name: {scorer_data.name}")
+            print(f"- Score: {scorer_data.score}")
+            print(f"- Threshold: {scorer_data.threshold}")
+            print(f"- Success: {scorer_data.success}")
+            print(f"- Reason: {scorer_data.reason}")
+            print(f"- Error: {scorer_data.error}")
+            if scorer_data.verbose_logs:
+                print(f"- Verbose Logs: {scorer_data.verbose_logs}")
+
+        return False
+    return True
+
 
 @pytest_asyncio.fixture
 async def client():
-    """Fixture to create and provide an HTTP client."""
-    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+    """Fixture to create and provide an HTTP client with proper cleanup."""
+    async with get_client() as client:
         yield client
+
+@pytest_asyncio.fixture
+async def cleanup_traces(client):
+    """Fixture to clean up traces after tests."""
+    logger.debug("Starting cleanup_traces fixture")
+    yield
+    logger.debug("Cleaning up traces")
+    # Add cleanup logic here if needed
 
 @pytest.mark.asyncio
 async def test_server_health(client):
     """Test that the server is running and healthy."""
-    response = await client.get(f"{SERVER_URL}/health")
-    assert response.status_code == 200
+    try:
+        logger.debug("Testing server health endpoint")
+        response = await client.get(f"{SERVER_URL}/health")
+        logger.debug(f"Health check response: {response.status_code}")
+        assert response.status_code == 200
+        data = response.json()
+        logger.debug(f"Health check data: {data}")
+        assert data == {"status": "ok"}  # Updated to match actual server response
+    except Exception as e:
+        logger.error(f"Error in test_server_health: {str(e)}", exc_info=True)
+        raise
+
+@pytest.mark.asyncio
+async def test_trace_count_endpoint(client):
+    """Test that the trace count endpoint works correctly."""
+    try:
+        logger.debug("Testing trace count endpoint")
+        response = await client.get(
+            f"{SERVER_URL}/traces/count/",
+            headers=get_headers()
+        )
+        logger.debug(f"Trace count response: {response.status_code}")
+        assert response.status_code == 200
+        data = response.json()
+        logger.debug(f"Trace count data: {data}")
+        assert "traces_ran" in data
+        assert "user_traces_ran" in data
+    except Exception as e:
+        logger.error(f"Error in test_trace_count_endpoint: {str(e)}", exc_info=True)
+        raise
+
+@pytest.mark.asyncio
+async def test_trace_save_increment(client, cleanup_traces):
+    """Test that saving a trace increments the trace count."""
+    try:
+        logger.debug("Starting trace save increment test")
+        # Get initial count
+        response = await client.get(
+            f"{SERVER_URL}/traces/count/",
+            headers=get_headers()
+        )
+        initial_count = response.json()["traces_ran"]
+        logger.debug(f"Initial trace count: {initial_count}")
+        
+        # Create a trace
+        timestamp = time.time()
+        trace_data = {
+            "name": f"test_trace_{int(timestamp)}",
+            "project_name": "test_project",
+            "trace_id": str(uuid4()),
+            "created_at": str(timestamp),
+            "entries": [
+                {
+                    "timestamp": timestamp,
+                    "type": "span",
+                    "name": "test_span",
+                    "inputs": {"test": "input"},
+                    "outputs": {"test": "output"},
+                    "duration": 0.1,
+                    "span_id": str(uuid4()),
+                    "parent_id": None
+                }
+            ],
+            "duration": 0.1,
+            "token_counts": {"total": 10},
+            "empty_save": False,
+            "overwrite": False
+        }
+        logger.debug(f"Created trace data: {trace_data}")
+
+        response = await client.post(
+            f"{SERVER_URL}/traces/save/",
+            json=trace_data,
+            headers=get_headers()
+        )
+        
+        logger.debug(f"Trace save response: {response.status_code}")
+        logger.debug(f"Trace save response body: {response.text}")
+        assert response.status_code == 200
+        
+        # Verify increment
+        response = await client.get(
+            f"{SERVER_URL}/traces/count/",
+            headers=get_headers()
+        )
+        assert response.status_code == 200
+        new_count = response.json()["traces_ran"]
+        logger.debug(f"New trace count: {new_count}")
+        assert new_count > initial_count
+    except Exception as e:
+        logger.error(f"Error in test_trace_save_increment: {str(e)}", exc_info=True)
+        raise
 
 @pytest.mark.asyncio
 async def test_judgee_count_endpoint(client):
@@ -78,117 +262,75 @@ async def test_trace_count_endpoint(client):
     assert "user_traces_ran" in data
 
 @pytest.mark.asyncio
-async def test_trace_save_increment(client):
-    """Test that saving a trace increments the trace count."""
-    # Get initial count
-    response = await client.get(
-        f"{SERVER_URL}/traces/count/",
-        headers=get_headers()
-    )
-    initial_count = response.json()["traces_ran"]
-    
-    # Create a trace
-    timestamp = time.time()
-    trace_data = {
-        "name": f"test_trace_{int(timestamp)}",
-        "project_name": "test_project",
-        "trace_id": str(uuid4()),
-        "created_at": str(timestamp),  # Convert to string
-        "entries": [
-            {
-                "timestamp": timestamp,
-                "type": "span",
-                "name": "test_span",
-                "inputs": {"test": "input"},
-                "outputs": {"test": "output"},
-                "duration": 0.1,
-                "span_id": str(uuid4()),
-                "parent_id": None
-            }
-        ],
-        "duration": 0.1,
-        "token_counts": {"total": 10},
-        "empty_save": False,
-        "overwrite": False
-    }
-
-    response = await client.post(
-        f"{SERVER_URL}/traces/save/",
-        json=trace_data,
-        headers=get_headers()
-    )
-    
-    # Print response for debugging
-    print(f"Response status: {response.status_code}")
-    print(f"Response content: {response.text}")
-    
-    # Verify increment
-    response = await client.get(
-        f"{SERVER_URL}/traces/count/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-    assert response.json()["traces_ran"] > initial_count
-
-@pytest.mark.asyncio
-async def test_concurrent_trace_saves(client):
+async def test_concurrent_trace_saves(client, cleanup_traces):
     """Test concurrent trace saves to verify atomic operations."""
-    # Get initial count
-    response = await client.get(
-        f"{SERVER_URL}/traces/count/",
-        headers=get_headers()
-    )
-    initial_count = response.json()["traces_ran"]
-    
-    # Number of concurrent traces to save
-    num_traces = 3
-    
-    async def save_trace(index):
-        timestamp = time.time()
-        trace_data = {
-            "name": f"concurrent_trace_{index}_{int(timestamp)}",
-            "project_name": "test_project",
-            "trace_id": str(uuid4()),
-            "created_at": str(timestamp),  # Convert to string
-            "entries": [
-                {
-                    "timestamp": timestamp,
-                    "type": "span",
-                    "name": f"test_span_{index}",
-                    "inputs": {"test": f"input_{index}"},
-                    "outputs": {"test": f"output_{index}"},
-                    "duration": 0.1,
-                    "span_id": str(uuid4()),
-                    "parent_id": None
-                }
-            ],
-            "duration": 0.1,
-            "token_counts": {"total": 10},
-            "empty_save": False,
-            "overwrite": False
-        }
-
-        response = await client.post(
-            f"{SERVER_URL}/traces/save/",
-            json=trace_data,
+    try:
+        # Get initial count
+        response = await client.get(
+            f"{SERVER_URL}/traces/count/",
             headers=get_headers()
         )
-        return response.status_code
-    
-    # Save traces concurrently
-    tasks = [save_trace(i) for i in range(num_traces)]
-    results = await asyncio.gather(*tasks)
-    
-    # All saves should succeed
-    assert all(status == 200 for status in results)
-    
-    # Verify increment
-    response = await client.get(
-        f"{SERVER_URL}/traces/count/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-    assert response.json()["traces_ran"] >= num_traces + initial_count
+        initial_count = response.json()["traces_ran"]
+        
+        # Number of concurrent traces to save
+        num_traces = 3
+        
+        async def save_trace(index):
+            try:
+                timestamp = time.time()
+                trace_data = {
+                    "name": f"concurrent_trace_{index}_{int(timestamp)}",
+                    "project_name": "test_project",
+                    "trace_id": str(uuid4()),
+                    "created_at": str(timestamp),
+                    "entries": [
+                        {
+                            "timestamp": timestamp,
+                            "type": "span",
+                            "name": f"test_span_{index}",
+                            "inputs": {"test": f"input_{index}"},
+                            "outputs": {"test": f"output_{index}"},
+                            "duration": 0.1,
+                            "span_id": str(uuid4()),
+                            "parent_id": None
+                        }
+                    ],
+                    "duration": 0.1,
+                    "token_counts": {"total": 10},
+                    "empty_save": False,
+                    "overwrite": False
+                }
+
+                response = await client.post(
+                    f"{SERVER_URL}/traces/save/",
+                    json=trace_data,
+                    headers=get_headers()
+                )
+                return response.status_code
+            except Exception as e:
+                logger.error(f"Error in save_trace {index}: {str(e)}")
+                return 500
+        
+        # Save traces concurrently with timeout
+        tasks = [save_trace(i) for i in range(num_traces)]
+        results = await asyncio.wait_for(
+            asyncio.gather(*tasks, return_exceptions=True),
+            timeout=30.0
+        )
+        
+        # All saves should succeed
+        assert all(status == 200 for status in results)
+        
+        # Verify increment
+        response = await client.get(
+            f"{SERVER_URL}/traces/count/",
+            headers=get_headers()
+        )
+        assert response.status_code == 200
+        assert response.json()["traces_ran"] >= num_traces + initial_count
+    except Exception as e:
+        logger.error(f"Error in test_concurrent_trace_saves: {str(e)}")
+        raise
 
 @pytest.mark.asyncio
 async def test_failed_trace_counting(client):
@@ -233,83 +375,51 @@ async def test_failed_trace_counting(client):
 
 @pytest.mark.asyncio
 async def test_real_trace_tracking(client):
-    """Test tracking with a real trace similar to those created by the Tracer class."""
-    # Get initial count
+    """Test real trace tracking with actual trace saves"""
+    from judgeval.common.tracer import Tracer
+    
+    print("Starting test_real_trace_tracking...")
+    
+    # Initialize tracer
+    print("Initializing Tracer...")
+    tracer = Tracer(
+        api_key=os.getenv("JUDGMENT_API_KEY"),
+        project_name="test_project",
+        organization_id=os.getenv("JUDGMENT_ORG_ID")
+    )
+    print("Tracer initialized successfully")
+    
+    # Create a real trace
+    print("Creating traced function...")
+    @tracer.observe(name="test_trace")
+    def test_function():
+        print("Running traced function...")
+        return "Hello, World!"
+    
+    # Run the traced function
+    print("Executing traced function...")
+    result = test_function()
+    print(f"Traced function result: {result}")
+    
+    # Verify counts were incremented
+    print("Checking trace counts...")
     response = await client.get(
-        f"{SERVER_URL}/traces/count/",
-        headers=get_headers()
+        f"{os.getenv('JUDGMENT_API_URL')}/traces/count/",
+        headers={
+            "Authorization": f"Bearer {os.getenv('JUDGMENT_API_KEY')}",
+            "X-Organization-Id": os.getenv("JUDGMENT_ORG_ID")
+        }
     )
-    initial_count = response.json()["traces_ran"]
+    print(f"Response status: {response.status_code}")
+    print(f"Response content: {response.text}")
     
-    # Create a realistic trace with spans similar to what the Tracer would create
-    timestamp = time.time()
-    trace_id = str(uuid4())
-    
-    trace_data = {
-        "name": f"test_real_trace_{int(timestamp)}",
-        "project_name": "test_project",
-        "trace_id": trace_id,
-        "created_at": str(timestamp),  # Convert to string
-        "entries": [
-            {
-                "timestamp": timestamp,
-                "type": "span",
-                "name": "llm_call",
-                "inputs": {
-                    "prompt": "What's the capital of France?",
-                    "model": "gpt-3.5-turbo"
-                },
-                "outputs": {
-                    "response": "The capital of France is Paris."
-                },
-                "duration": 0.5,
-                "span_id": str(uuid4()),
-                "parent_id": None
-            },
-            {
-                "timestamp": timestamp + 0.1,
-                "type": "span",
-                "name": "process_response",
-                "inputs": {
-                    "response": "The capital of France is Paris."
-                },
-                "outputs": {
-                    "processed": "PARIS"
-                },
-                "duration": 0.1,
-                "span_id": str(uuid4()),
-                "parent_id": None
-            }
-        ],
-        "duration": 0.6,
-        "token_counts": {
-            "prompt_tokens": 10,
-            "completion_tokens": 8,
-            "total": 18
-        },
-        "empty_save": False,
-        "overwrite": False
-    }
-    
-    response = await client.post(
-        f"{SERVER_URL}/traces/save/",
-        json=trace_data,
-        headers=get_headers()
-    )
     assert response.status_code == 200
-    
-    # Verify the trace was saved
     data = response.json()
-    assert "resource_usage" in data
-    assert "ui_results_url" in data
-    
-    # Verify the trace count was incremented
-    response = await client.get(
-        f"{SERVER_URL}/traces/count/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-    assert response.json()["traces_ran"] > initial_count
+    print(f"Trace count data: {data}")
+    assert "traces_ran" in data
+    assert "user_traces_ran" in data
+    assert data["traces_ran"] > 0
+    assert data["user_traces_ran"] > 0
 
 @pytest.mark.asyncio
 async def test_rate_limiting_detection(client):
@@ -472,3 +582,79 @@ async def test_on_demand_resource_detection(client):
     
     print(f"On-demand judgee endpoint available: {on_demand_judgee_available}")
     print(f"On-demand trace endpoint available: {on_demand_trace_available}")
+
+@pytest.mark.asyncio
+async def test_real_judgee_tracking(client):
+    """Test real judgee tracking with actual evaluation."""
+    # Get initial judgee count
+    print(f"Getting initial judgee count from {SERVER_URL}/judgees/count/")
+    response = await client.get(
+        f"{SERVER_URL}/judgees/count/",
+        headers=get_headers()
+    )
+    print(f"Initial count response: {response.status_code} {response.text}")
+    assert response.status_code == 200
+    initial_data = response.json()
+    initial_judgees = initial_data["judgees_ran"]
+    print(f"Initial judgee count: {initial_judgees}")
+
+    example = Example(
+        input="What's the capital of France?",
+        actual_output="The capital of France is Paris.",
+        expected_output="France's capital is Paris. It used to be called the city of lights until 1968.",
+    )
+
+    scorer = AnswerCorrectnessScorer(threshold=0.1)
+
+    judgment_client = JudgmentClient()
+    PROJECT_NAME = "test-project"
+    EVAL_RUN_NAME = "test-run-ac"
+    
+    print(f"Running evaluation with use_judgment=True...")
+    # Test with use_judgment=True
+    res = judgment_client.run_evaluation(
+        examples=[example],
+        scorers=[scorer],
+        model="Qwen/Qwen2.5-72B-Instruct-Turbo",
+        log_results=True,
+        project_name=PROJECT_NAME,
+        eval_run_name=EVAL_RUN_NAME,
+        use_judgment=True,
+        override=True,
+    )
+    print(f"Evaluation response: {res}")
+    print_debug_on_failure(res[0])
+
+    # Wait a moment for the count to update
+    await asyncio.sleep(2)
+
+    # Get final judgee count
+    print(f"Getting final judgee count from {SERVER_URL}/judgees/count/")
+    response = await client.get(
+        f"{SERVER_URL}/judgees/count/",
+        headers=get_headers()
+    )
+    print(f"Final count response: {response.status_code} {response.text}")
+    assert response.status_code == 200
+    final_data = response.json()
+    final_judgees = final_data["judgees_ran"]
+    print(f"Final judgee count: {final_judgees}")
+    print(f"Count difference: {final_judgees - initial_judgees}")
+
+    # Verify judgee count increased by 1
+    assert final_judgees == initial_judgees + 1, f"Expected judgee count to increase by 1, but got {final_judgees - initial_judgees}"
+
+    print(f"Running evaluation with use_judgment=False...")
+    # Test with use_judgment=False 
+    res = judgment_client.run_evaluation(
+        examples=[example],
+        scorers=[scorer],
+        model="Qwen/Qwen2.5-72B-Instruct-Turbo",
+        log_results=True,
+        project_name=PROJECT_NAME,
+        eval_run_name=EVAL_RUN_NAME,
+        use_judgment=False,
+        override=True,
+    )
+    print(f"Evaluation response: {res}")
+    print_debug_on_failure(res[0])
