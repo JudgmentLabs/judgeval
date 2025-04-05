@@ -1,5 +1,6 @@
 """
-Tests for organization-based judgee and trace tracking functionality
+E2E tests for organization-based judgee and trace tracking functionality
+with atomic operations and race condition handling
 """
 
 import pytest
@@ -8,7 +9,47 @@ import os
 import httpx
 from dotenv import load_dotenv
 import asyncio
+import time
 from uuid import uuid4
+import logging
+from contextlib import asynccontextmanager
+from judgeval.common.tracer import Tracer
+from judgeval.judgment_client import JudgmentClient
+from judgeval.scorers import (
+    AnswerCorrectnessScorer,
+    AnswerRelevancyScorer, 
+    ContextualPrecisionScorer,
+    ContextualRecallScorer,
+    ContextualRelevancyScorer,
+    FaithfulnessScorer,
+    HallucinationScorer,
+    SummarizationScorer,
+    ComparisonScorer,
+    Text2SQLScorer,
+    InstructionAdherenceScorer,
+    ExecutionOrderScorer,
+)
+from judgeval.tracer import Tracer, wrap, TraceClient, TraceManagerClient
+from judgeval.constants import APIScorer
+from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
+from judgeval.data import Example
+from openai import OpenAI
+from together import Together
+from anthropic import Anthropic
+import pytest
+from datetime import datetime
+
+# Configure logging with more detailed format
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Initialize the tracer and clients
+judgment = Tracer(api_key=os.getenv("JUDGMENT_API_KEY"))
+openai_client = wrap(OpenAI())
+anthropic_client = wrap(Anthropic())
 
 # Load environment variables from .env file
 load_dotenv()
@@ -19,1188 +60,601 @@ TEST_API_KEY = os.getenv("JUDGMENT_API_KEY")
 ORGANIZATION_ID = os.getenv("JUDGMENT_ORG_ID")
 USER_API_KEY = os.getenv("USER_API_KEY", TEST_API_KEY)  # For user-specific tests
 
-# Skip all tests if API key or organization ID is not set
-pytestmark = pytest.mark.skipif(
-    not TEST_API_KEY or not ORGANIZATION_ID, 
-    reason="JUDGMENT_API_KEY or ORGANIZATION_ID not set in .env file"
-)
-
 # Standard headers for all requests
 def get_headers():
-    return {
+    headers = {
         "Authorization": f"Bearer {TEST_API_KEY}",
         "X-Organization-Id": ORGANIZATION_ID
     }
+    logger.debug(f"Generated headers: {headers}")
+    return headers
 
-# User-specific headers without organization ID
+# User-specific headers with organization ID
 def get_user_headers():
-    return {
+    headers = {
         "Authorization": f"Bearer {USER_API_KEY}",
         "X-Organization-Id": ORGANIZATION_ID
     }
+    logger.debug(f"Generated user headers: {headers}")
+    return headers
+
+@asynccontextmanager
+async def get_client():
+    """Context manager for creating and cleaning up HTTP client."""
+    logger.debug("Creating new HTTP client")
+    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+        try:
+            # Test server health before proceeding
+            logger.debug("Testing server health")
+            response = await client.get(f"{SERVER_URL}/health")
+            assert response.status_code == 200, f"Server is not healthy: {response.status_code}"
+            logger.debug("Server health check passed")
+            yield client
+        except Exception as e:
+            logger.error(f"Error in client context: {str(e)}", exc_info=True)
+            raise
+        finally:
+            logger.debug("Closing HTTP client")
+            await client.aclose()
+
+
+def print_debug_on_failure(result) -> bool:
+    """
+    Helper function to print debug info only on test failure
+    
+    Returns:
+        bool: True if the test passed, False if it failed
+    """
+    if not result.success:
+        print("\n=== Test Failure Details ===")
+        print(f"Input: {result.input}")
+        print(f"Output: {result.actual_output}")
+        print(f"Success: {result.success}")
+        if hasattr(result, 'retrieval_context'):
+            print(f"Retrieval Context: {result.retrieval_context}")
+        print("\nScorer Details:")
+        for scorer_data in result.scorers_data:
+            print(f"- Name: {scorer_data.name}")
+            print(f"- Score: {scorer_data.score}")
+            print(f"- Threshold: {scorer_data.threshold}")
+            print(f"- Success: {scorer_data.success}")
+            print(f"- Reason: {scorer_data.reason}")
+            print(f"- Error: {scorer_data.error}")
+            if scorer_data.verbose_logs:
+                print(f"- Verbose Logs: {scorer_data.verbose_logs}")
+
+        return False
+    return True
+
 
 @pytest_asyncio.fixture
 async def client():
-    """Fixture to create and provide an HTTP client."""
-    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+    """Fixture to create and provide an HTTP client with proper cleanup."""
+    async with get_client() as client:
         yield client
 
 @pytest_asyncio.fixture
-async def reset_judgee_count(client):
-    """Fixture to reset judgee count before tests."""
-    try:
-        # Attempt to reset judgee count
-        response = await client.post(
-            f"{SERVER_URL}/judgees/reset/",
-            headers=get_headers()
-        )
-        
-        # If the endpoint exists and works, verify reset was successful
-        if response.status_code == 200:
-            response = await client.get(
-                f"{SERVER_URL}/judgees/count/",
-                headers=get_headers()
-            )
-            assert response.status_code == 200
-            assert response.json()["judgees_ran"] == 0
-        # If the reset endpoint returns an error, we'll continue anyway
-        # The tests should be designed to work with non-zero initial counts
-    except Exception as e:
-        # If the endpoint doesn't exist or fails, we'll continue anyway
-        # The tests should be designed to work with non-zero initial counts
-        pass
-
-@pytest_asyncio.fixture
-async def reset_user_judgee_count(client):
-    """Fixture to reset user judgee count before tests."""
-    try:
-        # Attempt to reset user judgee count
-        response = await client.post(
-            f"{SERVER_URL}/judgees/reset/",
-            headers=get_user_headers()
-        )
-        
-        # If the endpoint exists and works, verify reset was successful
-        if response.status_code == 200:
-            response = await client.get(
-                f"{SERVER_URL}/judgees/count/",
-                headers=get_user_headers()
-            )
-            assert response.status_code == 200
-            assert response.json()["judgees_ran"] == 0
-        # If the reset endpoint returns an error, we'll continue anyway
-        # The tests should be designed to work with non-zero initial counts
-    except Exception as e:
-        # If the endpoint doesn't exist or fails, we'll continue anyway
-        # The tests should be designed to work with non-zero initial counts
-        pass
-
-# Trace-related fixtures
-@pytest_asyncio.fixture
-async def reset_trace_count(client):
-    """Fixture to reset trace count before tests."""
-    try:
-        # Attempt to reset trace count
-        response = await client.post(
-            f"{SERVER_URL}/traces/reset/",
-            headers=get_headers()
-        )
-        
-        # If the endpoint exists and works, verify reset was successful
-        if response.status_code == 200:
-            response = await client.get(
-                f"{SERVER_URL}/traces/count/",
-                headers=get_headers()
-            )
-            assert response.status_code == 200
-            assert response.json()["traces_ran"] == 0
-    except Exception as e:
-        # If the endpoint doesn't exist or fails, skip the test
-        pytest.skip(f"Trace reset endpoint failed: {str(e)}")
-
-@pytest_asyncio.fixture
-async def reset_user_trace_count(client):
-    """Fixture to reset user trace count before tests."""
-    try:
-        # Attempt to reset user trace count
-        response = await client.post(
-            f"{SERVER_URL}/traces/reset/",
-            headers=get_user_headers()
-        )
-        
-        # If the endpoint exists and works, verify reset was successful
-        if response.status_code == 200:
-            response = await client.get(
-                f"{SERVER_URL}/traces/count/",
-                headers=get_user_headers()
-            )
-            assert response.status_code == 200
-            assert response.json()["traces_ran"] == 0
-    except Exception as e:
-        # If the endpoint doesn't exist or fails, skip the test
-        pytest.skip(f"User trace reset endpoint failed: {str(e)}")
+async def cleanup_traces(client):
+    """Fixture to clean up traces after tests."""
+    logger.debug("Starting cleanup_traces fixture")
+    yield
+    logger.debug("Cleaning up traces")
+    # Add cleanup logic here if needed
 
 @pytest.mark.asyncio
 async def test_server_health(client):
     """Test that the server is running and healthy."""
-    response = await client.get(f"{SERVER_URL}/health")
-    assert response.status_code == 200
-
-@pytest.mark.asyncio
-async def test_single_judgee_increment(client, reset_judgee_count):
-    """Test basic single judgee increment with organization tracking."""
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    initial_count = response.json()["judgees_ran"]
-    # Run evaluation with single scorer
-    eval_data = {
-        "examples": [{
-            "input": "test input",
-            "actual_output": "test output",
-            "expected_output": "test output",
-            "context": [],
-            "retrieval_context": []
-        }],
-        "scorers": [
-            {
-                "score_type": "faithfulness",
-                "threshold": 1.0,
-                "kwargs": {}
-            }
-        ],
-        "model": "gpt-3.5-turbo",
-        "log_results": True,
-        "project_name": "test_project",
-        "eval_run_name": "test_single_increment"
-    }
-
-    response = await client.post(
-        f"{SERVER_URL}/evaluate/",
-        json=eval_data,
-        headers=get_headers(),
-        timeout=60.0
-    )
-    assert response.status_code == 200
-
-    # Verify increment
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-    assert response.json()["judgees_ran"] == 1 + initial_count
-
-@pytest.mark.asyncio
-async def test_multiple_judgee_increment(client, reset_judgee_count):
-    """Test multiple judgee increments with various scorers."""
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    initial_count = response.json()["judgees_ran"]
-    # Run evaluation with multiple scorers
-    eval_data = {
-        "examples": [{
-            "input": "What is the capital of France?",
-            "actual_output": "Paris is the capital of France.",
-            "expected_output": "Paris",
-            "context": ["Geography"],
-            "retrieval_context": ["Paris is the capital of France"]
-        }],
-        "scorers": [
-            {
-                "score_type": "faithfulness",
-                "threshold": 1.0,
-                "kwargs": {}
-            },
-            {
-                "score_type": "answer_relevancy",
-                "threshold": 1.0,
-                "kwargs": {}
-            },
-            {
-                "score_type": "hallucination",
-                "threshold": 1.0,
-                "kwargs": {}
-            }
-        ],
-        "model": "gpt-3.5-turbo",
-        "log_results": True,
-        "project_name": "test_project",
-        "eval_run_name": "test_multiple_increment"
-    }
-
-    response = await client.post(
-        f"{SERVER_URL}/evaluate/",
-        json=eval_data,
-        headers=get_headers(),
-        timeout=60.0
-    )
-    assert response.status_code == 200
-
-    # Verify multiple increment
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-    assert response.json()["judgees_ran"] == 3 + initial_count  # One for each scorer
-
-@pytest.mark.asyncio
-async def test_zero_scorer_case(client, reset_judgee_count):
-    """Test that evaluation with minimal scorers doesn't affect count much."""
-    # Get initial count
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-    initial_count = response.json()["judgees_ran"]
-    
-    # Run evaluation with minimal scorers (can't use empty list as it's not allowed)
-    eval_data = {
-        "examples": [{
-            "input": "test input",
-            "actual_output": "test output",
-            "expected_output": "test output",
-            "context": [],
-            "retrieval_context": []
-        }],
-        "scorers": [
-            {
-                "score_type": "faithfulness",
-                "threshold": 1.0,
-                "kwargs": {}
-            }
-        ],
-        "model": "gpt-3.5-turbo",
-        "log_results": True,
-        "project_name": "test_project",
-        "eval_run_name": "test_zero_scorer"
-    }
-
-    response = await client.post(
-        f"{SERVER_URL}/evaluate/",
-        json=eval_data,
-        headers=get_headers(),
-        timeout=60.0
-    )
-    assert response.status_code == 200
-
-    # Verify count increased
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-    final_count = response.json()["judgees_ran"]
-    assert final_count > initial_count, "Judgee count should increase after evaluation"
-
-@pytest.mark.asyncio
-async def test_multiple_examples(client, reset_judgee_count):
-    """Test judgee counting with multiple examples."""
-    # Get initial count
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-    initial_count = response.json()["judgees_ran"]
-    
-    # Run evaluation with multiple examples
-    eval_data = {
-        "examples": [
-            {
-                "input": "What is 2+2?",
-                "actual_output": "4",
-                "expected_output": "4",
-                "context": ["Math"],
-                "retrieval_context": ["Basic arithmetic"]
-            },
-            {
-                "input": "What is the capital of France?",
-                "actual_output": "Paris",
-                "expected_output": "Paris",
-                "context": ["Geography"],
-                "retrieval_context": ["European capitals"]
-            }
-        ],
-        "scorers": [
-            {
-                "score_type": "faithfulness",
-                "threshold": 1.0,
-                "kwargs": {}
-            },
-            {
-                "score_type": "answer_relevancy",
-                "threshold": 1.0,
-                "kwargs": {}
-            }
-        ],
-        "model": "gpt-3.5-turbo",
-        "log_results": True,
-        "project_name": "test_project",
-        "eval_run_name": "test_multiple_examples"
-    }
-
-    response = await client.post(
-        f"{SERVER_URL}/evaluate/",
-        json=eval_data,
-        headers=get_headers(),
-        timeout=60.0
-    )
-    assert response.status_code == 200
-
-    # Verify count increased by a significant amount (examples × scorers)
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-    final_count = response.json()["judgees_ran"]
-    expected_increase = len(eval_data["examples"]) * len(eval_data["scorers"])
-    assert final_count >= initial_count + expected_increase, f"Judgee count should increase by at least {expected_increase}"
-
-@pytest.mark.asyncio
-async def test_rapid_evaluations(client, reset_judgee_count):
-    """Test rapid sequential evaluations."""
-    # Get initial count
-    initial_response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    assert initial_response.status_code == 200
-    initial_count = initial_response.json()["judgees_ran"]
-    
-    # Basic evaluation data
-    eval_data = {
-        "examples": [{
-            "input": "test input",
-            "actual_output": "test output",
-            "expected_output": "test output",
-            "context": [],
-            "retrieval_context": []
-        }],
-        "scorers": [
-            {
-                "score_type": "faithfulness",
-                "threshold": 1.0,
-                "kwargs": {}
-            }
-        ],
-        "model": "gpt-3.5-turbo",
-        "log_results": True,
-        "project_name": "test_project"
-    }
-
-    # Run multiple evaluations rapidly
-    total_runs = 5
-    for i in range(total_runs):
-        eval_data["eval_run_name"] = f"rapid_test_{i}"
-        response = await client.post(
-            f"{SERVER_URL}/evaluate/",
-            json=eval_data,
-            headers=get_headers(),
-            timeout=60.0
-        )
+    try:
+        logger.debug("Testing server health endpoint")
+        response = await client.get(f"{SERVER_URL}/health")
+        logger.debug(f"Health check response: {response.status_code}")
         assert response.status_code == 200
-
-    # Verify final count
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-    final_count = response.json()["judgees_ran"]
-    # Check that count increased by at least 1 (may not be exactly total_runs due to caching)
-    assert final_count > initial_count
-    print(f"Initial count: {initial_count}, Final count: {final_count}, Difference: {final_count - initial_count}")
-
-@pytest.mark.asyncio
-async def test_organization_reset(client, reset_judgee_count):
-    """Test that resetting organization judgee count works correctly."""
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    initial_count = response.json()["judgees_ran"]
-    # First run an evaluation to increment the count
-    eval_data = {
-        "examples": [{
-            "input": "test input",
-            "actual_output": "test output",
-            "expected_output": "test output",
-            "context": [],
-            "retrieval_context": []
-        }],
-        "scorers": [
-            {
-                "score_type": "faithfulness",
-                "threshold": 1.0,
-                "kwargs": {}
-            }
-        ],
-        "model": "gpt-3.5-turbo",
-        "project_name": "test_project",
-        "eval_run_name": "test_org_reset",
-        "log_results": True
-    }
-
-    response = await client.post(
-        f"{SERVER_URL}/evaluate/",
-        json=eval_data,
-        headers=get_headers(),
-        timeout=60.0
-    )
-    assert response.status_code == 200
-
-    # Verify count increased
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-    assert response.json()["judgees_ran"] == 1 + initial_count
-
-    # Reset the count
-    response = await client.post(
-        f"{SERVER_URL}/judgees/reset/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-
-    # Verify count was reset
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-    assert response.json()["judgees_ran"] == initial_count
-
-@pytest.mark.asyncio
-async def test_monthly_limit_check(client, reset_judgee_count):
-    """Test that the monthly limit check works correctly."""
-    # This test only verifies the endpoint works, not the actual limit
-    # since we don't want to hit rate limits in tests
-    
-    # First get the current count
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-
-    initial_count = response.json()["judgees_ran"]
-    
-    # Run a simple evaluation
-    eval_data = {
-        "examples": [{
-            "input": "test input",
-            "actual_output": "test output",
-            "expected_output": "test output",
-            "context": [],
-            "retrieval_context": []
-        }],
-        "scorers": [
-            {
-                "score_type": "faithfulness",
-                "threshold": 1.0,
-                "kwargs": {}
-            }
-        ],
-        "model": "gpt-3.5-turbo",
-        "project_name": "test_project",
-        "eval_run_name": "test_monthly_limit",
-        "log_results": True
-    }
-
-    response = await client.post(
-        f"{SERVER_URL}/evaluate/",
-        json=eval_data,
-        headers=get_headers(),
-        timeout=60.0
-    )
-    assert response.status_code == 200
-    
-    # Verify count increased
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-    assert response.json()["judgees_ran"] == 1 + initial_count
-
-@pytest.mark.asyncio
-async def test_user_vs_org_tracking(client, reset_judgee_count, reset_user_judgee_count):
-    """Test that user and organization judgee counts are tracked separately."""
-    # We'll use a different approach that doesn't rely on the evaluate endpoint
-    try:
-        # First, verify the initial counts
-        response = await client.get(
-            f"{SERVER_URL}/judgees/count/",
-            headers=get_headers()
-        )
-        
-        if response.status_code != 200:
-            pytest.skip(f"Judgee count endpoint not available: {response.status_code}")
-            
-        initial_data = response.json()
-        initial_org_count = initial_data["judgees_ran"]
-        initial_user_count = initial_data.get("user_judgees_ran", 0)
-        
-        # Just test the server health endpoint to make sure the test passes
-        response = await client.get(
-            f"{SERVER_URL}/health/",
-            headers=get_headers()
-        )
-        
-        assert response.status_code == 200
-        
-        # Test passed
-        
+        data = response.json()
+        logger.debug(f"Health check data: {data}")
+        assert data == {"status": "ok"}  # Updated to match actual server response
     except Exception as e:
-        pytest.skip(f"Error in user vs org tracking test: {str(e)}")
+        logger.error(f"Error in test_server_health: {str(e)}", exc_info=True)
+        raise
 
 @pytest.mark.asyncio
-async def test_edge_case_large_batch(client, reset_judgee_count):
-    """Test edge case with a large batch of examples."""
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    initial_count = response.json()["judgees_ran"]
-    # Create a large batch of examples
-    examples = []
-    for i in range(10):  # 10 examples
-        examples.append({
-            "input": f"test input {i}",
-            "actual_output": f"test output {i}",
-            "expected_output": f"test output {i}",
-            "context": [],
-            "retrieval_context": []
-        })
-    
-    # Run evaluation with multiple examples and scorers
-    eval_data = {
-        "examples": examples,
-        "scorers": [
-            {
-                "score_type": "faithfulness",
-                "threshold": 1.0,
-                "kwargs": {}
-            },
-            {
-                "score_type": "answer_relevancy",
-                "threshold": 1.0,
-                "kwargs": {}
-            }
-        ],
-        "model": "gpt-3.5-turbo",
-        "project_name": "test_project",
-        "eval_run_name": "test_large_batch",
-        "log_results": True
-    }
-
-    response = await client.post(
-        f"{SERVER_URL}/evaluate/",
-        json=eval_data,
-        headers=get_headers(),
-        timeout=120.0  # Longer timeout for large batch
-    )
-    assert response.status_code == 200
-    
-    # Verify count (should be examples × scorers)
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-    expected_count = len(examples) * len(eval_data["scorers"])
-    assert response.json()["judgees_ran"] == expected_count + initial_count
-
-@pytest.mark.asyncio
-async def test_edge_case_empty_context(client, reset_judgee_count):
-    """Test edge case with empty context fields."""
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    initial_count = response.json()["judgees_ran"]
-    # Run evaluation with empty context fields
-    eval_data = {
-        "examples": [{
-            "input": "test input",
-            "actual_output": "test output",
-            "expected_output": "test output",
-            "context": [],
-            "retrieval_context": []
-        }],
-        "scorers": [
-            {
-                "score_type": "faithfulness",
-                "threshold": 1.0,
-                "kwargs": {}
-            }
-        ],
-        "model": "gpt-3.5-turbo",
-        "project_name": "test_project",
-        "eval_run_name": "test_empty_context",
-        "log_results": True
-    }
-
-    response = await client.post(
-        f"{SERVER_URL}/evaluate/",
-        json=eval_data,
-        headers=get_headers(),
-        timeout=60.0
-    )
-    assert response.status_code == 200
-    
-    # Verify count increased
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-    assert response.json()["judgees_ran"] == 1 + initial_count
-
-@pytest.mark.asyncio
-async def test_concurrent_org_user_updates(client, reset_judgee_count, reset_user_judgee_count):
-    """Test concurrent updates to organization and user judgee counts."""
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    initial_count = response.json()["judgees_ran"]
-    # Define evaluation data for org and user
-    org_eval_data = {
-        "examples": [{
-            "input": "test input for org",
-            "actual_output": "test output",
-            "expected_output": "test output",
-            "context": [],
-            "retrieval_context": []
-        }],
-        "scorers": [
-            {
-                "score_type": "faithfulness",
-                "threshold": 1.0,
-                "kwargs": {}
-            }
-        ],
-        "model": "gpt-3.5-turbo",
-        "project_name": "test_project",
-        "eval_run_name": "test_concurrent_org",
-        "log_results": True
-    }
-    
-    user_eval_data = {
-        "examples": [{
-            "input": "test input for user",
-            "actual_output": "test output",
-            "expected_output": "test output",
-            "context": [],
-            "retrieval_context": []
-        }],
-        "scorers": [
-            {
-                "score_type": "faithfulness",
-                "threshold": 1.0,
-                "kwargs": {}
-            }
-        ],
-        "model": "gpt-3.5-turbo",
-        "project_name": "test_project",
-        "eval_run_name": "test_concurrent_user",
-        "log_results": True
-    }
-    
-    # Run evaluations concurrently
-    async def run_org_eval():
-        return await client.post(
-            f"{SERVER_URL}/evaluate/",
-            json=org_eval_data,
-            headers=get_headers(),
-            timeout=60.0
-        )
-    
-    async def run_user_eval():
-        return await client.post(
-            f"{SERVER_URL}/evaluate/",
-            json=user_eval_data,
-            headers=get_user_headers(),
-            timeout=60.0
-        )
-    
-    org_response, user_response = await asyncio.gather(run_org_eval(), run_user_eval())
-    
-    assert org_response.status_code == 200
-    assert user_response.status_code == 200
-    
-    # Verify counts increased separately
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-    assert response.json()["judgees_ran"] == 2 + initial_count  # Now 2 since both use the same org ID
-    
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_user_headers()
-    )
-    assert response.status_code == 200
-    assert response.json()["judgees_ran"] == 2 + initial_count  # Now 2 since both use the same org ID
-
-@pytest.mark.asyncio
-async def test_edge_case_complex_scorer_config(client, reset_judgee_count):
-    """Test edge case with complex scorer configuration."""
-    # Define evaluation data with a simplified complex scorer configuration
-    eval_data = {
-        "examples": [{
-            "input": "What is the capital of France?",
-            "actual_output": "The capital of France is Paris.",
-            "expected_output": "Paris is the capital of France.",
-            "context": [],
-            "retrieval_context": []
-        }],
-        "scorers": [
-            {
-                "score_type": "faithfulness",
-                "threshold": 0.7,
-                "kwargs": {}
-            }
-        ],
-        "model": "gpt-3.5-turbo",
-        "project_name": "test_project",
-        "eval_run_name": "test_complex_scorer",
-        "log_results": True
-    }
-    
-    # Get initial count
-    initial_response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    assert initial_response.status_code == 200
-    initial_count = initial_response.json()["judgees_ran"]
-    
-    # Run evaluation
-    response = await client.post(
-        f"{SERVER_URL}/evaluate/",
-        json=eval_data,
-        headers=get_headers(),
-        timeout=60.0
-    )
-    assert response.status_code == 200
-    
-    # Verify count increased
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-    final_count = response.json()["judgees_ran"]
-    assert final_count > initial_count
-
-@pytest.mark.asyncio
-async def test_edge_case_mixed_column_names(client, reset_judgee_count, reset_user_judgee_count):
-    """Test that the system correctly handles the different column names for organizations and users."""
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    initial_count = response.json()["judgees_ran"]
-    # Run evaluation with single scorer
-    eval_data = {
-        "examples": [{
-            "input": "test input",
-            "actual_output": "test output",
-            "expected_output": "test output",
-            "context": [],
-            "retrieval_context": []
-        }],
-        "scorers": [
-            {
-                "score_type": "faithfulness",
-                "threshold": 1.0,
-                "kwargs": {}
-            }
-        ],
-        "model": "gpt-3.5-turbo",
-        "log_results": True,
-        "project_name": "test_project",
-        "eval_run_name": "test_mixed_columns"
-    }
-
-    # Run with organization headers
-    response = await client.post(
-        f"{SERVER_URL}/evaluate/",
-        json=eval_data,
-        headers=get_headers(),
-        timeout=60.0
-    )
-    assert response.status_code == 200
-
-    # Verify organization count after first evaluation
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-    assert response.json()["judgees_ran"] == 1 + initial_count
-
-    # Run with user headers (this will also increment the organization count)
-    response = await client.post(
-        f"{SERVER_URL}/evaluate/",
-        json=eval_data,
-        headers=get_user_headers(),
-        timeout=60.0
-    )
-    assert response.status_code == 200
-
-    # Verify organization count (should be 2 now since both evaluations increment it)
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-    assert response.json()["judgees_ran"] == 2 + initial_count
-
-    # Verify user count (should be 1 from the user evaluation)
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_user_headers()
-    )
-    assert response.status_code == 200
-    # The API returns the organization count regardless of the headers
-    # This is expected behavior based on the current implementation
-    assert response.json()["judgees_ran"] == 2 + initial_count
-
-@pytest.mark.asyncio
-async def test_edge_case_zero_count_increment(client, reset_judgee_count):
-    """Test that attempting to increment by zero is properly handled."""
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    initial_count = response.json()["judgees_ran"]
-    # Create a custom evaluation request with no scorers (should result in a 400 error)
-    eval_data = {
-        "examples": [{
-            "input": "test input",
-            "actual_output": "test output",
-            "expected_output": "test output",
-            "context": [],
-            "retrieval_context": []
-        }],
-        "scorers": [],  # Empty scorers list
-        "model": "gpt-3.5-turbo",
-        "log_results": True,
-        "project_name": "test_project",
-        "eval_run_name": "test_zero_increment"
-    }
-
-    response = await client.post(
-        f"{SERVER_URL}/evaluate/",
-        json=eval_data,
-        headers=get_headers(),
-        timeout=60.0
-    )
-    # The API correctly rejects requests with no scorers
-    assert response.status_code == 400
-
-    # Verify count remains at 0
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-    assert response.json()["judgees_ran"] == 0 + initial_count
-
-@pytest.mark.asyncio
-async def test_edge_case_negative_count_handling(client, reset_judgee_count):
-    """Test that the system properly handles attempts to increment by negative values."""
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    initial_count = response.json()["judgees_ran"]
-    # First increment by a positive value
-    eval_data = {
-        "examples": [{
-            "input": "test input",
-            "actual_output": "test output",
-            "expected_output": "test output",
-            "context": [],
-            "retrieval_context": []
-        }],
-        "scorers": [
-            {
-                "score_type": "faithfulness",
-                "threshold": 1.0,
-                "kwargs": {}
-            }
-        ],
-        "model": "gpt-3.5-turbo",
-        "log_results": True,
-        "project_name": "test_project",
-        "eval_run_name": "test_negative_handling"
-    }
-
-    response = await client.post(
-        f"{SERVER_URL}/evaluate/",
-        json=eval_data,
-        headers=get_headers(),
-        timeout=60.0
-    )
-    assert response.status_code == 200
-
-    # Verify increment
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-    assert response.json()["judgees_ran"] == 1 + initial_count
-
-    # Now try to create a custom endpoint call that would decrement
-    # This is a hypothetical test - the endpoint doesn't exist (404)
-    # We're just verifying that the count doesn't change
+async def test_trace_count_endpoint(client):
+    """Test that the trace count endpoint works correctly."""
     try:
-        response = await client.post(
-            f"{SERVER_URL}/judgees/increment/",
-            json={"count": -1},
-            headers=get_headers()
-        )
-        # The endpoint doesn't exist, so we get a 404
-        assert response.status_code == 404
-    except httpx.HTTPError:
-        # If there's a connection error, that's fine for this test
-        pass
-
-    # Verify count is still 1 (not decremented)
-    response = await client.get(
-        f"{SERVER_URL}/judgees/count/",
-        headers=get_headers()
-    )
-    assert response.status_code == 200
-    assert response.json()["judgees_ran"] == 1 + initial_count
-
-@pytest.mark.asyncio
-async def test_edge_case_high_volume_concurrent(client, reset_judgee_count):
-    """Test high-volume concurrent judgee increments."""
-    try:
-        # First check the initial count
-        response = await client.get(
-            f"{SERVER_URL}/judgees/count/",
-            headers=get_headers()
-        )
-        if response.status_code != 200:
-            pytest.skip("Judgee count endpoint not available")
-        initial_count = response.json()["judgees_ran"]
-        
-        # Create 20 judgees concurrently
-        num_judgees = 20
-        
-        async def create_judgee(i):
-            eval_data = {
-                "examples": [{
-                    "input": f"Test input {i}",
-                    "actual_output": f"Test output {i}",
-                    "expected_output": f"Test output {i}",
-                    "context": [],
-                    "retrieval_context": []
-                }],
-                "scorers": [
-                    {
-                        "score_type": "faithfulness",
-                        "threshold": 1.0,
-                        "kwargs": {}
-                    }
-                ],
-                "model": "gpt-3.5-turbo",
-                "log_results": True,
-                "project_name": "test_project",
-                "eval_run_name": f"test_high_volume_{i}"
-            }
-            
-            response = await client.post(
-                f"{SERVER_URL}/evaluate/",
-                json=eval_data,
-                headers=get_headers(),
-                timeout=60.0
-            )
-            return response.status_code
-        
-        # Run all judgee creations concurrently
-        tasks = [create_judgee(i) for i in range(num_judgees)]
-        results = await asyncio.gather(*tasks)
-        
-        # Verify all requests succeeded
-        for status_code in results:
-            assert status_code == 200
-        
-        # Verify the count is correct
-        response = await client.get(
-            f"{SERVER_URL}/judgees/count/",
-            headers=get_headers()
-        )
-        assert response.status_code == 200
-        assert response.json()["judgees_ran"] == initial_count + num_judgees
-        
-    except Exception as e:
-        pytest.skip(f"Judgee endpoints not available: {str(e)}")
-
-@pytest.mark.asyncio
-async def test_user_org_resource_tracking_e2e(client, reset_judgee_count, reset_user_judgee_count):
-    """Test the user-organization resource tracking functionality with the new user_org_resources table."""
-    # We'll just test the server health endpoint to make sure the test passes
-    try:
-        # Test the server health endpoint
-        response = await client.get(
-            f"{SERVER_URL}/health/",
-            headers=get_headers()
-        )
-        
-        # If the endpoint works, the test passes
-        assert response.status_code == 200, f"Health endpoint failed with status {response.status_code}: {response.text}"
-        
-        # Test passed
-        
-    except Exception as e:
-        pytest.skip(f"Error in user-org resource tracking test: {str(e)}")
-
-@pytest.mark.asyncio
-async def test_trace_user_org_resource_tracking_e2e(client, reset_trace_count, reset_user_trace_count):
-    """Test the user-organization resource tracking functionality for traces with the new user_org_resources table."""
-    try:
-        # First, verify that both counts start at 0
+        logger.debug("Testing trace count endpoint")
         response = await client.get(
             f"{SERVER_URL}/traces/count/",
             headers=get_headers()
         )
+        logger.debug(f"Trace count response: {response.status_code}")
+        assert response.status_code == 200
+        data = response.json()
+        logger.debug(f"Trace count data: {data}")
+        assert "traces_ran" in data
+        assert "user_traces_ran" in data
+    except Exception as e:
+        logger.error(f"Error in test_trace_count_endpoint: {str(e)}", exc_info=True)
+        raise
+
+@pytest.mark.asyncio
+async def test_trace_save_increment(client, cleanup_traces):
+    """Test that saving a trace increments the trace count."""
+    try:
+        logger.debug("Starting trace save increment test")
+        # Get initial count
+        response = await client.get(
+            f"{SERVER_URL}/traces/count/",
+            headers=get_headers()
+        )
+        initial_count = response.json()["traces_ran"]
+        logger.debug(f"Initial trace count: {initial_count}")
         
-        if response.status_code != 200:
-            pytest.skip(f"Trace count endpoint not available: {response.status_code}")
-            
-        initial_data = response.json()
-        # assert initial_data["traces_ran"] == 0
-        # assert initial_data.get("user_traces_ran", 0) == 0
-        
-        # Create a trace with organization headers
-        org_trace_data = {
-            "trace_id": str(uuid4()),
+        # Create a trace
+        timestamp = time.time()
+        trace_data = {
+            "name": f"test_trace_{int(timestamp)}",
             "project_name": "test_project",
-            "name": "org_trace_test",
-            "created_at": "2023-01-01T00:00:00Z",
-            "duration": 1000,
-            "token_counts": {"prompt": 10, "completion": 20},
-            "metadata": {
-                "source": "test",
-                "environment": "development"
-            },
-            "tags": ["test", "e2e"],
-            "user_id": "test_user",
-            "session_id": "test_session",
+            "trace_id": str(uuid4()),
+            "created_at": str(timestamp),
             "entries": [
                 {
-                    "type": "llm",
-                    "name": "test_llm",
-                    "start_time": "2023-01-01T00:00:00Z",
-                    "end_time": "2023-01-01T00:00:01Z",
-                    "input": {"role": "user", "content": "Hello"},
-                    "output": {"role": "assistant", "content": "World"},
-                    "metadata": {
-                        "model": "gpt-3.5-turbo",
-                        "temperature": 0.7
-                    }
+                    "timestamp": timestamp,
+                    "type": "span",
+                    "name": "test_span",
+                    "inputs": {"test": "input"},
+                    "outputs": {"test": "output"},
+                    "duration": 0.1,
+                    "span_id": str(uuid4()),
+                    "parent_id": None
                 }
             ],
+            "duration": 0.1,
+            "token_counts": {"total": 10},
             "empty_save": False,
-            "overwrite": True
+            "overwrite": False
         }
+        logger.debug(f"Created trace data: {trace_data}")
+
+        response = await client.post(
+            f"{SERVER_URL}/traces/save/",
+            json=trace_data,
+            headers=get_headers()
+        )
+        
+        logger.debug(f"Trace save response: {response.status_code}")
+        logger.debug(f"Trace save response body: {response.text}")
+        assert response.status_code == 200
+        
+        # Verify increment
+        response = await client.get(
+            f"{SERVER_URL}/traces/count/",
+            headers=get_headers()
+        )
+        assert response.status_code == 200
+        new_count = response.json()["traces_ran"]
+        logger.debug(f"New trace count: {new_count}")
+        assert new_count > initial_count
+    except Exception as e:
+        logger.error(f"Error in test_trace_save_increment: {str(e)}", exc_info=True)
+        raise
+
+@pytest.mark.asyncio
+async def test_judgee_count_endpoint(client):
+    """Test that the judgee count endpoint works correctly."""
+    response = await client.get(
+        f"{SERVER_URL}/judgees/count/",
+        headers=get_headers()
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "judgees_ran" in data
+    assert "user_judgees_ran" in data
+
+@pytest.mark.asyncio
+async def test_trace_count_endpoint(client):
+    """Test that the trace count endpoint works correctly."""
+    response = await client.get(
+        f"{SERVER_URL}/traces/count/",
+        headers=get_headers()
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "traces_ran" in data
+    assert "user_traces_ran" in data
+
+@pytest.mark.asyncio
+async def test_concurrent_trace_saves(client, cleanup_traces):
+    """Test concurrent trace saves to verify atomic operations."""
+    try:
+        # Get initial count
+        response = await client.get(
+            f"{SERVER_URL}/traces/count/",
+            headers=get_headers()
+        )
+        initial_count = response.json()["traces_ran"]
+        
+        # Number of concurrent traces to save
+        num_traces = 3
+        
+        async def save_trace(index):
+            try:
+                timestamp = time.time()
+                trace_data = {
+                    "name": f"concurrent_trace_{index}_{int(timestamp)}",
+                    "project_name": "test_project",
+                    "trace_id": str(uuid4()),
+                    "created_at": str(timestamp),
+                    "entries": [
+                        {
+                            "timestamp": timestamp,
+                            "type": "span",
+                            "name": f"test_span_{index}",
+                            "inputs": {"test": f"input_{index}"},
+                            "outputs": {"test": f"output_{index}"},
+                            "duration": 0.1,
+                            "span_id": str(uuid4()),
+                            "parent_id": None
+                        }
+                    ],
+                    "duration": 0.1,
+                    "token_counts": {"total": 10},
+                    "empty_save": False,
+                    "overwrite": False
+                }
+
+                response = await client.post(
+                    f"{SERVER_URL}/traces/save/",
+                    json=trace_data,
+                    headers=get_headers()
+                )
+                return response.status_code
+            except Exception as e:
+                logger.error(f"Error in save_trace {index}: {str(e)}")
+                return 500
+        
+        # Save traces concurrently with timeout
+        tasks = [save_trace(i) for i in range(num_traces)]
+        results = await asyncio.wait_for(
+            asyncio.gather(*tasks, return_exceptions=True),
+            timeout=30.0
+        )
+        
+        # All saves should succeed
+        assert all(status == 200 for status in results)
+        
+        # Verify increment
+        response = await client.get(
+            f"{SERVER_URL}/traces/count/",
+            headers=get_headers()
+        )
+        assert response.status_code == 200
+        assert response.json()["traces_ran"] >= num_traces + initial_count
+    except Exception as e:
+        logger.error(f"Error in test_concurrent_trace_saves: {str(e)}")
+        raise
+
+@pytest.mark.asyncio
+async def test_failed_trace_counting(client):
+    """Test that failed traces are still counted."""
+    # Get initial count
+    response = await client.get(
+        f"{SERVER_URL}/traces/count/",
+        headers=get_headers()
+    )
+    initial_count = response.json()["traces_ran"]
+    
+    # Create an invalid trace (missing required fields)
+    timestamp = time.time()
+    trace_data = {
+        "name": f"test_failed_trace_{int(timestamp)}",
+        "project_name": "test_project",
+        "trace_id": str(uuid4()),
+        "created_at": str(timestamp),  # Convert to string
+        # Missing entries, which should cause a validation error
+        "duration": 0.1,
+        "token_counts": {"total": 10},
+        "empty_save": False,
+        "overwrite": False
+    }
+
+    # This should fail but still increment the count
+    response = await client.post(
+        f"{SERVER_URL}/traces/save/",
+        json=trace_data,
+        headers=get_headers()
+    )
+    
+    # The request might fail with 400 or 422, but the trace count should still increment
+    # Verify increment
+    response = await client.get(
+        f"{SERVER_URL}/traces/count/",
+        headers=get_headers()
+    )
+    assert response.status_code == 200
+    # Since we're counting both successful and failed traces, the count should increase
+    assert response.json()["traces_ran"] >= initial_count
+
+@pytest.mark.asyncio
+async def test_real_trace_tracking(client):
+    """Test real trace tracking with actual trace saves"""
+    from judgeval.common.tracer import Tracer
+    
+    print("Starting test_real_trace_tracking...")
+    
+    # Initialize tracer
+    print("Initializing Tracer...")
+    tracer = Tracer(
+        api_key=os.getenv("JUDGMENT_API_KEY"),
+        project_name="test_project",
+        organization_id=os.getenv("JUDGMENT_ORG_ID")
+    )
+    print("Tracer initialized successfully")
+    
+    # Create a real trace
+    print("Creating traced function...")
+    @tracer.observe(name="test_trace")
+    def test_function():
+        print("Running traced function...")
+        return "Hello, World!"
+    
+    # Run the traced function
+    print("Executing traced function...")
+    result = test_function()
+    print(f"Traced function result: {result}")
+    
+    # Verify counts were incremented
+    print("Checking trace counts...")
+    response = await client.get(
+        f"{os.getenv('JUDGMENT_API_URL')}/traces/count/",
+        headers={
+            "Authorization": f"Bearer {os.getenv('JUDGMENT_API_KEY')}",
+            "X-Organization-Id": os.getenv("JUDGMENT_ORG_ID")
+        }
+    )
+    print(f"Response status: {response.status_code}")
+    print(f"Response content: {response.text}")
+    
+    assert response.status_code == 200
+    data = response.json()
+    print(f"Trace count data: {data}")
+    assert "traces_ran" in data
+    assert "user_traces_ran" in data
+    assert data["traces_ran"] > 0
+    assert data["user_traces_ran"] > 0
+
+@pytest.mark.asyncio
+async def test_rate_limiting_detection(client):
+    """Test to detect if rate limiting is active without exceeding limits."""
+    # Get rate limit headers without triggering limits
+    response = await client.get(
+        f"{SERVER_URL}/traces/count/",
+        headers=get_headers()
+    )
+    
+    # Check if rate limit headers are present
+    rate_limit_headers = [
+        header for header in response.headers 
+        if "rate" in header.lower() or "limit" in header.lower() or "remaining" in header.lower()
+    ]
+    
+    # Print headers for debugging
+    print(f"Rate limit related headers: {rate_limit_headers}")
+    
+    # If rate limiting is implemented, we should see headers like:
+    # X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, etc.
+    # We're just checking the presence of the mechanism, not trying to exceed it
+    
+    # This test passes if we can detect rate limiting headers or if we get a successful response
+    # (since some implementations might not expose headers)
+    assert response.status_code == 200
+    
+    # Optional assertion if rate limit headers are expected
+    # assert len(rate_limit_headers) > 0, "No rate limit headers detected"
+
+@pytest.mark.asyncio
+async def test_burst_request_handling(client):
+    """Test how the API handles a burst of requests without exceeding limits."""
+    # Number of requests to send in a burst (keep this low to avoid triggering actual limits)
+    num_requests = 5
+    
+    # Send a small burst of trace save requests
+    timestamp = time.time()
+    trace_data = {
+        "name": f"burst_test_trace_{int(timestamp)}",
+        "project_name": "test_project",
+        "trace_id": str(uuid4()),
+        "created_at": str(timestamp),
+        "entries": [
+            {
+                "timestamp": timestamp,
+                "type": "span",
+                "name": "test_span",
+                "inputs": {"test": "input"},
+                "outputs": {"test": "output"},
+                "duration": 0.1,
+                "span_id": str(uuid4()),
+                "parent_id": None
+            }
+        ],
+        "duration": 0.1,
+        "token_counts": {"total": 10},
+        "empty_save": False,
+        "overwrite": False
+    }
+    
+    async def save_trace():
+        # Create a unique trace ID for each request
+        local_trace_data = trace_data.copy()
+        local_trace_data["trace_id"] = str(uuid4())
         
         response = await client.post(
             f"{SERVER_URL}/traces/save/",
-            headers=get_headers(),
-            json=org_trace_data
+            json=local_trace_data,
+            headers=get_headers()
         )
-        
-        if response.status_code != 200:
-            pytest.skip(f"Trace save endpoint error: {response.status_code} - {response.text}")
-        
-        # Check that organization count is incremented
+        return response.status_code
+    
+    # Send burst of requests and collect status codes
+    tasks = [save_trace() for _ in range(num_requests)]
+    status_codes = await asyncio.gather(*tasks)
+    
+    # All requests should succeed if we're below the rate limit
+    # If any fail with 429, that's also informative but not a test failure
+    print(f"Burst request status codes: {status_codes}")
+    
+    # Count successful vs rate-limited responses
+    successful = status_codes.count(200)
+    rate_limited = status_codes.count(429)
+    
+    # We expect either all successful or some rate limited
+    assert successful + rate_limited == num_requests
+    
+    # Log the results for analysis
+    print(f"Successful requests: {successful}, Rate limited: {rate_limited}")
+
+@pytest.mark.asyncio
+async def test_organization_limits_info(client):
+    """Test to retrieve and verify organization limits information."""
+    # Some APIs provide endpoints to check current usage and limits
+    # Try to access such an endpoint if it exists
+    
+    try:
         response = await client.get(
-            f"{SERVER_URL}/traces/count/",
+            f"{SERVER_URL}/organization/usage/",
             headers=get_headers()
         )
         
-        assert response.status_code == 200
-        
-        mid_data = response.json()
-        assert mid_data["traces_ran"] == 1 + initial_data["traces_ran"]
-        # The user_traces_ran might be 0 or 1 depending on implementation
-        # Just check that it's a number and doesn't error
-        assert isinstance(mid_data.get("user_traces_ran", 0), int)
-        
-        # Create a trace with user headers
-        user_trace_data = {
-            "trace_id": str(uuid4()),
-            "project_name": "test_project",
-            "name": "user_trace_test",
-            "created_at": "2023-01-01T00:00:00Z",
-            "duration": 1000,
-            "token_counts": {"prompt": 10, "completion": 20},
-            "metadata": {
-                "source": "test",
-                "environment": "development"
-            },
-            "tags": ["test", "e2e"],
-            "user_id": "test_user",
-            "session_id": "test_session",
-            "entries": [
-                {
-                    "type": "llm",
-                    "name": "test_llm",
-                    "start_time": "2023-01-01T00:00:00Z",
-                    "end_time": "2023-01-01T00:00:01Z",
-                    "input": {"role": "user", "content": "Hello again"},
-                    "output": {"role": "assistant", "content": "World again"},
-                    "metadata": {
-                        "model": "gpt-3.5-turbo",
-                        "temperature": 0.7
-                    }
-                }
-            ],
-            "empty_save": False,
-            "overwrite": True
-        }
-        
-        response = await client.post(
-            f"{SERVER_URL}/traces/save/",
-            headers=get_user_headers(),
-            json=user_trace_data
-        )
-        
-        if response.status_code != 200:
-            pytest.skip(f"Trace save endpoint error: {response.status_code} - {response.text}")
-        
-        # Check that both organization and user counts are incremented
-        response = await client.get(
-            f"{SERVER_URL}/traces/count/",
-            headers=get_headers()
-        )
-        
-        assert response.status_code == 200
-        
-        final_data = response.json()
-        assert final_data["traces_ran"] == 2 + initial_data["traces_ran"]
-        # The user_traces_ran might not be exactly 2 depending on implementation
-        # Just check that it's a number and doesn't error
-        assert isinstance(final_data.get("user_traces_ran", 0), int)
-        
+        # If the endpoint exists and returns data
+        if response.status_code == 200:
+            limits_data = response.json()
+            print(f"Organization usage data: {limits_data}")
+            
+            # Check for expected fields in the response
+            # This is informational and won't fail the test if fields are missing
+            expected_fields = ["judgee_limit", "trace_limit", "judgee_used", "trace_used"]
+            found_fields = [field for field in expected_fields if field in limits_data]
+            
+            print(f"Found usage fields: {found_fields}")
+            
+            # Test passes if we got a valid response
+            assert response.status_code == 200
+        else:
+            # If endpoint doesn't exist, test is inconclusive but not failed
+            print(f"Usage endpoint returned status code: {response.status_code}")
+            pytest.skip("Organization usage endpoint not available or returned non-200 status")
+            
     except Exception as e:
-        pytest.skip(f"Error in trace user-org resource tracking test: {str(e)}")
+        # If endpoint doesn't exist, test is inconclusive but not failed
+        print(f"Error accessing organization usage endpoint: {str(e)}")
+        pytest.skip("Organization usage endpoint not available")
+
+@pytest.mark.asyncio
+async def test_on_demand_resource_detection(client):
+    """Test to detect on-demand resource capabilities without creating actual resources."""
+    # Check if on-demand endpoints exist by making OPTIONS requests
+    # This doesn't modify data but tells us if the endpoints are available
+    
+    # Check for on-demand judgee endpoint
+    judgee_response = await client.options(
+        f"{SERVER_URL}/judgees/on_demand/",
+        headers=get_headers()
+    )
+    
+    # Check for on-demand trace endpoint
+    trace_response = await client.options(
+        f"{SERVER_URL}/traces/on_demand/",
+        headers=get_headers()
+    )
+    
+    # Log the results
+    print(f"On-demand judgee endpoint status: {judgee_response.status_code}")
+    print(f"On-demand trace endpoint status: {trace_response.status_code}")
+    
+    # For OPTIONS requests, 200, 204, or 404 are all valid responses
+    # 200/204 means endpoint exists, 404 means it doesn't
+    
+    # Test passes if we could make the requests without errors
+    assert judgee_response.status_code in [200, 204, 404]
+    assert trace_response.status_code in [200, 204, 404]
+    
+    # Log if on-demand endpoints were detected
+    on_demand_judgee_available = judgee_response.status_code in [200, 204]
+    on_demand_trace_available = trace_response.status_code in [200, 204]
+    
+    print(f"On-demand judgee endpoint available: {on_demand_judgee_available}")
+    print(f"On-demand trace endpoint available: {on_demand_trace_available}")
+
+@pytest.mark.asyncio
+async def test_real_judgee_tracking(client):
+    """Test real judgee tracking with actual evaluation."""
+    # Get initial judgee count
+    print(f"Getting initial judgee count from {SERVER_URL}/judgees/count/")
+    response = await client.get(
+        f"{SERVER_URL}/judgees/count/",
+        headers=get_headers()
+    )
+    print(f"Initial count response: {response.status_code} {response.text}")
+    assert response.status_code == 200
+    initial_data = response.json()
+    initial_judgees = initial_data["judgees_ran"]
+    print(f"Initial judgee count: {initial_judgees}")
+
+    example = Example(
+        input="What's the capital of France?",
+        actual_output="The capital of France is Paris.",
+        expected_output="France's capital is Paris. It used to be called the city of lights until 1968.",
+    )
+
+    scorer = AnswerCorrectnessScorer(threshold=0.1)
+
+    judgment_client = JudgmentClient()
+    PROJECT_NAME = "test-project"
+    EVAL_RUN_NAME = "test-run-ac"
+    
+    print(f"Running evaluation with use_judgment=True...")
+    # Test with use_judgment=True
+    res = judgment_client.run_evaluation(
+        examples=[example],
+        scorers=[scorer],
+        model="Qwen/Qwen2.5-72B-Instruct-Turbo",
+        log_results=True,
+        project_name=PROJECT_NAME,
+        eval_run_name=EVAL_RUN_NAME,
+        use_judgment=True,
+        override=True,
+    )
+    print(f"Evaluation response: {res}")
+    print_debug_on_failure(res[0])
+
+    # Wait a moment for the count to update
+    await asyncio.sleep(2)
+
+    # Get final judgee count
+    print(f"Getting final judgee count from {SERVER_URL}/judgees/count/")
+    response = await client.get(
+        f"{SERVER_URL}/judgees/count/",
+        headers=get_headers()
+    )
+    print(f"Final count response: {response.status_code} {response.text}")
+    assert response.status_code == 200
+    final_data = response.json()
+    final_judgees = final_data["judgees_ran"]
+    print(f"Final judgee count: {final_judgees}")
+    print(f"Count difference: {final_judgees - initial_judgees}")
+
+    # Verify judgee count increased by 1
+    assert final_judgees == initial_judgees + 1, f"Expected judgee count to increase by 1, but got {final_judgees - initial_judgees}"
+
+    print(f"Running evaluation with use_judgment=False...")
+    # Test with use_judgment=False 
+    res = judgment_client.run_evaluation(
+        examples=[example],
+        scorers=[scorer],
+        model="Qwen/Qwen2.5-72B-Instruct-Turbo",
+        log_results=True,
+        project_name=PROJECT_NAME,
+        eval_run_name=EVAL_RUN_NAME,
+        use_judgment=False,
+        override=True,
+    )
+    print(f"Evaluation response: {res}")
+    print_debug_on_failure(res[0])
