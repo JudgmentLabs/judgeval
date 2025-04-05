@@ -27,7 +27,8 @@ from judgeval.constants import (
     JUDGMENT_EVAL_FETCH_API_URL, 
     JUDGMENT_EVAL_DELETE_API_URL, 
     JUDGMENT_EVAL_DELETE_PROJECT_API_URL,
-    JUDGMENT_PROJECT_DELETE_API_URL
+    JUDGMENT_PROJECT_DELETE_API_URL,
+    JUDGMENT_PROJECT_CREATE_API_URL
 )
 from judgeval.common.exceptions import JudgmentAPIError
 from pydantic import BaseModel
@@ -43,8 +44,16 @@ class DeleteEvalRunRequestBody(BaseModel):
     project_name: str
     judgment_api_key: str
 
+class SingletonMeta(type):
+    _instances = {}
 
-class JudgmentClient:
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            instance = super().__call__(*args, **kwargs)
+            cls._instances[cls] = instance
+        return cls._instances[cls]
+
+class JudgmentClient(metaclass=SingletonMeta):
     def __init__(self, judgment_api_key: str = os.getenv("JUDGMENT_API_KEY"), organization_id: str = os.getenv("JUDGMENT_ORG_ID")):
         self.judgment_api_key = judgment_api_key
         self.organization_id = organization_id
@@ -56,8 +65,8 @@ class JudgmentClient:
             # May be bad to output their invalid API key...
             raise JudgmentAPIError(f"Issue with passed in Judgment API key: {response}")
         else:
-            print(f"Successfully initialized JudgmentClient, welcome back {response.get('detail', {}).get('user_name', 'user')}!")
-    
+            print(f"Successfully initialized JudgmentClient!")
+
     def a_run_evaluation(
         self, 
         examples: List[Example],
@@ -267,7 +276,7 @@ class JudgmentClient:
     def create_dataset(self) -> EvalDataset:
         return self.eval_dataset_client.create_dataset()
 
-    def push_dataset(self, alias: str, dataset: EvalDataset, overwrite: Optional[bool] = False) -> bool:
+    def push_dataset(self, alias: str, dataset: EvalDataset, project_name: str, overwrite: Optional[bool] = False) -> bool:
         """
         Uploads an `EvalDataset` to the Judgment platform for storage.
 
@@ -281,9 +290,9 @@ class JudgmentClient:
         """
         # Set judgment_api_key just in case it was not set
         dataset.judgment_api_key = self.judgment_api_key
-        return self.eval_dataset_client.push(dataset, alias, overwrite)
+        return self.eval_dataset_client.push(dataset, alias, project_name, overwrite)
     
-    def pull_dataset(self, alias: str) -> EvalDataset:
+    def pull_dataset(self, alias: str, project_name: str) -> EvalDataset:
         """
         Retrieves a saved `EvalDataset` from the Judgment platform.
 
@@ -293,25 +302,31 @@ class JudgmentClient:
         Returns:
             EvalDataset: The retrieved dataset
         """
-        return self.eval_dataset_client.pull(alias)
-    
-    def pull_all_user_dataset_stats(self) -> dict:
+        return self.eval_dataset_client.pull(alias, project_name)
+
+    def delete_dataset(self, alias: str, project_name: str) -> bool:
         """
-        Retrieves all dataset stats from the Judgment platform for the user.
+        Deletes a saved `EvalDataset` from the Judgment platform.
+        """
+        return self.eval_dataset_client.delete(alias, project_name)
+    
+    def pull_dataset_stats(self, project_name: str) -> dict:
+        """
+        Retrieves all dataset stats from the Judgment platform for the project.
 
         Args:
-            alias (str): The name of the dataset to retrieve
+            project_name (str): The name of the project to retrieve
 
         Returns:
-            EvalDataset: The retrieved dataset
+            dict: The retrieved dataset stats
         """
-        return self.eval_dataset_client.pull_all_user_dataset_stats()
+        return self.eval_dataset_client.pull_dataset_stats(project_name)
     
-    def edit_dataset(self, alias: str, examples: List[Example]) -> bool:
+    def append_to_dataset(self, alias: str, examples: List[Example], project_name: str) -> bool:
         """
         Edits the dataset on Judgment platform by adding new examples
         """
-        return self.eval_dataset_client.edit_dataset(alias, examples)
+        return self.eval_dataset_client.append_to_dataset(alias, examples, project_name)
     
     # Maybe add option where you can pass in the EvaluationRun object and it will pull the eval results from the backend
     def pull_eval(self, project_name: str, eval_run_name: str) -> List[Dict[str, Union[str, List[ScoringResult]]]]:
@@ -400,6 +415,23 @@ class JudgmentClient:
                         })
         if response.status_code != requests.codes.ok:
             raise ValueError(f"Error deleting eval results: {response.json()}")
+        return response.json()
+    
+    def create_project(self, project_name: str) -> bool:
+        """
+        Creates a project on the server.
+        """
+        response = requests.post(JUDGMENT_PROJECT_CREATE_API_URL, 
+                        json={
+                            "project_name": project_name,
+                        },
+                        headers={
+                            "Content-Type": "application/json",
+                            "Authorization": f"Bearer {self.judgment_api_key}",
+                            "X-Organization-Id": self.organization_id
+                        })
+        if response.status_code != requests.codes.ok:
+            raise ValueError(f"Error creating project: {response.json()}")
         return response.json()
     
     def delete_project(self, project_name: str) -> bool:

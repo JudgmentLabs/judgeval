@@ -10,59 +10,82 @@ import string
 from judgeval.judgment_client import JudgmentClient
 from judgeval.data import Example
 
+@pytest.fixture(scope="module", autouse=True)
+def setup_and_teardown_module(client: JudgmentClient):
+    # Code to run before all tests in the module
+    project_name = ''.join(random.choices(string.ascii_letters + string.digits, k=20))
+    client.create_project(project_name)
+    yield project_name # This is where the tests will run
+    
+    # Code to run after all tests in the module
+    client.delete_project(project_name)
+
+@pytest.fixture
+def project_name(setup_and_teardown_module):
+    return setup_and_teardown_module
+
 @pytest.mark.basic
 class TestDatasetOperations:
-    def test_dataset(self, client: JudgmentClient):
+    def test_dataset(self, client: JudgmentClient, project_name: str):
         """Test dataset creation and manipulation."""
         dataset = client.create_dataset()
         dataset.add_example(Example(input="input 1", actual_output="output 1"))
 
-        client.push_dataset(alias="test_dataset_5", dataset=dataset, overwrite=False)
+        client.push_dataset(alias="test_dataset_5", dataset=dataset, project_name=project_name, overwrite=False)
         
-        dataset = client.pull_dataset(alias="test_dataset_5")
+        dataset = client.pull_dataset(alias="test_dataset_5", project_name=project_name)
         assert dataset, "Failed to pull dataset"
 
-    def test_pull_all_user_dataset_stats(self, client: JudgmentClient):
-        """Test pulling statistics for all user datasets."""
+        client.delete_dataset(alias="test_dataset_5", project_name=project_name)
+
+    def test_pull_all_project_dataset_stats(self, client: JudgmentClient, project_name: str):
+        """Test pulling statistics for all project datasets."""
         dataset = client.create_dataset()
         dataset.add_example(Example(input="input 1", actual_output="output 1"))
         dataset.add_example(Example(input="input 2", actual_output="output 2"))
         dataset.add_example(Example(input="input 3", actual_output="output 3"))
         random_name1 = ''.join(random.choices(string.ascii_letters + string.digits, k=20))
-        client.push_dataset(alias=random_name1, dataset=dataset, overwrite=False)
+        client.push_dataset(alias=random_name1, dataset=dataset, project_name=project_name, overwrite=False)
 
         dataset = client.create_dataset()
         dataset.add_example(Example(input="input 1", actual_output="output 1"))
         dataset.add_example(Example(input="input 2", actual_output="output 2"))
         random_name2 = ''.join(random.choices(string.ascii_letters + string.digits, k=20))
-        client.push_dataset(alias=random_name2, dataset=dataset, overwrite=False)
+        client.push_dataset(alias=random_name2, dataset=dataset, project_name=project_name, overwrite=False)
         
-        all_datasets_stats = client.pull_all_user_dataset_stats()
-        print(all_datasets_stats)
+        all_datasets_stats = client.pull_dataset_stats(project_name)
+
         assert all_datasets_stats, "Failed to pull dataset"
         assert all_datasets_stats[random_name1]["example_count"] == 3, f"{random_name1} should have 3 examples"
         assert all_datasets_stats[random_name2]["example_count"] == 2, f"{random_name2} should have 2 examples"
 
-    def test_edit_dataset(self, client: JudgmentClient):
+        client.delete_dataset(alias=random_name1, project_name=project_name)
+        client.delete_dataset(alias=random_name2, project_name=project_name)
+
+    def test_edit_dataset(self, client: JudgmentClient, project_name: str):
         """Test dataset editing."""
         dataset = client.create_dataset()
         dataset.add_example(Example(input="input 1", actual_output="output 1"))
         dataset.add_example(Example(input="input 2", actual_output="output 2"))
-        client.push_dataset(alias="test_dataset_6", dataset=dataset, overwrite=True)
-        dataset = client.pull_dataset(alias="test_dataset_6") # Pull in case dataset already has examples
+        client.push_dataset(alias="test_dataset_6", dataset=dataset, project_name=project_name, overwrite=True)
+        dataset = client.pull_dataset(alias="test_dataset_6", project_name=project_name) # Pull in case dataset already has examples
 
         initial_example_count = len(dataset.examples)
+        assert initial_example_count == 2, "Dataset should have 2 examples"
 
-        client.edit_dataset(
+        client.append_to_dataset(
             alias="test_dataset_6",
             examples=[Example(input="input 3", actual_output="output 3")],
+            project_name=project_name
         )
-        dataset = client.pull_dataset(alias="test_dataset_6")
+        dataset = client.pull_dataset(alias="test_dataset_6", project_name=project_name)
         assert dataset, "Failed to pull dataset"
         assert len(dataset.examples) == initial_example_count + 1, \
             f"Dataset should have {initial_example_count + 1} examples, but has {len(dataset.examples)}"
 
-    def test_export_jsonl(self, client: JudgmentClient, random_name: str):
+        client.delete_dataset(alias="test_dataset_6", project_name=project_name)
+
+    def test_export_jsonl(self, client: JudgmentClient, random_name: str, project_name: str):
         """Test JSONL dataset export functionality."""
         # Create and push test dataset
         dataset = client.create_dataset()
@@ -71,10 +94,10 @@ class TestDatasetOperations:
             actual_output="Test output 1",
             expected_output="Expected output 1"
         ))
-        client.push_dataset(alias=random_name, dataset=dataset, overwrite=True)
+        client.push_dataset(alias=random_name, dataset=dataset, project_name=project_name, overwrite=True)
 
         # Export as JSONL
-        response = client.eval_dataset_client.export_jsonl(random_name)
+        response = client.eval_dataset_client.export_jsonl(random_name, project_name)
         assert response.status_code == 200, "Export request failed"
 
         # Validate JSONL format and content
@@ -92,4 +115,6 @@ class TestDatasetOperations:
                     assert "expected_output" in entry, "Example missing expected_output"
 
         assert example_count == 1, f"Expected 1 example, got {example_count}"
+
+        client.delete_dataset(alias=random_name, project_name=project_name)
          

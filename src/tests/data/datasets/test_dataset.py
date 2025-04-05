@@ -51,7 +51,7 @@ def test_push_success(mock_post, dataset, sample_example, eval_dataset_client):
 
     # Add example and push
     dataset.add_example(sample_example)
-    result = eval_dataset_client.push(dataset, "test_alias")
+    result = eval_dataset_client.push(dataset, "test_alias", "test_project")
 
     assert result is True
     assert dataset._alias == "test_alias"
@@ -64,7 +64,7 @@ def test_push_server_error(mock_post, dataset, eval_dataset_client):
     mock_response.status_code = 500
     mock_post.return_value = mock_response
 
-    result = eval_dataset_client.push(dataset, "test_alias")
+    result = eval_dataset_client.push(dataset, "test_alias", "test_project")
     assert result is False
 
     mock_post.assert_called_once()
@@ -75,12 +75,12 @@ def test_pull_success(mock_post, eval_dataset_client):
     mock_response.status_code = 200
     mock_response.json.return_value = {
         "examples": [{"input": "test", "actual_output": "test"}],
-        "_alias": "test_alias",
-        "_id": "test_id"
+        "alias": "test_alias",
+        "id": "test_id"
     }
     mock_post.return_value = mock_response
 
-    pulled_dataset = eval_dataset_client.pull("test_alias")
+    pulled_dataset = eval_dataset_client.pull("test_alias", "test_project")
     assert len(pulled_dataset.examples) == 1
     assert pulled_dataset._alias == "test_alias"
     assert pulled_dataset._id == "test_id"

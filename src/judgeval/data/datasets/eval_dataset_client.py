@@ -7,8 +7,9 @@ from judgeval.common.logger import debug, error, warning, info
 from judgeval.constants import (
     JUDGMENT_DATASETS_PUSH_API_URL,
     JUDGMENT_DATASETS_PULL_API_URL, 
-    JUDGMENT_DATASETS_PULL_ALL_API_URL,
-    JUDGMENT_DATASETS_EDIT_API_URL,
+    JUDGMENT_DATASETS_STATS_API_URL,
+    JUDGMENT_DATASETS_DELETE_API_URL,
+    JUDGMENT_DATASETS_APPEND_API_URL,
     JUDGMENT_DATASETS_EXPORT_JSONL_API_URL
 )
 from judgeval.data import Example
@@ -25,7 +26,7 @@ class EvalDatasetClient:
     def create_dataset(self) -> EvalDataset:
         return EvalDataset(judgment_api_key=self.judgment_api_key)
     
-    def push(self, dataset: EvalDataset, alias: str, overwrite: Optional[bool] = False) -> bool:
+    def push(self, dataset: EvalDataset, alias: str, project_name: str, overwrite: Optional[bool] = False) -> bool:
         debug(f"Pushing dataset with alias '{alias}' (overwrite={overwrite})")
         if overwrite:
             warning(f"Overwrite enabled for alias '{alias}'")
@@ -54,6 +55,7 @@ class EvalDatasetClient:
             )
             content = {
                     "alias": alias,
+                    "project_name": project_name,
                     "examples": [e.to_dict() for e in dataset.examples],
                     "overwrite": overwrite,
                 }
@@ -88,7 +90,7 @@ class EvalDatasetClient:
                 )
             return True
         
-    def pull(self, alias: str) -> EvalDataset:
+    def pull(self, alias: str, project_name: str) -> EvalDataset:
         debug(f"Pulling dataset with alias '{alias}'")
         """
         Pulls the dataset from Judgment platform
@@ -96,7 +98,7 @@ class EvalDatasetClient:
         Mock request:
         {
             "alias": alias,
-            "user_id": user_id
+            "project_name": project_name
         } 
         ==>
         {
@@ -119,6 +121,7 @@ class EvalDatasetClient:
                 )
                 request_body = {
                     "alias": alias,
+                    "project_name": project_name
                 }
 
                 try:
@@ -139,24 +142,58 @@ class EvalDatasetClient:
 
                 info(f"Successfully pulled dataset with alias '{alias}'")
                 payload = response.json()
+
                 dataset.examples = [Example(**e) for e in payload.get("examples", [])]
-                dataset._alias = payload.get("_alias")
-                dataset._id = payload.get("_id")
+                dataset._alias = payload.get("alias")
+                dataset._id = payload.get("id")
                 progress.update(
                     task_id,
                     description=f"{progress.tasks[task_id].description} [rgb(25,227,160)]Done!)",
                 )
 
                 return dataset
+    
+    def delete(self, alias: str, project_name: str) -> bool:
+        with Progress(
+                SpinnerColumn(style="rgb(106,0,255)"),
+                TextColumn("[progress.description]{task.description}"),
+                transient=False,
+            ) as progress:
+                task_id = progress.add_task(
+                    f"Deleting [rgb(106,0,255)]'{alias}'[/rgb(106,0,255)] from Judgment...",
+                    total=100,
+                )
+                request_body = {
+                    "alias": alias,
+                    "project_name": project_name
+                }
 
-    def pull_all_user_dataset_stats(self) -> dict:
-        debug(f"Pulling user datasets stats for user_id: {self.judgment_api_key}'")
+                try:
+                    response = requests.post(
+                        JUDGMENT_DATASETS_DELETE_API_URL, 
+                        json=request_body,
+                        headers={
+                            "Content-Type": "application/json",
+                            "Authorization": f"Bearer {self.judgment_api_key}",
+                            "X-Organization-Id": self.organization_id
+                        },
+                        verify=True
+                    )
+                    response.raise_for_status()
+                except requests.exceptions.RequestException as e:
+                    error(f"Error deleting dataset: {str(e)}")
+                    raise
+
+                return True
+        
+    def pull_dataset_stats(self, project_name: str) -> dict:
+        debug(f"Pulling project datasets stats for project_name: {project_name}'")
         """
-        Pulls the user datasets stats from Judgment platform
+        Pulls the project datasets stats from Judgment platform    
 
         Mock request:
         {
-            "user_id": user_id
+            "project_name": project_name
         } 
         ==>
         {
@@ -177,11 +214,12 @@ class EvalDatasetClient:
                     total=100,
                 )
                 request_body = {
+                    "project_name": project_name
                 }
 
                 try:
                     response = requests.post(
-                        JUDGMENT_DATASETS_PULL_ALL_API_URL, 
+                        JUDGMENT_DATASETS_STATS_API_URL, 
                         json=request_body,
                         headers={
                             "Content-Type": "application/json",
@@ -205,7 +243,7 @@ class EvalDatasetClient:
 
                 return payload
 
-    def edit_dataset(self, alias: str, examples: List[Example]) -> bool:
+    def append_to_dataset(self, alias: str, examples: List[Example], project_name: str) -> bool:
         """
         Edits the dataset on Judgment platform by adding new examples
 
@@ -213,7 +251,7 @@ class EvalDatasetClient:
         {
             "alias": alias,
             "examples": [...],
-            "judgment_api_key": self.judgment_api_key
+            "project_name": project_name
         }
         """
         with Progress(
@@ -229,11 +267,12 @@ class EvalDatasetClient:
             content = {
                 "alias": alias,
                 "examples": [e.to_dict() for e in examples],
+                "project_name": project_name
             }
 
             try:
                 response = requests.post(
-                    JUDGMENT_DATASETS_EDIT_API_URL,
+                    JUDGMENT_DATASETS_APPEND_API_URL,
                     json=content,
                     headers={
                         "Content-Type": "application/json",
@@ -250,7 +289,7 @@ class EvalDatasetClient:
             info(f"Successfully edited dataset '{alias}'")
             return True
 
-    def export_jsonl(self, alias: str) -> requests.Response:
+    def export_jsonl(self, alias: str, project_name: str) -> requests.Response:
         """Export dataset in JSONL format from Judgment platform"""
         debug(f"Exporting dataset with alias '{alias}' as JSONL")
         with Progress(
@@ -265,7 +304,7 @@ class EvalDatasetClient:
             try:
                 response = requests.post(
                     JUDGMENT_DATASETS_EXPORT_JSONL_API_URL,
-                    json={"alias": alias},
+                    json={"alias": alias, "project_name": project_name},
                     headers={
                         "Content-Type": "application/json",
                         "Authorization": f"Bearer {self.judgment_api_key}",
