@@ -1,0 +1,74 @@
+---
+title: 'Platform Notification Center'
+description: 'Configure and manage notifications through the Judgment web interface'
+---
+
+# Platform Notification Center
+
+The Judgment Platform provides a comprehensive notification system through its web interface, allowing you to configure email notifications, scheduled reports, and app integrations like Slack.
+
+<Frame>
+  <img src="/images/notifications_page.png" alt="Notifications Settings Page" />
+</Frame>
+
+## Slack Integration
+
+Judgment allows you to receive notifications directly in your Slack workspace.
+
+### Connecting Slack
+
+1. Navigate to the Notifications page in your Judgment account settings
+2. In the "App Integrations" section, find the Slack card
+3. Click the "Connect" button
+4. You'll be redirected to Slack's authorization page
+5. Select the workspace you want to connect and authorize the Judgment application
+6. Once connected, you'll be redirected back to Judgment
+
+### Slack Notification Features
+
+After connecting Slack:
+
+- Receive real-time alerts when evaluation rules are triggered
+- Get notifications about model performance issues
+- Track Judgment activity in your Slack channels
+
+### Managing Slack Notifications
+
+Once connected, you can:
+
+- Disconnect your Slack workspace at any time
+- Add specific channels for different types of notifications
+- Configure which notifications are sent to Slack
+
+## Email Notifications
+
+In the Notifications settings page, you can configure:
+
+1. **Evaluation Alerts** - Receive real-time email notifications whenever an evaluation alert is triggered
+2. **Custom Alert Recaps** - Receive periodic email summaries of evaluations, traces, and metric scores
+
+## Scheduled Reports (Recaps)
+
+You can create custom scheduled reports to receive regular updates on your agent's performance.
+
+### Creating a Report
+
+1. Navigate to the Notifications page in your Judgment account settings
+2. Under "Custom Alert Recaps," click the "+" button to create a new report
+3. Configure your report with the following options:
+
+<Frame>
+  <img src="/images/reports_modal.png" alt="Scheduled Reports Modal" />
+</Frame>
+
+| Setting | Description |
+|---------|-------------|
+| Report Name | A descriptive name for your report (e.g., "Daily Alert Summary") |
+| Recipient Emails | Email addresses that will receive the report |
+| Frequency | How often the report should be sent (Daily, Weekly, Monthly) |
+| Select Days | For weekly reports, specify which days of the week |
+| Time | When the report should be sent |
+| Timezone | Your local timezone for accurate scheduling |
+| Compare to Previous Period | Enable to see performance changes over time |
+
+Your reports will be sent automatically based on your schedule settings, providing insights into your model's performance over time. 

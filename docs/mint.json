@@ -90,6 +90,14 @@
       ]
     },
     {
+      "group": "Alerts",
+      "pages": [
+        "alerts/rules",
+        "alerts/notifications",
+        "alerts/platform_notifications"
+      ]
+    },
+    {
       "group": "Judgment Platform",
       "pages": [
         "judgment/introduction"
