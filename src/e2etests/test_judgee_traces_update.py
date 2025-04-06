@@ -658,3 +658,125 @@ async def test_real_judgee_tracking(client):
     )
     print(f"Evaluation response: {res}")
     print_debug_on_failure(res[0])
+
+@pytest.mark.asyncio
+async def test_real_trace_and_judgee_tracking(client):
+    """Test both trace and judgee tracking in a single E2E test.
+    
+    This test:
+    1. Checks initial trace and judgee counts
+    2. Creates and saves a trace
+    3. Verifies that trace counts are incremented
+    4. Runs an evaluation within the trace
+    5. Verifies that both trace and judgee counts are incremented correctly
+    """
+    import judgeval
+    from judgeval.judgment_client import JudgmentClient
+    from judgeval.scorers import AnswerCorrectnessScorer
+    from judgeval.data import Example
+    from judgeval.common.tracer import Tracer
+    
+    # Get initial counts
+    print("Getting initial counts...")
+    
+    # Get initial trace count
+    trace_response = await client.get(
+        f"{SERVER_URL}/traces/count/",
+        headers=get_headers()
+    )
+    assert trace_response.status_code == 200
+    initial_trace_data = trace_response.json()
+    initial_traces = initial_trace_data["traces_ran"]
+    print(f"Initial trace count: {initial_traces}")
+    
+    # Get initial judgee count
+    judgee_response = await client.get(
+        f"{SERVER_URL}/judgees/count/",
+        headers=get_headers()
+    )
+    assert judgee_response.status_code == 200
+    initial_judgee_data = judgee_response.json()
+    initial_judgees = initial_judgee_data["judgees_ran"]
+    print(f"Initial judgee count: {initial_judgees}")
+    
+    # Create a trace and run an evaluation within it
+    print("Creating trace and running evaluation...")
+    
+    # Define test data
+    example = Example(
+        input="What's the capital of France?",
+        actual_output="The capital of France is Paris.",
+        expected_output="France's capital is Paris. It is known as the City of Light.",
+    )
+    scorer = AnswerCorrectnessScorer(threshold=0.1)
+    
+    # Initialize judgment client
+    judgment_client = JudgmentClient()
+    PROJECT_NAME = "test-trace-judgee-project"
+    EVAL_RUN_NAME = "test-trace-judgee-run"
+    
+    # Create a tracer
+    tracer = Tracer(
+        api_key=os.getenv("JUDGMENT_API_KEY"),
+        project_name=PROJECT_NAME,
+        organization_id=os.getenv("JUDGMENT_ORG_ID")
+    )
+    
+    # Start a trace
+    with tracer.trace(name="test_trace_with_eval", overwrite=True) as trace:
+        print("Trace started, running evaluation within trace...")
+        
+        # Run evaluation within the trace
+        res = judgment_client.run_evaluation(
+            examples=[example],
+            scorers=[scorer],
+            model="Qwen/Qwen2.5-72B-Instruct-Turbo",
+            log_results=True,
+            project_name=PROJECT_NAME,
+            eval_run_name=EVAL_RUN_NAME,
+            use_judgment=True,
+            override=True,
+        )
+        
+        print(f"Evaluation response: {res}")
+        print_debug_on_failure(res[0])
+        
+        # Save the trace
+        trace_id, trace_data = trace.save()
+        print(f"Trace saved with ID: {trace_id}")
+    
+    # Wait for counts to update
+    print("Waiting for counts to update...")
+    await asyncio.sleep(3)
+    
+    # Get final trace count
+    print("Getting final trace count...")
+    trace_response = await client.get(
+        f"{SERVER_URL}/traces/count/",
+        headers=get_headers()
+    )
+    assert trace_response.status_code == 200
+    final_trace_data = trace_response.json()
+    final_traces = final_trace_data["traces_ran"]
+    print(f"Final trace count: {final_traces}")
+    print(f"Trace count difference: {final_traces - initial_traces}")
+    
+    # Get final judgee count
+    print("Getting final judgee count...")
+    judgee_response = await client.get(
+        f"{SERVER_URL}/judgees/count/",
+        headers=get_headers()
+    )
+    assert judgee_response.status_code == 200
+    final_judgee_data = judgee_response.json()
+    final_judgees = final_judgee_data["judgees_ran"]
+    print(f"Final judgee count: {final_judgees}")
+    print(f"Judgee count difference: {final_judgees - initial_judgees}")
+    
+    # Verify trace count increased by 1 (empty saves are no longer counted)
+    assert final_traces == initial_traces + 1, f"Expected trace count to increase by 1, but got {final_traces - initial_traces}"
+    
+    # Verify judgee count increased by 1
+    assert final_judgees == initial_judgees + 1, f"Expected judgee count to increase by 1, but got {final_judgees - initial_judgees}"
+    
+    print("Test completed successfully!")
