@@ -322,11 +322,11 @@ class JudgmentClient(metaclass=SingletonMeta):
         """
         return self.eval_dataset_client.pull_project_dataset_stats(project_name)
     
-    def append_to_dataset(self, alias: str, examples: List[Example], project_name: str) -> bool:
+    def insert_dataset(self, alias: str, examples: List[Example], project_name: str) -> bool:
         """
         Edits the dataset on Judgment platform by adding new examples
         """
-        return self.eval_dataset_client.append_to_dataset(alias, examples, project_name)
+        return self.eval_dataset_client.insert_dataset(alias, examples, project_name)
     
     # Maybe add option where you can pass in the EvaluationRun object and it will pull the eval results from the backend
     def pull_eval(self, project_name: str, eval_run_name: str) -> List[Dict[str, Union[str, List[ScoringResult]]]]:

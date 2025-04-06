@@ -62,7 +62,7 @@ class TestDatasetOperations:
         client.delete_dataset(alias=random_name1, project_name=project_name)
         client.delete_dataset(alias=random_name2, project_name=project_name)
 
-    def test_append_to_dataset(self, client: JudgmentClient, project_name: str):
+    def test_insert_dataset(self, client: JudgmentClient, project_name: str):
         """Test dataset editing."""
         dataset = client.create_dataset()
         dataset.add_example(Example(input="input 1", actual_output="output 1"))
@@ -73,7 +73,7 @@ class TestDatasetOperations:
         initial_example_count = len(dataset.examples)
         assert initial_example_count == 2, "Dataset should have 2 examples"
 
-        client.append_to_dataset(
+        client.insert_dataset(
             alias="test_dataset_6",
             examples=[Example(input="input 3", actual_output="output 3")],
             project_name=project_name

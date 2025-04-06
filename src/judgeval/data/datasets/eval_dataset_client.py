@@ -9,7 +9,7 @@ from judgeval.constants import (
     JUDGMENT_DATASETS_PULL_API_URL, 
     JUDGMENT_DATASETS_PROJECT_STATS_API_URL,
     JUDGMENT_DATASETS_DELETE_API_URL,
-    JUDGMENT_DATASETS_APPEND_API_URL,
+    JUDGMENT_DATASETS_INSERT_API_URL,
     JUDGMENT_DATASETS_EXPORT_JSONL_API_URL
 )
 from judgeval.data import Example
@@ -243,7 +243,7 @@ class EvalDatasetClient:
 
                 return payload
 
-    def append_to_dataset(self, alias: str, examples: List[Example], project_name: str) -> bool:
+    def insert_dataset(self, alias: str, examples: List[Example], project_name: str) -> bool:
         """
         Edits the dataset on Judgment platform by adding new examples
 
@@ -272,7 +272,7 @@ class EvalDatasetClient:
 
             try:
                 response = requests.post(
-                    JUDGMENT_DATASETS_APPEND_API_URL,
+                    JUDGMENT_DATASETS_INSERT_API_URL,
                     json=content,
                     headers={
                         "Content-Type": "application/json",
