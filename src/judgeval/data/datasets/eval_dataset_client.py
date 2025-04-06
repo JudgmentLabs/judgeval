@@ -7,7 +7,7 @@ from judgeval.common.logger import debug, error, warning, info
 from judgeval.constants import (
     JUDGMENT_DATASETS_PUSH_API_URL,
     JUDGMENT_DATASETS_PULL_API_URL, 
-    JUDGMENT_DATASETS_STATS_API_URL,
+    JUDGMENT_DATASETS_PROJECT_STATS_API_URL,
     JUDGMENT_DATASETS_DELETE_API_URL,
     JUDGMENT_DATASETS_APPEND_API_URL,
     JUDGMENT_DATASETS_EXPORT_JSONL_API_URL
@@ -54,7 +54,7 @@ class EvalDatasetClient:
                 total=100,
             )
             content = {
-                    "alias": alias,
+                    "dataset_alias": alias,
                     "project_name": project_name,
                     "examples": [e.to_dict() for e in dataset.examples],
                     "overwrite": overwrite,
@@ -120,7 +120,7 @@ class EvalDatasetClient:
                     total=100,
                 )
                 request_body = {
-                    "alias": alias,
+                    "dataset_alias": alias,
                     "project_name": project_name
                 }
 
@@ -164,7 +164,7 @@ class EvalDatasetClient:
                     total=100,
                 )
                 request_body = {
-                    "alias": alias,
+                    "dataset_alias": alias,
                     "project_name": project_name
                 }
 
@@ -186,7 +186,7 @@ class EvalDatasetClient:
 
                 return True
         
-    def pull_dataset_stats(self, project_name: str) -> dict:
+    def pull_project_dataset_stats(self, project_name: str) -> dict:
         debug(f"Pulling project datasets stats for project_name: {project_name}'")
         """
         Pulls the project datasets stats from Judgment platform    
@@ -219,7 +219,7 @@ class EvalDatasetClient:
 
                 try:
                     response = requests.post(
-                        JUDGMENT_DATASETS_STATS_API_URL, 
+                        JUDGMENT_DATASETS_PROJECT_STATS_API_URL, 
                         json=request_body,
                         headers={
                             "Content-Type": "application/json",
@@ -265,7 +265,7 @@ class EvalDatasetClient:
             )
             
             content = {
-                "alias": alias,
+                "dataset_alias": alias,
                 "examples": [e.to_dict() for e in examples],
                 "project_name": project_name
             }
@@ -304,7 +304,7 @@ class EvalDatasetClient:
             try:
                 response = requests.post(
                     JUDGMENT_DATASETS_EXPORT_JSONL_API_URL,
-                    json={"alias": alias, "project_name": project_name},
+                    json={"dataset_alias": alias, "project_name": project_name},
                     headers={
                         "Content-Type": "application/json",
                         "Authorization": f"Bearer {self.judgment_api_key}",

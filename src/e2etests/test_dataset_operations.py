@@ -53,7 +53,7 @@ class TestDatasetOperations:
         random_name2 = ''.join(random.choices(string.ascii_letters + string.digits, k=20))
         client.push_dataset(alias=random_name2, dataset=dataset, project_name=project_name, overwrite=False)
         
-        all_datasets_stats = client.pull_dataset_stats(project_name)
+        all_datasets_stats = client.pull_project_dataset_stats(project_name)
 
         assert all_datasets_stats, "Failed to pull dataset"
         assert all_datasets_stats[random_name1]["example_count"] == 3, f"{random_name1} should have 3 examples"
@@ -62,7 +62,7 @@ class TestDatasetOperations:
         client.delete_dataset(alias=random_name1, project_name=project_name)
         client.delete_dataset(alias=random_name2, project_name=project_name)
 
-    def test_edit_dataset(self, client: JudgmentClient, project_name: str):
+    def test_append_to_dataset(self, client: JudgmentClient, project_name: str):
         """Test dataset editing."""
         dataset = client.create_dataset()
         dataset.add_example(Example(input="input 1", actual_output="output 1"))

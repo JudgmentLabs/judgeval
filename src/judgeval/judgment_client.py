@@ -310,7 +310,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         """
         return self.eval_dataset_client.delete(alias, project_name)
     
-    def pull_dataset_stats(self, project_name: str) -> dict:
+    def pull_project_dataset_stats(self, project_name: str) -> dict:
         """
         Retrieves all dataset stats from the Judgment platform for the project.
 
@@ -320,7 +320,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         Returns:
             dict: The retrieved dataset stats
         """
-        return self.eval_dataset_client.pull_dataset_stats(project_name)
+        return self.eval_dataset_client.pull_project_dataset_stats(project_name)
     
     def append_to_dataset(self, alias: str, examples: List[Example], project_name: str) -> bool:
         """
