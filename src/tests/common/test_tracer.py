@@ -6,7 +6,7 @@ from openai import OpenAI
 from anthropic import Anthropic
 import requests
 
-from judgeval.common.tracer import Tracer, TraceEntry, wrap
+from judgeval.common.tracer import Tracer, TraceEntry, wrap, current_span_var
 from judgeval.judgment_client import JudgmentClient
 from judgeval.common.exceptions import JudgmentAPIError
 
@@ -116,24 +116,65 @@ def test_trace_entry_to_dict():
 
 def test_trace_client_span(trace_client):
     """Test span context manager"""
-    initial_entries = len(trace_client.entries)  # Get initial count
-    
+    # The trace_client fixture starts with a trace "test_trace" and its 'enter' entry
+    initial_entries_count = len(trace_client.entries)
+    assert initial_entries_count == 1 # Should only have the 'enter' for "test_trace"
+
+    parent_before_span = current_span_var.get() # Should be "test_trace"
+
     with trace_client.span("test_span") as span:
-        assert trace_client._current_span == "test_span"
-        assert len(trace_client.entries) == initial_entries + 1  # Compare to initial count
-    
-    assert len(trace_client.entries) == initial_entries + 2  # Account for both enter and exit
-    assert trace_client.entries[-1].type == "exit"
-    assert trace_client._current_span == "test_trace"
+        # Inside the span, the current span var should be updated
+        assert current_span_var.get() == "test_span"
+        # Check the 'enter' entry for the new span
+        enter_entry = trace_client.entries[-1]
+        assert enter_entry.type == "enter"
+        assert enter_entry.function == "test_span"
+        assert enter_entry.parent_span == parent_before_span # Check parent relationship
+        assert enter_entry.depth == 1 # Depth relative to parent
+
+    # After the span, the context var should be reset
+    assert current_span_var.get() == parent_before_span
+
+    # Check the 'exit' entry
+    exit_entry = trace_client.entries[-1]
+    assert exit_entry.type == "exit"
+    assert exit_entry.function == "test_span"
+    assert exit_entry.depth == 1 # Depth after exiting is the same as the entry depth for that span
+
+    # Check total entries (1 enter root + 1 enter span + 1 exit span)
+    assert len(trace_client.entries) == initial_entries_count + 2
 
 def test_trace_client_nested_spans(trace_client):
-    """Test nested spans maintain proper depth"""
-    with trace_client.span("outer"):
-        assert trace_client.tracer.depth == 2  # 1 for trace + 1 for span
-        with trace_client.span("inner"):
-            assert trace_client.tracer.depth == 3
-        assert trace_client.tracer.depth == 2
-    assert trace_client.tracer.depth == 1
+    """Test nested spans maintain proper depth recorded in entries"""
+    root_span_name = "test_trace" # From the fixture
+
+    with trace_client.span("outer") as outer_span:
+        # Check 'enter' entry for 'outer' span
+        outer_enter_entry = trace_client.entries[-1]
+        assert outer_enter_entry.type == "enter"
+        assert outer_enter_entry.function == "outer"
+        assert outer_enter_entry.parent_span == root_span_name
+        assert outer_enter_entry.depth == 1 # Depth is 0(root) + 1
+
+        with trace_client.span("inner") as inner_span:
+            # Check 'enter' entry for 'inner' span
+            inner_enter_entry = trace_client.entries[-1]
+            assert inner_enter_entry.type == "enter"
+            assert inner_enter_entry.function == "inner"
+            assert inner_enter_entry.parent_span == "outer"
+            assert inner_enter_entry.depth == 2 # Depth is 1(outer) + 1
+
+        # Check 'exit' entry for 'inner' span
+        inner_exit_entry = trace_client.entries[-1]
+        assert inner_exit_entry.type == "exit"
+        assert inner_exit_entry.function == "inner"
+        assert inner_exit_entry.depth == 2 # Depth when exiting inner is inner's entry depth
+
+    # Check 'exit' entry for 'outer' span
+    outer_exit_entry = trace_client.entries[-1]
+    assert outer_exit_entry.type == "exit"
+    assert outer_exit_entry.function == "outer"
+    assert outer_exit_entry.depth == 1 # Depth when exiting outer is outer's entry depth
 
 def test_record_input_output(trace_client):
     """Test recording inputs and outputs"""
