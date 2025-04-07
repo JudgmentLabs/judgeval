@@ -958,11 +958,6 @@ class Tracer:
                 # Get current trace from context
                 current_trace = current_trace_var.get()
                 
-                # Create a unique span name with parameters if available
-                unique_span_name = span_name
-                if args and len(args) > 0 and isinstance(args[0], str):
-                    unique_span_name = f"{span_name}_{args[0]}"
-                
                 # If there's no current trace, create a root trace
                 if not current_trace:
                     trace_id = str(uuid.uuid4())
@@ -972,7 +967,7 @@ class Tracer:
                     current_trace = TraceClient(
                         self,
                         trace_id,
-                        unique_span_name, # Root trace named after the function
+                        span_name, # MODIFIED: Use span_name directly
                         project_name=project,
                         overwrite=overwrite,
                         rules=self.rules,
@@ -987,7 +982,7 @@ class Tracer:
                     try:
                         # Use span for the function execution within the root trace
                         # This sets the current_span_var
-                        with current_trace.span(unique_span_name, span_type=span_type) as span:
+                        with current_trace.span(span_name, span_type=span_type) as span: # MODIFIED: Use span_name directly
                             # Record inputs
                             span.record_input({
                                 'args': str(args),
@@ -1009,7 +1004,7 @@ class Tracer:
                 else:
                     # Already have a trace context, just create a span in it
                     # The span method handles current_span_var
-                    with current_trace.span(unique_span_name, span_type=span_type) as span:
+                    with current_trace.span(span_name, span_type=span_type) as span: # MODIFIED: Use span_name directly
                         # Record inputs
                         span.record_input({
                             'args': str(args),
@@ -1032,11 +1027,6 @@ class Tracer:
                 # Get current trace from context
                 current_trace = current_trace_var.get()
                 
-                # Create a unique span name with parameters if available
-                unique_span_name = span_name
-                if args and len(args) > 0 and isinstance(args[0], str):
-                    unique_span_name = f"{span_name}_{args[0]}"
-                
                 # If there's no current trace, create a root trace
                 if not current_trace:
                     trace_id = str(uuid.uuid4())
@@ -1046,7 +1036,7 @@ class Tracer:
                     current_trace = TraceClient(
                         self,
                         trace_id,
-                        unique_span_name, # Root trace named after the function
+                        span_name, # MODIFIED: Use span_name directly
                         project_name=project,
                         overwrite=overwrite,
                         rules=self.rules,
@@ -1061,7 +1051,7 @@ class Tracer:
                     try:
                         # Use span for the function execution within the root trace
                         # This sets the current_span_var
-                        with current_trace.span(unique_span_name, span_type=span_type) as span:
+                        with current_trace.span(span_name, span_type=span_type) as span: # MODIFIED: Use span_name directly
                             # Record inputs
                             span.record_input({
                                 'args': str(args),
@@ -1083,7 +1073,7 @@ class Tracer:
                 else:
                     # Already have a trace context, just create a span in it
                     # The span method handles current_span_var
-                    with current_trace.span(unique_span_name, span_type=span_type) as span:
+                    with current_trace.span(span_name, span_type=span_type) as span: # MODIFIED: Use span_name directly
                         # Record inputs
                         span.record_input({
                             'args': str(args),
