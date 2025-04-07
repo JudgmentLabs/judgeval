@@ -46,6 +46,9 @@ from judgeval.rules import Rule
 from judgeval.evaluation_run import EvaluationRun
 from judgeval.data.result import ScoringResult
 
+# Standard library imports needed for the new class
+import concurrent.futures
+
 # Define context variables for tracking the current trace and the current span within a trace
 current_trace_var = contextvars.ContextVar('current_trace', default=None)
 current_span_var = contextvars.ContextVar('current_span', default=None) # NEW: ContextVar for the active span name
@@ -1247,25 +1250,56 @@ def _format_output_data(client: ApiClient, response: Any) -> dict:
     }
 
 # Add a global context-preserving gather function
-async def trace_gather(*coroutines, return_exceptions=False):
-    """
-    A wrapper around asyncio.gather that ensures the trace context
-    is available within the gathered coroutines using contextvars.copy_context.
-    """
-    # Get the original asyncio.gather (if we patched it)
-    original_gather = getattr(asyncio, "_original_gather", asyncio.gather)
-
-    # Use contextvars.copy_context() to ensure context propagation
-    ctx = contextvars.copy_context()
-    
-    # Wrap the gather call within the copied context
-    return await ctx.run(original_gather, *coroutines, return_exceptions=return_exceptions)
+# async def trace_gather(*coroutines, return_exceptions=False): # REMOVED
+#     """ # REMOVED
+#     A wrapper around asyncio.gather that ensures the trace context # REMOVED
+#     is available within the gathered coroutines using contextvars.copy_context. # REMOVED
+#     """ # REMOVED
+#     # Get the original asyncio.gather (if we patched it) # REMOVED
+#     original_gather = getattr(asyncio, "_original_gather", asyncio.gather) # REMOVED
+# # REMOVED
+#     # Use contextvars.copy_context() to ensure context propagation # REMOVED
+#     ctx = contextvars.copy_context() # REMOVED
+#      # REMOVED
+#     # Wrap the gather call within the copied context # REMOVED
+#     return await ctx.run(original_gather, *coroutines, return_exceptions=return_exceptions) # REMOVED
 
 # Store the original gather and apply the patch *once*
-global _original_gather_stored
-if not globals().get('_original_gather_stored'):
-    # Check if asyncio.gather is already our wrapper to prevent double patching
-    if asyncio.gather.__name__ != 'trace_gather': 
-        asyncio._original_gather = asyncio.gather
-        asyncio.gather = trace_gather
-        _original_gather_stored = True
+# global _original_gather_stored # REMOVED
+# if not globals().get('_original_gather_stored'): # REMOVED
+#     # Check if asyncio.gather is already our wrapper to prevent double patching # REMOVED
+#     if asyncio.gather.__name__ != 'trace_gather':  # REMOVED
+#         asyncio._original_gather = asyncio.gather # REMOVED
+#         asyncio.gather = trace_gather # REMOVED
+#         _original_gather_stored = True # REMOVED
+
+# Add the new TraceThreadPoolExecutor class
+class TraceThreadPoolExecutor(concurrent.futures.ThreadPoolExecutor):
+    """
+    A ThreadPoolExecutor subclass that automatically propagates contextvars
+    from the submitting thread to the worker thread using copy_context().run().
+
+    This ensures that context variables like `current_trace_var` and
+    `current_span_var` are available within functions executed by the pool,
+    allowing the Tracer to maintain correct parent-child relationships across
+    thread boundaries.
+    """
+    def submit(self, fn, /, *args, **kwargs):
+        """
+        Submit a callable to be executed with the captured context.
+        """
+        # Capture context from the submitting thread
+        ctx = contextvars.copy_context()
+
+        # We use functools.partial to bind the arguments to the function *now*,
+        # as ctx.run doesn't directly accept *args, **kwargs in the same way
+        # submit does. It expects ctx.run(callable, arg1, arg2...).
+        func_with_bound_args = functools.partial(fn, *args, **kwargs)
+
+        # Submit the ctx.run callable to the original executor.
+        # ctx.run will execute the (now argument-bound) function within the
+        # captured context in the worker thread.
+        return super().submit(ctx.run, func_with_bound_args)
+
+    # Note: The `map` method would also need to be overridden for full context
+    # propagation if users rely on it, but `submit` is the most common use case.
