@@ -715,13 +715,69 @@ class TraceClient:
                     # Update depth if exit depth is different (though current span() implementation keeps it same)
                     # current_span_data["depth"] = entry["depth"] 
 
-        # Convert dictionary to a list
-        condensed_list = list(spans_by_id.values())
-        
-        # Optional: Sort by timestamp for deterministic output
-        condensed_list.sort(key=lambda x: x.get("timestamp", 0))
+        # Convert dictionary to a list initially for easier access
+        spans_list = list(spans_by_id.values())
 
-        return condensed_list
+        # Build tree structure (adjacency list) and find roots
+        children_map: Dict[Optional[str], List[dict]] = {}
+        roots = []
+        span_map = {span['span_id']: span for span in spans_list} # Map for quick lookup
+
+        for span in spans_list:
+            parent_id = span.get("parent_span_id")
+            if parent_id is None:
+                roots.append(span)
+            else:
+                if parent_id not in children_map:
+                    children_map[parent_id] = []
+                children_map[parent_id].append(span)
+
+        # Sort roots by timestamp
+        roots.sort(key=lambda x: x.get("timestamp", 0))
+
+        # Perform depth-first traversal to get the final sorted list
+        sorted_condensed_list = []
+        visited = set() # To handle potential cycles, though unlikely with UUIDs
+
+        def dfs(span_data):
+            span_id = span_data['span_id']
+            if span_id in visited:
+                return # Avoid infinite loops in case of cycles
+            visited.add(span_id)
+            
+            sorted_condensed_list.append(span_data) # Add parent before children
+
+            # Get children, sort them by timestamp, and visit them
+            span_children = children_map.get(span_id, [])
+            span_children.sort(key=lambda x: x.get("timestamp", 0))
+            for child in span_children:
+                # Ensure the child exists in our map before recursing
+                if child['span_id'] in span_map: 
+                    dfs(child)
+                else:
+                    # This case might indicate an issue, but we'll add the child directly
+                    # if its parent was processed but the child itself wasn't in the initial list?
+                    # Or if the child's 'enter' event was missing. For robustness, add it.
+                    if child['span_id'] not in visited:
+                         visited.add(child['span_id'])
+                         sorted_condensed_list.append(child)
+
+
+        # Start DFS from each root
+        for root_span in roots:
+            if root_span['span_id'] not in visited:
+                dfs(root_span)
+                
+        # Handle spans that might not have been reachable from roots (orphans)
+        # Though ideally, all spans should descend from a root.
+        for span_data in spans_list:
+             if span_data['span_id'] not in visited:
+                  # Decide how to handle orphans, maybe append them at the end sorted by time?
+                  # For now, let's just add them to ensure they aren't lost.
+                  sorted_condensed_list.append(span_data)
+
+
+        return sorted_condensed_list
 
     def save(self, empty_save: bool = False, overwrite: bool = False) -> Tuple[str, dict]:
         """
