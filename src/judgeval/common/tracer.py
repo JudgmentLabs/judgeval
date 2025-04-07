@@ -67,6 +67,7 @@ class TraceEntry:
     """
     type: TraceEntryType
     function: str  # Name of the function being traced
+    span_id: str # Unique ID for this specific span instance
     depth: int    # Indentation level for nested calls
     message: str  # Human-readable description
     timestamp: float  # Unix timestamp when entry was created
@@ -76,7 +77,7 @@ class TraceEntry:
     inputs: dict = field(default_factory=dict)
     span_type: SpanType = "span"
     evaluation_runs: List[Optional[EvaluationRun]] = field(default=None)
-    parent_span: Optional[str] = None
+    parent_span_id: Optional[str] = None # ID of the parent span instance
     
     def print_entry(self):
         """Print a trace entry with proper formatting and parent relationship information."""
@@ -84,20 +85,20 @@ class TraceEntry:
         
         if self.type == "enter":
             # Format parent info if present
-            parent_info = f" (parent: {self.parent_span})" if self.parent_span else ""
-            print(f"{indent}→ {self.function}{parent_info} (trace: {self.message})")
+            parent_info = f" (parent_id: {self.parent_span_id})" if self.parent_span_id else ""
+            print(f"{indent}→ {self.function} (id: {self.span_id}){parent_info} (trace: {self.message})")
         elif self.type == "exit":
-            print(f"{indent}← {self.function} ({self.duration:.3f}s)")
+            print(f"{indent}← {self.function} (id: {self.span_id}) ({self.duration:.3f}s)")
         elif self.type == "output":
             # Format output to align properly
             output_str = str(self.output)
-            print(f"{indent}Output: {output_str}")
+            print(f"{indent}Output (for id: {self.span_id}): {output_str}")
         elif self.type == "input":
             # Format inputs to align properly
-            print(f"{indent}Input: {self.inputs}")
+            print(f"{indent}Input (for id: {self.span_id}): {self.inputs}")
         elif self.type == "evaluation":
             for evaluation_run in self.evaluation_runs:
-                print(f"{indent}Evaluation: {evaluation_run.model_dump()}")
+                print(f"{indent}Evaluation (for id: {self.span_id}): {evaluation_run.model_dump()}")
     
     def _serialize_inputs(self) -> dict:
         """Helper method to serialize input data safely.
@@ -156,6 +157,7 @@ class TraceEntry:
         return {
             "type": self.type,
             "function": self.function,
+            "span_id": self.span_id,
             "depth": self.depth,
             "message": self.message,
             "timestamp": self.timestamp,
@@ -164,7 +166,7 @@ class TraceEntry:
             "inputs": self._serialize_inputs(),
             "evaluation_runs": [evaluation_run.model_dump() for evaluation_run in self.evaluation_runs] if self.evaluation_runs else [],
             "span_type": self.span_type,
-            "parent_span": self.parent_span
+            "parent_span_id": self.parent_span_id
         }
 
     def _serialize_output(self) -> Any:
@@ -355,25 +357,28 @@ class TraceClient:
     def span(self, name: str, span_type: SpanType = "span"):
         """Context manager for creating a trace span, managing the current span via contextvars"""
         start_time = time.time()
-        parent_span_name = current_span_var.get()
-        token = current_span_var.set(name)
         
-        # Calculate depth based on parent
+        # Generate a unique ID for *this specific span invocation*
+        span_id = str(uuid.uuid4())
+        
+        parent_span_id = current_span_var.get() # Get ID of the parent span from context var
+        token = current_span_var.set(span_id) # Set *this* span's ID as the current one
+        
         current_depth = 0
-        if parent_span_name and parent_span_name in self._span_depths:
-            current_depth = self._span_depths[parent_span_name] + 1
+        if parent_span_id and parent_span_id in self._span_depths:
+            current_depth = self._span_depths[parent_span_id] + 1
         
-        # Store the depth for this span
-        self._span_depths[name] = current_depth
+        self._span_depths[span_id] = current_depth # Store depth by span_id
             
         entry = TraceEntry(
             type="enter",
             function=name,
-            depth=current_depth, # Use calculated depth
+            span_id=span_id, # Use the generated span_id
+            depth=current_depth,
             message=name,
             timestamp=start_time,
             span_type=span_type,
-            parent_span=parent_span_name
+            parent_span_id=parent_span_id # Use the parent_id from context var
         )
         self.add_entry(entry)
         
@@ -381,20 +386,20 @@ class TraceClient:
             yield self
         finally:
             duration = time.time() - start_time
-            # Use the stored depth for the exit entry
-            exit_depth = self._span_depths.get(name, 0) 
+            exit_depth = self._span_depths.get(span_id, 0) # Get depth using this span's ID
             self.add_entry(TraceEntry(
                 type="exit",
                 function=name,
-                depth=exit_depth, # Use calculated depth for consistency
+                span_id=span_id, # Use the same span_id for exit
+                depth=exit_depth, 
                 message=f"← {name}",
                 timestamp=time.time(),
                 duration=duration,
                 span_type=span_type
             ))
-            # Clean up depth tracking for this span
-            if name in self._span_depths:
-                del self._span_depths[name]
+            # Clean up depth tracking for this span_id
+            if span_id in self._span_depths:
+                del self._span_depths[span_id]
             # Reset context var
             current_span_var.reset(token)
 
@@ -494,24 +499,30 @@ class TraceClient:
         self.add_eval_run(eval_run, start_time)  # Pass start_time to record_evaluation
             
     def add_eval_run(self, eval_run: EvaluationRun, start_time: float):
-        """
-        Add evaluation run data to the trace
+        current_span_id = current_span_var.get()
+        if current_span_id:
+            duration = time.time() - start_time
+            prev_entry = self.entries[-1] if self.entries else None
+            # Determine function name based on previous entry or context var (less ideal)
+            function_name = "unknown_function" # Default
+            if prev_entry and prev_entry.span_type == "llm":
+                 function_name = prev_entry.function
+            else:
+                 # Try to find the function name associated with the current span_id
+                 for entry in reversed(self.entries):
+                     if entry.span_id == current_span_id and entry.type == 'enter':
+                         function_name = entry.function
+                         break
+            
+            # Get depth for the current span
+            current_depth = self._span_depths.get(current_span_id, 0)
 
-        Args:
-            eval_run (EvaluationRun): The evaluation run to add to the trace
-            start_time (float): The start time of the evaluation run
-        """
-        if current_span_var.get():
-            duration = time.time() - start_time  # Calculate duration from start_time
-            
-            prev_entry = self.entries[-1]
-            
-            # Select the last entry in the trace if it's an LLM call, otherwise use the current span
             self.add_entry(TraceEntry(
                 type="evaluation",
-                function=prev_entry.function if prev_entry.span_type == "llm" else current_span_var.get(),
-                depth=self.tracer.depth,
-                message=f"Evaluation results for {current_span_var.get()}",
+                function=function_name,
+                span_id=current_span_id, # Associate with current span
+                depth=current_depth,
+                message=f"Evaluation results for {function_name}",
                 timestamp=time.time(),
                 evaluation_runs=[eval_run],
                 duration=duration,
@@ -519,23 +530,23 @@ class TraceClient:
             ))
 
     def record_input(self, inputs: dict):
-        """Record input parameters for the current span (fetched from context var)"""
-        current_span_name = current_span_var.get()
-        if current_span_name:
+        current_span_id = current_span_var.get()
+        if current_span_id:
             entry_span_type = "span"
-            current_depth = self._span_depths.get(current_span_name, 0) # Get depth for current span
+            current_depth = self._span_depths.get(current_span_id, 0)
+            function_name = "unknown_function" # Default
             for entry in reversed(self.entries):
-                 if entry.type == "enter" and entry.function == current_span_name:
+                 if entry.span_id == current_span_id and entry.type == 'enter':
                       entry_span_type = entry.span_type
-                      # Optional: could also get depth from the enter entry if needed, but _span_depths is more direct
-                      # current_depth = entry.depth 
+                      function_name = entry.function
                       break
 
             self.add_entry(TraceEntry(
                 type="input",
-                function=current_span_name,
-                depth=current_depth, # Use looked-up depth
-                message=f"Inputs to {current_span_name}",
+                function=function_name,
+                span_id=current_span_id, # Use current span_id
+                depth=current_depth,
+                message=f"Inputs to {function_name}",
                 timestamp=time.time(),
                 inputs=inputs,
                 span_type=entry_span_type
@@ -552,22 +563,23 @@ class TraceClient:
             raise
 
     def record_output(self, output: Any):
-        """Record output for the current span (fetched from context var)"""
-        current_span_name = current_span_var.get()
-        if current_span_name:
+        current_span_id = current_span_var.get()
+        if current_span_id:
             entry_span_type = "span"
-            current_depth = self._span_depths.get(current_span_name, 0) # Get depth for current span
+            current_depth = self._span_depths.get(current_span_id, 0)
+            function_name = "unknown_function" # Default
             for entry in reversed(self.entries):
-                 if entry.type == "enter" and entry.function == current_span_name:
+                 if entry.span_id == current_span_id and entry.type == 'enter':
                       entry_span_type = entry.span_type
-                      # current_depth = entry.depth
+                      function_name = entry.function
                       break
 
             entry = TraceEntry(
                 type="output",
-                function=current_span_name,
-                depth=current_depth, # Use looked-up depth
-                message=f"Output from {current_span_name}",
+                function=function_name,
+                span_id=current_span_id, # Use current span_id
+                depth=current_depth,
+                message=f"Output from {function_name}",
                 timestamp=time.time(),
                 output="<pending>" if inspect.iscoroutine(output) else output,
                 span_type=entry_span_type
@@ -599,21 +611,21 @@ class TraceClient:
                 spans[entry.function] = {
                     "name": entry.function,
                     "depth": entry.depth,
-                    "parent": entry.parent_span,
+                    "parent_id": entry.parent_span_id,
                     "children": []
                 }
                 
                 # If no parent, it's a root span
-                if not entry.parent_span:
+                if not entry.parent_span_id:
                     root_spans.append(entry.function)
-                elif entry.parent_span not in spans:
+                elif entry.parent_span_id not in spans:
                     # If parent doesn't exist yet, temporarily treat as root
                     # (we'll fix this later)
                     root_spans.append(entry.function)
         
         # Build parent-child relationships
         for span_name, span in spans.items():
-            parent = span["parent"]
+            parent = span["parent_id"]
             if parent and parent in spans:
                 spans[parent]["children"].append(span_name)
                 # Remove from root spans if it was temporarily there
@@ -627,7 +639,7 @@ class TraceClient:
                 
             span = spans[span_name]
             indent = "  " * level
-            parent_info = f" (parent: {span['parent']})" if span["parent"] else ""
+            parent_info = f" (parent_id: {span['parent_id']})" if span["parent_id"] else ""
             print(f"{indent}→ {span_name}{parent_info}")
             
             # Print children
@@ -647,253 +659,66 @@ class TraceClient:
     
     def condense_trace(self, entries: List[dict]) -> List[dict]:
         """
-        Condenses trace entries into a single entry for each function call,
-        preserving parent-child span relationships with consistent depths.
+        Condenses trace entries into a single entry for each span instance,
+        preserving parent-child span relationships using span_id and parent_span_id.
         """
-        condensed = []
-        active_functions = {}  # Map of function name to its entry
-        function_entries = {}  # Store entries for each function
-        call_stack = []  # Track the active function call stack for correct hierarchy
-        execution_timeline = []  # Timeline of function entry/exit for analysis
-        
-        # Record the actual caller for functions
-        caller_for_function = {}
-        
-        # First pass: collect and organize all trace entries
+        spans_by_id: Dict[str, dict] = {}
+
+        # First pass: Group entries by span_id and gather data
         for entry in entries:
-            function = entry["function"]
-            is_enter = entry["type"] == "enter"
-            is_exit = entry["type"] == "exit"
-            
-            # Add to execution timeline for analyzing call patterns
-            if is_enter or is_exit:
-                execution_timeline.append({
-                    "function": function,
-                    "type": entry["type"],
-                    "timestamp": entry["timestamp"],
-                    "parent_span": entry.get("parent_span")
-                })
-            
-            if is_enter:
-                # Create function entry with explicitly provided parent
-                function_entries[function] = {
-                    "depth": entry["depth"],
-                    "function": function,
-                    "timestamp": entry["timestamp"],
-                    "inputs": None,
-                    "output": None,
-                    "evaluation_runs": [],
-                    "span_type": entry.get("span_type", "span"),
-                    "parent_span": entry.get("parent_span")
-                }
-                
-                # Record the currently active function as the caller
-                if call_stack:
-                    # The most recent function on the stack is the caller
-                    caller_for_function[function] = call_stack[-1]
-                
-                active_functions[function] = function_entries[function]
-                call_stack.append(function)
-                
-            elif is_exit and function in active_functions:
-                # Complete the function entry
-                current_entry = function_entries[function]
-                current_entry["duration"] = entry["timestamp"] - current_entry["timestamp"]
-                condensed.append(current_entry)
-                
-                # Remove from active functions and call stack
-                del active_functions[function]
-                if function in call_stack:
-                    call_stack.remove(function)
-                
-            # Update function entries with additional data
-            elif entry["type"] in ["input", "output", "evaluation"] and function in function_entries:
-                current_entry = function_entries[function]
+            span_id = entry.get("span_id")
+            if not span_id:
+                continue # Skip entries without a span_id (should not happen)
+
+            if entry["type"] == "enter":
+                if span_id not in spans_by_id:
+                    spans_by_id[span_id] = {
+                        "span_id": span_id,
+                        "function": entry["function"],
+                        "depth": entry["depth"], # Use the depth recorded at entry time
+                        "timestamp": entry["timestamp"],
+                        "parent_span_id": entry.get("parent_span_id"),
+                        "span_type": entry.get("span_type", "span"),
+                        "inputs": None,
+                        "output": None,
+                        "evaluation_runs": [],
+                        "duration": None
+                    }
+                # Handle potential duplicate enter events if necessary (e.g., log warning)
+
+            elif span_id in spans_by_id:
+                current_span_data = spans_by_id[span_id]
                 
                 if entry["type"] == "input" and entry["inputs"]:
-                    current_entry["inputs"] = entry["inputs"]
-                    
-                    # Extract explicit parent information if provided in inputs
-                    if "parent_span" in entry["inputs"] and entry["inputs"]["parent_span"]:
-                        current_entry["parent_span"] = entry["inputs"]["parent_span"]
-                    
-                if entry["type"] == "output" and "output" in entry:
-                    current_entry["output"] = entry["output"]
-                    
-                if entry["type"] == "evaluation" and "evaluation_runs" in entry:
-                    current_entry["evaluation_runs"] = entry["evaluation_runs"]
-        
-        # Sort timeline by timestamp to analyze execution flow
-        execution_timeline.sort(key=lambda x: x["timestamp"])
-        
-        # Analyze execution timeline to infer parent-child relationships
-        function_states = {}  # Track function start/end times
-        
-        # Build function state map with start/end times
-        for event in execution_timeline:
-            function = event["function"]
-            if event["type"] == "enter":
-                function_states[function] = {
-                    "start": event["timestamp"],
-                    "end": None,
-                    "parent": event.get("parent_span")
-                }
-            elif event["type"] == "exit" and function in function_states:
-                function_states[function]["end"] = event["timestamp"]
-        
-        # Analyze function call patterns to determine accurate parent-child relationships
-        direct_callers = {}
-        
-        # Find direct caller-callee relationships based on timing and the execution flow
-        for i, event in enumerate(execution_timeline):
-            if event["type"] != "enter":
-                continue
-                
-            function = event["function"]
-            start_time = event["timestamp"]
-            
-            # Find the most recent function that was active when this one started
-            # (excluding itself and parallel siblings)
-            active_at_start = []
-            for j in range(i-1, -1, -1):
-                prev_event = execution_timeline[j]
-                prev_fn = prev_event["function"]
-                
-                if prev_fn == function:
-                    continue
-                    
-                if prev_event["type"] == "enter":
-                    # This function started before the current one
-                    # Check if it was still active when the current function started
-                    is_active = True
-                    for k in range(j+1, i):
-                        if execution_timeline[k]["type"] == "exit" and execution_timeline[k]["function"] == prev_fn:
-                            is_active = False
-                            break
-                    
-                    if is_active:
-                        active_at_start.append((prev_fn, execution_timeline[j]["timestamp"]))
-            
-            # Sort active functions by start time (most recent first)
-            active_at_start.sort(key=lambda x: x[1], reverse=True)
-            
-            # Record the most recently started function as the likely caller
-            if active_at_start:
-                direct_callers[function] = active_at_start[0][0]
-        
-        # Now update parent_span information in condensed entries based on caller relationships
-        for entry in condensed:
-            function = entry["function"]
-            
-            # Apply parent-child relationship insights from call analysis
-            # Prefer explicit parent_span if provided
-            if not entry.get("parent_span") and function in direct_callers:
-                entry["parent_span"] = direct_callers[function]
-            
-            # Fall back to caller_for_function if we have it
-            if not entry.get("parent_span") and function in caller_for_function:
-                entry["parent_span"] = caller_for_function[function]
-        
-        # Sort by timestamp for consistent ordering
-        condensed.sort(key=lambda x: x["timestamp"])
-        
-        # Analyze each function to identify specific calling patterns
-        # This helps with edge cases in the async context
-        for i, entry in enumerate(condensed):
-            function = entry["function"]
-            fn_timestamp = entry["timestamp"]
-            
-            # For functions without an explicit parent_span, try to infer based on timing
-            if not entry.get("parent_span"):
-                # Look backwards through the timeline for the most likely parent
-                most_recent_active_parent = None
-                max_start_time = -1
+                    # Merge inputs if multiple are recorded, or just assign
+                    if current_span_data["inputs"] is None:
+                        current_span_data["inputs"] = entry["inputs"]
+                    elif isinstance(current_span_data["inputs"], dict) and isinstance(entry["inputs"], dict):
+                        current_span_data["inputs"].update(entry["inputs"])
+                    # Add more sophisticated merging if needed
 
-                for j in range(i - 1, -1, -1):
-                    prev_entry = condensed[j]
-                    prev_fn = prev_entry["function"]
-                    prev_timestamp = prev_entry["timestamp"]
-                    
-                    # Parent must start before the child
-                    if prev_timestamp >= fn_timestamp:
-                        continue
+                elif entry["type"] == "output" and "output" in entry:
+                    current_span_data["output"] = entry["output"]
 
-                    # Check if the potential parent was still active when the child started
-                    prev_end_time = prev_timestamp + prev_entry.get("duration", float('inf'))
-                    if prev_end_time >= fn_timestamp:
-                        # This function was active. Is it the most recently started one?
-                        if prev_timestamp > max_start_time:
-                            max_start_time = prev_timestamp
-                            most_recent_active_parent = prev_fn
-                
-                # Assign the inferred parent if found
-                if most_recent_active_parent:
-                    entry["parent_span"] = most_recent_active_parent
+                elif entry["type"] == "evaluation" and entry.get("evaluation_runs"):
+                    if current_span_data.get("evaluation_runs") is None:
+                        current_span_data["evaluation_runs"] = []
+                    current_span_data["evaluation_runs"].extend(entry["evaluation_runs"])
 
-        # Step 2: Analyze the spans to determine parent-child relationships
+                elif entry["type"] == "exit":
+                    if current_span_data["duration"] is None: # Calculate duration only once
+                        start_time = current_span_data.get("timestamp", entry["timestamp"])
+                        current_span_data["duration"] = entry["timestamp"] - start_time
+                    # Update depth if exit depth is different (though current span() implementation keeps it same)
+                    # current_span_data["depth"] = entry["depth"] 
+
+        # Convert dictionary to a list
+        condensed_list = list(spans_by_id.values())
         
-        # Build map of parent to children
-        parent_to_children = {}
-        for entry in condensed:
-            if "parent_span" in entry and entry["parent_span"]:
-                parent = entry["parent_span"]
-                if parent not in parent_to_children:
-                    parent_to_children[parent] = []
-                parent_to_children[parent].append(entry["function"])
-        
-        # Create a map of function names to their entries for easier lookup
-        spans_by_id = {entry["function"]: entry for entry in condensed}
-        
-        # Build parent-child relationships
-        parent_to_children = {}
-        for entry in condensed:
-            parent_span = entry.get("parent_span")
-            if parent_span and parent_span in spans_by_id:
-                if parent_span not in parent_to_children:
-                    parent_to_children[parent_span] = []
-                if entry["function"] not in parent_to_children[parent_span]:
-                    parent_to_children[parent_span].append(entry["function"])
-        
-        # Identify root spans (those without parents or with parents not in our spans)
-        root_spans = []
-        for entry in condensed:
-            parent_span = entry.get("parent_span")
-            if not parent_span or parent_span not in spans_by_id:
-                root_spans.append(entry["function"])
-        
-        # Calculate depths based on parent-child relationships
-        calculated_depths = {}
-        
-        def calculate_depth(function_name, current_depth=0, visited=None):
-            """Recursively calculate depth based on parent-child relationship"""
-            if visited is None:
-                visited = set()
-                
-            # Avoid cycles
-            if function_name in visited:
-                return
-            
-            visited.add(function_name)
-            calculated_depths[function_name] = current_depth
-            
-            # Calculate depths for all children
-            for child in parent_to_children.get(function_name, []):
-                calculate_depth(child, current_depth + 1, visited)
-        
-        # Start with root spans at depth 0
-        for root in root_spans:
-            calculate_depth(root, 0)
-        
-        # Update all entries with their calculated depths
-        for entry in condensed:
-            function = entry["function"]
-            if function in calculated_depths:
-                entry["depth"] = calculated_depths[function]
-            else:
-                # Fallback to original depth if not calculated
-                entry["depth"] = entry.get("depth", 0)
-        
-        return condensed
+        # Optional: Sort by timestamp for deterministic output
+        condensed_list.sort(key=lambda x: x.get("timestamp", 0))
+
+        return condensed_list
 
     def save(self, empty_save: bool = False, overwrite: bool = False) -> Tuple[str, dict]:
         """
