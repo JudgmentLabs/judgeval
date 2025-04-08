@@ -29,31 +29,6 @@ class ScoringResult(BaseModel):
     # Additional fields for internal use
     run_duration: Optional[float] = None
     evaluation_cost: Optional[float] = None
-
-    def update_scorer_data(self, scorer_data: ScorerData):
-        """
-        Updates scorer data field of test case after the scorers have been
-        evaluated on this test case.
-        """
-        debug(f"Updating scorer data for example '{self.name}' with scorer: {scorer_data}")
-        # self.scorers_data is a list of ScorerData objects that contain the 
-        # evaluation results of each scorer on this test case
-        if self.scorers_data is None:
-            self.scorers_data = [scorer_data]
-        else:
-            self.scorers_data.append(scorer_data)
-
-        if self.success is None:
-            # self.success will be None when it is a message
-            # in that case we will be setting success for the first time
-            self.success = scorer_data.success
-        else:
-            if scorer_data.success is False:
-                debug(f"Example '{self.name}' marked as failed due to scorer: {scorer_data}")
-                self.success = False
-
-    def update_run_duration(self, run_duration: float):
-        self.run_duration = run_duration
     
     def to_dict(self) -> dict:
         """Convert the ScoringResult instance to a dictionary, properly serializing scorer_data."""
@@ -74,6 +49,9 @@ class ScoringResult(BaseModel):
 
 def generate_scoring_result(
     example: Example,
+    success: bool,
+    scorers_data: List[ScorerData],
+    run_duration: float,
 ) -> ScoringResult:
     """
     Creates a final ScoringResult object for an evaluation run based on the results from a completed LLMApiTestCase.
@@ -81,22 +59,18 @@ def generate_scoring_result(
     When an LLMTestCase is executed, it turns into an LLMApiTestCase and the progress of the evaluation run is tracked.
     At the end of the evaluation run, we create a TestResult object out of the completed LLMApiTestCase.
     """
-    success = True
     if example.name is not None:
         name = example.name
     else:
         name = "Test Case Placeholder"
         debug(f"No name provided for example, using default name: {name}")
-    scorers_data = []
-
     debug(f"Creating ScoringResult for: {name}")
     scoring_result = ScoringResult(
         name=name,
         data_object=example,
         success=success,
         scorers_data=scorers_data,
-        run_duration=None,
+        run_duration=run_duration,
         evaluation_cost=None,
-        trace_id=example.trace_id
     )
     return scoring_result

@@ -399,7 +399,6 @@ async def a_eval_examples_helper(
         scorer.error = None  # Reset scorer error
 
     # scoring the Example
-    scoring_result = generate_scoring_result(example)  # Creates ScoringResult
     scoring_start_time = time.perf_counter()
     await score_with_indicator(
         scorers=scorers,
@@ -411,18 +410,20 @@ async def a_eval_examples_helper(
 
     # Now that all the scoring functions of each scorer have executed, we collect 
     # the results and update the ScoringResult with the scorer data
+    success = True
+    scorer_data_list = []
     for scorer in scorers:
         # At this point, the scorer has been executed and already contains data.
         if getattr(scorer, 'skipped', False):
             continue
         scorer_data = create_scorer_data(scorer)  # Fetch scorer data from completed scorer evaluation
-        scoring_result.update_scorer_data(scorer_data)  # Update ScoringResult with the same scorer data
+        success = success and scorer_data.success
+        scorer_data_list.append(scorer_data)
         
     scoring_end_time = time.perf_counter()
     run_duration = scoring_end_time - scoring_start_time
     
-    scoring_result.update_run_duration(run_duration)   # Update ScoringResult with execution time duration
-    
+    scoring_result = generate_scoring_result(example, scorer_data_list, run_duration, success)
     scoring_results[score_index] = scoring_result
     
     if pbar is not None:

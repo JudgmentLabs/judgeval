@@ -78,56 +78,10 @@ class TestScoringResult:
         assert "ScoringResult" in str_result
         assert "success=True" in str_result
 
-    def test_update_scorer_data_initial(self, sample_scorer_data):
-        """Test updating scorer data for the first time"""
-        result = ScoringResult(
-            success=True,
-            scorers_data=[]
-        )
-        result.update_scorer_data(sample_scorer_data)
-        
-        assert result.success == True
-        assert len(result.scorers_data) == 1
-        assert result.scorers_data[0] == sample_scorer_data
-    
-    def test_update_scorer_data_multiple(self, sample_scorer_data):
-        """Test updating scorer data multiple times"""
-        result = ScoringResult(
-            success=True,
-            scorers_data=[]
-        )
-        
-        # Add first scorer
-        result.update_scorer_data(sample_scorer_data)
-        
-        # Add second scorer with failure
-        failed_scorer = ScorerData(
-            name="failed_scorer",
-            threshold=1.0,
-            success=False,          
-            score=0.0,
-            metadata={}
-        )
-        result.update_scorer_data(failed_scorer)
-        
-        assert result.success == False
-        assert len(result.scorers_data) == 2
-        assert result.scorers_data[1] == failed_scorer
-    
-
-    def test_update_run_duration(self):
-        """Test updating run duration"""
-        result = ScoringResult(
-            success=True,
-            scorers_data=[]
-        )
-        result.update_run_duration(1.5)
-        assert result.run_duration == 1.5
-
 class TestGenerateScoringResult:
     def test_generate_from_example(self, sample_example):
         """Test generating ScoringResult from Example"""
-        result = generate_scoring_result(sample_example)
+        result = generate_scoring_result(sample_example, True, [], 0.0)
         
         assert isinstance(result, ScoringResult)
         assert result.data_object.input == sample_example.input
@@ -147,7 +101,7 @@ class TestGenerateScoringResult:
             scorers_data=[]
         )
         
-        result = generate_scoring_result(minimal_example)
+        result = generate_scoring_result(minimal_example, True, [], 0.0)
         assert isinstance(result, ScoringResult)
         assert result.success is True
         assert result.scorers_data == []

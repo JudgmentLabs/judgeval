@@ -848,11 +848,7 @@ async def test_a_eval_examples_helper_success(
         mock_scoring_result = ScoringResult(
             success=True,
             scorers_data=[mock_scorer_data],
-            input=mock_example.input,
-            actual_output=mock_example.actual_output,
-            expected_output=mock_example.expected_output,
-            context=mock_example.context,
-            retrieval_context=mock_example.retrieval_context,
+            data_object=mock_example,
             trace_id=mock_example.trace_id
         )
         mock_generate_result.return_value = mock_scoring_result
