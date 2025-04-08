@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 from typing import List, Union, Optional, Dict, Any, Union
 from judgeval.common.logger import debug, error
-
+from pydantic import BaseModel
 from judgeval.data import ScorerData, Example
 
-@dataclass
-class ScoringResult:
+
+class ScoringResult(BaseModel):
     """
     A ScoringResult contains the output of one or more scorers applied to a single example.
     Ie: One input, one actual_output, one expected_output, etc..., and 1+ scorer (Faithfulness, Hallucination, Summarization, etc...)
@@ -14,15 +14,7 @@ class ScoringResult:
         success (bool): Whether the evaluation was successful. 
                         This means that all scorers applied to this example returned a success.
         scorer_data (List[ScorerData]): The scorers data for the evaluated example
-        input (Optional[str]): The input to the example
-        actual_output (Optional[str]): The actual output of the example
-        expected_output (Optional[str]): The expected output of the example
-        context (Optional[List[str]]): The context of the example
-        retrieval_context (Optional[List[str]]): The retrieval context of the example
-        additional_metadata (Optional[Dict[str, Any]]): The additional metadata of the example
-        tools_called (Optional[List[str]]): The tools called by the example
-        expected_tools (Optional[List[str]]): The expected tools of the example
-        trace_id (Optional[str]): The trace id of the example
+        data_object (Optional[Example]): The original example object that was used to create the ScoringResult, can be Example, CustomExample (future), WorkflowRun (future)
         
     """
     # Fields for scoring outputs 
@@ -30,20 +22,10 @@ class ScoringResult:
     scorers_data: Union[List[ScorerData], None]
     name: Optional[str] = None
 
-    # Inputs from the original example
-    input: Optional[str] = None
-    actual_output: Optional[Union[str, List[str]]] = None
-    expected_output: Optional[Union[str, List[str]]] = None
-    context: Optional[List[str]] = None
-    retrieval_context: Optional[List[str]] = None
-    additional_metadata: Optional[Dict[str, Any]] = None
-    tools_called: Optional[List[str]] = None
-    expected_tools: Optional[List[str]] = None
+    # The original example object that was used to create the ScoringResult
+    data_object: Optional[Example] = None #can be Example, CustomExample (future), WorkflowRun (future)
     trace_id: Optional[str] = None
     
-    example_id: Optional[str] = None
-    eval_run_name: Optional[str] = None
-
     # Additional fields for internal use
     run_duration: Optional[float] = None
     evaluation_cost: Optional[float] = None
@@ -78,31 +60,16 @@ class ScoringResult:
         return {
             "success": self.success,
             "scorers_data": [scorer_data.to_dict() for scorer_data in self.scorers_data] if self.scorers_data else None,
-            "input": self.input,
-            "actual_output": self.actual_output,
-            "expected_output": self.expected_output,
-            "context": self.context,
-            "retrieval_context": self.retrieval_context,
-            "additional_metadata": self.additional_metadata,
-            "tools_called": self.tools_called,
-            "expected_tools": self.expected_tools,
-            "trace_id": self.trace_id,
-            "example_id": self.example_id
+            "data_object": self.data_object.to_dict() if self.data_object else None,
         }
-    
+
     def __str__(self) -> str:
         return f"ScoringResult(\
             success={self.success}, \
             scorer_data={self.scorers_data}, \
-            input={self.input}, \
-            actual_output={self.actual_output}, \
-            expected_output={self.expected_output}, \
-            context={self.context}, \
-            retrieval_context={self.retrieval_context}, \
-            additional_metadata={self.additional_metadata}, \
-            tools_called={self.tools_called}, \
-            expected_tools={self.expected_tools}, \
-            trace_id={self.trace_id})"
+            data_object={self.data_object}, \
+            run_duration={self.run_duration}, \
+            evaluation_cost={self.evaluation_cost})"
 
 
 def generate_scoring_result(
@@ -125,18 +92,11 @@ def generate_scoring_result(
     debug(f"Creating ScoringResult for: {name}")
     scoring_result = ScoringResult(
         name=name,
-        input=example.input,
-        actual_output=example.actual_output,
-        expected_output=example.expected_output,
-        context=example.context,
-        retrieval_context=example.retrieval_context,
-        tools_called=example.tools_called,
-        expected_tools=example.expected_tools,
+        data_object=example,
         success=success,
         scorers_data=scorers_data,
         run_duration=None,
         evaluation_cost=None,
-        additional_metadata=example.additional_metadata,
         trace_id=example.trace_id
     )
     return scoring_result

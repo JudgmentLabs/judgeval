@@ -117,21 +117,23 @@ def merge_results(api_results: List[ScoringResult], local_results: List[ScoringR
     
     # Each ScoringResult in api and local have all the same fields besides `scorers_data`
     for api_result, local_result in zip(api_results, local_results):
-        if api_result.input != local_result.input:
+        if not (api_result.data_object and local_result.data_object):
+            raise ValueError("Data object is None in one of the results.")
+        if api_result.data_object.input != local_result.data_object.input:
             raise ValueError("The API and local results are not aligned.")
-        if api_result.actual_output != local_result.actual_output:
+        if api_result.data_object.actual_output != local_result.data_object.actual_output:
             raise ValueError("The API and local results are not aligned.")
-        if api_result.expected_output != local_result.expected_output:
+        if api_result.data_object.expected_output != local_result.data_object.expected_output:
             raise ValueError("The API and local results are not aligned.")
-        if api_result.context != local_result.context:
+        if api_result.data_object.context != local_result.data_object.context:
             raise ValueError("The API and local results are not aligned.")
-        if api_result.retrieval_context != local_result.retrieval_context:
+        if api_result.data_object.retrieval_context != local_result.data_object.retrieval_context:
             raise ValueError("The API and local results are not aligned.")
-        if api_result.additional_metadata != local_result.additional_metadata:
+        if api_result.data_object.additional_metadata != local_result.data_object.additional_metadata:
             raise ValueError("The API and local results are not aligned.")
-        if api_result.tools_called != local_result.tools_called:
+        if api_result.data_object.tools_called != local_result.data_object.tools_called:
             raise ValueError("The API and local results are not aligned.")
-        if api_result.expected_tools != local_result.expected_tools:
+        if api_result.data_object.expected_tools != local_result.data_object.expected_tools:
             raise ValueError("The API and local results are not aligned.")
         
         
@@ -422,23 +424,7 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_error
             
             # Convert the response data to `ScoringResult` objects
             debug("Processing API results")
-            for idx, result in enumerate(response_data["results"]):  
-                with example_logging_context(evaluation_run.examples[idx].timestamp, evaluation_run.examples[idx].example_id):
-                    for scorer in judgment_scorers:
-                        debug(f"Processing API result for example {idx} and scorer {scorer.score_type}")
-                    # filter for key-value pairs that are used to initialize ScoringResult
-                    # there may be some stuff in here that doesn't belong in ScoringResult
-                    # TODO: come back and refactor this to have ScoringResult take in **kwargs
-                    filtered_result = {k: v for k, v in result.items() if k in ScoringResult.__annotations__}
-                    
-                    # Convert scorers_data dicts to ScorerData objects
-                    if "scorers_data" in filtered_result and filtered_result["scorers_data"]:
-                        filtered_result["scorers_data"] = [
-                            ScorerData(**scorer_dict) 
-                            for scorer_dict in filtered_result["scorers_data"]
-                        ]
-                    
-                    api_results.append(ScoringResult(**filtered_result))
+            api_results = [ScoringResult(**result) for result in response_data["results"]]
         # Run local evals
         if local_scorers:  # List[JudgevalScorer]
             # We should be removing local scorers soon
@@ -477,7 +463,7 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_error
         #         judgment_api_key=evaluation_run.judgment_api_key,
         #         organization_id=evaluation_run.organization_id
         #     )
-        
+        # print(merged_results)
         if evaluation_run.log_results:
             pretty_str = run_with_spinner("Logging Results: ", log_evaluation_results, merged_results, evaluation_run)
             rprint(pretty_str)
@@ -504,15 +490,14 @@ def assert_test(scoring_results: List[ScoringResult]) -> None:
 
             # Create a test case context with all relevant fields
             test_case = {
-                'input': result.input,
-                'actual_output': result.actual_output,
-                'expected_output': result.expected_output,
-                'context': result.context,
-                'retrieval_context': result.retrieval_context,
-                'additional_metadata': result.additional_metadata,
-                'tools_called': result.tools_called,
-                'expected_tools': result.expected_tools,
-                'eval_run_name': result.eval_run_name,
+                'input': result.data_object.input,
+                'actual_output': result.data_object.actual_output,
+                'expected_output': result.data_object.expected_output,
+                'context': result.data_object.context,
+                'retrieval_context': result.data_object.retrieval_context,
+                'additional_metadata': result.data_object.additional_metadata,
+                'tools_called': result.data_object.tools_called,
+                'expected_tools': result.data_object.expected_tools,
                 'failed_scorers': []
             }
             if result.scorers_data:
@@ -533,7 +518,6 @@ def assert_test(scoring_results: List[ScoringResult]) -> None:
             error_msg += f"Additional Metadata: {fail_case['additional_metadata']}\n"
             error_msg += f"Tools Called: {fail_case['tools_called']}\n"
             error_msg += f"Expected Tools: {fail_case['expected_tools']}\n"
-            error_msg += f"Eval Run Name: {fail_case['eval_run_name']}\n"
     
             for fail_scorer in fail_case['failed_scorers']:
 

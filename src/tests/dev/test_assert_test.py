@@ -1,9 +1,19 @@
 import pytest
-from judgeval.data import ScoringResult, ScorerData
+from judgeval.data import ScoringResult, ScorerData, Example
 from judgeval.run_evaluation import assert_test
 
+@pytest.fixture
+def sample_example():
+    return Example(
+        name="test_example",
+        input="test input",
+        actual_output="test output",
+        expected_output="expected output",
+        context=["context1", "context2"],
+        retrieval_context=["retrieval1"],
+    )
 
-def test_assert_test_all_passing():
+def test_assert_test_all_passing(sample_example):
     """Test when all results are successful"""
     scorer_data = ScorerData(
         name="test_scorer",
@@ -18,14 +28,9 @@ def test_assert_test_all_passing():
         verbose_logs="test logs",
         additional_metadata={}
     )
-    
+
     result = ScoringResult(
-        input="test input",
-        actual_output="test output",
-        expected_output="expected output",
-        context="test context",
-        retrieval_context="test retrieval",
-        eval_run_name="test_run",
+        data_object=sample_example,
         success=True,
         scorers_data=[scorer_data]
     )
@@ -33,7 +38,7 @@ def test_assert_test_all_passing():
     # Should not raise any exception
     assert_test([result])
 
-def test_assert_test_failed_scorer():
+def test_assert_test_failed_scorer(sample_example):
     """Test when a scorer fails"""
     failed_scorer = ScorerData(
         name="failed_scorer",
@@ -50,12 +55,7 @@ def test_assert_test_failed_scorer():
     )
     
     result = ScoringResult(
-        input="test input",
-        actual_output="test output",
-        expected_output="expected output",
-        context="test context",
-        retrieval_context="test retrieval",
-        eval_run_name="test_run",
+        data_object=sample_example,
         success=False,
         scorers_data=[failed_scorer]
     )
@@ -70,7 +70,7 @@ def test_assert_test_failed_scorer():
     assert "failed_scorer" in error_msg
     assert "Score below threshold" in error_msg
 
-def test_assert_test_multiple_failed_scorers():
+def test_assert_test_multiple_failed_scorers(sample_example):
     """Test when multiple scorers fail"""
     failed_scorer1 = ScorerData(
         name="scorer1",
@@ -100,13 +100,8 @@ def test_assert_test_multiple_failed_scorers():
         additional_metadata={}
     )
     
-    result = ScoringResult(
-        input="test input",
-        actual_output="test output",
-        expected_output="expected output",
-        context="test context",
-        retrieval_context="test retrieval",
-        eval_run_name="test_run",
+    result = ScoringResult( 
+        data_object=sample_example,
         success=False,
         scorers_data=[failed_scorer1, failed_scorer2]
     )
@@ -120,15 +115,10 @@ def test_assert_test_multiple_failed_scorers():
     assert "First failure" in error_msg
     assert "Second failure" in error_msg
 
-def test_assert_test_no_scorer_data():
+def test_assert_test_no_scorer_data(sample_example):
     """Test when result has no scorer data"""
     result = ScoringResult(
-        input="test input",
-        actual_output="test output",
-        expected_output="expected output",
-        context="test context",
-        retrieval_context="test retrieval",
-        eval_run_name="test_run",
+        data_object=sample_example,
         success=False,
         scorers_data=None
     )

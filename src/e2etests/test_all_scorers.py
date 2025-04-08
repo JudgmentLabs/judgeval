@@ -711,11 +711,11 @@ def print_debug_on_failure(result) -> bool:
     """
     if not result.success:
         print("\n=== Test Failure Details ===")
-        print(f"Input: {result.input}")
-        print(f"Output: {result.actual_output}")
+        print(f"Input: {result.data_object.input}")
+        print(f"Output: {result.data_object.actual_output}")
         print(f"Success: {result.success}")
-        if hasattr(result, 'retrieval_context'):
-            print(f"Retrieval Context: {result.retrieval_context}")
+        if hasattr(result.data_object, 'retrieval_context'):
+            print(f"Retrieval Context: {result.data_object.retrieval_context}")
         print("\nScorer Details:")
         for scorer_data in result.scorers_data:
             print(f"- Name: {scorer_data.name}")

@@ -29,6 +29,7 @@ from judgeval.scorers import (
     InstructionAdherenceScorer,
     ExecutionOrderScorer,
 )
+from e2etests.test_all_scorers import print_debug_on_failure
 from judgeval.tracer import Tracer, wrap, TraceClient, TraceManagerClient
 from judgeval.constants import APIScorer
 from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
@@ -96,36 +97,6 @@ async def get_client():
         finally:
             logger.debug("Closing HTTP client")
             await client.aclose()
-
-
-def print_debug_on_failure(result) -> bool:
-    """
-    Helper function to print debug info only on test failure
-    
-    Returns:
-        bool: True if the test passed, False if it failed
-    """
-    if not result.success:
-        print("\n=== Test Failure Details ===")
-        print(f"Input: {result.input}")
-        print(f"Output: {result.actual_output}")
-        print(f"Success: {result.success}")
-        if hasattr(result, 'retrieval_context'):
-            print(f"Retrieval Context: {result.retrieval_context}")
-        print("\nScorer Details:")
-        for scorer_data in result.scorers_data:
-            print(f"- Name: {scorer_data.name}")
-            print(f"- Score: {scorer_data.score}")
-            print(f"- Threshold: {scorer_data.threshold}")
-            print(f"- Success: {scorer_data.success}")
-            print(f"- Reason: {scorer_data.reason}")
-            print(f"- Error: {scorer_data.error}")
-            if scorer_data.verbose_logs:
-                print(f"- Verbose Logs: {scorer_data.verbose_logs}")
-
-        return False
-    return True
-
 
 @pytest_asyncio.fixture
 async def client():
