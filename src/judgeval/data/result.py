@@ -49,9 +49,9 @@ class ScoringResult(BaseModel):
 
 def generate_scoring_result(
     example: Example,
-    success: bool,
     scorers_data: List[ScorerData],
     run_duration: float,
+    success: bool,
 ) -> ScoringResult:
     """
     Creates a final ScoringResult object for an evaluation run based on the results from a completed LLMApiTestCase.
