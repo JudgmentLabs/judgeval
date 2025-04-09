@@ -15,6 +15,7 @@ import pytest
 from judgeval.tracer import Tracer, wrap, TraceClient, TraceManagerClient
 from judgeval.constants import APIScorer
 from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
+from judgeval.data import Example
 
 # Initialize the tracer and clients
 judgment = Tracer(api_key=os.getenv("JUDGMENT_API_KEY"))
@@ -33,13 +34,17 @@ async def make_upper(input: str) -> str:
     """
     output = input.upper()
     
-    judgment.async_evaluate(
-        scorers=[FaithfulnessScorer(threshold=0.5)],
+    example = Example(
         input="What if these shoes don't fit?",
         actual_output="We offer a 30-day full refund at no extra cost.",
         retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
         expected_output="We offer a 30-day full refund at no extra cost.",
-        expected_tools=["refund"],
+        expected_tools=["refund"]
+    )
+    
+    judgment.async_evaluate(
+        scorers=[FaithfulnessScorer(threshold=0.5)],
+        example=example,
         model="gpt-4o-mini",
         log_results=True
     )
@@ -51,8 +56,7 @@ async def make_upper(input: str) -> str:
 async def make_lower(input):
     output = input.lower()
     
-    judgment.async_evaluate(
-        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+    example = Example(
         input="How do I reset my password?",
         actual_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
         expected_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
@@ -60,7 +64,12 @@ async def make_lower(input):
         retrieval_context=["Password reset instructions"],
         tools_called=["authentication"],
         expected_tools=["authentication"],
-        additional_metadata={"difficulty": "medium"},
+        additional_metadata={"difficulty": "medium"}
+    )
+    
+    judgment.async_evaluate(
+        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+        example=example,
         model="gpt-4o-mini",
         log_results=True
     )
@@ -75,12 +84,17 @@ def llm_call(input):
 @pytest.mark.asyncio
 async def answer_user_question(input):
     output = llm_call(input)
-    judgment.async_evaluate(
-        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+    
+    example = Example(
         input=input,
         actual_output=output,
         retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
-        expected_output="We offer a 30-day full refund at no extra cost.",
+        expected_output="We offer a 30-day full refund at no extra cost."
+    )
+    
+    judgment.async_evaluate(
+        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+        example=example,
         model="gpt-4o-mini",
         log_results=True
     )
@@ -105,10 +119,14 @@ async def make_poem(input: str) -> str:
         )
         anthropic_result = anthropic_response.content[0].text
         
+        example = Example(
+            input=input,
+            actual_output=anthropic_result
+        )
+        
         judgment.async_evaluate(
             scorers=[AnswerRelevancyScorer(threshold=0.5)],
-            input=input,
-            actual_output=anthropic_result,
+            example=example,
             model="gpt-4o-mini",
             log_results=True
         )

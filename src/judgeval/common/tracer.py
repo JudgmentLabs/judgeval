@@ -409,14 +409,7 @@ class TraceClient:
     def async_evaluate(
         self,
         scorers: List[Union[APIJudgmentScorer, JudgevalScorer]],
-        input: Optional[str] = None,
-        actual_output: Optional[str] = None,
-        expected_output: Optional[str] = None,
-        context: Optional[List[str]] = None,
-        retrieval_context: Optional[List[str]] = None,
-        tools_called: Optional[List[str]] = None,
-        expected_tools: Optional[List[str]] = None,
-        additional_metadata: Optional[Dict[str, Any]] = None,
+        example: Example,
         model: Optional[str] = None,
         log_results: Optional[bool] = True
     ):
@@ -424,17 +417,6 @@ class TraceClient:
             return
         
         start_time = time.time()  # Record start time
-        example = Example(
-            input=input,
-            actual_output=actual_output,
-            expected_output=expected_output,
-            context=context,
-            retrieval_context=retrieval_context,
-            tools_called=tools_called,
-            expected_tools=expected_tools,
-            additional_metadata=additional_metadata,
-            trace_id=self.trace_id
-        )
         loaded_rules = None
         if self.rules:
             loaded_rules = []
@@ -1159,7 +1141,13 @@ class Tracer:
                 # Get current trace from contextvars
                 current_trace = current_trace_var.get()
                 if current_trace and scorers:
-                    current_trace.async_evaluate(scorers=scorers, input=args, actual_output=kwargs, model=model, log_results=log_results)
+                    # Create an Example object from args and kwargs
+                    example = Example(
+                        input=str(args),
+                        actual_output=str(kwargs),
+                        trace_id=current_trace.trace_id
+                    )
+                    current_trace.async_evaluate(scorers=scorers, example=example, model=model, log_results=log_results)
                 return await func(*args, **kwargs)
             return async_wrapper
         else:
@@ -1168,7 +1156,13 @@ class Tracer:
                 # Get current trace from contextvars
                 current_trace = current_trace_var.get()
                 if current_trace and scorers:
-                    current_trace.async_evaluate(scorers=scorers, input=args, actual_output=kwargs, model=model, log_results=log_results)
+                    # Create an Example object from args and kwargs
+                    example = Example(
+                        input=str(args),
+                        actual_output=str(kwargs),
+                        trace_id=current_trace.trace_id
+                    )
+                    current_trace.async_evaluate(scorers=scorers, example=example, model=model, log_results=log_results)
                 return func(*args, **kwargs)
             return wrapper
         
@@ -1180,7 +1174,17 @@ class Tracer:
         current_trace = current_trace_var.get()
         
         if current_trace:
-            current_trace.async_evaluate(*args, **kwargs)
+            # If args[0] is an Example object, use it directly
+            if len(args) > 0 and isinstance(args[0], Example):
+                current_trace.async_evaluate(*args, **kwargs)
+            else:
+                # Create an Example object from the arguments
+                example = Example(
+                    input=str(args),
+                    actual_output=str(kwargs),
+                    trace_id=current_trace.trace_id
+                )
+                current_trace.async_evaluate(example=example, *args[1:], **kwargs)
         else:
             warnings.warn("No trace found, skipping evaluation")
 
