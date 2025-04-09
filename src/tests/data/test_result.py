@@ -81,7 +81,7 @@ class TestScoringResult:
 class TestGenerateScoringResult:
     def test_generate_from_example(self, sample_example):
         """Test generating ScoringResult from Example"""
-        result = generate_scoring_result(sample_example, True, [], 0.0)
+        result = generate_scoring_result(sample_example, [], 0.0, True)
         
         assert isinstance(result, ScoringResult)
         assert result.data_object.input == sample_example.input
@@ -101,7 +101,7 @@ class TestGenerateScoringResult:
             scorers_data=[]
         )
         
-        result = generate_scoring_result(minimal_example, True, [], 0.0)
+        result = generate_scoring_result(minimal_example, [], 0.0, True)
         assert isinstance(result, ScoringResult)
         assert result.success is True
         assert result.scorers_data == []
