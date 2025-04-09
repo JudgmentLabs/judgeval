@@ -9,8 +9,7 @@ from chromadb.utils import embedding_functions
 
 from judgeval.tracer import Tracer, wrap
 from judgeval.scorers import AnswerRelevancyScorer, FaithfulnessScorer
-from judgeval.data import Example
-from judgeval import JudgmentClient
+from judgeval.examples import Example
 
 destinations_data = [
     {
@@ -127,25 +126,14 @@ async def get_flights(destination):
     """Search for flights to the destination."""
     prompt = f"Flights to {destination} from major cities"
     flights_search = search_tavily(prompt)
-    
-    # Create an Example object for evaluation
     example = Example(
         input=prompt,
         actual_output=str(flights_search["results"]),
-        expected_output="",  # No expected output for this case
-        context=[],
-        retrieval_context=[]
+        model="gpt-4o"
     )
-    
-    client = JudgmentClient()
-    results = client.run_evaluation(
-        examples=[example],
+    judgment.async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
-        model="gpt-4o",
-        project_name="travel_agent_demo",
-        eval_run_name="flights_eval",
-        override=True,
-        log_results=True
+        example=example
     )
     return flights_search
 
@@ -154,25 +142,11 @@ async def get_weather(destination, start_date, end_date):
     """Search for weather information."""
     prompt = f"Weather forecast for {destination} from {start_date} to {end_date}"
     weather_search = search_tavily(prompt)
-    
-    # Create an Example object for evaluation
-    example = Example(
+    judgment.async_evaluate(
+        scorers=[AnswerRelevancyScorer(threshold=0.5)],
         input=prompt,
         actual_output=str(weather_search["results"]),
-        expected_output="",  # No expected output for this case
-        context=[],
-        retrieval_context=[]
-    )
-    
-    client = JudgmentClient()
-    results = client.run_evaluation(
-        examples=[example],
-        scorers=[AnswerRelevancyScorer(threshold=0.5)],
         model="gpt-4o",
-        project_name="travel_agent_demo",
-        eval_run_name="weather_eval",
-        override=True,
-        log_results=True
     )
     return weather_search
 
@@ -248,24 +222,15 @@ async def create_travel_plan(destination, start_date, end_date, research_data):
         ]
     ).choices[0].message.content
 
-    # Create an Example object for evaluation
     example = Example(
         input=prompt,
         actual_output=str(response),
-        expected_output="",  # No expected output for this case
-        context=[],
-        retrieval_context=[str(vector_db_context), str(research_data)]
+        retrieval_context=[str(vector_db_context), str(research_data)],
+        model="gpt-4o"
     )
-    
-    client = JudgmentClient()
-    results = client.run_evaluation(
-        examples=[example],
+    judgment.async_evaluate(
         scorers=[FaithfulnessScorer(threshold=0.5)],
-        model="gpt-4o",
-        project_name="travel_agent_demo",
-        eval_run_name="itinerary_eval",
-        override=True,
-        log_results=True
+        example=example
     )
     
     return response

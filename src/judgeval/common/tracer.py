@@ -1174,17 +1174,7 @@ class Tracer:
         current_trace = current_trace_var.get()
         
         if current_trace:
-            # If args[0] is an Example object, use it directly
-            if len(args) > 0 and isinstance(args[0], Example):
-                current_trace.async_evaluate(*args, **kwargs)
-            else:
-                # Create an Example object from the arguments
-                example = Example(
-                    input=str(args),
-                    actual_output=str(kwargs),
-                    trace_id=current_trace.trace_id
-                )
-                current_trace.async_evaluate(example=example, *args[1:], **kwargs)
+            current_trace.async_evaluate(*args, **kwargs)
         else:
             warnings.warn("No trace found, skipping evaluation")
 
