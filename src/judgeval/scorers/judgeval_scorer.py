@@ -34,6 +34,7 @@ class JudgevalScorer:
     async_mode: bool = True  # Whether to run the scorer in async mode
     verbose_mode: bool = True  # Whether to run the scorer in verbose mode
     include_reason: bool = False  # Whether to include the reason in the output
+    custom_example: bool = False  # Whether the scorer corresponds to CustomExamples
     error: Optional[str] = None  # The error message if the scorer failed
     evaluation_cost: Optional[float] = None  # The cost of running the scorer
     verbose_logs: Optional[str] = None  # The verbose logs of the scorer
@@ -52,6 +53,7 @@ class JudgevalScorer:
         async_mode: bool = True, 
         verbose_mode: bool = True, 
         include_reason: bool = False, 
+        custom_example: bool = False,
         error: Optional[str] = None, 
         evaluation_cost: Optional[float] = None, 
         verbose_logs: Optional[str] = None, 
@@ -78,6 +80,7 @@ class JudgevalScorer:
             self.async_mode = async_mode
             self.verbose_mode = verbose_mode
             self.include_reason = include_reason
+            self.custom_example = custom_example
             self.error = error
             self.evaluation_cost = evaluation_cost
             self.verbose_logs = verbose_logs

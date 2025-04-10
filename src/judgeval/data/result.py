@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import List, Union, Optional, Dict, Any, Union
 from judgeval.common.logger import debug, error
 from pydantic import BaseModel
-from judgeval.data import ScorerData, Example
+from judgeval.data import ScorerData, Example, CustomExample
 
 
 class ScoringResult(BaseModel):
@@ -23,7 +23,7 @@ class ScoringResult(BaseModel):
     name: Optional[str] = None
 
     # The original example object that was used to create the ScoringResult
-    data_object: Optional[Example] = None #can be Example, CustomExample (future), WorkflowRun (future)
+    data_object: Optional[Union[Example, CustomExample]] = None #can be Example, CustomExample (future), WorkflowRun (future)
     trace_id: Optional[str] = None
     
     # Additional fields for internal use

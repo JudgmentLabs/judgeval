@@ -132,6 +132,20 @@ example = Example(
     retrieval_context=["Sparkling water is carbonated and has no calories."]
 )
 ```
+## Custom Examples 
+
+Custom Examples are a way to evaluate your LLM system with more complex data structures. It is composed of the same fields as an `Example`, but the fields are dictionaries instead of strings.
+
+```python custom_example.py
+from judgeval.data import CustomExample
+
+example = CustomExample(
+    input={"question": "Is sparkling water healthy?"},
+    actual_output={"answer": "Sparkling water is neither healthy nor unhealthy."},
+)
+```
+
+Custom Examples are designed to be used with our Custom Scorers. See the [Custom Scorers](/evaluation/scorers/custom_scorers#custom-scorers-with-custom-examples) documentation for more information.
 
 ## Conclusion 
 

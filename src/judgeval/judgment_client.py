@@ -10,6 +10,7 @@ from judgeval.data.datasets import EvalDataset, EvalDatasetClient
 from judgeval.data import (
     ScoringResult, 
     Example,
+    CustomExample,
 )
 from judgeval.scorers import (
     APIJudgmentScorer, 
@@ -86,7 +87,7 @@ class JudgmentClient(metaclass=SingletonMeta):
 
     def run_evaluation(
         self, 
-        examples: List[Example],
+        examples: Union[List[Example], List[CustomExample]],
         scorers: List[Union[ScorerWrapper, JudgevalScorer]],
         model: Union[str, List[str], JudgevalJudge],
         aggregator: Optional[str] = None,
@@ -104,7 +105,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         Executes an evaluation of `Example`s using one or more `Scorer`s
         
         Args:
-            examples (List[Example]): The examples to evaluate
+            examples (Union[List[Example], List[CustomExample]]): The examples to evaluate
             scorers (List[Union[ScorerWrapper, JudgevalScorer]]): A list of scorers to use for evaluation
             model (Union[str, List[str], JudgevalJudge]): The model used as a judge when using LLM as a Judge
             aggregator (Optional[str]): The aggregator to use for evaluation if using Mixture of Judges
@@ -161,7 +162,6 @@ class JudgmentClient(metaclass=SingletonMeta):
                         loaded_rules.append(new_rule)
                     except Exception as e:
                         raise ValueError(f"Failed to process rule '{rule.name}': {str(e)}")
-
             eval = EvaluationRun(
                 log_results=log_results,
                 project_name=project_name,

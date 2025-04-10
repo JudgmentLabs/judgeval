@@ -11,6 +11,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from judgeval.data import (
     Example, 
+    CustomExample,
     ScoringResult,
     generate_scoring_result,
     create_scorer_data,
@@ -240,7 +241,7 @@ async def score_with_indicator(
 
 
 async def a_execute_scoring(
-    examples: List[Example],
+    examples: Union[List[Example], List[CustomExample]],
     scorers: List[JudgevalScorer],
     model: Optional[Union[str, List[str], JudgevalJudge]] = None,
     ignore_errors: bool = True,
@@ -256,7 +257,7 @@ async def a_execute_scoring(
     Each `Example` will be evaluated by all of the `JudgevalScorer`s in the `scorers` list.
 
     Args:
-        examples (List[Example]): A list of `Example` objects to be evaluated.
+        examples (Union[List[Example], List[CustomExample]]): A list of `Example` objects to be evaluated.
         scorers (List[JudgevalScorer]): A list of `JudgevalScorer` objects to evaluate the examples.
         model (Union[str, List[str], JudgevalJudge]): The model to use for evaluation.
         ignore_errors (bool): Whether to ignore errors during evaluation.
@@ -313,7 +314,7 @@ async def a_execute_scoring(
                             debug(f"Scorer threshold: {scorer.threshold}")
                         if hasattr(scorer, 'model'):
                             debug(f"Scorer model: {type(scorer.model).__name__}")
-                if isinstance(ex, Example):
+                if isinstance(ex, Example) or isinstance(ex, CustomExample):
                     if len(scorers) == 0:
                         pbar.update(1)
                         continue
@@ -339,7 +340,7 @@ async def a_execute_scoring(
             await asyncio.gather(*tasks)
     else:
         for i, ex in enumerate(examples):
-            if isinstance(ex, Example):
+            if isinstance(ex, Example) or isinstance(ex, CustomExample):
                 if len(scorers) == 0:
                     continue
 
@@ -366,7 +367,7 @@ async def a_execute_scoring(
 
 async def a_eval_examples_helper(
     scorers: List[JudgevalScorer],
-    example: Example,
+    example: Union[Example, CustomExample],
     scoring_results: List[ScoringResult],
     score_index: int,
     ignore_errors: bool,
