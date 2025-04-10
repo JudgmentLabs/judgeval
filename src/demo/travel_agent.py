@@ -9,7 +9,7 @@ from chromadb.utils import embedding_functions
 
 from judgeval.tracer import Tracer, wrap
 from judgeval.scorers import AnswerRelevancyScorer, FaithfulnessScorer
-from judgeval.examples import Example
+from judgeval.data import Example
 
 destinations_data = [
     {
@@ -128,12 +128,12 @@ async def get_flights(destination):
     flights_search = search_tavily(prompt)
     example = Example(
         input=prompt,
-        actual_output=str(flights_search["results"]),
-        model="gpt-4o"
+        actual_output=str(flights_search["results"])
     )
     judgment.async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
-        example=example
+        example=example,
+        model="gpt-4o"
     )
     return flights_search
 
@@ -142,11 +142,14 @@ async def get_weather(destination, start_date, end_date):
     """Search for weather information."""
     prompt = f"Weather forecast for {destination} from {start_date} to {end_date}"
     weather_search = search_tavily(prompt)
+    example = Example(
+        input=prompt,
+        actual_output=str(weather_search["results"])
+    )
     judgment.async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
-        input=prompt,
-        actual_output=str(weather_search["results"]),
-        model="gpt-4o",
+        example=example,
+        model="gpt-4o"
     )
     return weather_search
 
@@ -225,12 +228,12 @@ async def create_travel_plan(destination, start_date, end_date, research_data):
     example = Example(
         input=prompt,
         actual_output=str(response),
-        retrieval_context=[str(vector_db_context), str(research_data)],
-        model="gpt-4o"
+        retrieval_context=[str(vector_db_context), str(research_data)]
     )
     judgment.async_evaluate(
         scorers=[FaithfulnessScorer(threshold=0.5)],
-        example=example
+        example=example,
+        model="gpt-4o"
     )
     
     return response
