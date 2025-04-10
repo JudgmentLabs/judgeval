@@ -11,7 +11,8 @@ from rich import print as rprint
 from judgeval.data import (
     ScorerData, 
     ScoringResult,
-    Example
+    Example,
+    CustomExample
 )
 from judgeval.scorers import (
     JudgevalScorer, 
@@ -232,7 +233,7 @@ def log_evaluation_results(merged_results: List[ScoringResult], evaluation_run: 
                 "X-Organization-Id": evaluation_run.organization_id
             },
             json={
-                "results": [result.to_dict() for result in merged_results],
+                "results": [result.model_dump(warnings=False) for result in merged_results],
                 "project_name": evaluation_run.project_name,
                 "eval_name": evaluation_run.eval_name,
             },
@@ -373,12 +374,20 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_error
             local_scorers.append(scorer)
             debug(f"Added local scorer: {type(scorer).__name__}")
     
+    custom_example_check = [scorer.custom_example for scorer in local_scorers]
+    if any(custom_example_check) and not all(custom_example_check):
+        error("All scorers must be custom scorers if using custom examples")
+        raise ValueError("All scorers must be custom scorers if using custom examples")
+    
     debug(f"Found {len(judgment_scorers)} judgment scorers and {len(local_scorers)} local scorers")
     
     api_results: List[ScoringResult] = []
     local_results: List[ScoringResult] = []
 
     if async_execution:
+        if len(local_scorers) > 0:
+            error("Local scorers are not supported in async execution")
+            
         check_examples(evaluation_run.examples, evaluation_run.scorers)
         info("Starting async evaluation")
         payload = evaluation_run.model_dump(warnings=False)
@@ -396,7 +405,6 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_error
     else:
         if judgment_scorers:
             # Execute evaluation using Judgment API
-            check_examples(evaluation_run.examples, evaluation_run.scorers)
             info("Starting API evaluation")
             debug(f"Creating API evaluation run with {len(judgment_scorers)} scorers")
             try:  # execute an EvaluationRun with just JudgmentScorers
