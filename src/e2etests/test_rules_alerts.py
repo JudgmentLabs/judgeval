@@ -114,15 +114,18 @@ async def get_llm_response(question: str) -> str:
     )
     
     # Evaluate the response using the current trace
+    example = Example(
+        input=question,
+        actual_output=response.choices[0].message.content,
+        expected_output=None,  # No expected output for this test
+        model="gpt-4"
+    )
     judgment.async_evaluate(
         scorers=[
             FaithfulnessScorer(threshold=0.7),
             AnswerRelevancyScorer(threshold=0.7)
         ],
-        input=question,
-        actual_output=response.choices[0].message.content,
-        expected_output=None,  # No expected output for this test
-        model="gpt-4",
+        example=example,
         log_results=True
     )
     

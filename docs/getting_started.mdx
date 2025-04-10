@@ -142,10 +142,13 @@ def main():
         messages=[{"role": "user", "content": f"{task_input}"}]
     ).choices[0].message.content
 
+    example = Example(
+        input=task_input,
+        actual_output=res
+    )
     judgment.async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
-        input=task_input,
-        actual_output=res,
+        example=example,
         model="gpt-4o"
     )
 
