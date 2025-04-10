@@ -126,7 +126,6 @@ async def get_flights(destination):
     """Search for flights to the destination."""
     prompt = f"Flights to {destination} from major cities"
     flights_search = search_tavily(prompt)
-    # Create example object to pass to async_evaluate
     example = Example(
         input=prompt,
         actual_output=str(flights_search["results"])
@@ -143,7 +142,6 @@ async def get_weather(destination, start_date, end_date):
     """Search for weather information."""
     prompt = f"Weather forecast for {destination} from {start_date} to {end_date}"
     weather_search = search_tavily(prompt)
-    # Create example object to pass to async_evaluate
     example = Example(
         input=prompt,
         actual_output=str(weather_search["results"])
@@ -227,7 +225,6 @@ async def create_travel_plan(destination, start_date, end_date, research_data):
         ]
     ).choices[0].message.content
 
-    # Create example object to pass to async_evaluate
     example = Example(
         input=prompt,
         actual_output=str(response),
