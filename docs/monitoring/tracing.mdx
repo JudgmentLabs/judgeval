@@ -127,7 +127,7 @@ To execute an asynchronous evaluation, you can use the `trace.async_evaluate()` 
 ```python
 from judgeval.tracer import Tracer
 from judgeval.scorers import AnswerRelevancyScorer
-from judgeval.examples import Example
+from judgeval.data import Example
 
 judgment = Tracer(project_name="my_project")
 
@@ -136,16 +136,18 @@ def main():
     query = "What is the capital of France?"
     res = "The capital of France is Paris."  # Replace with your workflow logic
     
+    # Create an Example object to pass to async_evaluate
     example = Example(
         input=query,
         actual_output=res
     )
+    
+    # Run the evaluation with the Example object
     judgment.async_evaluate(
-        scorers=[AnswerRelevancyScorer(threshold=1.0)],
+        scorers=[AnswerRelevancyScorer(threshold=0.5)],
         example=example,
-        model="gpt-4o",
+        model="gpt-4o"
     )
-    return res
 ```
 
 <Tip>
