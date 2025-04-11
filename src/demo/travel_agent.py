@@ -84,7 +84,7 @@ Key Information:
 ]
 
 client = wrap(openai.Client(api_key=os.getenv("OPENAI_API_KEY")))
-judgment = Tracer(api_key=os.getenv("JUDGMENT_API_KEY"), project_name="travel_agent_demo", enable_evaluations=False, enable_monitoring=False)
+judgment = Tracer(api_key=os.getenv("JUDGMENT_API_KEY"), project_name="travel_agent_demo")
 
 def populate_vector_db(collection, destinations_data):
     """

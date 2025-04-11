@@ -65,10 +65,10 @@ def test_tracer_requires_api_key():
 def test_trace_entry_print(capsys):
     """Test TraceEntry print formatting"""
     entries = [
-        TraceEntry(type="enter", function="test_func", span_id="test-span-1", depth=1, message="test", timestamp=0),
-        TraceEntry(type="exit", function="test_func", span_id="test-span-1", depth=1, message="test", timestamp=0, duration=0.5),
-        TraceEntry(type="output", function="test_func", span_id="test-span-1", depth=1, message="test", timestamp=0, output="result"),
-        TraceEntry(type="input", function="test_func", span_id="test-span-1", depth=1, message="test", timestamp=0, inputs={"arg": 1}),
+        TraceEntry(type="enter", function="test_func", span_id="test-span-1", depth=1, message="test", created_at=0),
+        TraceEntry(type="exit", function="test_func", span_id="test-span-1", depth=1, message="test", created_at=0, duration=0.5),
+        TraceEntry(type="output", function="test_func", span_id="test-span-1", depth=1, message="test", created_at=0, output="result"),
+        TraceEntry(type="input", function="test_func", span_id="test-span-1", depth=1, message="test", created_at=0, inputs={"arg": 1}),
     ]
     
     expected_outputs = [
@@ -92,7 +92,7 @@ def test_trace_entry_to_dict():
         span_id="test-span-1",
         depth=1,
         message="test",
-        timestamp=0
+        created_at=0
     )
     data = entry.to_dict()
     assert data["type"] == "enter"
@@ -110,7 +110,7 @@ def test_trace_entry_to_dict():
         span_id="test-span-2",
         depth=1,
         message="test",
-        timestamp=0,
+        created_at=0,
         output=non_serializable
     )
     
@@ -217,36 +217,40 @@ def test_condense_trace(trace_client):
             "type": "enter",
             "function": "test_func",
             "span_id": span_id,
+            "trace_id": trace_client.trace_id,
             "depth": base_depth,
-            "timestamp": 1.0,
+            "created_at": "2024-01-01T00:00:01.000000",
             "parent_span_id": None
         },
         {
             "type": "input",
             "function": "test_func",
             "span_id": span_id,
+            "trace_id": trace_client.trace_id,
             "depth": base_depth + 1,
-            "timestamp": 1.1,
+            "created_at": "2024-01-01T00:00:01.100000",
             "inputs": {"x": 1}
         },
         {
             "type": "output",
             "function": "test_func",
             "span_id": span_id,
+            "trace_id": trace_client.trace_id,
             "depth": base_depth + 1,
-            "timestamp": 1.2,
+            "created_at": "2024-01-01T00:00:01.200000",
             "output": "result"
         },
         {
             "type": "exit",
             "function": "test_func",
             "span_id": span_id,
+            "trace_id": trace_client.trace_id,
             "depth": base_depth,
-            "timestamp": 2.0
+            "created_at": "2024-01-01T00:00:02.000000"
         },
     ]
     
-    condensed = trace_client.condense_trace(entries)
+    condensed, evals = trace_client.condense_trace(entries)
     print(f"{condensed=}")
     # Test that the condensed entry's depth matches the enter event's depth
     assert len(condensed) == 1
