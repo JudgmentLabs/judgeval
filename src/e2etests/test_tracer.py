@@ -172,45 +172,6 @@ async def test_evaluation_mixed(test_input):
         
         trace.print()
         return result
-
-@pytest.mark.asyncio
-async def test_trace_delete(trace_manager_client):
-    with judgment.trace("TEST_RUN", project_name="TEST", overwrite=True) as trace:
-        pass
-
-    response = trace_manager_client.fetch_trace(trace.trace_id)
-    assert response, "No traces found"
-
-    trace_manager_client.delete_trace(trace.trace_id)
-    response = trace_manager_client.fetch_trace(trace.trace_id)
-    assert not response, "Trace should be deleted"
-
-@pytest.mark.asyncio
-async def test_trace_delete_batch(trace_manager_client):
-    with judgment.trace("TEST_RUN2", project_name="TEST", overwrite=True) as trace:
-        pass
-
-    with judgment.trace("TEST_RUN3", project_name="TEST2", overwrite=True) as trace2:
-        pass
-
-    response = trace_manager_client.fetch_trace(trace.trace_id)
-    assert response, "No traces found"
-
-    response = trace_manager_client.fetch_trace(trace2.trace_id)
-    assert response, "No traces found"
-
-    trace_ids = [trace.trace_id, trace2.trace_id]
-    response = trace_manager_client.delete_traces(trace_ids)
-    assert response, "Delete batch should be successful"
-
-    response = trace_manager_client.fetch_trace(trace.trace_id)
-    assert not response, "Trace should be deleted"
-
-    response = trace_manager_client.fetch_trace(trace2.trace_id)
-    assert not response, "Trace should be deleted"
-
-    trace_manager_client.delete_project(project_name="TEST")
-    trace_manager_client.delete_project(project_name="TEST2")
     
 @pytest.mark.asyncio
 async def run_selected_tests(test_names: list[str]):

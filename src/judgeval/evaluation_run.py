@@ -34,6 +34,7 @@ class EvaluationRun(BaseModel):
     model: Union[str, List[str], JudgevalJudge]
     aggregator: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+    trace_span_id: Optional[str] = None
     # API Key will be "" until user calls client.run_eval(), then API Key will be set
     judgment_api_key: Optional[str] = ""
     override: Optional[bool] = False
