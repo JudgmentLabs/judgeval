@@ -177,23 +177,25 @@ async def test_trace_save_increment(client, cleanup_traces):
             "name": f"test_trace_{int(timestamp)}",
             "project_name": "test_project",
             "trace_id": str(uuid4()),
-            "created_at": str(timestamp),
+            "created_at": datetime.fromtimestamp(timestamp).isoformat(),
             "entries": [
                 {
-                    "timestamp": timestamp,
+                    "timestamp": datetime.fromtimestamp(timestamp).isoformat(),
                     "type": "span",
                     "name": "test_span",
                     "inputs": {"test": "input"},
                     "outputs": {"test": "output"},
                     "duration": 0.1,
                     "span_id": str(uuid4()),
-                    "parent_id": None
+                    "parent_id": None,
+                    "depth": 0
                 }
             ],
             "duration": 0.1,
             "token_counts": {"total": 10},
             "empty_save": False,
-            "overwrite": False
+            "overwrite": False,
+            "evaluation_runs": []
         }
         logger.debug(f"Created trace data: {trace_data}")
 
@@ -264,23 +266,25 @@ async def test_concurrent_trace_saves(client, cleanup_traces):
                     "name": f"concurrent_trace_{index}_{int(timestamp)}",
                     "project_name": "test_project",
                     "trace_id": str(uuid4()),
-                    "created_at": str(timestamp),
+                    "created_at": datetime.fromtimestamp(timestamp).isoformat(),
                     "entries": [
                         {
-                            "timestamp": timestamp,
+                            "timestamp": datetime.fromtimestamp(timestamp).isoformat(),
                             "type": "span",
                             "name": f"test_span_{index}",
                             "inputs": {"test": f"input_{index}"},
                             "outputs": {"test": f"output_{index}"},
                             "duration": 0.1,
                             "span_id": str(uuid4()),
-                            "parent_id": None
+                            "parent_id": None,
+                            "depth": 0
                         }
                     ],
                     "duration": 0.1,
                     "token_counts": {"total": 10},
                     "empty_save": False,
-                    "overwrite": False
+                    "overwrite": False,
+                    "evaluation_runs": []
                 }
 
                 response = await client.post(
@@ -450,29 +454,32 @@ async def test_burst_request_handling(client):
         "name": f"burst_test_trace_{int(timestamp)}",
         "project_name": "test_project",
         "trace_id": str(uuid4()),
-        "created_at": str(timestamp),
+        "created_at": datetime.fromtimestamp(timestamp).isoformat(),
         "entries": [
             {
-                "timestamp": timestamp,
+                "timestamp": datetime.fromtimestamp(timestamp).isoformat(),
                 "type": "span",
                 "name": "test_span",
                 "inputs": {"test": "input"},
                 "outputs": {"test": "output"},
                 "duration": 0.1,
                 "span_id": str(uuid4()),
-                "parent_id": None
+                "parent_id": None,
+                "depth": 0
             }
         ],
         "duration": 0.1,
         "token_counts": {"total": 10},
         "empty_save": False,
-        "overwrite": False
+        "overwrite": False,
+        "evaluation_runs": []
     }
     
     async def save_trace():
         # Create a unique trace ID for each request
         local_trace_data = trace_data.copy()
         local_trace_data["trace_id"] = str(uuid4())
+        local_trace_data["entries"][0]["span_id"] = str(uuid4())
         
         response = await client.post(
             f"{SERVER_URL}/traces/save/",
