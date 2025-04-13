@@ -73,7 +73,7 @@ class TraceEntry:
     span_id: str # Unique ID for this specific span instance
     depth: int    # Indentation level for nested calls
     message: str  # Human-readable description
-    created_at: float
+# created_at: Unix timestamp when entry was created, replacing the deprecated 'timestamp' field
     duration: Optional[float] = None  # Time taken (for exit/evaluation entries)
     trace_id: str = None # ID of the trace this entry belongs to
     output: Any = None  # Function output value
