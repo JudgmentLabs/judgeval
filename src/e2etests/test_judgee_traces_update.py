@@ -173,10 +173,11 @@ async def test_trace_save_increment(client, cleanup_traces):
         
         # Create a trace
         timestamp = time.time()
+        trace_id = str(uuid4())
         trace_data = {
             "name": f"test_trace_{int(timestamp)}",
             "project_name": "test_project",
-            "trace_id": str(uuid4()),
+            "trace_id": trace_id,
             "created_at": datetime.fromtimestamp(timestamp).isoformat(),
             "entries": [
                 {
@@ -187,6 +188,7 @@ async def test_trace_save_increment(client, cleanup_traces):
                     "outputs": {"test": "output"},
                     "duration": 0.1,
                     "span_id": str(uuid4()),
+                    "trace_id": trace_id,
                     "parent_id": None,
                     "depth": 0
                 }
@@ -262,10 +264,11 @@ async def test_concurrent_trace_saves(client, cleanup_traces):
         async def save_trace(index):
             try:
                 timestamp = time.time()
+                trace_id = str(uuid4())
                 trace_data = {
                     "name": f"concurrent_trace_{index}_{int(timestamp)}",
                     "project_name": "test_project",
-                    "trace_id": str(uuid4()),
+                    "trace_id": trace_id,
                     "created_at": datetime.fromtimestamp(timestamp).isoformat(),
                     "entries": [
                         {
@@ -276,6 +279,7 @@ async def test_concurrent_trace_saves(client, cleanup_traces):
                             "outputs": {"test": f"output_{index}"},
                             "duration": 0.1,
                             "span_id": str(uuid4()),
+                            "trace_id": trace_id,
                             "parent_id": None,
                             "depth": 0
                         }
@@ -450,10 +454,11 @@ async def test_burst_request_handling(client):
     
     # Send a small burst of trace save requests
     timestamp = time.time()
+    trace_id = str(uuid4())
     trace_data = {
         "name": f"burst_test_trace_{int(timestamp)}",
         "project_name": "test_project",
-        "trace_id": str(uuid4()),
+        "trace_id": trace_id,
         "created_at": datetime.fromtimestamp(timestamp).isoformat(),
         "entries": [
             {
@@ -464,6 +469,7 @@ async def test_burst_request_handling(client):
                 "outputs": {"test": "output"},
                 "duration": 0.1,
                 "span_id": str(uuid4()),
+                "trace_id": trace_id,
                 "parent_id": None,
                 "depth": 0
             }
@@ -480,6 +486,7 @@ async def test_burst_request_handling(client):
         local_trace_data = trace_data.copy()
         local_trace_data["trace_id"] = str(uuid4())
         local_trace_data["entries"][0]["span_id"] = str(uuid4())
+        local_trace_data["entries"][0]["trace_id"] = local_trace_data["trace_id"]
         
         response = await client.post(
             f"{SERVER_URL}/traces/save/",

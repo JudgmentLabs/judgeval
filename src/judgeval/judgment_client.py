@@ -181,24 +181,6 @@ class JudgmentClient(metaclass=SingletonMeta):
         except Exception as e:
             raise Exception(f"An unexpected error occurred during evaluation: {str(e)}")
         
-    # from judgeval.common.tracer import TraceEntry
-    # def run_evaluation_trace(
-    #     self,
-    #     trace: List[TraceEntry],
-    #     scorers: List[Union[ScorerWrapper, JudgevalScorer]],
-    #     model: Union[str, List[str], JudgevalJudge],
-    #     aggregator: Optional[str] = None,
-    #     metadata: Optional[Dict[str, Any]] = None,
-    #     log_results: bool = True,
-    #     project_name: str = "default_project",
-    #     eval_run_name: str = "default_eval_run",
-    #     override: bool = False,
-    #     use_judgment: bool = True,
-    #     ignore_errors: bool = True,
-    #     async_execution: bool = False,
-    #     rules: Optional[List[Rule]] = None
-    # )
-    
     def evaluate_dataset(
         self, 
         dataset: EvalDataset,
