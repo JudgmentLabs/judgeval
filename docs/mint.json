@@ -65,7 +65,6 @@
             "evaluation/scorers/execution_order",
             "evaluation/scorers/groundedness",
             "evaluation/scorers/faithfulness",
-            "evaluation/scorers/hallucination",
             "evaluation/scorers/json_correctness",
             "evaluation/scorers/summarization",
             "evaluation/scorers/custom_scorers",
