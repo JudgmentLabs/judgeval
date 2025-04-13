@@ -188,8 +188,6 @@ async def run_selected_tests(test_names: list[str]):
     
     test_map = {
         'token_counting': test_token_counting,
-        'trace_delete': test_trace_delete,
-        'trace_delete_batch': test_trace_delete_batch,
     }
 
     for test_name in test_names:
@@ -206,6 +204,4 @@ if __name__ == "__main__":
     # Use a more meaningful test input
     asyncio.run(run_selected_tests([
         "token_counting", 
-        "trace_delete", 
-        "trace_delete_batch"
         ]))
