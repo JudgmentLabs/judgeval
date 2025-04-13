@@ -3,6 +3,7 @@ from typing import List, Union, Optional, Dict, Any, Union
 from judgeval.common.logger import debug, error
 from pydantic import BaseModel
 from judgeval.data import ScorerData, Example, CustomExample
+from judgeval.data.sequence import Sequence
 
 
 class ScoringResult(BaseModel):
@@ -23,7 +24,7 @@ class ScoringResult(BaseModel):
     name: Optional[str] = None
 
     # The original example object that was used to create the ScoringResult
-    data_object: Optional[Union[Example, CustomExample]] = None #can be Example, CustomExample (future), WorkflowRun (future)
+    data_object: Optional[Union[Sequence, CustomExample, Example]] = None
     trace_id: Optional[str] = None
     
     # Additional fields for internal use
@@ -48,7 +49,7 @@ class ScoringResult(BaseModel):
 
 
 def generate_scoring_result(
-    example: Example,
+    data_object: Union[Example, Sequence],
     scorers_data: List[ScorerData],
     run_duration: float,
     success: bool,
@@ -59,15 +60,15 @@ def generate_scoring_result(
     When an LLMTestCase is executed, it turns into an LLMApiTestCase and the progress of the evaluation run is tracked.
     At the end of the evaluation run, we create a TestResult object out of the completed LLMApiTestCase.
     """
-    if example.name is not None:
-        name = example.name
+    if data_object.name is not None:
+        name = data_object.name
     else:
         name = "Test Case Placeholder"
         debug(f"No name provided for example, using default name: {name}")
     debug(f"Creating ScoringResult for: {name}")
     scoring_result = ScoringResult(
         name=name,
-        data_object=example,
+        data_object=data_object,
         success=success,
         scorers_data=scorers_data,
         run_duration=run_duration,

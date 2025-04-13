@@ -11,6 +11,7 @@ from judgeval.data import (
     ScoringResult, 
     Example,
     CustomExample,
+    Sequence,
 )
 from judgeval.scorers import (
     APIJudgmentScorer, 
@@ -21,8 +22,10 @@ from judgeval.scorers import (
 from judgeval.evaluation_run import EvaluationRun
 from judgeval.run_evaluation import (
     run_eval, 
-    assert_test
+    assert_test,
+    run_sequence_eval
 )
+from judgeval.data.sequence_run import SequenceRun
 from judgeval.judges import JudgevalJudge
 from judgeval.constants import (
     JUDGMENT_EVAL_FETCH_API_URL, 
@@ -84,6 +87,80 @@ class JudgmentClient(metaclass=SingletonMeta):
         rules: Optional[List[Rule]] = None
     ) -> List[ScoringResult]:
         return self.run_evaluation(examples, scorers, model, aggregator, metadata, log_results, project_name, eval_run_name, override, use_judgment, ignore_errors, True, rules)
+
+    def run_sequence_evaluation(
+        self,
+        sequence: Sequence,
+        scorers: List[Union[ScorerWrapper, JudgevalScorer]],
+        model: Union[str, List[str], JudgevalJudge],
+        aggregator: Optional[str] = None,
+        project_name: str = "default_project",
+        eval_run_name: str = "default_eval_sequence",
+        use_judgment: bool = True,
+        log_results: bool = True,
+        override: bool = False,
+        ignore_errors: bool = True,
+        rules: Optional[List[Rule]] = None
+    ) -> List[ScoringResult]:
+        try:
+            # Load appropriate implementations for all scorers
+            loaded_scorers: List[Union[JudgevalScorer, APIJudgmentScorer]] = []
+            for scorer in scorers:
+                try:
+                    if isinstance(scorer, ScorerWrapper):
+                        loaded_scorers.append(scorer.load_implementation(use_judgment=use_judgment))
+                    else:
+                        loaded_scorers.append(scorer)
+                except Exception as e:
+                    raise ValueError(f"Failed to load implementation for scorer {scorer}: {str(e)}")
+
+            # Prevent using JudgevalScorer with rules - only APIJudgmentScorer allowed with rules
+            if rules and any(isinstance(scorer, JudgevalScorer) for scorer in loaded_scorers):
+                raise ValueError("Cannot use Judgeval scorers (only API scorers) when using rules. Please either remove rules or use only APIJudgmentScorer types.")
+
+            # Convert ScorerWrapper in rules to their implementations
+            loaded_rules = None
+            if rules:
+                loaded_rules = []
+                for rule in rules:
+                    try:
+                        processed_conditions = []
+                        for condition in rule.conditions:
+                            # Convert metric if it's a ScorerWrapper
+                            if isinstance(condition.metric, ScorerWrapper):
+                                try:
+                                    condition_copy = condition.model_copy()
+                                    condition_copy.metric = condition.metric.load_implementation(use_judgment=use_judgment)
+                                    processed_conditions.append(condition_copy)
+                                except Exception as e:
+                                    raise ValueError(f"Failed to convert ScorerWrapper to implementation in rule '{rule.name}', condition metric '{condition.metric}': {str(e)}")
+                            else:
+                                processed_conditions.append(condition)
+                        
+                        # Create new rule with processed conditions
+                        new_rule = rule.model_copy()
+                        new_rule.conditions = processed_conditions
+                        loaded_rules.append(new_rule)
+                    except Exception as e:
+                        raise ValueError(f"Failed to process rule '{rule.name}': {str(e)}")
+                    
+            sequence_run = SequenceRun(
+                project_name=project_name,
+                eval_name=eval_run_name,
+                sequences=[sequence],
+                scorers=loaded_scorers,
+                model=model,
+                aggregator=aggregator,
+                log_results=log_results,
+                judgment_api_key=self.judgment_api_key,
+                organization_id=self.organization_id
+            )
+
+            return run_sequence_eval(sequence_run, override, ignore_errors, use_judgment)
+        except ValueError as e:
+            raise ValueError(f"Please check your SequenceRun object, one or more fields are invalid: \n{str(e)}")
+        except Exception as e:
+            raise Exception(f"An unexpected error occurred during evaluation: {str(e)}")
 
     def run_evaluation(
         self, 
