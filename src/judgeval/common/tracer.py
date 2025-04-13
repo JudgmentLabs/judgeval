@@ -37,7 +37,6 @@ from judgeval.constants import (
     RABBITMQ_QUEUE,
     JUDGMENT_TRACES_DELETE_API_URL,
     JUDGMENT_PROJECT_DELETE_API_URL,
-    JUDGMENT_TRACES_ADD_TO_EVAL_QUEUE_API_URL
 )
 from judgeval.judgment_client import JudgmentClient
 from judgeval.data import Example
@@ -874,27 +873,7 @@ class TraceClient:
             "overwrite": overwrite,
             "parent_trace_id": self.parent_trace_id,
             "parent_name": self.parent_name
-        }
-        # Execute asynchrous evaluation in the background
-        # if not empty_save:  # Only send to RabbitMQ if the trace is not empty
-        #     # Send trace data to evaluation queue via API
-        #     try:
-        #         response = requests.post(
-        #             JUDGMENT_TRACES_ADD_TO_EVAL_QUEUE_API_URL,
-        #             json=trace_data,
-        #             headers={
-        #                 "Content-Type": "application/json",
-        #                 "Authorization": f"Bearer {self.tracer.api_key}",
-        #                 "X-Organization-Id": self.tracer.organization_id
-        #             },
-        #             verify=True
-        #         )
-                
-        #         if response.status_code != HTTPStatus.OK:
-        #             warnings.warn(f"Failed to add trace to evaluation queue: {response.text}")
-        #     except Exception as e:
-        #         warnings.warn(f"Error sending trace to evaluation queue: {str(e)}")
-        
+        }        
         self.trace_manager_client.save_trace(trace_data)
 
         return self.trace_id, trace_data
