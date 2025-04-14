@@ -90,7 +90,7 @@ class JudgmentClient(metaclass=SingletonMeta):
 
     def run_sequence_evaluation(
         self,
-        sequence: Sequence,
+        sequences: List[Sequence],
         model: Union[str, List[str], JudgevalJudge],
         aggregator: Optional[str] = None,
         project_name: str = "default_project",
@@ -129,7 +129,7 @@ class JudgmentClient(metaclass=SingletonMeta):
             sequence_run = SequenceRun(
                 project_name=project_name,
                 eval_name=eval_run_name,
-                sequences=[sequence],
+                sequences=sequences,
                 model=model,
                 aggregator=aggregator,
                 log_results=log_results,
