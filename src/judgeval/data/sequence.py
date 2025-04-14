@@ -3,15 +3,15 @@ from typing import List, Optional, Union, Any
 from judgeval.data.example import Example
 from judgeval.scorers import ScorerWrapper, JudgevalScorer
 from uuid import uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 
 class Sequence(BaseModel):
     """
     A sequence is a list of either Examples or nested Sequence objects.
     """
     sequence_id: str = Field(default_factory=lambda: str(uuid4()))
-    name: Optional[str] = None
-    created_at: str = Field(default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S"))
+    name: Optional[str] = "Sequence"
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S"))
     items: List[Union["Sequence", Example]]
     scorers: Optional[Any] = None
     parent_sequence_id: Optional[str] = None
