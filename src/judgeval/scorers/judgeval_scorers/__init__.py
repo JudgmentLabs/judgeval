@@ -172,5 +172,5 @@ __all__ = [
     "Text2SQLScorer",
     "ComparisonScorer",
     "GroundednessScorer",
-    "ActionAdvancementScorer",
+    "DerailmentScorer",
 ]

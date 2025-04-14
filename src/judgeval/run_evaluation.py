@@ -351,7 +351,7 @@ def run_sequence_eval(sequence_run: SequenceRun, override: bool = False, ignore_
     for scorer in sequence_run.scorers:
         if isinstance(scorer, (APIJudgmentScorer, ClassifierScorer)):
             judgment_scorers.append(scorer)
-            print(f"Added judgment scorer: {type(scorer).__name__}")
+            debug(f"Added judgment scorer: {type(scorer).__name__}")
         else:
             local_scorers.append(scorer)
             debug(f"Added local scorer: {type(scorer).__name__}")

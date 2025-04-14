@@ -5,20 +5,21 @@ from judgeval.scorers import DerailmentScorer
 client = JudgmentClient()
 
 example = Example(
-    input="What if these shoes don't fit?",
-    actual_output="We offer a 30-day full refund at no extra cost.",
-    retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
+    input="How do I prepare this recipe?",
+    actual_output="Here are the steps: Preheat the oven, mix the ingredients, bake for 30 minutes, etc.",
 )
-
 example2 = Example(
-    input="What if I dont like the product?",
-    actual_output="We offer a 30-day full refund at no extra cost.",
-    retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
+    input="What is the weather like?",
+    actual_output="It's sunny with a high of 75°F."
+)
+example3 = Example(
+    input="What is recipe step 5 again?",
+    actual_output="Recipe step 5: Let the dough rest for 10 minutes"
 )
 
 sequence = Sequence(
     name="Refund Policy",
-    items=[example, example2],
+    items=[example, example2, example3],
 )
 
 
