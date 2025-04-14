@@ -13,7 +13,8 @@ Evaluation is the process of **scoring** an LLM system's outputs with metrics; a
 
 In `judgeval`, an Example is a unit of data that allows you to use evaluation scorers on your LLM system.
 
-```python example.py
+<CodeGroup>
+```Python example.py
 from judgeval.data import Example
 
 example = Example(
@@ -23,8 +24,23 @@ example = Example(
 )
 ```
 
+```Typescript example.ts
+import { ExampleBuilder } from 'judgeval';
+
+const example = new ExampleBuilder()
+  .input("Based on the context, what is the capital of France?") 
+  .actualOutput("According to the context, the capital of France is Paris.")
+  .context([ 
+    "France is a country in Western Europe.",
+    "Paris is the capital and most populous city of France.",
+    "The Eiffel Tower is located in Paris."
+  ])
+  .build();
+```
+</CodeGroup>
+
 In this example, `input` represents a user talking with a RAG-based LLM application, where `actual_output` is the 
-output of your chatbot and `retrieval_context` is the retrieved context. 
+output of your chatbot and `retrieval_context` (Python) or `context` (Typescript) is the retrieved context. 
 
 <Tip>
 There are many fields in an `Example` that can be used in an evaluation. 
@@ -34,12 +50,18 @@ To learn more about the `Example` class, click [here](/evaluation/data_examples)
 Creating an Example allows you to evaluate using 
 `judgeval`'s default scorers:
 
-```python example.py
+<CodeGroup>
+```Python example.py
 from judgeval import JudgmentClient
 from judgeval.scorers import FaithfulnessScorer
 from judgeval.data import Example
 
-example = Example(...)
+# Assume example is defined as above
+example = Example(
+    input="Who founded Microsoft?",
+    actual_output="Bill Gates and Paul Allen.",
+    retrieval_context=["Bill Gates co-founded Microsoft with Paul Allen in 1975."],
+)
 
 client = JudgmentClient()
 
@@ -52,6 +74,35 @@ results = client.run_evaluation(
 )
 print(results)
 ```
+
+```Typescript example.ts
+import { JudgmentClient, ExampleBuilder, FaithfulnessScorer, logger } from 'judgeval';
+
+const example = new ExampleBuilder()
+  .input("Based on the context, what is the capital of France?")
+  .actualOutput("According to the context, the capital of France is Paris.")
+  .context([
+    "France is a country in Western Europe.",
+    "Paris is the capital and most populous city of France.",
+    "The Eiffel Tower is located in Paris."
+  ])
+  .build();
+
+const client = JudgmentClient.getInstance();
+
+const faithfulnessScorer = new FaithfulnessScorer(0.5);
+
+const results = await client.evaluate({
+  examples: [example],
+  scorers: [faithfulnessScorer],
+  model: "gpt-4o",
+  projectName: "my-intro-project",
+  evalName: "intro-evaluation-run"
+});
+
+logger.print(results);
+```
+</CodeGroup>
 
 ## Datasets
 

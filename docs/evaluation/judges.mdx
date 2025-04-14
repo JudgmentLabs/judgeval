@@ -13,53 +13,98 @@ A good judge model should be able to evaluate your LLM system performance with h
 `judgeval` supports all models found in the [LiteLLM API](https://docs.litellm.ai/docs/providers). 
 This includes all popular closed-source models such as the OpenAI (GPT), Anthropic (Claude), and Gemini families. 
 
-To use a LiteLLM judge model, you simply pass the model name to the `model` parameter in `client.run_evaluation()`:
+To use a LiteLLM judge model, you simply pass the model name to the `model` parameter in your evaluation call:
 
-```python judge.py
+<CodeGroup>
+```Python judge.py
+from judgeval import JudgmentClient # Added import
+from judgeval.data import Example # Added import
+from judgeval.scorers import AnswerRelevancyScorer # Added import
 
-...
+client = JudgmentClient()
+example1 = Example(input="Q1", actual_output="A1")
 
 results = client.run_evaluation(
-    examples=[example1, ...],
-    scorers=[AnswerRelevancyScorer(threshold=0.5), ...]
+    examples=[example1],
+    scorers=[AnswerRelevancyScorer(threshold=0.5)],
     model="gpt-4o"  # or any other LiteLLM model name
 )
 ```
+```Typescript judge.ts
+import { JudgmentClient, ExampleBuilder, AnswerRelevancyScorer, logger } from 'judgeval';
+
+const client = JudgmentClient.getInstance();
+const example1 = new ExampleBuilder().input("Q1").actualOutput("A1").build();
+
+async function runLiteLLMJudge() {
+    const results = await client.evaluate({
+        examples: [example1],
+        scorers: [new AnswerRelevancyScorer(0.5)],
+        model: "gpt-4o", // or any other LiteLLM model name
+        projectName: "litellm-judge-ts-proj",
+        evalName: "litellm-judge-ts-eval"
+    });
+    logger.print(results);
+}
+
+runLiteLLMJudge();
+```
+</CodeGroup>
 
 ## Open Source Judge Models
 
 In addition to LiteLLM judge models, `judgeval` supports a variety of popular open-source judge models via [TogetherAI](https://together.ai/) inference. 
 This includes all popular open-source models such as the Llama, DeepSeek, QWEN, Mistral, (and more!) families.
 
-To use an open-source judge model, you simply pass the model name to the `model` parameter in `client.run_evaluation()`:
+To use an open-source judge model, you simply pass the model name to the `model` parameter in your evaluation call:
 
-```python judge.py
+<CodeGroup>
+```Python judge.py
+from judgeval import JudgmentClient # Added import
+from judgeval.data import Example # Added import
+from judgeval.scorers import AnswerRelevancyScorer # Added import
 
-...
+client = JudgmentClient()
+example1 = Example(input="Q1", actual_output="A1")
 
 results = client.run_evaluation(
-    examples=[example1, ...],
-    scorers=[AnswerRelevancyScorer(threshold=0.5), ...]
+    examples=[example1],
+    scorers=[AnswerRelevancyScorer(threshold=0.5)],
     model="Qwen/Qwen2.5-72B-Instruct-Turbo"  # or any other open-source model name
 )
 ```
+```Typescript judge.ts
+import { JudgmentClient, ExampleBuilder, AnswerRelevancyScorer, logger } from 'judgeval';
+
+const client = JudgmentClient.getInstance();
+const example1 = new ExampleBuilder().input("Q1").actualOutput("A1").build();
+
+async function runOSSJudge() {
+    const results = await client.evaluate({
+        examples: [example1],
+        scorers: [new AnswerRelevancyScorer(0.5)],
+        model: "Qwen/Qwen2.5-72B-Instruct-Turbo", // or any other open-source model name
+        projectName: "oss-judge-ts-proj",
+        evalName: "oss-judge-ts-eval"
+    });
+    logger.print(results);
+}
+
+runOSSJudge();
+```
+</CodeGroup>
 
 ## Use Your Own Judge Model
 
-If you have a custom model you'd like to use as a judge, such as a finetuned `gpt4o-mini`, you can use them in your `JudgevalScorer` evaluations.
+If you have a custom model you'd like to use as a judge, such as a finetuned `gpt4o-mini`, you can potentially use them in your `judgeval` evaluations.
 
-Simply inherit from the `judgevalJudge` class and implement the following methods:
-- `__init__()`: sets the `model_name (str)` and `model` attributes.
-- `load_model()`: loads the model.
-- `generate()`: generates a response from the model given a conversation history (List[dict]).
-- `a_generate()`: generates a response from the model asynchronously given a conversation history (List[dict]).
-- `get_model_name()`: returns the model name.
+In Python, this typically involves inheriting from the `judgevalJudge` class and implementing specific methods.
 
-Here's an example of implementing a custom judge model for Gemini Flash 1.5:
-
-```python gemini_judge.py 
+```Python gemini_judge.py 
 import vertexai
 from vertexai.generative_models import GenerativeModel
+from judgeval.judges import judgevalJudge # Assuming import path
+from typing import List # Added import
 
 PROJECT_ID = "<YOUR PROJECT ID>"
 vertexai.init(project=PROJECT_ID, location="<REGION NAME>")
@@ -67,11 +112,12 @@ vertexai.init(project=PROJECT_ID, location="<REGION NAME>")
 class VertexAIJudge(judgevalJudge):
 
     def __init__(self, model_name: str = "gemini-1.5-flash-002"):
-        self.model_name = model_name
-        self.model = GenerativeModel(self.model_name)
+        super().__init__(model_name=model_name) # Call super init
+        self.model = self.load_model() # Load model in init
 
     def load_model(self):
-        return self.model
+        # It's generally better to load the model once
+        return GenerativeModel(self.model_name)
 
     def generate(self, prompt: List[dict]) -> str:
         # For models that don't support chat history, we need to convert to string
@@ -86,3 +132,7 @@ class VertexAIJudge(judgevalJudge):
     def get_model_name(self) -> str:
         return self.model_name
 ```
+
+<Note>
+Implementing custom judge models is currently supported in the Python library. Functionality may differ in the Typescript library.
+</Note>
