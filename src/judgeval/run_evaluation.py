@@ -4,7 +4,7 @@ import time
 import sys
 import itertools
 import threading
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 from datetime import datetime
 from rich import print as rprint
 
@@ -243,7 +243,7 @@ def check_eval_run_name_exists(eval_name: str, project_name: str, judgment_api_k
         raise JudgmentAPIError(f"Failed to check if eval run name exists: {str(e)}")
 
 
-def log_evaluation_results(merged_results: List[ScoringResult], evaluation_run: EvaluationRun) -> str:
+def log_evaluation_results(merged_results: List[ScoringResult], run: Union[EvaluationRun, SequenceRun]) -> str:
     """
     Logs evaluation results to the Judgment API database.
 
@@ -260,13 +260,12 @@ def log_evaluation_results(merged_results: List[ScoringResult], evaluation_run: 
             JUDGMENT_EVAL_LOG_API_URL,
             headers={
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {evaluation_run.judgment_api_key}",
-                "X-Organization-Id": evaluation_run.organization_id
+                "Authorization": f"Bearer {run.judgment_api_key}",
+                "X-Organization-Id": run.organization_id
             },
             json={
                 "results": [result.model_dump(warnings=False) for result in merged_results],
-                "project_name": evaluation_run.project_name,
-                "eval_name": evaluation_run.eval_name,
+                "run": run.model_dump(warnings=False)
             },
             verify=True
         )
@@ -345,38 +344,24 @@ def run_sequence_eval(sequence_run: SequenceRun, override: bool = False, ignore_
             sequence_run.organization_id
         )
 
-    debug("Grouping scorers by type")
-    judgment_scorers: List[APIJudgmentScorer] = []
-    local_scorers: List[JudgevalScorer] = []
-    for scorer in sequence_run.scorers:
-        if isinstance(scorer, (APIJudgmentScorer, ClassifierScorer)):
-            judgment_scorers.append(scorer)
-            debug(f"Added judgment scorer: {type(scorer).__name__}")
-        else:
-            local_scorers.append(scorer)
-            debug(f"Added local scorer: {type(scorer).__name__}")
+    # Execute evaluation using Judgment API
+    info("Starting API evaluation")
+    try:  # execute an EvaluationRun with just JudgmentScorers
+        debug("Sending request to Judgment API")    
+        response_data: List[Dict] = run_with_spinner("Running Sequence Evaluation: ", execute_api_sequence_eval, sequence_run)
 
-    api_results: List[ScoringResult] = []
-    local_results: List[ScoringResult] = []
-
-    if judgment_scorers:
-        # Execute evaluation using Judgment API
-        info("Starting API evaluation")
-        debug(f"Creating API evaluation run with {len(judgment_scorers)} scorers")
-        try:  # execute an EvaluationRun with just JudgmentScorers
-            debug("Sending request to Judgment API")    
-            response_data: List[Dict] = run_with_spinner("Running Sequence Evaluation: ", execute_api_sequence_eval, sequence_run)
-
-            info(f"Received {len(response_data['results'])} results from API")
-        except JudgmentAPIError as e:
-            error(f"An error occurred while executing the Judgment API request: {str(e)}")
-            raise JudgmentAPIError(f"An error occurred while executing the Judgment API request: {str(e)}")
-        except ValueError as e:
-            raise ValueError(f"Please check your SequenceRun object, one or more fields are invalid: {str(e)}")
-        
-        # Convert the response data to `ScoringResult` objects
-        debug("Processing API results")
-        api_results = [ScoringResult(**result) for result in response_data["results"]]
+        info(f"Received {len(response_data['results'])} results from API")
+    except JudgmentAPIError as e:
+        error(f"An error occurred while executing the Judgment API request: {str(e)}")
+        raise JudgmentAPIError(f"An error occurred while executing the Judgment API request: {str(e)}")
+    except ValueError as e:
+        raise ValueError(f"Please check your SequenceRun object, one or more fields are invalid: {str(e)}")
+    
+    # Convert the response data to `ScoringResult` objects
+    debug("Processing API results")
+    api_results = []
+    for result in response_data["results"]:
+        api_results.append(ScoringResult(**result))
         
     # TODO: allow for custom scorer on sequences
     if sequence_run.log_results:

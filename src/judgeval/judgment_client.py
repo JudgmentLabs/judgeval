@@ -91,7 +91,6 @@ class JudgmentClient(metaclass=SingletonMeta):
     def run_sequence_evaluation(
         self,
         sequence: Sequence,
-        scorers: List[Union[ScorerWrapper, JudgevalScorer]],
         model: Union[str, List[str], JudgevalJudge],
         aggregator: Optional[str] = None,
         project_name: str = "default_project",
@@ -103,23 +102,6 @@ class JudgmentClient(metaclass=SingletonMeta):
         rules: Optional[List[Rule]] = None
     ) -> List[ScoringResult]:
         try:
-            # Load appropriate implementations for all scorers
-            loaded_scorers: List[Union[JudgevalScorer, APIJudgmentScorer]] = []
-            for scorer in scorers:
-                try:
-                    if isinstance(scorer, ScorerWrapper):
-                        loaded_scorers.append(scorer.load_implementation(use_judgment=use_judgment))
-                    else:
-                        loaded_scorers.append(scorer)
-                except Exception as e:
-                    raise ValueError(f"Failed to load implementation for scorer {scorer}: {str(e)}")
-
-            # Prevent using JudgevalScorer with rules - only APIJudgmentScorer allowed with rules
-            if rules and any(isinstance(scorer, JudgevalScorer) for scorer in loaded_scorers):
-                raise ValueError("Cannot use Judgeval scorers (only API scorers) when using rules. Please either remove rules or use only APIJudgmentScorer types.")
-
-            # Convert ScorerWrapper in rules to their implementations
-            loaded_rules = None
             if rules:
                 loaded_rules = []
                 for rule in rules:
@@ -148,7 +130,6 @@ class JudgmentClient(metaclass=SingletonMeta):
                 project_name=project_name,
                 eval_name=eval_run_name,
                 sequences=[sequence],
-                scorers=loaded_scorers,
                 model=model,
                 aggregator=aggregator,
                 log_results=log_results,
