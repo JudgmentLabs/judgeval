@@ -8,7 +8,6 @@ airlines_example = Example(
     input="Which airlines fly to Paris?",
     actual_output="Air France, Delta, and American Airlines offer direct flights."
 )
-
 weather_example = Example(
     input="What is the weather like in Texas?",
     actual_output="It's sunny with a high of 75°F in Texas."
@@ -26,7 +25,7 @@ top_example1 = Example(
 )
 top_example2 = Example(
     input="Can you book a flight for me?",
-    actual_output="Sure, I’ll help you with flights and hotels."
+    actual_output="Sure, I'll help you with flights and hotels."
 )
 top_level_sequence = Sequence(
     name="Travel Planning",
@@ -34,7 +33,6 @@ top_level_sequence = Sequence(
     scorers=[DerailmentScorer(threshold=1)]
 )
 
-scorer = DerailmentScorer(threshold=1)
 results = client.run_sequence_evaluation(
     eval_run_name="sequence-run2",
     project_name="jnpr-demo-sequence",
