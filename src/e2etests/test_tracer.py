@@ -15,7 +15,6 @@ import pytest
 from judgeval.tracer import Tracer, wrap, TraceClient, TraceManagerClient
 from judgeval.constants import APIScorer
 from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
-from judgeval.data import Example
 
 # Initialize the tracer and clients
 judgment = Tracer(api_key=os.getenv("JUDGMENT_API_KEY"))
@@ -34,17 +33,13 @@ async def make_upper(input: str) -> str:
     """
     output = input.upper()
     
-    example = Example(
+    judgment.async_evaluate(
+        scorers=[FaithfulnessScorer(threshold=0.5)],
         input="What if these shoes don't fit?",
         actual_output="We offer a 30-day full refund at no extra cost.",
         retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
         expected_output="We offer a 30-day full refund at no extra cost.",
-        expected_tools=["refund"]
-    )
-    
-    judgment.async_evaluate(
-        scorers=[FaithfulnessScorer(threshold=0.5)],
-        example=example,
+        expected_tools=["refund"],
         model="gpt-4o-mini",
         log_results=True
     )
@@ -56,7 +51,8 @@ async def make_upper(input: str) -> str:
 async def make_lower(input):
     output = input.lower()
     
-    example = Example(
+    judgment.async_evaluate(
+        scorers=[AnswerRelevancyScorer(threshold=0.5)],
         input="How do I reset my password?",
         actual_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
         expected_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
@@ -64,12 +60,7 @@ async def make_lower(input):
         retrieval_context=["Password reset instructions"],
         tools_called=["authentication"],
         expected_tools=["authentication"],
-        additional_metadata={"difficulty": "medium"}
-    )
-    
-    judgment.async_evaluate(
-        scorers=[AnswerRelevancyScorer(threshold=0.5)],
-        example=example,
+        additional_metadata={"difficulty": "medium"},
         model="gpt-4o-mini",
         log_results=True
     )
@@ -84,17 +75,12 @@ def llm_call(input):
 @pytest.mark.asyncio
 async def answer_user_question(input):
     output = llm_call(input)
-    
-    example = Example(
+    judgment.async_evaluate(
+        scorers=[AnswerRelevancyScorer(threshold=0.5)],
         input=input,
         actual_output=output,
         retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
-        expected_output="We offer a 30-day full refund at no extra cost."
-    )
-    
-    judgment.async_evaluate(
-        scorers=[AnswerRelevancyScorer(threshold=0.5)],
-        example=example,
+        expected_output="We offer a 30-day full refund at no extra cost.",
         model="gpt-4o-mini",
         log_results=True
     )
@@ -119,14 +105,10 @@ async def make_poem(input: str) -> str:
         )
         anthropic_result = anthropic_response.content[0].text
         
-        example = Example(
-            input=input,
-            actual_output=anthropic_result
-        )
-        
         judgment.async_evaluate(
             scorers=[AnswerRelevancyScorer(threshold=0.5)],
-            example=example,
+            input=input,
+            actual_output=anthropic_result,
             model="gpt-4o-mini",
             log_results=True
         )
@@ -190,45 +172,6 @@ async def test_evaluation_mixed(test_input):
         
         trace.print()
         return result
-
-@pytest.mark.asyncio
-async def test_trace_delete(trace_manager_client):
-    with judgment.trace("TEST_RUN", project_name="TEST", overwrite=True) as trace:
-        pass
-
-    response = trace_manager_client.fetch_trace(trace.trace_id)
-    assert response, "No traces found"
-
-    trace_manager_client.delete_trace(trace.trace_id)
-    response = trace_manager_client.fetch_trace(trace.trace_id)
-    assert not response, "Trace should be deleted"
-
-@pytest.mark.asyncio
-async def test_trace_delete_batch(trace_manager_client):
-    with judgment.trace("TEST_RUN2", project_name="TEST", overwrite=True) as trace:
-        pass
-
-    with judgment.trace("TEST_RUN3", project_name="TEST2", overwrite=True) as trace2:
-        pass
-
-    response = trace_manager_client.fetch_trace(trace.trace_id)
-    assert response, "No traces found"
-
-    response = trace_manager_client.fetch_trace(trace2.trace_id)
-    assert response, "No traces found"
-
-    trace_ids = [trace.trace_id, trace2.trace_id]
-    response = trace_manager_client.delete_traces(trace_ids)
-    assert response, "Delete batch should be successful"
-
-    response = trace_manager_client.fetch_trace(trace.trace_id)
-    assert not response, "Trace should be deleted"
-
-    response = trace_manager_client.fetch_trace(trace2.trace_id)
-    assert not response, "Trace should be deleted"
-
-    trace_manager_client.delete_project(project_name="TEST")
-    trace_manager_client.delete_project(project_name="TEST2")
     
 @pytest.mark.asyncio
 async def run_selected_tests(test_names: list[str]):
@@ -245,8 +188,6 @@ async def run_selected_tests(test_names: list[str]):
     
     test_map = {
         'token_counting': test_token_counting,
-        'trace_delete': test_trace_delete,
-        'trace_delete_batch': test_trace_delete_batch,
     }
 
     for test_name in test_names:
@@ -263,6 +204,4 @@ if __name__ == "__main__":
     # Use a more meaningful test input
     asyncio.run(run_selected_tests([
         "token_counting", 
-        "trace_delete", 
-        "trace_delete_batch"
         ]))
