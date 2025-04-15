@@ -24,7 +24,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
     def __init__(self, tracer: Tracer):
         self.tracer = tracer
         self.previous_spans = [] # stack of previous spans
-        self.finished = False
+        self.created_trace = False
 
         # Attributes for users to access
         self.previous_node = None
@@ -153,9 +153,10 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         current_trace = self.tracer.get_current_trace()
         if kwargs.get('name') == 'LangGraph':
             if not current_trace:
+                self.created_trace = True
                 trace_id = str(uuid.uuid4())
                 project = self.tracer.project_name
-                trace = TraceClient(self.tracer, trace_id, trace_id, project_name=project, overwrite=False, rules=self.tracer.rules, enable_monitoring=self.tracer.enable_monitoring, enable_evaluations=self.tracer.enable_evaluations)
+                trace = TraceClient(self.tracer, trace_id, "Langgraph", project_name=project, overwrite=False, rules=self.tracer.rules, enable_monitoring=self.tracer.enable_monitoring, enable_evaluations=self.tracer.enable_evaluations)
                 self.tracer.set_current_trace(trace)
                 self.start_span("LangGraph", span_type="Main Function")
             
@@ -180,13 +181,11 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         **kwargs: Any,
     ) -> Any:   
         current_trace = self.tracer.get_current_trace()
-        if outputs == "__end__" or (not kwargs and not tags):
-            self.finished = True
         if tags is not None and any("graph:step" in tag for tag in tags):
             current_trace.record_output(outputs)
             self.end_span(span_type="node")
 
-        if self.finished:
+        if self.created_trace and (outputs == "__end__" or (not kwargs and not tags)):
             self.end_span(span_type="Main Function")
     
     def on_chain_error(
