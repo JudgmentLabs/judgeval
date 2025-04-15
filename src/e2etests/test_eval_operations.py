@@ -5,6 +5,7 @@ Tests for evaluation operations in the JudgmentClient.
 import pytest
 import random
 import string
+import uuid
 
 from judgeval.judgment_client import JudgmentClient
 from judgeval.data import Example
@@ -194,6 +195,7 @@ class TestEvalOperations:
         
         # Third run with override=True should succeed
         try:
+            example1.example_id = str(uuid.uuid4())
             client.run_evaluation(
                 examples=[example1],
                 scorers=[scorer],
