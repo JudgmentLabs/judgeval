@@ -24,28 +24,28 @@ You can evaluate your workflow execution data to measure quality metrics such as
 
 Create a file named `evaluate.py` with the following code:
 
-   ```python
-    from judgeval import JudgmentClient
-    from judgeval.data import Example
-    from judgeval.scorers import FaithfulnessScorer
+```python
+from judgeval import JudgmentClient
+from judgeval.data import Example
+from judgeval.scorers import FaithfulnessScorer
 
-    client = JudgmentClient()
+client = JudgmentClient()
 
-    example = Example(
-        input="What if these shoes don't fit?",
-        actual_output="We offer a 30-day full refund at no extra cost.",
-        retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
-    )
+example = Example(
+    input="What if these shoes don't fit?",
+    actual_output="We offer a 30-day full refund at no extra cost.",
+    retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
+)
 
-    scorer = FaithfulnessScorer(threshold=0.5)
-    results = client.run_evaluation(
-        examples=[example],
-        scorers=[scorer],
-        model="gpt-4o",
-    )
-    print(results)
-   ```
-   Click [here](https://judgment.mintlify.app/getting_started#create-your-first-experiment) for a more detailed explanation
+scorer = FaithfulnessScorer(threshold=0.5)
+results = client.run_evaluation(
+    examples=[example],
+    scorers=[scorer],
+    model="gpt-4o",
+)
+print(results)
+```
+Click [here](https://judgment.mintlify.app/getting_started#create-your-first-experiment) for a more detailed explanation
 
 ## Quickstart: Traces
 
@@ -53,27 +53,27 @@ Track your workflow execution for full observability with just a few lines of co
 
 Create a file named `traces.py` with the following code:
 
-   ```python
-    from judgeval.common.tracer import Tracer, wrap
-    from openai import OpenAI
+```python
+from judgeval.common.tracer import Tracer, wrap
+from openai import OpenAI
 
-    client = wrap(OpenAI())
-    judgment = Tracer(project_name="my_project")
+client = wrap(OpenAI())
+judgment = Tracer(project_name="my_project")
 
-    @judgment.observe(span_type="tool")
-    def my_tool():
-        return "Hello world!"
+@judgment.observe(span_type="tool")
+def my_tool():
+    return "Hello world!"
 
-    @judgment.observe(span_type="function")
-    def main():
-        task_input = my_tool()
-        res = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": f"{task_input}"}]
-        )
-        return res.choices[0].message.content
-   ```
-   Click [here](https://judgment.mintlify.app/getting_started#create-your-first-trace) for a more detailed explanation 
+@judgment.observe(span_type="function")
+def main():
+    task_input = my_tool()
+    res = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": f"{task_input}"}]
+    )
+    return res.choices[0].message.content
+```
+Click [here](https://judgment.mintlify.app/getting_started#create-your-first-trace) for a more detailed explanation 
 
 ## Quickstart: Online Evaluations
 
@@ -81,36 +81,103 @@ Apply performance monitoring to measure the quality of your systems in productio
 
 Using the same traces.py file we created earlier:
 
-   ```python
-    from judgeval.common.tracer import Tracer, wrap
-    from judgeval.scorers import AnswerRelevancyScorer
-    from openai import OpenAI
+```python
+from judgeval.common.tracer import Tracer, wrap
+from judgeval.scorers import AnswerRelevancyScorer
+from openai import OpenAI
 
-    client = wrap(OpenAI())
-    judgment = Tracer(project_name="my_project")
+client = wrap(OpenAI())
+judgment = Tracer(project_name="my_project")
 
-    @judgment.observe(span_type="tool")
-    def my_tool():
-        return "Hello world!"
+@judgment.observe(span_type="tool")
+def my_tool():
+    return "Hello world!"
 
-    @judgment.observe(span_type="function")
-    def main():
-        task_input = my_tool()
-        res = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": f"{task_input}"}]
-        ).choices[0].message.content
+@judgment.observe(span_type="function")
+def main():
+    task_input = my_tool()
+    res = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": f"{task_input}"}]
+    ).choices[0].message.content
 
-        judgment.get_current_trace().async_evaluate(
-            scorers=[AnswerRelevancyScorer(threshold=0.5)],
-            input=task_input,
-            actual_output=res,
-            model="gpt-4o"
-        )
+    judgment.get_current_trace().async_evaluate(
+        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+        input=task_input,
+        actual_output=res,
+        model="gpt-4o"
+    )
 
-        return res
-   ```
-   Click [here](https://judgment.mintlify.app/getting_started#create-your-first-online-evaluation) for a more detailed explanation 
+    return res
+```
+Click [here](https://judgment.mintlify.app/getting_started#create-your-first-online-evaluation) for a more detailed explanation 
+
+## Working with Datasets
+
+In most scenarios, you'll have multiple examples that you want to evaluate together. JudgeVal makes it easy to work with evaluation datasets through the `EvalDataset` class, which is a collection of examples you can scale evaluations across.
+
+For complete documentation, visit our [Datasets Guide](https://judgment.mintlify.app/evaluation/data_datasets#overview).
+
+#### Creating a Dataset
+
+Creating an `EvalDataset` is straightforward - simply supply a list of `Example` objects:
+
+```python
+from judgeval.data import Example
+from judgeval.data.datasets import EvalDataset
+
+examples = [
+    Example(
+        input="What is the capital of France?",
+        actual_output="Paris is the capital of France."
+    ),
+    Example(
+        input="Calculate 15% of 200",
+        actual_output="30"
+    ),
+    Example(
+        input="Write a haiku about programming",
+        actual_output="Code flows like water\nBugs emerge from hidden depths\nDebugger saves all"
+    )
+]
+
+dataset = EvalDataset(examples=examples)
+
+# You can also add examples one at a time
+dataset.add_example(Example(
+    input="What's the square root of 16?",
+    actual_output="4"
+))
+```
+
+#### Saving and Loading Datasets
+
+JudgeVal supports multiple formats for saving and loading datasets. The simplest way is using Judgment Cloud:
+
+```python
+from judgeval import JudgmentClient
+
+# Saving a dataset
+client = JudgmentClient()
+client.push_dataset(alias="qa_examples", dataset=dataset)
+
+# Loading a dataset
+loaded_dataset = client.pull_dataset(alias="qa_examples")
+```
+
+#### Evaluating Your Dataset
+
+You can evaluate all examples in your dataset using the `JudgmentClient`:
+
+```python
+res = client.evaluate_dataset(
+    dataset=dataset,
+    scorers=[FaithfulnessScorer(threshold=0.9)],
+    model="gpt-4"
+)
+```
+
+For more advanced usage, including additional storage formats, check out our [detailed documentation](https://judgment.mintlify.app/evaluation/data_datasets#overview).
 
 ## Documentation and Demos
 
