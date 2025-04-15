@@ -170,7 +170,8 @@ async def test_evaluation_mixed(test_input):
     await answer_user_question("What if these shoes don't fit?")
     
     # Get trace data and test token counting
-    trace_data = judgment.get_current_trace()
+    trace = judgment.get_current_trace()
+    trace_id, trace_data = trace.save()
     
     """Test that token counts are properly aggregated from different LLM API calls."""
     # Verify token counts exist and are properly aggregated
@@ -188,7 +189,7 @@ async def test_evaluation_mixed(test_input):
     print(f"Completion Tokens: {token_counts['completion_tokens']}")
     print(f"Total Tokens: {token_counts['total_tokens']}")
     
-    judgment.print_current_trace()
+    trace.print()
     return result
 
 @pytest.mark.asyncio
