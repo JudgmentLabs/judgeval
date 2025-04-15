@@ -411,14 +411,7 @@ class TraceClient:
     def async_evaluate(
         self,
         scorers: List[Union[APIJudgmentScorer, JudgevalScorer]],
-        input: Optional[str] = None,
-        actual_output: Optional[str] = None,
-        expected_output: Optional[str] = None,
-        context: Optional[List[str]] = None,
-        retrieval_context: Optional[List[str]] = None,
-        tools_called: Optional[List[str]] = None,
-        expected_tools: Optional[List[str]] = None,
-        additional_metadata: Optional[Dict[str, Any]] = None,
+        example: Example,
         model: Optional[str] = None,
         log_results: Optional[bool] = True
     ):
@@ -426,17 +419,6 @@ class TraceClient:
             return
         
         start_time = time.time()  # Record start time
-        example = Example(
-            input=input,
-            actual_output=actual_output,
-            expected_output=expected_output,
-            context=context,
-            retrieval_context=retrieval_context,
-            tools_called=tools_called,
-            expected_tools=expected_tools,
-            additional_metadata=additional_metadata,
-            trace_id=self.trace_id
-        )
         loaded_rules = None
         if self.rules:
             loaded_rules = []
@@ -459,6 +441,7 @@ class TraceClient:
                 new_rule = rule.model_copy()
                 new_rule.conditions = processed_conditions
                 loaded_rules.append(new_rule)
+
         try:
             # Load appropriate implementations for all scorers
             loaded_scorers: List[Union[JudgevalScorer, APIJudgmentScorer]] = []
@@ -483,6 +466,10 @@ class TraceClient:
         except Exception as e:
             warnings.warn(f"Failed to load scorers: {str(e)}")
             return
+        
+        # Check examples before creating evaluation run
+        from judgeval.run_evaluation import check_examples
+        check_examples([example], loaded_scorers)
         
         # Combine the trace-level rules with any evaluation-specific rules)
         eval_run = EvaluationRun(
@@ -920,7 +907,6 @@ class Tracer:
                 "To use a different project name, ensure the first Tracer initialization uses the desired project name.",
                 RuntimeWarning
             )
-        
                 
     def get_current_trace(self) -> Optional[TraceClient]:
         """
