@@ -73,7 +73,7 @@ def main():
     )
     return res.choices[0].message.content
 ```
-Click [here](https://judgment.mintlify.app/getting_started#create-your-first-trace) for a more detailed explanation 
+Click [here](https://judgment.mintlify.app/getting_started#create-your-first-trace) for a more detailed explanation
 
 ## Quickstart: Online Evaluations
 
@@ -110,11 +110,11 @@ def main():
 
     return res
 ```
-Click [here](https://judgment.mintlify.app/getting_started#create-your-first-online-evaluation) for a more detailed explanation 
+Click [here](https://judgment.mintlify.app/getting_started#create-your-first-online-evaluation) for a more detailed explanation
 
 ## Working with Datasets
 
-In most scenarios, you'll have multiple examples that you want to evaluate together. JudgeVal makes it easy to work with evaluation datasets through the `EvalDataset` class, which is a collection of examples you can scale evaluations across.
+In most scenarios, you'll have multiple examples that you want to evaluate together. Judgeval makes it easy to work with evaluation datasets through the `EvalDataset` class, which is a collection of examples you can scale evaluations across.
 
 For complete documentation, visit our [Datasets Guide](https://judgment.mintlify.app/evaluation/data_datasets#overview).
 
@@ -179,8 +179,52 @@ res = client.evaluate_dataset(
 
 For more advanced usage, including additional storage formats, check out our [detailed documentation](https://judgment.mintlify.app/evaluation/data_datasets#overview).
 
+## Integrations
+
+### Integrating with LangGraph
+
+We make it easy to integrate Judgeval with LangGraph workflows. By adding the `JudgevalCallbackHandler` to your LangGraph workflow, you can automatically trace and monitor your entire workflow execution.
+
+```python
+from judgeval.common.tracer import Tracer
+from judgeval.integrations.langgraph import JudgevalCallbackHandler, set_global_handler
+from langgraph.graph import StateGraph
+
+judgment = Tracer(
+    api_key=os.getenv("JUDGMENT_API_KEY"), 
+    project_name=PROJECT_NAME
+)
+
+graph_builder = StateGraph(State)
+
+# YOUR LANGGRAPH WORKFLOW DEFINITION HERE
+
+# Set up the Judgeval handler
+handler = JudgevalCallbackHandler(judgment)
+set_global_handler(handler)  # This will automatically trace your entire workflow
+
+# Execute your workflow
+result = graph.invoke({
+    "messages": [HumanMessage(content=prompt)]
+})
+
+# Access execution information
+print(handler.executed_nodes)      # List of node names that were executed
+print(handler.executed_tools)      # List of tool names that were executed
+print(handler.executed_node_tools) # Combined execution list (e.g. ['chatbot', 'tools', 'tools:search_tool'])
+```
+
+The `JudgevalCallbackHandler` automatically traces:
+
+- All node visits
+- Tool calls
+- Execution flow
+- Additional metadata about your workflow execution
+
+When using the `JudgevalCallbackHandler`, you don't need to manually add `@observe` decorators to your nodes/tools - everything is automatically traced for you.
+
+For more details about LangGraph integration, check out our [Integration Guide](https://judgment.mintlify.app/integrations/langgraph).
+
 ## Documentation and Demos
 
 For more detailed documentation, please check out our [docs](https://judgment.mintlify.app/getting_started) and some of our [demo videos](https://www.youtube.com/@AlexShan-j3o) for reference!
-
-## 
