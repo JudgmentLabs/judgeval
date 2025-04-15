@@ -439,6 +439,7 @@ class TraceClient:
                 new_rule = rule.model_copy()
                 new_rule.conditions = processed_conditions
                 loaded_rules.append(new_rule)
+
         try:
             # Load appropriate implementations for all scorers
             loaded_scorers: List[Union[JudgevalScorer, APIJudgmentScorer]] = []
@@ -463,6 +464,10 @@ class TraceClient:
         except Exception as e:
             warnings.warn(f"Failed to load scorers: {str(e)}")
             return
+        
+        # Check examples before creating evaluation run
+        from judgeval.run_evaluation import check_examples
+        check_examples([example], loaded_scorers)
         
         # Combine the trace-level rules with any evaluation-specific rules)
         eval_run = EvaluationRun(

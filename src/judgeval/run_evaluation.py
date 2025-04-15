@@ -4,7 +4,7 @@ import time
 import sys
 import itertools
 import threading
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 from datetime import datetime
 from rich import print as rprint
 
@@ -285,21 +285,18 @@ def run_with_spinner(message: str, func, *args, **kwargs) -> Any:
 
         return result
 
-def check_examples(examples: List[Example], scorers: List[APIJudgmentScorer]) -> None:
+def check_examples(examples: List[Example], scorers: List[Union[APIJudgmentScorer, JudgevalScorer]]) -> None:
     """
     Checks if the example contains the necessary parameters for the scorer.
     """
     for scorer in scorers:
-        if isinstance(scorer, APIJudgmentScorer):
-            for example in examples:
-                missing_params = []
-                for param in scorer.required_params:
-                    if getattr(example, param.value) is None:
-                        missing_params.append(f"'{param.value}'")
-                if missing_params:
-                    # We do this because we want to inform users that an example is missing parameters for a scorer
-                    # Example ID (usually random UUID) does not provide any helpful information for the user but printing the entire example is overdoing it
-                    print(f"WARNING: Example {example.example_id} is missing the following parameters: {missing_params} for scorer {scorer.score_type.value}")
+        for example in examples:
+            missing_params = []
+            for param in scorer.required_params:
+                if getattr(example, param.value) is None:
+                    missing_params.append(f"'{param.value}'")
+            if missing_params:
+                print(f"WARNING: Example {example.example_id} is missing the following parameters: {missing_params} for scorer {scorer.score_type.value}")
 
 def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_errors: bool = True, async_execution: bool = False) -> List[ScoringResult]:
     """
