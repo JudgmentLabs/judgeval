@@ -98,12 +98,6 @@
       ]
     },
     {
-      "group": "Judgment Platform",
-      "pages": [
-        "judgment/introduction"
-      ]
-    },
-    {
       "group": "API Reference",
       "pages": [
         "api_reference/judgment_client",
