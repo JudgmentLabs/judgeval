@@ -921,51 +921,6 @@ class Tracer:
                 RuntimeWarning
             )
         
-    @contextmanager
-    def trace(
-        self, 
-        name: str, 
-        project_name: str = None, 
-        overwrite: bool = False,
-        rules: Optional[List[Rule]] = None  # Added rules parameter
-    ) -> Generator[TraceClient, None, None]:
-        """Start a new trace context using a context manager"""
-        trace_id = str(uuid.uuid4())
-        project = project_name if project_name is not None else self.project_name
-        
-        # Get parent trace info from context
-        parent_trace = current_trace_var.get()
-        parent_trace_id = None
-        parent_name = None
-        
-        if parent_trace:
-            parent_trace_id = parent_trace.trace_id
-            parent_name = parent_trace.name
-
-        trace = TraceClient(
-            self, 
-            trace_id, 
-            name, 
-            project_name=project, 
-            overwrite=overwrite,
-            rules=self.rules,  # Pass combined rules to the trace client
-            enable_monitoring=self.enable_monitoring,
-            enable_evaluations=self.enable_evaluations,
-            parent_trace_id=parent_trace_id,
-            parent_name=parent_name
-        )
-        
-        # Set the current trace in context variables
-        token = current_trace_var.set(trace)
-        
-        # Automatically create top-level span
-        with trace.span(name or "unnamed_trace") as span:
-            try:
-                # Save the trace to the database to handle Evaluations' trace_id referential integrity
-                yield trace
-            finally:
-                # Reset the context variable
-                current_trace_var.reset(token)
                 
     def get_current_trace(self) -> Optional[TraceClient]:
         """
@@ -1130,32 +1085,6 @@ class Tracer:
                         
                         return result
                     
-            return wrapper
-        
-    def score(self, func=None, scorers: List[Union[APIJudgmentScorer, JudgevalScorer]] = None, model: str = None, log_results: bool = True, *, name: str = None, span_type: SpanType = "span"):
-        """
-        Decorator to trace function execution with detailed entry/exit information.
-        """
-        if func is None:
-            return lambda f: self.score(f, scorers=scorers, model=model, log_results=log_results, name=name, span_type=span_type)
-        
-        if asyncio.iscoroutinefunction(func):
-            @functools.wraps(func)
-            async def async_wrapper(*args, **kwargs):
-                # Get current trace from contextvars
-                current_trace = current_trace_var.get()
-                if current_trace and scorers:
-                    current_trace.async_evaluate(scorers=scorers, input=args, actual_output=kwargs, model=model, log_results=log_results)
-                return await func(*args, **kwargs)
-            return async_wrapper
-        else:
-            @functools.wraps(func)
-            def wrapper(*args, **kwargs):
-                # Get current trace from contextvars
-                current_trace = current_trace_var.get()
-                if current_trace and scorers:
-                    current_trace.async_evaluate(scorers=scorers, input=args, actual_output=kwargs, model=model, log_results=log_results)
-                return func(*args, **kwargs)
             return wrapper
         
     def async_evaluate(self, *args, **kwargs):
