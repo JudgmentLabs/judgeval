@@ -15,6 +15,7 @@ import pytest
 from judgeval.tracer import Tracer, wrap, TraceClient, TraceManagerClient
 from judgeval.constants import APIScorer
 from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
+from judgeval.data import Example
 
 # Initialize the tracer and clients
 judgment = Tracer(api_key=os.getenv("JUDGMENT_API_KEY"))
@@ -33,13 +34,17 @@ async def make_upper(input: str) -> str:
     """
     output = input.upper()
     
-    judgment.async_evaluate(
-        scorers=[FaithfulnessScorer(threshold=0.5)],
+    example = Example(
         input="What if these shoes don't fit?",
         actual_output="We offer a 30-day full refund at no extra cost.",
         retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
         expected_output="We offer a 30-day full refund at no extra cost.",
         expected_tools=["refund"],
+    )
+    
+    judgment.async_evaluate(
+        scorers=[FaithfulnessScorer(threshold=0.5)],
+        example=example,
         model="gpt-4o-mini",
         log_results=True
     )
@@ -50,9 +55,8 @@ async def make_upper(input: str) -> str:
 @pytest.mark.asyncio
 async def make_lower(input):
     output = input.lower()
-    
-    judgment.async_evaluate(
-        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+
+    example = Example(
         input="How do I reset my password?",
         actual_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
         expected_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
@@ -60,7 +64,12 @@ async def make_lower(input):
         retrieval_context=["Password reset instructions"],
         tools_called=["authentication"],
         expected_tools=["authentication"],
-        additional_metadata={"difficulty": "medium"},
+        additional_metadata={"difficulty": "medium"}
+    )
+    
+    judgment.async_evaluate(
+        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+        example=example,
         model="gpt-4o-mini",
         log_results=True
     )
@@ -75,12 +84,17 @@ def llm_call(input):
 @pytest.mark.asyncio
 async def answer_user_question(input):
     output = llm_call(input)
-    judgment.async_evaluate(
-        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+    
+    example = Example(
         input=input,
         actual_output=output,
         retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
         expected_output="We offer a 30-day full refund at no extra cost.",
+    )
+    
+    judgment.async_evaluate(
+        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+        example=example,
         model="gpt-4o-mini",
         log_results=True
     )
@@ -104,11 +118,15 @@ async def make_poem(input: str) -> str:
             max_tokens=30
         )
         anthropic_result = anthropic_response.content[0].text
+
+        example = Example(
+            input=input,
+            actual_output=anthropic_result
+        )
         
         judgment.async_evaluate(
             scorers=[AnswerRelevancyScorer(threshold=0.5)],
-            input=input,
-            actual_output=anthropic_result,
+            example=example,
             model="gpt-4o-mini",
             log_results=True
         )
@@ -143,36 +161,36 @@ def test_input():
     return "What if these shoes don't fit?"
 
 @pytest.mark.asyncio
+@judgment.observe(span_type="test")
 async def test_evaluation_mixed(test_input):
     PROJECT_NAME = "TestingPoemBot"
     print(f"Using test input: {test_input}")
-    with judgment.trace("Use-claude-hehexd123", project_name=PROJECT_NAME, overwrite=True) as trace:
-        upper = await make_upper(test_input)
-        result = await make_poem(upper)
-        await answer_user_question("What if these shoes don't fit?")
-        
-        # Save trace data and test token counting
-        trace_id, trace_data = trace.save()
-        
-        """Test that token counts are properly aggregated from different LLM API calls."""
-        # Verify token counts exist and are properly aggregated
-        token_counts = trace_data["token_counts"]
-        assert token_counts["prompt_tokens"] > 0, "Prompt tokens should be counted"
-        assert token_counts["completion_tokens"] > 0, "Completion tokens should be counted"
-        assert token_counts["total_tokens"] > 0, "Total tokens should be counted"
-        assert token_counts["total_tokens"] == (
-            token_counts["prompt_tokens"] + token_counts["completion_tokens"]
-        ), "Total tokens should be equal to the sum of prompt and completion tokens"
-        
-        # Print token counts for verification
-        print("\nToken Count Results:")
-        print(f"Prompt Tokens: {token_counts['prompt_tokens']}")
-        print(f"Completion Tokens: {token_counts['completion_tokens']}")
-        print(f"Total Tokens: {token_counts['total_tokens']}")
-        
-        trace.print()
-        return result
+    upper = await make_upper(test_input)
+    result = await make_poem(upper)
+    await answer_user_question("What if these shoes don't fit?")
     
+    # Get trace data and test token counting
+    trace_data = judgment.get_current_trace()
+    
+    """Test that token counts are properly aggregated from different LLM API calls."""
+    # Verify token counts exist and are properly aggregated
+    token_counts = trace_data["token_counts"]
+    assert token_counts["prompt_tokens"] > 0, "Prompt tokens should be counted"
+    assert token_counts["completion_tokens"] > 0, "Completion tokens should be counted"
+    assert token_counts["total_tokens"] > 0, "Total tokens should be counted"
+    assert token_counts["total_tokens"] == (
+        token_counts["prompt_tokens"] + token_counts["completion_tokens"]
+    ), "Total tokens should be equal to the sum of prompt and completion tokens"
+    
+    # Print token counts for verification
+    print("\nToken Count Results:")
+    print(f"Prompt Tokens: {token_counts['prompt_tokens']}")
+    print(f"Completion Tokens: {token_counts['completion_tokens']}")
+    print(f"Total Tokens: {token_counts['total_tokens']}")
+    
+    judgment.print_current_trace()
+    return result
+
 @pytest.mark.asyncio
 async def run_selected_tests(test_names: list[str]):
     """
