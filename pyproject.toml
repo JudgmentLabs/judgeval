@@ -1,6 +1,6 @@
 [project]
 name = "judgeval"
-version = "0.0.26"
+version = "0.0.29"
 authors = [
     { name="Andrew Li", email="andrew@judgmentlabs.ai" },
     { name="Alex Shan", email="alex@judgmentlabs.ai" },

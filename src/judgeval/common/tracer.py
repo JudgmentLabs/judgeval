@@ -37,7 +37,6 @@ from judgeval.constants import (
     RABBITMQ_QUEUE,
     JUDGMENT_TRACES_DELETE_API_URL,
     JUDGMENT_PROJECT_DELETE_API_URL,
-    JUDGMENT_TRACES_ADD_TO_EVAL_QUEUE_API_URL
 )
 from judgeval.judgment_client import JudgmentClient
 from judgeval.data import Example
@@ -73,8 +72,9 @@ class TraceEntry:
     span_id: str # Unique ID for this specific span instance
     depth: int    # Indentation level for nested calls
     message: str  # Human-readable description
-    timestamp: float  # Unix timestamp when entry was created
+    created_at: float # Unix timestamp when entry was created, replacing the deprecated 'timestamp' field
     duration: Optional[float] = None  # Time taken (for exit/evaluation entries)
+    trace_id: str = None # ID of the trace this entry belongs to
     output: Any = None  # Function output value
     # Use field() for mutable defaults to avoid shared state issues
     inputs: dict = field(default_factory=dict)
@@ -161,9 +161,10 @@ class TraceEntry:
             "type": self.type,
             "function": self.function,
             "span_id": self.span_id,
+            "trace_id": self.trace_id,
             "depth": self.depth,
             "message": self.message,
-            "timestamp": self.timestamp,
+            "created_at": datetime.fromtimestamp(self.created_at).isoformat(),
             "duration": self.duration,
             "output": self._serialize_output(),
             "inputs": self._serialize_inputs(),
@@ -228,13 +229,12 @@ class TraceManagerClient:
         
         return response.json()
 
-    def save_trace(self, trace_data: dict, empty_save: bool):
+    def save_trace(self, trace_data: dict):
         """
         Saves a trace to the database
 
         Args:
             trace_data: The trace data to save
-            empty_save: Whether to save an empty trace
             NOTE we save empty traces in order to properly handle async operations; we need something in the DB to associate the async results with
         """
         response = requests.post(
@@ -253,7 +253,7 @@ class TraceManagerClient:
         elif response.status_code != HTTPStatus.OK:
             raise ValueError(f"Failed to save trace data: {response.text}")
         
-        if not empty_save and "ui_results_url" in response.json():
+        if "ui_results_url" in response.json():
             pretty_str = f"\n🔍 You can view your trace data here: [rgb(106,0,255)][link={response.json()['ui_results_url']}]View Trace[/link]\n"
             rprint(pretty_str)
 
@@ -377,9 +377,10 @@ class TraceClient:
             type="enter",
             function=name,
             span_id=span_id, # Use the generated span_id
+            trace_id=self.trace_id, # Use the trace_id from the trace client
             depth=current_depth,
             message=name,
-            timestamp=start_time,
+            created_at=start_time,
             span_type=span_type,
             parent_span_id=parent_span_id # Use the parent_id from context var
         )
@@ -394,9 +395,10 @@ class TraceClient:
                 type="exit",
                 function=name,
                 span_id=span_id, # Use the same span_id for exit
+                trace_id=self.trace_id, # Use the trace_id from the trace client
                 depth=exit_depth, 
                 message=f"← {name}",
-                timestamp=time.time(),
+                created_at=time.time(),
                 duration=duration,
                 span_type=span_type
             ))
@@ -483,6 +485,7 @@ class TraceClient:
             metadata={},
             judgment_api_key=self.tracer.api_key,
             override=self.overwrite,
+            trace_span_id=current_span_var.get(),
             rules=loaded_rules # Use the combined rules
         )
         
@@ -511,9 +514,10 @@ class TraceClient:
                 type="evaluation",
                 function=function_name,
                 span_id=current_span_id, # Associate with current span
+                trace_id=self.trace_id, # Use the trace_id from the trace client
                 depth=current_depth,
                 message=f"Evaluation results for {function_name}",
-                timestamp=time.time(),
+                created_at=time.time(),
                 evaluation_runs=[eval_run],
                 duration=duration,
                 span_type="evaluation"
@@ -535,9 +539,10 @@ class TraceClient:
                 type="input",
                 function=function_name,
                 span_id=current_span_id, # Use current span_id
+                trace_id=self.trace_id, # Use the trace_id from the trace client
                 depth=current_depth,
                 message=f"Inputs to {function_name}",
-                timestamp=time.time(),
+                created_at=time.time(),
                 inputs=inputs,
                 span_type=entry_span_type
             ))
@@ -570,7 +575,7 @@ class TraceClient:
                 span_id=current_span_id, # Use current span_id
                 depth=current_depth,
                 message=f"Output from {function_name}",
-                timestamp=time.time(),
+                created_at=time.time(),
                 output="<pending>" if inspect.iscoroutine(output) else output,
                 span_type=entry_span_type
             )
@@ -653,6 +658,7 @@ class TraceClient:
         preserving parent-child span relationships using span_id and parent_span_id.
         """
         spans_by_id: Dict[str, dict] = {}
+        evaluation_runs: List[EvaluationRun] = []
 
         # First pass: Group entries by span_id and gather data
         for entry in entries:
@@ -666,7 +672,8 @@ class TraceClient:
                         "span_id": span_id,
                         "function": entry["function"],
                         "depth": entry["depth"], # Use the depth recorded at entry time
-                        "timestamp": entry["timestamp"],
+                        "created_at": entry["created_at"],
+                        "trace_id": entry["trace_id"],
                         "parent_span_id": entry.get("parent_span_id"),
                         "span_type": entry.get("span_type", "span"),
                         "inputs": None,
@@ -691,14 +698,14 @@ class TraceClient:
                     current_span_data["output"] = entry["output"]
 
                 elif entry["type"] == "evaluation" and entry.get("evaluation_runs"):
-                    if current_span_data.get("evaluation_runs") is None:
-                        current_span_data["evaluation_runs"] = []
-                    current_span_data["evaluation_runs"].extend(entry["evaluation_runs"])
+                    if current_span_data.get("evaluation_runs") is not None:
+                        evaluation_runs.extend(entry["evaluation_runs"])
 
                 elif entry["type"] == "exit":
                     if current_span_data["duration"] is None: # Calculate duration only once
-                        start_time = current_span_data.get("timestamp", entry["timestamp"])
-                        current_span_data["duration"] = entry["timestamp"] - start_time
+                        start_time = datetime.fromisoformat(current_span_data.get("created_at", entry["created_at"]))
+                        end_time = datetime.fromisoformat(entry["created_at"])
+                        current_span_data["duration"] = (end_time - start_time).total_seconds()
                     # Update depth if exit depth is different (though current span() implementation keeps it same)
                     # current_span_data["depth"] = entry["depth"] 
 
@@ -720,7 +727,7 @@ class TraceClient:
                 children_map[parent_id].append(span)
 
         # Sort roots by timestamp
-        roots.sort(key=lambda x: x.get("timestamp", 0))
+        roots.sort(key=lambda x: datetime.fromisoformat(x.get("created_at", "1970-01-01T00:00:00")))
 
         # Perform depth-first traversal to get the final sorted list
         sorted_condensed_list = []
@@ -734,9 +741,9 @@ class TraceClient:
             
             sorted_condensed_list.append(span_data) # Add parent before children
 
-            # Get children, sort them by timestamp, and visit them
+            # Get children, sort them by created_at, and visit them
             span_children = children_map.get(span_id, [])
-            span_children.sort(key=lambda x: x.get("timestamp", 0))
+            span_children.sort(key=lambda x: datetime.fromisoformat(x.get("created_at", "1970-01-01T00:00:00")))
             for child in span_children:
                 # Ensure the child exists in our map before recursing
                 if child['span_id'] in span_map: 
@@ -764,9 +771,9 @@ class TraceClient:
                   sorted_condensed_list.append(span_data)
 
 
-        return sorted_condensed_list
+        return sorted_condensed_list, evaluation_runs
 
-    def save(self, empty_save: bool = False, overwrite: bool = False) -> Tuple[str, dict]:
+    def save(self, overwrite: bool = False) -> Tuple[str, dict]:
         """
         Save the current trace to the database.
         Returns a tuple of (trace_id, trace_data) where trace_data is the trace data that was saved.
@@ -776,7 +783,7 @@ class TraceClient:
         
         raw_entries = [entry.to_dict() for entry in self.entries]
         
-        condensed_entries = self.condense_trace(raw_entries)
+        condensed_entries, evaluation_runs = self.condense_trace(raw_entries)
 
         # Calculate total token counts from LLM API calls
         total_prompt_tokens = 0
@@ -849,32 +856,12 @@ class TraceClient:
                 "total_cost_usd": total_cost
             },
             "entries": condensed_entries,
-            "empty_save": empty_save,
+            "evaluation_runs": evaluation_runs,
             "overwrite": overwrite,
             "parent_trace_id": self.parent_trace_id,
             "parent_name": self.parent_name
-        }
-        # Execute asynchrous evaluation in the background
-        if not empty_save:  # Only send to RabbitMQ if the trace is not empty
-            # Send trace data to evaluation queue via API
-            try:
-                response = requests.post(
-                    JUDGMENT_TRACES_ADD_TO_EVAL_QUEUE_API_URL,
-                    json=trace_data,
-                    headers={
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bearer {self.tracer.api_key}",
-                        "X-Organization-Id": self.tracer.organization_id
-                    },
-                    verify=True
-                )
-                
-                if response.status_code != HTTPStatus.OK:
-                    warnings.warn(f"Failed to add trace to evaluation queue: {response.text}")
-            except Exception as e:
-                warnings.warn(f"Error sending trace to evaluation queue: {str(e)}")
-        
-        self.trace_manager_client.save_trace(trace_data, empty_save)
+        }        
+        self.trace_manager_client.save_trace(trace_data)
 
         return self.trace_id, trace_data
 
@@ -920,6 +907,7 @@ class Tracer:
                 "To use a different project name, ensure the first Tracer initialization uses the desired project name.",
                 RuntimeWarning
             )
+
                 
     def get_current_trace(self) -> Optional[TraceClient]:
         """
@@ -972,7 +960,7 @@ class Tracer:
                     )
                     
                     # Save empty trace and set trace context
-                    current_trace.save(empty_save=True, overwrite=overwrite)
+                    # current_trace.save(empty_save=True, overwrite=overwrite)
                     trace_token = current_trace_var.set(current_trace)
                     
                     try:
@@ -992,7 +980,7 @@ class Tracer:
                             span.record_output(result)
                             
                         # Save the completed trace
-                        current_trace.save(empty_save=False, overwrite=overwrite)
+                        current_trace.save(overwrite=overwrite)
                         return result
                     finally:
                         # Reset trace context (span context resets automatically)
@@ -1041,7 +1029,7 @@ class Tracer:
                     )
                     
                     # Save empty trace and set trace context
-                    current_trace.save(empty_save=True, overwrite=overwrite)
+                    # current_trace.save(empty_save=True, overwrite=overwrite)
                     trace_token = current_trace_var.set(current_trace)
                     
                     try:
@@ -1061,7 +1049,7 @@ class Tracer:
                             span.record_output(result)
                             
                         # Save the completed trace
-                        current_trace.save(empty_save=False, overwrite=overwrite)
+                        current_trace.save(overwrite=overwrite)
                         return result
                     finally:
                         # Reset trace context (span context resets automatically)
