@@ -112,13 +112,13 @@ def main():
 ```
 Click [here](https://judgment.mintlify.app/getting_started#create-your-first-online-evaluation) for a more detailed explanation
 
-## Working with Datasets
+## Quickstart: Datasets
 
 In most scenarios, you'll have multiple examples that you want to evaluate together. Judgeval makes it easy to work with evaluation datasets through the `EvalDataset` class, which is a collection of examples you can scale evaluations across.
 
 For complete documentation, visit our [Datasets Guide](https://judgment.mintlify.app/evaluation/data_datasets#overview).
 
-#### Creating a Dataset
+### Creating a Dataset
 
 Creating an `EvalDataset` is straightforward - simply supply a list of `Example` objects:
 
@@ -150,7 +150,7 @@ dataset.add_example(Example(
 ))
 ```
 
-#### Saving and Loading Datasets
+### Saving and Loading Datasets
 
 JudgeVal supports multiple formats for saving and loading datasets. The simplest way is using Judgment Cloud:
 
@@ -165,7 +165,7 @@ client.push_dataset(alias="qa_examples", dataset=dataset)
 loaded_dataset = client.pull_dataset(alias="qa_examples")
 ```
 
-#### Evaluating Your Dataset
+### Evaluating Your Dataset
 
 You can evaluate all examples in your dataset using the `JudgmentClient`:
 
@@ -181,7 +181,7 @@ For more advanced usage, including additional storage formats, check out our [de
 
 ## Integrations
 
-### Integrating with LangGraph
+### Quickstart: Integrating with LangGraph
 
 We make it easy to integrate Judgeval with LangGraph workflows. By adding the `JudgevalCallbackHandler` to your LangGraph workflow, you can automatically trace and monitor your entire workflow execution.
 
