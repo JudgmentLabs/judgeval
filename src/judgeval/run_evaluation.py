@@ -198,8 +198,8 @@ def check_eval_run_name_exists(eval_name: str, project_name: str, judgment_api_k
         )
         
         if response.status_code == 409:
-            error(f"Eval run name '{eval_name}' already exists for this project. Please choose a different name or set the `override` flag to true.")
-            raise ValueError(f"Eval run name '{eval_name}' already exists for this project. Please choose a different name or set the `override` flag to true.")
+            error(f"Eval run name '{eval_name}' already exists for this project. Please choose a different name, set the `override` flag to true, or set the `append` flag to true.")
+            raise ValueError(f"Eval run name '{eval_name}' already exists for this project. Please choose a different name, set the `override` flag to true, or set the `append` flag to true.")
         
         if not response.ok:
             response_data = response.json()
@@ -234,8 +234,7 @@ def log_evaluation_results(merged_results: List[ScoringResult], evaluation_run: 
             },
             json={
                 "results": [result.model_dump(warnings=False) for result in merged_results],
-                "project_name": evaluation_run.project_name,
-                "eval_name": evaluation_run.eval_name,
+                "run": evaluation_run.model_dump(warnings=False)
             },
             verify=True
         )
@@ -330,7 +329,7 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_error
     """
 
     # Call endpoint to check to see if eval run name exists (if we DON'T want to override and DO want to log results)
-    if not override and evaluation_run.log_results:
+    if not override and evaluation_run.log_results and not evaluation_run.append:
         check_eval_run_name_exists(
             evaluation_run.eval_name,
             evaluation_run.project_name,
