@@ -21,23 +21,6 @@ from judgeval.common.exceptions import MissingTestCaseParamsError
 from judgeval.common.logger import example_logging_context, debug, error, warning, info
 from judgeval.judges import JudgevalJudge
 
-def check_examples(examples: List[Example], scorers: List[JudgevalScorer]) -> None:
-    """
-    Checks if the example contains the necessary parameters for the scorer.
-    """
-    for scorer in scorers:
-        # Check if scorer has required_params attribute
-        if hasattr(scorer, 'required_params'):
-            for example in examples:
-                missing_params = []
-                for param in scorer.required_params:
-                    if getattr(example, param.value) is None:
-                        missing_params.append(f"'{param.value}'")
-                if missing_params:
-                    # We do this because we want to inform users that an example is missing parameters for a scorer
-                    # Example ID (usually random UUID) does not provide any helpful information for the user but printing the entire example is overdoing it
-                    print(f"WARNING: Example {example.example_id} is missing the following parameters: {missing_params} for scorer {scorer.score_type.value}")
-
 async def safe_a_score_example(
     scorer: JudgevalScorer,
     example: Example,
@@ -287,8 +270,6 @@ async def a_execute_scoring(
     Returns:
         List[ScoringResult]: A list of `ScoringResult` objects containing the evaluation results.
     """
-    # Check if examples have required parameters for scorers
-    check_examples(examples, scorers)
 
     semaphore = asyncio.Semaphore(max_concurrent)
 
