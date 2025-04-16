@@ -87,6 +87,7 @@ jobs:
           fi
         
       - name: Run E2E tests
+        working-directory: src
         run: |      
           SECRET_VARS=$(aws secretsmanager get-secret-value --secret-id gh-actions/api-keys/judgeval --query SecretString --output text)
           export $(echo "$SECRET_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
