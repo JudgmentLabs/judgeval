@@ -74,6 +74,7 @@ jobs:
          
       - name: Install judgeval dependencies
         run: |
+          pip install pipenv
           pipenv install --dev
 
       - name: Check if server is running
