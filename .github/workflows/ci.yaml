@@ -7,7 +7,6 @@ on:
   push:
     branches:
       - main
-      - justin/add-e2e-tests
 
 jobs:
   run-tests:
