@@ -292,6 +292,12 @@ class JudgmentClient(metaclass=SingletonMeta):
         dataset.judgment_api_key = self.judgment_api_key
         return self.eval_dataset_client.push(dataset, alias, project_name, overwrite)
     
+    def append_dataset(self, alias: str, examples: List[Example], project_name: str) -> bool:
+        """
+        Appends an `EvalDataset` to the Judgment platform for storage.
+        """
+        return self.eval_dataset_client.append(alias, examples, project_name)
+    
     def pull_dataset(self, alias: str, project_name: str) -> EvalDataset:
         """
         Retrieves a saved `EvalDataset` from the Judgment platform.
