@@ -179,51 +179,39 @@ res = client.evaluate_dataset(
 
 For more advanced usage, including additional storage formats, check out our [detailed documentation](https://judgment.mintlify.app/evaluation/data_datasets#overview).
 
-## Integrations
+## Quickstart: Unit Testing with Pytest
 
-### Quickstart: Integrating with LangGraph
+Unit testing is essential for maintaining the quality and reliability of your LLM applications. Judgeval natively integrates with `pytest`, allowing you to write robust unit tests for your evaluation logic using familiar testing workflows.
 
-We make it easy to integrate Judgeval with LangGraph workflows. By adding the `JudgevalCallbackHandler` to your LangGraph workflow, you can automatically trace and monitor your entire workflow execution.
+With Judgeval, you can assert that your LLM outputs meet specific quality metrics—such as faithfulness or relevancy—directly within your test suite. This makes it easy to catch regressions and ensure your models behave as expected.
+
+Here's an example of how to use Judgeval with `pytest`:
 
 ```python
-from judgeval.common.tracer import Tracer
-from judgeval.integrations.langgraph import JudgevalCallbackHandler, set_global_handler
-from langgraph.graph import StateGraph
+import pytest
+from judgeval import JudgmentClient
+from judgeval.data import Example
+from judgeval.scorers import FaithfulnessScorer
 
-judgment = Tracer(
-    api_key=os.getenv("JUDGMENT_API_KEY"), 
-    project_name=PROJECT_NAME
-)
-
-graph_builder = StateGraph(State)
-
-# YOUR LANGGRAPH WORKFLOW DEFINITION HERE
-
-# Set up the Judgeval handler
-handler = JudgevalCallbackHandler(judgment)
-set_global_handler(handler)  # This will automatically trace your entire workflow
-
-# Execute your workflow
-result = graph.invoke({
-    "messages": [HumanMessage(content=prompt)]
-})
-
-# Access execution information
-print(handler.executed_nodes)      # List of node names that were executed
-print(handler.executed_tools)      # List of tool names that were executed
-print(handler.executed_node_tools) # Combined execution list (e.g. ['chatbot', 'tools', 'tools:search_tool'])
+def test_faithfulness():
+    client = JudgmentClient()
+    example = Example(
+        input="What is the capital of France?",
+        actual_output="The capital of France is Lyon.",
+        retrieval_context=["Come tour Paris' museums in the capital of France!"]
+    )
+    # This example contains a hallucination, so we expect an AssertionError
+    with pytest.raises(AssertionError):
+        client.assert_test(
+            eval_run_name="test_eval",
+            examples=[example],
+            scorers=[FaithfulnessScorer(threshold=1.0)],
+        )
 ```
 
-The `JudgevalCallbackHandler` automatically traces:
+Judgeval's `client.assert_test` method integrates seamlessly with `pytest`, so you don't need to learn any new testing frameworks. This allows you to enforce quality standards and catch issues early in your CI pipelines.
 
-- All node visits
-- Tool calls
-- Execution flow
-- Additional metadata about your workflow execution
-
-When using the `JudgevalCallbackHandler`, you don't need to manually add `@observe` decorators to your nodes/tools - everything is automatically traced for you.
-
-For more details about LangGraph integration, check out our [Integration Guide](https://judgment.mintlify.app/integrations/langgraph).
+For more details, see our [unit testing documentation](https://judgment.mintlify.app/evaluation/unit_testing).
 
 ## Documentation and Demos
 
