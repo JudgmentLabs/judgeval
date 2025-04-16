@@ -51,24 +51,31 @@
       "pages": [
         "evaluation/introduction",
         "evaluation/data_examples",
+        "evaluation/data_sequences",
         "evaluation/data_datasets",
         {
           "group": "Scorers",
           "pages": [
             "evaluation/scorers/introduction",
-            "evaluation/scorers/answer_correctness",
-            "evaluation/scorers/answer_relevancy",
-            "evaluation/scorers/comparison",
-            "evaluation/scorers/contextual_precision",
-            "evaluation/scorers/contextual_recall",
-            "evaluation/scorers/contextual_relevancy",
-            "evaluation/scorers/execution_order",
-            "evaluation/scorers/groundedness",
-            "evaluation/scorers/faithfulness",
-            "evaluation/scorers/json_correctness",
-            "evaluation/scorers/summarization",
-            "evaluation/scorers/custom_scorers",
-            "evaluation/scorers/classifier_scorer"
+            {
+              "group": "Scorer Definitions",
+              "pages": [
+                "evaluation/scorers/default/answer_correctness",
+                "evaluation/scorers/default/answer_relevancy",
+                "evaluation/scorers/default/comparison",
+                "evaluation/scorers/default/contextual_precision",
+                "evaluation/scorers/default/contextual_recall",
+                "evaluation/scorers/default/contextual_relevancy",
+                "evaluation/scorers/default/execution_order",
+                "evaluation/scorers/default/groundedness",
+                "evaluation/scorers/default/faithfulness",
+                "evaluation/scorers/default/json_correctness",
+                "evaluation/scorers/default/summarization",
+                "evaluation/scorers/agent/derailment",
+                "evaluation/scorers/custom_scorers",
+                "evaluation/scorers/classifier_scorer"
+              ]
+            }
           ]
         },
         "evaluation/judges",
