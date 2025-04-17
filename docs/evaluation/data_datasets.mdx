@@ -2,13 +2,13 @@
 title: Datasets
 ---
 ## Overview
-In most scenarios, you will have multiple `Example`s that you want to evaluate together.  
-In `judgeval` (Python), an evaluation dataset (`EvalDataset`) is a collection of `Example`s that you can scale evaluations across. The Typescript library handles collections of examples as standard arrays passed to evaluation functions.
+In most scenarios, you will have multiple `Example`s that you want to evaluate together. Both `judgeval` (Python) and `judgeval-js` (TypeScript) provide an `EvalDataset` class to manage collections of `Example`s. These classes allow you to scale evaluations and offer similar functionalities for saving, loading, and synchronizing datasets with the Judgment platform.
 
-## Creating a Dataset (Python `EvalDataset`)
+## Creating a Dataset
 
-Creating an `EvalDataset` in Python is as simple as supplying a list of `Example`s.
+Creating an `EvalDataset` is straightforward in both languages. You can initialize it with a list (Python) or array (TypeScript) of `Example`s.
 
+<CodeGroup>
 ```Python create_dataset.py
 from judgeval.data import Example
 from judgeval.data.datasets import EvalDataset
@@ -19,66 +19,101 @@ examples = [
     # ... more examples
 ]
 
-
 dataset = EvalDataset(
     examples=examples
 )
 ```
+```Typescript create_dataset.ts
+import { Example, EvalDataset, ExampleBuilder } from 'judgeval';
 
-<Note>
-In Typescript, you would typically manage your examples as an array:
-`const examples: Example[] = [ example1, example2, ... ];`
-</Note>
+const examples: Example[] = [
+    new ExampleBuilder().input("Question 1?").actualOutput("Answer 1.").build(),
+    new ExampleBuilder().input("Question 2?").actualOutput("Answer 2.").build(),
+    // ... more examples
+];
 
-You can also add `Example`s to an existing `EvalDataset` in Python using the `add_example` method.
+const dataset = new EvalDataset(examples);
+```
+</CodeGroup>
 
+You can also add `Example`s to an existing `EvalDataset`.
+
+<CodeGroup>
 ```Python add_to_dataset.py
 from judgeval.data import Example
 # Assume dataset = EvalDataset([...]) exists
 
 dataset.add_example(Example(input="Question 3?", actual_output="Answer 3."))
 ```
+```Typescript add_to_dataset.ts
+import { Example, EvalDataset, ExampleBuilder } from 'judgeval';
 
-<Note>
-In Typescript, you would add to an array using standard methods like `push()`:
-`examples.push(newExample);`
-</Note>
+// Assume 'dataset' is an existing EvalDataset instance
+const dataset = new EvalDataset(/* ... */);
 
-## Saving/Loading Datasets (Python `EvalDataset`)
+const newExample = new ExampleBuilder()
+    .input("Question 3?")
+    .actualOutput("Answer 3.")
+    .build();
 
-`judgeval` (Python) supports saving and loading `EvalDataset` objects in the following formats:
+dataset.addExample(newExample);
+```
+</CodeGroup>
+
+## Saving/Loading Datasets
+
+Both libraries support saving and loading `EvalDataset` objects locally and interacting with the Judgment Platform.
+
+**Local Formats:**
 - JSON
 - CSV
 - YAML
+
+**Remote:**
 - Judgment Platform
 
-<Note>
-These dataset management features (`push_dataset`, `pull_dataset`, `save_as`, `add_from_json`, etc.) are specific to the Python library's `EvalDataset` class.
-</Note>
+### From Judgment Platform
 
-### From Judgment (Python)
-```Python push_dataset.py
-# Saving
-from judgeval import JudgmentClient # Added import
-from judgeval.data.datasets import EvalDataset # Added import
+You can push your local `EvalDataset` to the Judgment platform or pull an existing one.
+
+<CodeGroup>
+```Python push_pull_judgment.py
+# Saving (Pushing)
+from judgeval import JudgmentClient
+from judgeval.data.datasets import EvalDataset
 # Assume client = JudgmentClient() exists
 # Assume dataset = EvalDataset(...) exists
 
 client = JudgmentClient()
-client.push_dataset(alias="my_dataset", dataset=dataset, project_name="my_project") # Added project_name based on TS client
-```
-```Python pull_dataset.py
-# Loading
-from judgeval import JudgmentClient # Added import
+client.push_dataset(alias="my_dataset", dataset=dataset, project_name="my_project")
+
+# Loading (Pulling)
 # Assume client = JudgmentClient() exists
-
-client = JudgmentClient()
-dataset = client.pull_dataset(alias="my_dataset", project_name="my_project") # Added project_name based on TS client
+pulled_dataset = client.pull_dataset(alias="my_dataset", project_name="my_project")
 ```
+```Typescript push_pull_judgment.ts
+import { EvalDataset, EvalDatasetClient } from 'judgeval';
 
-### From JSON (Python)
+// Assume client = new EvalDatasetClient(apiKey, orgId) exists
+// Assume dataset = new EvalDataset(...) exists
+const alias = "my-ts-dataset";
+const projectName = "my-ts-project";
 
-Your JSON file should have the following structure:
+// Saving (Pushing)
+// Use await in an async function context
+await client.pushDataset(dataset, alias, projectName, true); // overwrite=true
+
+// Loading (Pulling)
+// Use await in an async function context
+const pulledDataset: EvalDataset = await client.pullDataset(alias, projectName);
+```
+</CodeGroup>
+
+
+### From JSON
+
+Your JSON file should have a top-level `examples` key containing an array of example objects (using snake_case keys).
+
 ```json structure.json
 {
     "examples": [
@@ -91,8 +126,9 @@ Your JSON file should have the following structure:
 }
 ```
 
-Here's an example of how use `judgeval` (Python) to save/load from JSON.
+Here's how to save/load from JSON in both languages.
 
+<CodeGroup>
 ```Python json_dataset.py
 from judgeval.data.datasets import EvalDataset
 
@@ -103,13 +139,31 @@ dataset.save_as("json", "/path/to/save/dir", "save_name")
 # loading
 new_dataset = EvalDataset()
 new_dataset.add_from_json("/path/to/your/json/file.json")
-
 ```
+```Typescript json_dataset.ts
+import { EvalDataset } from 'judgeval';
 
-### From CSV (Python)
+// Assume 'dataset' is an existing EvalDataset instance filled with examples
+const dataset = new EvalDataset(/* ... */);
+const saveDir = './temp_datasets';
+const saveName = 'my_ts_dataset_save';
+const jsonPath = `${saveDir}/${saveName}.json`; // Simplified path construction
 
-Your CSV should contain rows that can be mapped to `Example`s via column names.
+// Saving
+// Note: Ensure saveDir exists beforehand
+dataset.saveAs('json', saveDir, saveName);
 
+// Loading
+const newDataset = new EvalDataset();
+newDataset.addFromJson(jsonPath);
+```
+</CodeGroup>
+
+### From CSV
+
+Your CSV should contain rows that can be mapped to `Example`s via column names (typically snake_case). When loading, you'll need to provide a mapping from your `Example`'s camelCase field names to the CSV header names.
+
+<CodeGroup>
 ```Python csv_dataset.py
 from judgeval.data.datasets import EvalDataset
 
@@ -121,11 +175,42 @@ dataset.save_as("csv", "/path/to/save/dir", "save_name")
 new_dataset = EvalDataset()
 new_dataset.add_from_csv("/path/to/your/csv/file.csv")
 ```
+```Typescript csv_dataset.ts
+import { EvalDataset, ExampleOptions } from 'judgeval';
 
-### From YAML (Python)
+// Assume 'dataset' is an existing EvalDataset instance filled with examples
+const dataset = new EvalDataset(/* ... */);
+const saveDir = './temp_datasets';
+const saveName = 'my_ts_dataset_save';
+const csvPath = `${saveDir}/${saveName}.csv`; // Simplified path construction
 
-Your YAML should contain rows that can be mapped to `Example`s via column names.
+// Saving
+// Note: Ensure saveDir exists beforehand
+dataset.saveAs('csv', saveDir, saveName);
 
+// Loading
+const newDataset = new EvalDataset();
+const headerMapping: { [key in keyof ExampleOptions]?: string } = {
+    input: 'input',
+    actualOutput: 'actual_output',
+    // ... other mappings
+};
+newDataset.addFromCsv(csvPath, headerMapping);
+```
+</CodeGroup>
+
+### From YAML
+
+Your YAML file should have a top-level `examples` key containing a list of example objects (using snake_case keys).
+
+```yaml example.yaml
+examples:
+  - input: ...
+    actual_output: ...
+    expected_output: ...
+```
+
+<CodeGroup>
 ```Python yaml_dataset.py
 from judgeval.data.datasets import EvalDataset
 
@@ -136,19 +221,29 @@ dataset.save_as("yaml", "/path/to/save/dir", "save_name")
 # loading
 new_dataset = EvalDataset()
 new_dataset.add_from_yaml("/path/to/your/yaml/file.yaml")
-
 ```
+```Typescript yaml_dataset.ts
+import { EvalDataset } from 'judgeval';
 
-```yaml example.yaml
-examples:
-  - input: ...
-    actual_output: ...
-    expected_output: ...
+// Assume 'dataset' is an existing EvalDataset instance filled with examples
+const dataset = new EvalDataset(/* ... */);
+const saveDir = './temp_datasets';
+const saveName = 'my_ts_dataset_save';
+const yamlPath = `${saveDir}/${saveName}.yaml`; // Simplified path construction
+
+// Saving
+// Note: Ensure saveDir exists beforehand
+dataset.saveAs('yaml', saveDir, saveName);
+
+// Loading
+const newDataset = new EvalDataset();
+newDataset.addFromYaml(yamlPath);
 ```
+</CodeGroup>
 
 ## Evaluate On Your Dataset / Examples
 
-You can use the `JudgmentClient` to evaluate a collection of `Example`s using scorers.
+You can use the `JudgmentClient` (Python) or `JudgmentClient` (TypeScript) to evaluate a collection of `Example`s using scorers. You can pass either an `EvalDataset` object (Python) or an array of `Example` objects (TypeScript) to the respective evaluation methods.
 
 <CodeGroup>
 ```Python evaluate_dataset.py
@@ -164,29 +259,26 @@ res = client.evaluate_dataset(
 )
 ```
 ```Typescript evaluate_dataset.ts
-import { JudgmentClient, Example, FaithfulnessScorer, logger, ExampleBuilder } from 'judgeval';
+import { JudgmentClient, Example, FaithfulnessScorer, ExampleBuilder } from 'judgeval';
 
 // Assume client = JudgmentClient.getInstance() exists
 const client = JudgmentClient.getInstance();
 
-// Create an array of examples
 const dataset: Example[] = [
     new ExampleBuilder().input("Q1").actualOutput("A1").build(),
     new ExampleBuilder().input("Q2").actualOutput("A2").build()
 ];
 
-async function evaluateExamples() {
-    const results = await client.evaluate({
-        examples: dataset, // Pass the array of examples directly
-        scorers: [new FaithfulnessScorer(0.9)],
-        model: "gpt-4o",
-        projectName: "dataset-eval-ts-proj",
-        evalName: "dataset-eval-ts-run"
-    });
-    logger.print(results);
-}
+// Use await in an async function context
+const results = await client.evaluate({
+    examples: dataset,
+    scorers: [new FaithfulnessScorer(0.9)],
+    model: "gpt-4o",
+    projectName: "dataset-eval-ts-proj",
+    evalName: "dataset-eval-ts-run"
+});
 
-evaluateExamples();
+// Process results (e.g., logger.print(results))
 ```
 </CodeGroup>
 
@@ -194,6 +286,6 @@ evaluateExamples();
 
 Congratulations! 🎉
 
-You've now learned how to create, save, and evaluate an `EvalDataset` in `judgeval`.
+You've now learned how to create, save, load, and evaluate datasets using both the Python (`judgeval`) and TypeScript (`judgeval-js`) libraries.
 
 You can also view and manage your datasets via the [Judgment platform](/judgment/introduction).
