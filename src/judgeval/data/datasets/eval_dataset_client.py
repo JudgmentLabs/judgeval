@@ -6,6 +6,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from judgeval.common.logger import debug, error, warning, info
 from judgeval.constants import (
     JUDGMENT_DATASETS_PUSH_API_URL,
+    JUDGMENT_DATASETS_APPEND_API_URL,
     JUDGMENT_DATASETS_PULL_API_URL, 
     JUDGMENT_DATASETS_PROJECT_STATS_API_URL,
     JUDGMENT_DATASETS_DELETE_API_URL,
@@ -70,9 +71,9 @@ class EvalDatasetClient:
                     },
                     verify=True
                 )
-                if response.status_code == 500:
-                    error(f"Server error during push: {content.get('message')}")
-                    return False
+                if response.status_code != 200:
+                    error(f"Server error during push: {response.json()}")
+                    raise Exception(f"Server error during push: {response.json()}")
                 response.raise_for_status()
             except requests.exceptions.HTTPError as err:
                 if response.status_code == 422:
@@ -90,6 +91,64 @@ class EvalDatasetClient:
                 )
             return True
         
+
+    def append(self, alias: str, examples: List[Example], project_name: str) -> bool:
+        debug(f"Appending dataset with alias '{alias}'")
+        """
+        Appends the dataset to Judgment platform
+
+        Mock request:
+        dataset = {
+            "alias": alias,
+            "examples": [...],
+            "project_name": project_name
+        } ==>
+        {
+            "_alias": alias,
+            "_id": "..."  # ID of the dataset
+        }
+        """
+        with Progress(
+            SpinnerColumn(style="rgb(106,0,255)"),
+            TextColumn("[progress.description]{task.description}"),
+            transient=False,
+        ) as progress:
+            task_id = progress.add_task(
+                f"Appending [rgb(106,0,255)]'{alias}' to Judgment...",
+                total=100,
+            )
+            content = {
+                    "dataset_alias": alias,
+                    "project_name": project_name,
+                    "examples": [e.to_dict() for e in examples],
+                }
+            try:
+                response = requests.post(
+                    JUDGMENT_DATASETS_APPEND_API_URL, 
+                    json=content,
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {self.judgment_api_key}",
+                        "X-Organization-Id": self.organization_id
+                    },
+                    verify=True
+                )
+                if response.status_code != 200:
+                    error(f"Server error during append: {response.json()}")
+                    raise Exception(f"Server error during append: {response.json()}")
+                response.raise_for_status()
+            except requests.exceptions.HTTPError as err:
+                if response.status_code == 422:
+                    error(f"Validation error during append: {err.response.json()}")
+                else:
+                    error(f"HTTP error during append: {err}")
+            
+            progress.update(
+                    task_id,
+                    description=f"{progress.tasks[task_id].description} [rgb(25,227,160)]Done!)",
+                )
+            return True
+    
     def pull(self, alias: str, project_name: str) -> EvalDataset:
         debug(f"Pulling dataset with alias '{alias}'")
         """
