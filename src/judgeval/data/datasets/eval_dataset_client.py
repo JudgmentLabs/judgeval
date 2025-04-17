@@ -114,7 +114,7 @@ class EvalDatasetClient:
             transient=False,
         ) as progress:
             task_id = progress.add_task(
-                f"Pushing [rgb(106,0,255)]'{alias}' to Judgment...",
+                f"Appending [rgb(106,0,255)]'{alias}' to Judgment...",
                 total=100,
             )
             content = {
