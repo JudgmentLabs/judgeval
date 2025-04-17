@@ -271,6 +271,7 @@ async def a_execute_scoring(
     Returns:
         List[ScoringResult]: A list of `ScoringResult` objects containing the evaluation results.
     """
+
     semaphore = asyncio.Semaphore(max_concurrent)
 
     async def execute_with_semaphore(func: Callable, *args, **kwargs):
