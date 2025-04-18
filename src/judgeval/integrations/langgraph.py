@@ -18,7 +18,6 @@ from langchain_core.messages.ai import AIMessage
 from langchain_core.messages.tool import ToolMessage
 from langchain_core.messages.base import BaseMessage
 from langchain_core.documents import Document
-from braintrust_langchain import BraintrustCallbackHandler, set_global_handler
 
 class JudgevalCallbackHandler(BaseCallbackHandler):
     def __init__(self, tracer: Tracer):

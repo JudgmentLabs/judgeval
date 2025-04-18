@@ -38,6 +38,7 @@ class EvaluationRun(BaseModel):
     # API Key will be "" until user calls client.run_eval(), then API Key will be set
     judgment_api_key: Optional[str] = ""
     override: Optional[bool] = False
+    append: Optional[bool] = False
     rules: Optional[List[Rule]] = None
     
     def model_dump(self, **kwargs):

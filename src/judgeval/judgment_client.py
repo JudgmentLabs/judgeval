@@ -82,11 +82,12 @@ class JudgmentClient(metaclass=SingletonMeta):
         project_name: str = "default_project",
         eval_run_name: str = "default_eval_run",
         override: bool = False,
+        append: bool = False,
         use_judgment: bool = True,
         ignore_errors: bool = True,
         rules: Optional[List[Rule]] = None
     ) -> List[ScoringResult]:
-        return self.run_evaluation(examples, scorers, model, aggregator, metadata, log_results, project_name, eval_run_name, override, use_judgment, ignore_errors, True, rules)
+        return self.run_evaluation(examples, scorers, model, aggregator, metadata, log_results, project_name, eval_run_name, override, append, use_judgment, ignore_errors, True, rules)
 
     def run_sequence_evaluation(
         self,
@@ -154,6 +155,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         project_name: str = "default_project",
         eval_run_name: str = "default_eval_run",
         override: bool = False,
+        append: bool = False,
         use_judgment: bool = True,
         ignore_errors: bool = True,
         async_execution: bool = False,
@@ -179,6 +181,9 @@ class JudgmentClient(metaclass=SingletonMeta):
         Returns:
             List[ScoringResult]: The results of the evaluation
         """
+        if override and append:
+            raise ValueError("Cannot set both override and append to True. Please choose one.")
+
         try:
             # Load appropriate implementations for all scorers
             loaded_scorers: List[Union[JudgevalScorer, APIJudgmentScorer]] = []
@@ -222,6 +227,7 @@ class JudgmentClient(metaclass=SingletonMeta):
                         raise ValueError(f"Failed to process rule '{rule.name}': {str(e)}")
             eval = EvaluationRun(
                 log_results=log_results,
+                append=append,
                 project_name=project_name,
                 eval_name=eval_run_name,
                 examples=examples,
@@ -419,14 +425,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         if eval_run.status_code != requests.codes.ok:
             raise ValueError(f"Error fetching eval results: {eval_run.json()}")
 
-        eval_run_result = [{}]
-        for result in eval_run.json():
-            result_id = result.get("id", "")
-            result_data = result.get("result", dict())
-            filtered_result = {k: v for k, v in result_data.items() if k in ScoringResult.__annotations__}
-            eval_run_result[0]["id"] = result_id
-            eval_run_result[0]["results"] = [ScoringResult(**filtered_result)]
-        return eval_run_result
+        return eval_run.json()
     
     def delete_eval(self, project_name: str, eval_run_names: List[str]) -> bool:
         """

@@ -46,6 +46,7 @@ def client() -> JudgmentClient:
     client.delete_project(project_name="TEST")
     client.delete_project(project_name="TEST2")
     client.delete_project(project_name="text2sql")
+    client.delete_project(project_name="OutreachWorkflow")
     client.delete_project(project_name="test-langgraph-project")
     client.delete_project(project_name="test-trace-judgee-project")
 
