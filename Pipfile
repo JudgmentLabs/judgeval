@@ -24,6 +24,7 @@ langchain-openai = "*"
 langchain-anthropic = "*"
 langchain-core = "*"
 langchain-community = "*"
+langgraph = "*"
 
 [dev-packages]
 pytest = "*"
