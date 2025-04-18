@@ -35,9 +35,7 @@
       "url": "https://judgmentlabs.ai/"
     }
   ],
-  "anchors": [
-    
-  ],
+  "anchors": [],
   "navigation": [
     {
       "group": "Welcome!",
@@ -102,6 +100,12 @@
       "pages": [
         "api_reference/judgment_client",
         "api_reference/trace"
+      ]
+    },
+    {
+      "group": "Changelog",
+      "pages": [
+        "changelog/2025-04-18.mdx"
       ]
     }
   ],
