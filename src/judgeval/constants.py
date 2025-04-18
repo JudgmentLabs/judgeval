@@ -42,6 +42,7 @@ ROOT_API = os.getenv("JUDGMENT_API_URL", "https://api.judgmentlabs.ai")
 JUDGMENT_EVAL_API_URL = f"{ROOT_API}/evaluate/"
 JUDGMENT_SEQUENCE_EVAL_API_URL = f"{ROOT_API}/evaluate_sequence/"
 JUDGMENT_DATASETS_PUSH_API_URL = f"{ROOT_API}/datasets/push/"
+JUDGMENT_DATASETS_APPEND_API_URL = f"{ROOT_API}/datasets/insert_examples/"
 JUDGMENT_DATASETS_PULL_API_URL = f"{ROOT_API}/datasets/pull/"
 JUDGMENT_DATASETS_DELETE_API_URL = f"{ROOT_API}/datasets/delete/"
 JUDGMENT_DATASETS_EXPORT_JSONL_API_URL = f"{ROOT_API}/datasets/export_jsonl/"
