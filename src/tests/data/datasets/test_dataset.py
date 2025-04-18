@@ -64,9 +64,10 @@ def test_push_server_error(mock_post, dataset, eval_dataset_client):
     mock_response.status_code = 500
     mock_post.return_value = mock_response
 
-    result = eval_dataset_client.push(dataset, "test_alias", "test_project")
-    assert result is False
+    with pytest.raises(Exception, match="Server error during push:"):
+        eval_dataset_client.push(dataset, "test_alias", "test_project")
 
+    # Ensure the post request was called once
     mock_post.assert_called_once()
 
 @patch('requests.post')
