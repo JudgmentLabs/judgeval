@@ -68,11 +68,11 @@ class TraceEntry:
     - evaluation: Evaluation: (evaluation results)
     """
     type: TraceEntryType
-    function: str  # Name of the function being traced
     span_id: str # Unique ID for this specific span instance
     depth: int    # Indentation level for nested calls
-    message: str  # Human-readable description
     created_at: float # Unix timestamp when entry was created, replacing the deprecated 'timestamp' field
+    function: Optional[str] = None  # Name of the function being traced
+    message: Optional[str] = None  # Human-readable description
     duration: Optional[float] = None  # Time taken (for exit/evaluation entries)
     trace_id: str = None # ID of the trace this entry belongs to
     output: Any = None  # Function output value
@@ -228,6 +228,8 @@ class TraceManagerClient:
             raise ValueError(f"Failed to fetch traces: {response.text}")
         
         return response.json()
+    
+
 
     def save_trace(self, trace_data: dict):
         """
@@ -355,6 +357,18 @@ class TraceClient:
         self.executed_tools = []
         self.executed_node_tools = []
         self._span_depths: Dict[str, int] = {} # NEW: To track depth of active spans
+    
+    def get_current_span(self):
+        """Get the current span from the context var"""
+        return current_span_var.get()
+    
+    def set_current_span(self, span: Any):
+        """Set the current span from the context var"""
+        return current_span_var.set(span)
+    
+    def reset_current_span(self, token: Any):
+        """Reset the current span from the context var"""
+        return current_span_var.reset(token)
         
     @contextmanager
     def span(self, name: str, span_type: SpanType = "span"):
@@ -920,6 +934,18 @@ class Tracer:
                 "To use a different project name, ensure the first Tracer initialization uses the desired project name.",
                 RuntimeWarning
             )
+    
+    def set_current_trace(self, trace: TraceClient):
+        """
+        Set the current trace context in contextvars
+        """
+        current_trace_var.set(trace)
+    
+    def get_current_trace(self):
+        """
+        Get the current trace context from contextvars
+        """
+        return current_trace_var.get()
         
     @contextmanager
     def trace(
