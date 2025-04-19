@@ -105,6 +105,12 @@
       ]
     },
     {
+      "group": "Clustering",
+      "pages": [
+        "clustering/clustering"
+      ]
+    },
+    {
       "group": "API Reference",
       "pages": [
         "api_reference/judgment_client",
