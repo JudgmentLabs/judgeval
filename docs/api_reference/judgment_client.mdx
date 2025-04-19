@@ -16,12 +16,12 @@ export JUDGMENT_ORG_ID="your_org_id"
 ```
 
 <CodeGroup>
-```python init_client.py
+```Python Python
 from judgeval import JudgmentClient
 
 client = JudgmentClient()
 ```
-```typescript init_client.ts
+```Typescript Typescript
 import { JudgmentClient } from 'judgeval';
 
 // Gets the singleton instance, reading credentials from environment variables
@@ -34,7 +34,7 @@ const client = JudgmentClient.getInstance();
 The `client.run_evaluation` (Python) or `client.evaluate` (Typescript) method is the primary method for executing evaluations.
 
 <CodeGroup>
-```python run_eval.py
+```Python Python
 from judgeval import JudgmentClient
 from judgeval.scorers import FaithfulnessScorer
 from judgeval.data import Example
@@ -53,7 +53,7 @@ results = client.run_evaluation(
     model="gpt-4o",
 )
 ```
-```typescript run_eval.ts
+```Typescript Typescript
 import { JudgmentClient, ExampleBuilder, FaithfulnessScorer, logger } from 'judgeval';
 
 const client = JudgmentClient.getInstance();

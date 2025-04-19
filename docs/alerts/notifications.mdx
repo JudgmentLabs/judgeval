@@ -41,7 +41,7 @@ For aggregated reports and periodic summaries of multiple alerts, use the [Sched
 ### Basic Configuration
 
 <CodeGroup>
-```python config_basic.py
+```Python Python
 from judgeval.rules import NotificationConfig
 
 # Create a notification configuration
@@ -52,7 +52,7 @@ notification_config = NotificationConfig(
     send_at=None  # Send immediately
 )
 ```
-```typescript config_basic.ts
+```Typescript Typescript
 import { NotificationConfig } from 'judgeval';
 
 // Create a notification configuration
@@ -85,7 +85,7 @@ Notifications can be attached to [rules](/alerts/rules) during rule creation or 
 ### During Rule Creation
 
 <CodeGroup>
-```python rule_with_config.py
+```Python Python
 from judgeval.rules import Rule, Condition, NotificationConfig
 from judgeval.scorers import FaithfulnessScorer
 
@@ -108,7 +108,7 @@ rule = Rule(
     notification=notification_config
 )
 ```
-```typescript rule_with_config.ts
+```Typescript Typescript
 import { Rule, Condition, NotificationConfig, FaithfulnessScorer } from 'judgeval';
 
 // Create notification config
@@ -137,7 +137,7 @@ const rule = new Rule(
 You can schedule one-time notifications to be sent at a specific time using the `send_at` / `sendAt` parameter:
 
 <CodeGroup>
-```python config_scheduled.py
+```Python Python
 from judgeval.rules import NotificationConfig
 import time
 
@@ -151,7 +151,7 @@ notification_config = NotificationConfig(
     send_at=one_hour_from_now
 )
 ```
-```typescript config_scheduled.ts
+```Typescript Typescript
 import { NotificationConfig } from 'judgeval';
 
 // Schedule notification for 1 hour from now
@@ -200,7 +200,7 @@ For information about configuring notifications in the Judgment web platform, in
 Here's a complete example showing how to set up rules with notifications and integrate them with the Tracer:
 
 <CodeGroup>
-```python practical_example.py
+```Python Python
 import os
 from judgeval.common.tracer import Tracer, wrap
 from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
@@ -242,7 +242,7 @@ client = wrap(OpenAI())
 
 # Now any evaluations that trigger the rules will send notifications
 ``` 
-```typescript practical_example.ts
+```Typescript Typescript
 import { Tracer, wrap, FaithfulnessScorer, AnswerRelevancyScorer, Rule, Condition, NotificationConfig } from 'judgeval';
 import OpenAI from 'openai';
 

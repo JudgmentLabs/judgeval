@@ -11,7 +11,7 @@ Unit testing is natively supported in `judgeval` through the `client.assert_test
 **This also integrates with popular testing frameworks like `pytest` (Python) or `jest`/`vitest` (Typescript), meaning you won't have to learn any new testing frameworks!**
 
 <CodeGroup>
-```Python test_example.py
+```Python Python
 import pytest # Added import
 from judgeval import JudgmentClient
 from judgeval.data import Example
@@ -44,7 +44,7 @@ def test_faithfulness():
         model="gpt-4o" # Added model parameter
     )
 ```
-```Typescript test_example.test.ts
+```Typescript Typescript
 import { JudgmentClient, ExampleBuilder, FaithfulnessScorer } from 'judgeval';
 import { describe, it, expect } from 'vitest'; // Or import from 'jest'
 

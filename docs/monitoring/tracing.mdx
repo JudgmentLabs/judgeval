@@ -23,16 +23,15 @@ Setting up tracing with `judgeval` takes two simple steps:
 ### 1. Initialize a tracer with your API keys and project name
 
 <CodeGroup>
-```python init_tracer.py
+```Python Python
 from judgeval.tracer import Tracer
 
 # loads from JUDGMENT_API_KEY and JUDGMENT_ORG_ID env vars
 judgment = Tracer(project_name="my_project")
 ```
-```typescript init_tracer.ts
+```Typescript Typescript
 import { Tracer } from 'judgeval';
 
-// Ensure JUDGMENT_API_KEY and JUDGMENT_ORG_ID are set in your environment
 // The getInstance method ensures a singleton Tracer is used
 const judgment = Tracer.getInstance({ projectName: "my_project" });
 ```
@@ -57,17 +56,16 @@ The `wrap()` function goes over your LLM client (e.g. OpenAI, Anthropic, etc.) a
 
 Here's an example of using `wrap()` on an OpenAI client:
 <CodeGroup>
-```python wrap_example.py
+```Python Python
 from openai import OpenAI
 from judgeval.tracer import wrap
 
 client = wrap(OpenAI())
 ```
-```typescript wrap_example.ts
+```Typescript Typescript
 import OpenAI from 'openai';
 import { wrap } from 'judgeval';
 
-// Ensure JUDGMENT_API_KEY and JUDGMENT_ORG_ID are set in your environment
 const client = wrap(new OpenAI());
 ```
 </CodeGroup>
@@ -80,7 +78,7 @@ The `@observe` decorator (Python) or the `observe()` higher-order function (Type
 
 Here's an example of using the observer mechanism:
 <CodeGroup>
-```python observe_example.py
+```Python Python
 from judgeval.tracer import Tracer
 
 # loads from JUDGMENT_API_KEY env var
@@ -91,17 +89,15 @@ def my_tool():
     print("Hello world!")
 
 ```
-```typescript observe_example.ts
+```Typescript Typescript
 import { Tracer } from 'judgeval';
 
-// Ensure JUDGMENT_API_KEY and JUDGMENT_ORG_ID are set in your environment
 const judgment = Tracer.getInstance({ projectName: "my_project" });
 
 async function myTool(): Promise<void> {
     console.log("Hello world!");
 }
 
-// Wrap the function
 const observedMyTool = judgment.observe({ spanType: "tool" })(myTool);
 
 // You would then call observedMyTool() instead of myTool()
@@ -119,7 +115,7 @@ const observedMyTool = judgment.observe({ spanType: "tool" })(myTool);
 #### Putting it all Together
 Here's a complete example of using judgeval's tracing mechanisms:
 <CodeGroup>
-```python together_example.py
+```Python Python
 from judgeval.tracer import Tracer, wrap
 from openai import OpenAI
 
@@ -144,11 +140,10 @@ def my_llm_call():
 # and saves it upon completion or error.
 main_result = my_llm_call()
 ```
-```typescript together_example.ts
+```Typescript Typescript
 import { Tracer, wrap } from 'judgeval';
 import OpenAI from 'openai';
 
-// Ensure JUDGMENT_API_KEY and JUDGMENT_ORG_ID are set in your environment
 const openaiClient = wrap(new OpenAI());
 const judgment = Tracer.getInstance({ projectName: "my_project" });
 
@@ -198,7 +193,7 @@ This enables you to run evaluations on your **production data in real-time**, wh
 To execute an asynchronous evaluation, you can use the `trace.asyncEvaluate()` method (Typescript) or `judgment.async_evaluate()` (Python, assuming it operates on the currently active trace).
 
 <CodeGroup>
-```python prod_eval.py
+```Python Python
 from judgeval.tracer import Tracer
 from judgeval.scorers import AnswerRelevancyScorer
 
@@ -220,7 +215,7 @@ def main():
 
 main() # Call the observed function
 ```
-```typescript prod_eval.ts
+```Typescript Typescript
 import { Tracer, AnswerRelevancyScorer } from 'judgeval';
 
 const judgment = Tracer.getInstance({ projectName: "my_project" });
@@ -229,7 +224,6 @@ async function mainWithEval(): Promise<string> {
     const query = "What is the capital of France?";
     const res = "The capital of France is Paris."; // Replace with your workflow logic
 
-    // Get the current trace instance
     const currentTrace = judgment.getCurrentTrace();
     if (currentTrace) {
         await currentTrace.asyncEvaluate(
@@ -299,7 +293,7 @@ This is useful for debugging or exporting any state of your workflow to run an e
 
 Here's an example of using explicit trace management:
 <CodeGroup>
-```python explicit_trace.py
+```Python Python
 from judgeval.tracer import Tracer, wrap
 from openai import OpenAI
 
@@ -323,7 +317,7 @@ def main():
 
     return res.choices[0].message.content
 ```
-```typescript explicit_trace.ts
+```Typescript Typescript
 import { Tracer, wrap } from 'judgeval';
 import OpenAI from 'openai';
 
@@ -348,7 +342,6 @@ async function main() {
         });
         resultMessage = res.choices[0]?.message?.content;
 
-        // Manually interact with the trace client
         trace.print(); // Prints the trace to console
         await trace.save(); // Saves the trace to the Judgment platform
         

@@ -14,7 +14,7 @@ An `Example` is can be composed of a mixture of the following fields:
 **Here's a sample of creating an `Example`:**
 
 <CodeGroup>
-```Python example_test.py
+```Python Python
 from judgeval.data import Example
 
 example = Example(
@@ -25,7 +25,7 @@ example = Example(
     context=["Bill Gates and Paul Allen are the founders of Microsoft."],
 )
 ```
-```Typescript example_test.ts
+```Typescript Typescript
 import { ExampleBuilder } from 'judgeval';
 
 const example = new ExampleBuilder()
@@ -67,7 +67,7 @@ The `actual_output` field represents what your LLM system outputs based on the `
 This is the actual output of your LLM system created either at evaluation time or with saved answers.
 
 <CodeGroup>
-```Python actual_output.py
+```Python Python
 # Sample app implementation
 import medical_chatbot
 from judgeval.data import Example # Added import
@@ -78,7 +78,7 @@ example = Example(
     actual_output=medical_chatbot.chat(question)
 )
 ```
-```Typescript actual_output.ts
+```Typescript Typescript
 // Sample app implementation (assuming medical_chatbot exists)
 import { medical_chatbot } from './medical_chatbot'; // Example import
 import { ExampleBuilder } from 'judgeval';
@@ -100,7 +100,7 @@ One great part of `judgeval`'s scorers is that they use LLMs which have flexible
 To learn more about how `judgeval`'s scorers work, please see the [scorer docs](evaluation/scorers/introduction).
 
 <CodeGroup>
-```Python expected_output.py
+```Python Python
 # Sample app implementation
 import medical_chatbot
 from judgeval.data import Example # Added import
@@ -112,7 +112,7 @@ example = Example(
     expected_output="Sparkling water is neither healthy nor unhealthy."
 )
 ```
-```Typescript expected_output.ts
+```Typescript Typescript
 // Sample app implementation (assuming medical_chatbot exists)
 import { medical_chatbot } from './medical_chatbot'; // Example import
 import { ExampleBuilder } from 'judgeval';
@@ -138,7 +138,7 @@ not `context`. **If you're building a RAG system, you'll want to use `retrieval_
 </Tip>
 
 <CodeGroup>
-```Python context.py
+```Python Python
 # Sample app implementation
 import medical_chatbot
 from judgeval.data import Example # Added import
@@ -151,7 +151,7 @@ example = Example(
     context=["Sparkling water is a type of water that is carbonated."]
 )
 ```
-```Typescript context.ts
+```Typescript Typescript
 // Sample app implementation (assuming medical_chatbot exists)
 import { medical_chatbot } from './medical_chatbot'; // Example import
 import { ExampleBuilder } from 'judgeval';
@@ -178,7 +178,7 @@ Some common cases for using `retrieval_context` are:
 </Tip>
 
 <CodeGroup>
-```Python retrieval_context.py
+```Python Python
 # Sample app implementation
 import medical_chatbot
 from judgeval.data import Example # Added import
@@ -192,7 +192,7 @@ example = Example(
     retrieval_context=["Sparkling water is carbonated and has no calories."]
 )
 ```
-```Typescript retrieval_context.ts
+```Typescript Typescript
 // Sample app implementation (assuming medical_chatbot exists)
 import { medical_chatbot } from './medical_chatbot'; // Example import
 import { ExampleBuilder } from 'judgeval';

@@ -30,7 +30,7 @@ Optional parameters include:
 ### Basic Rule Structure
 
 <CodeGroup>
-```python create_rule.py
+```Python Python
 from judgeval.rules import Rule, Condition
 from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
 
@@ -45,7 +45,7 @@ rule = Rule(
     combine_type="all"  # "all" = AND, "any" = OR
 )
 ```
-```typescript create_rule.ts
+```Typescript Typescript
 import { Rule, Condition, FaithfulnessScorer, AnswerRelevancyScorer } from 'judgeval';
 
 // Create a rule
@@ -68,7 +68,7 @@ Conditions are the building blocks of rules. Each condition specifies a metric (
 ### Creating Conditions
 
 <CodeGroup>
-```python create_condition.py
+```Python Python
 from judgeval.rules import Condition
 from judgeval.scorers import FaithfulnessScorer
 
@@ -77,7 +77,7 @@ condition = Condition(
     metric=FaithfulnessScorer(threshold=0.7)
 )
 ```
-```typescript create_condition.ts
+```Typescript Typescript
 import { Condition, FaithfulnessScorer } from 'judgeval';
 
 // Create a condition that passes when faithfulness score is greater than or equal to 0.7
@@ -109,7 +109,7 @@ This design is meant for setting up alerts that trigger when your metrics indica
 Rules are most commonly used with the `Tracer` to monitor your AI system's performance:
 
 <CodeGroup>
-```python tracer_with_rules.py
+```Python Python
 from judgeval.common.tracer import Tracer
 from judgeval.rules import Rule, Condition
 from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
@@ -133,7 +133,7 @@ judgment = Tracer(
     rules=rules
 )
 ```
-```typescript tracer_with_rules.ts
+```Typescript Typescript
 import { Tracer, Rule, Condition, FaithfulnessScorer, AnswerRelevancyScorer } from 'judgeval';
 
 // Create rules

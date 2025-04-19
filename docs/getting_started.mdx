@@ -6,10 +6,10 @@ description: "This guide will help you learn the essential components of `judgev
 # Installation 
 
 <CodeGroup>
-```Shell Python Installation
+```Shell Shell
 pip install judgeval
 ```
-```Shell Typescript Installation
+```Shell Shell
 npm install judgeval
 ```
 </CodeGroup>
@@ -45,7 +45,7 @@ feel free to [get in touch with our team](mailto:contact@judgmentlabs.ai).
 # Create Your First Experiment
 
 <CodeGroup>
-```Python sample_eval.py
+```Python Python
 from judgeval import JudgmentClient
 from judgeval.data import Example
 from judgeval.scorers import FaithfulnessScorer
@@ -66,7 +66,7 @@ results = client.run_evaluation(
 )
 print(results)
 ```
-```Typescript sample_eval.ts
+```Typescript Typescript
 import { JudgmentClient, ExampleBuilder, FaithfulnessScorer, logger } from 'judgeval';
 
 async function runFirstExperiment() { // Wrap in async function for await
@@ -115,7 +115,7 @@ Traces enable you to track your LLM system's flow end-to-end and measure:
 
 
 <CodeGroup>
-```Python trace_example.py
+```Python Python
 from judgeval.common.tracer import Tracer, wrap
 from openai import OpenAI
 
@@ -138,7 +138,7 @@ def main():
 # Calling the observed function implicitly starts and saves the trace
 main()
 ```
-```Typescript trace_example.ts
+```Typescript Typescript
 import { Tracer, wrap } from 'judgeval';
 import OpenAI from 'openai';
 
@@ -205,7 +205,7 @@ In addition to tracing, `judgeval` allows you to run online evaluations on your 
 To run an online evaluation, you can simply add one line of code to your existing trace:
 
 <CodeGroup>
-```Python trace_example.py
+```Python Python
 from judgeval.common.tracer import Tracer, wrap
 from judgeval.scorers import AnswerRelevancyScorer
 from openai import OpenAI
@@ -237,7 +237,7 @@ def main():
 
 main()
 ```
-```Typescript trace_example.ts
+```Typescript Typescript
 import { Tracer, wrap, AnswerRelevancyScorer } from 'judgeval';
 import OpenAI from 'openai';
 

@@ -42,7 +42,7 @@ Our contextual precision scorer is based on Stanford NLP's [ARES](https://arxiv.
 ## Sample Implementation
 
 <CodeGroup>
-```Python contextual_precision.py
+```Python Python
 from judgeval import JudgmentClient
 from judgeval.data import Example
 from judgeval.scorers import ContextualPrecisionScorer
@@ -68,7 +68,7 @@ results = client.run_evaluation(
 )
 print(results)
 ```
-```Typescript contextual_precision.ts
+```Typescript Typescript
 import { JudgmentClient, ExampleBuilder, ContextualPrecisionScorer, logger } from 'judgeval';
 
 async function runContextualPrecision() {

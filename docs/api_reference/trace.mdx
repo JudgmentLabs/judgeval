@@ -10,13 +10,13 @@ click [here](/monitoring/tracing).
 The `Tracer` class is used to trace the execution of your LLM system.
 
 <CodeGroup>
-```python init_tracer.py
+```Python Python
 from judgeval.tracer import Tracer
 
 # loads from JUDGMENT_API_KEY and JUDGMENT_ORG_ID env vars
 tracer = Tracer(project_name="my_project")
 ```
-```typescript init_tracer.ts
+```Typescript Typescript
 import { Tracer } from 'judgeval';
 
 // Loads from JUDGMENT_API_KEY and JUDGMENT_ORG_ID env vars
@@ -36,7 +36,7 @@ observability tooling in one place.
 When using the `.trace()` context manager (Python) or explicitly calling `tracer.startTrace()` (Typescript), you can control trace attributes like `name`, `project_name`, and `overwrite`.
 
 <CodeGroup>
-```python explicit_trace.py
+```Python Python
 # Assume tracer = Tracer(...) exists
 
 with tracer.trace(
@@ -47,7 +47,7 @@ with tracer.trace(
     # ... operations within the trace ...
     trace.save() # Context manager often handles saving on exit
 ```
-```typescript explicit_trace.ts
+```Typescript Typescript
 // Assume tracer = Tracer.getInstance(...) exists
 
 async function manageTrace() {
@@ -98,7 +98,7 @@ Each intermediate function or coroutine you want to trace is wrapped with the `@
 Here's an example using `observe`:
 
 <CodeGroup>
-```python observe_example.py
+```Python Python
 # Assume judgment = Tracer(...) exists
 from langchain.tools import tool # Example other decorator
 
@@ -111,7 +111,7 @@ def my_tool(query: str):
 
 # Calling my_tool("some query") will now be traced.
 ```
-```typescript observe_example.ts
+```Typescript Typescript
 // Assume tracer = Tracer.getInstance(...) exists
 
 // Assume an equivalent decorator or wrapper for @tool exists if needed

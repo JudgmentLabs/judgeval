@@ -32,7 +32,7 @@ The threshold for the comparison scorer determines the acceptable number of diff
 ## Sample Implementation
 
 <CodeGroup>
-```Python comparison.py
+```Python Python
 from judgeval import JudgmentClient
 from judgeval.data import Example
 from judgeval.scorers import ComparisonScorer
@@ -64,7 +64,7 @@ results = client.run_evaluation(
 )
 print(results) # Add print to show results
 ```
-```Typescript comparison.ts
+```Typescript Typescript
 import { JudgmentClient, ExampleBuilder, ComparisonScorer, logger } from 'judgeval';
 
 async function runComparison() {

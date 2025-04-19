@@ -14,7 +14,7 @@ Evaluation is the process of **scoring** an LLM system's outputs with metrics; a
 In `judgeval`, an Example is a unit of data that allows you to use evaluation scorers on your LLM system.
 
 <CodeGroup>
-```Python example.py
+```Python Python
 from judgeval.data import Example
 
 example = Example(
@@ -24,7 +24,7 @@ example = Example(
 )
 ```
 
-```Typescript example.ts
+```Typescript Typescript
 import { ExampleBuilder } from 'judgeval';
 
 const example = new ExampleBuilder()
@@ -51,7 +51,7 @@ Creating an Example allows you to evaluate using
 `judgeval`'s default scorers:
 
 <CodeGroup>
-```Python example.py
+```Python Python
 from judgeval import JudgmentClient
 from judgeval.scorers import FaithfulnessScorer
 from judgeval.data import Example
@@ -75,7 +75,7 @@ results = client.run_evaluation(
 print(results)
 ```
 
-```Typescript example.ts
+```Typescript Typescript
 import { JudgmentClient, ExampleBuilder, FaithfulnessScorer, logger } from 'judgeval';
 
 const example = new ExampleBuilder()
@@ -110,7 +110,7 @@ An Evaluation Dataset is a collection of Examples. It provides an interface for 
 your LLM system using one or more scorers.
 
 <CodeGroup>
-```python dataset.py
+```python Python
 from judgeval.data import Example
 from judgeval.data.datasets import EvalDataset
 
@@ -120,7 +120,7 @@ example2 = Example(input="...", actual_output="...", retrieval_context="...")
 dataset = EvalDataset(examples=[example1, example2])
 ```
 
-```typescript dataset.ts
+```typescript Typescript
 import { ExampleBuilder, EvalDataset } from 'judgeval';
 
 const example1 = new ExampleBuilder()
@@ -150,7 +150,7 @@ For more information on how to use `EvalDataset`s, please see the [EvalDataset d
 Then, you can run evaluations on the dataset:
 
 <CodeGroup>
-```python evaluate_dataset.py
+```python Python
 from judgeval import JudgmentClient
 from judgeval.scorers import FaithfulnessScorer
 # Assume dataset is defined as above
@@ -164,7 +164,7 @@ results = client.evaluate_dataset(
 )
 ```
 
-```typescript evaluate_dataset.ts
+```typescript Typescript
 import { JudgmentClient, FaithfulnessScorer, logger } from 'judgeval';
 // Assume dataset is defined as above and is an instance of EvalDataset
 
@@ -190,13 +190,13 @@ logger.print(results);
 Every `Scorer` has a `threshold` parameter that you can use in the context of unit testing your app.
 
 <CodeGroup>
-```python scorer.py
+```python Python
 from judgeval.scorers import FaithfulnessScorer
 
 scorer = FaithfulnessScorer(threshold=1.0)
 ```
 
-```typescript scorer.ts
+```typescript Typescript
 import { FaithfulnessScorer } from 'judgeval';
 
 const scorer = new FaithfulnessScorer(1.0);
