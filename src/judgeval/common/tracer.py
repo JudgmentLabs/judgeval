@@ -1204,19 +1204,30 @@ def wrap(client: Any) -> Any:
     """
     # Get the appropriate configuration for this client type
     span_name, original_create = _get_client_config(client)
+
+    # Handle async clients differently than synchronous clients (need an async function for async clients)
     if (isinstance(client, (AsyncOpenAI, AsyncAnthropic, AsyncTogether))):
         async def traced_create(*args, **kwargs):
+            # Get the current trace from contextvars
             current_trace = current_trace_var.get()
             
+            # Skip tracing if no active trace
             if not current_trace:
                 return original_create(*args, **kwargs)
 
             with current_trace.span(span_name, span_type="llm") as span:
+                # Format and record the input parameters
                 input_data = _format_input_data(client, **kwargs)
                 span.record_input(input_data)
                 
-                response = await original_create(*args, **kwargs)
+                # Make the actual API call
+                try:
+                    response = await original_create(*args, **kwargs)
+                except Exception as e:
+                    print(f"Error during API call: {e}")
+                    raise
 
+                # Format and record the output
                 output_data = _format_output_data(client, response)
                 span.record_output(output_data)
                 
@@ -1236,8 +1247,11 @@ def wrap(client: Any) -> Any:
                 span.record_input(input_data)
                 
                 # Make the actual API call
-
-                response = original_create(*args, **kwargs)
+                try:
+                    response = original_create(*args, **kwargs)
+                except Exception as e:
+                    print(f"Error during API call: {e}")
+                    raise
                 
                 # Format and record the output
                 output_data = _format_output_data(client, response)
