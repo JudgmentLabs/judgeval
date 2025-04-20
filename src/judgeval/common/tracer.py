@@ -24,9 +24,9 @@ import requests
 from litellm import cost_per_token
 from pydantic import BaseModel
 from rich import print as rprint
-from openai import OpenAI
-from together import Together
-from anthropic import Anthropic
+from openai import OpenAI, AsyncOpenAI
+from together import Together, AsyncTogether
+from anthropic import Anthropic, AsyncAnthropic
 
 # Local application/library-specific imports
 from judgeval.constants import (
@@ -53,7 +53,7 @@ current_trace_var = contextvars.ContextVar('current_trace', default=None)
 current_span_var = contextvars.ContextVar('current_span', default=None) # NEW: ContextVar for the active span name
 
 # Define type aliases for better code readability and maintainability
-ApiClient: TypeAlias = Union[OpenAI, Together, Anthropic]  # Supported API clients
+ApiClient: TypeAlias = Union[OpenAI, Together, Anthropic, AsyncOpenAI, AsyncAnthropic, AsyncTogether]  # Supported API clients
 TraceEntryType = Literal['enter', 'exit', 'output', 'input', 'evaluation']  # Valid trace entry types
 SpanType = Literal['span', 'tool', 'llm', 'evaluation', 'chain']
 @dataclass
@@ -1204,33 +1204,66 @@ def wrap(client: Any) -> Any:
     """
     # Get the appropriate configuration for this client type
     span_name, original_create = _get_client_config(client)
-    
-    def traced_create(*args, **kwargs):
-        # Get the current trace from contextvars
-        current_trace = current_trace_var.get()
-        
-        # Skip tracing if no active trace
-        if not current_trace:
-            return original_create(*args, **kwargs)
 
-        with current_trace.span(span_name, span_type="llm") as span:
-            # Format and record the input parameters
-            input_data = _format_input_data(client, **kwargs)
-            span.record_input(input_data)
+    # Handle async clients differently than synchronous clients (need an async function for async clients)
+    if (isinstance(client, (AsyncOpenAI, AsyncAnthropic, AsyncTogether))):
+        async def traced_create(*args, **kwargs):
+            # Get the current trace from contextvars
+            current_trace = current_trace_var.get()
             
-            # Make the actual API call
-            response = original_create(*args, **kwargs)
+            # Skip tracing if no active trace
+            if not current_trace:
+                return original_create(*args, **kwargs)
+
+            with current_trace.span(span_name, span_type="llm") as span:
+                # Format and record the input parameters
+                input_data = _format_input_data(client, **kwargs)
+                span.record_input(input_data)
+                
+                # Make the actual API call
+                try:
+                    response = await original_create(*args, **kwargs)
+                except Exception as e:
+                    print(f"Error during API call: {e}")
+                    raise
+
+                # Format and record the output
+                output_data = _format_output_data(client, response)
+                span.record_output(output_data)
+                
+                return response
+    else:
+        def traced_create(*args, **kwargs):
+            # Get the current trace from contextvars
+            current_trace = current_trace_var.get()
             
-            # Format and record the output
-            output_data = _format_output_data(client, response)
-            span.record_output(output_data)
-            
-            return response
+            # Skip tracing if no active trace
+            if not current_trace:
+                return original_create(*args, **kwargs)
+
+            with current_trace.span(span_name, span_type="llm") as span:
+                # Format and record the input parameters
+                input_data = _format_input_data(client, **kwargs)
+                span.record_input(input_data)
+                
+                # Make the actual API call
+                try:
+                    response = original_create(*args, **kwargs)
+                except Exception as e:
+                    print(f"Error during API call: {e}")
+                    raise
+                
+                # Format and record the output
+                output_data = _format_output_data(client, response)
+                span.record_output(output_data)
+                
+                return response
+        
             
     # Replace the original method with our traced version
-    if isinstance(client, (OpenAI, Together)):
+    if isinstance(client, (OpenAI, Together, AsyncOpenAI, AsyncTogether)):
         client.chat.completions.create = traced_create
-    elif isinstance(client, Anthropic):
+    elif isinstance(client, (Anthropic, AsyncAnthropic)):
         client.messages.create = traced_create
         
     return client
@@ -1251,11 +1284,11 @@ def _get_client_config(client: ApiClient) -> tuple[str, callable]:
     Raises:
         ValueError: If client type is not supported
     """
-    if isinstance(client, OpenAI):
+    if isinstance(client, (OpenAI, AsyncOpenAI)):
         return "OPENAI_API_CALL", client.chat.completions.create
-    elif isinstance(client, Together):
+    elif isinstance(client, (Together, AsyncTogether)):
         return "TOGETHER_API_CALL", client.chat.completions.create
-    elif isinstance(client, Anthropic):
+    elif isinstance(client, (Anthropic, AsyncAnthropic)):
         return "ANTHROPIC_API_CALL", client.messages.create
     raise ValueError(f"Unsupported client type: {type(client)}")
 
@@ -1265,7 +1298,7 @@ def _format_input_data(client: ApiClient, **kwargs) -> dict:
     Extracts relevant parameters from kwargs based on the client type
     to ensure consistent tracing across different APIs.
     """
-    if isinstance(client, (OpenAI, Together)):
+    if isinstance(client, (OpenAI, Together, AsyncOpenAI, AsyncTogether)):
         return {
             "model": kwargs.get("model"),
             "messages": kwargs.get("messages"),
@@ -1288,7 +1321,7 @@ def _format_output_data(client: ApiClient, response: Any) -> dict:
             - content: The generated text
             - usage: Token usage statistics
     """
-    if isinstance(client, (OpenAI, Together)):
+    if isinstance(client, (OpenAI, Together, AsyncOpenAI, AsyncTogether)):
         return {
             "content": response.choices[0].message.content,
             "usage": {
