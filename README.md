@@ -62,10 +62,11 @@ Create a file named `traces.py` with the following code:
     judgment = Tracer(project_name="my_project")
 
     # Or with S3 storage enabled
+    # NOTE: Make sure AWS creds correspond to an account with write access to the specified S3 bucket
     judgment = Tracer(
         project_name="my_project",
         use_s3=True,
-        s3_bucket_name="my-traces-bucket",
+        s3_bucket_name="my-traces-bucket", # Bucket created automatically if it doesn't exist
         s3_aws_access_key_id="your-access-key",  # Optional: defaults to AWS_ACCESS_KEY_ID env var
         s3_aws_secret_access_key="your-secret-key",  # Optional: defaults to AWS_SECRET_ACCESS_KEY env var
         s3_region_name="us-west-1"  # Optional: defaults to AWS_REGION env var or "us-west-1"

@@ -3,6 +3,7 @@ import json
 import boto3
 from typing import Optional
 from datetime import datetime, UTC
+from botocore.exceptions import ClientError
 
 class S3Storage:
     """Utility class for storing and retrieving trace data from S3."""
@@ -30,6 +31,33 @@ class S3Storage:
             region_name=region_name or os.getenv('AWS_REGION', 'us-west-1')
         )
         
+    def _ensure_bucket_exists(self):
+        """Ensure the S3 bucket exists, creating it if necessary."""
+        try:
+            self.s3_client.head_bucket(Bucket=self.bucket_name)
+        except ClientError as e:
+            error_code = e.response['Error']['Code']
+            if error_code == '404':
+                # Bucket doesn't exist, create it
+                print(f"Bucket {self.bucket_name} doesn't exist, creating it ...")
+                try:
+                    self.s3_client.create_bucket(
+                        Bucket=self.bucket_name,
+                        CreateBucketConfiguration={
+                            'LocationConstraint': self.s3_client.meta.region_name
+                        }
+                    )
+                    print(f"Created S3 bucket: {self.bucket_name}")
+                except ClientError as create_error:
+                    if create_error.response['Error']['Code'] == 'BucketAlreadyOwnedByYou':
+                        # Bucket was just created by another process
+                        pass
+                    else:
+                        raise create_error
+            else:
+                # Some other error occurred
+                raise e
+        
     def save_trace(self, trace_data: dict, trace_id: str, project_name: str) -> str:
         """Save trace data to S3.
         
@@ -41,6 +69,9 @@ class S3Storage:
         Returns:
             str: S3 key where the trace was saved
         """
+        # Ensure bucket exists before saving
+        self._ensure_bucket_exists()
+        
         # Create a timestamped key for the trace
         timestamp = datetime.now(UTC).strftime('%Y%m%d_%H%M%S')
         s3_key = f"traces/{project_name}/{trace_id}_{timestamp}.json"
