@@ -26,6 +26,7 @@ langchain-core = "*"
 langchain-community = "*"
 langgraph = "*"
 google-genai = "*"
+boto3 = "*"
 
 [dev-packages]
 pytest = "*"

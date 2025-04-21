@@ -57,8 +57,19 @@ Create a file named `traces.py` with the following code:
     from judgeval.common.tracer import Tracer, wrap
     from openai import OpenAI
 
+    # Basic initialization
     client = wrap(OpenAI())
     judgment = Tracer(project_name="my_project")
+
+    # Or with S3 storage enabled
+    judgment = Tracer(
+        project_name="my_project",
+        use_s3=True,
+        s3_bucket_name="my-traces-bucket",
+        s3_aws_access_key_id="your-access-key",  # Optional: defaults to AWS_ACCESS_KEY_ID env var
+        s3_aws_secret_access_key="your-secret-key",  # Optional: defaults to AWS_SECRET_ACCESS_KEY env var
+        s3_region_name="us-west-1"  # Optional: defaults to AWS_REGION env var or "us-west-1"
+    )
 
     @judgment.observe(span_type="tool")
     def my_tool():
