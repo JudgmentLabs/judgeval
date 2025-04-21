@@ -1,7 +1,7 @@
 """
 base e2e tests for all default judgeval scorers
 """
-
+import uuid
 
 from judgeval.judgment_client import JudgmentClient
 from judgeval.scorers import (
@@ -17,9 +17,10 @@ from judgeval.scorers import (
     Text2SQLScorer,
     InstructionAdherenceScorer,
     ExecutionOrderScorer,
+    DerailmentScorer,
 )
 
-from judgeval.data import Example
+from judgeval.data import Example, Sequence
 
 
 def test_ac_scorer():
@@ -50,6 +51,7 @@ def test_ac_scorer():
     print_debug_on_failure(res[0])
 
     # Test with use_judgment=False 
+    example.example_id = str(uuid.uuid4())
     res = client.run_evaluation(
         examples=[example],
         scorers=[scorer],
@@ -100,6 +102,8 @@ def test_ar_scorer():
     assert res[1].success == False
 
     # Test with use_judgment=False
+    example_1.example_id = str(uuid.uuid4())
+    example_2.example_id = str(uuid.uuid4())
     res = client.run_evaluation(
         examples=[example_1, example_2],
         scorers=[scorer],
@@ -201,6 +205,8 @@ def test_cp_scorer():
     assert res[1].success == False  # example_2 should fail
 
     # Test with use_judgment=False
+    example_1.example_id = str(uuid.uuid4())
+    example_2.example_id = str(uuid.uuid4())
     res = client.run_evaluation(
         examples=[example_1, example_2],
         scorers=[scorer],
@@ -255,6 +261,7 @@ def test_cr_scorer():
     assert res[0].success == True  # example_1 should pass
 
     # Test with use_judgment=False
+    example_1.example_id = str(uuid.uuid4())
     res = client.run_evaluation(
         examples=[example_1],
         scorers=[scorer],
@@ -309,6 +316,7 @@ def test_crelevancy_scorer():
     assert res[0].success == True  # example_1 should pass
 
     # Test with use_judgment=False
+    example_1.example_id = str(uuid.uuid4())
     res = client.run_evaluation(
         examples=[example_1],
         scorers=[scorer],
@@ -374,6 +382,8 @@ def test_faithfulness_scorer():
     assert res[1].success == False, res[1]  # contradictory_example should fail
 
     # Test with use_judgment=False
+    faithful_example.example_id = str(uuid.uuid4())
+    contradictory_example.example_id = str(uuid.uuid4())
     res = client.run_evaluation(
         examples=[faithful_example, contradictory_example],
         scorers=[scorer],
@@ -434,6 +444,7 @@ def test_hallucination_scorer():
     assert res[0].success == True, f"Hallucination test failed: score={res[0].scorers_data[0].score}, threshold={res[0].scorers_data[0].threshold}, reason={res[0].scorers_data[0].reason}"
 
     # Test with use_judgment=False
+    example_1.example_id = str(uuid.uuid4())
     res = client.run_evaluation(
         examples=[example_1],
         scorers=[scorer],
@@ -508,6 +519,7 @@ def test_summarization_scorer():
     assert res[0].success == True, f"Summarization test failed: score={res[0].scorers_data[0].score}, threshold={res[0].scorers_data[0].threshold}, reason={res[0].scorers_data[0].reason}"
 
     # Test with use_judgment=False
+    example_1.example_id = str(uuid.uuid4())
     res = client.run_evaluation(
         examples=[example_1],
         scorers=[scorer],
@@ -700,6 +712,36 @@ def test_execution_order_scorer():
         eval_run_name=EVAL_RUN_NAME,
         override=True
     )
+
+def test_derailment_scorer():
+    client = JudgmentClient()
+    PROJECT_NAME = "test-project"
+    EVAL_RUN_NAME = "test-run-derailment"
+
+    airlines_example = Example(
+    input="Which airlines fly to Paris?",
+    actual_output="Air France, Delta, and American Airlines offer direct flights."
+    )
+    weather_example = Example(
+        input="What is the weather like in Texas?",
+        actual_output="It's sunny with a high of 75°F in Texas."
+    )
+    airline_sequence = Sequence(
+        name="Flight Details",
+        items=[airlines_example, weather_example],
+        scorers=[DerailmentScorer(threshold=0.5)]
+    )
+    results = client.run_sequence_evaluation(
+        eval_run_name=EVAL_RUN_NAME,
+        project_name=PROJECT_NAME,
+        sequences=[airline_sequence],
+        model="gpt-4o",
+        log_results=True,
+        override=True,
+    )
+
+
+        
 
 
 def print_debug_on_failure(result) -> bool:

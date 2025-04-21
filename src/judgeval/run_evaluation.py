@@ -4,14 +4,15 @@ import time
 import sys
 import itertools
 import threading
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 from datetime import datetime
 from rich import print as rprint
 
 from judgeval.data import (
     ScorerData, 
     ScoringResult,
-    Example
+    Example,
+    CustomExample
 )
 from judgeval.scorers import (
     JudgevalScorer, 
@@ -22,6 +23,7 @@ from judgeval.scorers.score import a_execute_scoring
 from judgeval.constants import (
     ROOT_API,
     JUDGMENT_EVAL_API_URL,
+    JUDGMENT_SEQUENCE_EVAL_API_URL,
     JUDGMENT_EVAL_LOG_API_URL,
     MAX_CONCURRENT_EVALUATIONS,
     JUDGMENT_ADD_TO_RUN_EVAL_QUEUE_API_URL
@@ -34,7 +36,7 @@ from judgeval.common.logger import (
     example_logging_context
 )
 from judgeval.evaluation_run import EvaluationRun
-
+from judgeval.data.sequence_run import SequenceRun
 
 def send_to_rabbitmq(evaluation_run: EvaluationRun) -> None:
     """
@@ -91,6 +93,36 @@ def execute_api_eval(evaluation_run: EvaluationRun) -> List[Dict]:
         raise JudgmentAPIError(error_message)
     return response_data
 
+def execute_api_sequence_eval(sequence_run: SequenceRun) -> List[Dict]:
+    """
+    Executes an evaluation of a list of `Example`s using one or more `JudgmentScorer`s via the Judgment API.
+    """
+        
+    try:
+        # submit API request to execute evals
+        payload = sequence_run.model_dump(warnings=False)
+        response = requests.post(
+            JUDGMENT_SEQUENCE_EVAL_API_URL, 
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {sequence_run.judgment_api_key}",
+                "X-Organization-Id": sequence_run.organization_id
+            }, 
+            json=payload,
+            verify=True
+        )
+        response_data = response.json()
+    except Exception as e:
+        error(f"Error: {e}")
+        details = response.json().get("detail", "No details provided")
+        raise JudgmentAPIError("An error occurred while executing the Judgment API request: " + details)
+    # Check if the response status code is not 2XX
+    # Add check for the duplicate eval run name
+    if not response.ok:
+        error_message = response_data.get('detail', 'An unknown error occurred.')
+        error(f"Error: {error_message=}")
+        raise JudgmentAPIError(error_message)
+    return response_data
 
 def merge_results(api_results: List[ScoringResult], local_results: List[ScoringResult]) -> List[ScoringResult]:
     """
@@ -197,8 +229,8 @@ def check_eval_run_name_exists(eval_name: str, project_name: str, judgment_api_k
         )
         
         if response.status_code == 409:
-            error(f"Eval run name '{eval_name}' already exists for this project. Please choose a different name or set the `override` flag to true.")
-            raise ValueError(f"Eval run name '{eval_name}' already exists for this project. Please choose a different name or set the `override` flag to true.")
+            error(f"Eval run name '{eval_name}' already exists for this project. Please choose a different name, set the `override` flag to true, or set the `append` flag to true.")
+            raise ValueError(f"Eval run name '{eval_name}' already exists for this project. Please choose a different name, set the `override` flag to true, or set the `append` flag to true.")
         
         if not response.ok:
             response_data = response.json()
@@ -211,7 +243,7 @@ def check_eval_run_name_exists(eval_name: str, project_name: str, judgment_api_k
         raise JudgmentAPIError(f"Failed to check if eval run name exists: {str(e)}")
 
 
-def log_evaluation_results(merged_results: List[ScoringResult], evaluation_run: EvaluationRun) -> str:
+def log_evaluation_results(merged_results: List[ScoringResult], run: Union[EvaluationRun, SequenceRun]) -> str:
     """
     Logs evaluation results to the Judgment API database.
 
@@ -228,13 +260,12 @@ def log_evaluation_results(merged_results: List[ScoringResult], evaluation_run: 
             JUDGMENT_EVAL_LOG_API_URL,
             headers={
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {evaluation_run.judgment_api_key}",
-                "X-Organization-Id": evaluation_run.organization_id
+                "Authorization": f"Bearer {run.judgment_api_key}",
+                "X-Organization-Id": run.organization_id
             },
             json={
-                "results": [result.to_dict() for result in merged_results],
-                "project_name": evaluation_run.project_name,
-                "eval_name": evaluation_run.eval_name,
+                "results": [result.model_dump(warnings=False) for result in merged_results],
+                "run": run.model_dump(warnings=False)
             },
             verify=True
         )
@@ -303,6 +334,42 @@ def check_examples(examples: List[Example], scorers: List[APIJudgmentScorer]) ->
                     # Example ID (usually random UUID) does not provide any helpful information for the user but printing the entire example is overdoing it
                     print(f"WARNING: Example {example.example_id} is missing the following parameters: {missing_params} for scorer {scorer.score_type.value}")
 
+def run_sequence_eval(sequence_run: SequenceRun, override: bool = False, ignore_errors: bool = True, async_execution: bool = False) -> List[ScoringResult]:
+    # Call endpoint to check to see if eval run name exists (if we DON'T want to override and DO want to log results)
+    if not override and sequence_run.log_results:
+        check_eval_run_name_exists(
+            sequence_run.eval_name,
+            sequence_run.project_name,
+            sequence_run.judgment_api_key,
+            sequence_run.organization_id
+        )
+
+    # Execute evaluation using Judgment API
+    info("Starting API evaluation")
+    try:  # execute an EvaluationRun with just JudgmentScorers
+        debug("Sending request to Judgment API")    
+        response_data: List[Dict] = run_with_spinner("Running Sequence Evaluation: ", execute_api_sequence_eval, sequence_run)
+
+        info(f"Received {len(response_data['results'])} results from API")
+    except JudgmentAPIError as e:
+        error(f"An error occurred while executing the Judgment API request: {str(e)}")
+        raise JudgmentAPIError(f"An error occurred while executing the Judgment API request: {str(e)}")
+    except ValueError as e:
+        raise ValueError(f"Please check your SequenceRun object, one or more fields are invalid: {str(e)}")
+    
+    # Convert the response data to `ScoringResult` objects
+    debug("Processing API results")
+    api_results = []
+    for result in response_data["results"]:
+        api_results.append(ScoringResult(**result))
+        
+    # TODO: allow for custom scorer on sequences
+    if sequence_run.log_results:
+        pretty_str = run_with_spinner("Logging Results: ", log_evaluation_results, api_results, sequence_run)
+        rprint(pretty_str)
+    
+    
+
 def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_errors: bool = True, async_execution: bool = False) -> List[ScoringResult]:
     """
     Executes an evaluation of `Example`s using one or more `Scorer`s
@@ -329,7 +396,7 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_error
     """
 
     # Call endpoint to check to see if eval run name exists (if we DON'T want to override and DO want to log results)
-    if not override and evaluation_run.log_results:
+    if not override and evaluation_run.log_results and not evaluation_run.append:
         check_eval_run_name_exists(
             evaluation_run.eval_name,
             evaluation_run.project_name,
@@ -373,12 +440,20 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_error
             local_scorers.append(scorer)
             debug(f"Added local scorer: {type(scorer).__name__}")
     
+    custom_example_check = [scorer.custom_example for scorer in local_scorers]
+    if any(custom_example_check) and not all(custom_example_check):
+        error("All scorers must be custom scorers if using custom examples")
+        raise ValueError("All scorers must be custom scorers if using custom examples")
+    
     debug(f"Found {len(judgment_scorers)} judgment scorers and {len(local_scorers)} local scorers")
     
     api_results: List[ScoringResult] = []
     local_results: List[ScoringResult] = []
 
     if async_execution:
+        if len(local_scorers) > 0:
+            error("Local scorers are not supported in async execution")
+            
         check_examples(evaluation_run.examples, evaluation_run.scorers)
         info("Starting async evaluation")
         payload = evaluation_run.model_dump(warnings=False)
@@ -396,7 +471,6 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_error
     else:
         if judgment_scorers:
             # Execute evaluation using Judgment API
-            check_examples(evaluation_run.examples, evaluation_run.scorers)
             info("Starting API evaluation")
             debug(f"Creating API evaluation run with {len(judgment_scorers)} scorers")
             try:  # execute an EvaluationRun with just JudgmentScorers

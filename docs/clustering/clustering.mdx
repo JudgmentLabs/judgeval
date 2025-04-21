@@ -1,0 +1,68 @@
+---
+title: 'Introduction to Clustering'
+---
+
+# Clustering Visualization
+
+The Clustering feature provides powerful visualization tools to help you analyze and understand patterns in your data through interactive 2D visualizations. This document explains how to use the clustering functionality across different data sources in your projects.
+
+## Overview
+
+Clustering visualization helps you:
+- Discover patterns and relationships in your data through dimensionality reduction
+- Identify similar items that form natural groups
+- Explore data points to understand cluster characteristics
+- Compare results across different evaluation sets, traces, or datasets
+
+![Clustering visualization example](/images/cluster.png)
+
+## Accessing Clustering Visualization
+
+You can access clustering visualization in three different contexts:
+
+1. **Evaluation Clustering**: Visualize results from your evaluation experiments
+2. **Trace Clustering**: Visualize patterns in your monitored traces
+3. **Dataset Clustering**: Visualize data points from your datasets
+
+## Using Clustering Visualization
+
+### Navigation
+
+1. **Select a project**: Choose your project from the from the projects page of the platform website.
+2. **Choose data source**: From the project page, we can click into experiments, monitoring traces, or datasets and choose the option to cluster from within the respective pages. The visualization will display data from the specified source.
+
+![Clustering visualization button location](/images/cluster_button.png)
+
+### Interacting with the Visualization
+
+The clustering visualization offers several interactive features:
+
+1. **Zoom and Pan**: 
+   - Zoom in/out using the mouse wheel or pinch gesture
+   - Pan by clicking and dragging on the visualization area
+   - The visualization automatically adjusts detail level based on zoom level
+
+2. **Hover Interactions**:
+   - Hover over a point to see a tooltip with basic information
+   - Click on a point to see detailed information
+
+3. **Cluster Information Panel**:
+   - View a list of all clusters on the right side
+   - See the number of points in each cluster
+   - Expand a cluster to view individual points
+   - Click on a point to see detailed information
+
+### Understanding the Visualization
+
+- **Points**: Each point represents a data item (evaluation result, trace, or dataset entry)
+- **Clusters**: Points are colored by their cluster assignment
+- **Proximity**: Points that are close together are similar based on their semantic content
+- **Cluster Labels**: The visualization shows cluster names derived from the content of points in each cluster
+
+
+## Best Practices
+
+- Start with a high-level view of all data, then zoom in to explore specific clusters
+- Compare multiple evaluation runs to see how changes affect clustering patterns
+- Use clustering to identify outliers or unexpected patterns in your data
+- Examine cluster names to understand the common themes within each group 
