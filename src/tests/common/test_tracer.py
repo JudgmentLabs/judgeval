@@ -51,9 +51,7 @@ def trace_client(tracer):
     try:
         # Create a root span without recording any data
         with trace_client.span("root_span", span_type="test"):
-            pass
-            
-        yield trace_client
+            yield trace_client
     finally:
         # Clean up the trace context
         current_trace_var.reset(token)
