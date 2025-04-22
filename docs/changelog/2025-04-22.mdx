@@ -1,0 +1,37 @@
+```
+# Changelog
+
+## Features
+
+*   **Judgeval TS SDK:** Published, improved, and documented the Judgeval TypeScript SDK on npm, matching changes in the judgeval package. Included cookbook agents and examples.
+*   **Self-Hosted Environment:** Implemented a self-hosted server with cookie bug fixes, disabling Stripe/Slack notifications, and backend authentication logic. Created Terraform and Supabase API workflow and a Judgment command line tool for creating a self-hosted environment. Also implemented moving Supabase operations to the backend.
+*   **Synthetic Data Generation:** Completed endpoints, integrating Andrew's script for synthetic data generation.
+*   **Trace Comparison:** Implemented a "load diff" feature for larger comparisons in experiments and traces and implemented caching of comparison diffs.  Improved trace comparison functionality with QOL updates including: updating the trace URL in parameters when switching between traces, adding the trace ID to the trace comparison dropdown, and fixing an issue with the first span in trace comparisons.
+*   **Code Quickstart:** Implemented a code quickstart popup instead of redirecting to a new page.
+*   **Asynchronous LLM API Clients:** Added support for asynchronous LLM API clients.
+*   **S3 Trace Data Upload:** Added the ability to upload trace data to an S3 bucket through the Judgeval SDK.
+
+## Performance
+
+*   **Performance Tests:** Write performance tests to ensure server behaviors is expected under load.
+
+## Observability
+
+*   **OpenTelemetry Integration:** Integrated OpenTelemetry for Vercel AI SDK.
+
+## Infrastructure
+
+*   **Clustering:** Clustering frontend + backend implementation.
+
+## Judgeval Updates
+
+*   **Judgeval Async Eval:** judgeval async eval updates.
+
+## UI/UX
+
+*   **Enhanced Cluster Labels:** Enhanced cluster labels.
+
+## MCP Server
+
+*   **Analysis Enabled:** Enabled analysis of single traces and experiments for MCP server and Enabled analysis of last_k traces and experiments for MCP server.
+```
