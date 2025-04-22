@@ -25,6 +25,7 @@ langchain-anthropic = "*"
 langchain-core = "*"
 langchain-community = "*"
 langgraph = "*"
+google-genai = "*"
 
 [dev-packages]
 pytest = "*"

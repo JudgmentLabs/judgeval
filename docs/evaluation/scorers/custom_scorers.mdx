@@ -151,6 +151,158 @@ You've made your first custom judgeval scorer! Now that your scorer is implement
 just like any other `judgeval` scorer. Your scorer is fully integrated with `judgeval`'s infrastructure so you can view it on 
 the [Judgment platform](/judgment/introduction) too.
 
+## Implementing a Custom Scorer in TypeScript
+
+You can also implement custom scorers using the Judgeval TypeScript SDK (`@judgment/sdk`). The principles are similar to Python, but the implementation details differ slightly.
+
+### 1. Inherit from the `JudgevalScorer` class
+
+Import the necessary classes and extend `JudgevalScorer`.
+
+```typescript custom_scorer.ts
+import { JudgevalScorer } from '@judgment/sdk'; // Adjust import path if needed
+import { Example } from '@judgment/sdk/data';
+import { ScorerData } from '@judgment/sdk/data';
+
+export class SampleTsScorer extends JudgevalScorer {
+    // ... scorer implementation ...
+}
+```
+
+### 2. Implement the `constructor`
+
+Set the required and optional attributes for your scorer. Call `super()` to initialize the base class.
+
+```typescript custom_scorer.ts
+export class SampleTsScorer extends JudgevalScorer {
+    constructor(
+        threshold: number = 0.5,
+        score_type: string = "Sample TS Scorer",
+        include_reason: boolean = true,
+        async_mode: boolean = true, // Affects how runEvaluation schedules the scorer
+        strict_mode: boolean = false,
+        verbose_mode: boolean = true
+    ) {
+        // Pass core attributes to the base class constructor
+        super(score_type, threshold, undefined, include_reason, async_mode, strict_mode, verbose_mode);
+        // Adjust threshold based on strict_mode if necessary
+        this.threshold = strict_mode ? 1.0 : threshold;
+        // Store attributes if needed for scoreExample logic
+        this.include_reason = include_reason;
+        this.strict_mode = strict_mode;
+        this.verbose_mode = verbose_mode;
+    }
+    // ...
+}
+```
+
+### 3. Implement the `scoreExample()` method
+
+This asynchronous method takes an `Example` object and performs your custom scoring logic. Unlike the Python version which sets instance attributes, the TypeScript version **must return a `Promise<ScorerData>` object** containing the scoring results.
+
+```typescript custom_scorer.ts
+import { Example } from '@judgment/sdk/data';
+import { ScorerData } from '@judgment/sdk/data';
+
+export class SampleTsScorer extends JudgevalScorer {
+    // ... constructor ...
+
+    async scoreExample(example: Example): Promise<ScorerData> {
+        let score: number | undefined;
+        let reason: string | null = null;
+        let verbose_logs: string | null = null;
+        let error: string | null = null;
+        let success: boolean = false;
+
+        try {
+            // --- Your scoring logic here ---
+            // This example checks if actualOutput contains expectedOutput (case-insensitive)
+            const actual = (Array.isArray(example.actualOutput) ? example.actualOutput.join('\\n') : example.actualOutput)?.toLowerCase() || '';
+            const expected = (Array.isArray(example.expectedOutput) ? example.expectedOutput.join('\\n') : example.expectedOutput)?.toLowerCase() || '';
+            score = actual.includes(expected) ? 1.0 : 0.0;
+            // --- End scoring logic ---
+
+            if (this.include_reason) {
+                reason = score === 1.0 ? "Actual output contains expected output." : "Actual output does not contain expected output.";
+            }
+            if (this.verbose_mode) {
+                verbose_logs = `Comparing (case-insensitive) if "${actual}" includes "${expected}"`;
+            }
+
+            // Set score attribute temporarily for _successCheck and determine success
+            this.score = score;
+            success = this._successCheck();
+
+        } catch (e) {
+            error = e instanceof Error ? e.message : String(e);
+            success = false; // Ensure failure on error
+            score = 0; // Default score on error
+            reason = `Error during scoring: ${error}`;
+            this.error = error; // Set error attribute for potential use in _successCheck
+        }
+
+        // Return the ScorerData object
+        return {
+            name: this.name, // Use the getter
+            threshold: this.threshold,
+            success: success, // Result from _successCheck
+            score: score ?? 0, // Provide a default if undefined
+            reason: reason,
+            strict_mode: this.strict_mode,
+            evaluation_model: "custom-logic-scorer", // Identify the scorer logic
+            error: error,
+            evaluation_cost: null, // Set if applicable (e.g., LLM calls)
+            verbose_logs: verbose_logs,
+            additional_metadata: this.additional_metadata || {} // Include if set
+        };
+    }
+    // ...
+}
+```
+<Note>
+The core difference from the Python implementation is that `scoreExample` returns a `ScorerData` object rather than modifying instance attributes directly (like `self.score`, `self.reason`, etc.). The returned object contains all the necessary information about the scoring result for that specific example.
+</Note>
+
+### 4. Implement the `_successCheck()` method
+
+This protected method determines if the score meets the threshold for success. It's typically called internally by `scoreExample` after calculating the score.
+
+```typescript custom_scorer.ts
+export class SampleTsScorer extends JudgevalScorer {
+    // ... constructor and scoreExample ...
+
+    protected _successCheck(): boolean {
+        // Check if an error occurred during scoring
+        if (this.error !== undefined && this.error !== null) {
+            return false;
+        }
+        // Check if the score was successfully calculated
+        if (this.score === undefined) {
+             return false;
+        }
+        // Compare the score against the threshold
+        return this.score >= this.threshold;
+    }
+    // ...
+}
+```
+
+### 5. Implement the `name` getter
+
+Provide a getter for the scorer's name, which will be used in results and the Judgment platform.
+
+```typescript custom_scorer.ts
+export class SampleTsScorer extends JudgevalScorer {
+    // ... other methods ...
+
+    get name(): string {
+        return "Sample TS Scorer"; // Return the name of your scorer
+    }
+}
+```
+
+With these steps, your TypeScript custom scorer is ready to be used with `JudgmentClient.runEvaluation()`, just like any built-in scorer.
+
 ## Using a Custom Scorer
 
 Once you've implemented your custom scorer, you can use it in the same way as any other scorer in `judgeval`. 

@@ -6,25 +6,35 @@ The `JudgmentClient` is the main interface for interacting with the Judgment API
 
 ## Initializing the Judgment Client
 
-A client can be initialized using an API key. **To receive an API key**, please send us an email at contact@judgmentlabs.ai.
+A client can be initialized using an API key and Organization ID. **To receive these credentials**, please sign up at [app.judgmentlabs.ai/register](https://app.judgmentlabs.ai/register).
 
-Setting the `JUDGMENT_API_KEY` environment variable to your API key allows you to initialize the client without passing an API key to the constructor.
+Setting the `JUDGMENT_API_KEY` and `JUDGMENT_ORG_ID` environment variables allows you to initialize the client without passing credentials to the constructor/`getInstance` method.
 
 ```bash
 export JUDGMENT_API_KEY="your_api_key"
+export JUDGMENT_ORG_ID="your_org_id"
 ```
 
-```python
+<CodeGroup>
+```Python Python
 from judgeval import JudgmentClient
 
 client = JudgmentClient()
 ```
+```Typescript Typescript
+import { JudgmentClient } from 'judgeval';
+
+// Gets the singleton instance, reading credentials from environment variables
+const client = JudgmentClient.getInstance(); 
+```
+</CodeGroup>
 
 ## Running an Evaluation
 
-The `client.run_evaluation` method is the primary method for executing evaluations.
+The `client.run_evaluation` (Python) or `client.evaluate` (Typescript) method is the primary method for executing evaluations.
 
-```python
+<CodeGroup>
+```Python Python
 from judgeval import JudgmentClient
 from judgeval.scorers import FaithfulnessScorer
 from judgeval.data import Example
@@ -43,17 +53,47 @@ results = client.run_evaluation(
     model="gpt-4o",
 )
 ```
+```Typescript Typescript
+import { JudgmentClient, ExampleBuilder, FaithfulnessScorer, logger } from 'judgeval';
 
-The `run_evaluation` method has the following keyword arguments:
-- `examples`: A list of [Example](/evaluation/data_examples) objects to evaluate.
-- `model`: The model to use for the evaluation, such as GPT-4o or QWEN.
-- `scorers`: A list of [Scorer](/evaluation/scorers) objects to use for the evaluation.
-- `use_judgment`: Whether to use Judgment's infrastructure to execute the evaluation. Defaults to `True`.
-- `log_results`: Whether to log the results of the evaluation to the Judgment platform. Defaults to `True`.
-- `override`: Whether to override an existing evaluation with the same name. Defaults to `False`.
+const client = JudgmentClient.getInstance();
+
+const example = new ExampleBuilder()
+    .input("What is the capital of France?") // replace this with your system input
+    .actualOutput("Paris") // replace this with your LLM's output
+    .context(["France has many cities, including the capital Paris, Lyon, and Marseille."]) // replace this with your RAG contents
+    .build();
+
+async function runEval() {
+    const results = await client.evaluate({
+        examples: [example],
+        scorers: [new FaithfulnessScorer(0.5)],
+        model: "gpt-4o",
+        projectName: "client-api-ref-proj", // Optional: Provide a project name
+        evalName: "client-api-ref-eval"   // Optional: Provide an eval name
+    });
+    logger.print(results);
+}
+
+runEval();
+```
+</CodeGroup>
+
+The `run_evaluation` (Python) / `evaluate` (Typescript) method accepts the following arguments/options:
+- `examples`: A list/array of [Example](/evaluation/data_examples) objects to evaluate.
+- `model`: The model to use for the evaluation, such as `gpt-4o` or `Qwen/Qwen2.5-72B-Instruct-Turbo`.
+- `scorers`: A list/array of [Scorer](/evaluation/scorers) objects to use for the evaluation.
+- `use_judgment` (Python) / `useJudgment` (Typescript): Whether to use Judgment's infrastructure to execute the evaluation. Defaults to `true`.
+- `log_results` (Python) / `logResults` (Typescript): Whether to log the results of the evaluation to the Judgment platform. Defaults to `true`.
+- `override`: Whether to override an existing evaluation with the same name. Defaults to `false`.
 - `append`: Whether to append the results of the evaluation to an existing evaluation with the same name. Defaults to `False`.
-- `project_name`: The name of the project to use for the evaluation. Defaults to `"default_project"`.
-- `eval_run_name`: The name of the evaluation run. Defaults to `"default_eval_run"`.
+- `project_name` (Python) / `projectName` (Typescript): The name of the project to use for the evaluation. Defaults to `"default_project"`.
+- `eval_run_name` (Python) / `evalName` (Typescript): The name of the evaluation run. Defaults to `"default_eval_run"`.
+- `asyncExecution` (Typescript only): Whether to run the evaluation asynchronously. Defaults to `false`.
+- `rules` (Typescript only): An array of [Rule](/alerts/rules) objects to associate with the evaluation.
+- `metadata` (Typescript only): Additional metadata for the evaluation run.
+- `aggregator` (Typescript only): Aggregator function name.
+- `ignoreErrors` (Typescript only): Whether to ignore errors during evaluation. Defaults to `true`.
 
 <Tip>
 In Judgment, **projects** are used to organize workflows, while **evaluation runs** 
