@@ -22,12 +22,20 @@ Setting up tracing with `judgeval` takes two simple steps:
 
 ### 1. Initialize a tracer with your API keys and project name
 
-```python
+<CodeGroup>
+```Python Python
 from judgeval.tracer import Tracer
 
 # loads from JUDGMENT_API_KEY and JUDGMENT_ORG_ID env vars
 judgment = Tracer(project_name="my_project")
 ```
+```Typescript Typescript
+import { Tracer } from 'judgeval';
+
+// The getInstance method ensures a singleton Tracer is used
+const judgment = Tracer.getInstance({ projectName: "my_project" });
+```
+</CodeGroup>
 
 <Note>
     The [Judgment tracer](/api_reference/trace) is a singleton object that should be shared across your application. 
@@ -47,21 +55,30 @@ The `wrap()` function goes over your LLM client (e.g. OpenAI, Anthropic, etc.) a
 - Model name
 
 Here's an example of using `wrap()` on an OpenAI client:
-```python
+<CodeGroup>
+```Python Python
 from openai import OpenAI
 from judgeval.tracer import wrap
 
 client = wrap(OpenAI())
 ```
+```Typescript Typescript
+import OpenAI from 'openai';
+import { wrap } from 'judgeval';
 
-#### `@observe` ####
-The `@observe` decorator wraps your functions/tools and captures metadata surrounding your function calls, such as:
+const client = wrap(new OpenAI());
+```
+</CodeGroup>
+
+#### `@observe` (Python) / `observe()` (Typescript) ####
+The `@observe` decorator (Python) or the `observe()` higher-order function (Typescript) wraps your functions/tools and captures metadata surrounding your function calls, such as:
 - Latency
 - Input/Output
 - Span type (e.g. `retriever`, `tool`, `LLM call`, etc.)
 
-Here's an example of using the `@observe` decorator on a function:
-```python
+Here's an example of using the observer mechanism:
+<CodeGroup>
+```Python Python
 from judgeval.tracer import Tracer
 
 # loads from JUDGMENT_API_KEY env var
@@ -72,17 +89,33 @@ def my_tool():
     print("Hello world!")
 
 ```
+```Typescript Typescript
+import { Tracer } from 'judgeval';
+
+const judgment = Tracer.getInstance({ projectName: "my_project" });
+
+async function myTool(): Promise<void> {
+    console.log("Hello world!");
+}
+
+const observedMyTool = judgment.observe({ spanType: "tool" })(myTool);
+
+// You would then call observedMyTool() instead of myTool()
+// await observedMyTool();
+```
+</CodeGroup>
 
 <Note>
     `span_type` is a string that you can use to categorize and organize your trace spans. 
-    Span types are displayed on the trace UI to easily nagivate a visualization of your workflow. 
+    Span types are displayed on the trace UI to easily navigate a visualization of your workflow. 
     Common span types include `tool`, `function`, `retriever`, `database`, `web search`, etc.
 </Note>
 
 
 #### Putting it all Together
 Here's a complete example of using judgeval's tracing mechanisms:
-```python
+<CodeGroup>
+```Python Python
 from judgeval.tracer import Tracer, wrap
 from openai import OpenAI
 
@@ -103,11 +136,46 @@ def my_llm_call():
     )
     return res.choices[0].message.content
 
-@judgment.observe(span_type="function")
-def main():
-    res = my_llm_call()
-    return res
+# This implicitly starts a trace if one isn't active
+# and saves it upon completion or error.
+main_result = my_llm_call()
 ```
+```Typescript Typescript
+import { Tracer, wrap } from 'judgeval';
+import OpenAI from 'openai';
+
+const openaiClient = wrap(new OpenAI());
+const judgment = Tracer.getInstance({ projectName: "my_project" });
+
+async function myTool(): Promise<string> {
+    return "Hello world!";
+}
+const observedMyTool = judgment.observe({ spanType: "tool" })(myTool);
+
+async function myLlmCall(): Promise<string | null | undefined> {
+    const message = await observedMyTool();
+    const res = await openaiClient.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: message }],
+    });
+    return res.choices[0]?.message?.content;
+}
+const observedLlmCall = judgment.observe({ spanType: "function" })(myLlmCall);
+
+// Calling the observed function implicitly starts and saves the trace
+async function runImplicitTrace() {
+    try {
+        const result = await observedLlmCall();
+        console.log("Implicit trace completed:", result);
+    } catch (error) {
+        console.error("Implicit trace failed:", error);
+        // Trace saved automatically by observe on completion/error
+    }
+}
+
+runImplicitTrace();
+```
+</CodeGroup>
 
 And the trace will appear on the Judgment platform as follows:
 
@@ -122,9 +190,10 @@ This enables you to run evaluations on your **production data in real-time**, wh
 - Exporting production data for **offline experimentation** (e.g for A/B testing your workflow versions on relevant use cases).
 - Getting **actionable insights** on how to fix common failure modes in your workflow (e.g. missing knowledge base info, suboptimal prompts, etc.). 
 
-To execute an asynchronous evaluation, you can use the `trace.async_evaluate()` method. Here's an example of that:
+To execute an asynchronous evaluation, you can use the `trace.asyncEvaluate()` method (Typescript) or `judgment.async_evaluate()` (Python, assuming it operates on the currently active trace).
 
-```python
+<CodeGroup>
+```Python Python
 from judgeval.tracer import Tracer
 from judgeval.scorers import AnswerRelevancyScorer
 
@@ -135,6 +204,7 @@ def main():
     query = "What is the capital of France?"
     res = "The capital of France is Paris."  # Replace with your workflow logic
     
+    # Assumes this runs within an active trace context implicitly started by @observe
     judgment.async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=1.0)],
         input=query,
@@ -142,7 +212,51 @@ def main():
         model="gpt-4o",
     )
     return res
+
+main() # Call the observed function
 ```
+```Typescript Typescript
+import { Tracer, AnswerRelevancyScorer } from 'judgeval';
+
+const judgment = Tracer.getInstance({ projectName: "my_project" });
+
+async function mainWithEval(): Promise<string> {
+    const query = "What is the capital of France?";
+    const res = "The capital of France is Paris."; // Replace with your workflow logic
+
+    const currentTrace = judgment.getCurrentTrace();
+    if (currentTrace) {
+        await currentTrace.asyncEvaluate(
+            [new AnswerRelevancyScorer(1.0)], 
+            {
+                input: query,
+                actualOutput: res,
+                model: "gpt-4o"
+            }
+        );
+    } else {
+        console.warn("No active trace for async evaluation.");
+    }
+    return res;
+}
+
+// Explicitly start a trace for the evaluation
+async function runMainWithEvalTrace() {
+    const trace = judgment.startTrace("main_eval_trace");
+    const observedMainWithEval = judgment.observe({ spanType: "function" })(mainWithEval);
+    try {
+        const result = await observedMainWithEval();
+        console.log("Trace with eval completed:", result);
+        await trace.save();
+    } catch (error) {
+        console.error("Trace with eval failed:", error);
+        await trace.save();
+    }
+}
+
+runMainWithEvalTrace();
+```
+</CodeGroup>
 
 <Tip>
     Your async evaluations will be logged to the Judgment platform as part of the original trace and 
@@ -165,19 +279,21 @@ In this video, we'll walk through all of the topics covered in this guide by tra
 ></iframe>
 
 
-## Advanced: Customizing Traces Using the Context Manager ##
+## Advanced: Customizing Traces Using the Context Manager (Python) / Explicit Trace Client (Typescript) ##
 
-If you need to customize your tracing context, you can use the `with judgment.trace()` context manager.
+In Python, if you need to customize your tracing context beyond the implicit behavior of `@observe`, you can use the `with judgment.trace()` context manager.
+In Typescript, you achieve similar control by explicitly creating a `TraceClient` instance using `judgment.startTrace()` and manually calling methods like `save()` or `print()` on it.
 
-The context manager can **save/print the state of the trace at any point in the workflow**.
+The explicit trace client allows you to **save or print the state of the trace at any point in the workflow**.
 This is useful for debugging or exporting any state of your workflow to run an evaluation from!
 
 <Tip>
-    The `with judgment.trace()` context manager detects any `@observe` decorated functions or wrapped LLM calls within the context and automatically captures their metadata.
+    Any functions wrapped with `judgment.observe()` called within the scope where the `TraceClient` is active will automatically be associated with that trace.
 </Tip>
 
-Here's an example of using the context manager to trace a workflow:
-```python
+Here's an example of using explicit trace management:
+<CodeGroup>
+```Python Python
 from judgeval.tracer import Tracer, wrap
 from openai import OpenAI
 
@@ -195,15 +311,59 @@ def main():
             messages=[{"role": "user", "content": f"{my_tool()}"}]
         )
     
-    trace.print()  # prints the state of the trace to console
-    trace.save()  # saves the current state of the trace to the Judgment platform
+        trace.print()  # prints the state of the trace to console
+        trace.save()  # saves the current state of the trace to the Judgment platform
+        # Note: Python trace context likely saves automatically on exit
 
     return res.choices[0].message.content
 ```
+```Typescript Typescript
+import { Tracer, wrap } from 'judgeval';
+import OpenAI from 'openai';
+
+const judgment = Tracer.getInstance({ projectName: "my_project" });
+const client = wrap(new OpenAI());
+
+async function myTool(): Promise<string> {
+    return "Hello world!";
+}
+const observedMyTool = judgment.observe({ spanType: "tool" })(myTool);
+
+async function main() {
+    // Start the trace explicitly
+    const trace = judgment.startTrace("my_workflow"); 
+    let resultMessage: string | null | undefined;
+
+    try {
+        const toolOutput = await observedMyTool(); // observedMyTool is associated with the active trace
+        const res = await client.chat.completions.create({
+            model: "gpt-4o",
+            messages: [{ role: "user", content: toolOutput }],
+        });
+        resultMessage = res.choices[0]?.message?.content;
+
+        trace.print(); // Prints the trace to console
+        await trace.save(); // Saves the trace to the Judgment platform
+        
+    } catch (error) {
+        console.error("Workflow failed:", error);
+        await trace.save(); // Still save trace on error
+    } finally {
+        // Ensure save is called if not already done (optional, depends on desired behavior)
+        // await trace.save(); // Could be redundant if already saved in try/catch
+    }
+
+    return resultMessage;
+}
+
+main();
+```
+</CodeGroup>
 
 <Warning>
-    The `with judgment.trace()` context manager should only be used if you need to customize the context 
-    over which you're tracing. In most cases, you should trace using the `@observe` decorator.
+    In Python, the `with judgment.trace()` context manager should only be used if you need fine-grained control 
+    over the trace lifecycle. In Typescript, explicit management via `startTrace()` and `trace.save()` is the standard way to gain this control.
+    In most simple cases in Python, the `@observe` decorator is sufficient.
 </Warning>
 
 

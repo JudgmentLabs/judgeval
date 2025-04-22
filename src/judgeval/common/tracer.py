@@ -27,6 +27,7 @@ from rich import print as rprint
 from openai import OpenAI, AsyncOpenAI
 from together import Together, AsyncTogether
 from anthropic import Anthropic, AsyncAnthropic
+from google import genai
 
 # Local application/library-specific imports
 from judgeval.constants import (
@@ -53,7 +54,7 @@ current_trace_var = contextvars.ContextVar('current_trace', default=None)
 current_span_var = contextvars.ContextVar('current_span', default=None) # NEW: ContextVar for the active span name
 
 # Define type aliases for better code readability and maintainability
-ApiClient: TypeAlias = Union[OpenAI, Together, Anthropic, AsyncOpenAI, AsyncAnthropic, AsyncTogether]  # Supported API clients
+ApiClient: TypeAlias = Union[OpenAI, Together, Anthropic, AsyncOpenAI, AsyncAnthropic, AsyncTogether, genai.Client, genai.client.AsyncClient]  # Supported API clients
 TraceEntryType = Literal['enter', 'exit', 'output', 'input', 'evaluation']  # Valid trace entry types
 SpanType = Literal['span', 'tool', 'llm', 'evaluation', 'chain']
 @dataclass
@@ -888,6 +889,13 @@ class TraceClient:
             "parent_trace_id": self.parent_trace_id,
             "parent_name": self.parent_name
         }        
+        # --- Log trace data before saving ---
+        try:
+            rprint(f"[TraceClient.save] Saving trace data for trace_id {self.trace_id}:")
+            rprint(json.dumps(trace_data, indent=2))
+        except Exception as log_e:
+            rprint(f"[TraceClient.save] Error logging trace data: {log_e}")
+        # --- End logging ---
         self.trace_manager_client.save_trace(trace_data)
 
         return self.trace_id, trace_data
@@ -1206,7 +1214,7 @@ def wrap(client: Any) -> Any:
     span_name, original_create = _get_client_config(client)
 
     # Handle async clients differently than synchronous clients (need an async function for async clients)
-    if (isinstance(client, (AsyncOpenAI, AsyncAnthropic, AsyncTogether))):
+    if (isinstance(client, (AsyncOpenAI, AsyncAnthropic, AsyncTogether, genai.client.AsyncClient))):
         async def traced_create(*args, **kwargs):
             # Get the current trace from contextvars
             current_trace = current_trace_var.get()
@@ -1265,6 +1273,8 @@ def wrap(client: Any) -> Any:
         client.chat.completions.create = traced_create
     elif isinstance(client, (Anthropic, AsyncAnthropic)):
         client.messages.create = traced_create
+    elif isinstance(client, (genai.Client, genai.client.AsyncClient)):
+        client.models.generate_content = traced_create
         
     return client
 
@@ -1290,6 +1300,8 @@ def _get_client_config(client: ApiClient) -> tuple[str, callable]:
         return "TOGETHER_API_CALL", client.chat.completions.create
     elif isinstance(client, (Anthropic, AsyncAnthropic)):
         return "ANTHROPIC_API_CALL", client.messages.create
+    elif isinstance(client, (genai.Client, genai.client.AsyncClient)):
+        return "GOOGLE_API_CALL", client.models.generate_content
     raise ValueError(f"Unsupported client type: {type(client)}")
 
 def _format_input_data(client: ApiClient, **kwargs) -> dict:
@@ -1302,6 +1314,11 @@ def _format_input_data(client: ApiClient, **kwargs) -> dict:
         return {
             "model": kwargs.get("model"),
             "messages": kwargs.get("messages"),
+        }
+    elif isinstance(client, (genai.Client, genai.client.AsyncClient)):
+        return {
+            "model": kwargs.get("model"),
+            "contents": kwargs.get("contents")
         }
     # Anthropic requires additional max_tokens parameter
     return {
@@ -1328,6 +1345,15 @@ def _format_output_data(client: ApiClient, response: Any) -> dict:
                 "prompt_tokens": response.usage.prompt_tokens,
                 "completion_tokens": response.usage.completion_tokens,
                 "total_tokens": response.usage.total_tokens
+            }
+        }
+    elif isinstance(client, (genai.Client, genai.client.AsyncClient)):
+        return {
+            "content": response.candidates[0].content.parts[0].text,
+            "usage": {
+                "prompt_tokens": response.usage_metadata.prompt_token_count,
+                "completion_tokens": response.usage_metadata.candidates_token_count,
+                "total_tokens": response.usage_metadata.total_token_count
             }
         }
     # Anthropic has a different response structure

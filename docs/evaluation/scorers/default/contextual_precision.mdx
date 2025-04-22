@@ -41,7 +41,8 @@ Our contextual precision scorer is based on Stanford NLP's [ARES](https://arxiv.
 
 ## Sample Implementation
 
-```python contextual_precision.py
+<CodeGroup>
+```Python Python
 from judgeval import JudgmentClient
 from judgeval.data import Example
 from judgeval.scorers import ContextualPrecisionScorer
@@ -67,6 +68,37 @@ results = client.run_evaluation(
 )
 print(results)
 ```
+```Typescript Typescript
+import { JudgmentClient, ExampleBuilder, ContextualPrecisionScorer, logger } from 'judgeval';
+
+async function runContextualPrecision() {
+    const client = JudgmentClient.getInstance();
+    const example = new ExampleBuilder()
+        .input("What's your return policy for a pair of socks?")
+        // Replace this with your LLM system's output
+        .actualOutput("We offer a 30-day return policy for all items, including socks!")
+        // Replace this with the ideal output from your RAG generator model
+        .expectedOutput("All customers are eligible for a 30-day return policy, no questions asked.")
+        // Replace this with the contexts retrieved by your RAG retriever
+        .context(["Return policy, all items: 30-day limit for full refund, no questions asked."])
+        .build();
+
+    // supply your own threshold
+    const scorer = new ContextualPrecisionScorer(0.8);
+
+    const results = await client.evaluate({
+        examples: [example],
+        scorers: [scorer],
+        model: "gpt-4o",
+        projectName: "ctx-precision-ts-proj",
+        evalName: "ctx-precision-ts-eval"
+    });
+    logger.print(results); // Log results to console
+}
+
+runContextualPrecision();
+```
+</CodeGroup>
 
 <Note>
 The `ContextualPrecision` scorer uses an LLM judge, so you'll receive a reason for the score in the `reason` field of the results. 
