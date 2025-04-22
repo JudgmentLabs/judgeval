@@ -1,0 +1,28 @@
+---
+title: Introduction
+---
+
+The Judgment CLI is a command-line tool that allows you to manage your Judgment resources and backend infrastructure.
+
+## Installation
+
+Clone the repository and install the Judgment CLI:
+```bash
+git clone https://github.com/JudgmentLabs/judgment-cli.git
+cd judgment-cli
+pip install -e .
+```
+
+## Usage
+
+To see usage information, run:
+```bash
+judgment --help
+```
+
+Available commands:
+- `judgment self-host`
+  - `judgment self-host main`: Deploy a self-hosted instance of Judgment (and optionally set up the HTTPS listener).
+  - `judgment self-host https-listener`: Set up the HTTPS listener for a self-hosted Judgment instance.
+
+See the other pages in this section for more information on each command.

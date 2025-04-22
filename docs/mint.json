@@ -111,6 +111,19 @@
       ]
     },
     {
+      "group": "Self-Hosting",
+      "pages": [
+        "self_hosting/get_started"
+      ]
+    },
+    {
+      "group": "Judgment CLI",
+      "pages": [
+        "judgment_cli/installation",
+        "judgment_cli/self-hosting"
+      ]
+    },
+    {
       "group": "API Reference",
       "pages": [
         "api_reference/judgment_client",
