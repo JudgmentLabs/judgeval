@@ -87,7 +87,7 @@
       "pages": [
         "monitoring/introduction",
         "monitoring/tracing",
-        "monitoring/production_insights"
+        "monitoring/annotations"
       ]
     },
     {
