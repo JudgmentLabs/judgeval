@@ -11,6 +11,7 @@ from judgeval.data import (
     ScoringResult, 
     Example,
     CustomExample,
+    Sequence,
 )
 from judgeval.scorers import (
     APIJudgmentScorer, 
@@ -21,8 +22,10 @@ from judgeval.scorers import (
 from judgeval.evaluation_run import EvaluationRun
 from judgeval.run_evaluation import (
     run_eval, 
-    assert_test
+    assert_test,
+    run_sequence_eval
 )
+from judgeval.data.sequence_run import SequenceRun
 from judgeval.judges import JudgevalJudge
 from judgeval.constants import (
     JUDGMENT_EVAL_FETCH_API_URL, 
@@ -79,11 +82,67 @@ class JudgmentClient(metaclass=SingletonMeta):
         project_name: str = "default_project",
         eval_run_name: str = "default_eval_run",
         override: bool = False,
+        append: bool = False,
         use_judgment: bool = True,
         ignore_errors: bool = True,
         rules: Optional[List[Rule]] = None
     ) -> List[ScoringResult]:
-        return self.run_evaluation(examples, scorers, model, aggregator, metadata, log_results, project_name, eval_run_name, override, use_judgment, ignore_errors, True, rules)
+        return self.run_evaluation(examples, scorers, model, aggregator, metadata, log_results, project_name, eval_run_name, override, append, use_judgment, ignore_errors, True, rules)
+
+    def run_sequence_evaluation(
+        self,
+        sequences: List[Sequence],
+        model: Union[str, List[str], JudgevalJudge],
+        aggregator: Optional[str] = None,
+        project_name: str = "default_project",
+        eval_run_name: str = "default_eval_sequence",
+        use_judgment: bool = True,
+        log_results: bool = True,
+        override: bool = False,
+        ignore_errors: bool = True,
+        rules: Optional[List[Rule]] = None
+    ) -> List[ScoringResult]:
+        try:
+            if rules:
+                loaded_rules = []
+                for rule in rules:
+                    try:
+                        processed_conditions = []
+                        for condition in rule.conditions:
+                            # Convert metric if it's a ScorerWrapper
+                            if isinstance(condition.metric, ScorerWrapper):
+                                try:
+                                    condition_copy = condition.model_copy()
+                                    condition_copy.metric = condition.metric.load_implementation(use_judgment=use_judgment)
+                                    processed_conditions.append(condition_copy)
+                                except Exception as e:
+                                    raise ValueError(f"Failed to convert ScorerWrapper to implementation in rule '{rule.name}', condition metric '{condition.metric}': {str(e)}")
+                            else:
+                                processed_conditions.append(condition)
+                        
+                        # Create new rule with processed conditions
+                        new_rule = rule.model_copy()
+                        new_rule.conditions = processed_conditions
+                        loaded_rules.append(new_rule)
+                    except Exception as e:
+                        raise ValueError(f"Failed to process rule '{rule.name}': {str(e)}")
+                    
+            sequence_run = SequenceRun(
+                project_name=project_name,
+                eval_name=eval_run_name,
+                sequences=sequences,
+                model=model,
+                aggregator=aggregator,
+                log_results=log_results,
+                judgment_api_key=self.judgment_api_key,
+                organization_id=self.organization_id
+            )
+
+            return run_sequence_eval(sequence_run, override, ignore_errors, use_judgment)
+        except ValueError as e:
+            raise ValueError(f"Please check your SequenceRun object, one or more fields are invalid: \n{str(e)}")
+        except Exception as e:
+            raise Exception(f"An unexpected error occurred during evaluation: {str(e)}")
 
     def run_evaluation(
         self, 
@@ -96,6 +155,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         project_name: str = "default_project",
         eval_run_name: str = "default_eval_run",
         override: bool = False,
+        append: bool = False,
         use_judgment: bool = True,
         ignore_errors: bool = True,
         async_execution: bool = False,
@@ -121,6 +181,9 @@ class JudgmentClient(metaclass=SingletonMeta):
         Returns:
             List[ScoringResult]: The results of the evaluation
         """
+        if override and append:
+            raise ValueError("Cannot set both override and append to True. Please choose one.")
+
         try:
             # Load appropriate implementations for all scorers
             loaded_scorers: List[Union[JudgevalScorer, APIJudgmentScorer]] = []
@@ -164,6 +227,7 @@ class JudgmentClient(metaclass=SingletonMeta):
                         raise ValueError(f"Failed to process rule '{rule.name}': {str(e)}")
             eval = EvaluationRun(
                 log_results=log_results,
+                append=append,
                 project_name=project_name,
                 eval_name=eval_run_name,
                 examples=examples,
@@ -361,14 +425,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         if eval_run.status_code != requests.codes.ok:
             raise ValueError(f"Error fetching eval results: {eval_run.json()}")
 
-        eval_run_result = [{}]
-        for result in eval_run.json():
-            result_id = result.get("id", "")
-            result_data = result.get("result", dict())
-            filtered_result = {k: v for k, v in result_data.items() if k in ScoringResult.__annotations__}
-            eval_run_result[0]["id"] = result_id
-            eval_run_result[0]["results"] = [ScoringResult(**filtered_result)]
-        return eval_run_result
+        return eval_run.json()
     
     def delete_eval(self, project_name: str, eval_run_names: List[str]) -> bool:
         """

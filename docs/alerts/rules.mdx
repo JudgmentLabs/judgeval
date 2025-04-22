@@ -17,7 +17,7 @@ Rules and notifications only work with built-in APIScorers. Local scorers and cu
 
 ## Creating Rules
 
-Rules can be created using the `Rule` class from the `judgeval.rules` module. Each rule requires:
+Rules can be created using the `Rule` class from the `judgeval.rules` (Python) or `judgeval` (Typescript) module. Each rule requires:
 
 - A name
 - A list of [conditions](#conditions)
@@ -29,7 +29,8 @@ Optional parameters include:
 
 ### Basic Rule Structure
 
-```python
+<CodeGroup>
+```Python Python
 from judgeval.rules import Rule, Condition
 from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
 
@@ -44,14 +45,30 @@ rule = Rule(
     combine_type="all"  # "all" = AND, "any" = OR
 )
 ```
+```Typescript Typescript
+import { Rule, Condition, FaithfulnessScorer, AnswerRelevancyScorer } from 'judgeval';
+
+// Create a rule
+const rule = new Rule(
+    "Quality Check", 
+    [ 
+        new Condition(new FaithfulnessScorer(0.7)),
+        new Condition(new AnswerRelevancyScorer(0.8))
+    ],
+    "all", // "all" = AND, "any" = OR
+    "Check if quality metrics meet thresholds"
+);
+```
+</CodeGroup>
 
 ## Conditions
 
-Conditions are the building blocks of rules. Each condition specifies a metric (must be a built-in APIScorer like FaithfulnessScorer or AnswerRelevancyScorer). The condition is met when the score for that metric is greater than or equal to the threshold specified in the scorer.
+Conditions are the building blocks of rules. Each condition specifies a metric (must be a built-in API Scorer like `FaithfulnessScorer` or `AnswerRelevancyScorer`). The condition is met when the score for that metric is greater than or equal to the threshold specified in the scorer.
 
 ### Creating Conditions
 
-```python
+<CodeGroup>
+```Python Python
 from judgeval.rules import Condition
 from judgeval.scorers import FaithfulnessScorer
 
@@ -60,6 +77,15 @@ condition = Condition(
     metric=FaithfulnessScorer(threshold=0.7)
 )
 ```
+```Typescript Typescript
+import { Condition, FaithfulnessScorer } from 'judgeval';
+
+// Create a condition that passes when faithfulness score is greater than or equal to 0.7
+const condition = new Condition(
+    new FaithfulnessScorer(0.7)
+);
+```
+</CodeGroup>
 
 ### How Conditions are Evaluated
 
@@ -82,7 +108,8 @@ This design is meant for setting up alerts that trigger when your metrics indica
 
 Rules are most commonly used with the `Tracer` to monitor your AI system's performance:
 
-```python
+<CodeGroup>
+```Python Python
 from judgeval.common.tracer import Tracer
 from judgeval.rules import Rule, Condition
 from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
@@ -102,10 +129,32 @@ rules = [
 
 # Initialize tracer with rules
 judgment = Tracer(
-    api_key="your_api_key", 
     project_name="your_project", 
     rules=rules
 )
 ```
+```Typescript Typescript
+import { Tracer, Rule, Condition, FaithfulnessScorer, AnswerRelevancyScorer } from 'judgeval';
+
+// Create rules
+const rules = [
+    new Rule(
+        "Quality Check", 
+        [ 
+            new Condition(new FaithfulnessScorer(0.7)),
+            new Condition(new AnswerRelevancyScorer(0.8))
+        ],
+        "all", // Trigger when all conditions fail
+        "Check if quality metrics meet thresholds"
+    )
+];
+
+// Initialize tracer with rules
+const judgment = Tracer.getInstance({
+    projectName: "your_project",
+    rules: rules
+});
+```
+</CodeGroup>
 
 For more information on configuring notifications with rules, see the [Notifications documentation](/alerts/notifications#attaching-notifications-to-rules). 

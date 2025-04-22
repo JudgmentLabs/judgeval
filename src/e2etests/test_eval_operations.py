@@ -5,6 +5,7 @@ Tests for evaluation operations in the JudgmentClient.
 import pytest
 import random
 import string
+import uuid
 
 from judgeval.judgment_client import JudgmentClient
 from judgeval.data import Example
@@ -60,6 +61,41 @@ class TestEvalOperations:
         results = client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
         assert results, f"No evaluation results found for {EVAL_RUN_NAME}"
 
+        client.delete_project(project_name=PROJECT_NAME)
+
+    def test_run_eval_append(self, client: JudgmentClient):
+        """Test evaluation append behavior."""
+        PROJECT_NAME = "OutreachWorkflow"
+        EVAL_RUN_NAME = "ColdEmailGenerator-Improve-BasePrompt"
+
+        self.run_eval_helper(client, PROJECT_NAME, EVAL_RUN_NAME)
+        results = client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
+        assert results, f"No evaluation results found for {EVAL_RUN_NAME}"
+
+        assert len(results) == 2
+
+        example1 = Example(
+            input="Generate a cold outreach email for TechCorp. Facts: They recently launched an AI-powered analytics platform. Their CEO Sarah Chen previously worked at Google. They have 50+ enterprise clients.",
+            actual_output="Dear Ms. Chen,\n\nI noticed TechCorp's recent launch of your AI analytics platform and was impressed by its enterprise-focused approach. Your experience from Google clearly shines through in building scalable solutions, as evidenced by your impressive 50+ enterprise client base.\n\nWould you be open to a brief call to discuss how we could potentially collaborate?\n\nBest regards,\nAlex",
+            retrieval_context=["TechCorp launched AI analytics platform in 2024", "Sarah Chen is CEO, ex-Google executive", "Current client base: 50+ enterprise customers"],
+        )
+        scorer = FaithfulnessScorer(threshold=0.5)
+        
+        client.run_evaluation(
+            examples=[example1],
+            scorers=[scorer],
+            model="Qwen/Qwen2.5-72B-Instruct-Turbo",
+            metadata={"batch": "test"},
+            project_name=PROJECT_NAME,
+            eval_run_name=EVAL_RUN_NAME,
+            append=True,
+        )
+
+        results = client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
+        print(results)
+        assert results, f"No evaluation results found for {EVAL_RUN_NAME}"
+
+        assert len(results) == 3
         client.delete_project(project_name=PROJECT_NAME)
 
     def test_delete_eval_by_project_and_run_names(self, client: JudgmentClient):
@@ -194,6 +230,7 @@ class TestEvalOperations:
         
         # Third run with override=True should succeed
         try:
+            example1.example_id = str(uuid.uuid4())
             client.run_evaluation(
                 examples=[example1],
                 scorers=[scorer],

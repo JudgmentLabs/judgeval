@@ -8,12 +8,13 @@ An `Example` is can be composed of a mixture of the following fields:
 - `input` [Optional]
 - `actual_output` [Optional]
 - `expected_output` [Optional]
-- `retrieval_context` [Optional]
+- `retrieval_context` [Optional] (Python)
 - `context` [Optional]
 
 **Here's a sample of creating an `Example`:**
 
-```python example_test.py
+<CodeGroup>
+```Python Python
 from judgeval.data import Example
 
 example = Example(
@@ -24,13 +25,25 @@ example = Example(
     context=["Bill Gates and Paul Allen are the founders of Microsoft."],
 )
 ```
+```Typescript Typescript
+import { ExampleBuilder } from 'judgeval';
+
+const example = new ExampleBuilder()
+    .input("Who founded Microsoft?")
+    .actualOutput("Bill Gates and Paul Allen.")
+    .expectedOutput("Bill Gates and Paul Allen founded Microsoft in New Mexico in 1975.")
+    .retrievalContext(["Bill Gates co-founded Microsoft with Paul Allen in 1975."]) // Corresponds to python retrieval_context
+    .context(["Bill Gates and Paul Allen are the founders of Microsoft."]) // General context
+    .build();
+```
+</CodeGroup>
 
 <Note>
 The `input` and `actual_output` fields are required for all examples. **However**, you don't need to use them in your evaluations. 
 
 For example, if you're evaluating whether a chatbot's response is friendly, you don't need to use `input`. 
 
-Other fields are optional and depend on the type of evaluation. If you want to detect hallucinations in a RAG system, you'd use the `retrieval_context` field for the [**Faithfulness**](/evaluation/scorers/faithfulness) scorer.
+Other fields are optional and depend on the type of evaluation. If you want to detect hallucinations in a RAG system, you'd use the `retrieval_context` field (Python) or `retrievalContext` (Typescript) for the [**Faithfulness**](/evaluation/scorers/faithfulness) scorer.
 </Note>
 
 ## Example Fields 
@@ -53,9 +66,11 @@ Evaluation is always tied with optimization, so you should try to **isolate your
 The `actual_output` field represents what your LLM system outputs based on the `input`. 
 This is the actual output of your LLM system created either at evaluation time or with saved answers.
 
-```python actual_output.py
+<CodeGroup>
+```Python Python
 # Sample app implementation
 import medical_chatbot
+from judgeval.data import Example # Added import
 
 question = "Is sparkling water healthy?"
 example = Example(
@@ -63,6 +78,18 @@ example = Example(
     actual_output=medical_chatbot.chat(question)
 )
 ```
+```Typescript Typescript
+// Sample app implementation (assuming medical_chatbot exists)
+import { medical_chatbot } from './medical_chatbot'; // Example import
+import { ExampleBuilder } from 'judgeval';
+
+const question = "Is sparkling water healthy?";
+const example = new ExampleBuilder()
+    .input(question)
+    .actualOutput(medical_chatbot.chat(question)) // Assuming chat is async or sync
+    .build();
+```
+</CodeGroup>
 
 ### Expected Output
 
@@ -72,9 +99,11 @@ One great part of `judgeval`'s scorers is that they use LLMs which have flexible
 
 To learn more about how `judgeval`'s scorers work, please see the [scorer docs](evaluation/scorers/introduction).
 
-```python expected_output.py
+<CodeGroup>
+```Python Python
 # Sample app implementation
 import medical_chatbot
+from judgeval.data import Example # Added import
 
 question = "Is sparkling water healthy?"
 example = Example(
@@ -83,6 +112,19 @@ example = Example(
     expected_output="Sparkling water is neither healthy nor unhealthy."
 )
 ```
+```Typescript Typescript
+// Sample app implementation (assuming medical_chatbot exists)
+import { medical_chatbot } from './medical_chatbot'; // Example import
+import { ExampleBuilder } from 'judgeval';
+
+const question = "Is sparkling water healthy?";
+const example = new ExampleBuilder()
+    .input(question)
+    .actualOutput(medical_chatbot.chat(question))
+    .expectedOutput("Sparkling water is neither healthy nor unhealthy.")
+    .build();
+```
+</CodeGroup>
 
 ### Context 
 
@@ -95,9 +137,11 @@ In RAG systems, contextual information is retrieved from a vector database and i
 not `context`. **If you're building a RAG system, you'll want to use `retrieval_context`.**
 </Tip>
 
-```python context.py
+<CodeGroup>
+```Python Python
 # Sample app implementation
 import medical_chatbot
+from judgeval.data import Example # Added import
 
 question = "Is sparkling water healthy?"
 example = Example(
@@ -107,6 +151,20 @@ example = Example(
     context=["Sparkling water is a type of water that is carbonated."]
 )
 ```
+```Typescript Typescript
+// Sample app implementation (assuming medical_chatbot exists)
+import { medical_chatbot } from './medical_chatbot'; // Example import
+import { ExampleBuilder } from 'judgeval';
+
+const question = "Is sparkling water healthy?";
+const example = new ExampleBuilder()
+    .input(question)
+    .actualOutput(medical_chatbot.chat(question))
+    .expectedOutput("Sparkling water is neither healthy nor unhealthy.")
+    .context(["Sparkling water is a type of water that is carbonated."])
+    .build();
+```
+</CodeGroup>
 
 ### Retrieval Context 
 
@@ -119,9 +177,11 @@ Some common cases for using `retrieval_context` are:
 - Evaluating the quality of a retriever model by comparing `retrieval_context` to `context`
 </Tip>
 
-```python retrieval_context.py
+<CodeGroup>
+```Python Python
 # Sample app implementation
 import medical_chatbot
+from judgeval.data import Example # Added import
 
 question = "Is sparkling water healthy?"
 example = Example(
@@ -132,6 +192,21 @@ example = Example(
     retrieval_context=["Sparkling water is carbonated and has no calories."]
 )
 ```
+```Typescript Typescript
+// Sample app implementation (assuming medical_chatbot exists)
+import { medical_chatbot } from './medical_chatbot'; // Example import
+import { ExampleBuilder } from 'judgeval';
+
+const question = "Is sparkling water healthy?";
+const example = new ExampleBuilder()
+    .input(question)
+    .actualOutput(medical_chatbot.chat(question))
+    .expectedOutput("Sparkling water is neither healthy nor unhealthy.")
+    .context(["Sparkling water is a type of water that is carbonated."])
+    .retrievalContext(["Sparkling water is carbonated and has no calories."])
+    .build();
+```
+</CodeGroup>
 ## Custom Examples 
 
 Custom Examples are a way to evaluate your LLM system with more complex data structures. It is composed of the same fields as an `Example`, but the fields are dictionaries instead of strings.

@@ -26,7 +26,8 @@ $$
 
 ## Sample Implementation
 
-```python answer_correctness.py
+<CodeGroup>
+```Python Python
 from judgeval import JudgmentClient
 from judgeval.data import Example
 from judgeval.scorers import AnswerCorrectnessScorer
@@ -49,6 +50,35 @@ results = client.run_evaluation(
 )
 print(results)
 ```
+```Typescript Typescript
+import { JudgmentClient, ExampleBuilder, AnswerCorrectnessScorer, logger } from 'judgeval';
+
+async function runAnswerCorrectness() {
+    const client = JudgmentClient.getInstance();
+    const example = new ExampleBuilder()
+        .input("What's your return policy for a pair of socks?")
+        // Replace this with your LLM system's output
+        .actualOutput("We offer a 30-day return policy for all items, including socks!")
+        // Replace this with your golden/ground truth answer
+        .expectedOutput("Socks can be returned within 30 days of purchase.")
+        .build();
+
+    // supply your own threshold
+    const scorer = new AnswerCorrectnessScorer(0.8);
+
+    const results = await client.evaluate({
+        examples: [example],
+        scorers: [scorer],
+        model: "gpt-4o",
+        projectName: "ans-correct-ts-proj",
+        evalName: "ans-correct-ts-eval"
+    });
+    logger.print(results); // Log results to console
+}
+
+runAnswerCorrectness();
+```
+</CodeGroup>
 
 <Note>
 The `AnswerCorrectness` scorer uses an LLM judge, so you'll receive a reason for the score in the `reason` field of the results. 

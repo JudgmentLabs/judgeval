@@ -1,10 +1,10 @@
 name: CI
 
-# Run on PR change request, approval, or comment.
-# TODO: Don't allow until the approved unit test pass (can only do with Github Pro)
 on:
-  pull_request_review:
-    types: [submitted]
+  pull_request:
+    branches:
+      - main
+  push:
     branches:
       - main
 
@@ -42,3 +42,52 @@ jobs:
         run: |
           cd src
           pipenv run pytest
+
+  run-e2e-tests:
+    if: "!contains(github.actor, '[bot]')"  # Exclude if the actor is a bot
+    concurrency:
+      group: e2e-tests
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python-version:
+          - "3.11"
+    name: E2E Tests
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-1
+          
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+         
+      - name: Install judgeval dependencies
+        run: |
+          pip install pipenv
+          pipenv install --dev
+
+      - name: Check if server is running
+        run: |
+          if ! curl -s http://api.judgmentlabs.ai/health > /dev/null; then
+            echo "Production Judgment server is not running properly. Check logs on AWS CloudWatch for more details."
+            exit 1
+          else
+            echo "Server is running."
+          fi
+        
+      - name: Run E2E tests
+        working-directory: src
+        run: |      
+          SECRET_VARS=$(aws secretsmanager get-secret-value --secret-id gh-actions/api-keys/judgeval --query SecretString --output text)
+          export $(echo "$SECRET_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
+          pipenv run pytest ./e2etests

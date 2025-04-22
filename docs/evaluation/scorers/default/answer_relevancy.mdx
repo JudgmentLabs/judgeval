@@ -29,7 +29,8 @@ $$
 
 ## Sample Implementation
 
-```python answer_relevancy.py
+<CodeGroup>
+```Python Python
 from judgeval import JudgmentClient
 from judgeval.data import Example
 from judgeval.scorers import AnswerRelevancyScorer
@@ -50,6 +51,33 @@ results = client.run_evaluation(
 )
 print(results)
 ```
+```Typescript Typescript
+import { JudgmentClient, ExampleBuilder, AnswerRelevancyScorer, logger } from 'judgeval';
+
+async function runAnswerRelevancy() {
+    const client = JudgmentClient.getInstance();
+    const example = new ExampleBuilder()
+        .input("What's your return policy for a pair of socks?")
+        // Replace this with your LLM system's output
+        .actualOutput("We offer a 30-day return policy for all items, including socks!")
+        .build();
+
+    // supply your own threshold
+    const scorer = new AnswerRelevancyScorer(0.8);
+
+    const results = await client.evaluate({
+        examples: [example],
+        scorers: [scorer],
+        model: "gpt-4o",
+        projectName: "ans-relevancy-ts-proj",
+        evalName: "ans-relevancy-ts-eval"
+    });
+    logger.print(results); // Log results to console
+}
+
+runAnswerRelevancy();
+```
+</CodeGroup>
 
 <Note>
 The `AnswerRelevancy` scorer uses an LLM judge, so you'll receive a reason for the score in the `reason` field of the results. 

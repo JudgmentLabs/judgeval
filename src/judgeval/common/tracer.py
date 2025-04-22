@@ -24,9 +24,10 @@ import requests
 from litellm import cost_per_token
 from pydantic import BaseModel
 from rich import print as rprint
-from openai import OpenAI
-from together import Together
-from anthropic import Anthropic
+from openai import OpenAI, AsyncOpenAI
+from together import Together, AsyncTogether
+from anthropic import Anthropic, AsyncAnthropic
+from google import genai
 
 # Local application/library-specific imports
 from judgeval.constants import (
@@ -53,7 +54,7 @@ current_trace_var = contextvars.ContextVar('current_trace', default=None)
 current_span_var = contextvars.ContextVar('current_span', default=None) # NEW: ContextVar for the active span name
 
 # Define type aliases for better code readability and maintainability
-ApiClient: TypeAlias = Union[OpenAI, Together, Anthropic]  # Supported API clients
+ApiClient: TypeAlias = Union[OpenAI, Together, Anthropic, AsyncOpenAI, AsyncAnthropic, AsyncTogether, genai.Client, genai.client.AsyncClient]  # Supported API clients
 TraceEntryType = Literal['enter', 'exit', 'output', 'input', 'evaluation']  # Valid trace entry types
 SpanType = Literal['span', 'tool', 'llm', 'evaluation', 'chain']
 @dataclass
@@ -68,11 +69,11 @@ class TraceEntry:
     - evaluation: Evaluation: (evaluation results)
     """
     type: TraceEntryType
-    function: str  # Name of the function being traced
     span_id: str # Unique ID for this specific span instance
     depth: int    # Indentation level for nested calls
-    message: str  # Human-readable description
     created_at: float # Unix timestamp when entry was created, replacing the deprecated 'timestamp' field
+    function: Optional[str] = None  # Name of the function being traced
+    message: Optional[str] = None  # Human-readable description
     duration: Optional[float] = None  # Time taken (for exit/evaluation entries)
     trace_id: str = None # ID of the trace this entry belongs to
     output: Any = None  # Function output value
@@ -228,6 +229,8 @@ class TraceManagerClient:
             raise ValueError(f"Failed to fetch traces: {response.text}")
         
         return response.json()
+    
+
 
     def save_trace(self, trace_data: dict):
         """
@@ -355,6 +358,18 @@ class TraceClient:
         self.executed_tools = []
         self.executed_node_tools = []
         self._span_depths: Dict[str, int] = {} # NEW: To track depth of active spans
+    
+    def get_current_span(self):
+        """Get the current span from the context var"""
+        return current_span_var.get()
+    
+    def set_current_span(self, span: Any):
+        """Set the current span from the context var"""
+        return current_span_var.set(span)
+    
+    def reset_current_span(self, token: Any):
+        """Reset the current span from the context var"""
+        return current_span_var.reset(token)
         
     @contextmanager
     def span(self, name: str, span_type: SpanType = "span"):
@@ -861,6 +876,13 @@ class TraceClient:
             "parent_trace_id": self.parent_trace_id,
             "parent_name": self.parent_name
         }        
+        # --- Log trace data before saving ---
+        try:
+            rprint(f"[TraceClient.save] Saving trace data for trace_id {self.trace_id}:")
+            rprint(json.dumps(trace_data, indent=2))
+        except Exception as log_e:
+            rprint(f"[TraceClient.save] Error logging trace data: {log_e}")
+        # --- End logging ---
         self.trace_manager_client.save_trace(trace_data)
 
         return self.trace_id, trace_data
@@ -907,6 +929,64 @@ class Tracer:
                 "To use a different project name, ensure the first Tracer initialization uses the desired project name.",
                 RuntimeWarning
             )
+    
+    def set_current_trace(self, trace: TraceClient):
+        """
+        Set the current trace context in contextvars
+        """
+        current_trace_var.set(trace)
+    
+    def get_current_trace(self):
+        """
+        Get the current trace context from contextvars
+        """
+        return current_trace_var.get()
+        
+    @contextmanager
+    def trace(
+        self, 
+        name: str, 
+        project_name: str = None, 
+        overwrite: bool = False,
+        rules: Optional[List[Rule]] = None  # Added rules parameter
+    ) -> Generator[TraceClient, None, None]:
+        """Start a new trace context using a context manager"""
+        trace_id = str(uuid.uuid4())
+        project = project_name if project_name is not None else self.project_name
+        
+        # Get parent trace info from context
+        parent_trace = current_trace_var.get()
+        parent_trace_id = None
+        parent_name = None
+        
+        if parent_trace:
+            parent_trace_id = parent_trace.trace_id
+            parent_name = parent_trace.name
+
+        trace = TraceClient(
+            self, 
+            trace_id, 
+            name, 
+            project_name=project, 
+            overwrite=overwrite,
+            rules=self.rules,  # Pass combined rules to the trace client
+            enable_monitoring=self.enable_monitoring,
+            enable_evaluations=self.enable_evaluations,
+            parent_trace_id=parent_trace_id,
+            parent_name=parent_name
+        )
+        
+        # Set the current trace in context variables
+        token = current_trace_var.set(trace)
+        
+        # Automatically create top-level span
+        with trace.span(name or "unnamed_trace") as span:
+            try:
+                # Save the trace to the database to handle Evaluations' trace_id referential integrity
+                yield trace
+            finally:
+                # Reset the context variable
+                current_trace_var.reset(token)
                 
     def get_current_trace(self) -> Optional[TraceClient]:
         """
@@ -1093,34 +1173,69 @@ def wrap(client: Any) -> Any:
     """
     # Get the appropriate configuration for this client type
     span_name, original_create = _get_client_config(client)
-    
-    def traced_create(*args, **kwargs):
-        # Get the current trace from contextvars
-        current_trace = current_trace_var.get()
-        
-        # Skip tracing if no active trace
-        if not current_trace:
-            return original_create(*args, **kwargs)
 
-        with current_trace.span(span_name, span_type="llm") as span:
-            # Format and record the input parameters
-            input_data = _format_input_data(client, **kwargs)
-            span.record_input(input_data)
+    # Handle async clients differently than synchronous clients (need an async function for async clients)
+    if (isinstance(client, (AsyncOpenAI, AsyncAnthropic, AsyncTogether, genai.client.AsyncClient))):
+        async def traced_create(*args, **kwargs):
+            # Get the current trace from contextvars
+            current_trace = current_trace_var.get()
             
-            # Make the actual API call
-            response = original_create(*args, **kwargs)
+            # Skip tracing if no active trace
+            if not current_trace:
+                return original_create(*args, **kwargs)
+
+            with current_trace.span(span_name, span_type="llm") as span:
+                # Format and record the input parameters
+                input_data = _format_input_data(client, **kwargs)
+                span.record_input(input_data)
+                
+                # Make the actual API call
+                try:
+                    response = await original_create(*args, **kwargs)
+                except Exception as e:
+                    print(f"Error during API call: {e}")
+                    raise
+
+                # Format and record the output
+                output_data = _format_output_data(client, response)
+                span.record_output(output_data)
+                
+                return response
+    else:
+        def traced_create(*args, **kwargs):
+            # Get the current trace from contextvars
+            current_trace = current_trace_var.get()
             
-            # Format and record the output
-            output_data = _format_output_data(client, response)
-            span.record_output(output_data)
-            
-            return response
+            # Skip tracing if no active trace
+            if not current_trace:
+                return original_create(*args, **kwargs)
+
+            with current_trace.span(span_name, span_type="llm") as span:
+                # Format and record the input parameters
+                input_data = _format_input_data(client, **kwargs)
+                span.record_input(input_data)
+                
+                # Make the actual API call
+                try:
+                    response = original_create(*args, **kwargs)
+                except Exception as e:
+                    print(f"Error during API call: {e}")
+                    raise
+                
+                # Format and record the output
+                output_data = _format_output_data(client, response)
+                span.record_output(output_data)
+                
+                return response
+        
             
     # Replace the original method with our traced version
-    if isinstance(client, (OpenAI, Together)):
+    if isinstance(client, (OpenAI, Together, AsyncOpenAI, AsyncTogether)):
         client.chat.completions.create = traced_create
-    elif isinstance(client, Anthropic):
+    elif isinstance(client, (Anthropic, AsyncAnthropic)):
         client.messages.create = traced_create
+    elif isinstance(client, (genai.Client, genai.client.AsyncClient)):
+        client.models.generate_content = traced_create
         
     return client
 
@@ -1140,12 +1255,14 @@ def _get_client_config(client: ApiClient) -> tuple[str, callable]:
     Raises:
         ValueError: If client type is not supported
     """
-    if isinstance(client, OpenAI):
+    if isinstance(client, (OpenAI, AsyncOpenAI)):
         return "OPENAI_API_CALL", client.chat.completions.create
-    elif isinstance(client, Together):
+    elif isinstance(client, (Together, AsyncTogether)):
         return "TOGETHER_API_CALL", client.chat.completions.create
-    elif isinstance(client, Anthropic):
+    elif isinstance(client, (Anthropic, AsyncAnthropic)):
         return "ANTHROPIC_API_CALL", client.messages.create
+    elif isinstance(client, (genai.Client, genai.client.AsyncClient)):
+        return "GOOGLE_API_CALL", client.models.generate_content
     raise ValueError(f"Unsupported client type: {type(client)}")
 
 def _format_input_data(client: ApiClient, **kwargs) -> dict:
@@ -1154,10 +1271,15 @@ def _format_input_data(client: ApiClient, **kwargs) -> dict:
     Extracts relevant parameters from kwargs based on the client type
     to ensure consistent tracing across different APIs.
     """
-    if isinstance(client, (OpenAI, Together)):
+    if isinstance(client, (OpenAI, Together, AsyncOpenAI, AsyncTogether)):
         return {
             "model": kwargs.get("model"),
             "messages": kwargs.get("messages"),
+        }
+    elif isinstance(client, (genai.Client, genai.client.AsyncClient)):
+        return {
+            "model": kwargs.get("model"),
+            "contents": kwargs.get("contents")
         }
     # Anthropic requires additional max_tokens parameter
     return {
@@ -1177,13 +1299,22 @@ def _format_output_data(client: ApiClient, response: Any) -> dict:
             - content: The generated text
             - usage: Token usage statistics
     """
-    if isinstance(client, (OpenAI, Together)):
+    if isinstance(client, (OpenAI, Together, AsyncOpenAI, AsyncTogether)):
         return {
             "content": response.choices[0].message.content,
             "usage": {
                 "prompt_tokens": response.usage.prompt_tokens,
                 "completion_tokens": response.usage.completion_tokens,
                 "total_tokens": response.usage.total_tokens
+            }
+        }
+    elif isinstance(client, (genai.Client, genai.client.AsyncClient)):
+        return {
+            "content": response.candidates[0].content.parts[0].text,
+            "usage": {
+                "prompt_tokens": response.usage_metadata.prompt_token_count,
+                "completion_tokens": response.usage_metadata.candidates_token_count,
+                "total_tokens": response.usage_metadata.total_token_count
             }
         }
     # Anthropic has a different response structure

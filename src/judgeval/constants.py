@@ -26,7 +26,8 @@ class APIScorer(str, Enum):
     JSON_CORRECTNESS = "json_correctness"
     COMPARISON = "comparison"
     GROUNDEDNESS = "groundedness"
-
+    DERAILMENT = "derailment"
+    
     @classmethod
     def _missing_(cls, value):
         # Handle case-insensitive lookup
@@ -39,6 +40,7 @@ UNBOUNDED_SCORERS = set([APIScorer.COMPARISON])  # scorers whose scores are not 
 ROOT_API = os.getenv("JUDGMENT_API_URL", "https://api.judgmentlabs.ai")
 # API URLs
 JUDGMENT_EVAL_API_URL = f"{ROOT_API}/evaluate/"
+JUDGMENT_SEQUENCE_EVAL_API_URL = f"{ROOT_API}/evaluate_sequence/"
 JUDGMENT_DATASETS_PUSH_API_URL = f"{ROOT_API}/datasets/push/"
 JUDGMENT_DATASETS_APPEND_API_URL = f"{ROOT_API}/datasets/insert_examples/"
 JUDGMENT_DATASETS_PULL_API_URL = f"{ROOT_API}/datasets/pull/"

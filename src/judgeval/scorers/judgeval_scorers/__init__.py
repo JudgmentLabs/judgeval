@@ -15,6 +15,7 @@ from judgeval.scorers.judgeval_scorers.api_scorers import (
     ComparisonScorer as APIComparisonScorer,
     InstructionAdherenceScorer as APIInstructionAdherenceScorer,
     GroundednessScorer as APIGroundednessScorer,
+    DerailmentScorer as APIDerailmentScorer,
 )
 
 from judgeval.scorers.judgeval_scorers.local_implementations import (
@@ -153,6 +154,11 @@ GroundednessScorer = ScorerWrapper(
     api_implementation=APIGroundednessScorer,
 )
 
+DerailmentScorer = ScorerWrapper(
+    api_implementation=APIDerailmentScorer,
+    local_implementation=LocalInstructionAdherenceScorer # TODO: add local implementation
+)
+
 __all__ = [
     "ExecutionOrderScorer",
     "JSONCorrectnessScorer",
@@ -166,4 +172,5 @@ __all__ = [
     "Text2SQLScorer",
     "ComparisonScorer",
     "GroundednessScorer",
+    "DerailmentScorer",
 ]

@@ -37,6 +37,7 @@ class Example(BaseModel):
     example_index: Optional[int] = None
     timestamp: Optional[str] = None
     trace_id: Optional[str] = None
+    sequence_order: Optional[int] = 0
     
     def __init__(self, **data):
         if 'example_id' not in data:
