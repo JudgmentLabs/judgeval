@@ -111,6 +111,12 @@
       ]
     },
     {
+      "group": "MCP Server",
+      "pages": [
+        "mcp_server/mcp_server"
+      ]
+    },
+    {
       "group": "API Reference",
       "pages": [
         "api_reference/judgment_client",
