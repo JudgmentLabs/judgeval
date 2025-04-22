@@ -1,0 +1,35 @@
+# Changelog
+
+## Judgeval SDK (Typescript)
+*   Published judgeval typescript package on npm.
+*   Improved judgeval typescript to match changes in judgeval package.
+*   Wrote Typescript Judgeval documentation.
+*   Completed judgeval TS SDK.
+*   Updated documentation for TS SDK.
+*   Created more cookbook agent & examples with Typescript SDK.
+*   judgeval async eval updates.
+*   Add ability to upload trace data to S3 bucket through Judgeval SDK.
+
+## Observability & Monitoring
+*   Integrated OpenTelemetry for Vercel AI SDK.
+*   Write performance tests to ensure server behaviors is expected under load.
+*   Implemented a "load diff" feature for larger comparisons in experiments and traces.
+*   Implemented caching of comparison diffs for larger text fields when a user clicks "load diff".
+*   Improved trace comparison functionality with QOL updates including: updating the trace URL in parameters when switching between traces, adding the trace ID to the trace comparison dropdown, and fixing an issue with the first span in trace comparisons.
+*   Enabled analysis of single traces and experiments for MCP server
+*   Enabled analysis of last_k traces and experiments for MCP server
+
+## Platform & Infrastructure
+*   Clustering frontend + backend implementation.
+*   Self-hosted server, including cookie bug fixes, disabling Stripe and Slack notifications, and backend authentication logic.
+*   Synthetic data generation; completed endpoints, integrating Andrew's script.
+*   Moving supabase operations to backend (for security + self hosted website functionality).
+*   Created Terraform and Supabase API workflow for creating a self-hosted environment.
+*   Created Judgment command line tool to facilitate self-hosted environment creation.
+
+## User Interface & Experience
+*   Implemented a code quickstart popup instead of redirecting to a new page.
+*   Enhanced cluster labels.
+
+## General
+*   Added support for asynchronous LLM API clients.
