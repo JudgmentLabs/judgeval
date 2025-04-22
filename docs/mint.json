@@ -58,7 +58,7 @@
           "pages": [
             "evaluation/scorers/introduction",
             {
-              "group": "Scorer Definitions",
+              "group": "Default Scorer Definitions",
               "pages": [
                 "evaluation/scorers/default/answer_correctness",
                 "evaluation/scorers/default/answer_relevancy",
@@ -71,11 +71,11 @@
                 "evaluation/scorers/default/faithfulness",
                 "evaluation/scorers/default/json_correctness",
                 "evaluation/scorers/default/summarization",
-                "evaluation/scorers/agent/derailment",
-                "evaluation/scorers/custom_scorers",
-                "evaluation/scorers/classifier_scorer"
+                "evaluation/scorers/agent/derailment"
               ]
-            }
+            },
+            "evaluation/scorers/custom_scorers",
+            "evaluation/scorers/classifier_scorer"
           ]
         },
         "evaluation/judges",
