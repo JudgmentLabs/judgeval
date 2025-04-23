@@ -49,6 +49,7 @@ async def root_function():
 
 # Level 2 - Direct child of root
 # Using observe with same tracer - this will create spans in the parent trace
+@tracer.observe(name="level2_function")
 async def level2_function(param):
     # Capture this function in a span within the current trace
     print(f"Level 2 function with {param}")

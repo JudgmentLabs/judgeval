@@ -53,6 +53,7 @@ import concurrent.futures
 # Define context variables for tracking the current trace and the current span within a trace
 current_trace_var = contextvars.ContextVar('current_trace', default=None)
 current_span_var = contextvars.ContextVar('current_span', default=None) # ContextVar for the active span name
+in_traced_function_var = contextvars.ContextVar('in_traced_function', default=False) # Track if we're in a traced function
 
 # Define type aliases for better code readability and maintainability
 ApiClient: TypeAlias = Union[OpenAI, Together, Anthropic, AsyncOpenAI, AsyncAnthropic, AsyncTogether, genai.Client, genai.client.AsyncClient]  # Supported API clients
@@ -1073,6 +1074,13 @@ class Tracer:
         if asyncio.iscoroutinefunction(func):
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
+                # Check if we're already in a traced function
+                if in_traced_function_var.get():
+                    return await func(*args, **kwargs)
+                
+                # Set in_traced_function_var to True
+                token = in_traced_function_var.set(True)
+                
                 # Get current trace from context
                 current_trace = current_trace_var.get()
                 
@@ -1128,39 +1136,52 @@ class Tracer:
                     finally:
                         # Reset trace context (span context resets automatically)
                         current_trace_var.reset(trace_token)
+                        # Reset in_traced_function_var
+                        in_traced_function_var.reset(token)
                 else:
                     # Already have a trace context, just create a span in it
                     # The span method handles current_span_var
                     
-                    with current_trace.span(span_name, span_type=span_type) as span: # MODIFIED: Use span_name directly
-                        # Record inputs
-                        span.record_input({
-                            'args': str(args),
-                            'kwargs': kwargs
-                        })
-                        
-                        # If deep tracing is enabled, apply monkey patching
-                        if use_deep_tracing:
-                            module, original_functions = self._apply_deep_tracing(func, span_type)
-                        
-                        # Execute function
-                        result = await func(*args, **kwargs)
-                        
-                        # Restore original functions if deep tracing was enabled
-                        if use_deep_tracing and module and 'original_functions' in locals():
-                            for name, obj in original_functions.items():
-                                setattr(module, name, obj)
-                        
-                        # Record output
-                        span.record_output(result)
+                    try:
+                        with current_trace.span(span_name, span_type=span_type) as span: # MODIFIED: Use span_name directly
+                            # Record inputs
+                            span.record_input({
+                                'args': str(args),
+                                'kwargs': kwargs
+                            })
+                            
+                            # If deep tracing is enabled, apply monkey patching
+                            if use_deep_tracing:
+                                module, original_functions = self._apply_deep_tracing(func, span_type)
+                            
+                            # Execute function
+                            result = await func(*args, **kwargs)
+                            
+                            # Restore original functions if deep tracing was enabled
+                            if use_deep_tracing and module and 'original_functions' in locals():
+                                for name, obj in original_functions.items():
+                                    setattr(module, name, obj)
+                            
+                            # Record output
+                            span.record_output(result)
                         
                         return result
+                    finally:
+                        # Reset in_traced_function_var
+                        in_traced_function_var.reset(token)
                 
             return async_wrapper
         else:
             # Non-async function implementation with deep tracing
             @functools.wraps(func)
             def wrapper(*args, **kwargs):
+                # Check if we're already in a traced function
+                if in_traced_function_var.get():
+                    return func(*args, **kwargs)
+                
+                # Set in_traced_function_var to True
+                token = in_traced_function_var.set(True)
+                
                 # Get current trace from context
                 current_trace = current_trace_var.get()
                 
@@ -1216,33 +1237,39 @@ class Tracer:
                     finally:
                         # Reset trace context (span context resets automatically)
                         current_trace_var.reset(trace_token)
+                        # Reset in_traced_function_var
+                        in_traced_function_var.reset(token)
                 else:
                     # Already have a trace context, just create a span in it
                     # The span method handles current_span_var
                     
-                    with current_trace.span(span_name, span_type=span_type) as span: # MODIFIED: Use span_name directly
-                        # Record inputs
-                        span.record_input({
-                            'args': str(args),
-                            'kwargs': kwargs
-                        })
-                        
-                        # If deep tracing is enabled, apply monkey patching
-                        if use_deep_tracing:
-                            module, original_functions = self._apply_deep_tracing(func, span_type)
-                        
-                        # Execute function
-                        result = func(*args, **kwargs)
-                        
-                        # Restore original functions if deep tracing was enabled
-                        if use_deep_tracing and module and 'original_functions' in locals():
-                            for name, obj in original_functions.items():
-                                setattr(module, name, obj)
-                        
-                        # Record output
-                        span.record_output(result)
+                    try:
+                        with current_trace.span(span_name, span_type=span_type) as span: # MODIFIED: Use span_name directly
+                            # Record inputs
+                            span.record_input({
+                                'args': str(args),
+                                'kwargs': kwargs
+                            })
+                            
+                            # If deep tracing is enabled, apply monkey patching
+                            if use_deep_tracing:
+                                module, original_functions = self._apply_deep_tracing(func, span_type)
+                            
+                            # Execute function
+                            result = func(*args, **kwargs)
+                            
+                            # Restore original functions if deep tracing was enabled
+                            if use_deep_tracing and module and 'original_functions' in locals():
+                                for name, obj in original_functions.items():
+                                    setattr(module, name, obj)
+                            
+                            # Record output
+                            span.record_output(result)
                         
                         return result
+                    finally:
+                        # Reset in_traced_function_var
+                        in_traced_function_var.reset(token)
                 
             return wrapper
         
