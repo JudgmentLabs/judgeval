@@ -4,12 +4,12 @@ from judgeval.scorers import DerailmentScorer
 
 client = JudgmentClient()
 
-dataset = client.pull_dataset(alias="test", project_name="simple_trace_demo")
+dataset = client.pull_dataset(alias="test", project_name="travel_agent_demo_test")
 
-client.evaluate_sequence_dataset(
-    dataset=dataset,
+client.run_sequence_evaluation(
+    sequences=dataset.sequences,
     model="gpt-4o",
-    project_name="simple_trace_demo",
+    project_name="travel_agent_demo_test",
     scorers=[DerailmentScorer(threshold=0.5)],
     log_results=True,
     override=True,

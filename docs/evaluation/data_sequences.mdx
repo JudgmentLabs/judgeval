@@ -32,6 +32,12 @@ Here are the fields that can be used to create a `Sequence`:
 ### Name
 The `name` field is the name of the Sequence.
 
+### Inputs
+The `inputs` field is mainly used when exporting a `Trace` from the Judgment platform into a `Sequence`. It represents a functions inputs.
+
+### Outputs
+The `outputs` field is mainly used when exporting a `Trace` from the Judgment platform into a `Sequence`. It represents a functions outputs.
+
 ### Items
 The `items` field is a list of either `Examples` or nested sequence objects. Here is an example of a nested sequence:
 
@@ -66,10 +72,6 @@ outer_sequence = Sequence(
 ```
 
 With nested sequences, you have the ability to group multiple examples and sequences together to give you more flexibility in how you can evaluate your LLM system.
-
-### Scorers
-The `scorers` field is a list of scorers that will be applied to this specific Sequence.
-
 
 <Note>
 When defining nested sequence objects, the scorer at the top level will be applied to the entire Sequence and all nested Sequences within it. Find a list of all our agentic scorers [here](/evaluation/scorers).

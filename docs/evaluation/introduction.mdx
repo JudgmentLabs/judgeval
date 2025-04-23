@@ -157,8 +157,8 @@ from judgeval.scorers import FaithfulnessScorer
 
 client = JudgmentClient()
 scorer = FaithfulnessScorer(threshold=0.5)
-results = client.evaluate_dataset(
-    dataset=dataset,
+results = client.run_evaluation(
+    examples=dataset.examples,
     scorers=[scorer],
     model="Qwen/Qwen2.5-72B-Instruct-Turbo",
 )
