@@ -8,7 +8,6 @@ import pytest
 # Third-party imports
 from openai import OpenAI, AsyncOpenAI
 from anthropic import Anthropic, AsyncAnthropic
-import pytest
 
 # Local imports
 from judgeval.tracer import Tracer, wrap, TraceClient, TraceManagerClient
