@@ -1,7 +1,7 @@
 from judgeval.scorers.api_scorer import APIJudgmentScorer
 from judgeval.scorers.judgeval_scorer import JudgevalScorer
 from judgeval.scorers.prompt_scorer import PromptScorer, ClassifierScorer
-from judgeval.scorers.judgeval_scorers import (
+from judgeval.scorers.judgeval_scorers.api_scorers import (
     ExecutionOrderScorer,
     JSONCorrectnessScorer,
     SummarizationScorer,
@@ -11,13 +11,14 @@ from judgeval.scorers.judgeval_scorers import (
     ContextualPrecisionScorer,
     ContextualRecallScorer,
     AnswerRelevancyScorer,
-    ScorerWrapper,
     AnswerCorrectnessScorer,
-    Text2SQLScorer,
     ComparisonScorer,
     InstructionAdherenceScorer,
     GroundednessScorer,
     DerailmentScorer,
+)
+from judgeval.scorers.judgeval_scorers.classifiers import (
+    Text2SQLScorer,
 )
 
 __all__ = [
@@ -34,7 +35,6 @@ __all__ = [
     "ContextualPrecisionScorer",
     "ContextualRecallScorer",
     "AnswerRelevancyScorer",
-    "ScorerWrapper",
     "AnswerCorrectnessScorer",
     "Text2SQLScorer",
     "ComparisonScorer",

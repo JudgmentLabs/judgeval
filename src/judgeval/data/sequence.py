@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import List, Optional, Union, Any
 from judgeval.data.example import Example
-from judgeval.scorers import ScorerWrapper, JudgevalScorer
+from judgeval.scorers import JudgevalScorer, APIJudgmentScorer
 from uuid import uuid4
 from datetime import datetime, timezone
 
@@ -22,16 +22,10 @@ class Sequence(BaseModel):
 
     @field_validator("scorers")
     def validate_scorer(cls, v):
-        loaded_scorers = []
         for scorer in v or []:
-            try:
-                if isinstance(scorer, ScorerWrapper):
-                    loaded_scorers.append(scorer.load_implementation())
-                else:
-                    loaded_scorers.append(scorer)
-            except Exception as e:
-                raise ValueError(f"Failed to load implementation for scorer {scorer}: {str(e)}")
-        return loaded_scorers
+            if not isinstance(scorer, APIJudgmentScorer) and not isinstance(scorer, JudgevalScorer):
+                raise ValueError(f"Invalid scorer type: {type(scorer)}")
+        return v
     
     @model_validator(mode="after")
     def populate_sequence_metadata(self) -> "Sequence":
