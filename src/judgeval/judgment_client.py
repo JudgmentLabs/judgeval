@@ -93,16 +93,47 @@ class JudgmentClient(metaclass=SingletonMeta):
         self,
         sequences: List[Sequence],
         model: Union[str, List[str], JudgevalJudge],
+        scorers: List[Union[ScorerWrapper, JudgevalScorer]],
         aggregator: Optional[str] = None,
         project_name: str = "default_project",
         eval_run_name: str = "default_eval_sequence",
         use_judgment: bool = True,
         log_results: bool = True,
+        append: bool = False,
         override: bool = False,
         ignore_errors: bool = True,
         rules: Optional[List[Rule]] = None
     ) -> List[ScoringResult]:
         try:
+            loaded_scorers = []
+            for scorer in scorers:
+                try:
+                    if isinstance(scorer, ScorerWrapper):
+                        loaded_scorers.append(scorer.load_implementation())
+                    else:
+                        loaded_scorers.append(scorer)
+                except Exception as e:
+                    raise ValueError(f"Failed to load implementation for scorer {scorer}: {str(e)}")
+
+            def get_all_sequences(root: Sequence) -> List[Sequence]:
+                all_sequences = [root]
+
+                for item in root.items:
+                    if isinstance(item, Sequence):
+                        all_sequences.extend(get_all_sequences(item))
+
+                return all_sequences
+
+            def flatten_sequence_list(sequences: List[Sequence]) -> List[Sequence]:
+                flattened = []
+                for seq in sequences:
+                    flattened.extend(get_all_sequences(seq))
+                return flattened
+            
+            flattened_sequences = flatten_sequence_list(sequences)
+            for sequence in flattened_sequences:
+                sequence.scorers = loaded_scorers
+
             if rules:
                 loaded_rules = []
                 for rule in rules:
@@ -134,10 +165,10 @@ class JudgmentClient(metaclass=SingletonMeta):
                 model=model,
                 aggregator=aggregator,
                 log_results=log_results,
+                append=append,
                 judgment_api_key=self.judgment_api_key,
                 organization_id=self.organization_id
             )
-
             return run_sequence_eval(sequence_run, override, ignore_errors, use_judgment)
         except ValueError as e:
             raise ValueError(f"Please check your SequenceRun object, one or more fields are invalid: \n{str(e)}")
@@ -252,8 +283,8 @@ class JudgmentClient(metaclass=SingletonMeta):
         model: Union[str, List[str], JudgevalJudge],
         aggregator: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
-        project_name: str = "",
-        eval_run_name: str = "",
+        project_name: str = "default_project",
+        eval_run_name: str = "default_eval_run",
         log_results: bool = True,
         use_judgment: bool = True,
         rules: Optional[List[Rule]] = None
@@ -336,6 +367,37 @@ class JudgmentClient(metaclass=SingletonMeta):
             raise ValueError(f"Please check your EvaluationRun object, one or more fields are invalid: \n{str(e)}")
         except Exception as e:
             raise Exception(f"An unexpected error occurred during evaluation: {str(e)}")
+
+    def evaluate_sequence_dataset(
+        self, 
+        dataset: EvalDataset,
+        scorers: List[Any],
+        model: Union[str, List[str], JudgevalJudge],
+        aggregator: Optional[str] = None,
+        project_name: str = "default_project",
+        eval_run_name: str = "default_eval_run",
+        override: bool = False,
+        ignore_errors: bool = True,
+        append: bool = False,
+        log_results: bool = True,
+        use_judgment: bool = True,
+        rules: Optional[List[Rule]] = None
+    ) -> List[ScoringResult]:
+        # print(dataset.sequences)
+        return self.run_sequence_evaluation(
+            sequences=dataset.sequences,
+            scorers=scorers,
+            model=model,
+            aggregator=aggregator,
+            project_name=project_name,
+            eval_run_name=eval_run_name,
+            use_judgment=use_judgment,
+            log_results=log_results,
+            override=override,
+            append=append,
+            ignore_errors=ignore_errors,
+            rules=rules
+        )
 
     def create_dataset(self) -> EvalDataset:
         return self.eval_dataset_client.create_dataset()
