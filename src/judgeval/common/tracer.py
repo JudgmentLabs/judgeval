@@ -952,12 +952,51 @@ class Tracer:
         """
         current_trace_var.set(trace)
     
-    def get_current_trace(self):
+    def get_current_trace(self) -> Optional[TraceClient]:
         """
         Get the current trace context from contextvars
         """
         return current_trace_var.get()
         
+    def _apply_deep_tracing(self, func, span_type="span"):
+        """
+        Apply deep tracing to all functions in the same module as the given function.
+        
+        Args:
+            func: The function being traced
+            span_type: Type of span to use for traced functions
+            
+        Returns:
+            A tuple of (module, original_functions_dict) where original_functions_dict
+            contains the original functions that were replaced with traced versions.
+        """
+        module = inspect.getmodule(func)
+        if not module:
+            return None, {}
+            
+        # Save original functions
+        original_functions = {}
+        
+        # Find all functions in the module
+        for name, obj in inspect.getmembers(module, inspect.isfunction):
+            # Skip already wrapped functions
+            if hasattr(obj, '_judgment_traced'):
+                continue
+                
+            # Create a traced version of the function
+            traced_func = _create_deep_tracing_wrapper(obj, self, span_type)
+            
+            # Mark the function as traced to avoid double wrapping
+            traced_func._judgment_traced = True
+            
+            # Save the original function
+            original_functions[name] = obj
+            
+            # Replace with traced version
+            setattr(module, name, traced_func)
+            
+        return module, original_functions
+
     @contextmanager
     def trace(
         self, 
@@ -1003,13 +1042,7 @@ class Tracer:
             finally:
                 # Reset the context variable
                 current_trace_var.reset(token)
-                
-    def get_current_trace(self) -> Optional[TraceClient]:
-        """
-        Get the current trace context from contextvars
-        """
-        return current_trace_var.get()
-
+    
     def observe(self, func=None, *, name=None, span_type: SpanType = "span", project_name: str = None, overwrite: bool = False, deep_tracing: bool = None):
         """
         Decorator to trace function execution with detailed entry/exit information.
@@ -1076,32 +1109,7 @@ class Tracer:
                             
                             # If deep tracing is enabled, apply monkey patching
                             if use_deep_tracing:
-                                # Get the module where the function is defined
-                                module = inspect.getmodule(func)
-                                if module:
-                                    # Save original functions
-                                    original_functions = {}
-                                    
-                                    # Find all functions in the module
-                                    for name, obj in inspect.getmembers(module, inspect.isfunction):
-                                        # Don't skip the function being traced - we want to trace all calls
-                                        # including recursive calls or when functions call each other
-                                        
-                                        # Skip already wrapped functions
-                                        if hasattr(obj, '_judgment_traced'):
-                                            continue
-                                            
-                                        # Create a traced version of the function
-                                        traced_func = _create_deep_tracing_wrapper(obj, self, span_type)
-                                        
-                                        # Mark the function as traced to avoid double wrapping
-                                        traced_func._judgment_traced = True
-                                        
-                                        # Save the original function
-                                        original_functions[name] = obj
-                                        
-                                        # Replace with traced version
-                                        setattr(module, name, traced_func)
+                                module, original_functions = self._apply_deep_tracing(func, span_type)
                             
                             # Execute function
                             result = await func(*args, **kwargs)
@@ -1133,32 +1141,7 @@ class Tracer:
                         
                         # If deep tracing is enabled, apply monkey patching
                         if use_deep_tracing:
-                            # Get the module where the function is defined
-                            module = inspect.getmodule(func)
-                            if module:
-                                # Save original functions
-                                original_functions = {}
-                                
-                                # Find all functions in the module
-                                for name, obj in inspect.getmembers(module, inspect.isfunction):
-                                    # Don't skip the function being traced - we want to trace all calls
-                                    # including recursive calls or when functions call each other
-                                        
-                                    # Skip already wrapped functions
-                                    if hasattr(obj, '_judgment_traced'):
-                                        continue
-                                        
-                                    # Create a traced version of the function
-                                    traced_func = _create_deep_tracing_wrapper(obj, self, span_type)
-                                    
-                                    # Mark the function as traced to avoid double wrapping
-                                    traced_func._judgment_traced = True
-                                    
-                                    # Save the original function
-                                    original_functions[name] = obj
-                                    
-                                    # Replace with traced version
-                                    setattr(module, name, traced_func)
+                            module, original_functions = self._apply_deep_tracing(func, span_type)
                         
                         # Execute function
                         result = await func(*args, **kwargs)
@@ -1214,32 +1197,7 @@ class Tracer:
                             
                             # If deep tracing is enabled, apply monkey patching
                             if use_deep_tracing:
-                                # Get the module where the function is defined
-                                module = inspect.getmodule(func)
-                                if module:
-                                    # Save original functions
-                                    original_functions = {}
-                                    
-                                    # Find all functions in the module
-                                    for name, obj in inspect.getmembers(module, inspect.isfunction):
-                                        # Don't skip the function being traced - we want to trace all calls
-                                        # including recursive calls or when functions call each other
-                                        
-                                        # Skip already wrapped functions
-                                        if hasattr(obj, '_judgment_traced'):
-                                            continue
-                                            
-                                        # Create a traced version of the function
-                                        traced_func = _create_deep_tracing_wrapper(obj, self, span_type)
-                                        
-                                        # Mark the function as traced to avoid double wrapping
-                                        traced_func._judgment_traced = True
-                                        
-                                        # Save the original function
-                                        original_functions[name] = obj
-                                        
-                                        # Replace with traced version
-                                        setattr(module, name, traced_func)
+                                module, original_functions = self._apply_deep_tracing(func, span_type)
                             
                             # Execute function
                             result = func(*args, **kwargs)
@@ -1271,32 +1229,7 @@ class Tracer:
                         
                         # If deep tracing is enabled, apply monkey patching
                         if use_deep_tracing:
-                            # Get the module where the function is defined
-                            module = inspect.getmodule(func)
-                            if module:
-                                # Save original functions
-                                original_functions = {}
-                                
-                                # Find all functions in the module
-                                for name, obj in inspect.getmembers(module, inspect.isfunction):
-                                    # Don't skip the function being traced - we want to trace all calls
-                                    # including recursive calls or when functions call each other
-                                        
-                                    # Skip already wrapped functions
-                                    if hasattr(obj, '_judgment_traced'):
-                                        continue
-                                        
-                                    # Create a traced version of the function
-                                    traced_func = _create_deep_tracing_wrapper(obj, self, span_type)
-                                    
-                                    # Mark the function as traced to avoid double wrapping
-                                    traced_func._judgment_traced = True
-                                    
-                                    # Save the original function
-                                    original_functions[name] = obj
-                                    
-                                    # Replace with traced version
-                                    setattr(module, name, traced_func)
+                            module, original_functions = self._apply_deep_tracing(func, span_type)
                         
                         # Execute function
                         result = func(*args, **kwargs)
