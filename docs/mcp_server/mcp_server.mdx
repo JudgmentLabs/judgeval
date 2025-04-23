@@ -41,7 +41,9 @@ with Cursor, Windsurf, and Claude Desktop. To integrate our MCP server with an A
     }
 }
 ```
-Note: With the current implementation of our MCP server, you will need a Gemini API key.
+Note: With the current implementation of our MCP server, you will need to also pass in an API key for an LLM. We recommend using Gemini if 
+you have an API key for it, but we also support OpenAI or Anthropic. If using Anthropic, pass in ANTHROPIC_API_KEY for the -e flag. If using 
+OpenAI, pass in OPENAI_API_KEY for the -e flag.
 
 Ensure that the MCP server is enabled (may take a couple seconds for the Docker pull). 
 
