@@ -87,7 +87,7 @@
       "pages": [
         "monitoring/introduction",
         "monitoring/tracing",
-        "monitoring/production_insights"
+        "monitoring/annotations"
       ]
     },
     {
@@ -108,6 +108,12 @@
       "group": "Clustering",
       "pages": [
         "clustering/clustering"
+      ]
+    },
+    {
+      "group": "MCP Server",
+      "pages": [
+        "mcp_server/mcp_server"
       ]
     },
     {
