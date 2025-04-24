@@ -22,29 +22,18 @@ from judgeval import JudgmentClient
 from judgeval.data import Example
 from judgeval.scorers import AnswerRelevancyScorer # Or your specific scorer
 
-# Platform-specific imports (examples)
-# from langfuse import Langfuse
-# from langsmith import Client, wrappers
-# from braintrust import Eval
-# from arize.experimental.datasets import ArizeDatasetsClient
-# from arize.experimental.datasets.experiments.types import EvaluationResult
+# Other common imports (add platform-specific ones within each tab)
 import json
-# ... other necessary imports like os, openai, etc.
+import os 
 ```
 
-You will also need to initialize the `JudgmentClient` and the client for the specific platform you are using, typically configuring them with the necessary API keys.
+You will also need to initialize the `JudgmentClient`.
 
 ```python
-# Initialize Judgeval Client
+# Initialize Judgment Client (Universal)
 judgment_client = JudgmentClient()
 
-# Initialize Platform Clients (Example for Langfuse)
-# langfuse = Langfuse(
-#     secret_key=os.environ["LANGFUSE_SECRET_KEY"],
-#     public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
-#     host="https://cloud.langfuse.com" # Or your self-hosted instance
-# )
-# ... initialize other clients similarly
+# Platform-specific client initializations moved to respective tabs below
 ```
 
 ## Platform-Specific Integration Examples
@@ -53,6 +42,8 @@ Below are examples demonstrating how to create and integrate a Judgeval scorer f
 
 <Tabs>
   <Tab title="Arize">
+    ### Arize
+
     **Platform:** Arize
 
     **Terminology:** Evaluator
@@ -62,8 +53,16 @@ Below are examples demonstrating how to create and integrate a Judgeval scorer f
     Arize's `run_experiment` expects evaluators to return an `EvaluationResult` object containing `score`, `label`, and `explanation`.
 
     ```python
+    # Platform-specific imports
+    from arize.experimental.datasets import ArizeDatasetsClient
     from arize.experimental.datasets.experiments.types import EvaluationResult
     import json
+
+    # Initialize Arize Client (Example)
+    arize_client = ArizeDatasetsClient(
+        api_key=os.environ["ARIZE_API_KEY"], 
+        space_key=os.environ["ARIZE_SPACE_KEY"]
+    )
 
     # Evaluator function signature expected by Arize
     def use_judgment_scorer(input, output, experiment_output):
@@ -111,16 +110,18 @@ Below are examples demonstrating how to create and integrate a Judgeval scorer f
         return EvaluationResult(score=score, label=label, explanation=explanation)
 
     # Example Usage:
-    # client.run_experiment(
-    #     space_id="YOUR_SPACE_ID",
-    #     dataset_name="YOUR_DATASET_NAME",
-    #     task=your_task_function, # Your function that generates model output
-    #     evaluators=[use_judgment_scorer],
-    #     experiment_name="my-judgeval-experiment",
-    # )
+    client.run_experiment(
+        space_id="YOUR_SPACE_ID",
+        dataset_name="YOUR_DATASET_NAME",
+        task=your_task_function, # Your function that generates model output
+        evaluators=[use_judgment_scorer],
+        experiment_name="my-judgeval-experiment",
+    )
     ```
   </Tab>
   <Tab title="Braintrust">
+    ### Braintrust
+
     **Platform:** Braintrust
 
     **Terminology:** Score Function
@@ -130,6 +131,15 @@ Below are examples demonstrating how to create and integrate a Judgeval scorer f
     Braintrust's `Eval` expects score functions to return a single numeric score value.
 
     ```python
+    # Platform-specific imports
+    from braintrust import Eval
+    import os
+
+    # Initialize Braintrust Client (implicitly done via Eval or other setup)
+    # Ensure BRAINTRUST_API_KEY environment variable is set
+    # No explicit client object needed for this example, 
+    # but ensure API key is in environment.
+
     # Score function signature expected by Braintrust
     def use_judgment_scorer(input, expected, output):
         print(f"input: {input}, expected: {expected}, output: {output}")
@@ -163,16 +173,18 @@ Below are examples demonstrating how to create and integrate a Judgeval scorer f
         return score
 
     # Example Usage:
-    # Eval(
-    #     project="Your Braintrust Project",
-    #     experiment="My Judgeval Experiment",
-    #     data=your_data_source, # Function or list providing input/expected pairs
-    #     task=your_task_function, # Your function that generates model output
-    #     scores=[use_judgment_scorer],
-    # )
+    Eval(
+        project="Your Braintrust Project",
+        experiment="My Judgeval Experiment",
+        data=your_data_source, # Function or list providing input/expected pairs
+        task=your_task_function, # Your function that generates model output
+        scores=[use_judgment_scorer],
+    )
     ```
    </Tab>
    <Tab title="Langfuse">
+    ### Langfuse
+
     **Platform:** Langfuse
 
     **Terminology:** Score
@@ -182,6 +194,17 @@ Below are examples demonstrating how to create and integrate a Judgeval scorer f
     Langfuse allows attaching scores to existing traces. You typically loop through traces and call `langfuse.score` for each, providing a numeric value.
 
     ```python
+    # Platform-specific imports
+    from langfuse import Langfuse
+    import os
+
+    # Initialize Langfuse Client (Example)
+    langfuse = Langfuse(
+        secret_key=os.environ["LANGFUSE_SECRET_KEY"],
+        public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
+        host="https://us.cloud.langfuse.com" # Or your self-hosted instance
+    )
+
     # Helper function to calculate score (can be defined separately or inline)
     def calculate_judgeval_score(input_str, actual_output_str, expected_output_str=None):
         print(f"input: {input_str}\\n expected: {expected_output_str}\\n output: {actual_output_str}")
@@ -213,40 +236,42 @@ Below are examples demonstrating how to create and integrate a Judgeval scorer f
         return score
 
     # Example Usage (assuming 'traces_batch' contains fetched Langfuse traces):
-    # for trace in traces_batch:
-    #     try:
-    #         # 1. Extract data from Langfuse trace context
-    #         # Adjust extraction based on your trace structure
-    #         input_arg = trace.input.get('args', [None])[0] or trace.input.get('input', None)
-    #         output_val = trace.output
+    for trace in traces_batch:
+        try:
+            # 1. Extract data from Langfuse trace context
+            # Adjust extraction based on your trace structure
+            input_arg = trace.input.get('args', [None])[0] or trace.input.get('input', None)
+            output_val = trace.output
 
-    #         if input_arg is None or output_val is None:
-    #             print(f"Skipping trace {trace.id}: Missing input or output.")
-    #             continue
+            if input_arg is None or output_val is None:
+                print(f"Skipping trace {trace.id}: Missing input or output.")
+                continue
 
-    #         # Expected output might not always be present in a trace
-    #         expected_val = None # Or extract if available, e.g., trace.expected
+            # Expected output might not always be present in a trace
+            expected_val = None # Or extract if available, e.g., trace.expected
 
-    #         # Calculate score using the helper function
-    #         judgeval_score = calculate_judgeval_score(
-    #             input_str=str(input_arg), # Ensure strings
-    #             actual_output_str=str(output_val),
-    #             expected_output_str=str(expected_val) if expected_val else None
-    #         )
+            # Calculate score using the helper function
+            judgeval_score = calculate_judgeval_score(
+                input_str=str(input_arg), # Ensure strings
+                actual_output_str=str(output_val),
+                expected_output_str=str(expected_val) if expected_val else None
+            )
 
-    #         # Attach score to the Langfuse trace
-    #         langfuse.score(
-    #             trace_id=trace.id,
-    #             name="judgeval_answer_relevancy", # Choose a descriptive name
-    #             value=judgeval_score # Pass the numeric score
-    #         )
-    #         print(f"Scored trace {trace.id} with {judgeval_score}")
-    #     except Exception as e:
-    #         print(f"Error processing trace {trace.id}: {e}")
+            # Attach score to the Langfuse trace
+            langfuse.score(
+                trace_id=trace.id,
+                name="judgeval_answer_relevancy", # Choose a descriptive name
+                value=judgeval_score # Pass the numeric score
+            )
+            print(f"Scored trace {trace.id} with {judgeval_score}")
+        except Exception as e:
+            print(f"Error processing trace {trace.id}: {e}")
 
     ```
    </Tab>
    <Tab title="Langsmith">
+    ### LangSmith
+
     **Platform:** LangSmith
 
     **Terminology:** Custom Evaluator
@@ -256,6 +281,16 @@ Below are examples demonstrating how to create and integrate a Judgeval scorer f
     LangSmith evaluators typically receive `run` and `example` objects and should return a dictionary containing a `key` (scorer name) and a numeric `score`.
 
     ```python
+    # Platform-specific imports
+    from langsmith import Client, wrappers
+    from openai import OpenAI # Example dependency
+    import os
+
+    # Initialize LangSmith Client (Example)
+    langsmith_client = Client()
+    # Example of wrapping another client if needed by your task function
+    openai_client = wrappers.wrap_openai(OpenAI())
+
     # Evaluator function signature expected by LangSmith
     def use_judgment_scorer(run, example):
         # 1. Extract data from LangSmith context
@@ -305,14 +340,14 @@ Below are examples demonstrating how to create and integrate a Judgeval scorer f
         return {"key": "judgment_answer_relevancy", "score": score}
 
     # Example Usage:
-    # experiment_results = client.evaluate(
-    #     your_target_function, # Your function generating model output
-    #     data = "your_langsmith_dataset_name", # Dataset name or ID
-    #     evaluators = [
-    #         use_judgment_scorer
-    #     ],
-    #     experiment_prefix = "my-judgeval-experiment",
-    # )
+    experiment_results = client.evaluate(
+        your_target_function, # Your function generating model output
+        data = "your_langsmith_dataset_name", # Dataset name or ID
+        evaluators = [
+            use_judgment_scorer
+        ],
+        experiment_prefix = "my-judgeval-experiment",
+    )
 
     ```
    </Tab>
