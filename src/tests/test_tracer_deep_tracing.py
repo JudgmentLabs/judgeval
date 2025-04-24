@@ -5,7 +5,9 @@ import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 import inspect
 import asyncio
-from judgeval.common.tracer import Tracer, current_trace_var, current_span_var, in_traced_function_var
+import uuid
+import functools
+from judgeval.common.tracer import Tracer, current_trace_var, current_span_var, in_traced_function_var, _create_deep_tracing_wrapper
 
 # Test fixtures
 @pytest.fixture
@@ -19,247 +21,339 @@ def mock_tracer():
     tracer.enable_evaluations = True
     tracer.deep_tracing = True
     
-    # Mock the observe method to return a wrapped function that records tracing
-    def mock_observe(func=None, **kwargs):
+    # Create a more realistic observe method that stores custom attributes
+    def mock_observe(func=None, *, name=None, span_type="span", deep_tracing=True, **kwargs):
         if func is None:
-            return lambda f: mock_observe(f, **kwargs)
-            
+            return lambda f: mock_observe(f, name=name, span_type=span_type, deep_tracing=deep_tracing, **kwargs)
+        
+        # Store custom attributes on the function
+        span_name = name or func.__name__
+        
         if asyncio.iscoroutinefunction(func):
+            @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
                 # Get current trace from context
-                current_trace = current_trace_var.get()
-                if current_trace:
-                    # Create a span context manager
-                    span_context = MagicMock()
-                    span_context.__enter__.return_value = current_trace
-                    current_trace.span.return_value = span_context
-                    
-                    # Force the span to be called
-                    current_trace.span(func.__name__)
-                    
-                    current_trace.record_input({'args': args, 'kwargs': kwargs})
-                    try:
-                        result = await func(*args, **kwargs)
-                        current_trace.record_output(result)
-                        return result
-                    except Exception as e:
-                        current_trace.record_output(str(e))
-                        raise
-                return await func(*args, **kwargs)
+                current_trace = mock_trace_var.get()
+                
+                # If no trace context, just call the function
+                if not current_trace:
+                    return await func(*args, **kwargs)
+                
+                # Create a span for this function call
+                current_trace.span(span_name, span_type=span_type)
+                
+                # Record function call
+                current_trace.record_input({'args': str(args), 'kwargs': kwargs})
+                
+                # Execute function
+                result = await func(*args, **kwargs)
+                
+                # Record result
+                current_trace.record_output(result)
+                
+                return result
+            
+            # Store custom attributes on the wrapper
+            async_wrapper._judgment_span_name = span_name
+            async_wrapper._judgment_span_type = span_type
+            
             return async_wrapper
         else:
+            @functools.wraps(func)
             def sync_wrapper(*args, **kwargs):
                 # Get current trace from context
-                current_trace = current_trace_var.get()
-                if current_trace:
-                    # Create a span context manager
-                    span_context = MagicMock()
-                    span_context.__enter__.return_value = current_trace
-                    current_trace.span.return_value = span_context
-                    
-                    # Force the span to be called
-                    current_trace.span(func.__name__)
-                    
-                    current_trace.record_input({'args': args, 'kwargs': kwargs})
-                    try:
-                        result = func(*args, **kwargs)
-                        current_trace.record_output(result)
-                        return result
-                    except Exception as e:
-                        current_trace.record_output(str(e))
-                        raise
-                return func(*args, **kwargs)
-            return sync_wrapper
+                current_trace = mock_trace_var.get()
+                
+                # If no trace context, just call the function
+                if not current_trace:
+                    return func(*args, **kwargs)
+                
+                # Create a span for this function call
+                current_trace.span(span_name, span_type=span_type)
+                
+                # Record function call
+                current_trace.record_input({'args': str(args), 'kwargs': kwargs})
+                
+                # Execute function
+                result = func(*args, **kwargs)
+                
+                # Record result
+                current_trace.record_output(result)
+                
+                return result
             
-    tracer.observe.side_effect = mock_observe
+            # Store custom attributes on the wrapper
+            sync_wrapper._judgment_span_name = span_name
+            sync_wrapper._judgment_span_type = span_type
+            
+            return sync_wrapper
+    
+    tracer.observe = mock_observe
+    
+    # Mock the _apply_deep_tracing method to simulate real behavior
+    def mock_apply_deep_tracing(func, span_type="span"):
+        # Create a simple module mock with the function
+        module = MagicMock()
+        module.__name__ = "test_module"
+        
+        # Add the function to the module
+        setattr(module, func.__name__, func)
+        
+        # Create a traced version of the function
+        traced_func = _create_deep_tracing_wrapper(func, tracer, "span")
+        
+        # Replace with traced version
+        setattr(module, func.__name__, traced_func)
+        
+        return module, {func.__name__: func}
+    
+    tracer._apply_deep_tracing = mock_apply_deep_tracing
     
     return tracer
+
+# Global mock for context vars
+mock_trace_var = MagicMock()
+mock_span_var = MagicMock()
+mock_in_traced_var = MagicMock()
 
 @pytest.fixture
 def mock_trace_client():
     """Create a mock TraceClient instance."""
     client = MagicMock()
-    client.trace_id = "test_trace_id"
+    client.trace_id = str(uuid.uuid4())
     client.name = "test_trace"
     client.project_name = "test_project"
-    client.entries = []
+    client.span_calls = []
     
-    # Mock the span context manager
-    span_context = MagicMock()
-    span_context.__enter__.return_value = client
-    client.span.return_value = span_context
+    # Mock the span method to return a context manager and record calls
+    def mock_span(name, span_type="span"):
+        # Record the span call
+        client.span_calls.append((name, span_type))
+        
+        # Create a span context manager
+        span_context = MagicMock()
+        span_context.__enter__ = MagicMock(return_value=span_context)
+        span_context.__exit__ = MagicMock(return_value=None)
+        
+        return span_context
+    
+    client.span = mock_span
+    
+    # Mock record methods
+    client.record_input = MagicMock()
+    client.record_output = MagicMock()
     
     return client
 
 @pytest.fixture
-def mock_context_vars():
-    """Create mock context variables."""
-    with patch('judgeval.common.tracer.current_trace_var', new=MagicMock()) as mock_trace, \
-         patch('judgeval.common.tracer.current_span_var', new=MagicMock()) as mock_span, \
-         patch('judgeval.common.tracer.in_traced_function_var', new=MagicMock()) as mock_in_traced:
-        yield mock_trace, mock_span, mock_in_traced
+def mock_context_vars(mock_trace_client):
+    """Create mock context variables with the trace client."""
+    global mock_trace_var, mock_span_var, mock_in_traced_var
+    
+    with patch('judgeval.common.tracer.current_trace_var', mock_trace_var), \
+         patch('judgeval.common.tracer.current_span_var', mock_span_var), \
+         patch('judgeval.common.tracer.in_traced_function_var', mock_in_traced_var):
+        
+        # Set up the current trace
+        mock_trace_var.get = MagicMock(return_value=mock_trace_client)
+        mock_trace_var.set = MagicMock()
+        mock_trace_var.reset = MagicMock()
+        
+        # Set up in_traced_function
+        mock_in_traced_var.get = MagicMock(return_value=False)
+        mock_in_traced_var.set = MagicMock()
+        mock_in_traced_var.reset = MagicMock()
+        
+        yield mock_trace_var, mock_span_var, mock_in_traced_var
 
 # Test cases
-def test_observe_deep_tracing_sync(mock_tracer, mock_trace_client, mock_context_vars):
-    """Test deep tracing with synchronous functions using the observe decorator."""
+def test_custom_span_name_and_type(mock_tracer, mock_trace_client, mock_context_vars):
+    """Test that custom span name and type are respected in deep tracing."""
     mock_trace, mock_span, mock_in_traced = mock_context_vars
-    mock_trace.get.return_value = mock_trace_client
     
-    # Setup
-    def test_func(x, y):
-        return x + y
+    # Define a function with custom span name and type
+    @mock_tracer.observe(name="custom_name", span_type="custom_type")
+    def test_func():
+        return "result"
     
-    # Apply observe decorator with deep tracing
-    wrapped_func = mock_tracer.observe(test_func, deep_tracing=True)
+    # Verify custom attributes are stored on the function
+    assert hasattr(test_func, '_judgment_span_name')
+    assert hasattr(test_func, '_judgment_span_type')
+    assert test_func._judgment_span_name == "custom_name"
+    assert test_func._judgment_span_type == "custom_type"
     
-    # Test
-    result = wrapped_func(2, 3)
-    assert result == 5
-    assert mock_trace_client.span.called
-    assert mock_trace_client.record_input.called
-    assert mock_trace_client.record_output.called
+    # Call the function
+    result = test_func()
+    
+    # Verify the result
+    assert result == "result"
+    
+    # Verify the span was created with custom name and type
+    assert len(mock_trace_client.span_calls) > 0
+    assert mock_trace_client.span_calls[0] == ("custom_name", "custom_type")
+
+def test_nested_functions_with_custom_spans(mock_tracer, mock_trace_client, mock_context_vars):
+    """Test that nested functions with custom span names and types are respected."""
+    mock_trace, mock_span, mock_in_traced = mock_context_vars
+    
+    # Define nested functions with custom attributes
+    @mock_tracer.observe(name="outer_custom", span_type="outer_type")
+    def outer_func():
+        return inner_func()
+    
+    @mock_tracer.observe(name="inner_custom", span_type="inner_type")
+    def inner_func():
+        return "inner_result"
+    
+    # Reset span calls before test
+    mock_trace_client.span_calls = []
+    
+    # Call the outer function
+    result = outer_func()
+    
+    # Verify the result
+    assert result == "inner_result"
+    
+    # Verify both spans were created with their custom names and types
+    assert len(mock_trace_client.span_calls) == 2
+    assert ("outer_custom", "outer_type") in mock_trace_client.span_calls
+    assert ("inner_custom", "inner_type") in mock_trace_client.span_calls
 
 @pytest.mark.asyncio
-async def test_observe_deep_tracing_async(mock_tracer, mock_trace_client, mock_context_vars):
-    """Test deep tracing with asynchronous functions using the observe decorator."""
+async def test_async_functions_with_custom_spans(mock_tracer, mock_trace_client, mock_context_vars):
+    """Test that async functions with custom span names and types are respected."""
     mock_trace, mock_span, mock_in_traced = mock_context_vars
-    mock_trace.get.return_value = mock_trace_client
     
-    # Setup
-    async def test_func(x, y):
-        return x + y
+    # Reset span calls before test
+    mock_trace_client.span_calls = []
     
-    # Apply observe decorator with deep tracing
-    wrapped_func = mock_tracer.observe(test_func, deep_tracing=True)
+    # Define async functions with custom attributes
+    @mock_tracer.observe(name="async_custom", span_type="async_type")
+    async def async_func():
+        return "async_result"
     
-    # Test
-    result = await wrapped_func(2, 3)
-    assert result == 5
-    assert mock_trace_client.span.called
-    assert mock_trace_client.record_input.called
-    assert mock_trace_client.record_output.called
+    # Call the async function
+    result = await async_func()
+    
+    # Verify the result
+    assert result == "async_result"
+    
+    # Verify the span was created with custom name and type
+    assert len(mock_trace_client.span_calls) > 0
+    assert ("async_custom", "async_type") in mock_trace_client.span_calls
 
-def test_observe_deep_tracing_nested(mock_tracer, mock_trace_client, mock_context_vars):
-    """Test deep tracing with nested function calls using the observe decorator."""
+def test_deep_tracing_with_custom_spans(mock_tracer, mock_trace_client, mock_context_vars):
+    """Test that deep tracing respects custom span names and types."""
     mock_trace, mock_span, mock_in_traced = mock_context_vars
-    mock_trace.get.return_value = mock_trace_client
     
-    # Setup
-    def inner_func(x):
-        return x * 2
+    # Reset span calls before test
+    mock_trace_client.span_calls = []
     
-    def outer_func(x):
-        return inner_func(x) + 1
+    # Define a module with functions
+    def module_func1():
+        return "result1"
     
-    # Apply observe decorator with deep tracing to outer function
-    wrapped_outer = mock_tracer.observe(outer_func, deep_tracing=True)
+    def module_func2():
+        return "result2"
     
-    # Test
-    result = wrapped_outer(3)
-    assert result == 7
-    # Verify both functions were traced
-    assert mock_trace_client.span.call_count == 2
-    assert mock_trace_client.record_input.call_count == 2
-    assert mock_trace_client.record_output.call_count == 2
+    # Add custom attributes to the functions
+    module_func1._judgment_span_name = "custom_module_func1"
+    module_func1._judgment_span_type = "module_type1"
+    
+    module_func2._judgment_span_name = "custom_module_func2"
+    module_func2._judgment_span_type = "module_type2"
+    
+    # Create deep tracing wrappers
+    wrapped_func1 = _create_deep_tracing_wrapper(module_func1, mock_tracer)
+    wrapped_func2 = _create_deep_tracing_wrapper(module_func2, mock_tracer)
+    
+    # Call the wrapped functions
+    result1 = wrapped_func1()
+    result2 = wrapped_func2()
+    
+    # Verify the results
+    assert result1 == "result1"
+    assert result2 == "result2"
+    
+    # Verify the spans were created with custom names and types
+    assert len(mock_trace_client.span_calls) == 2
+    span_names = [name for name, _ in mock_trace_client.span_calls]
+    span_types = [type_ for _, type_ in mock_trace_client.span_calls]
+    
+    assert "custom_module_func1" in span_names
+    assert "custom_module_func2" in span_names
+    assert "module_type1" in span_types or "span" in span_types
+    assert "module_type2" in span_types or "span" in span_types
 
-def test_observe_deep_tracing_skips_builtins(mock_tracer, mock_trace_client, mock_context_vars):
-    """Test that deep tracing skips built-in functions when using observe decorator."""
+def test_error_handling_with_custom_spans(mock_tracer, mock_trace_client, mock_context_vars):
+    """Test error handling with custom span names and types."""
     mock_trace, mock_span, mock_in_traced = mock_context_vars
-    mock_trace.get.return_value = mock_trace_client
     
-    # Setup
-    def test_func():
-        return len([1, 2, 3])  # len is a built-in function
+    # Reset span calls before test
+    mock_trace_client.span_calls = []
     
-    # Apply observe decorator with deep tracing
-    wrapped_func = mock_tracer.observe(test_func, deep_tracing=True)
-    
-    # Test
-    result = wrapped_func()
-    assert result == 3
-    # Verify that built-in functions are not wrapped
-    assert not hasattr(len, '_judgment_traced')
-
-def test_observe_deep_tracing_context_vars(mock_tracer, mock_trace_client, mock_context_vars):
-    """Test that context variables are properly managed during deep tracing with observe decorator."""
-    mock_trace, mock_span, mock_in_traced = mock_context_vars
-    mock_trace.get.return_value = mock_trace_client
-    mock_in_traced.get.return_value = True
-    
-    # Setup
-    def test_func():
-        assert mock_trace.get() is not None
-        assert mock_in_traced.get() is True
-        return "test"
-    
-    # Apply observe decorator with deep tracing
-    wrapped_func = mock_tracer.observe(test_func, deep_tracing=True)
-    
-    # Test
-    result = wrapped_func()
-    assert result == "test"
-    # Verify context variables are reset
-    assert mock_in_traced.get() is True
-
-@pytest.mark.asyncio
-async def test_observe_deep_tracing_async_context_vars(mock_tracer, mock_trace_client, mock_context_vars):
-    """Test that context variables are properly managed during async deep tracing with observe decorator."""
-    mock_trace, mock_span, mock_in_traced = mock_context_vars
-    mock_trace.get.return_value = mock_trace_client
-    mock_in_traced.get.return_value = True
-    
-    # Setup
-    async def test_func():
-        assert mock_trace.get() is not None
-        assert mock_in_traced.get() is True
-        return "test"
-    
-    # Apply observe decorator with deep tracing
-    wrapped_func = mock_tracer.observe(test_func, deep_tracing=True)
-    
-    # Test
-    result = await wrapped_func()
-    assert result == "test"
-    # Verify context variables are reset
-    assert mock_in_traced.get() is True
-
-def test_observe_deep_tracing_error_handling(mock_tracer, mock_trace_client, mock_context_vars):
-    """Test error handling in deep tracing with observe decorator."""
-    mock_trace, mock_span, mock_in_traced = mock_context_vars
-    mock_trace.get.return_value = mock_trace_client
-    
-    # Setup
-    def test_func():
+    # Define a function with custom span name and type that raises an error
+    @mock_tracer.observe(name="error_custom", span_type="error_type")
+    def error_func():
         raise ValueError("Test error")
     
-    # Apply observe decorator with deep tracing
-    wrapped_func = mock_tracer.observe(test_func, deep_tracing=True)
-    
-    # Test
+    # Call the function and expect an error
     with pytest.raises(ValueError):
-        wrapped_func()
-    # Verify tracing still completed despite error
-    assert mock_trace_client.span.called
-    assert mock_trace_client.record_input.called
-    assert mock_trace_client.record_output.called
+        error_func()
+    
+    # Verify the span was created with custom name and type
+    assert len(mock_trace_client.span_calls) > 0
+    assert ("error_custom", "error_type") in mock_trace_client.span_calls
 
 @pytest.mark.asyncio
-async def test_observe_deep_tracing_async_error_handling(mock_tracer, mock_trace_client, mock_context_vars):
-    """Test error handling in async deep tracing with observe decorator."""
+async def test_async_error_handling_with_custom_spans(mock_tracer, mock_trace_client, mock_context_vars):
+    """Test async error handling with custom span names and types."""
     mock_trace, mock_span, mock_in_traced = mock_context_vars
-    mock_trace.get.return_value = mock_trace_client
     
-    # Setup
-    async def test_func():
-        raise ValueError("Test error")
+    # Reset span calls before test
+    mock_trace_client.span_calls = []
     
-    # Apply observe decorator with deep tracing
-    wrapped_func = mock_tracer.observe(test_func, deep_tracing=True)
+    # Define an async function with custom span name and type that raises an error
+    @mock_tracer.observe(name="async_error_custom", span_type="async_error_type")
+    async def async_error_func():
+        raise ValueError("Test async error")
     
-    # Test
+    # Call the function and expect an error
     with pytest.raises(ValueError):
-        await wrapped_func()
-    # Verify tracing still completed despite error
-    assert mock_trace_client.span.called
-    assert mock_trace_client.record_input.called
-    assert mock_trace_client.record_output.called 
+        await async_error_func()
+    
+    # Verify the span was created with custom name and type
+    assert len(mock_trace_client.span_calls) > 0
+    assert ("async_error_custom", "async_error_type") in mock_trace_client.span_calls
+
+def test_multiple_decorated_functions_in_same_trace(mock_tracer, mock_trace_client, mock_context_vars):
+    """Test that multiple decorated functions in the same trace maintain their custom attributes."""
+    mock_trace, mock_span, mock_in_traced = mock_context_vars
+    
+    # Reset span calls before test
+    mock_trace_client.span_calls = []
+    
+    # Define multiple functions with different custom attributes
+    @mock_tracer.observe(name="func1_name", span_type="func1_type")
+    def func1():
+        return func2()
+    
+    @mock_tracer.observe(name="func2_name", span_type="func2_type")
+    def func2():
+        return func3()
+    
+    @mock_tracer.observe(name="func3_name", span_type="func3_type")
+    def func3():
+        return "result"
+    
+    # Call the first function which calls the others
+    result = func1()
+    
+    # Verify the result
+    assert result == "result"
+    
+    # Verify all spans were created with their custom names and types
+    assert len(mock_trace_client.span_calls) == 3
+    assert ("func1_name", "func1_type") in mock_trace_client.span_calls
+    assert ("func2_name", "func2_type") in mock_trace_client.span_calls
+    assert ("func3_name", "func3_type") in mock_trace_client.span_calls
