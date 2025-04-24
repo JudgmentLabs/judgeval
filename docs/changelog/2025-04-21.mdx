@@ -1,32 +1,24 @@
 ## Judgeval SDK (Typescript)
 
 *   Published judgeval TypeScript SDK on npm.
-*   Added agent cookbooks for Typescript SDK
-*   judgeval async eval updates
+*   Added agent cookbooks for Typescript SDK.
+*   Integrated OpenTelemetry for Vercel AI SDK.
 
 ## Infrastructure & Self-Hosting
 
-*   Add clustering
+*   Release [clustering](docs/changelog/2025-04-21.mdx): Enhance experiment debugging efficiency through automated topic failure analysis. This feature enables precise identification of problematic areas by analyzing failure patterns across topics, facilitating targeted error resolution and system optimization.
 *   Add ability to upload trace data to S3 bucket through Judgeval SDK
 *   Created Judgment command line tool to facilitate self-hosted environment creation
 
 ## Experimentation & Trace Analysis
 
 *   Implemented a "load diff" feature for larger comparisons in experiments and traces.
-*   Implemented caching of comparison diffs for larger text fields when a user clicks "load diff".
-*   Improved trace comparison functionality with QOL updates including: updating the trace URL in parameters when switching between traces, adding the trace ID to the trace comparison dropdown, and fixing an issue with the first span in trace comparisons.
 *   Enabled analysis of single and last_k traces and experiments for MCP server
 
 ## UI/UX
 
-*   Implemented a code quickstart popup instead of redirecting to a new page.
-*   Implemented a sidebar for the clustering page, designed to display top patterns and trends in the user data
+*   Added quickstart popups with basic cookbooks for running tracing and experiments.
 
 ## LLM & Evaluation
 
-*   Added support for asynchronous LLM API clients.
-*   Enhanced cluster labels, further increasing accuracy.
-
-## SDK & Integrations
-
-*   Integrated OpenTelemetry for Vercel AI SDK.
+*   Added tracing support for asynchronous LLM API clients.
