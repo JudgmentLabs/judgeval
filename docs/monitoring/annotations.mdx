@@ -1,0 +1,41 @@
+---
+title: Annotations
+---
+
+## Reviewing Traces and Evaluations ##
+
+Once traces and evaluations are logged to the Judgment platform, you can review them to understand performance, debug issues, and add human feedback.
+
+### Adding Span Annotations (Human Notes) ###
+
+While reviewing a trace, you can add manual annotations to specific spans. This allows you to layer human judgment and context onto the automated trace data.
+
+Annotations typically include:
+- **Label:** A category for the annotation (e.g., "Hallucination", "Incorrect Tool Use", "Data Quality Issue").
+- **Score:** An optional score relevant to the label.
+- **Notes:** Freeform text where you can add detailed observations, corrections, or explanations (e.g., noting a false positive from an evaluation scorer, explaining why a specific output is problematic)..
+
+Adding annotations is crucial for:
+- **Clarifying automated scores:** Explaining edge cases or nuances not captured by scorers.
+- **Tracking specific issues:** Tagging spans related to known bugs or areas for improvement.
+- **Creating datasets:** Using annotated spans to build datasets for fine-tuning or further analysis.
+
+### Annotation Queue ###
+
+To help prioritize manual review, Judgment provides an **Annotation Queue**. This queue automatically collects spans from traces where an asynchronous evaluation (run via `judgment.async_evaluate`) has failed (i.e., scored below its defined threshold).
+
+You can access the queue from your project dashboard via the "View Annotation Queue" button:
+
+![Project Dashboard showing Annotation Queue Button](/images/dashboard_annotation_queue_button.png "Annotation Queue Button")
+
+The queue interface separates spans into sections "Pending Review" and "Recently Annotated":
+
+![Annotation Queue UI](/images/annotation_queue_ui.png "Annotation Queue UI")
+
+From the queue, you can:
+- **See failing spans:** Quickly view which spans (identified by Name, Trace ID, and Span ID) require attention due to low evaluation scores.
+- **Navigate to the trace:** Click on an item to go directly to the relevant span within its trace context.
+- **Review and annotate:** Analyze the inputs, outputs, and evaluation results for the flagged span, then add your own manual annotations (as described above).
+- **Manage the queue:** Move reviewed items from pending to annotated status.
+
+Using the Annotation Queue helps focus review efforts on the most critical or problematic workflow executions identified by your automated evaluations.

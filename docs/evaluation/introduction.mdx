@@ -72,6 +72,13 @@ results = client.run_evaluation(
     scorers=[faithfulness_scorer],
     model="gpt-4o",
 )
+
+# You also run evaluations asynchronously like so:
+results = client.a_run_evaluation(
+    examples=[example],
+    scorers=[faithfulness_scorer],
+    model="gpt-4o",
+)
 print(results)
 ```
 
