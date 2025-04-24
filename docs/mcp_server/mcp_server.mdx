@@ -2,25 +2,36 @@
 title: 'Model Context Protocol'
 ---
 
-## What is MCP?
+## Overview
 
-The Model Context Protocol (MCP) is an open standard designed to unify how applications deliver context and tools to large language models (LLMs). 
-MCP integrates easily with Judgment, as LLMs can provide more valuable insights to help improve workflows and agents with our MCP server. 
-For more information about MCP, refer to the official [documentation](https://modelcontextprotocol.io/introduction).
+The Model Context Protocol (MCP) is an open standard that standardizes how applications deliver context and tools to large language models (LLMs). 
+Judgment integrates seamlessly with MCP, enabling LLMs to provide actionable insights for improving workflows and agents through our MCP server. 
+For detailed information about the MCP specification, refer to the official [documentation](https://modelcontextprotocol.io/introduction).
 
-## Why use our MCP server?
+## Benefits of the Judgment MCP Server
 
-The MCP server allows an LLM you are working with to easily gain key insights about workflows and agents, including information about traces and evaluations 
-allow for a much better understanding of what is working well and what needs improvement. In addition, one other benefit, if integrating with an AI powered 
-code editor, is that the LLM will now have a much better idea of how to approach code optimization. For example, imagine if you have a workflow with 1000 traces and 
-something is not working. You can ask your AI powered IDE for analysis on what is going wrong with the traces, and then ask the IDE to optimize your code based on the 
-insights! This greatly reduces the amount of work you have to do while running experiments or monitoring your workflow with Judgment.
+The Judgment MCP server provides LLMs with comprehensive insights into workflows and agents, including detailed trace and evaluation data. This enables:
 
-## How do I use the MCP server?
+- **Enhanced Debugging**: Identify performance bottlenecks and issues in complex workflows
+- **Optimized Code Generation**: AI-powered IDEs can analyze trace data to suggest targeted code improvements
+- **Efficient Experimentation**: Rapidly iterate on LLM applications with automated evaluation feedback
+- **Reduced Development Time**: Minimize manual analysis of trace data across large-scale deployments
 
-Right now, MCP is a relatively new protocol, and many AI agents have still not added integration with MCP server. Some common ways to integrate our MCP server are 
-with Cursor, Windsurf, and Claude Desktop. To integrate our MCP server with an AI agent, use the following json file as the MCP config (using Docker):
-```
+For example, when working with a complex workflow containing thousands of traces, the MCP server allows your AI-powered IDE to analyze trace patterns, identify root causes of issues, and suggest specific code optimizations based on evaluation metrics.
+
+## Integration Guide
+
+### Prerequisites
+
+- Docker installed on your system
+- Judgment API credentials
+- LLM API key (Gemini, OpenAI, or Anthropic)
+
+### Configuration
+
+To integrate the Judgment MCP server with your AI agent, create an MCP configuration file with the following structure:
+
+```json
 {
     "mcpServers": {
         "mcp-server": {
@@ -41,16 +52,21 @@ with Cursor, Windsurf, and Claude Desktop. To integrate our MCP server with an A
     }
 }
 ```
-Note: With the current implementation of our MCP server, you will need to also pass in an API key for an LLM. We recommend using Gemini if 
-you have an API key for it, but we also support OpenAI or Anthropic. If using Anthropic, pass in ANTHROPIC_API_KEY for the -e flag. If using 
-OpenAI, pass in OPENAI_API_KEY for the -e flag.
 
-Ensure that the MCP server is enabled (may take a couple seconds for the Docker pull). 
+<Note>
+The current implementation requires an LLM API key. We recommend using Gemini, but OpenAI and Anthropic are also supported. For Anthropic, use the `ANTHROPIC_API_KEY` environment variable. For OpenAI, use the `OPENAI_API_KEY` environment variable.
+</Note>
 
-### Rule File
+### Supported AI Agents
 
-If your AI powered IDE supports it, we strongly recommend adding a rule file which helps the AI agent better understand the tools and 
-how to optimize your code:
+The MCP server is compatible with several AI agents, including:
+- Cursor
+- Windsurf
+- Claude Desktop
+
+### Rule File Configuration
+
+For optimal performance, we recommend adding a rule file to your AI agent configuration. This file helps the AI agent understand the available tools and how to optimize your code based on trace analysis.
 
 <Accordion title="Judgment Rule File">
     ````
@@ -542,22 +558,29 @@ how to optimize your code:
     ````
 </Accordion>
 
+## Available Tools
 
-## What tools are available with the MCP server?
+The Judgment MCP server provides the following tools for analyzing and optimizing your LLM applications:
 
-Currently, the MCP server supports the following tools:
+### Analysis Tools
 
-`get_experiment_analysis` : Get experiment analysis for a single experiment, given the project and experiment names.
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `get_experiment_analysis` | Retrieves analysis for a specific experiment | `project_name`, `eval_name` |
+| `get_trace_analysis` | Retrieves analysis for a specific trace | `trace_id` |
+| `get_experiment_analysis_project` | Retrieves analysis for multiple experiments in a project | `project_name`, `num_exps` (default: "10") |
+| `get_trace_analysis_project` | Retrieves analysis for multiple traces in a project | `project_name`, `num_traces` (default: "10") |
 
-`get_trace_analysis` : Get trace analysis for a single trace, given the trace id.
+### Evaluation Tool
 
-`get_experiment_analysis_project` : Get experiment analysis for a full project, given the project name. Optionally, can also specify 
-the value k, where the analysis will be for the last k experiments. k is 10 by default.
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `run_evaluation` | Executes an evaluation directly through the MCP server | `project_name`, `evaluation_run` |
 
-`get_trace_analysis_project` : Get trace analysis for a full project, given the project name. Optionally, can also specify 
-the value k, where the analysis will be for the last k traces. k is 10 by default.
+The `evaluation_run` parameter accepts a comprehensive configuration object that can include:
+- Examples with input/output pairs
+- Scorer configurations
+- Model specifications
+- Logging preferences
 
-`run_evaluation` : Run an evaluation directly through an MCP tool! Specify the project name and as many fields as you would like to 
-when it comes to the other EvaluationRun object fields. For example, you can specify all of the information for each of the examples and 
-scorers and which model to use, or you can simply just ask the AI agent to create the examples based on a specific prompt. Think of this tool 
-as a way to very quickly experiment any idea you may have.
+This tool enables rapid experimentation with different evaluation configurations without modifying your application code.
