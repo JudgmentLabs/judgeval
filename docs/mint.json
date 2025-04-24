@@ -94,7 +94,7 @@
       "group": "Integrations",
       "pages": [
         "integration/langgraph",
-        "integration/braintrust"
+        "integration/tracing_integrations"
       ]
     },
     {
