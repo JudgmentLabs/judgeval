@@ -985,7 +985,8 @@ class Tracer:
                 continue
                 
             # Create a traced version of the function
-            traced_func = _create_deep_tracing_wrapper(obj, self, span_type)
+            # Always use default span type "span" for child functions
+            traced_func = _create_deep_tracing_wrapper(obj, self, "span")
             
             # Mark the function as traced to avoid double wrapping
             traced_func._judgment_traced = True
@@ -1067,6 +1068,10 @@ class Tracer:
         
         # Use provided name or fall back to function name
         span_name = name or func.__name__
+        
+        # Store custom attributes on the function object
+        func._judgment_span_name = span_name
+        func._judgment_span_type = span_type
         
         # Use the provided deep_tracing value or fall back to the tracer's default
         use_deep_tracing = deep_tracing if deep_tracing is not None else self.deep_tracing
@@ -1491,8 +1496,11 @@ def _create_deep_tracing_wrapper(func, tracer, span_type="span"):
     if not callable(func) or isinstance(func, type) or func.__module__ == 'builtins':
         return func
     
-    # Get function name for the span
-    func_name = func.__name__
+    # Get function name for the span - check for custom name set by @observe
+    func_name = getattr(func, '_judgment_span_name', func.__name__)
+    
+    # Check for custom span_type set by @observe
+    func_span_type = getattr(func, '_judgment_span_type', "span")
     
     # Store original function to prevent losing reference
     original_func = func
@@ -1508,8 +1516,8 @@ def _create_deep_tracing_wrapper(func, tracer, span_type="span"):
             if not current_trace:
                 return await original_func(*args, **kwargs)
             
-            # Create a span for this function call
-            with current_trace.span(func_name, span_type=span_type) as span:
+            # Create a span for this function call - use custom span_type if available
+            with current_trace.span(func_name, span_type=func_span_type) as span:
                 # Record inputs
                 span.record_input({
                     'args': str(args),
@@ -1535,8 +1543,8 @@ def _create_deep_tracing_wrapper(func, tracer, span_type="span"):
             if not current_trace:
                 return original_func(*args, **kwargs)
             
-            # Create a span for this function call
-            with current_trace.span(func_name, span_type=span_type) as span:
+            # Create a span for this function call - use custom span_type if available
+            with current_trace.span(func_name, span_type=func_span_type) as span:
                 # Record inputs
                 span.record_input({
                     'args': str(args),
