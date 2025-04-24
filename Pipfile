@@ -27,6 +27,7 @@ langchain-community = "*"
 langgraph = "*"
 google-genai = "*"
 autoevals = "*"
+langfuse = "*"
 
 [dev-packages]
 pytest = "*"
