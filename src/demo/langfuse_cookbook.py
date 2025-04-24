@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from judgeval import JudgmentClient
 from judgeval.data import Example
 from judgeval.scorers import AnswerRelevancyScorer
+from langfuse.decorators import langfuse_context, observe
 judgment_client = JudgmentClient()
 
 topic_suggestion = """ You're a world-class journalist, specialized
@@ -60,7 +61,6 @@ def explain_concept(topic):
             }
         ],
         model="gpt-4o-mini",
- 
         temperature=0.6
     ).choices[0].message.content
  
@@ -75,7 +75,7 @@ TOTAL_TRACES = 50
 langfuse = Langfuse(
     secret_key=os.environ["LANGFUSE_SECRET_KEY"],
     public_key=os.environ["LANGFUSE_PUBLIC_KEY"],
-    host="https://cloud.langfuse.com"  # 🇪🇺 EU region
+    host="https://us.cloud.langfuse.com"
 )
  
 now = datetime.now()
@@ -160,7 +160,7 @@ print(f"Dominant tones: {test_tone_score}")
 
 
 def use_judgment_scorer(input, expected, output):
-    print(f"input: {input}, expected: {expected}, output: {output}")
+    print(f"input: {input}\n expected: {expected}\n output: {output}")
     example = Example(
         input=input,
         expected_output=expected,
@@ -179,8 +179,9 @@ def use_judgment_scorer(input, expected, output):
     print(results)
     return results[0].scorers_data[0].score
 
-langfuse.score(
-    trace_id=traces_batch[1].id,
-    name="tone",
-    value=use_judgment_scorer(traces_batch[1].input['args'][0], traces_batch[1].output, traces_batch[1].output)
-)
+for trace in traces_batch:
+    langfuse.score(
+        trace_id=trace.id,
+        name="hallucination_marker",
+        value=use_judgment_scorer(trace.input['args'][0], trace.output, trace.output)
+    )

@@ -19,7 +19,7 @@ def task(dataset_row: Dict):
     return dataset_row
 
 def use_judgment_scorer(input, output, experiment_output):
-
+    print(f"input: {input}  \noutput: {output}\nexperiment_output: {experiment_output}")
     # Parse the input/output/experiment_output data from Arize's Datasets
     input_data = json.loads(input)
     input_str = input_data['messages'][0]['content']
@@ -60,5 +60,5 @@ client.run_experiment(
     dataset_name="eval", 
     task=task, 
     evaluators=[use_judgment_scorer], 
-    experiment_name="evals26", 
+    experiment_name="evals27", 
 )
