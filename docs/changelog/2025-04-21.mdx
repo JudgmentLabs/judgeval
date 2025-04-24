@@ -1,54 +1,32 @@
 ## Judgeval SDK (Typescript)
 
-*   Published judgeval typescript package on npm.
-*   Improved judgeval typescript to match changes in judgeval package.
-*   Wrote Typescript Judgeval documentation.
-*   Completed judgeval TS SDK
-*   Updated documentation for TS SDK
-*   Created more cookbook agent & examples with Typescript SDK
+*   Published judgeval TypeScript SDK on npm.
+*   Added agent cookbooks for Typescript SDK
 *   judgeval async eval updates
-*   Add ability to upload trace data to S3 bucket through Judgeval SDK
 
 ## Infrastructure & Self-Hosting
 
-*   Clustering frontend + backend implementation
-*   Self-hosted server, including cookie bug fixes, disabling Stripe and Slack notifications, and backend authentication logic
-*   Created Terraform and Supabase API workflow for creating a self-hosted environment
+*   Add clustering
+*   Add ability to upload trace data to S3 bucket through Judgeval SDK
 *   Created Judgment command line tool to facilitate self-hosted environment creation
-*   Moving supabase operations to backend (for security + self hosted website functionality)
 
 ## Experimentation & Trace Analysis
 
 *   Implemented a "load diff" feature for larger comparisons in experiments and traces.
 *   Implemented caching of comparison diffs for larger text fields when a user clicks "load diff".
 *   Improved trace comparison functionality with QOL updates including: updating the trace URL in parameters when switching between traces, adding the trace ID to the trace comparison dropdown, and fixing an issue with the first span in trace comparisons.
-*   Enabled analysis of single traces and experiments for MCP server
-*   Enabled analysis of last_k traces and experiments for MCP server
-*   Synthetic data generation; completed endpoints, integrating Andrew's script
+*   Enabled analysis of single and last_k traces and experiments for MCP server
 
 ## UI/UX
 
 *   Implemented a code quickstart popup instead of redirecting to a new page.
 *   Implemented a sidebar for the clustering page, designed to display top patterns and trends in the user data
 
-## Data Management & Database
-
-*   Results column of the `eval_results` table was unpacked and migrated into a separate table.
-*   Currently working on refactoring existing endpoints referencing `eval_results` to update the results column to `eval_scorers_data`
-
 ## LLM & Evaluation
 
 *   Added support for asynchronous LLM API clients.
-*   Enhanced cluster labels.
+*   Enhanced cluster labels, further increasing accuracy.
 
 ## SDK & Integrations
 
 *   Integrated OpenTelemetry for Vercel AI SDK.
-
-## Performance & Testing
-
-*   Write performance tests to ensure server behaviors is expected under load
-
-## Documentation
-
-*   Documentation for clustering via Mintlify was updated.
