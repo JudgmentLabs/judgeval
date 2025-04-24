@@ -5,14 +5,23 @@ description: "This guide will help you learn the essential components of `judgev
 
 # Installation 
 
-`pip install judgeval`
+<CodeGroup>
+```Shell Python
+pip install judgeval
+```
+```Shell Typescript
+npm install judgeval
+```
+</CodeGroup>
 
 Judgeval runs evaluations that you can manage inside the library. Additionally, you should analyze and manage your evaluations, datasets, and metrics on 
 the natively-integrated [Judgment Platform](https://app.judgmentlabs.ai/register), an all-in-one suite for LLM system evaluation.
 
 <Tip>
-Our team is always making new releases of the `judgeval` package! To get the latest version, run `pip install --upgrade judgeval`. 
-You can follow our latest updates via our [GitHub](https://github.com/judgmentlabs/judgeval).
+Our team is always making new releases of the `judgeval` package! 
+To get the latest Python version, run `pip install --upgrade judgeval`. 
+To get the latest Typescript version, run `npm update judgeval`.
+You can follow our latest updates via our [GitHub](https://github.com/judgmentlabs).
 </Tip>
 
 # Judgment API Keys
@@ -35,7 +44,8 @@ feel free to [get in touch with our team](mailto:contact@judgmentlabs.ai).
 
 # Create Your First Experiment
 
-```python sample_eval.py
+<CodeGroup>
+```Python Python
 from judgeval import JudgmentClient
 from judgeval.data import Example
 from judgeval.scorers import FaithfulnessScorer
@@ -56,11 +66,37 @@ results = client.run_evaluation(
 )
 print(results)
 ```
+```Typescript Typescript
+import { JudgmentClient, ExampleBuilder, FaithfulnessScorer, logger } from 'judgeval';
+
+async function runFirstExperiment() { // Wrap in async function for await
+    const client = JudgmentClient.getInstance();
+
+    const example = new ExampleBuilder()
+        .input("What if these shoes don't fit?")
+        .actualOutput("We offer a 30-day full refund at no extra cost.")
+        .context(["All customers are eligible for a 30 day full refund at no extra cost."])
+        .build();
+
+    const scorer = new FaithfulnessScorer(0.5);
+    const results = await client.evaluate({
+        examples: [example],
+        scorers: [scorer],
+        model: "gpt-4o",
+        projectName: "my-first-ts-project", // Example project name
+        evalName: "first-ts-experiment"   // Example eval name
+    });
+    logger.print(results);
+}
+
+runFirstExperiment(); // Call the async function
+```
+</CodeGroup>
 
 Congratulations! Your evaluation should have passed. Let's break down what happened.
 
 - The variable `input` mimics a user input and `actual_output` is a placeholder for what your LLM system returns based on the input.
-- The variable `retrieval_context` represents the retrieved context from your RAG knowledge base.
+- The variable `retrieval_context` (Python) or `context` (Typescript) represents the retrieved context from your RAG knowledge base.
 - `FaithfulnessScorer(threshold=0.5)` is a scorer that checks if the output is hallucinated relative to the retrieved context.
     - <Note>The threshold is used in the context of [unit testing](/evaluation/unit_testing).</Note>
 - We chose `gpt-4o` as our judge model to measure faithfulness. Judgment Labs offers ANY judge model for your evaluation needs. 
@@ -78,7 +114,8 @@ Traces enable you to track your LLM system's flow end-to-end and measure:
 - Quality metrics, such as hallucination, retrieval quality, and more.
 
 
-```python trace_example.py
+<CodeGroup>
+```Python Python
 from judgeval.common.tracer import Tracer, wrap
 from openai import OpenAI
 
@@ -97,7 +134,52 @@ def main():
         messages=[{"role": "user", "content": f"{task_input}"}]
     )
     return res.choices[0].message.content
+
+# Calling the observed function implicitly starts and saves the trace
+main()
 ```
+```Typescript Typescript
+import { Tracer, wrap } from 'judgeval';
+import OpenAI from 'openai';
+
+// Ensure JUDGMENT_API_KEY and JUDGMENT_ORG_ID are set in your environment
+const client = wrap(new OpenAI());
+const judgment = Tracer.getInstance({ projectName: "my_project" });
+
+// Define the function to be traced
+async function myTool(): Promise<string> {
+    return "Hello world!";
+}
+// Wrap the function using the observe method
+const observedMyTool = judgment.observe({ spanType: "tool" })(myTool);
+
+// Define the main function
+async function main(): Promise<string | null | undefined> {
+    const taskInput = await observedMyTool();
+    const res = await client.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: taskInput }],
+    });
+    return res.choices[0]?.message?.content;
+}
+
+// Wrap the main function
+const observedMain = judgment.observe({ spanType: "function" })(main);
+
+// Calling the observed function implicitly starts and saves the trace
+async function runImplicitTrace() {
+    try {
+        const result = await observedMain();
+        console.log("Implicit trace completed successfully:", result);
+    } catch (error) {
+        console.error("Implicit trace failed:", error);
+        // The trace should still be saved automatically on error by observe
+    }
+}
+
+runImplicitTrace();
+```
+</CodeGroup>
 
 Congratulations! You've just created your first trace. It should look like this:
 
@@ -122,7 +204,8 @@ In addition to tracing, `judgeval` allows you to run online evaluations on your 
 
 To run an online evaluation, you can simply add one line of code to your existing trace:
 
-```python trace_example.py
+<CodeGroup>
+```Python Python
 from judgeval.common.tracer import Tracer, wrap
 from judgeval.scorers import AnswerRelevancyScorer
 from openai import OpenAI
@@ -142,6 +225,7 @@ def main():
         messages=[{"role": "user", "content": f"{task_input}"}]
     ).choices[0].message.content
 
+    # In Python, this likely operates on the implicit trace context
     judgment.async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
         input=task_input,
@@ -150,7 +234,71 @@ def main():
     )
 
     return res
+
+main()
 ```
+```Typescript Typescript
+import { Tracer, wrap, AnswerRelevancyScorer } from 'judgeval';
+import OpenAI from 'openai';
+
+// Ensure JUDGMENT_API_KEY and JUDGMENT_ORG_ID are set in your environment
+const client = wrap(new OpenAI());
+const judgment = Tracer.getInstance({ projectName: "my_project" });
+
+// Define the function to be traced
+async function myTool(): Promise<string> {
+    return "Hello world!";
+}
+// Wrap the function using the observe method
+const observedMyTool = judgment.observe({ spanType: "tool" })(myTool);
+
+// Define the main function with async evaluation
+async function mainWithEval(): Promise<string | null | undefined> {
+    const taskInput = await observedMyTool();
+    const res = await client.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: taskInput }],
+    });
+    const actualOutput = res.choices[0]?.message?.content;
+
+    if (actualOutput) {
+        // Get the current trace instance from the Tracer singleton
+        const currentTrace = judgment.getCurrentTrace(); 
+        if (currentTrace) {
+             // Run async evaluation within the current trace context
+            await currentTrace.asyncEvaluate(
+                [new AnswerRelevancyScorer(0.5)],
+                {
+                    input: taskInput,
+                    actualOutput: actualOutput,
+                    model: "gpt-4o"
+                }
+            );
+        } else {
+            console.warn("Could not find active trace to run async evaluation.");
+        }
+    }
+    return actualOutput;
+}
+
+// Still need explicit trace management here because asyncEvaluate is on the TraceClient
+async function runMainWithEval() {
+    const trace = judgment.startTrace("main_trace_with_eval"); // Start a trace
+    try {
+        // Wrap the main function call within the trace's context
+        const observedMain = judgment.observe({ spanType: "function" })(mainWithEval);
+        const result = await observedMain();
+        console.log("Trace with eval completed successfully:", result);
+        await trace.save(); // Save the trace
+    } catch (error) {
+        console.error("Trace with eval failed:", error);
+        await trace.save(); // Save the trace even on error
+    }
+}
+
+runMainWithEval();
+```
+</CodeGroup>
 
 Online evaluations are automatically logged to the Judgment Platform as part of your traces. You can view them by navigating to your trace and clicking on the 
 trace span that contains the online evaluation. If there is a quality regression, the UI will display an alert, like this: 
@@ -158,180 +306,6 @@ trace span that contains the online evaluation. If there is a quality regression
 <div style={{display: 'flex', justifyContent: 'center'}}>
   ![Alt text](/images/online_eval_fault.png "Image of an alert on the Judgment Platform")
 </div>
-
-{/*
-# Create Your First Scorer
-`judgeval` offers three kinds of LLM scorers for your evaluation needs: ready-made, classifier scorers, and custom scorers.
-
-## Ready-made Scorers
-Judgment Labs provides default implementations of 10+ research-backed metrics covering evaluation needs ranging from hallucination detection to RAG retrieval quality. To create a ready-made scorer, just import it directly from `judgeval.scorers`:
-
-```python scorer_example.py
-from judgeval import JudgmentClient
-from judgeval.data import Example
-from judgeval.scorers import FaithfulnessScorer
-
-client = JudgmentClient()
-example = Example(
-    input="...",
-    actual_output="...",
-    retrieval_context=["..."],
-)
-scorer = FaithfulnessScorer(threshold=0.5)
-
-results = client.run_evaluation(
-    examples=[example],
-    scorers=[scorer],
-    model="gpt-4o",
-)
-print(results)
-```
-
-<Note>
-For a complete list of ready-made scorers, see the [scorers docs](/evaluation/scorers).
-</Note>
-
-## Classifier Scorers
-`judgeval` allows you to create custom scorers using natural language. These can range from simple judges to powerful evaluators for your LLM systems.
-
-```python classifier_scorer.py
-from judgeval.scorers import ClassifierScorer
-
-classifier_scorer = ClassifierScorer(
-    name="Tone Scorer",
-    threshold=0.9,
-    conversation=[
-        {
-            "role": "system", 
-            "content": "Is the response positive (Y/N)? The response is: {{actual_output}}."
-        }
-    ],
-    options={"Y": 1, "N": 0}
-)
-```
-
-To learn more about `ClassifierScorer`s, click [here](/evaluation/scorers/classifier_scorer).
-
-## Custom Scorers
-If you find that none of the ready-made scorers or classifier scorers fit your needs, you can easily create your own custom scorer. 
-These can be as simple or complex as you need them to be and **_do not_** have to use an LLM judge model. 
-Here's an example of computing BLEU scores:
-
-```python bleu_custom_scorer.py
-import sacrebleu
-from judgeval.scorers import JudgevalScorer
-
-class BLEUScorer(JudgevalScorer):
-    def __init__(self, threshold: float = 0.5):
-        super().__init__(score_type="BLEU", threshold=threshold)
-
-    def score_example(self, example: Example) -> float:
-        reference = example.expected_output
-        candidate = example.actual_output
-
-        score = sacrebleu.sentence_bleu(candidate, [reference]).score
-        self.score = score
-        return score
-
-    # Async implementation of score_example(). If you have no async logic, you can
-    # just use the synchronous implementation.
-    async def a_score_example(self, example: Example) -> float:
-        return self.score_example(example)
-
-    def success_check(self) -> bool:
-        return self.score >= self.threshold
-
-    @property
-    def __name__(self):
-        return "BLEU"
-
-# example usage 
-example = Example("input"="...", "actual_output"="...", "expected_output"="...")
-scorer = BLEUScorer()
-results = scorer.score_example(example)
-print(results)
-```
-
-<Note>
-For a deeper dive into making custom scorers, see the custom scorers [page](/evaluation/scorers/custom_scorers).
-</Note>
-
-## Running Multiple Scorers Simultaneously
-
-If you're interested in measuring multiple metrics at once, you can group scorers together when running evaluations, 
-regardless of the type of scorer.
-
-```python multiple_scorers.py
-from judgeval import JudgmentClient
-from judgeval.scorers import FaithfulnessScorer, SummarizationScorer
-
-client = JudgmentClient()
-
-faithfulness_scorer = FaithfulnessScorer(threshold=0.5)
-summarization_scorer = SummarizationScorer(threshold=0.8)
-
-results = client.run_evaluation(
-    examples=[example],
-    scorers=[faithfulness_scorer, summarization_scorer],
-    model="gpt-4o",
-)
-```
-
-# Create Your First Dataset 
-In most cases, you will not be running evaluations on a single example; instead, you will be scoring your LLM system on a dataset. 
-Judgeval allows you to create datasets, save them, and run evaluations on them. 
-An `EvalDataset` is a collection of `Example`s.
-
-```python create_dataset.py
-from judgeval.data import Example, EvalDataset
-
-example1 = Example(input="...", actual_output="...")
-example2 = Example(input="...", actual_output="...")
-
-dataset = EvalDataset(examples=[example1, example2])
-```
-
-Then, you can run evaluations on the dataset:
-
-```python evaluate_dataset.py
-...
-
-client = JudgmentClient()
-scorer = FaithfulnessScorer(threshold=0.5)
-results = client.evaluate_dataset(
-    dataset=dataset,
-    scorers=[scorer],
-    model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-)
-```
-
-
-# Using Judgment Labs Platform
- 
-When scaling your evaluations beyond a few examples, Judgment's platform allows you to manage your **evaluations, 
-datasets, and scorers** in a single place. 
-
-To get started, create a Judgment account by emailing us at `contact@judgmentlabs.ai`. 
-We'll get you set up with a login and you'll be able to:
-- Run evaluations directly on Judgment's platform
-- Track and inspect evaluations with an **intuitive UI**
-- Compare your evaluations **across iterations** of your LLM system.
-- Manage your datasets and scorers
-- Monitor your LLM systems in production, gaining insights into your LLM system's performance in **real-world scenarios.**
-
-<Note> 
-Click [here](/judgment/introduction) to learn more about Judgment Labs' platform. 
-</Note>
-
-## Running Evaluations on Judgment
-
-Work in progress!
-
-## Managing Datasets
-
-Work in progress!
-
-*/}
 
 # Optimizing Your LLM System
 

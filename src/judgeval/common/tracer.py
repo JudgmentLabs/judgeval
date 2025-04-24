@@ -903,6 +903,13 @@ class TraceClient:
             "parent_trace_id": self.parent_trace_id,
             "parent_name": self.parent_name
         }        
+        # --- Log trace data before saving ---
+        try:
+            rprint(f"[TraceClient.save] Saving trace data for trace_id {self.trace_id}:")
+            rprint(json.dumps(trace_data, indent=2))
+        except Exception as log_e:
+            rprint(f"[TraceClient.save] Error logging trace data: {log_e}")
+        # --- End logging ---
         self.trace_manager_client.save_trace(trace_data)
 
         return self.trace_id, trace_data
