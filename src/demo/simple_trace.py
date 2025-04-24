@@ -15,13 +15,13 @@ judgment = Tracer(
 )
 
 @judgment.observe(span_type="tool")
-async def get_weather():
+async def get_weather(city: str):
     """Simulated weather tool call."""
-    weather_data = "It is sunny and 72°F in Paris."
+    weather_data = f"It is sunny and 72°F in {city}."
     return weather_data
 
 @judgment.observe(span_type="tool")
-async def get_attractions():
+async def get_attractions(city: str):
     """Simulated attractions tool call."""
     attractions = [
         "Eiffel Tower",
@@ -32,17 +32,17 @@ async def get_attractions():
     return attractions
 
 @judgment.observe(span_type="Research")
-async def gather_information():
+async def gather_information(city: str):
     """Gather all necessary travel information."""
-    weather = await get_weather()
-    attractions = await get_attractions()
+    weather = await get_weather(city)
+    attractions = await get_attractions(city)
 
-    judgment.async_evaluate(
-        scorers=[AnswerRelevancyScorer(threshold=0.5)],
-        input="What is the weather in Paris?",
-        actual_output=weather,
-        model="gpt-4",
-    )
+    # judgment.async_evaluate(
+    #     scorers=[AnswerRelevancyScorer(threshold=0.5)],
+    #     input="What is the weather in Paris?",
+    #     actual_output=weather,
+    #     model="gpt-4",
+    # )
     
     return {
         "weather": weather,
@@ -67,23 +67,23 @@ async def create_travel_plan(research_data):
         ]
     ).choices[0].message.content
 
-    judgment.async_evaluate(
-        scorers=[FaithfulnessScorer(threshold=0.5)],
-        input=prompt,
-        actual_output=response,
-        retrieval_context=[str(research_data)],
-        model="gpt-4",
-    )
+    # judgment.async_evaluate(
+    #     scorers=[FaithfulnessScorer(threshold=0.5)],
+    #     input=prompt,
+    #     actual_output=response,
+    #     retrieval_context=[str(research_data)],
+    #     model="gpt-4",
+    # )
     
     return response
 
 @judgment.observe(span_type="function")
-async def generate_simple_itinerary():
+async def generate_simple_itinerary(query: str = "I want to plan a trip to Paris."):
     """Main function to generate a travel itinerary."""
-    research_data = await gather_information()
+    research_data = await gather_information(city="Paris")
     itinerary = await create_travel_plan(research_data)
     return itinerary
 
 if __name__ == "__main__":
     import asyncio
-    itinerary = asyncio.run(generate_simple_itinerary())
+    itinerary = asyncio.run(generate_simple_itinerary("I want to plan a trip to Paris."))
