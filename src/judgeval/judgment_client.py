@@ -93,16 +93,47 @@ class JudgmentClient(metaclass=SingletonMeta):
         self,
         sequences: List[Sequence],
         model: Union[str, List[str], JudgevalJudge],
+        scorers: List[Union[ScorerWrapper, JudgevalScorer]],
         aggregator: Optional[str] = None,
         project_name: str = "default_project",
         eval_run_name: str = "default_eval_sequence",
         use_judgment: bool = True,
         log_results: bool = True,
+        append: bool = False,
         override: bool = False,
         ignore_errors: bool = True,
         rules: Optional[List[Rule]] = None
     ) -> List[ScoringResult]:
         try:
+            loaded_scorers = []
+            for scorer in scorers:
+                try:
+                    if isinstance(scorer, ScorerWrapper):
+                        loaded_scorers.append(scorer.load_implementation())
+                    else:
+                        loaded_scorers.append(scorer)
+                except Exception as e:
+                    raise ValueError(f"Failed to load implementation for scorer {scorer}: {str(e)}")
+
+            def get_all_sequences(root: Sequence) -> List[Sequence]:
+                all_sequences = [root]
+
+                for item in root.items:
+                    if isinstance(item, Sequence):
+                        all_sequences.extend(get_all_sequences(item))
+
+                return all_sequences
+
+            def flatten_sequence_list(sequences: List[Sequence]) -> List[Sequence]:
+                flattened = []
+                for seq in sequences:
+                    flattened.extend(get_all_sequences(seq))
+                return flattened
+            
+            flattened_sequences = flatten_sequence_list(sequences)
+            for sequence in flattened_sequences:
+                sequence.scorers = loaded_scorers
+
             if rules:
                 loaded_rules = []
                 for rule in rules:
@@ -134,10 +165,10 @@ class JudgmentClient(metaclass=SingletonMeta):
                 model=model,
                 aggregator=aggregator,
                 log_results=log_results,
+                append=append,
                 judgment_api_key=self.judgment_api_key,
                 organization_id=self.organization_id
             )
-
             return run_sequence_eval(sequence_run, override, ignore_errors, use_judgment)
         except ValueError as e:
             raise ValueError(f"Please check your SequenceRun object, one or more fields are invalid: \n{str(e)}")
@@ -240,98 +271,6 @@ class JudgmentClient(metaclass=SingletonMeta):
                 organization_id=self.organization_id
             )
             return run_eval(eval, override, ignore_errors=ignore_errors, async_execution=async_execution)
-        except ValueError as e:
-            raise ValueError(f"Please check your EvaluationRun object, one or more fields are invalid: \n{str(e)}")
-        except Exception as e:
-            raise Exception(f"An unexpected error occurred during evaluation: {str(e)}")
-        
-    def evaluate_dataset(
-        self, 
-        dataset: EvalDataset,
-        scorers: List[Union[ScorerWrapper, JudgevalScorer]],
-        model: Union[str, List[str], JudgevalJudge],
-        aggregator: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        project_name: str = "",
-        eval_run_name: str = "",
-        log_results: bool = True,
-        use_judgment: bool = True,
-        rules: Optional[List[Rule]] = None
-    ) -> List[ScoringResult]:
-        """
-        Executes an evaluation of a `EvalDataset` using one or more `Scorer`s
-        
-        Args:
-            dataset (EvalDataset): The dataset containing examples to evaluate
-            scorers (List[Union[ScorerWrapper, JudgevalScorer]]): A list of scorers to use for evaluation
-            model (Union[str, List[str], JudgevalJudge]): The model used as a judge when using LLM as a Judge
-            aggregator (Optional[str]): The aggregator to use for evaluation if using Mixture of Judges
-            metadata (Optional[Dict[str, Any]]): Additional metadata to include for this evaluation run
-            project_name (str): The name of the project the evaluation results belong to
-            eval_run_name (str): A name for this evaluation run
-            log_results (bool): Whether to log the results to the Judgment API
-            use_judgment (bool): Whether to use Judgment API for evaluation
-            rules (Optional[List[Rule]]): Rules to evaluate against scoring results
-            
-        Returns:
-            List[ScoringResult]: The results of the evaluation
-        """
-        try:
-            # Load appropriate implementations for all scorers
-            loaded_scorers: List[Union[JudgevalScorer, APIJudgmentScorer]] = []
-            for scorer in scorers:
-                try:
-                    if isinstance(scorer, ScorerWrapper):
-                        loaded_scorers.append(scorer.load_implementation(use_judgment=use_judgment))
-                    else:
-                        loaded_scorers.append(scorer)
-                except Exception as e:
-                    raise ValueError(f"Failed to load implementation for scorer {scorer}: {str(e)}")
-
-            # Prevent using JudgevalScorer with rules - only APIJudgmentScorer allowed with rules
-            if rules and any(isinstance(scorer, JudgevalScorer) for scorer in loaded_scorers):
-                raise ValueError("Cannot use Judgeval scorers (only API scorers) when using rules. Please either remove rules or use only APIJudgmentScorer types.")
-
-            # Convert ScorerWrapper in rules to their implementations
-            loaded_rules = None
-            if rules:
-                loaded_rules = []
-                for rule in rules:
-                    try:
-                        processed_conditions = []
-                        for condition in rule.conditions:
-                            # Convert metric if it's a ScorerWrapper
-                            if isinstance(condition.metric, ScorerWrapper):
-                                try:
-                                    condition_copy = condition.model_copy()
-                                    condition_copy.metric = condition.metric.load_implementation(use_judgment=use_judgment)
-                                    processed_conditions.append(condition_copy)
-                                except Exception as e:
-                                    raise ValueError(f"Failed to convert ScorerWrapper to implementation in rule '{rule.name}', condition metric '{condition.metric}': {str(e)}")
-                            else:
-                                processed_conditions.append(condition)
-                        
-                        # Create new rule with processed conditions
-                        new_rule = rule.model_copy()
-                        new_rule.conditions = processed_conditions
-                        loaded_rules.append(new_rule)
-                    except Exception as e:
-                        raise ValueError(f"Failed to process rule '{rule.name}': {str(e)}")
-
-            evaluation_run = EvaluationRun(
-                log_results=log_results,
-                project_name=project_name,
-                eval_name=eval_run_name,
-                examples=dataset.examples,
-                scorers=loaded_scorers,
-                model=model,
-                aggregator=aggregator,
-                metadata=metadata,
-                judgment_api_key=self.judgment_api_key,
-                rules=loaded_rules,
-                organization_id=self.organization_id
-            )
-            return run_eval(evaluation_run)
         except ValueError as e:
             raise ValueError(f"Please check your EvaluationRun object, one or more fields are invalid: \n{str(e)}")
         except Exception as e:

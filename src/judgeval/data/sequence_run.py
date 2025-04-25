@@ -21,6 +21,7 @@ class SequenceRun(BaseModel):
         metadata (Optional[Dict[str, Any]]): Additional metadata to include for this evaluation run, e.g. comments, dataset name, purpose, etc.
         judgment_api_key (Optional[str]): The API key for running evaluations on the Judgment API
         rules (Optional[List[Rule]]): Rules to evaluate against scoring results
+        append (Optional[bool]): Whether to append to existing evaluation results
     """
 
     # The user will specify whether they want log_results when they call run_eval
@@ -33,6 +34,7 @@ class SequenceRun(BaseModel):
     aggregator: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
     trace_span_id: Optional[str] = None
+    append: Optional[bool] = False
     # API Key will be "" until user calls client.run_eval(), then API Key will be set
     judgment_api_key: Optional[str] = ""
     override: Optional[bool] = False

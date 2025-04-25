@@ -181,8 +181,8 @@ class TestEvalOperations:
         )
 
         dataset = EvalDataset(examples=[example1, example2])
-        res = client.evaluate_dataset(
-            dataset=dataset,
+        res = client.run_evaluation(
+            examples = dataset.examples,
             scorers=[FaithfulnessScorer(threshold=0.5)],
             model="Qwen/Qwen2.5-72B-Instruct-Turbo",
             metadata={"batch": "test"},

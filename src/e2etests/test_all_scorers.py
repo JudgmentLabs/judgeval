@@ -729,12 +729,12 @@ def test_derailment_scorer():
     airline_sequence = Sequence(
         name="Flight Details",
         items=[airlines_example, weather_example],
-        scorers=[DerailmentScorer(threshold=0.5)]
     )
     results = client.run_sequence_evaluation(
         eval_run_name=EVAL_RUN_NAME,
         project_name=PROJECT_NAME,
         sequences=[airline_sequence],
+        scorers=[DerailmentScorer(threshold=0.5)],
         model="gpt-4o",
         log_results=True,
         override=True,
