@@ -250,8 +250,8 @@ from judgeval.scorers import FaithfulnessScorer # Added import
 # Assume client = JudgmentClient() exists
 # Assume dataset = client.pull_dataset(alias="my_dataset", project_name="my_project") exists
 
-res = client.evaluate_dataset(
-    dataset=dataset, # Pass the EvalDataset object
+res = client.run_evaluation(
+    examples=dataset.examples,
     scorers=[FaithfulnessScorer(threshold=0.9)],
     model="gpt-4o",
 )

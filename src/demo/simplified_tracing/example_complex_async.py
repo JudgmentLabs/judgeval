@@ -25,7 +25,9 @@ tracer = Tracer(
 )
 
 # In this example, we'll use a single trace with spans for all function calls
+
 @tracer.observe(name="custom_root", span_type="function")
+
 async def root_function():
     print("Root function starting")
     
@@ -49,6 +51,7 @@ async def root_function():
 
 # Level 2 - Direct child of root
 # Using observe with same tracer - this will create spans in the parent trace
+
 async def level2_function(param):
     # Capture this function in a span within the current trace
     print(f"Level 2 function with {param}")
@@ -94,6 +97,7 @@ async def level3_function(param):
     return f"level3:{result}"
 
 # Level 3 - First parallel function called by level2_parallel1
+
 async def level3_parallel1(param):
     # Capture this function in a span within the current trace
     print(f"Level 3 parallel 1 with {param}")

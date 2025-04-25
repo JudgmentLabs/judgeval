@@ -1497,6 +1497,7 @@ _TRACE_BLOCKLIST = {
     'append', 'extend', 'insert', 'remove', 'pop', 'clear', 'index', 'count', 'sort',
 }
 
+
 # Add a new function for deep tracing at the module level
 def _create_deep_tracing_wrapper(func, tracer, span_type="span"):
     """
@@ -1523,6 +1524,7 @@ def _create_deep_tracing_wrapper(func, tracer, span_type="span"):
     if func.__module__ and any(func.__module__.startswith(m) for m in ['logging', 'sys', 'os', 'json', 'time', 'datetime']):
         return func
     
+
     # Get function name for the span - check for custom name set by @observe
     func_name = getattr(func, '_judgment_span_name', func.__name__)
     
