@@ -946,9 +946,12 @@ class Tracer:
             
             if not organization_id:
                 raise ValueError("Tracer must be configured with an Organization ID")
-            
             if use_s3 and not s3_bucket_name:
                 raise ValueError("S3 bucket name must be provided when use_s3 is True")
+            if use_s3 and not (s3_aws_access_key_id or os.getenv("AWS_ACCESS_KEY_ID")):
+                raise ValueError("AWS Access Key ID must be provided when use_s3 is True")
+            if use_s3 and not (s3_aws_secret_access_key or os.getenv("AWS_SECRET_ACCESS_KEY")):
+                raise ValueError("AWS Secret Access Key must be provided when use_s3 is True")
             
             self.api_key: str = api_key
             self.project_name: str = project_name
