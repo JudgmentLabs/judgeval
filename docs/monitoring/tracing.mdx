@@ -349,14 +349,13 @@ async function main() {
         console.error("Workflow failed:", error);
         await trace.save(); // Still save trace on error
     } finally {
-        // Ensure save is called if not already done (optional, depends on desired behavior)
-        // await trace.save(); // Could be redundant if already saved in try/catch
+        judgment.clearCurrentTrace(); // Clean up
     }
 
     return resultMessage;
 }
 
-main();
+main().then(console.log).catch(console.error);
 ```
 </CodeGroup>
 
@@ -366,9 +365,126 @@ main();
     In most simple cases in Python, the `@observe` decorator is sufficient.
 </Warning>
 
+## Advanced: Deep Tracing and Agent-to-Agent Calls ##
 
+Judgment's tracing system includes powerful deep tracing capabilities that automatically capture function calls within your application without requiring explicit `@observe` decorators on every function.
 
+### Enabling Deep Tracing
 
+Deep tracing can be enabled globally or for specific functions:
 
+<CodeGroup>
+```Python Python
+# Enable deep tracing globally
+judgment = Tracer(
+    project_name="my_project",
+    deep_tracing=True  # Enable for all observed functions
+)
 
+# Or enable it for specific functions
+@judgment.observe(deep_tracing=True)
+def my_function():
+    # All function calls inside will be traced automatically
+    result = some_other_function()  # This will be traced without @observe
+    return result
+```
+```Typescript Typescript
+// Enable deep tracing globally
+const judgment = Tracer.getInstance({ 
+    projectName: "my_project",
+    deepTracing: true  // Enable for all observed functions
+});
 
+// Or enable it for specific functions
+const myFunction = judgment.observe({ 
+    spanType: "function",
+    deepTracing: true 
+})(async () => {
+    // All function calls inside will be traced automatically
+    const result = await someOtherFunction();  # This will be traced without observe
+    return result;
+});
+```
+</CodeGroup>
+
+### Smart Function Filtering
+
+Deep tracing intelligently filters out utility functions to keep your traces focused on meaningful application logic:
+
+- **Excluded Functions**: Print statements, logging calls, and basic utility functions are automatically excluded
+- **Module-Based Filtering**: Functions from standard modules like `logging`, `sys`, `os`, and others are not traced
+- **Cleaner Visualization**: Your trace visualizations remain concise and focused on application-specific logic
+
+### Tracing Agent-to-Agent (A2A) Calls
+
+Judgment's tracing system can capture interactions between multiple agents in your system:
+
+<CodeGroup>
+```Python Python
+from judgeval.tracer import Tracer
+
+judgment = Tracer(project_name="multi_agent_system", deep_tracing=True)
+
+@judgment.observe(name="agent_1", span_type="agent")
+def agent_1(query):
+    # This agent processes the query
+    processed = process_query(query)
+    # Then calls agent_2 for additional processing
+    return agent_2(processed)
+
+@judgment.observe(name="agent_2", span_type="agent")
+def agent_2(data):
+    # Second agent processes data from agent_1
+    return generate_response(data)
+
+# The trace will show the full flow from agent_1 to agent_2
+# including all internal function calls thanks to deep tracing
+with judgment.trace(name="multi_agent_workflow") as trace:
+    result = agent_1("What's the weather in San Francisco?")
+    trace.save()
+```
+```Typescript Typescript
+import { Tracer } from 'judgeval';
+
+const judgment = Tracer.getInstance({ 
+    projectName: "multi_agent_system",
+    deepTracing: true
+});
+
+const agent1 = judgment.observe({ 
+    name: "agent_1", 
+    spanType: "agent" 
+})(async (query: string) => {
+    # This agent processes the query
+    const processed = processQuery(query);
+    # Then calls agent_2 for additional processing
+    return await agent2(processed);
+});
+
+const agent2 = judgment.observe({ 
+    name: "agent_2", 
+    spanType: "agent" 
+})(async (data: any) => {
+    # Second agent processes data from agent_1
+    return generateResponse(data);
+});
+
+# The trace will show the full flow from agent_1 to agent_2
+async function runMultiAgentWorkflow() {
+    const trace = judgment.startTrace("multi_agent_workflow");
+    try {
+        const result = await agent1("What's the weather in San Francisco?");
+        console.log(result);
+        await trace.save();
+    } catch (error) {
+        console.error(error);
+        await trace.save();
+    }
+}
+```
+</CodeGroup>
+
+This approach provides end-to-end visibility into complex multi-agent systems, helping you understand how information flows between agents and identify bottlenecks or issues in your agent interactions.
+
+## Integrations ##
+{{ ... }}

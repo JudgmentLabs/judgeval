@@ -1478,6 +1478,25 @@ def _format_output_data(client: ApiClient, response: Any) -> dict:
         }
     }
 
+# Define a blocklist of functions that should not be traced
+# These are typically utility functions, print statements, logging, etc.
+_TRACE_BLOCKLIST = {
+    # Built-in functions
+    'print', 'str', 'int', 'float', 'bool', 'list', 'dict', 'set', 'tuple',
+    'len', 'range', 'enumerate', 'zip', 'map', 'filter', 'sorted', 'reversed',
+    'min', 'max', 'sum', 'any', 'all', 'abs', 'round', 'format',
+    # Logging functions
+    'debug', 'info', 'warning', 'error', 'critical', 'exception', 'log',
+    # Common utility functions
+    'sleep', 'time', 'datetime', 'json', 'dumps', 'loads',
+    # String operations
+    'join', 'split', 'strip', 'lstrip', 'rstrip', 'replace', 'lower', 'upper',
+    # Dict operations
+    'get', 'items', 'keys', 'values', 'update',
+    # List operations
+    'append', 'extend', 'insert', 'remove', 'pop', 'clear', 'index', 'count', 'sort',
+}
+
 # Add a new function for deep tracing at the module level
 def _create_deep_tracing_wrapper(func, tracer, span_type="span"):
     """
@@ -1494,6 +1513,14 @@ def _create_deep_tracing_wrapper(func, tracer, span_type="span"):
     """
     # Skip wrapping if the function is not callable or is a built-in
     if not callable(func) or isinstance(func, type) or func.__module__ == 'builtins':
+        return func
+    
+    # Skip functions in the blocklist
+    if func.__name__ in _TRACE_BLOCKLIST:
+        return func
+    
+    # Skip functions from certain modules (logging, sys, etc.)
+    if func.__module__ and any(func.__module__.startswith(m) for m in ['logging', 'sys', 'os', 'json', 'time', 'datetime']):
         return func
     
     # Get function name for the span - check for custom name set by @observe
