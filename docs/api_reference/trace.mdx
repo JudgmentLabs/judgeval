@@ -122,36 +122,29 @@ def process_result(result: str):
 # Calling main_workflow("some query") will trace the entire call stack
 ```
 ```Typescript Typescript
-// Initialize tracer (deep tracing is enabled by default)
-const judgment = Tracer.getInstance({ 
-    projectName: "my_project"
-});
+// Assume tracer = Tracer.getInstance(...) exists
 
-// Only need to observe the top-level function
-const mainWorkflow = judgment.observe({ spanType: "function" })(async (query: string) => {
-    // All function calls inside will be automatically traced
-    const result = myTool(query);
-    return processResult(result);
-});
+// Assume an equivalent decorator or wrapper for @tool exists if needed
+// e.g., const langchainTool = createLangchainToolWrapper();
 
-// No observe needed - automatically traced when called from mainWorkflow
-function myTool(query: string): string {
+async function myTool(query: string): Promise<string> {
+    // ... tool logic ...
     console.log(`Tool executed with query: ${query}`);
     return "Tool result";
 }
 
-// No observe needed - automatically traced when called from mainWorkflow
-function processResult(result: string): string {
-    return `Processed: ${result}`;
-}
+// Apply the observe wrapper
+const observedMyTool = tracer.observe({ spanType: "tool" })(myTool);
 
-// Calling mainWorkflow("some query") will trace the entire call stack
+// Apply other wrappers if necessary (order might matter depending on wrappers)
+// const finalWrappedTool = langchainTool(observedMyTool); 
+
+// Calling observedMyTool("some query") will now be traced.
+// (or finalWrappedTool if multiple wrappers are used)
 ```
 </CodeGroup>
 
-### Disabling Deep Tracing
-
-Deep tracing is enabled by default. If you prefer more granular control or want to trace only explicitly decorated functions, you can disable deep tracing:
+You can also disable deep tracing if you prefer manual control:
 
 <CodeGroup>
 ```Python Python
@@ -161,51 +154,6 @@ judgment = Tracer(
     deep_tracing=False  # Disable automatic deep tracing
 )
 
-# Now you'll need to explicitly observe each function you want to trace
-@judgment.observe(span_type="function")
-def main_workflow(query: str):
-    result = my_tool(query)  # Won't be traced unless decorated
-    return process_result(result)  # Won't be traced unless decorated
-
-@judgment.observe(span_type="tool")
-def my_tool(query: str):
-    print(f"Tool executed with query: {query}")
-    return "Tool result"
-
-@judgment.observe(span_type="function")
-def process_result(result: str):
-    return f"Processed: {result}"
-```
-```Typescript Typescript
-// Disable deep tracing
-const judgment = Tracer.getInstance({ 
-    projectName: "my_project",
-    deepTracing: false  // Disable automatic deep tracing
-});
-
-// Now you'll need to explicitly observe each function you want to trace
-const mainWorkflow = judgment.observe({ spanType: "function" })(async (query: string) => {
-    const result = await myTool(query);  # Won't be traced unless wrapped
-    return await processResult(result);  # Won't be traced unless wrapped
-});
-
-const myTool = judgment.observe({ spanType: "tool" })(async (query: string) => {
-    console.log(`Tool executed with query: ${query}`);
-    return "Tool result";
-});
-
-const processResult = judgment.observe({ spanType: "function" })(async (result: string) => {
-    return `Processed: ${result}`;
-});
-```
-</CodeGroup>
-
-### Function-Specific Deep Tracing Control
-
-You can also override the global deep tracing setting for specific functions:
-
-<CodeGroup>
-```Python Python
 # Even with deep tracing globally enabled (default)
 # You can disable it for specific functions
 @judgment.observe(span_type="function", deep_tracing=False)
@@ -214,15 +162,69 @@ def selective_function():
     return "Done"
 ```
 ```Typescript Typescript
-// Even with deep tracing globally enabled (default)
-// You can disable it for specific functions
-const selectiveFunction = judgment.observe({ 
-    spanType: "function",
-    deepTracing: false 
-})(async () => {
-    helperFunction();  # Won't be traced automatically
-    return "Done";
-});
+// Assume tracer = Tracer.getInstance(...) exists
+
+// Assume an equivalent decorator or wrapper for @tool exists if needed
+// e.g., const langchainTool = createLangchainToolWrapper();
+
+async function myTool(query: string): Promise<string> {
+    // ... tool logic ...
+    console.log(`Tool executed with query: ${query}`);
+    return "Tool result";
+}
+
+// Apply the observe wrapper
+const observedMyTool = tracer.observe({ spanType: "tool" })(myTool);
+
+// Apply other wrappers if necessary (order might matter depending on wrappers)
+// const finalWrappedTool = langchainTool(observedMyTool); 
+
+// Calling observedMyTool("some query") will now be traced.
+// (or finalWrappedTool if multiple wrappers are used)
+```
+</CodeGroup>
+
+The `span_type` / `spanType` argument can be used to categorize the type of span for observability purposes and will be displayed 
+on the Judgment platform:
+
+![span_type](/images/basic_trace_example.png)
+
+Here's an example using multiple decorators:
+
+<CodeGroup>
+```Python Python
+# Assume judgment = Tracer(...) exists
+from langchain.tools import tool # Example other decorator
+
+@tool
+@judgment.observe(span_type="tool")
+def my_tool(query: str):
+    # ... tool logic ...
+    print(f"Tool executed with query: {query}")
+    return "Tool result"
+
+# Calling my_tool("some query") will now be traced.
+```
+```Typescript Typescript
+// Assume tracer = Tracer.getInstance(...) exists
+
+// Assume an equivalent decorator or wrapper for @tool exists if needed
+// e.g., const langchainTool = createLangchainToolWrapper();
+
+async function myTool(query: string): Promise<string> {
+    // ... tool logic ...
+    console.log(`Tool executed with query: ${query}`);
+    return "Tool result";
+}
+
+// Apply the observe wrapper
+const observedMyTool = tracer.observe({ spanType: "tool" })(myTool);
+
+// Apply other wrappers if necessary (order might matter depending on wrappers)
+// const finalWrappedTool = langchainTool(observedMyTool); 
+
+// Calling observedMyTool("some query") will now be traced.
+// (or finalWrappedTool if multiple wrappers are used)
 ```
 </CodeGroup>
 
@@ -238,7 +240,7 @@ from langchain.tools import tool # Example other decorator
 @tool
 @judgment.observe(span_type="tool")
 def my_tool(query: str):
-    # ... tool logic ...
+    """Tool logic"""
     print(f"Tool executed with query: {query}")
     return "Tool result"
 

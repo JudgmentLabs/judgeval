@@ -113,16 +113,20 @@ Traces enable you to track your LLM system's flow end-to-end and measure:
 - Workflow latency
 - Quality metrics, such as hallucination, retrieval quality, and more.
 
+With automatic deep tracing, you only need to observe top-level functions, and all nested function calls will be automatically traced. This significantly reduces the amount of instrumentation needed in your code.
 
 <CodeGroup>
 ```Python Python
-from judgeval.common.tracer import Tracer, wrap
+from judgeval.tracer import Tracer, wrap
 from openai import OpenAI
 
 client = wrap(OpenAI())
 judgment = Tracer(project_name="my_project")
 
-# With automatic deep tracing, you only need to observe the top-level function
+@judgment.observe(span_type="tool")
+def my_tool():
+    return "Hello world!"
+
 @judgment.observe(span_type="function")
 def main():
     # my_tool will be automatically traced without @observe
@@ -131,31 +135,36 @@ def main():
         model="gpt-4o",
         messages=[{"role": "user", "content": f"{task_input}"}]
     )
+    judgment.async_evaluate(
+        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+        input=task_input,
+        actual_output=res.choices[0].message.content,
+        model="gpt-4o"
+    )
     return res.choices[0].message.content
 
 # No @observe needed - automatically traced when called from main
-def my_tool():
-    return "Hello world!"
+def helper_function():
+    return "This function will be traced automatically"
 
-# Calling the observed function implicitly starts and saves the trace
 main()
 ```
 ```Typescript Typescript
-import { Tracer, wrap } from 'judgeval';
+import { Tracer, wrap, AnswerRelevancyScorer } from 'judgeval';
 import OpenAI from 'openai';
 
 // Ensure JUDGMENT_API_KEY and JUDGMENT_ORG_ID are set in your environment
 const client = wrap(new OpenAI());
-const judgment = Tracer.getInstance({ 
-    projectName: "my_project"
-});
+const judgment = Tracer.getInstance({ projectName: "my_project" });
 
-// Define the function that will be automatically traced
-function myTool(): string {
+// Define the function to be traced
+async function myTool(): Promise<string> {
     return "Hello world!";
 }
+// Wrap the function using the observe method
+const observedMyTool = judgment.observe({ spanType: "tool" })(myTool);
 
-// Define and observe only the main function
+// Define the main function
 const main = judgment.observe({ spanType: "function" })(async () => {
     // myTool will be automatically traced without explicit observe
     const taskInput = myTool();
@@ -163,7 +172,26 @@ const main = judgment.observe({ spanType: "function" })(async () => {
         model: "gpt-4o",
         messages: [{ role: "user", content: taskInput }],
     });
-    return res.choices[0]?.message?.content;
+    const actualOutput = res.choices[0]?.message?.content;
+
+    if (actualOutput) {
+        // Get the current trace instance from the Tracer singleton
+        const currentTrace = judgment.getCurrentTrace(); 
+        if (currentTrace) {
+             // Run async evaluation within the current trace context
+            await currentTrace.asyncEvaluate(
+                [new AnswerRelevancyScorer(0.5)],
+                {
+                    input: taskInput,
+                    actualOutput: actualOutput,
+                    model: "gpt-4o"
+                }
+            );
+        } else {
+            console.warn("Could not find active trace to run async evaluation.");
+        }
+    }
+    return actualOutput;
 });
 
 // Calling the observed function implicitly starts and saves the trace
@@ -172,7 +200,7 @@ async function runImplicitTrace() {
         const result = await main();
         console.log("Implicit trace completed successfully:", result);
     } catch (error) {
-        console.error("Implicit trace failed:", error);
+        console.error(`Implicit trace failed: ${error}`);
         // The trace should still be saved automatically on error by observe
     }
 }
@@ -183,18 +211,20 @@ runImplicitTrace();
 
 Congratulations! You've just created your first trace. It should look like this:
 
-![Alt text](https://storage.googleapis.com/judgment-public-assets/trace-example.png)
+<div style={{display: 'flex', justifyContent: 'center'}}>
+  ![Alt text](/images/trace_ss.png "Image of a RAG pipeline trace")
+</div>
 
-There are many benefits of monitoring your LLM systems with judgeval tracing, including:
-
+There are many benefits of monitoring your LLM systems with `judgeval` tracing, including:
 - Debugging LLM workflows in seconds with full observability
 - Using production workflow data to create experimental datasets for future improvement/optimization
-- Tracking and creating Slack/Email alerts on any metric (e.g. latency, cost, hallucination, etc.)
+- Tracking and creating Slack/Email alerts on **any metric** (e.g. latency, cost, hallucination, etc.)
 
-To learn more about judgeval's tracing module, click [here](/monitoring/tracing).
+<Tip>
+To learn more about `judgeval`'s tracing module, click [here](/monitoring/tracing).
+</Tip>
 
-​
-## Create Your First Online Evaluation
+# Run Online Evaluations
 
 In addition to tracing, `judgeval` allows you to run online evaluations on your LLM systems. This enables you to:
 - Catch real-time quality regressions to take action before customers are impacted
@@ -286,7 +316,7 @@ async function runImplicitTrace() {
         const result = await main();
         console.log("Implicit trace completed successfully:", result);
     } catch (error) {
-        console.error("Implicit trace failed:", error);
+        console.error(`Implicit trace failed: ${error}`);
         // The trace should still be saved automatically on error by observe
     }
 }
