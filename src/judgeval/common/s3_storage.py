@@ -4,6 +4,7 @@ import boto3
 from typing import Optional
 from datetime import datetime, UTC
 from botocore.exceptions import ClientError
+from judgeval.common.logger import warning, info
 
 class S3Storage:
     """Utility class for storing and retrieving trace data from S3."""
@@ -39,7 +40,7 @@ class S3Storage:
             error_code = e.response['Error']['Code']
             if error_code == '404':
                 # Bucket doesn't exist, create it
-                print(f"Bucket {self.bucket_name} doesn't exist, creating it ...")
+                info(f"Bucket {self.bucket_name} doesn't exist, creating it ...")
                 try:
                     self.s3_client.create_bucket(
                         Bucket=self.bucket_name,
@@ -47,10 +48,11 @@ class S3Storage:
                             'LocationConstraint': self.s3_client.meta.region_name
                         }
                     )
-                    print(f"Created S3 bucket: {self.bucket_name}")
+                    info(f"Created S3 bucket: {self.bucket_name}")
                 except ClientError as create_error:
                     if create_error.response['Error']['Code'] == 'BucketAlreadyOwnedByYou':
                         # Bucket was just created by another process
+                        warning(f"Bucket {self.bucket_name} was just created by another process")
                         pass
                     else:
                         raise create_error
@@ -80,7 +82,7 @@ class S3Storage:
         trace_json = json.dumps(trace_data)
         
         # Upload to S3
-        print(f"Uploading trace to S3 at key {s3_key}, in bucket {self.bucket_name} ...")
+        info(f"Uploading trace to S3 at key {s3_key}, in bucket {self.bucket_name} ...")
         self.s3_client.put_object(
             Bucket=self.bucket_name,
             Key=s3_key,
@@ -89,20 +91,3 @@ class S3Storage:
         )
         
         return s3_key
-        
-    def get_trace(self, s3_key: str) -> dict:
-        """Retrieve trace data from S3.
-        
-        Args:
-            s3_key: S3 key where the trace is stored
-            
-        Returns:
-            dict: The trace data
-        """
-        response = self.s3_client.get_object(
-            Bucket=self.bucket_name,
-            Key=s3_key
-        )
-        
-        trace_json = response['Body'].read().decode('utf-8')
-        return json.loads(trace_json) 
