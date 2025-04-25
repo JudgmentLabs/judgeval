@@ -120,20 +120,22 @@ from judgeval.common.tracer import Tracer, wrap
 from openai import OpenAI
 
 client = wrap(OpenAI())
-judgment = Tracer(project_name="my_project")
+judgment = Tracer(project_name="my_project", deep_tracing=True)
 
-@judgment.observe(span_type="tool")
-def my_tool():
-    return "Hello world!"
-
+# With deep tracing, you only need to observe the top-level function
 @judgment.observe(span_type="function")
 def main():
+    # my_tool will be automatically traced without @observe
     task_input = my_tool()
     res = client.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "user", "content": f"{task_input}"}]
     )
     return res.choices[0].message.content
+
+# No @observe needed - automatically traced when called from main
+def my_tool():
+    return "Hello world!"
 
 # Calling the observed function implicitly starts and saves the trace
 main()
@@ -144,32 +146,31 @@ import OpenAI from 'openai';
 
 // Ensure JUDGMENT_API_KEY and JUDGMENT_ORG_ID are set in your environment
 const client = wrap(new OpenAI());
-const judgment = Tracer.getInstance({ projectName: "my_project" });
+const judgment = Tracer.getInstance({ 
+    projectName: "my_project",
+    deepTracing: true  // Enable deep tracing
+});
 
-// Define the function to be traced
-async function myTool(): Promise<string> {
+// Define the function that will be automatically traced
+function myTool(): string {
     return "Hello world!";
 }
-// Wrap the function using the observe method
-const observedMyTool = judgment.observe({ spanType: "tool" })(myTool);
 
-// Define the main function
-async function main(): Promise<string | null | undefined> {
-    const taskInput = await observedMyTool();
+// Define and observe only the main function
+const main = judgment.observe({ spanType: "function" })(async () => {
+    // myTool will be automatically traced without explicit observe
+    const taskInput = myTool();
     const res = await client.chat.completions.create({
         model: "gpt-4o",
         messages: [{ role: "user", content: taskInput }],
     });
     return res.choices[0]?.message?.content;
-}
-
-// Wrap the main function
-const observedMain = judgment.observe({ spanType: "function" })(main);
+});
 
 // Calling the observed function implicitly starts and saves the trace
 async function runImplicitTrace() {
     try {
-        const result = await observedMain();
+        const result = await main();
         console.log("Implicit trace completed successfully:", result);
     } catch (error) {
         console.error("Implicit trace failed:", error);
@@ -211,30 +212,30 @@ from judgeval.scorers import AnswerRelevancyScorer
 from openai import OpenAI
 
 client = wrap(OpenAI())
-judgment = Tracer(project_name="my_project")
+judgment = Tracer(project_name="my_project", deep_tracing=True)
 
-@judgment.observe(span_type="tool")
-def my_tool():
-    return "Hello world!"
-
+# With deep tracing, you only need to observe the top-level function
 @judgment.observe(span_type="function")
 def main():
+    # my_tool will be automatically traced without @observe
     task_input = my_tool()
     res = client.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "user", "content": f"{task_input}"}]
-    ).choices[0].message.content
-
-    # In Python, this likely operates on the implicit trace context
+    )
     judgment.async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
         input=task_input,
-        actual_output=res,
+        actual_output=res.choices[0].message.content,
         model="gpt-4o"
     )
+    return res.choices[0].message.content
 
-    return res
+# No @observe needed - automatically traced when called from main
+def my_tool():
+    return "Hello world!"
 
+# Calling the observed function implicitly starts and saves the trace
 main()
 ```
 ```Typescript Typescript
@@ -243,18 +244,20 @@ import OpenAI from 'openai';
 
 // Ensure JUDGMENT_API_KEY and JUDGMENT_ORG_ID are set in your environment
 const client = wrap(new OpenAI());
-const judgment = Tracer.getInstance({ projectName: "my_project" });
+const judgment = Tracer.getInstance({ 
+    projectName: "my_project",
+    deepTracing: true  // Enable deep tracing
+});
 
-// Define the function to be traced
-async function myTool(): Promise<string> {
+// Define the function that will be automatically traced
+function myTool(): string {
     return "Hello world!";
 }
-// Wrap the function using the observe method
-const observedMyTool = judgment.observe({ spanType: "tool" })(myTool);
 
-// Define the main function with async evaluation
-async function mainWithEval(): Promise<string | null | undefined> {
-    const taskInput = await observedMyTool();
+// Define and observe only the main function
+const main = judgment.observe({ spanType: "function" })(async () => {
+    // myTool will be automatically traced without explicit observe
+    const taskInput = myTool();
     const res = await client.chat.completions.create({
         model: "gpt-4o",
         messages: [{ role: "user", content: taskInput }],
@@ -279,24 +282,20 @@ async function mainWithEval(): Promise<string | null | undefined> {
         }
     }
     return actualOutput;
-}
+});
 
-// Still need explicit trace management here because asyncEvaluate is on the TraceClient
-async function runMainWithEval() {
-    const trace = judgment.startTrace("main_trace_with_eval"); // Start a trace
+// Calling the observed function implicitly starts and saves the trace
+async function runImplicitTrace() {
     try {
-        // Wrap the main function call within the trace's context
-        const observedMain = judgment.observe({ spanType: "function" })(mainWithEval);
-        const result = await observedMain();
-        console.log("Trace with eval completed successfully:", result);
-        await trace.save(); // Save the trace
+        const result = await main();
+        console.log("Implicit trace completed successfully:", result);
     } catch (error) {
-        console.error("Trace with eval failed:", error);
-        await trace.save(); // Save the trace even on error
+        console.error("Implicit trace failed:", error);
+        // The trace should still be saved automatically on error by observe
     }
 }
 
-runMainWithEval();
+runImplicitTrace();
 ```
 </CodeGroup>
 
