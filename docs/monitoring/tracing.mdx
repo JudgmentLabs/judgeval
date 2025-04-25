@@ -26,7 +26,7 @@ Setting up tracing with `judgeval` takes two simple steps:
 ```Python Python
 from judgeval.tracer import Tracer
 
-# loads from JUDGMENT_API_KEY and JUDGMENT_ORG_ID env vars
+// loads from JUDGMENT_API_KEY and JUDGMENT_ORG_ID env vars
 judgment = Tracer(project_name="my_project")
 ```
 ```Typescript Typescript
@@ -79,34 +79,33 @@ With deep tracing, you only need one `judgment.observe` at the top level, and al
 from judgeval.tracer import Tracer, wrap
 from openai import OpenAI
 
-judgment = Tracer(project_name="my_project", deep_tracing=True)  # Enable deep tracing
+judgment = Tracer(project_name="my_project")  // Deep tracing is enabled by default
 client = wrap(OpenAI())
 
-# With deep tracing, you only need to observe the top-level function
+// With automatic deep tracing, you only need to observe the top-level function
 @judgment.observe(span_type="function")
 def my_workflow():
-    # All function calls inside will be automatically traced
+    // All function calls inside will be automatically traced
     response = client.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "user", "content": "Hello!"}]
     )
     return response.choices[0].message.content
 
-result = my_workflow()  # This will trace the entire workflow
+result = my_workflow()  // This will trace the entire workflow
 ```
 ```Typescript Typescript
 import { Tracer, wrap } from 'judgeval';
 import OpenAI from 'openai';
 
 const judgment = Tracer.getInstance({ 
-    projectName: "my_project",
-    deepTracing: true  # Enable deep tracing
+    projectName: "my_project"  // Deep tracing is enabled by default
 });
 const client = wrap(new OpenAI());
 
-// With deep tracing, you only need to observe the top-level function
+// With automatic deep tracing, you only need to observe the top-level function
 const myWorkflow = judgment.observe({ spanType: "function" })(async () => {
-    # All function calls inside will be automatically traced
+    // All function calls inside will be automatically traced
     const response = await client.chat.completions.create({
         model: "gpt-4o",
         messages: [{ role: "user", content: "Hello!" }],
@@ -114,9 +113,22 @@ const myWorkflow = judgment.observe({ spanType: "function" })(async () => {
     return response.choices[0]?.message?.content;
 });
 
-myWorkflow().then(console.log);  # This will trace the entire workflow
+myWorkflow().then(console.log);  // This will trace the entire workflow
 ```
 </CodeGroup>
+
+<Note>
+Deep tracing is enabled by default. If you prefer to trace only explicitly decorated functions, you can disable it:
+```python
+judgment = Tracer(project_name="my_project", deep_tracing=False)
+```
+```typescript
+const judgment = Tracer.getInstance({ 
+    projectName: "my_project",
+    deepTracing: false
+});
+```
+</Note>
 
 #### Putting it all Together
 Here's a complete example of using judgeval's tracing mechanisms:
@@ -126,10 +138,10 @@ from judgeval.tracer import Tracer, wrap
 from openai import OpenAI
 
 openai_client = wrap(OpenAI())
-# loads from JUDGMENT_API_KEY and JUDGMENT_ORG_ID env vars
+// loads from JUDGMENT_API_KEY and JUDGMENT_ORG_ID env vars
 judgment = Tracer(project_name="my_project")
 
-@judgment.observe(span_type="tool")
+@judgment.observe(name="agent_1", span_type="agent")
 def my_tool():
     return "Hello world!"
 
@@ -142,8 +154,8 @@ def my_llm_call():
     )
     return res.choices[0].message.content
 
-# This implicitly starts a trace if one isn't active
-# and saves it upon completion or error.
+// This implicitly starts a trace if one isn't active
+// and saves it upon completion or error.
 main_result = my_llm_call()
 ```
 ```Typescript Typescript
@@ -178,8 +190,6 @@ async function runImplicitTrace() {
         // Trace saved automatically by observe on completion/error
     }
 }
-
-runImplicitTrace();
 ```
 </CodeGroup>
 
@@ -203,16 +213,16 @@ To execute an asynchronous evaluation, you can use the `trace.asyncEvaluate()` m
 from judgeval.tracer import Tracer
 from judgeval.scorers import AnswerRelevancyScorer
 
-judgment = Tracer(project_name="my_project", deep_tracing=True)
+judgment = Tracer(project_name="my_project")  // Deep tracing is enabled by default
 
-# With deep tracing, only the main function needs to be observed
-@judgment.observe(span_type="function")
+// With automatic deep tracing, only the main function needs to be observed
+@judgment.observe(name="agent_1", span_type="agent")
 def main():
     query = "What is the capital of France?"
-    # This function call will be automatically traced
+    // This function call will be automatically traced
     res = generate_response(query)
     
-    # Assumes this runs within an active trace context implicitly started by @observe
+    // Assumes this runs within an active trace context implicitly started by @observe
     judgment.async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=1.0)],
         input=query,
@@ -221,7 +231,7 @@ def main():
     )
     return res
 
-# This function will be automatically traced when called from main()
+// This function will be automatically traced when called from main()
 def generate_response(query):
     return "The capital of France is Paris."
 
@@ -231,14 +241,13 @@ main() # Call the observed function
 import { Tracer, AnswerRelevancyScorer } from 'judgeval';
 
 const judgment = Tracer.getInstance({ 
-    projectName: "my_project",
-    deepTracing: true
+    projectName: "my_project"  // Deep tracing is enabled by default
 });
 
-// With deep tracing, only the main function needs to be observed
+// With automatic deep tracing, only the main function needs to be observed
 const mainWithEval = judgment.observe({ spanType: "function" })(async () => {
     const query = "What is the capital of France?";
-    # This function call will be automatically traced
+    // This function call will be automatically traced
     const res = generateResponse(query);
 
     const currentTrace = judgment.getCurrentTrace();
@@ -259,26 +268,23 @@ const mainWithEval = judgment.observe({ spanType: "function" })(async () => {
 
 // This function will be automatically traced when called from mainWithEval
 function generateResponse(query) {
-    return "The capital of France is Paris.";
+    return `The capital of France is Paris.`;
 }
 
-// Explicitly start a trace for the evaluation
+// The trace will show the full flow from mainWithEval to generateResponse
 async function runMainWithEvalTrace() {
     const trace = judgment.startTrace("main_eval_trace");
     try {
         const result = await mainWithEval();
-        console.log("Trace with eval completed:", result);
+        console.log(result);
         await trace.save();
     } catch (error) {
-        console.error("Trace with eval failed:", error);
+        console.error(error);
         await trace.save();
     } finally {
         judgment.clearCurrentTrace(); // Clean up
     }
-    return result;
 }
-
-runMainWithEvalTrace().then(console.log).catch(console.error);
 ```
 </CodeGroup>
 
@@ -287,97 +293,56 @@ runMainWithEvalTrace().then(console.log).catch(console.error);
     a new evaluation will be created on the Judgment platform.
 </Tip>
 
+## Example: Music Recommendation Agent
+In this video, we'll walk through all of the topics covered in this guide by tracing over a simple OpenAI API-based music recommendation agent.
+
+<iframe
+  width="560"
+  height="315"
+  src="https://www.youtube.com/embed/7g0fut06UxQ"
+  title="YouTube video player"
+  frameborder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowfullscreen
+></iframe>
+
 ## Advanced: Deep Tracing and Agent-to-Agent Calls ##
 
 Judgment's tracing system includes powerful deep tracing capabilities that automatically capture function calls within your application without requiring explicit `@observe` decorators on every function.
 
-### Enabling Deep Tracing
+### Automatic Deep Tracing
 
-Deep tracing can be enabled globally or for specific functions:
-
-<CodeGroup>
-```Python Python
-# Enable deep tracing globally
-judgment = Tracer(
-    project_name="my_project",
-    deep_tracing=True  # Enable for all observed functions
-)
-
-# Only the top-level function needs @observe
-@judgment.observe(span_type="function")
-def my_function():
-    # All function calls inside will be traced automatically
-    result = some_other_function()  # This will be traced without @observe
-    return result
-
-# No @observe needed - automatically traced when called from my_function
-def some_other_function():
-    return "Hello world!"
-```
-```Typescript Typescript
-// Enable deep tracing globally
-const judgment = Tracer.getInstance({ 
-    projectName: "my_project",
-    deepTracing: true  # Enable for all observed functions
-});
-
-// Only the top-level function needs observe
-const myFunction = judgment.observe({ 
-    spanType: "function"
-})(async () => {
-    # All function calls inside will be traced automatically
-    const result = await someOtherFunction();  # This will be traced without observe
-    return result;
-});
-
-// No observe needed - automatically traced when called from myFunction
-async function someOtherFunction() {
-    return "Hello world!";
-}
-```
-</CodeGroup>
-
-### Smart Function Filtering
-
-Deep tracing intelligently filters out utility functions to keep your traces focused on meaningful application logic:
-
-- **Excluded Functions**: Print statements, logging calls, and basic utility functions are automatically excluded
-- **Module-Based Filtering**: Functions from standard modules like `logging`, `sys`, `os`, and others are not traced
-- **Cleaner Visualization**: Your trace visualizations remain concise and focused on application-specific logic
-
-### Tracing Agent-to-Agent (A2A) Calls
-
-Judgment's tracing system can capture interactions between multiple agents in your system with minimal instrumentation:
+Deep tracing is enabled by default, allowing you to observe only top-level functions while all nested calls are automatically traced:
 
 <CodeGroup>
 ```Python Python
 from judgeval.tracer import Tracer
 
-judgment = Tracer(project_name="multi_agent_system", deep_tracing=True)
+judgment = Tracer(project_name="multi_agent_system")  // Deep tracing is enabled by default
 
-# Only need to observe the top-level agent
+// Only need to observe the top-level agent
 @judgment.observe(name="agent_1", span_type="agent")
 def agent_1(query):
-    # This agent processes the query
+    // This agent processes the query
     processed = process_query(query)
-    # Then calls agent_2 for additional processing
+    // Then calls agent_2 for additional processing
     return agent_2(processed)
 
-# No @observe needed - automatically traced when called from agent_1
+// No @observe needed - automatically traced when called from agent_1
 def agent_2(data):
-    # Second agent processes data from agent_1
+    // Second agent processes data from agent_1
     return generate_response(data)
 
-# No @observe needed - automatically traced when called from agent_2
+// No @observe needed - automatically traced when called from agent_2
 def generate_response(data):
     return f"Response for: {data}"
 
-# No @observe needed - automatically traced when called from agent_1
+// No @observe needed - automatically traced when called from agent_1
 def process_query(query):
     return f"Processed: {query}"
 
-# The trace will show the full flow from agent_1 to agent_2
-# including all internal function calls thanks to deep tracing
+// The trace will show the full flow from agent_1 to agent_2
+// including all internal function calls thanks to deep tracing
 with judgment.trace(name="multi_agent_workflow") as trace:
     result = agent_1("What's the weather in San Francisco?")
     trace.save()
@@ -386,8 +351,7 @@ with judgment.trace(name="multi_agent_workflow") as trace:
 import { Tracer } from 'judgeval';
 
 const judgment = Tracer.getInstance({ 
-    projectName: "multi_agent_system",
-    deepTracing: true
+    projectName: "multi_agent_system"  // Deep tracing is enabled by default
 });
 
 // Only need to observe the top-level agent
@@ -395,15 +359,15 @@ const agent1 = judgment.observe({
     name: "agent_1", 
     spanType: "agent" 
 })(async (query: string) => {
-    # This agent processes the query
+    // This agent processes the query
     const processed = processQuery(query);
-    # Then calls agent_2 for additional processing
+    // Then calls agent_2 for additional processing
     return await agent2(processed);
 });
 
 // No observe needed - automatically traced when called from agent1
 async function agent2(data: any) {
-    # Second agent processes data from agent_1
+    // Second agent processes data from agent_1
     return generateResponse(data);
 }
 
@@ -432,22 +396,62 @@ async function runMultiAgentWorkflow() {
 ```
 </CodeGroup>
 
+### Disabling Deep Tracing
+
+If you prefer more control over what gets traced, you can disable deep tracing:
+
+<CodeGroup>
+```Python Python
+// Disable deep tracing if you prefer manual control
+judgment = Tracer(
+    project_name="multi_agent_system",
+    deep_tracing=False
+)
+
+// Now you'll need to explicitly observe each function
+@judgment.observe(name="agent_1", span_type="agent")
+def agent_1(query):
+    processed = process_query(query)
+    return agent_2(processed)
+```
+```Typescript Typescript
+// Disable deep tracing if you prefer manual control
+const judgment = Tracer.getInstance({ 
+    projectName: "multi_agent_system",
+    deepTracing: false
+});
+
+// Now you'll need to explicitly observe each function
+const agent1 = judgment.observe({ 
+    name: "agent_1", 
+    spanType: "agent" 
+})(async (query: string) => {
+    const processed = await processQuery(query);
+    return await agent2(processed);
+});
+
+const agent2 = judgment.observe({ 
+    name: "agent_2", 
+    spanType: "agent" 
+})(async (data: any) => {
+    return await generateResponse(data);
+});
+
+const generateResponse = judgment.observe({ 
+    spanType: "function" 
+})(async (data: any) => {
+    return `Response for: ${data}`;
+});
+
+const processQuery = judgment.observe({ 
+    spanType: "function" 
+})(async (query: string) => {
+    return `Processed: ${query}`;
+});
+```
+</CodeGroup>
+
 This approach provides end-to-end visibility into complex multi-agent systems with minimal instrumentation, helping you understand how information flows between agents and identify bottlenecks or issues in your agent interactions.
-
-## Example: Music Recommendation Agent
-
-In this video, we'll walk through all of the topics covered in this guide by tracing over a simple OpenAI API-based music recommendation agent.
-
-<iframe 
-    width="560" 
-    height="315" 
-    src="https://www.youtube.com/embed/7g0fut06UxQ"
-    title="YouTube video player" 
-    frameborder="0" 
-    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
-    referrerpolicy="strict-origin-when-cross-origin" 
-    allowfullscreen
-></iframe>
 
 ## Advanced: Customizing Traces Using the Context Manager (Python) / Explicit Trace Client (Typescript) ##
 
@@ -481,9 +485,9 @@ def main():
             messages=[{"role": "user", "content": f"{my_tool()}"}]
         )
     
-        trace.print()  # prints the state of the trace to console
-        trace.save()  # saves the current state of the trace to the Judgment platform
-        # Note: Python trace context likely saves automatically on exit
+        trace.print()  // prints the state of the trace to console
+        trace.save()  // saves the current state of the trace to the Judgment platform
+        // Note: Python trace context likely saves automatically on exit
 
     return res.choices[0].message.content
 ```
@@ -495,6 +499,7 @@ const judgment = Tracer.getInstance({ projectName: "my_project" });
 const client = wrap(new OpenAI());
 
 async function myTool(): Promise<string> {
+    console.log("Hello world!");
     return "Hello world!";
 }
 const observedMyTool = judgment.observe({ spanType: "tool" })(myTool);
@@ -536,4 +541,5 @@ main().then(console.log).catch(console.error);
 </Warning>
 
 ## Integrations ##
-{{ ... }}
+
+Judgment's tracing system integrates with various frameworks and libraries to provide seamless observability across your tech stack.

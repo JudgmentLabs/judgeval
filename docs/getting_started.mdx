@@ -120,9 +120,9 @@ from judgeval.common.tracer import Tracer, wrap
 from openai import OpenAI
 
 client = wrap(OpenAI())
-judgment = Tracer(project_name="my_project", deep_tracing=True)
+judgment = Tracer(project_name="my_project")
 
-# With deep tracing, you only need to observe the top-level function
+# With automatic deep tracing, you only need to observe the top-level function
 @judgment.observe(span_type="function")
 def main():
     # my_tool will be automatically traced without @observe
@@ -147,8 +147,7 @@ import OpenAI from 'openai';
 // Ensure JUDGMENT_API_KEY and JUDGMENT_ORG_ID are set in your environment
 const client = wrap(new OpenAI());
 const judgment = Tracer.getInstance({ 
-    projectName: "my_project",
-    deepTracing: true  // Enable deep tracing
+    projectName: "my_project"
 });
 
 // Define the function that will be automatically traced
@@ -184,20 +183,18 @@ runImplicitTrace();
 
 Congratulations! You've just created your first trace. It should look like this:
 
-<div style={{display: 'flex', justifyContent: 'center'}}>
-  ![Alt text](/images/trace_ss.png "Image of a RAG pipeline trace")
-</div>
+![Alt text](https://storage.googleapis.com/judgment-public-assets/trace-example.png)
 
-There are many benefits of monitoring your LLM systems with `judgeval` tracing, including:
+There are many benefits of monitoring your LLM systems with judgeval tracing, including:
+
 - Debugging LLM workflows in seconds with full observability
 - Using production workflow data to create experimental datasets for future improvement/optimization
-- Tracking and creating Slack/Email alerts on **any metric** (e.g. latency, cost, hallucination, etc.)
+- Tracking and creating Slack/Email alerts on any metric (e.g. latency, cost, hallucination, etc.)
 
-<Tip>
-To learn more about `judgeval`'s tracing module, click [here](/tracing/introduction).
-</Tip>
+To learn more about judgeval's tracing module, click [here](/monitoring/tracing).
 
-# Create Your First Online Evaluation
+​
+## Create Your First Online Evaluation
 
 In addition to tracing, `judgeval` allows you to run online evaluations on your LLM systems. This enables you to:
 - Catch real-time quality regressions to take action before customers are impacted
@@ -212,9 +209,9 @@ from judgeval.scorers import AnswerRelevancyScorer
 from openai import OpenAI
 
 client = wrap(OpenAI())
-judgment = Tracer(project_name="my_project", deep_tracing=True)
+judgment = Tracer(project_name="my_project")
 
-# With deep tracing, you only need to observe the top-level function
+# With automatic deep tracing, you only need to observe the top-level function
 @judgment.observe(span_type="function")
 def main():
     # my_tool will be automatically traced without @observe
@@ -245,8 +242,7 @@ import OpenAI from 'openai';
 // Ensure JUDGMENT_API_KEY and JUDGMENT_ORG_ID are set in your environment
 const client = wrap(new OpenAI());
 const judgment = Tracer.getInstance({ 
-    projectName: "my_project",
-    deepTracing: true  // Enable deep tracing
+    projectName: "my_project"
 });
 
 // Define the function that will be automatically traced
@@ -302,9 +298,7 @@ runImplicitTrace();
 Online evaluations are automatically logged to the Judgment Platform as part of your traces. You can view them by navigating to your trace and clicking on the 
 trace span that contains the online evaluation. If there is a quality regression, the UI will display an alert, like this: 
 
-<div style={{display: 'flex', justifyContent: 'center'}}>
-  ![Alt text](/images/online_eval_fault.png "Image of an alert on the Judgment Platform")
-</div>
+![Alt text](/images/online_eval_fault.png "Image of an alert on the Judgment Platform")
 
 # Optimizing Your LLM System
 

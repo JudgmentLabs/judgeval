@@ -92,16 +92,16 @@ The `TraceClient` object manages the context of a single trace context (or workf
 
 ## Tracing functions (`@observe` / `observe()`)
 
-With deep tracing enabled, you only need to observe top-level functions, and all nested function calls will be automatically traced. This significantly reduces the amount of instrumentation needed in your code.
+With automatic deep tracing, you only need to observe top-level functions, and all nested function calls will be automatically traced. This significantly reduces the amount of instrumentation needed in your code.
 
 **If you use multiple decorators in Python**, the `@judgment.observe()` decorator should be the innermost decorator to preserve functionality.
 
-Here's an example using deep tracing:
+Here's an example using automatic deep tracing:
 
 <CodeGroup>
 ```Python Python
-# Initialize tracer with deep tracing enabled
-judgment = Tracer(project_name="my_project", deep_tracing=True)
+# Initialize tracer (deep tracing is enabled by default)
+judgment = Tracer(project_name="my_project")
 
 # Only need to observe the top-level function
 @judgment.observe(span_type="function")
@@ -122,10 +122,9 @@ def process_result(result: str):
 # Calling main_workflow("some query") will trace the entire call stack
 ```
 ```Typescript Typescript
-// Initialize tracer with deep tracing enabled
+// Initialize tracer (deep tracing is enabled by default)
 const judgment = Tracer.getInstance({ 
-    projectName: "my_project",
-    deepTracing: true
+    projectName: "my_project"
 });
 
 // Only need to observe the top-level function
@@ -150,52 +149,86 @@ function processResult(result: string): string {
 ```
 </CodeGroup>
 
-### Deep Tracing Configuration
+### Disabling Deep Tracing
 
-You can enable deep tracing globally when initializing the tracer:
+Deep tracing is enabled by default. If you prefer more granular control or want to trace only explicitly decorated functions, you can disable deep tracing:
 
 <CodeGroup>
 ```Python Python
-# Enable deep tracing globally
+# Disable deep tracing
 judgment = Tracer(
     project_name="my_project",
-    deep_tracing=True  # Enable for all observed functions
+    deep_tracing=False  # Disable automatic deep tracing
 )
+
+# Now you'll need to explicitly observe each function you want to trace
+@judgment.observe(span_type="function")
+def main_workflow(query: str):
+    result = my_tool(query)  # Won't be traced unless decorated
+    return process_result(result)  # Won't be traced unless decorated
+
+@judgment.observe(span_type="tool")
+def my_tool(query: str):
+    print(f"Tool executed with query: {query}")
+    return "Tool result"
+
+@judgment.observe(span_type="function")
+def process_result(result: str):
+    return f"Processed: {result}"
 ```
 ```Typescript Typescript
-// Enable deep tracing globally
+// Disable deep tracing
 const judgment = Tracer.getInstance({ 
     projectName: "my_project",
-    deepTracing: true  // Enable for all observed functions
+    deepTracing: false  // Disable automatic deep tracing
+});
+
+// Now you'll need to explicitly observe each function you want to trace
+const mainWorkflow = judgment.observe({ spanType: "function" })(async (query: string) => {
+    const result = await myTool(query);  # Won't be traced unless wrapped
+    return await processResult(result);  # Won't be traced unless wrapped
+});
+
+const myTool = judgment.observe({ spanType: "tool" })(async (query: string) => {
+    console.log(`Tool executed with query: ${query}`);
+    return "Tool result";
+});
+
+const processResult = judgment.observe({ spanType: "function" })(async (result: string) => {
+    return `Processed: ${result}`;
 });
 ```
 </CodeGroup>
 
-Or you can enable it for specific functions:
+### Function-Specific Deep Tracing Control
+
+You can also override the global deep tracing setting for specific functions:
 
 <CodeGroup>
 ```Python Python
-# Enable deep tracing for a specific function
-@judgment.observe(deep_tracing=True)
-def my_function():
-    # All function calls inside will be traced
-    return some_other_function()
+# Even with deep tracing globally enabled (default)
+# You can disable it for specific functions
+@judgment.observe(span_type="function", deep_tracing=False)
+def selective_function():
+    helper_function()  # Won't be traced automatically
+    return "Done"
 ```
 ```Typescript Typescript
-// Enable deep tracing for a specific function
-const myFunction = judgment.observe({ 
+// Even with deep tracing globally enabled (default)
+// You can disable it for specific functions
+const selectiveFunction = judgment.observe({ 
     spanType: "function",
-    deepTracing: true 
+    deepTracing: false 
 })(async () => {
-    // All function calls inside will be traced
-    return await someOtherFunction();
+    helperFunction();  # Won't be traced automatically
+    return "Done";
 });
 ```
 </CodeGroup>
 
 ### Traditional Function-by-Function Tracing
 
-If you prefer more granular control or are not using deep tracing, you can still observe each function individually:
+If you're using the traditional approach with deep tracing disabled, you'll need to observe each function individually:
 
 <CodeGroup>
 ```Python Python
