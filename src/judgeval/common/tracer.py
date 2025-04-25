@@ -206,9 +206,10 @@ class TraceManagerClient:
     - Saving a trace
     - Deleting a trace
     """
-    def __init__(self, judgment_api_key: str, organization_id: str):
+    def __init__(self, judgment_api_key: str, organization_id: str, tracer: Optional["Tracer"] = None):
         self.judgment_api_key = judgment_api_key
         self.organization_id = organization_id
+        self.tracer = tracer
 
     def fetch_trace(self, trace_id: str):
         """
@@ -236,12 +237,13 @@ class TraceManagerClient:
 
     def save_trace(self, trace_data: dict):
         """
-        Saves a trace to the database
+        Saves a trace to the Judgment Supabase and optionally to S3 if configured.
 
         Args:
             trace_data: The trace data to save
             NOTE we save empty traces in order to properly handle async operations; we need something in the DB to associate the async results with
         """
+        # Save to Judgment API
         response = requests.post(
             JUDGMENT_TRACES_SAVE_API_URL,
             json=trace_data,
@@ -257,6 +259,18 @@ class TraceManagerClient:
             raise ValueError(f"Failed to save trace data: Check your Trace name for conflicts, set overwrite=True to overwrite existing traces: {response.text}")
         elif response.status_code != HTTPStatus.OK:
             raise ValueError(f"Failed to save trace data: {response.text}")
+        
+        # If S3 storage is enabled, save to S3 as well
+        if self.tracer and self.tracer.use_s3:
+            try:
+                s3_key = self.tracer.s3_storage.save_trace(
+                    trace_data=trace_data,
+                    trace_id=trace_data["trace_id"],
+                    project_name=trace_data["project_name"]
+                )
+                print(f"Trace also saved to S3 at key: {s3_key}")
+            except Exception as e:
+                warnings.warn(f"Failed to save trace to S3: {str(e)}")
         
         if "ui_results_url" in response.json():
             pretty_str = f"\n🔍 You can view your trace data here: [rgb(106,0,255)][link={response.json()['ui_results_url']}]View Trace[/link]\n"
@@ -355,7 +369,7 @@ class TraceClient:
         self.client: JudgmentClient = tracer.client
         self.entries: List[TraceEntry] = []
         self.start_time = time.time()
-        self.trace_manager_client = TraceManagerClient(tracer.api_key, tracer.organization_id)
+        self.trace_manager_client = TraceManagerClient(tracer.api_key, tracer.organization_id, tracer)
         self.visited_nodes = []
         self.executed_tools = []
         self.executed_node_tools = []
@@ -921,6 +935,12 @@ class Tracer:
         organization_id: str = os.getenv("JUDGMENT_ORG_ID"),
         enable_monitoring: bool = os.getenv("JUDGMENT_MONITORING", "true").lower() == "true",
         enable_evaluations: bool = os.getenv("JUDGMENT_EVALUATIONS", "true").lower() == "true",
+        # S3 configuration
+        use_s3: bool = False,
+        s3_bucket_name: Optional[str] = None,
+        s3_aws_access_key_id: Optional[str] = None,
+        s3_aws_secret_access_key: Optional[str] = None,
+        s3_region_name: Optional[str] = None,
         deep_tracing: bool = True  # NEW: Enable deep tracing by default
         ):
         if not hasattr(self, 'initialized'):
@@ -929,6 +949,13 @@ class Tracer:
             
             if not organization_id:
                 raise ValueError("Tracer must be configured with an Organization ID")
+            if use_s3 and not s3_bucket_name:
+                raise ValueError("S3 bucket name must be provided when use_s3 is True")
+            if use_s3 and not (s3_aws_access_key_id or os.getenv("AWS_ACCESS_KEY_ID")):
+                raise ValueError("AWS Access Key ID must be provided when use_s3 is True")
+            if use_s3 and not (s3_aws_secret_access_key or os.getenv("AWS_SECRET_ACCESS_KEY")):
+                raise ValueError("AWS Secret Access Key must be provided when use_s3 is True")
+            
             self.api_key: str = api_key
             self.project_name: str = project_name
             self.client: JudgmentClient = JudgmentClient(judgment_api_key=api_key)
@@ -938,7 +965,19 @@ class Tracer:
             self.initialized: bool = True
             self.enable_monitoring: bool = enable_monitoring
             self.enable_evaluations: bool = enable_evaluations
+
+            # Initialize S3 storage if enabled
+            self.use_s3 = use_s3
+            if use_s3:
+                from judgeval.common.s3_storage import S3Storage
+                self.s3_storage = S3Storage(
+                    bucket_name=s3_bucket_name,
+                    aws_access_key_id=s3_aws_access_key_id,
+                    aws_secret_access_key=s3_aws_secret_access_key,
+                    region_name=s3_region_name
+                )
             self.deep_tracing: bool = deep_tracing  # NEW: Store deep tracing setting
+
         elif hasattr(self, 'project_name') and self.project_name != project_name:
             warnings.warn(
                 f"Attempting to initialize Tracer with project_name='{project_name}' but it was already initialized with "
