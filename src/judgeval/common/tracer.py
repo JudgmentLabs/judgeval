@@ -940,7 +940,7 @@ class Tracer:
         s3_bucket_name: Optional[str] = None,
         s3_aws_access_key_id: Optional[str] = None,
         s3_aws_secret_access_key: Optional[str] = None,
-        s3_region_name: Optional[str] = None
+        s3_region_name: Optional[str] = None,
         deep_tracing: bool = True  # NEW: Enable deep tracing by default
         ):
         if not hasattr(self, 'initialized'):
