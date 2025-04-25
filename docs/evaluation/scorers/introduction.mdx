@@ -16,17 +16,13 @@ This enables you to **use evaluations as unit tests** by setting a `threshold` t
 
 ## Categories of Scorers
 `judgeval` supports three categories of scorers. 
-- **Default Scorers**: built-in scorers that are ready to use
+- **Osiris Scorers**: built-in scorers that are ready to use
 - **Custom Scorers**: Powerful scorers that you can tailor to your own LLM system
 - **Classifier Scorers**: A special custom scorer that evaluates your LLM system using a natural language criteria
 
 In this section, we'll cover each kind of scorer and how to use them.
 
-### Default Scorers
-Most of the built-in scorers in `judgeval` are **LLM judges**, meaning they use LLMs to evaluate your LLM system. 
-This is intentional since **LLM evaluations are flexible, scalable, and strongly correlate with human evaluation**.
-
-### Introducing Osiris
+### Osiris Scorers
 
 We introduce **Osiris**, a **state-of-the-art hallucination detection system** developed by researchers at **Judgment Labs** and the **Stanford Artificial Intelligence Laboratory (SAIL)**, under the guidance of Professor Chris Manning.
 
@@ -43,15 +39,10 @@ In addition to its superior performance, Osiris is also **substantially more cos
 We'll be releasing a report soon detailing some of the novel data augmentation techniques we've developed—stay tuned! 
 </Tip>
 
-`judgeval`'s default scorers have been meticulously crafted by our research team based on leading work in the LLM evaluation community. 
+#### Standard Scorers
 
-Our implementations are described on their respective documentation pages. 
-Judgment implementations of default scorers are backed by **leading industry/academic research** and are preferable to other implementations because:
-- They are meticulously prompt-engineered to maximize evaluation quality and consistency
-- Provide a chain of thought for evaluation scores, so you can double-check the evaluation quality
-- Can be run using any LLM, including Judgment's **state-of-the-art LLM judges** developed in collaboration with **Stanford's AI Lab**.
-
-Here are the default scorers in `judgeval`:
+Here are the standard scorers in `judgeval`, which our designed to evaluate a single component within your workflow, such as a **retriever call**, **tool invocation**, or **LLM generation**.
+Our implementations are described on their respective documentation pages:
 - [Answer Correctness](/evaluation/scorers/answer_correctness)
 - [Answer Relevancy](/evaluation/scorers/answer_relevancy)
 - [Comparison](/evaluation/scorers/comparison)
@@ -64,10 +55,8 @@ Here are the default scorers in `judgeval`:
 - [JSON Correctness](/evaluation/scorers/json_correctness)
 - [Summarization](/evaluation/scorers/summarization)
 
-
-### Agentic Scorers
-
-Agentic scorers are designed to evaluate multiple steps together within your LLM system—rather than evaluating one step at a time. They are especially useful for multi-step workflows, such as agents, chains, or graphs, where the quality of the overall process matters more than individual outputs.
+#### Agentic Scorers
+Osiris also includes specialized scorers designed to evaluate multiple steps together within your LLM system—rather than evaluating one step at a time. These agentic scorers are especially useful for multi-step workflows, such as agents, chains, or graphs, where the quality of the overall process matters more than individual outputs.
 
 By grouping related steps into a single evaluation, agentic scorers allow you to:
 - Measure end-to-end correctness
