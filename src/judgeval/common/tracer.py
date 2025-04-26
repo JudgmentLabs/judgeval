@@ -11,11 +11,12 @@ import time
 import uuid
 import warnings
 import contextvars
+import sys
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from http import HTTPStatus
-from typing import Any, Dict, Generator, List, Literal, Optional, Tuple, TypeAlias, Union, Callable, Awaitable
+from typing import Any, Dict, Generator, List, Literal, Optional, Tuple, TypeAlias, Union, Callable, Awaitable, Set
 from rich import print as rprint
 
 # Third-party imports
@@ -51,7 +52,8 @@ import concurrent.futures
 
 # Define context variables for tracking the current trace and the current span within a trace
 current_trace_var = contextvars.ContextVar('current_trace', default=None)
-current_span_var = contextvars.ContextVar('current_span', default=None) # NEW: ContextVar for the active span name
+current_span_var = contextvars.ContextVar('current_span', default=None) # ContextVar for the active span name
+in_traced_function_var = contextvars.ContextVar('in_traced_function', default=False) # Track if we're in a traced function
 
 # Define type aliases for better code readability and maintainability
 ApiClient: TypeAlias = Union[OpenAI, Together, Anthropic, AsyncOpenAI, AsyncAnthropic, AsyncTogether, genai.Client, genai.client.AsyncClient]  # Supported API clients
@@ -204,9 +206,10 @@ class TraceManagerClient:
     - Saving a trace
     - Deleting a trace
     """
-    def __init__(self, judgment_api_key: str, organization_id: str):
+    def __init__(self, judgment_api_key: str, organization_id: str, tracer: Optional["Tracer"] = None):
         self.judgment_api_key = judgment_api_key
         self.organization_id = organization_id
+        self.tracer = tracer
 
     def fetch_trace(self, trace_id: str):
         """
@@ -234,12 +237,13 @@ class TraceManagerClient:
 
     def save_trace(self, trace_data: dict):
         """
-        Saves a trace to the database
+        Saves a trace to the Judgment Supabase and optionally to S3 if configured.
 
         Args:
             trace_data: The trace data to save
             NOTE we save empty traces in order to properly handle async operations; we need something in the DB to associate the async results with
         """
+        # Save to Judgment API
         response = requests.post(
             JUDGMENT_TRACES_SAVE_API_URL,
             json=trace_data,
@@ -255,6 +259,18 @@ class TraceManagerClient:
             raise ValueError(f"Failed to save trace data: Check your Trace name for conflicts, set overwrite=True to overwrite existing traces: {response.text}")
         elif response.status_code != HTTPStatus.OK:
             raise ValueError(f"Failed to save trace data: {response.text}")
+        
+        # If S3 storage is enabled, save to S3 as well
+        if self.tracer and self.tracer.use_s3:
+            try:
+                s3_key = self.tracer.s3_storage.save_trace(
+                    trace_data=trace_data,
+                    trace_id=trace_data["trace_id"],
+                    project_name=trace_data["project_name"]
+                )
+                print(f"Trace also saved to S3 at key: {s3_key}")
+            except Exception as e:
+                warnings.warn(f"Failed to save trace to S3: {str(e)}")
         
         if "ui_results_url" in response.json():
             pretty_str = f"\n🔍 You can view your trace data here: [rgb(106,0,255)][link={response.json()['ui_results_url']}]View Trace[/link]\n"
@@ -353,7 +369,7 @@ class TraceClient:
         self.client: JudgmentClient = tracer.client
         self.entries: List[TraceEntry] = []
         self.start_time = time.time()
-        self.trace_manager_client = TraceManagerClient(tracer.api_key, tracer.organization_id)
+        self.trace_manager_client = TraceManagerClient(tracer.api_key, tracer.organization_id, tracer)
         self.visited_nodes = []
         self.executed_tools = []
         self.executed_node_tools = []
@@ -918,7 +934,14 @@ class Tracer:
         rules: Optional[List[Rule]] = None,  # Added rules parameter
         organization_id: str = os.getenv("JUDGMENT_ORG_ID"),
         enable_monitoring: bool = os.getenv("JUDGMENT_MONITORING", "true").lower() == "true",
-        enable_evaluations: bool = os.getenv("JUDGMENT_EVALUATIONS", "true").lower() == "true"
+        enable_evaluations: bool = os.getenv("JUDGMENT_EVALUATIONS", "true").lower() == "true",
+        # S3 configuration
+        use_s3: bool = False,
+        s3_bucket_name: Optional[str] = None,
+        s3_aws_access_key_id: Optional[str] = None,
+        s3_aws_secret_access_key: Optional[str] = None,
+        s3_region_name: Optional[str] = None,
+        deep_tracing: bool = True  # NEW: Enable deep tracing by default
         ):
         if not hasattr(self, 'initialized'):
             if not api_key:
@@ -926,6 +949,13 @@ class Tracer:
             
             if not organization_id:
                 raise ValueError("Tracer must be configured with an Organization ID")
+            if use_s3 and not s3_bucket_name:
+                raise ValueError("S3 bucket name must be provided when use_s3 is True")
+            if use_s3 and not (s3_aws_access_key_id or os.getenv("AWS_ACCESS_KEY_ID")):
+                raise ValueError("AWS Access Key ID must be provided when use_s3 is True")
+            if use_s3 and not (s3_aws_secret_access_key or os.getenv("AWS_SECRET_ACCESS_KEY")):
+                raise ValueError("AWS Secret Access Key must be provided when use_s3 is True")
+            
             self.api_key: str = api_key
             self.project_name: str = project_name
             self.client: JudgmentClient = JudgmentClient(judgment_api_key=api_key)
@@ -935,6 +965,19 @@ class Tracer:
             self.initialized: bool = True
             self.enable_monitoring: bool = enable_monitoring
             self.enable_evaluations: bool = enable_evaluations
+
+            # Initialize S3 storage if enabled
+            self.use_s3 = use_s3
+            if use_s3:
+                from judgeval.common.s3_storage import S3Storage
+                self.s3_storage = S3Storage(
+                    bucket_name=s3_bucket_name,
+                    aws_access_key_id=s3_aws_access_key_id,
+                    aws_secret_access_key=s3_aws_secret_access_key,
+                    region_name=s3_region_name
+                )
+            self.deep_tracing: bool = deep_tracing  # NEW: Store deep tracing setting
+
         elif hasattr(self, 'project_name') and self.project_name != project_name:
             warnings.warn(
                 f"Attempting to initialize Tracer with project_name='{project_name}' but it was already initialized with "
@@ -949,12 +992,52 @@ class Tracer:
         """
         current_trace_var.set(trace)
     
-    def get_current_trace(self):
+    def get_current_trace(self) -> Optional[TraceClient]:
         """
         Get the current trace context from contextvars
         """
         return current_trace_var.get()
         
+    def _apply_deep_tracing(self, func, span_type="span"):
+        """
+        Apply deep tracing to all functions in the same module as the given function.
+        
+        Args:
+            func: The function being traced
+            span_type: Type of span to use for traced functions
+            
+        Returns:
+            A tuple of (module, original_functions_dict) where original_functions_dict
+            contains the original functions that were replaced with traced versions.
+        """
+        module = inspect.getmodule(func)
+        if not module:
+            return None, {}
+            
+        # Save original functions
+        original_functions = {}
+        
+        # Find all functions in the module
+        for name, obj in inspect.getmembers(module, inspect.isfunction):
+            # Skip already wrapped functions
+            if hasattr(obj, '_judgment_traced'):
+                continue
+                
+            # Create a traced version of the function
+            # Always use default span type "span" for child functions
+            traced_func = _create_deep_tracing_wrapper(obj, self, "span")
+            
+            # Mark the function as traced to avoid double wrapping
+            traced_func._judgment_traced = True
+            
+            # Save the original function
+            original_functions[name] = obj
+            
+            # Replace with traced version
+            setattr(module, name, traced_func)
+            
+        return module, original_functions
+
     @contextmanager
     def trace(
         self, 
@@ -1000,14 +1083,8 @@ class Tracer:
             finally:
                 # Reset the context variable
                 current_trace_var.reset(token)
-                
-    def get_current_trace(self) -> Optional[TraceClient]:
-        """
-        Get the current trace context from contextvars
-        """
-        return current_trace_var.get()
-
-    def observe(self, func=None, *, name=None, span_type: SpanType = "span", project_name: str = None, overwrite: bool = False):
+    
+    def observe(self, func=None, *, name=None, span_type: SpanType = "span", project_name: str = None, overwrite: bool = False, deep_tracing: bool = None):
         """
         Decorator to trace function execution with detailed entry/exit information.
         
@@ -1017,20 +1094,37 @@ class Tracer:
             span_type: Type of span (default "span")
             project_name: Optional project name override
             overwrite: Whether to overwrite existing traces
+            deep_tracing: Whether to enable deep tracing for this function and all nested calls.
+                          If None, uses the tracer's default setting.
         """
         # If monitoring is disabled, return the function as is
         if not self.enable_monitoring:
             return func if func else lambda f: f
         
         if func is None:
-            return lambda f: self.observe(f, name=name, span_type=span_type, project_name=project_name, overwrite=overwrite)
+            return lambda f: self.observe(f, name=name, span_type=span_type, project_name=project_name, 
+                                         overwrite=overwrite, deep_tracing=deep_tracing)
         
         # Use provided name or fall back to function name
         span_name = name or func.__name__
         
+        # Store custom attributes on the function object
+        func._judgment_span_name = span_name
+        func._judgment_span_type = span_type
+        
+        # Use the provided deep_tracing value or fall back to the tracer's default
+        use_deep_tracing = deep_tracing if deep_tracing is not None else self.deep_tracing
+        
         if asyncio.iscoroutinefunction(func):
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
+                # Check if we're already in a traced function
+                if in_traced_function_var.get():
+                    return await func(*args, **kwargs)
+                
+                # Set in_traced_function_var to True
+                token = in_traced_function_var.set(True)
+                
                 # Get current trace from context
                 current_trace = current_trace_var.get()
                 
@@ -1064,10 +1158,19 @@ class Tracer:
                                 'args': str(args),
                                 'kwargs': kwargs
                             })
+                            
+                            # If deep tracing is enabled, apply monkey patching
+                            if use_deep_tracing:
+                                module, original_functions = self._apply_deep_tracing(func, span_type)
                             
                             # Execute function
                             result = await func(*args, **kwargs)
                             
+                            # Restore original functions if deep tracing was enabled
+                            if use_deep_tracing and module and 'original_functions' in locals():
+                                for name, obj in original_functions.items():
+                                    setattr(module, name, obj)
+                            
                             # Record output
                             span.record_output(result)
                             
@@ -1077,29 +1180,52 @@ class Tracer:
                     finally:
                         # Reset trace context (span context resets automatically)
                         current_trace_var.reset(trace_token)
+                        # Reset in_traced_function_var
+                        in_traced_function_var.reset(token)
                 else:
                     # Already have a trace context, just create a span in it
                     # The span method handles current_span_var
-                    with current_trace.span(span_name, span_type=span_type) as span: # MODIFIED: Use span_name directly
-                        # Record inputs
-                        span.record_input({
-                            'args': str(args),
-                            'kwargs': kwargs
-                        })
-                        
-                        # Execute function
-                        result = await func(*args, **kwargs)
-                        
-                        # Record output
-                        span.record_output(result)
+                    
+                    try:
+                        with current_trace.span(span_name, span_type=span_type) as span: # MODIFIED: Use span_name directly
+                            # Record inputs
+                            span.record_input({
+                                'args': str(args),
+                                'kwargs': kwargs
+                            })
+                            
+                            # If deep tracing is enabled, apply monkey patching
+                            if use_deep_tracing:
+                                module, original_functions = self._apply_deep_tracing(func, span_type)
+                            
+                            # Execute function
+                            result = await func(*args, **kwargs)
+                            
+                            # Restore original functions if deep tracing was enabled
+                            if use_deep_tracing and module and 'original_functions' in locals():
+                                for name, obj in original_functions.items():
+                                    setattr(module, name, obj)
+                            
+                            # Record output
+                            span.record_output(result)
                         
                         return result
-                    
+                    finally:
+                        # Reset in_traced_function_var
+                        in_traced_function_var.reset(token)
+                
             return async_wrapper
         else:
-            # Non-async function implementation remains unchanged
+            # Non-async function implementation with deep tracing
             @functools.wraps(func)
             def wrapper(*args, **kwargs):
+                # Check if we're already in a traced function
+                if in_traced_function_var.get():
+                    return func(*args, **kwargs)
+                
+                # Set in_traced_function_var to True
+                token = in_traced_function_var.set(True)
+                
                 # Get current trace from context
                 current_trace = current_trace_var.get()
                 
@@ -1134,8 +1260,17 @@ class Tracer:
                                 'kwargs': kwargs
                             })
                             
+                            # If deep tracing is enabled, apply monkey patching
+                            if use_deep_tracing:
+                                module, original_functions = self._apply_deep_tracing(func, span_type)
+                            
                             # Execute function
                             result = func(*args, **kwargs)
+                            
+                            # Restore original functions if deep tracing was enabled
+                            if use_deep_tracing and module and 'original_functions' in locals():
+                                for name, obj in original_functions.items():
+                                    setattr(module, name, obj)
                             
                             # Record output
                             span.record_output(result)
@@ -1146,24 +1281,40 @@ class Tracer:
                     finally:
                         # Reset trace context (span context resets automatically)
                         current_trace_var.reset(trace_token)
+                        # Reset in_traced_function_var
+                        in_traced_function_var.reset(token)
                 else:
                     # Already have a trace context, just create a span in it
                     # The span method handles current_span_var
-                    with current_trace.span(span_name, span_type=span_type) as span: # MODIFIED: Use span_name directly
-                        # Record inputs
-                        span.record_input({
-                            'args': str(args),
-                            'kwargs': kwargs
-                        })
-                        
-                        # Execute function
-                        result = func(*args, **kwargs)
-                        
-                        # Record output
-                        span.record_output(result)
+                    
+                    try:
+                        with current_trace.span(span_name, span_type=span_type) as span: # MODIFIED: Use span_name directly
+                            # Record inputs
+                            span.record_input({
+                                'args': str(args),
+                                'kwargs': kwargs
+                            })
+                            
+                            # If deep tracing is enabled, apply monkey patching
+                            if use_deep_tracing:
+                                module, original_functions = self._apply_deep_tracing(func, span_type)
+                            
+                            # Execute function
+                            result = func(*args, **kwargs)
+                            
+                            # Restore original functions if deep tracing was enabled
+                            if use_deep_tracing and module and 'original_functions' in locals():
+                                for name, obj in original_functions.items():
+                                    setattr(module, name, obj)
+                            
+                            # Record output
+                            span.record_output(result)
                         
                         return result
-                    
+                    finally:
+                        # Reset in_traced_function_var
+                        in_traced_function_var.reset(token)
+                
             return wrapper
         
     def score(self, func=None, scorers: List[Union[APIJudgmentScorer, JudgevalScorer]] = None, model: str = None, log_results: bool = True, *, name: str = None, span_type: SpanType = "span"):
@@ -1366,29 +1517,88 @@ def _format_output_data(client: ApiClient, response: Any) -> dict:
         }
     }
 
-# Add a global context-preserving gather function
-# async def trace_gather(*coroutines, return_exceptions=False): # REMOVED
-#     """ # REMOVED
-#     A wrapper around asyncio.gather that ensures the trace context # REMOVED
-#     is available within the gathered coroutines using contextvars.copy_context. # REMOVED
-#     """ # REMOVED
-#     # Get the original asyncio.gather (if we patched it) # REMOVED
-#     original_gather = getattr(asyncio, "_original_gather", asyncio.gather) # REMOVED
-# # REMOVED
-#     # Use contextvars.copy_context() to ensure context propagation # REMOVED
-#     ctx = contextvars.copy_context() # REMOVED
-#      # REMOVED
-#     # Wrap the gather call within the copied context # REMOVED
-#     return await ctx.run(original_gather, *coroutines, return_exceptions=return_exceptions) # REMOVED
-
-# Store the original gather and apply the patch *once*
-# global _original_gather_stored # REMOVED
-# if not globals().get('_original_gather_stored'): # REMOVED
-#     # Check if asyncio.gather is already our wrapper to prevent double patching # REMOVED
-#     if asyncio.gather.__name__ != 'trace_gather':  # REMOVED
-#         asyncio._original_gather = asyncio.gather # REMOVED
-#         asyncio.gather = trace_gather # REMOVED
-#         _original_gather_stored = True # REMOVED
+# Add a new function for deep tracing at the module level
+def _create_deep_tracing_wrapper(func, tracer, span_type="span"):
+    """
+    Creates a wrapper for a function that automatically traces it when called within a traced function.
+    This enables deep tracing without requiring explicit @observe decorators on every function.
+    
+    Args:
+        func: The function to wrap
+        tracer: The Tracer instance
+        span_type: Type of span (default "span")
+        
+    Returns:
+        A wrapped function that will be traced when called
+    """
+    # Skip wrapping if the function is not callable or is a built-in
+    if not callable(func) or isinstance(func, type) or func.__module__ == 'builtins':
+        return func
+    
+    # Get function name for the span - check for custom name set by @observe
+    func_name = getattr(func, '_judgment_span_name', func.__name__)
+    
+    # Check for custom span_type set by @observe
+    func_span_type = getattr(func, '_judgment_span_type', "span")
+    
+    # Store original function to prevent losing reference
+    original_func = func
+    
+    # Create appropriate wrapper based on whether the function is async or not
+    if asyncio.iscoroutinefunction(func):
+        @functools.wraps(func)
+        async def async_deep_wrapper(*args, **kwargs):
+            # Get current trace from context
+            current_trace = current_trace_var.get()
+            
+            # If no trace context, just call the function
+            if not current_trace:
+                return await original_func(*args, **kwargs)
+            
+            # Create a span for this function call - use custom span_type if available
+            with current_trace.span(func_name, span_type=func_span_type) as span:
+                # Record inputs
+                span.record_input({
+                    'args': str(args),
+                    'kwargs': kwargs
+                })
+                
+                # Execute function
+                result = await original_func(*args, **kwargs)
+                
+                # Record output
+                span.record_output(result)
+                
+                return result
+                
+        return async_deep_wrapper
+    else:
+        @functools.wraps(func)
+        def deep_wrapper(*args, **kwargs):
+            # Get current trace from context
+            current_trace = current_trace_var.get()
+            
+            # If no trace context, just call the function
+            if not current_trace:
+                return original_func(*args, **kwargs)
+            
+            # Create a span for this function call - use custom span_type if available
+            with current_trace.span(func_name, span_type=func_span_type) as span:
+                # Record inputs
+                span.record_input({
+                    'args': str(args),
+                    'kwargs': kwargs
+                })
+                
+                # Execute function
+                result = original_func(*args, **kwargs)
+                
+                # Record output
+                span.record_output(result)
+                
+                return result
+                
+        return deep_wrapper
 
 # Add the new TraceThreadPoolExecutor class
 class TraceThreadPoolExecutor(concurrent.futures.ThreadPoolExecutor):

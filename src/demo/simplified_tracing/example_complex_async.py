@@ -25,7 +25,7 @@ tracer = Tracer(
 )
 
 # In this example, we'll use a single trace with spans for all function calls
-@tracer.observe(name="root_function")
+@tracer.observe(name="root_function_custom_name", span_type="function")
 async def root_function():
     print("Root function starting")
     
@@ -49,7 +49,7 @@ async def root_function():
 
 # Level 2 - Direct child of root
 # Using observe with same tracer - this will create spans in the parent trace
-@tracer.observe()
+@tracer.observe(name="level2_apple", span_type="llm")
 async def level2_function(param):
     # Capture this function in a span within the current trace
     print(f"Level 2 function with {param}")
@@ -60,7 +60,6 @@ async def level2_function(param):
     return f"level2:{result}"
 
 # Level 2 - First parallel function
-@tracer.observe()
 async def level2_parallel1(param):
     # Capture this function in a span within the current trace
     print(f"Level 2 parallel 1 with {param}")
@@ -76,7 +75,6 @@ async def level2_parallel1(param):
     return f"level2_parallel1:{r1},{r2}"
 
 # Level 2 - Second parallel function
-@tracer.observe()
 async def level2_parallel2(param):
     # Capture this function in a span within the current trace
     print(f"Level 2 parallel 2 with {param}")
@@ -87,7 +85,6 @@ async def level2_parallel2(param):
     return f"level2_parallel2:{result}"
 
 # Level 3 - Child of level 2 direct
-@tracer.observe()
 async def level3_function(param):
     # Capture this function in a span within the current trace
     print(f"Level 3 function with {param}")
@@ -98,7 +95,7 @@ async def level3_function(param):
     return f"level3:{result}"
 
 # Level 3 - First parallel function called by level2_parallel1
-@tracer.observe()
+@tracer.observe(name="john", span_type="function")
 async def level3_parallel1(param):
     # Capture this function in a span within the current trace
     print(f"Level 3 parallel 1 with {param}")
@@ -114,7 +111,6 @@ async def level3_parallel1(param):
     return f"level3_p1:{','.join(results)}"
 
 # Level 3 - Second parallel function called by level2_parallel1
-@tracer.observe()
 async def level3_parallel2(param):
     # Capture this function in a span within the current trace
     print(f"Level 3 parallel 2 with {param}")
@@ -126,7 +122,6 @@ async def level3_parallel2(param):
     return f"level3_p2:{result}"
 
 # Level 4 - Deepest regular function
-@tracer.observe()
 async def level4_function(param):
     # Capture this function in a span within the current trace
     print(f"Level 4 function with {param}")
@@ -135,7 +130,6 @@ async def level4_function(param):
     return f"level4:{param}"
 
 # Level 4 - Deep function that calls level 5
-@tracer.observe()
 async def level4_deep_function(param):
     # Capture this function in a span within the current trace
     print(f"Level 4 deep function with {param}")
@@ -145,14 +139,12 @@ async def level4_deep_function(param):
     test = await fib(5)
     return f"level4_deep:{result}"
 
-@tracer.observe()
 async def fib(n):
     if n <= 1:
         return n
     return await fib(n-1) + await fib(n-2)
 
 # Level 5 - Deepest level
-@tracer.observe()
 async def level5_function(param):
     # Capture this function in a span within the current trace
     print(f"Level 5 function with {param}")
@@ -162,7 +154,6 @@ async def level5_function(param):
     
 # --- Synchronous ThreadPoolExecutor Test ---
 
-@tracer.observe(name="sync_child_task1")
 def sync_child_task1(param):
     """A simple synchronous function to be run in a thread."""
     print(f"SYNC CHILD 1: Received {param}. Sleeping...")
@@ -171,7 +162,6 @@ def sync_child_task1(param):
     print("SYNC CHILD 1: Done.")
     return result
 
-@tracer.observe(name="sync_child_task2")
 def sync_child_task2(param1, param2):
     """Another simple synchronous function."""
     print(f"SYNC CHILD 2: Received {param1} and {param2}. Sleeping...")

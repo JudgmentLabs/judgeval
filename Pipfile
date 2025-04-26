@@ -28,6 +28,7 @@ langgraph = "*"
 google-genai = "*"
 autoevals = "*"
 langfuse = "*"
+boto3 = "*"
 
 [dev-packages]
 pytest = "*"
