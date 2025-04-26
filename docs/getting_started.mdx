@@ -129,7 +129,7 @@ def my_tool():
 
 @judgment.observe(span_type="function")
 def main():
-    # my_tool will be automatically traced without @observe
+    # Call my_tool which is also observed with its own decorator
     task_input = my_tool()
     res = client.chat.completions.create(
         model="gpt-4o",
@@ -142,10 +142,6 @@ def main():
         model="gpt-4o"
     )
     return res.choices[0].message.content
-
-# No @observe needed - automatically traced when called from main
-def helper_function():
-    return "This function will be traced automatically"
 
 main()
 ```
@@ -164,10 +160,10 @@ async function myTool(): Promise<string> {
 // Wrap the function using the observe method
 const observedMyTool = judgment.observe({ spanType: "tool" })(myTool);
 
-// Define the main function
+// Define the main function with observe decorator
 const main = judgment.observe({ spanType: "function" })(async () => {
-    // myTool will be automatically traced without explicit observe
-    const taskInput = myTool();
+    // Call the observed myTool function
+    const taskInput = await observedMyTool();
     const res = await client.chat.completions.create({
         model: "gpt-4o",
         messages: [{ role: "user", content: taskInput }],
