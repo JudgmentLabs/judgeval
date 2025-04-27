@@ -208,10 +208,6 @@ def trace_manager_client():
     """Fixture to initialize TraceManagerClient."""
     return TraceManagerClient(judgment_api_key=os.getenv("JUDGMENT_API_KEY"), organization_id=os.getenv("JUDGMENT_ORG_ID"))
 
-@pytest.mark.asyncio
-async def test_token_counting(trace_manager_client):
-    input = "Write a poem about Nissan R32 GTR"
-
 @pytest.fixture
 def test_input():
     """Fixture providing default test input"""
@@ -229,6 +225,93 @@ async def test_evaluation_mixed_async(test_input):
 
 
 @pytest.mark.asyncio
+async def test_openai_response_api():
+    """
+    Test OpenAI's Response API with token counting verification.
+    
+    This test verifies that token counting works correctly with the OpenAI Response API.
+    It performs the same API call with both chat.completions.create and responses.create
+    to compare token counting for both APIs.
+    """
+    print("\n\n=== Testing OpenAI Response API with token counting ===")
+    
+    # Define test messages
+    messages = [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "What is the capital of France?"}
+    ]
+    
+    # Common project name for easy comparison in the Judgment UI
+    project_name = "ResponseAPITest"
+    
+    # Test chat.completions.create
+    with judgment.trace("chat_completions_api", project_name=project_name, overwrite=True) as trace:
+        response_chat = openai_client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=messages
+        )
+        content_chat = response_chat.choices[0].message.content
+        print(f"\nChat Completions Response: {content_chat}")
+        
+        trace_id, trace_data = trace.save()
+        token_counts_chat = trace_data["token_counts"]
+        
+        print("\nChat Completions Token Counts:")
+        print(f"  Prompt tokens: {token_counts_chat['prompt_tokens']}")
+        print(f"  Completion tokens: {token_counts_chat['completion_tokens']}")
+        print(f"  Total tokens: {token_counts_chat['total_tokens']}")
+        
+        # Verify chat.completions token counts
+        assert token_counts_chat["prompt_tokens"] > 0, "Prompt tokens should be counted"
+        assert token_counts_chat["completion_tokens"] > 0, "Completion tokens should be counted"
+        assert token_counts_chat["total_tokens"] > 0, "Total tokens should be counted"
+        assert token_counts_chat["total_tokens"] == token_counts_chat["prompt_tokens"] + token_counts_chat["completion_tokens"], \
+            "Total tokens should equal prompt + completion tokens"
+    
+    # Test responses.create
+    with judgment.trace("responses_api", project_name=project_name, overwrite=True) as trace:
+        response_resp = openai_client.responses.create(
+            model="gpt-4.1-mini",
+            input=messages
+        )
+        
+        # Extract text from the response
+        content_resp = ""
+        for item in response_resp.output:
+            if hasattr(item, 'text'):
+                content_resp += item.text
+        
+        print(f"\nResponses API Response: {content_resp}")
+        
+        trace_id, trace_data = trace.save()
+        token_counts_resp = trace_data["token_counts"]
+        
+        print("\nResponses API Token Counts:")
+        print(f"  Prompt tokens: {token_counts_resp['prompt_tokens']}")
+        print(f"  Completion tokens: {token_counts_resp['completion_tokens']}")
+        print(f"  Total tokens: {token_counts_resp['total_tokens']}")
+        
+        # Verify responses.create token counts
+        assert token_counts_resp["prompt_tokens"] > 0, "Prompt tokens should be counted"
+        assert token_counts_resp["completion_tokens"] > 0, "Completion tokens should be counted"
+        assert token_counts_resp["total_tokens"] > 0, "Total tokens should be counted"
+        assert token_counts_resp["total_tokens"] == token_counts_resp["prompt_tokens"] + token_counts_resp["completion_tokens"], \
+            "Total tokens should equal prompt + completion tokens"
+    
+    print("\nTest passed! Token counting works correctly for both Chat Completions and Response APIs.")
+    
+    return {
+        "chat_completions": {
+            "content": content_chat,
+            "token_counts": token_counts_chat
+        },
+        "responses": {
+            "content": content_resp,
+            "token_counts": token_counts_resp
+        }
+    }
+
+@pytest.mark.asyncio
 async def run_selected_tests(test_names: list[str]):
     """
     Run only the specified tests by name.
@@ -243,6 +326,8 @@ async def run_selected_tests(test_names: list[str]):
     
     test_map = {
         'token_counting': test_token_counting,
+        'deep_tracing': test_deep_tracing_with_custom_spans,
+        'openai_response_api': test_openai_response_api,
     }
 
     for test_name in test_names:
@@ -433,34 +518,6 @@ async def test_deep_tracing_with_custom_spans():
     
     return result
 
-@pytest.mark.asyncio
-async def run_selected_tests(test_names: list[str]):
-    """
-    Run only the specified tests by name.
-    
-    Args:
-        test_names (list[str]): List of test function names to run (without 'test_' prefix)
-    """
-
-    trace_manager_client = TraceManagerClient(judgment_api_key=os.getenv("JUDGMENT_API_KEY"), organization_id=os.getenv("JUDGMENT_ORG_ID"))
-    print("Client initialized successfully")
-    print("*" * 40)
-    
-    test_map = {
-        'token_counting': test_token_counting,
-        'deep_tracing': test_deep_tracing_with_custom_spans,
-    }
-
-    for test_name in test_names:
-        if test_name not in test_map:
-            print(f"Warning: Test '{test_name}' not found")
-            continue
-            
-        print(f"Running test: {test_name}")
-        await test_map[test_name](trace_manager_client)
-        print(f"{test_name} test successful")
-        print("*" * 40)
-
 # Helper function to print trace hierarchy
 def print_trace_hierarchy(entries):
     """Print a hierarchical representation of the trace for debugging."""
@@ -494,4 +551,5 @@ if __name__ == "__main__":
     asyncio.run(run_selected_tests([
         "token_counting", 
         "deep_tracing",
+        "openai_response_api",
         ]))

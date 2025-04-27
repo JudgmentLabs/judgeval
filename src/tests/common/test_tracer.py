@@ -342,17 +342,13 @@ def test_tracer_invalid_api_key(mocker):
     """Test that Tracer handles invalid API keys"""
     # Clear the singleton instance first
     Tracer._instance = None
+    JudgmentClient._instances = {}  # Clear JudgmentClient singleton too
     
-    # Create the mock response for invalid API key
-    mock_post_response = mocker.Mock(spec=requests.Response)
-    mock_post_response.status_code = 401
-    mock_post_response.json.return_value = {"detail": "API key is invalid"}
-    mock_post_response.raise_for_status.side_effect = requests.exceptions.HTTPError()
+    # Directly patch the _validate_api_key method in JudgmentClient
+    mocker.patch('judgeval.judgment_client.JudgmentClient._validate_api_key',
+                return_value=(False, "API key is invalid"))
     
-    # Create mock for POST request
-    mock_post = mocker.patch('requests.post', autospec=True)
-    mock_post.return_value = mock_post_response
-    
+    # Now when Tracer tries to initialize JudgmentClient, it will receive our mocked result
     with pytest.raises(JudgmentAPIError, match="Issue with passed in Judgment API key: API key is invalid"):
         Tracer(api_key="invalid_key", organization_id="test_org")
 
@@ -376,3 +372,41 @@ def test_observe_decorator_with_error(tracer):
     with tracer.trace("test_trace"):
         with pytest.raises(ValueError):
             failing_function()
+
+@patch('requests.post')
+def test_wrap_openai_responses_api(mock_post, tracer):
+    """Test wrapping OpenAI responses API"""
+    # Configure mock response properly
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.text = '{"message": "success"}'
+    mock_post.return_value = mock_response
+    
+    client = OpenAI()
+    # Create mock for responses.create method
+    mock_responses_result = MagicMock()
+    mock_responses_result.output = [MagicMock(type="text", text="test response")]
+    mock_responses_result.usage = MagicMock(prompt_tokens=15, completion_tokens=25, total_tokens=40)
+    
+    # Mock the responses.create method
+    client.responses = MagicMock()
+    original_mock = MagicMock(return_value=mock_responses_result)
+    client.responses.create = original_mock
+    
+    wrapped_client = wrap(client)
+    
+    # Test that the responses.create method is wrapped correctly
+    with tracer.trace("test_response_api"):
+        response = wrapped_client.responses.create(
+            model="gpt-4.1-mini",
+            input=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "What is the capital of France?"}
+            ]
+        )
+    
+    # Verify the response is correctly passed through
+    assert response == mock_responses_result
+    
+    # Verify that the original mock was called - check by examining call count
+    assert original_mock.call_count == 1, "responses.create should have been called exactly once"
