@@ -4,6 +4,7 @@ base e2e tests for all default judgeval scorers
 import uuid
 
 from judgeval.judgment_client import JudgmentClient
+from pydantic import BaseModel
 from judgeval.scorers import (
     AnswerCorrectnessScorer,
     AnswerRelevancyScorer, 
@@ -18,12 +19,14 @@ from judgeval.scorers import (
     InstructionAdherenceScorer,
     ExecutionOrderScorer,
     DerailmentScorer,
+    JSONCorrectnessScorer,
+    ClassifierScorer,
 )
 
 from judgeval.data import Example, Sequence
 
 
-def test_ac_scorer():
+def test_ac_scorer(client: JudgmentClient):
     
     example = Example(
         input="What's the capital of France?",
@@ -32,12 +35,9 @@ def test_ac_scorer():
     )
 
     scorer = AnswerCorrectnessScorer(threshold=0.5)
-
-    client = JudgmentClient()
     PROJECT_NAME = "test-project"
     EVAL_RUN_NAME = "test-run-ac"
-    
-    # Test with use_judgment=True
+
     res = client.run_evaluation(
         examples=[example],
         scorers=[scorer],
@@ -45,27 +45,11 @@ def test_ac_scorer():
         log_results=True,
         project_name=PROJECT_NAME,
         eval_run_name=EVAL_RUN_NAME,
-        use_judgment=True,
         override=True,
     )
     print_debug_on_failure(res[0])
 
-    # Test with use_judgment=False 
-    example.example_id = str(uuid.uuid4())
-    res = client.run_evaluation(
-        examples=[example],
-        scorers=[scorer],
-        model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-        log_results=True,
-        project_name=PROJECT_NAME,
-        eval_run_name=EVAL_RUN_NAME,
-        use_judgment=False,
-        override=True,
-    )
-    print_debug_on_failure(res[0])
-
-
-def test_ar_scorer():
+def test_ar_scorer(client: JudgmentClient):
 
     example_1 = Example(  # should pass
         input="What's the capital of France?",
@@ -79,11 +63,9 @@ def test_ar_scorer():
 
     scorer = AnswerRelevancyScorer(threshold=0.5)
 
-    client = JudgmentClient()
     PROJECT_NAME = "test-project"
     EVAL_RUN_NAME = "test-run-ar"
 
-    # Test with use_judgment=True
     res = client.run_evaluation(
         examples=[example_1, example_2],
         scorers=[scorer],
@@ -91,27 +73,6 @@ def test_ar_scorer():
         log_results=True,
         project_name=PROJECT_NAME,
         eval_run_name=EVAL_RUN_NAME,
-        use_judgment=True,
-        override=True,
-    )
-
-    print_debug_on_failure(res[0])
-    print_debug_on_failure(res[1])
-    
-    assert res[0].success == True
-    assert res[1].success == False
-
-    # Test with use_judgment=False
-    example_1.example_id = str(uuid.uuid4())
-    example_2.example_id = str(uuid.uuid4())
-    res = client.run_evaluation(
-        examples=[example_1, example_2],
-        scorers=[scorer],
-        model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-        log_results=True,
-        project_name=PROJECT_NAME,
-        eval_run_name=EVAL_RUN_NAME,
-        use_judgment=False,
         override=True,
     )
 
@@ -122,7 +83,7 @@ def test_ar_scorer():
     assert res[1].success == False
 
 
-def test_comparison_scorer():
+def test_comparison_scorer(client: JudgmentClient):
     example_1 = Example(
         input="Generate a poem about a field",
         expected_output="A sunlit meadow, alive with whispers of wind, where daisies dance and hope begins again. Each petal holds a promise—bright, unbruised— a symphony of light that cannot be refused.",
@@ -137,7 +98,6 @@ def test_comparison_scorer():
 
     scorer = ComparisonScorer(threshold=1, criteria="Tone and Style", description="The tone and style of the poem should be consistent and cohesive.")
 
-    client = JudgmentClient()
     PROJECT_NAME = "test-project"
     EVAL_RUN_NAME = "test-run-comparison"
 
@@ -148,7 +108,6 @@ def test_comparison_scorer():
         log_results=True,
         project_name=PROJECT_NAME,
         eval_run_name=EVAL_RUN_NAME,
-        use_judgment=True,
         override=True,  
     )
 
@@ -156,7 +115,7 @@ def test_comparison_scorer():
     assert res[0].success == False
     assert res[1].success == True
 
-def test_cp_scorer():
+def test_cp_scorer(client: JudgmentClient):
 
     example_1 = Example(  # should pass
         input="What's the capital of France?",
@@ -182,11 +141,9 @@ def test_cp_scorer():
 
     scorer = ContextualPrecisionScorer(threshold=0.5)
 
-    client = JudgmentClient()
     PROJECT_NAME = "test-project"
     EVAL_RUN_NAME = "test-run-cp"
 
-    # Test with use_judgment=True
     res = client.run_evaluation(
         examples=[example_1, example_2],
         scorers=[scorer],
@@ -194,7 +151,6 @@ def test_cp_scorer():
         log_results=True,
         project_name=PROJECT_NAME,
         eval_run_name=EVAL_RUN_NAME,
-        use_judgment=True,
         override=True,
     )
 
@@ -204,28 +160,7 @@ def test_cp_scorer():
     assert res[0].success == True  # example_1 should pass
     assert res[1].success == False  # example_2 should fail
 
-    # Test with use_judgment=False
-    example_1.example_id = str(uuid.uuid4())
-    example_2.example_id = str(uuid.uuid4())
-    res = client.run_evaluation(
-        examples=[example_1, example_2],
-        scorers=[scorer],
-        model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-        log_results=True,
-        project_name=PROJECT_NAME,
-        eval_run_name=EVAL_RUN_NAME,
-        use_judgment=False,
-        override=True,
-    )
-
-    print_debug_on_failure(res[0])
-    print_debug_on_failure(res[1])
-
-    assert res[0].success == True  # example_1 should pass
-    assert res[1].success == False  # example_2 should fail
-
-
-def test_cr_scorer():
+def test_cr_scorer(client: JudgmentClient):
 
     example_1 = Example(  # should pass
         input="What's the capital of France?",
@@ -240,11 +175,9 @@ def test_cr_scorer():
 
     scorer = ContextualRecallScorer(threshold=0.5)
 
-    client = JudgmentClient()
     PROJECT_NAME = "test-project"
     EVAL_RUN_NAME = "test-run-cr"
 
-    # Test with use_judgment=True
     res = client.run_evaluation(
         examples=[example_1],
         scorers=[scorer],
@@ -252,7 +185,6 @@ def test_cr_scorer():
         log_results=True,
         project_name=PROJECT_NAME,
         eval_run_name=EVAL_RUN_NAME,
-        use_judgment=True,
         override=True,
     )
 
@@ -260,25 +192,7 @@ def test_cr_scorer():
 
     assert res[0].success == True  # example_1 should pass
 
-    # Test with use_judgment=False
-    example_1.example_id = str(uuid.uuid4())
-    res = client.run_evaluation(
-        examples=[example_1],
-        scorers=[scorer],
-        model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-        log_results=True,
-        project_name=PROJECT_NAME,
-        eval_run_name=EVAL_RUN_NAME,
-        use_judgment=False,
-        override=True,
-    )
-
-    print_debug_on_failure(res[0])
-
-    assert res[0].success == True  # example_1 should pass
-
-
-def test_crelevancy_scorer():
+def test_crelevancy_scorer(client: JudgmentClient):
 
     example_1 = Example(  # should pass
         input="What's the capital of France?",
@@ -293,11 +207,9 @@ def test_crelevancy_scorer():
 
     scorer = ContextualRelevancyScorer(threshold=0.5)
 
-    client = JudgmentClient()
     PROJECT_NAME = "test-project"
     EVAL_RUN_NAME = "test-run-crelevancy"
 
-    # Test with use_judgment=True
     res = client.run_evaluation(
         examples=[example_1],
         scorers=[scorer],
@@ -305,7 +217,6 @@ def test_crelevancy_scorer():
         log_results=True,
         project_name=PROJECT_NAME,
         eval_run_name=EVAL_RUN_NAME,
-        use_judgment=True,
         override=True,
     )
 
@@ -315,25 +226,7 @@ def test_crelevancy_scorer():
 
     assert res[0].success == True  # example_1 should pass
 
-    # Test with use_judgment=False
-    example_1.example_id = str(uuid.uuid4())
-    res = client.run_evaluation(
-        examples=[example_1],
-        scorers=[scorer],
-        model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-        log_results=True,
-        project_name=PROJECT_NAME,
-        eval_run_name=EVAL_RUN_NAME,
-        use_judgment=False,
-        override=True,
-    )
-
-    print_debug_on_failure(res[0])
-
-    assert res[0].success == True  # example_1 should pass
-
-
-def test_faithfulness_scorer():
+def test_faithfulness_scorer(client: JudgmentClient):
 
     faithful_example = Example(  # should pass
         input="What's the capital of France?",
@@ -359,11 +252,9 @@ def test_faithfulness_scorer():
 
     scorer = FaithfulnessScorer(threshold=1.0)
 
-    client = JudgmentClient()
     PROJECT_NAME = "test-project"
     EVAL_RUN_NAME = "test-run-faithfulness"
 
-    # Test with use_judgment=True
     res = client.run_evaluation(
         examples=[faithful_example, contradictory_example],
         scorers=[scorer],
@@ -371,27 +262,6 @@ def test_faithfulness_scorer():
         log_results=True,
         project_name=PROJECT_NAME,
         eval_run_name=EVAL_RUN_NAME,
-        use_judgment=True,
-        override=True,
-    )
-
-    print_debug_on_failure(res[0])
-    print_debug_on_failure(res[1])
-
-    assert res[0].success == True  # faithful_example should pass
-    assert res[1].success == False, res[1]  # contradictory_example should fail
-
-    # Test with use_judgment=False
-    faithful_example.example_id = str(uuid.uuid4())
-    contradictory_example.example_id = str(uuid.uuid4())
-    res = client.run_evaluation(
-        examples=[faithful_example, contradictory_example],
-        scorers=[scorer],
-        model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-        log_results=True,
-        project_name=PROJECT_NAME,
-        eval_run_name=EVAL_RUN_NAME,
-        use_judgment=False,
         override=True,
     )
 
@@ -402,7 +272,7 @@ def test_faithfulness_scorer():
     assert res[1].success == False, res[1]  # contradictory_example should fail
 
 
-def test_hallucination_scorer():
+def test_hallucination_scorer(client: JudgmentClient):
 
     example_1 = Example(  # should pass
         input="What's the capital of France?",
@@ -422,11 +292,9 @@ def test_hallucination_scorer():
 
     scorer = HallucinationScorer(threshold=0.5)
 
-    client = JudgmentClient()
     PROJECT_NAME = "test-project"
     EVAL_RUN_NAME = "test-run-hallucination"
 
-    # Test with use_judgment=True
     res = client.run_evaluation(
         examples=[example_1],
         scorers=[scorer],
@@ -434,7 +302,6 @@ def test_hallucination_scorer():
         log_results=True,
         project_name=PROJECT_NAME,
         eval_run_name=EVAL_RUN_NAME,
-        use_judgment=True,
         override=True,
     )
 
@@ -443,26 +310,7 @@ def test_hallucination_scorer():
     # Add more detailed assertion error message
     assert res[0].success == True, f"Hallucination test failed: score={res[0].scorers_data[0].score}, threshold={res[0].scorers_data[0].threshold}, reason={res[0].scorers_data[0].reason}"
 
-    # Test with use_judgment=False
-    example_1.example_id = str(uuid.uuid4())
-    res = client.run_evaluation(
-        examples=[example_1],
-        scorers=[scorer],
-        model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-        log_results=True,
-        project_name=PROJECT_NAME,
-        eval_run_name=EVAL_RUN_NAME,
-        use_judgment=False,
-        override=True,
-    )
-
-    print_debug_on_failure(res[0])
-
-    # Add more detailed assertion error message
-    assert res[0].success == True, f"Hallucination test failed: score={res[0].scorers_data[0].score}, threshold={res[0].scorers_data[0].threshold}, reason={res[0].scorers_data[0].reason}"
-
-
-def test_instruction_adherence_scorer():
+def test_instruction_adherence_scorer(client: JudgmentClient):
     example_1 = Example(
         input="write me a poem about cars and then turn it into a joke, but also what is 5 +5?",
         actual_output="Cars on the road, they zoom and they fly, Under the sun or a stormy sky. Engines roar, tires spin, A symphony of motion, let the race begin. Now for the joke: Why did the car break up with the bicycle. Because it was tired of being two-tired! And 5 + 5 is 10.",
@@ -470,7 +318,6 @@ def test_instruction_adherence_scorer():
 
     scorer = InstructionAdherenceScorer(threshold=0.5)
 
-    client = JudgmentClient()
     PROJECT_NAME = "test-project"
     EVAL_RUN_NAME = "test-run-instruction-adherence"
 
@@ -481,7 +328,6 @@ def test_instruction_adherence_scorer():
         log_results=True,
         project_name=PROJECT_NAME,
         eval_run_name=EVAL_RUN_NAME,
-        use_judgment=True,
         override=True,
     )
 
@@ -489,7 +335,7 @@ def test_instruction_adherence_scorer():
 
     assert res[0].success == True
 
-def test_summarization_scorer():
+def test_summarization_scorer(client: JudgmentClient):
     example_1 = Example(  # should pass
         input="Paris is the capital city of France and one of the most populous cities in Europe. The city is known for its iconic landmarks like the Eiffel Tower, Louvre Museum, and Notre-Dame Cathedral. Paris is also a global center for art, fashion, gastronomy and culture. The city's romantic atmosphere, historic architecture, and world-class museums attract millions of visitors each year.",
         actual_output="Paris is France's capital and a major European city famous for landmarks like the Eiffel Tower. It's a global hub for art, fashion and culture that draws many tourists.",
@@ -497,11 +343,9 @@ def test_summarization_scorer():
 
     scorer = SummarizationScorer(threshold=0.5)
 
-    client = JudgmentClient()
     PROJECT_NAME = "test-project"
     EVAL_RUN_NAME = "test-run-summarization"
 
-    # Test with use_judgment=True
     res = client.run_evaluation(
         examples=[example_1],
         scorers=[scorer],
@@ -509,7 +353,6 @@ def test_summarization_scorer():
         log_results=True,
         project_name=PROJECT_NAME,
         eval_run_name=EVAL_RUN_NAME,
-        use_judgment=True,
         override=True,
     )
 
@@ -518,27 +361,7 @@ def test_summarization_scorer():
     # Add detailed assertion error message
     assert res[0].success == True, f"Summarization test failed: score={res[0].scorers_data[0].score}, threshold={res[0].scorers_data[0].threshold}, reason={res[0].scorers_data[0].reason}"
 
-    # Test with use_judgment=False
-    example_1.example_id = str(uuid.uuid4())
-    res = client.run_evaluation(
-        examples=[example_1],
-        scorers=[scorer],
-        model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-        log_results=True,
-        project_name=PROJECT_NAME,
-        eval_run_name=EVAL_RUN_NAME,
-        use_judgment=False,
-        override=True,
-    )
-
-    print_debug_on_failure(res[0])
-    
-    # Add detailed assertion error message
-    assert res[0].success == True, f"Summarization test failed: score={res[0].scorers_data[0].score}, threshold={res[0].scorers_data[0].threshold}, reason={res[0].scorers_data[0].reason}"
-
-
-def test_text2sql_scorer():
-    client = JudgmentClient()
+def test_text2sql_scorer(client: JudgmentClient):
 
     table_schema = """CREATE TABLE Artists (
     artist_id VARCHAR(50) PRIMARY KEY,
@@ -691,10 +514,7 @@ LIMIT 10;
     assert print_debug_on_failure(res[3])
     assert not print_debug_on_failure(res[4])
 
-
-
-def test_execution_order_scorer():
-    client = JudgmentClient()
+def test_execution_order_scorer(client: JudgmentClient):
     PROJECT_NAME = "test-project"
     EVAL_RUN_NAME = "test-run-execution-order"
 
@@ -713,8 +533,7 @@ def test_execution_order_scorer():
         override=True
     )
 
-def test_derailment_scorer():
-    client = JudgmentClient()
+def test_derailment_scorer(client: JudgmentClient):
     PROJECT_NAME = "test-project"
     EVAL_RUN_NAME = "test-run-derailment"
 
@@ -739,6 +558,82 @@ def test_derailment_scorer():
         log_results=True,
         override=True,
     )
+def test_json_scorer(client: JudgmentClient):
+        """Test JSON scorer functionality."""
+        example1 = Example(
+            input="What if these shoes don't fit?",
+            actual_output='{"tool": "authentication"}',
+            retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
+        )
+
+        example2 = Example(
+            input="How do I reset my password?",
+            actual_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
+            expected_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
+            name="Password Reset",
+            context=["User Account"],
+            retrieval_context=["Password reset instructions"],
+            tools_called=["authentication"],
+            expected_tools=["authentication"],
+            additional_metadata={"difficulty": "medium"}
+        )
+
+        class SampleSchema(BaseModel):
+            tool: str
+
+        scorer = JSONCorrectnessScorer(threshold=0.5, json_schema=SampleSchema)
+        PROJECT_NAME = "test_project"
+        EVAL_RUN_NAME = "test_json_scorer"
+        
+        res = client.run_evaluation(
+            examples=[example1, example2],
+            scorers=[scorer],
+            model="Qwen/Qwen2.5-72B-Instruct-Turbo",
+            metadata={"batch": "test"},
+            project_name=PROJECT_NAME,
+            eval_run_name=EVAL_RUN_NAME,
+            log_results=True,
+            override=True,
+        )
+        assert res, "JSON scorer evaluation failed"
+
+def test_classifier_scorer(client: JudgmentClient, random_name: str):
+    """Test classifier scorer functionality."""
+    random_slug = random_name
+    faithfulness_scorer = FaithfulnessScorer(threshold=0.5)
+    
+    # Creating a classifier scorer from SDK
+    classifier_scorer_custom = ClassifierScorer(
+        name="Test Classifier Scorer",
+        slug=random_slug,
+        threshold=0.5,
+        conversation=[],
+        options={}
+    )
+    
+    classifier_scorer_custom.update_conversation(conversation=[{"role": "user", "content": "What is the capital of France?"}])
+    classifier_scorer_custom.update_options(options={"yes": 1, "no": 0})
+    
+    slug = client.push_classifier_scorer(scorer=classifier_scorer_custom)
+    
+    classifier_scorer_custom = client.fetch_classifier_scorer(slug=slug)
+    
+    example1 = Example(
+        input="What is the capital of France?",
+        actual_output="Paris",
+        retrieval_context=["The capital of France is Paris."],
+    )
+
+    res = client.run_evaluation(
+        examples=[example1],
+        scorers=[faithfulness_scorer, classifier_scorer_custom],
+        model="Qwen/Qwen2.5-72B-Instruct-Turbo",
+        log_results=True,
+        eval_run_name="ToneScorerTest",
+        project_name="ToneScorerTest",
+        override=True,
+    )
+    assert res, "Classifier scorer evaluation failed" 
 
 
         

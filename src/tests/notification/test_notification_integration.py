@@ -206,8 +206,7 @@ class TestDirectNotificationIntegration:
 class TestNotificationWithAPICalls:
     """Tests for notifications with API calls to external services."""
     
-    @patch('judgeval.scorers.judgeval_scorers.ScorerWrapper.load_implementation')
-    def test_judgment_client_with_notification_rules(self, mock_load_implementation, mock_post):
+    def test_judgment_client_with_notification_rules(self, mock_post):
         """Test JudgmentClient with notification rules."""
         # Mock API responses
         mock_auth_response = MagicMock()
@@ -262,11 +261,6 @@ class TestNotificationWithAPICalls:
                 return mock_eval_response
         
         mock_post.side_effect = mock_post_side_effect
-        
-        # Create a mock implementation that will be returned
-        mock_implementation = MagicMock()
-        mock_implementation.score_type = "faithfulness"
-        mock_load_implementation.return_value = mock_implementation
         
         # Create JudgmentClient
         with patch.object(JudgmentClient, '_validate_api_key', return_value=(True, {"detail": {"user_name": "test_user"}})):
@@ -325,8 +319,7 @@ class TestNotificationWithAPICalls:
             assert rule_data["notification"]["communication_methods"] == ["slack", "email"]
             assert rule_data["notification"]["email_addresses"] == ["test@example.com"]
     
-    @patch('judgeval.scorers.judgeval_scorers.ScorerWrapper.load_implementation')
-    def test_notification_with_multiple_methods(self, mock_load_implementation, mock_post):
+    def test_notification_with_multiple_methods(self, mock_post):
         """Test notifications with multiple communication methods."""
         # Mock API responses (same as before but with multiple methods and proper structure)
         mock_auth_response = MagicMock()
@@ -379,11 +372,6 @@ class TestNotificationWithAPICalls:
                 return mock_eval_response
         
         mock_post.side_effect = mock_post_side_effect
-            
-        # Create a mock implementation that will be returned
-        mock_implementation = MagicMock()
-        mock_implementation.score_type = "faithfulness"
-        mock_load_implementation.return_value = mock_implementation
         
         # Create JudgmentClient
         with patch.object(JudgmentClient, '_validate_api_key', return_value=(True, {"detail": {"user_name": "test_user"}})):
