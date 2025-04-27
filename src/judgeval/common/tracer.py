@@ -1396,26 +1396,19 @@ def wrap(client: Any) -> Any:
 
     # Function replacing .stream() - NOW returns the wrapper class instance
     def traced_stream_async(*args, **kwargs):
-        print(f"[DEBUG] Entered traced_stream_async for {span_name}") # DEBUG
-        current_trace = current_trace_var.get() # Get the TraceClient instance
+        current_trace = current_trace_var.get()
         if not current_trace or not original_stream:
-            print(f"[DEBUG] traced_stream_async: No trace or original stream, calling original.") # DEBUG
-            return original_stream(*args, **kwargs) # Fallback
-
-        # Call original stream method *synchronously* to get the manager object
+            return original_stream(*args, **kwargs)
         original_manager = original_stream(*args, **kwargs)
-
-        # Create and return an instance of our wrapper context manager
         wrapper_manager = _TracedAsyncStreamManagerWrapper(
             original_manager=original_manager,
             client=client,
             span_name=span_name,
-            trace_client=current_trace, # Pass the TraceClient instance
+            trace_client=current_trace,
             stream_wrapper_func=_async_stream_wrapper,
-            input_kwargs=kwargs # Pass the original kwargs for input recording
+            input_kwargs=kwargs
         )
-        print(f"[DEBUG] traced_stream_async: Returning _TracedAsyncStreamManagerWrapper for {span_name}") # DEBUG
-        return wrapper_manager # Return our wrapper instance
+        return wrapper_manager
 
     # --- Define Traced Sync Functions ---
     def traced_create_sync(*args, **kwargs):
@@ -1451,14 +1444,10 @@ def wrap(client: Any) -> Any:
 
     # Function replacing sync .stream()
     def traced_stream_sync(*args, **kwargs):
-         print(f"[DEBUG] Entered traced_stream_sync for {span_name}") # DEBUG
          current_trace = current_trace_var.get()
          if not current_trace or not original_stream:
-             print(f"[DEBUG] traced_stream_sync: No trace or original stream, calling original.")
              return original_stream(*args, **kwargs)
          original_manager = original_stream(*args, **kwargs)
-
-         # Create and return an instance of our sync wrapper context manager
          wrapper_manager = _TracedSyncStreamManagerWrapper(
              original_manager=original_manager,
              client=client,
@@ -1467,7 +1456,6 @@ def wrap(client: Any) -> Any:
              stream_wrapper_func=_sync_stream_wrapper,
              input_kwargs=kwargs
          )
-         print(f"[DEBUG] traced_stream_sync: Returning _TracedSyncStreamManagerWrapper for {span_name}")
          return wrapper_manager
 
 
@@ -1478,7 +1466,7 @@ def wrap(client: Any) -> Any:
     elif isinstance(client, AsyncAnthropic):
         client.messages.create = traced_create_async
         if original_stream:
-             client.messages.stream = traced_stream_async # Assign new wrapper func
+             client.messages.stream = traced_stream_async
     elif isinstance(client, genai.client.AsyncClient):
         client.generate_content = traced_create_async
     elif isinstance(client, (OpenAI, Together)):
@@ -1486,10 +1474,9 @@ def wrap(client: Any) -> Any:
     elif isinstance(client, Anthropic):
          client.messages.create = traced_create_sync
          if original_stream:
-             client.messages.stream = traced_stream_sync # Assign new wrapper func
+             client.messages.stream = traced_stream_sync
     elif isinstance(client, genai.Client):
          client.generate_content = traced_create_sync
-
 
     return client
 
@@ -1797,7 +1784,7 @@ def _sync_stream_wrapper(
 async def _async_stream_wrapper(
     original_stream: AsyncIterator,
     client: ApiClient,
-    output_entry: TraceEntry # This is the entry for the inner LLM span
+    output_entry: TraceEntry
 ) -> AsyncGenerator[Any, None]:
     # [Existing logic - unchanged]
     full_content = ""
@@ -1851,22 +1838,15 @@ async def _async_stream_wrapper(
         elif last_content_chunk:
              usage_info = _extract_usage_from_final_chunk(client, last_content_chunk)
 
-        print(f"[DEBUG] _async_stream_wrapper finally: Updating output for entry span ID: {target_span_id}")
-        print(f"[DEBUG] _async_stream_wrapper finally: Calculated usage_info: {usage_info}")
-
         if output_entry and hasattr(output_entry, 'output'):
             output_entry.output = {
                 "content": full_content,
                 "usage": usage_info if usage_info else {"info": "Usage data not available in stream."},
                 "streamed": True
             }
-            # Ensure duration calculation uses valid timestamps
-            start_ts = getattr(output_entry, 'created_at', time.time()) # Fallback to now if created_at is missing
+            start_ts = getattr(output_entry, 'created_at', time.time())
             output_entry.duration = time.time() - start_ts
-            output_print = getattr(output_entry, 'output', 'ERROR: output_entry has no output attr')
-            print(f"[DEBUG] _async_stream_wrapper finally: Updated output_entry.output: {output_print}")
-        else:
-             print(f"[DEBUG] _async_stream_wrapper finally: ERROR - output_entry object is invalid or missing for span {target_span_id}. Cannot update output.")
+        # else: # Handle error case if necessary, but remove debug print
 
 # --- Define Context Manager Wrapper Classes ---
 class _TracedAsyncStreamManagerWrapper(AbstractAsyncContextManager):
@@ -1875,33 +1855,24 @@ class _TracedAsyncStreamManagerWrapper(AbstractAsyncContextManager):
         self._original_manager = original_manager
         self._client = client
         self._span_name = span_name
-        self._trace_client = trace_client # The TraceClient instance
-        self._stream_wrapper_func = stream_wrapper_func # e.g., _async_stream_wrapper
-        self._input_kwargs = input_kwargs # kwargs passed to original .stream()
-        self._span_context = None # To hold the span context manager
-        self._parent_span_id_at_entry = None # Store parent span ID when __aenter__ starts
+        self._trace_client = trace_client
+        self._stream_wrapper_func = stream_wrapper_func
+        self._input_kwargs = input_kwargs
+        self._parent_span_id_at_entry = None
 
     async def __aenter__(self):
-        self._parent_span_id_at_entry = current_span_var.get() # Capture parent ID *before* creating inner span
-        print(f"[DEBUG] Wrapper __aenter__ for {self._span_name}. Parent span ID: {self._parent_span_id_at_entry}") # DEBUG
+        self._parent_span_id_at_entry = current_span_var.get()
         if not self._trace_client:
-             print("[DEBUG] Wrapper __aenter__: No trace client, calling original manager.") # DEBUG
              # If no trace, just delegate to the original manager
              return await self._original_manager.__aenter__()
 
-        # Create and enter the span context manager manually to control order
-        self._span_context = self._trace_client.span(self._span_name, span_type="llm")
-        # We don't __enter__ the span context here yet, __aenter__ needs the TraceClient instance from it
-
         # --- Manually create the 'enter' entry ---
-        # This ensures the parent_span_id is correctly captured *before* the inner span becomes current
         start_time = time.time()
-        span_id = str(uuid.uuid4()) # Generate ID for this span invocation
+        span_id = str(uuid.uuid4())
         current_depth = 0
         if self._parent_span_id_at_entry and self._parent_span_id_at_entry in self._trace_client._span_depths:
             current_depth = self._trace_client._span_depths[self._parent_span_id_at_entry] + 1
-        self._trace_client._span_depths[span_id] = current_depth # Store depth
-
+        self._trace_client._span_depths[span_id] = current_depth
         enter_entry = TraceEntry(
              type="enter", function=self._span_name, span_id=span_id,
              trace_id=self._trace_client.trace_id, depth=current_depth, message=self._span_name,
@@ -1910,57 +1881,42 @@ class _TracedAsyncStreamManagerWrapper(AbstractAsyncContextManager):
         self._trace_client.add_entry(enter_entry)
         # --- End manual 'enter' entry ---
 
-        # Now set the current span ID in contextvars for children
+        # Set the current span ID in contextvars
         self._span_context_token = current_span_var.set(span_id)
 
-        print(f"[DEBUG] Wrapper __aenter__: Created inner span '{self._span_name}' (ID: {span_id}, Parent: {self._parent_span_id_at_entry})") # DEBUG
-
-
-        # Record inputs using the TraceClient instance and the *new* span_id
+        # Manually create 'input' entry
         input_data = _format_input_data(self._client, **self._input_kwargs)
-        # Manually create input entry associated with the new span_id
         input_entry = TraceEntry(
              type="input", function=self._span_name, span_id=span_id,
              trace_id=self._trace_client.trace_id, depth=current_depth, message=f"Inputs to {self._span_name}",
              created_at=time.time(), inputs=input_data, span_type="llm"
         )
         self._trace_client.add_entry(input_entry)
-        print(f"[DEBUG] Wrapper __aenter__: Recorded input for span {span_id}") # DEBUG
 
-        # Call the original __aenter__ to get the raw stream iterator
+        # Call the original __aenter__
         raw_iterator = await self._original_manager.__aenter__()
 
-        # Record pending output and get the entry reference
-        # Manually create output entry associated with the new span_id
+        # Manually create pending 'output' entry
         output_entry = TraceEntry(
             type="output", function=self._span_name, span_id=span_id,
             trace_id=self._trace_client.trace_id, depth=current_depth, message=f"Output from {self._span_name}",
             created_at=time.time(), output="<pending stream>", span_type="llm"
         )
-        self._trace_client.add_entry(output_entry) # Add the pending entry
-        entry_span_id = getattr(output_entry, 'span_id', 'UNKNOWN')
-        print(f"[DEBUG] Wrapper __aenter__: Recorded pending output for span {span_id}, entry span ID: {entry_span_id}") # DEBUG
+        self._trace_client.add_entry(output_entry)
 
-
-        # Wrap the raw iterator with our stream processing logic
-        # Pass the necessary arguments: iterator, client, *output_entry object*
+        # Wrap the raw iterator
         wrapped_iterator = self._stream_wrapper_func(raw_iterator, self._client, output_entry)
-
-        return wrapped_iterator # Return the wrapped iterator
+        return wrapped_iterator
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        print(f"[DEBUG] Wrapper __aexit__ for {self._span_name}") # DEBUG
-        
-        # Manually create the 'exit' entry if the span was created
-        if hasattr(self, '_span_context_token'): # Check if contextvar token exists
-             span_id = current_span_var.get() # Should be the ID we set in __aenter__
-             start_time_for_duration = 0 # Need to get the start time somehow, maybe store enter_entry?
-             # Find the corresponding enter entry to calculate duration accurately
+        # Manually create the 'exit' entry
+        if hasattr(self, '_span_context_token'):
+             span_id = current_span_var.get()
+             start_time_for_duration = 0
              for entry in reversed(self._trace_client.entries):
                   if entry.span_id == span_id and entry.type == 'enter':
                        start_time_for_duration = entry.created_at
                        break
-             
              duration = time.time() - start_time_for_duration if start_time_for_duration else None
              exit_depth = self._trace_client._span_depths.get(span_id, 0)
              exit_entry = TraceEntry(
@@ -1969,38 +1925,29 @@ class _TracedAsyncStreamManagerWrapper(AbstractAsyncContextManager):
                   created_at=time.time(), duration=duration, span_type="llm"
              )
              self._trace_client.add_entry(exit_entry)
-             
-             # Clean up depth tracking
-             if span_id in self._trace_client._span_depths:
-                  del self._trace_client._span_depths[span_id]
-                  
-             # Reset context var using the token stored in __aenter__
+             if span_id in self._trace_client._span_depths: del self._trace_client._span_depths[span_id]
              current_span_var.reset(self._span_context_token)
-             delattr(self, '_span_context_token') # Clean up token attribute
+             delattr(self, '_span_context_token')
 
-        # Delegate __aexit__ to the original manager
+        # Delegate __aexit__
         if hasattr(self._original_manager, "__aexit__"):
-             # Result of original __aexit__ determines exception suppression
-             should_suppress = await self._original_manager.__aexit__(exc_type, exc_val, exc_tb)
-             return should_suppress
-        return None # Default: don't suppress exception
+             return await self._original_manager.__aexit__(exc_type, exc_val, exc_tb)
+        return None
 
-class _TracedSyncStreamManagerWrapper(AbstractContextManager): # Use sync base class
+class _TracedSyncStreamManagerWrapper(AbstractContextManager):
     """Wraps an original sync stream manager to add tracing."""
     def __init__(self, original_manager, client, span_name, trace_client, stream_wrapper_func, input_kwargs):
         self._original_manager = original_manager
         self._client = client
         self._span_name = span_name
         self._trace_client = trace_client
-        self._stream_wrapper_func = stream_wrapper_func # e.g., _sync_stream_wrapper
+        self._stream_wrapper_func = stream_wrapper_func
         self._input_kwargs = input_kwargs
         self._parent_span_id_at_entry = None
 
     def __enter__(self):
         self._parent_span_id_at_entry = current_span_var.get()
-        print(f"[DEBUG] Wrapper __enter__ for {self._span_name}. Parent span ID: {self._parent_span_id_at_entry}")
         if not self._trace_client:
-             print("[DEBUG] Wrapper __enter__: No trace client, calling original manager.")
              return self._original_manager.__enter__()
 
         # Manually create 'enter' entry
@@ -2016,8 +1963,7 @@ class _TracedSyncStreamManagerWrapper(AbstractContextManager): # Use sync base c
              created_at=start_time, span_type="llm", parent_span_id=self._parent_span_id_at_entry
         )
         self._trace_client.add_entry(enter_entry)
-        self._span_context_token = current_span_var.set(span_id) # Set contextvar
-        print(f"[DEBUG] Wrapper __enter__: Created inner span '{self._span_name}' (ID: {span_id}, Parent: {self._parent_span_id_at_entry})")
+        self._span_context_token = current_span_var.set(span_id)
 
         # Manually create 'input' entry
         input_data = _format_input_data(self._client, **self._input_kwargs)
@@ -2027,7 +1973,6 @@ class _TracedSyncStreamManagerWrapper(AbstractContextManager): # Use sync base c
              created_at=time.time(), inputs=input_data, span_type="llm"
         )
         self._trace_client.add_entry(input_entry)
-        print(f"[DEBUG] Wrapper __enter__: Recorded input for span {span_id}")
 
         # Call original __enter__
         raw_iterator = self._original_manager.__enter__()
@@ -2039,15 +1984,12 @@ class _TracedSyncStreamManagerWrapper(AbstractContextManager): # Use sync base c
             created_at=time.time(), output="<pending stream>", span_type="llm"
         )
         self._trace_client.add_entry(output_entry)
-        entry_span_id = getattr(output_entry, 'span_id', 'UNKNOWN')
-        print(f"[DEBUG] Wrapper __enter__: Recorded pending output for span {span_id}, entry span ID: {entry_span_id}")
 
         # Wrap the raw iterator
         wrapped_iterator = self._stream_wrapper_func(raw_iterator, self._client, output_entry)
         return wrapped_iterator
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        print(f"[DEBUG] Wrapper __exit__ for {self._span_name}")
         # Manually create 'exit' entry
         if hasattr(self, '_span_context_token'):
              span_id = current_span_var.get()
