@@ -42,7 +42,7 @@ from judgeval.constants import (
 )
 from judgeval.judgment_client import JudgmentClient
 from judgeval.data import Example
-from judgeval.scorers import APIJudgmentScorer, JudgevalScorer, ScorerWrapper
+from judgeval.scorers import APIJudgmentScorer, JudgevalScorer
 from judgeval.rules import Rule
 from judgeval.evaluation_run import EvaluationRun
 from judgeval.data.result import ScoringResult
@@ -468,47 +468,14 @@ class TraceClient:
             additional_metadata=additional_metadata,
             trace_id=self.trace_id
         )
-        loaded_rules = None
-        if self.rules:
-            loaded_rules = []
-            for rule in self.rules:
-                processed_conditions = []
-                for condition in rule.conditions:
-                    # Convert metric if it's a ScorerWrapper
-                    try:
-                        if isinstance(condition.metric, ScorerWrapper):
-                            condition_copy = condition.model_copy()
-                            condition_copy.metric = condition.metric.load_implementation(use_judgment=True)
-                            processed_conditions.append(condition_copy)
-                        else:
-                            processed_conditions.append(condition)
-                    except Exception as e:
-                        warnings.warn(f"Failed to convert ScorerWrapper in rule '{rule.name}', condition metric '{condition.metric_name}': {str(e)}")
-                        processed_conditions.append(condition)  # Keep original condition as fallback
-                
-                # Create new rule with processed conditions
-                new_rule = rule.model_copy()
-                new_rule.conditions = processed_conditions
-                loaded_rules.append(new_rule)
         try:
             # Load appropriate implementations for all scorers
-            loaded_scorers: List[Union[JudgevalScorer, APIJudgmentScorer]] = []
-            for scorer in scorers:
-                try:
-                    if isinstance(scorer, ScorerWrapper):
-                        loaded_scorers.append(scorer.load_implementation(use_judgment=True))
-                    else:
-                        loaded_scorers.append(scorer)
-                except Exception as e:
-                    warnings.warn(f"Failed to load implementation for scorer {scorer}: {str(e)}")
-                    # Skip this scorer
-            
-            if not loaded_scorers:
+            if not scorers:
                 warnings.warn("No valid scorers available for evaluation")
                 return
             
             # Prevent using JudgevalScorer with rules - only APIJudgmentScorer allowed with rules
-            if loaded_rules and any(isinstance(scorer, JudgevalScorer) for scorer in loaded_scorers):
+            if self.rules and any(isinstance(scorer, JudgevalScorer) for scorer in scorers):
                 raise ValueError("Cannot use Judgeval scorers, you can only use API scorers when using rules. Please either remove rules or use only APIJudgmentScorer types.")
             
         except Exception as e:
@@ -522,15 +489,15 @@ class TraceClient:
             project_name=self.project_name,
             eval_name=f"{self.name.capitalize()}-"
                 f"{current_span_var.get()}-"
-                f"[{','.join(scorer.score_type.capitalize() for scorer in loaded_scorers)}]",
+                f"[{','.join(scorer.score_type.capitalize() for scorer in scorers)}]",
             examples=[example],
-            scorers=loaded_scorers,
+            scorers=scorers,
             model=model,
             metadata={},
             judgment_api_key=self.tracer.api_key,
             override=self.overwrite,
             trace_span_id=current_span_var.get(),
-            rules=loaded_rules # Use the combined rules
+            rules=self.rules # Use the combined rules
         )
         
         self.add_eval_run(eval_run, start_time)  # Pass start_time to record_evaluation
