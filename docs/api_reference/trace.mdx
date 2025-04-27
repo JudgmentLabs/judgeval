@@ -149,123 +149,21 @@ You can also disable deep tracing if you prefer manual control:
 <CodeGroup>
 ```Python Python
 # Disable deep tracing
-judgment = Tracer(
-    project_name="my_project",
-    deep_tracing=False  # Disable automatic deep tracing
-)
+judgment = Tracer(project_name="my_project")
 
 # Even with deep tracing globally enabled (default)
-# You can disable it for specific functions
+# You can disable it for specific functions so judgment would not trace any functions this selective_function calls
 @judgment.observe(span_type="function", deep_tracing=False)
 def selective_function():
     helper_function()  # Won't be traced automatically
     return "Done"
 ```
 ```Typescript Typescript
-// Assume tracer = Tracer.getInstance(...) exists
-
-// Assume an equivalent decorator or wrapper for @tool exists if needed
-// e.g., const langchainTool = createLangchainToolWrapper();
-
-async function myTool(query: string): Promise<string> {
-    // ... tool logic ...
-    console.log(`Tool executed with query: ${query}`);
-    return "Tool result";
-}
-
-// Apply the observe wrapper
-const observedMyTool = tracer.observe({ spanType: "tool" })(myTool);
-
-// Apply other wrappers if necessary (order might matter depending on wrappers)
-// const finalWrappedTool = langchainTool(observedMyTool); 
-
-// Calling observedMyTool("some query") will now be traced.
-// (or finalWrappedTool if multiple wrappers are used)
-```
-</CodeGroup>
-
-The `span_type` / `spanType` argument can be used to categorize the type of span for observability purposes and will be displayed 
-on the Judgment platform:
-
-![span_type](/images/basic_trace_example.png)
-
-Here's an example using multiple decorators:
-
-<CodeGroup>
-```Python Python
-# Assume judgment = Tracer(...) exists
-from langchain.tools import tool # Example other decorator
-
-@tool
-@judgment.observe(span_type="tool")
-def my_tool(query: str):
-    # ... tool logic ...
-    print(f"Tool executed with query: {query}")
-    return "Tool result"
-
-# Calling my_tool("some query") will now be traced.
-```
-```Typescript Typescript
-// Assume tracer = Tracer.getInstance(...) exists
-
-// Assume an equivalent decorator or wrapper for @tool exists if needed
-// e.g., const langchainTool = createLangchainToolWrapper();
-
-async function myTool(query: string): Promise<string> {
-    // ... tool logic ...
-    console.log(`Tool executed with query: ${query}`);
-    return "Tool result";
-}
-
-// Apply the observe wrapper
-const observedMyTool = tracer.observe({ spanType: "tool" })(myTool);
-
-// Apply other wrappers if necessary (order might matter depending on wrappers)
-// const finalWrappedTool = langchainTool(observedMyTool); 
-
-// Calling observedMyTool("some query") will now be traced.
-// (or finalWrappedTool if multiple wrappers are used)
-```
-</CodeGroup>
-
-### Traditional Function-by-Function Tracing
-
-If you're using the traditional approach with deep tracing disabled, you'll need to observe each function individually:
-
-<CodeGroup>
-```Python Python
-# Assume judgment = Tracer(...) exists
-from langchain.tools import tool # Example other decorator
-
-@tool
-@judgment.observe(span_type="tool")
-def my_tool(query: str):
-    """Tool logic"""
-    print(f"Tool executed with query: {query}")
-    return "Tool result"
-
-# Calling my_tool("some query") will now be traced.
-```
-```Typescript Typescript
-// Assume tracer = Tracer.getInstance(...) exists
-
-// Assume an equivalent decorator or wrapper for @tool exists if needed
-// e.g., const langchainTool = createLangchainToolWrapper();
-
-async function myTool(query: string): Promise<string> {
-    // ... tool logic ...
-    console.log(`Tool executed with query: ${query}`);
-    return "Tool result";
-}
-
-// Apply the observe wrapper
-const observedMyTool = tracer.observe({ spanType: "tool" })(myTool);
-
-// Apply other wrappers if necessary (order might matter depending on wrappers)
-// const finalWrappedTool = langchainTool(observedMyTool); 
-
-// Calling observedMyTool("some query") will now be traced.
-// (or finalWrappedTool if multiple wrappers are used)
+// Disable deep tracing
+const judgment = Tracer.getInstance({ 
+    projectName: "my_project",
+    deepTracing: false  // Disable automatic deep tracing
+});
 ```
 </CodeGroup>
 
