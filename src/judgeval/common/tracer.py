@@ -426,7 +426,15 @@ class TraceClient:
     def async_evaluate(
         self,
         scorers: List[Union[APIJudgmentScorer, JudgevalScorer]],
-        example: Example,
+        example: Optional[Example] = None,
+        input: Optional[str] = None,
+        actual_output: Optional[Union[str, List[str]]] = None,
+        expected_output: Optional[Union[str, List[str]]] = None,
+        context: Optional[List[str]] = None,
+        retrieval_context: Optional[List[str]] = None,
+        tools_called: Optional[List[str]] = None,
+        expected_tools: Optional[List[str]] = None,
+        additional_metadata: Optional[Dict[str, Any]] = None,
         model: Optional[str] = None,
         log_results: Optional[bool] = True
     ):
@@ -481,6 +489,26 @@ class TraceClient:
         except Exception as e:
             warnings.warn(f"Failed to load scorers: {str(e)}")
             return
+        
+        # If example is not provided, create one from the individual parameters
+        if example is None:
+            # Check if any of the individual parameters are provided
+            if any(param is not None for param in [input, actual_output, expected_output, context, 
+                                                retrieval_context, tools_called, expected_tools, 
+                                                additional_metadata]):
+                example = Example(
+                    input=input,
+                    actual_output=actual_output,
+                    expected_output=expected_output,
+                    context=context,
+                    retrieval_context=retrieval_context,
+                    tools_called=tools_called,
+                    expected_tools=expected_tools,
+                    additional_metadata=additional_metadata,
+                    trace_id=self.trace_id
+                )
+            else:
+                raise ValueError("Either 'example' or at least one of the individual parameters (input, actual_output, etc.) must be provided")
         
         # Check examples before creating evaluation run
         from judgeval.run_evaluation import check_examples
