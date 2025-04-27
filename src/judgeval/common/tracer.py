@@ -1389,6 +1389,27 @@ def wrap(client: Any) -> Any:
     # Replace the original method with our traced version
     if isinstance(client, (OpenAI, Together, AsyncOpenAI, AsyncTogether)):
         client.chat.completions.create = traced_create
+        # Wrap the Responses API endpoint for OpenAI clients
+        if hasattr(client, "responses") and hasattr(client.responses, "create"):
+            # Capture the original responses.create
+            original_responses_create = client.responses.create
+            def traced_responses(*args, **kwargs):
+                # Get the current trace from contextvars
+                current_trace = current_trace_var.get()
+                # If no active trace, call the original
+                if not current_trace:
+                    return original_responses_create(*args, **kwargs)
+                # Trace this responses.create call
+                with current_trace.span(span_name, span_type="llm") as span:
+                    # Record raw input kwargs
+                    span.record_input(kwargs)
+                    # Make the actual API call
+                    response = original_responses_create(*args, **kwargs)
+                    # Record the output object
+                    span.record_output(response)
+                    return response
+            # Assign the traced wrapper
+            client.responses.create = traced_responses
     elif isinstance(client, (Anthropic, AsyncAnthropic)):
         client.messages.create = traced_create
     elif isinstance(client, (genai.Client, genai.client.AsyncClient)):
