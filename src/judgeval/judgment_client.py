@@ -442,6 +442,8 @@ class JudgmentClient(metaclass=SingletonMeta):
             raise JudgmentAPIError(f"Failed to fetch classifier scorer '{slug}': {response.json().get('detail', '')}")
             
         scorer_config = response.json()
+        created_at = scorer_config.pop("created_at")
+        updated_at = scorer_config.pop("updated_at")
         
         try:
             return ClassifierScorer(**scorer_config)
