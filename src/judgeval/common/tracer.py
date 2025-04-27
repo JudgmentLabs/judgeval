@@ -16,7 +16,21 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from http import HTTPStatus
-from typing import Any, Dict, Generator, List, Literal, Optional, Tuple, TypeAlias, Union, Callable, Awaitable, Set
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generator,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    AsyncGenerator,
+    TypeAlias,
+)
 from rich import print as rprint
 
 # Third-party imports
@@ -49,6 +63,7 @@ from judgeval.data.result import ScoringResult
 
 # Standard library imports needed for the new class
 import concurrent.futures
+from collections.abc import Iterator, AsyncIterator # Add Iterator and AsyncIterator
 
 # Define context variables for tracking the current trace and the current span within a trace
 current_trace_var = contextvars.ContextVar('current_trace', default=None)
@@ -188,6 +203,15 @@ class TraceEntry:
         if isinstance(self.output, BaseModel):
             return self.output.model_dump()
         
+        # NEW check: If output is the dict structure from our stream wrapper
+        if isinstance(self.output, dict) and 'streamed' in self.output:
+            # Assume it's already JSON-serializable (content is string, usage is dict or None)
+            return self.output
+        # NEW check: If output is the placeholder string before stream completes
+        elif self.output == "<pending stream>":
+             # Represent this state clearly in the serialized data
+            return {"status": "pending stream"}
+
         try:
             # Try to serialize the output to verify it's JSON compatible
             json.dumps(self.output)
@@ -627,6 +651,9 @@ class TraceClient:
             
             if inspect.iscoroutine(output):
                 asyncio.create_task(self._update_coroutine_output(entry, output))
+            
+            # Return the created entry
+            return entry
 
     def add_entry(self, entry: TraceEntry):
         """Add a trace entry to this trace context"""
@@ -1372,25 +1399,47 @@ def wrap(client: Any) -> Any:
             
             # Skip tracing if no active trace
             if not current_trace:
-                return original_create(*args, **kwargs)
-
+                # Ensure original_create is awaited if it's a coroutine function
+                if asyncio.iscoroutinefunction(original_create):
+                    return await original_create(*args, **kwargs)
+                else:
+                    # This path might not be hit if original_create is always async for async clients, but added for safety
+                    return original_create(*args, **kwargs)
+            
+            is_streaming = kwargs.get("stream", False)
+            
             with current_trace.span(span_name, span_type="llm") as span:
                 # Format and record the input parameters
                 input_data = _format_input_data(client, **kwargs)
                 span.record_input(input_data)
                 
-                # Make the actual API call
-                try:
-                    response = await original_create(*args, **kwargs)
-                except Exception as e:
-                    print(f"Error during API call: {e}")
-                    raise
+                # Add stream options for OpenAI if streaming
+                if (isinstance(client, AsyncOpenAI) or isinstance(client, OpenAI)) and is_streaming:
+                     kwargs["stream_options"] = {"include_usage": True}
 
-                # Format and record the output
-                output_data = _format_output_data(client, response)
-                span.record_output(output_data)
-                
-                return response
+                try:
+                    # === FIX 3: Handle async non-streaming calls more robustly ===
+                    if is_streaming:
+                        # Streaming logic (verified working)
+                        create_coro = original_create(*args, **kwargs)
+                        stream_iterator = await create_coro
+                        output_entry = span.record_output("<pending stream>")
+                        return _async_stream_wrapper(stream_iterator, client, output_entry)
+                    else:
+                        # Non-streaming: Ensure we await the response first
+                        awaited_response = await original_create(*args, **kwargs)
+                        
+                        # Now format the *awaited* response
+                        output_data = _format_output_data(client, awaited_response) 
+                        span.record_output(output_data) # Record the formatted data
+                        return awaited_response # Return the actual response object
+                    # =======================================================
+
+                except Exception as e:
+                    print(f"Error during wrapped API call: {e}") # Clarify error source
+                    # Record error in span and re-raise
+                    span.record_output({"error": str(e)}) 
+                    raise
     else:
         def traced_create(*args, **kwargs):
             # Get the current trace from contextvars
@@ -1398,27 +1447,35 @@ def wrap(client: Any) -> Any:
             
             # Skip tracing if no active trace
             if not current_trace:
-                return original_create(*args, **kwargs)
+                 return original_create(*args, **kwargs)
 
-            with current_trace.span(span_name, span_type="llm") as span:
-                # Format and record the input parameters
-                input_data = _format_input_data(client, **kwargs)
-                span.record_input(input_data)
-                
-                # Make the actual API call
-                try:
-                    response = original_create(*args, **kwargs)
-                except Exception as e:
-                    print(f"Error during API call: {e}")
-                    raise
-                
-                # Format and record the output
-                output_data = _format_output_data(client, response)
-                span.record_output(output_data)
-                
-                return response
-        
+            is_streaming = kwargs.get("stream", False)
             
+            with current_trace.span(span_name, span_type="llm") as span:
+                 # Format and record the input parameters
+                 input_data = _format_input_data(client, **kwargs)
+                 span.record_input(input_data)
+
+                 # Add stream options for OpenAI if streaming
+                 if (isinstance(client, AsyncOpenAI) or isinstance(client, OpenAI)) and is_streaming:
+                     kwargs["stream_options"] = {"include_usage": True}
+
+                 try:
+                     # Sync clients return the iterator/response directly
+                     response = original_create(*args, **kwargs)
+                 except Exception as e:
+                     print(f"Error during API call: {e}")
+                     span.record_output({"error": str(e)})
+                     raise
+                 
+                 if is_streaming:
+                     output_entry = span.record_output("<pending stream>")
+                     return _sync_stream_wrapper(response, client, output_entry)
+                 else:
+                     output_data = _format_output_data(client, response)
+                     span.record_output(output_data)
+                     return response
+
     # Replace the original method with our traced version
     if isinstance(client, (OpenAI, Together, AsyncOpenAI, AsyncTogether)):
         client.chat.completions.create = traced_create
@@ -1630,3 +1687,158 @@ class TraceThreadPoolExecutor(concurrent.futures.ThreadPoolExecutor):
 
     # Note: The `map` method would also need to be overridden for full context
     # propagation if users rely on it, but `submit` is the most common use case.
+
+# Helper functions for stream processing
+# ---------------------------------------
+
+def _extract_content_from_chunk(client: ApiClient, chunk: Any) -> Optional[str]:
+    """Extracts the text content from a stream chunk based on the client type."""
+    try:
+        if isinstance(client, (OpenAI, Together, AsyncOpenAI, AsyncTogether)):
+            return chunk.choices[0].delta.content
+        elif isinstance(client, (Anthropic, AsyncAnthropic)):
+            # Anthropic streams various event types, we only care for content blocks
+            if chunk.type == "content_block_delta":
+                return chunk.delta.text
+        elif isinstance(client, (genai.Client, genai.client.AsyncClient)):
+            # Google streams Candidate objects
+            if chunk.candidates and chunk.candidates[0].content and chunk.candidates[0].content.parts:
+                return chunk.candidates[0].content.parts[0].text
+    except (AttributeError, IndexError, KeyError):
+        # Handle cases where chunk structure is unexpected or doesn't contain content
+        pass # Return None
+    return None
+
+def _extract_usage_from_final_chunk(client: ApiClient, chunk: Any) -> Optional[Dict[str, int]]:
+    """Extracts usage data if present in the *final* chunk (client-specific)."""
+    try:
+        # OpenAI/Together include usage in the *last* chunk's `usage` attribute if available
+        # This typically requires specific API versions or settings. Often usage is *not* streamed.
+        if isinstance(client, (OpenAI, Together, AsyncOpenAI, AsyncTogether)):
+             # Check if usage is directly on the chunk (some models might do this)
+             if hasattr(chunk, 'usage') and chunk.usage:
+                 return {
+                     "prompt_tokens": chunk.usage.prompt_tokens,
+                     "completion_tokens": chunk.usage.completion_tokens,
+                     "total_tokens": chunk.usage.total_tokens
+                 }
+             # Check if usage is nested within choices (less common for final chunk, but check)
+             elif chunk.choices and hasattr(chunk.choices[0], 'usage') and chunk.choices[0].usage:
+                 usage = chunk.choices[0].usage
+                 return {
+                      "prompt_tokens": usage.prompt_tokens,
+                      "completion_tokens": usage.completion_tokens,
+                      "total_tokens": usage.total_tokens
+                  }
+             # Anthropic includes usage in the 'message_stop' event type
+        elif isinstance(client, (Anthropic, AsyncAnthropic)):
+            if chunk.type == "message_stop":
+                # Anthropic final usage is often attached to the *message* object, not the chunk directly
+                # The API might provide a way to get the final message object, but typically not in the stream itself.
+                # Let's assume for now usage might appear in the final *chunk* metadata if supported.
+                # This is a placeholder - Anthropic usage typically needs a separate call or context.
+                pass
+        elif isinstance(client, (genai.Client, genai.client.AsyncClient)):
+             # Google provides usage metadata on the full response object, not typically streamed per chunk.
+             # It might be in the *last* chunk's usage_metadata if the stream implementation supports it.
+             if hasattr(chunk, 'usage_metadata') and chunk.usage_metadata:
+                 return {
+                     "prompt_tokens": chunk.usage_metadata.prompt_token_count,
+                     "completion_tokens": chunk.usage_metadata.candidates_token_count,
+                     "total_tokens": chunk.usage_metadata.total_token_count
+                 }
+
+    except (AttributeError, IndexError, KeyError, TypeError):
+        # Handle cases where usage data is missing or malformed
+         pass # Return None
+    return None
+
+
+# --- Sync Stream Wrapper ---
+def _sync_stream_wrapper(
+    original_stream: Iterator,
+    client: ApiClient,
+    output_entry: TraceEntry
+) -> Generator[Any, None, None]:
+    """Wraps a synchronous stream iterator to capture content and update the trace."""
+    full_content = ""
+    final_usage = None
+    last_chunk = None
+    try:
+        for chunk in original_stream:
+            content_part = _extract_content_from_chunk(client, chunk)
+            if content_part:
+                full_content += content_part
+            last_chunk = chunk # Keep track of the last chunk for potential usage data
+            yield chunk # Pass the chunk to the caller
+    finally:
+        # Attempt to extract usage from the last chunk received
+        if last_chunk:
+            final_usage = _extract_usage_from_final_chunk(client, last_chunk)
+
+        # Update the trace entry with the accumulated content and usage
+        output_entry.output = {
+            "content": full_content,
+            "usage": final_usage if final_usage else {"info": "Usage data not available in stream."}, # Provide placeholder if None
+            "streamed": True
+        }
+        # Note: We might need to adjust _serialize_output if this dict causes issues,
+        # but Pydantic's model_dump should handle dicts.
+
+# --- Async Stream Wrapper ---
+async def _async_stream_wrapper(
+    original_stream: AsyncIterator,
+    client: ApiClient,
+    output_entry: TraceEntry
+) -> AsyncGenerator[Any, None]:
+    """Wraps an asynchronous stream iterator to capture content and update the trace.
+    Handles OpenAI's final usage chunk when stream_options={'include_usage': True} is used.
+    """
+    full_content = ""
+    final_usage_data = None # To store usage from the dedicated chunk
+    last_content_chunk = None # Keep track of the last chunk *with content*
+
+    try:
+        async for chunk in original_stream:
+            # Check for OpenAI's final usage chunk
+            # This chunk has usage but no choices/content delta
+            if hasattr(chunk, 'usage') and chunk.usage is not None:
+                final_usage_data = { # Store the usage data directly
+                    "prompt_tokens": chunk.usage.prompt_tokens,
+                    "completion_tokens": chunk.usage.completion_tokens,
+                    "total_tokens": chunk.usage.total_tokens
+                }
+                # This is the final chunk, we can potentially break or just let the loop finish
+                # Let's yield it just in case the caller expects it, though it has no content
+                yield chunk
+                continue # Move to the next iteration (or end)
+
+            # Process regular content chunks
+            content_part = _extract_content_from_chunk(client, chunk)
+            if content_part:
+                full_content += content_part
+                last_content_chunk = chunk # Update last chunk *with content*
+
+            yield chunk # Pass the chunk to the caller
+
+    finally:
+        # Use the explicitly captured usage data if available (from OpenAI's include_usage)
+        if final_usage_data:
+             usage_info = final_usage_data
+        # Fallback: Try to extract usage from the last *content* chunk (for other providers or older OpenAI)
+        elif last_content_chunk:
+             usage_info = _extract_usage_from_final_chunk(client, last_content_chunk)
+        else:
+             usage_info = None # No usage data found
+
+        # Update the trace entry
+        output_entry.output = {
+            "content": full_content,
+            # Provide placeholder if no usage data could be determined
+            "usage": usage_info if usage_info else {"info": "Usage data not available in stream."},
+            "streamed": True
+        }
+        # Manually update duration for the output entry when the stream finishes
+        output_entry.duration = time.time() - output_entry.created_at
+        # Note: We might need to adjust _serialize_output if this dict causes issues,
+        # but Pydantic's model_dump should handle dicts.
