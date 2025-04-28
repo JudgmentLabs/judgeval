@@ -23,30 +23,41 @@ This enables you to **use evaluations as unit tests** by setting a `threshold` t
 In this section, we'll cover each kind of scorer and how to use them.
 
 ### Default Scorers
-Most of the built-in scorers in `judgeval` are **LLM judges**, meaning they use LLMs to evaluate your LLM system. 
-This is intentional since **LLM evaluations are flexible, scalable, and strongly correlate with human evaluation**.
 
-`judgeval`'s default scorers have been meticulously crafted by our research team based on leading work in the LLM evaluation community. 
+Most built-in scorers in **`judgeval`** are LLM systems, leveraging advanced prompt engineering to ensure evaluations are flexible, scalable, and aligned closely with human judgment. Each scorer provides transparent reasoning through detailed chains of thought, enabling clear validation of evaluation outcomes.
 
-Our implementations are described on their respective documentation pages. 
-Judgment implementations of default scorers are backed by **leading industry/academic research** and are preferable to other implementations because:
-- They are meticulously prompt-engineered to maximize evaluation quality and consistency
-- Provide a chain of thought for evaluation scores, so you can double-check the evaluation quality
-- Can be run using any LLM, including Judgment's **state-of-the-art LLM judges** developed in collaboration with **Stanford's AI Lab**.
+#### Introducing Osiris
 
-Here are the default scorers in `judgeval`:
-- [Answer Correctness](/evaluation/scorers/answer_correctness)
-- [Answer Relevancy](/evaluation/scorers/answer_relevancy)
-- [Comparison](/evaluation/scorers/comparison)
-- [Contextual Precision](/evaluation/scorers/contextual_precision)
-- [Contextual Recall](/evaluation/scorers/contextual_recall)
-- [Contextual Relevancy](/evaluation/scorers/contextual_relevancy)
-- [Execution Order](/evaluation/scorers/execution_order)
-- [Faithfulness](/evaluation/scorers/faithfulness)
-- [Groundedness](/evaluation/scorers/groundedness)
-- [JSON Correctness](/evaluation/scorers/json_correctness)
-- [Summarization](/evaluation/scorers/summarization)
+To push the frontier of LLM evaluation further, we've developed **Osiris**, our state-of-the-art hallucination detection system. Created in collaboration with researchers from **Judgment Labs** and the **Stanford Artificial Intelligence Laboratory (SAIL)** under Professor Chris Manning, Osiris integrates leading-edge techniques:
 
+- **Multi-agent system**
+- **Test-time scaling**
+- **Reinforcement learning**
+- **Data augmentation**
+
+These methods allow Osiris to significantly outperform traditional LLM-based evaluation methods—delivering higher accuracy in hallucination detection at substantially lower costs than closed-source models.
+
+We’ll be releasing a report soon detailing some of the novel techniques we’ve developed—stay tuned!
+
+We're actively extending Osiris's innovative techniques to our full suite of default scorers. Soon, you'll benefit from these improvements across all evaluation metrics, enhancing accuracy, reliability, and cost-effectiveness for your entire evaluation workflow.
+
+Check out Osiris-powered evaluations now through our [**Faithfulness**](#) scorer!
+
+---
+
+#### All Default Scorers in judgeval:
+
+- [**Answer Correctness**](#)
+- [**Answer Relevancy**](#)
+- [**Comparison**](#)
+- [**Contextual Precision**](#)
+- [**Contextual Recall**](#)
+- [**Contextual Relevancy**](#)
+- [**Execution Order**](#)
+- [**Faithfulness**](#)
+- [**Groundedness**](#)
+- [**JSON Correctness**](#)
+- [**Summarization**](#)
 
 ### Agentic Scorers
 
