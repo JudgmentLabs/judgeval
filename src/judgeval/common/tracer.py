@@ -189,7 +189,7 @@ class TraceEntry:
             "inputs": self._serialize_inputs(),
             "evaluation_runs": [evaluation_run.model_dump() for evaluation_run in self.evaluation_runs] if self.evaluation_runs else [],
             "span_type": self.span_type,
-            "parent_span_id": self.parent_span_id
+            "parent_span_id": self.parent_span_id,
         }
 
     def _serialize_output(self) -> Any:
@@ -432,13 +432,13 @@ class TraceClient:
         entry = TraceEntry(
             type="enter",
             function=name,
-            span_id=span_id, # Use the generated span_id
-            trace_id=self.trace_id, # Use the trace_id from the trace client
+            span_id=span_id,
+            trace_id=self.trace_id,
             depth=current_depth,
             message=name,
             created_at=start_time,
             span_type=span_type,
-            parent_span_id=parent_span_id # Use the parent_id from context var
+            parent_span_id=parent_span_id,
         )
         self.add_entry(entry)
         
@@ -456,7 +456,7 @@ class TraceClient:
                 message=f"← {name}",
                 created_at=time.time(),
                 duration=duration,
-                span_type=span_type
+                span_type=span_type,
             ))
             # Clean up depth tracking for this span_id
             if span_id in self._span_depths:
@@ -580,7 +580,7 @@ class TraceClient:
                 message=f"Inputs to {function_name}",
                 created_at=time.time(),
                 inputs=inputs,
-                span_type=entry_span_type
+                span_type=entry_span_type,
             ))
 
     async def _update_coroutine_output(self, entry: TraceEntry, coroutine: Any):
@@ -613,7 +613,7 @@ class TraceClient:
                 message=f"Output from {function_name}",
                 created_at=time.time(),
                 output="<pending>" if inspect.iscoroutine(output) else output,
-                span_type=entry_span_type
+                span_type=entry_span_type,
             )
             self.add_entry(entry)
             
@@ -833,8 +833,10 @@ class TraceClient:
         total_completion_tokens_cost = 0.0
         total_cost = 0.0
         
+        # Only count tokens for actual LLM API call spans
+        llm_span_names = {"OPENAI_API_CALL", "TOGETHER_API_CALL", "ANTHROPIC_API_CALL", "GOOGLE_API_CALL"}
         for entry in condensed_entries:
-            if entry.get("span_type") == "llm" and isinstance(entry.get("output"), dict):
+            if entry.get("span_type") == "llm" and entry.get("function") in llm_span_names and isinstance(entry.get("output"), dict):
                 output = entry["output"]
                 usage = output.get("usage", {})
                 model_name = entry.get("inputs", {}).get("model", "")
@@ -1463,6 +1465,27 @@ def wrap(client: Any) -> Any:
     # [Assignment logic remains the same]
     if isinstance(client, (AsyncOpenAI, AsyncTogether)):
         client.chat.completions.create = traced_create_async
+        # Wrap the Responses API endpoint for OpenAI clients
+        if hasattr(client, "responses") and hasattr(client.responses, "create"):
+            # Capture the original responses.create
+            original_responses_create = client.responses.create
+            def traced_responses(*args, **kwargs):
+                # Get the current trace from contextvars
+                current_trace = current_trace_var.get()
+                # If no active trace, call the original
+                if not current_trace:
+                    return original_responses_create(*args, **kwargs)
+                # Trace this responses.create call
+                with current_trace.span(span_name, span_type="llm") as span:
+                    # Record raw input kwargs
+                    span.record_input(kwargs)
+                    # Make the actual API call
+                    response = original_responses_create(*args, **kwargs)
+                    # Record the output object
+                    span.record_output(response)
+                    return response
+            # Assign the traced wrapper
+            client.responses.create = traced_responses
     elif isinstance(client, AsyncAnthropic):
         client.messages.create = traced_create_async
         if original_stream:
