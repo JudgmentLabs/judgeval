@@ -1793,14 +1793,14 @@ def _sync_stream_wrapper(
     output_entry: TraceEntry
 ) -> Generator[Any, None, None]:
     """Wraps a synchronous stream iterator to capture content and update the trace."""
-    full_content = ""
+    content_parts = []  # Use a list instead of string concatenation
     final_usage = None
     last_chunk = None
     try:
         for chunk in original_stream:
             content_part = _extract_content_from_chunk(client, chunk)
             if content_part:
-                full_content += content_part
+                content_parts.append(content_part)  # Append to list instead of concatenating
             last_chunk = chunk # Keep track of the last chunk for potential usage data
             yield chunk # Pass the chunk to the caller
     finally:
@@ -1810,7 +1810,7 @@ def _sync_stream_wrapper(
 
         # Update the trace entry with the accumulated content and usage
         output_entry.output = {
-            "content": full_content,
+            "content": "".join(content_parts),  # Join list at the end
             "usage": final_usage if final_usage else {"info": "Usage data not available in stream."}, # Provide placeholder if None
             "streamed": True
         }
@@ -1824,7 +1824,7 @@ async def _async_stream_wrapper(
     output_entry: TraceEntry
 ) -> AsyncGenerator[Any, None]:
     # [Existing logic - unchanged]
-    full_content = ""
+    content_parts = []  # Use a list instead of string concatenation
     final_usage_data = None
     last_content_chunk = None
     anthropic_input_tokens = 0
@@ -1854,7 +1854,7 @@ async def _async_stream_wrapper(
 
             content_part = _extract_content_from_chunk(client, chunk)
             if content_part:
-                full_content += content_part
+                content_parts.append(content_part)  # Append to list instead of concatenating
                 last_content_chunk = chunk
 
             yield chunk
@@ -1877,7 +1877,7 @@ async def _async_stream_wrapper(
 
         if output_entry and hasattr(output_entry, 'output'):
             output_entry.output = {
-                "content": full_content,
+                "content": "".join(content_parts),  # Join list at the end
                 "usage": usage_info if usage_info else {"info": "Usage data not available in stream."},
                 "streamed": True
             }
