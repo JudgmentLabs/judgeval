@@ -92,24 +92,34 @@ The `TraceClient` object manages the context of a single trace context (or workf
 
 ## Tracing functions (`@observe` / `observe()`)
 
-Each intermediate function or coroutine you want to trace is wrapped with the `@judgment.observe()` decorator (Python) or the `tracer.observe()` higher-order function (Typescript). 
+With automatic deep tracing, you only need to observe top-level functions, and all nested function calls will be automatically traced. This significantly reduces the amount of instrumentation needed in your code.
+
 **If you use multiple decorators in Python**, the `@judgment.observe()` decorator should be the innermost decorator to preserve functionality.
 
-Here's an example using `observe`:
+Here's an example using automatic deep tracing:
 
 <CodeGroup>
 ```Python Python
-# Assume judgment = Tracer(...) exists
-from langchain.tools import tool # Example other decorator
+# Initialize tracer (deep tracing is enabled by default)
+judgment = Tracer(project_name="my_project")
 
-@tool
-@judgment.observe(span_type="tool")
+# Only need to observe the top-level function
+@judgment.observe(span_type="function")
+def main_workflow(query: str):
+    # All function calls inside will be automatically traced
+    result = my_tool(query)
+    return process_result(result)
+
+# No @observe needed - automatically traced when called from main_workflow
 def my_tool(query: str):
-    # ... tool logic ...
     print(f"Tool executed with query: {query}")
     return "Tool result"
 
-# Calling my_tool("some query") will now be traced.
+# No @observe needed - automatically traced when called from main_workflow
+def process_result(result: str):
+    return f"Processed: {result}"
+
+# Calling main_workflow("some query") will trace the entire call stack
 ```
 ```Typescript Typescript
 // Assume tracer = Tracer.getInstance(...) exists
@@ -134,11 +144,30 @@ const observedMyTool = tracer.observe({ spanType: "tool" })(myTool);
 ```
 </CodeGroup>
 
+You can also disable deep tracing if you prefer manual control:
+
+<CodeGroup>
+```Python Python
+# Disable deep tracing
+judgment = Tracer(project_name="my_project")
+
+# Even with deep tracing globally enabled (default)
+# You can disable it for specific functions so judgment would not trace any functions this selective_function calls
+@judgment.observe(span_type="function", deep_tracing=False)
+def selective_function():
+    helper_function()  # Won't be traced automatically
+    return "Done"
+```
+```Typescript Typescript
+// Disable deep tracing
+const judgment = Tracer.getInstance({ 
+    projectName: "my_project",
+    deepTracing: false  // Disable automatic deep tracing
+});
+```
+</CodeGroup>
+
 The `span_type` / `spanType` argument can be used to categorize the type of span for observability purposes and will be displayed 
 on the Judgment platform:
 
 ![span_type](/images/basic_trace_example.png)
-
-
-
-

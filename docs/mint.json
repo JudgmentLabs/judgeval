@@ -35,9 +35,7 @@
       "url": "https://judgmentlabs.ai/"
     }
   ],
-  "anchors": [
-    
-  ],
+  "anchors": [],
   "navigation": [
     {
       "group": "Welcome!",
@@ -58,7 +56,7 @@
           "pages": [
             "evaluation/scorers/introduction",
             {
-              "group": "Scorer Definitions",
+              "group": "Default Scorer Definitions",
               "pages": [
                 "evaluation/scorers/default/answer_correctness",
                 "evaluation/scorers/default/answer_relevancy",
@@ -71,11 +69,11 @@
                 "evaluation/scorers/default/faithfulness",
                 "evaluation/scorers/default/json_correctness",
                 "evaluation/scorers/default/summarization",
-                "evaluation/scorers/agent/derailment",
-                "evaluation/scorers/custom_scorers",
-                "evaluation/scorers/classifier_scorer"
+                "evaluation/scorers/agent/derailment"
               ]
-            }
+            },
+            "evaluation/scorers/custom_scorers",
+            "evaluation/scorers/classifier_scorer"
           ]
         },
         "evaluation/judges",
@@ -87,7 +85,7 @@
       "pages": [
         "monitoring/introduction",
         "monitoring/tracing",
-        "monitoring/production_insights"
+        "monitoring/annotations"
       ]
     },
     {
@@ -123,11 +121,22 @@
         "judgment_cli/self-hosting"
       ]
     },
+      "group": "MCP Server",
+      "pages": [
+        "mcp_server/mcp_server"
+      ]
+    },
     {
       "group": "API Reference",
       "pages": [
         "api_reference/judgment_client",
         "api_reference/trace"
+      ]
+    },
+    {
+      "group": "Changelog",
+      "pages": [
+        "changelog/2025-04-21"
       ]
     }
   ],

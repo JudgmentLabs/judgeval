@@ -299,13 +299,8 @@ class TestNotificationInAlertResults:
 class TestNotificationWithJudgmentClient:
     """Tests for notification with JudgmentClient."""
     
-    @patch('judgeval.scorers.judgeval_scorers.ScorerWrapper.load_implementation')
-    def test_judgment_client_with_rules_and_notification(self, mock_load_implementation, mock_run_eval):
+    def test_judgment_client_with_rules_and_notification(self, mock_run_eval):
         """Test that JudgmentClient works with rules that have notification configs."""
-        # Mock the implementation of ScorerWrapper.load_implementation
-        mock_implementation = MagicMock()
-        mock_implementation.score_type = "faithfulness"
-        mock_load_implementation.return_value = mock_implementation
         
         # Mock the run_eval function
         mock_result = MagicMock()

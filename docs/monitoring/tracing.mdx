@@ -70,23 +70,44 @@ const client = wrap(new OpenAI());
 ```
 </CodeGroup>
 
+<Note>
+    When using OpenAI streaming with a wrapped client, you need to explicitly enable token usage tracking by setting `stream_options={"include_usage": True}`. Otherwise, token counts won't be captured for streaming calls.
+
+    ```python
+    # Enable token counting with streaming
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": "Hello"}],
+        stream=True,
+        stream_options={"include_usage": True}  # Required for token counting
+    )
+    ```
+</Note>
+
 #### `@observe` (Python) / `observe()` (Typescript) ####
 The `@observe` decorator (Python) or the `observe()` higher-order function (Typescript) wraps your functions/tools and captures metadata surrounding your function calls, such as:
 - Latency
 - Input/Output
 - Span type (e.g. `retriever`, `tool`, `LLM call`, etc.)
 
+With automatic deep tracing (enabled by default), you only need to observe top-level functions, and all nested function calls will be automatically traced. This significantly reduces the amount of instrumentation needed in your code.
+
 Here's an example of using the observer mechanism:
 <CodeGroup>
 ```Python Python
-from judgeval.tracer import Tracer
-
 # loads from JUDGMENT_API_KEY env var
-judgment = Tracer(project_name="my_project")
+judgment = Tracer(project_name="my_project")  # Deep tracing is enabled by default
 
-@judgment.observe(span_type="tool")
-def my_tool():
+# With automatic deep tracing, you only need to observe the top-level function
+@judgment.observe(span_type="function")
+def my_workflow():
+    # All function calls inside will be automatically traced
+    my_tool()
     print("Hello world!")
+
+# This function will be automatically traced when called from my_workflow
+def my_tool():
+    print("Tool executed!")
 
 ```
 ```Typescript Typescript
@@ -111,9 +132,8 @@ const observedMyTool = judgment.observe({ spanType: "tool" })(myTool);
     Common span types include `tool`, `function`, `retriever`, `database`, `web search`, etc.
 </Note>
 
-
 #### Putting it all Together
-Here's a complete example of using judgeval's tracing mechanisms:
+Here's a complete example of using judgeval's tracing mechanisms with automatic deep tracing:
 <CodeGroup>
 ```Python Python
 from judgeval.tracer import Tracer, wrap
@@ -121,15 +141,16 @@ from openai import OpenAI
 
 openai_client = wrap(OpenAI())
 # loads from JUDGMENT_API_KEY and JUDGMENT_ORG_ID env vars
-judgment = Tracer(project_name="my_project")
+judgment = Tracer(project_name="my_project")  # Deep tracing is enabled by default
 
-@judgment.observe(span_type="tool")
+# Define a tool function that will be automatically traced when called from main
 def my_tool():
     return "Hello world!"
 
+# With automatic deep tracing, only the main function needs to be observed
 @judgment.observe(span_type="function")
 def my_llm_call():
-    message = my_tool()
+    message = my_tool()  # This tool call will be automatically traced
     res = openai_client.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "user", "content": message}]
@@ -144,8 +165,8 @@ main_result = my_llm_call()
 import { Tracer, wrap } from 'judgeval';
 import OpenAI from 'openai';
 
-const openaiClient = wrap(new OpenAI());
 const judgment = Tracer.getInstance({ projectName: "my_project" });
+const openaiClient = wrap(new OpenAI());
 
 async function myTool(): Promise<string> {
     return "Hello world!";
@@ -180,6 +201,61 @@ runImplicitTrace();
 And the trace will appear on the Judgment platform as follows:
 
 ![Alt text](/images/basic_trace_example.png "Basic Trace Example")
+
+### Using Streaming with Token Counting
+
+When using streaming responses with a wrapped client, you need to explicitly enable token usage tracking:
+
+<CodeGroup>
+```Python Python
+@judgment.observe(span_type="function")
+def my_llm_streaming_call():
+    # Enable token counting with streaming API calls
+    stream = openai_client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": "Write a poem"}],
+        stream=True,
+        stream_options={"include_usage": True}  # Required for token counting
+    )
+    
+    # Process the stream
+    full_response = ""
+    for chunk in stream:
+        if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+            content = chunk.choices[0].delta.content
+            full_response += content
+            print(content, end="", flush=True)
+    
+    return full_response
+```
+```Typescript Typescript
+const observedStreamingCall = judgment.observe({ spanType: "function" })(async () => {
+    // Enable token counting with streaming API calls
+    const stream = await openaiClient.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: "Write a poem" }],
+        stream: true,
+        stream_options: { include_usage: true }  // Required for token counting
+    });
+    
+    // Process the stream
+    let fullResponse = "";
+    for await (const chunk of stream) {
+        if (chunk.choices[0]?.delta?.content) {
+            const content = chunk.choices[0].delta.content;
+            fullResponse += content;
+            process.stdout.write(content);
+        }
+    }
+    
+    return fullResponse;
+});
+```
+</CodeGroup>
+
+<Warning>
+  Without setting `stream_options={"include_usage": True}`, token counts will not be captured for streaming API calls, and your usage metrics in traces will be incomplete.
+</Warning>
 
 ### 3. Running Production Evaluations
 
@@ -365,10 +441,3 @@ main();
     over the trace lifecycle. In Typescript, explicit management via `startTrace()` and `trace.save()` is the standard way to gain this control.
     In most simple cases in Python, the `@observe` decorator is sufficient.
 </Warning>
-
-
-
-
-
-
-
