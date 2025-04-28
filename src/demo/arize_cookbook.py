@@ -2,7 +2,8 @@ from arize.experimental.datasets import ArizeDatasetsClient
 import json
 from arize.experimental.datasets.experiments.types import EvaluationResult
 
-client = ArizeDatasetsClient(api_key="89501374ac3b32dd4c0", developer_key="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpYXQiOjE3NDQxNjMzMTksInVzZXJJZCI6MjUyODcsInV1aWQiOiJkMzExOWU4Ny03MmE3LTRhODgtOWM5NS0zZTQ5Y2RhZmU2NzMiLCJpc3MiOiJodHRwczovL2FwcC5hcml6ZS5jb20ifQ.iPjW1RHLXIB0AmlUBOP3s7SBES0FFyX36Hnx9pVDqjk")
+client = ArizeDatasetsClient(api_key=os.environ["ARIZE_API_KEY"], developer_key=os.environ["ARIZE_DEVELOPER_KEY"])
+
 
 from judgeval import JudgmentClient
 from judgeval.data import Example
