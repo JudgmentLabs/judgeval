@@ -70,6 +70,20 @@ const client = wrap(new OpenAI());
 ```
 </CodeGroup>
 
+<Note>
+    When using OpenAI streaming with a wrapped client, you need to explicitly enable token usage tracking by setting `stream_options={"include_usage": True}`. Otherwise, token counts won't be captured for streaming calls.
+
+    ```python
+    # Enable token counting with streaming
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": "Hello"}],
+        stream=True,
+        stream_options={"include_usage": True}  # Required for token counting
+    )
+    ```
+</Note>
+
 #### `@observe` (Python) / `observe()` (Typescript) ####
 The `@observe` decorator (Python) or the `observe()` higher-order function (Typescript) wraps your functions/tools and captures metadata surrounding your function calls, such as:
 - Latency
@@ -180,6 +194,61 @@ runImplicitTrace();
 And the trace will appear on the Judgment platform as follows:
 
 ![Alt text](/images/basic_trace_example.png "Basic Trace Example")
+
+### Using Streaming with Token Counting
+
+When using streaming responses with a wrapped client, you need to explicitly enable token usage tracking:
+
+<CodeGroup>
+```Python Python
+@judgment.observe(span_type="function")
+def my_llm_streaming_call():
+    # Enable token counting with streaming API calls
+    stream = openai_client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": "Write a poem"}],
+        stream=True,
+        stream_options={"include_usage": True}  # Required for token counting
+    )
+    
+    # Process the stream
+    full_response = ""
+    for chunk in stream:
+        if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+            content = chunk.choices[0].delta.content
+            full_response += content
+            print(content, end="", flush=True)
+    
+    return full_response
+```
+```Typescript Typescript
+const observedStreamingCall = judgment.observe({ spanType: "function" })(async () => {
+    // Enable token counting with streaming API calls
+    const stream = await openaiClient.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: "Write a poem" }],
+        stream: true,
+        stream_options: { include_usage: true }  // Required for token counting
+    });
+    
+    // Process the stream
+    let fullResponse = "";
+    for await (const chunk of stream) {
+        if (chunk.choices[0]?.delta?.content) {
+            const content = chunk.choices[0].delta.content;
+            fullResponse += content;
+            process.stdout.write(content);
+        }
+    }
+    
+    return fullResponse;
+});
+```
+</CodeGroup>
+
+<Warning>
+  Without setting `stream_options={"include_usage": True}`, token counts will not be captured for streaming API calls, and your usage metrics in traces will be incomplete.
+</Warning>
 
 ### 3. Running Production Evaluations
 
