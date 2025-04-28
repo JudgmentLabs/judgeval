@@ -656,6 +656,7 @@ async def test_openai_sync_streaming_usage(test_input):
             model="gpt-4o-mini", 
             messages=[{"role": "user", "content": prompt}],
             stream=True,
+            stream_options={"include_usage": True}  # Explicitly enable usage tracking
         )
         # Consume the stream fully
         response_content = ""
@@ -713,6 +714,7 @@ async def test_openai_async_streaming_usage(test_input):
             model="gpt-4o-mini", 
             messages=[{"role": "user", "content": prompt}],
             stream=True,
+            stream_options={"include_usage": True}  # Explicitly enable usage tracking
         )
         # Consume the stream fully
         response_content = ""
@@ -766,7 +768,7 @@ def print_trace_hierarchy(entries):
         if parent_id not in entries_by_parent:
             entries_by_parent[parent_id] = []
         entries_by_parent[parent_id].append(entry)
-
+    
 # --- NEW COMPREHENSIVE TOKEN COUNTING TEST ---
 
 @pytest.mark.asyncio
@@ -801,7 +803,8 @@ async def test_token_counting():
                 stream = openai_client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[{"role": "user", "content": prompt2}],
-                    stream=True
+                    stream=True,
+                    stream_options={"include_usage": True}  # Explicitly enable usage tracking
                 )
                 resp2_content = ""
                 for chunk in stream:
@@ -1028,4 +1031,4 @@ if __name__ == "__main__":
         # Add back if needed:
         # 'evaluation_mixed',
         # 'evaluation_mixed_async',
-    ]))
+        ]))

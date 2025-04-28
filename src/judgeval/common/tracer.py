@@ -1377,8 +1377,15 @@ def wrap(client: Any) -> Any:
             input_data = _format_input_data(client, **kwargs)
             span.record_input(input_data)
 
+            # Warn about token counting limitations with streaming
             if isinstance(client, (AsyncOpenAI, OpenAI)) and is_streaming:
-                 kwargs["stream_options"] = {"include_usage": True}
+                if not kwargs.get("stream_options", {}).get("include_usage"):
+                    warnings.warn(
+                        "OpenAI streaming calls don't include token counts by default. "
+                        "To enable token counting with streams, set stream_options={'include_usage': True} "
+                        "in your API call arguments.",
+                        UserWarning
+                    )
 
             try:
                 if is_streaming:
@@ -1425,8 +1432,15 @@ def wrap(client: Any) -> Any:
              input_data = _format_input_data(client, **kwargs)
              span.record_input(input_data)
 
+             # Warn about token counting limitations with streaming
              if isinstance(client, (AsyncOpenAI, OpenAI)) and is_streaming:
-                 kwargs["stream_options"] = {"include_usage": True}
+                 if not kwargs.get("stream_options", {}).get("include_usage"):
+                     warnings.warn(
+                         "OpenAI streaming calls don't include token counts by default. "
+                         "To enable token counting with streams, set stream_options={'include_usage': True} "
+                         "in your API call arguments.",
+                         UserWarning
+                     )
 
              try:
                  response_or_iterator = original_create(*args, **kwargs)
