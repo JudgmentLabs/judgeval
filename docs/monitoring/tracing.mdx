@@ -434,3 +434,51 @@ main();
     over the trace lifecycle. In Typescript, explicit management via `startTrace()` and `trace.save()` is the standard way to gain this control.
     In most simple cases in Python, the `@observe` decorator is sufficient.
 </Warning>
+
+## Automatic Deep Tracing
+
+Judgeval includes automatic deep tracing, which significantly reduces the amount of instrumentation needed in your code. With deep tracing enabled (the default), you only need to observe top-level functions, and all nested function calls will be automatically traced.
+
+### How Deep Tracing Works
+
+When you decorate a function with `@observe` (Python) or wrap it with `observe()` (TypeScript), the tracer automatically instruments all functions called within that function, creating a complete trace of your execution flow without requiring explicit decorators on every function.
+
+<CodeGroup>
+```Python Python
+# Deep tracing is enabled by default
+judgment = Tracer(project_name="my_project")
+
+# Only need to observe the top-level function
+@judgment.observe(span_type="function")
+def main():
+    # These functions will be automatically traced without @observe
+    result = helper_function()
+    return process_result(result)
+
+def helper_function():
+    return "Helper result"
+
+def process_result(result):
+    return f"Processed: {result}"
+
+main()  # Traces main, helper_function, and process_result
+```
+</CodeGroup>
+
+### Disabling Deep Tracing
+
+If you prefer more control over what gets traced, you can disable deep tracing:
+
+<CodeGroup>
+```Python Python
+# Disable deep tracing globally
+judgment = Tracer(project_name="my_project", deep_tracing=False)
+
+# Or disable for specific functions
+@judgment.observe(span_type="function", deep_tracing=False)
+def selective_function():
+    helper_function()  # Won't be traced automatically
+```
+</CodeGroup>
+
+With deep tracing disabled, you'll need to explicitly observe each function you want to trace. You can still name and declare span types for each function using jdugement.observe().
