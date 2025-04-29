@@ -1,0 +1,77 @@
+---
+title: "Integrating with LiteLLM"
+sidebar_label: "Integrating with LiteLLM"
+---
+
+LiteLLM allows you to integrate Judgment's tracing capabilities by adding an observe decorator above the functions where you make your LLM calls. This enables automatic tracing of all LLM calls made through LiteLLM.
+
+<Note>
+We expect you to already be familiar with Judgment and its tools. If you are not, please refer to the [Getting Started](/getting_started) guide. For more information about tracing and the use of the observe decorator, please visit the [Tracing](/monitoring/tracing) page.
+</Note>
+
+## Prerequisites
+
+Ensure you have the necessary libraries installed and imported:
+
+```python
+# Judgment imports
+from judgeval.common.tracer import Tracer
+
+# Other common imports
+import litellm
+import os
+from dotenv import load_dotenv
+```
+
+## Usage Example
+
+Here's a complete example showing how to use Judgment's tracing with LiteLLM:
+
+```python
+# Platform-specific imports
+import litellm
+from judgeval.common.tracer import Tracer
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Initialize the Tracer
+tracer = Tracer(
+    project_name="your_project_name",
+    api_key=os.getenv("JUDGMENT_API_KEY"),
+    organization_id=os.getenv("JUDGMENT_ORG_ID")
+)
+
+# Example usage with LiteLLM
+def make_llm_call():
+    try:
+        # Make a call using LiteLLM
+        response = litellm.completion(
+            model="gpt-3.5-turbo",  # or any other supported model
+            messages=[{"role": "user", "content": "Your prompt here"}]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        print(f"Error making LLM call: {e}")
+        return None
+
+# Example Usage:
+@tracer.observe()  # Add tracing to the entire function
+def main():
+    result = make_llm_call()
+    print(f"LLM Response: {result}")
+
+if __name__ == "__main__":
+    main()
+    print("\nTrace completed. Check Judgment for trace details.")
+```
+
+## Key Features
+
+This integration allows you to:
+1. Automatically trace all LLM calls made through LiteLLM
+2. Use the `@tracer.observe()` decorator for function-level tracing
+3. Track both successful and failed LLM calls
+4. View detailed traces in the Judgment platform
