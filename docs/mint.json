@@ -121,6 +121,7 @@
         "judgment_cli/self-hosting"
       ]
     },
+    {
       "group": "MCP Server",
       "pages": [
         "mcp_server/mcp_server"
