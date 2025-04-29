@@ -1,0 +1,85 @@
+---
+title: Answer Relevancy
+description: ""
+---
+
+The answer relevancy scorer is a default LLM judge scorer that measures how relevant the LLM system's `actual_output` is to the `input`.
+In practice, this scorer helps determine whether your RAG pipeline's generator **produces relevant answers to the user's query**.
+
+<Tip>
+There are many factors to consider when evaluating the quality of your RAG pipeline. `judgeval` offers a suite of default scorers to construct a comprehensive 
+evaluation of each RAG component. Check out our guide on RAG system evaluation for a deeper dive! TODO add link here.
+</Tip>
+
+## Required Fields
+
+To run the answer relevancy scorer, you must include the following fields in your `Example`:
+- `input`
+- `actual_output`
+
+## Scorer Breakdown
+
+`AnswerRelevancy` scores are calculated by extracting statements made in the `actual_output` and classifying how many are relevant to the `input`.
+
+The score is calculated as:
+
+$$
+\text{relevancy score} = \frac{\text{relevant statements}}{\text{total statements}}
+$$
+
+## Sample Implementation
+
+<CodeGroup>
+```Python Python
+from judgeval import JudgmentClient
+from judgeval.data import Example
+from judgeval.scorers import AnswerRelevancyScorer
+
+client = JudgmentClient()
+example = Example(
+    input="What's your return policy for a pair of socks?",
+    # Replace this with your LLM system's output
+    actual_output="We offer a 30-day return policy for all items, including socks!",
+)
+# supply your own threshold
+scorer = AnswerRelevancyScorer(threshold=0.8)
+
+results = client.run_evaluation(
+    examples=[example],
+    scorers=[scorer],
+    model="gpt-4o",
+)
+print(results)
+```
+```Typescript Typescript
+import { JudgmentClient, ExampleBuilder, AnswerRelevancyScorer, logger } from 'judgeval';
+
+async function runAnswerRelevancy() {
+    const client = JudgmentClient.getInstance();
+    const example = new ExampleBuilder()
+        .input("What's your return policy for a pair of socks?")
+        // Replace this with your LLM system's output
+        .actualOutput("We offer a 30-day return policy for all items, including socks!")
+        .build();
+
+    // supply your own threshold
+    const scorer = new AnswerRelevancyScorer(0.8);
+
+    const results = await client.evaluate({
+        examples: [example],
+        scorers: [scorer],
+        model: "gpt-4o",
+        projectName: "ans-relevancy-ts-proj",
+        evalName: "ans-relevancy-ts-eval"
+    });
+    logger.print(results); // Log results to console
+}
+
+runAnswerRelevancy();
+```
+</CodeGroup>
+
+<Note>
+The `AnswerRelevancy` scorer uses an LLM judge, so you'll receive a reason for the score in the `reason` field of the results. 
+This allows you to double-check the accuracy of the evaluation and understand how the score was calculated.
+</Note>

@@ -1,0 +1,54 @@
+---
+title: Derailment
+description: ""
+---
+
+The derailment scorer is a default LLM judge scorer that measures whether steps within your LLM system are deviating/derailing from the initial conversation. 
+Derailment is a common issue in agentic systems, where the LLM may start to stray off the inital topic.
+
+## Scorer Breakdown
+
+`Derailment` scores are calculated by determing the context from the first step in the `Sequence` and then evaluating every step in the `Sequence` to see if it is deviating from that generated context.
+
+<Note>
+Derailment only considers the first step in the `Sequence` as the context.
+</Note>
+
+
+## Scorer Implementation
+```python derailment.py
+from judgeval import JudgmentClient
+from judgeval.data import Example, Sequence
+from judgeval.scorers import DerailmentScorer
+
+client = JudgmentClient()
+
+airlines_example = Example(
+    input="Which airlines fly to Paris?",
+    actual_output="Air France, Delta, and American Airlines offer direct flights."
+)
+airline_followup = Example(
+    input="Which airline is the best for a family of 4?",
+    actual_output="Delta is the best airline for a family of 4."
+)
+weather_example = Example(
+    input="What is the weather like in Texas?",
+    actual_output="It's sunny with a high of 75°F in Texas."
+)
+airline_sequence = Sequence(
+    name="Flight Details",
+    items=[airlines_example, airline_followup, weather_example]
+)
+
+results = client.run_sequence_evaluation(
+    sequences=[airline_sequence],
+    scorers=[DerailmentScorer(threshold=0.5)],
+    model="gpt-4o",
+    log_results=True,
+    override=True,
+)
+```
+
+<Note>
+You would expect a derailment score of 0.66 for this `airline_sequence` because only the last step is deviating from the initial context.
+</Note>

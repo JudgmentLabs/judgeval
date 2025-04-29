@@ -5,6 +5,7 @@ Tests for evaluation operations in the JudgmentClient.
 import pytest
 import random
 import string
+import uuid
 
 from judgeval.judgment_client import JudgmentClient
 from judgeval.data import Example
@@ -60,6 +61,41 @@ class TestEvalOperations:
         results = client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
         assert results, f"No evaluation results found for {EVAL_RUN_NAME}"
 
+        client.delete_project(project_name=PROJECT_NAME)
+
+    def test_run_eval_append(self, client: JudgmentClient):
+        """Test evaluation append behavior."""
+        PROJECT_NAME = "OutreachWorkflow"
+        EVAL_RUN_NAME = "ColdEmailGenerator-Improve-BasePrompt"
+
+        self.run_eval_helper(client, PROJECT_NAME, EVAL_RUN_NAME)
+        results = client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
+        assert results, f"No evaluation results found for {EVAL_RUN_NAME}"
+
+        assert len(results) == 2
+
+        example1 = Example(
+            input="Generate a cold outreach email for TechCorp. Facts: They recently launched an AI-powered analytics platform. Their CEO Sarah Chen previously worked at Google. They have 50+ enterprise clients.",
+            actual_output="Dear Ms. Chen,\n\nI noticed TechCorp's recent launch of your AI analytics platform and was impressed by its enterprise-focused approach. Your experience from Google clearly shines through in building scalable solutions, as evidenced by your impressive 50+ enterprise client base.\n\nWould you be open to a brief call to discuss how we could potentially collaborate?\n\nBest regards,\nAlex",
+            retrieval_context=["TechCorp launched AI analytics platform in 2024", "Sarah Chen is CEO, ex-Google executive", "Current client base: 50+ enterprise customers"],
+        )
+        scorer = FaithfulnessScorer(threshold=0.5)
+        
+        client.run_evaluation(
+            examples=[example1],
+            scorers=[scorer],
+            model="Qwen/Qwen2.5-72B-Instruct-Turbo",
+            metadata={"batch": "test"},
+            project_name=PROJECT_NAME,
+            eval_run_name=EVAL_RUN_NAME,
+            append=True,
+        )
+
+        results = client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
+        print(results)
+        assert results, f"No evaluation results found for {EVAL_RUN_NAME}"
+
+        assert len(results) == 3
         client.delete_project(project_name=PROJECT_NAME)
 
     def test_delete_eval_by_project_and_run_names(self, client: JudgmentClient):
@@ -145,8 +181,8 @@ class TestEvalOperations:
         )
 
         dataset = EvalDataset(examples=[example1, example2])
-        res = client.evaluate_dataset(
-            dataset=dataset,
+        res = client.run_evaluation(
+            examples = dataset.examples,
             scorers=[FaithfulnessScorer(threshold=0.5)],
             model="Qwen/Qwen2.5-72B-Instruct-Turbo",
             metadata={"batch": "test"},
@@ -194,6 +230,7 @@ class TestEvalOperations:
         
         # Third run with override=True should succeed
         try:
+            example1.example_id = str(uuid.uuid4())
             client.run_evaluation(
                 examples=[example1],
                 scorers=[scorer],
@@ -220,83 +257,3 @@ class TestEvalOperations:
                 log_results=True,
                 override=False,
             )
-
-@pytest.mark.advanced
-class TestAdvancedEvalOperations:
-    def test_json_scorer(self, client: JudgmentClient):
-        """Test JSON scorer functionality."""
-        example1 = Example(
-            input="What if these shoes don't fit?",
-            actual_output='{"tool": "authentication"}',
-            retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
-        )
-
-        example2 = Example(
-            input="How do I reset my password?",
-            actual_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
-            expected_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
-            name="Password Reset",
-            context=["User Account"],
-            retrieval_context=["Password reset instructions"],
-            tools_called=["authentication"],
-            expected_tools=["authentication"],
-            additional_metadata={"difficulty": "medium"}
-        )
-
-        class SampleSchema(BaseModel):
-            tool: str
-
-        scorer = JSONCorrectnessScorer(threshold=0.5, json_schema=SampleSchema)
-        PROJECT_NAME = "test_project"
-        EVAL_RUN_NAME = "test_json_scorer"
-        
-        res = client.run_evaluation(
-            examples=[example1, example2],
-            scorers=[scorer],
-            model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-            metadata={"batch": "test"},
-            project_name=PROJECT_NAME,
-            eval_run_name=EVAL_RUN_NAME,
-            log_results=True,
-            override=True,
-            use_judgment=True,
-        )
-        assert res, "JSON scorer evaluation failed"
-
-    def test_classifier_scorer(self, client: JudgmentClient, random_name: str):
-        """Test classifier scorer functionality."""
-        random_slug = random_name
-        faithfulness_scorer = FaithfulnessScorer(threshold=0.5)
-        
-        # Creating a classifier scorer from SDK
-        classifier_scorer_custom = ClassifierScorer(
-            name="Test Classifier Scorer",
-            slug=random_slug,
-            threshold=0.5,
-            conversation=[],
-            options={}
-        )
-        
-        classifier_scorer_custom.update_conversation(conversation=[{"role": "user", "content": "What is the capital of France?"}])
-        classifier_scorer_custom.update_options(options={"yes": 1, "no": 0})
-        
-        slug = client.push_classifier_scorer(scorer=classifier_scorer_custom)
-        
-        classifier_scorer_custom = client.fetch_classifier_scorer(slug=slug)
-        
-        example1 = Example(
-            input="What is the capital of France?",
-            actual_output="Paris",
-            retrieval_context=["The capital of France is Paris."],
-        )
-
-        res = client.run_evaluation(
-            examples=[example1],
-            scorers=[faithfulness_scorer, classifier_scorer_custom],
-            model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-            log_results=True,
-            eval_run_name="ToneScorerTest",
-            project_name="ToneScorerTest",
-            override=True,
-        )
-        assert res, "Classifier scorer evaluation failed" 

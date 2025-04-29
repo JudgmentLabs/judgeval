@@ -9,12 +9,21 @@ click [here](/monitoring/tracing).
 
 The `Tracer` class is used to trace the execution of your LLM system.
 
-```python
+<CodeGroup>
+```Python Python
 from judgeval.tracer import Tracer
 
 # loads from JUDGMENT_API_KEY and JUDGMENT_ORG_ID env vars
 tracer = Tracer(project_name="my_project")
 ```
+```Typescript Typescript
+import { Tracer } from 'judgeval';
+
+// Loads from JUDGMENT_API_KEY and JUDGMENT_ORG_ID env vars
+// Use getInstance to get the singleton
+const tracer = Tracer.getInstance({ projectName: "my_project" }); 
+```
+</CodeGroup>
 
 <Note>
 The `Tracer` class is a singleton, so you only need to initialize it once in your application. 
@@ -22,61 +31,143 @@ The `project_name` enables you to group traces by workflow, keeping all your eva
 observability tooling in one place.
 </Note>
 
-## Explicitly exporting traces
+## Explicitly Managing Traces
 
-When using the `.trace()` context manager, you can control how your traces are exported to the Judgment platform by 
-providing the `project_name` argument. This allows you to group traces by workflow, keeping all your evaluations and 
-observability tooling in one place.
+When using the `.trace()` context manager (Python) or explicitly calling `tracer.startTrace()` (Typescript), you can control trace attributes like `name`, `project_name`, and `overwrite`.
 
-```python
+<CodeGroup>
+```Python Python
+# Assume tracer = Tracer(...) exists
+
 with tracer.trace(
-    name="my_workflow", 
+    name="my_workflow_run_123", 
     project_name="my_project", 
     overwrite=True
     ) as trace: 
-    ...
+    # ... operations within the trace ...
+    trace.save() # Context manager often handles saving on exit
 ```
+```Typescript Typescript
+// Assume tracer = Tracer.getInstance(...) exists
 
-`.trace()` has the following args:
+async function manageTrace() {
+    const trace = tracer.startTrace("my_workflow_run_123", {
+        projectName: "my_project", // Optional, defaults to Tracer's project name
+        overwrite: true
+    });
+
+    try {
+        // ... operations within the trace ...
+        console.log("Performing traced operations...");
+        await trace.save(); // Manually save the trace
+    } catch (error) {
+        console.error("Trace failed:", error);
+        await trace.save(); // Save even on error
+    }
+}
+
+manageTrace();
+```
+</CodeGroup>
+
+Key arguments/options:
 - `name`: The name of the trace. Can be make unique to each workflow run by using a timestamp or other unique identifier.
-- `project_name`: The name of the project to use for the trace. Used to group traces by workflow.
+- `project_name` / `projectName`: The name of the project to use for the trace. Used to group traces by workflow.
 - `overwrite`: Whether to overwrite the trace with the same `name` if it already exists.
 
-The `trace()` context manager yields a `TraceClient` object.
+The Python context manager yields a `TraceClient` object. The Typescript `startTrace` method returns a `TraceClient` instance.
 
 
 ## TraceClient
 
 The `TraceClient` object manages the context of a single trace context (or workflow run).
 
-`TraceClient` has the following methods:
-- `async_evaluate()`: Evaluate an LLM system.
-- `print()`: Print the trace to the console.
+`TraceClient` has the following key methods:
+- `asyncEvaluate()` (Typescript) / `async_evaluate()` (Python): Evaluate an LLM system within the trace context.
+- `print()`: Print the trace details to the console.
 - `save()`: Save the trace to the Judgment platform.
+- `recordInput()`, `recordOutput()`, `recordError()` (Typescript): Manually record inputs, outputs, or errors for the current span.
+- `startSpan()`, `endSpan()` (Typescript): Manually control span boundaries (less common than using `observe`).
 
 
-## Tracing functions
+## Tracing functions (`@observe` / `observe()`)
 
-Each intermediate function or coroutine you want to trace is wrapped with the `@judgment.observe()` decorator. 
-**If you use multiple decorators**, the `@judgment.observe()` decorator should be the innermost decorator to 
-preserve functionality.
+With automatic deep tracing, you only need to observe top-level functions, and all nested function calls will be automatically traced. This significantly reduces the amount of instrumentation needed in your code.
 
-Here's an example of a tool that uses the langchain `@tool` decorator.
+**If you use multiple decorators in Python**, the `@judgment.observe()` decorator should be the innermost decorator to preserve functionality.
 
-```python
-...
+Here's an example using automatic deep tracing:
 
-@tool
-@judgment.observe(span_type="tool")
+<CodeGroup>
+```Python Python
+# Initialize tracer (deep tracing is enabled by default)
+judgment = Tracer(project_name="my_project")
+
+# Only need to observe the top-level function
+@judgment.observe(span_type="function")
+def main_workflow(query: str):
+    # All function calls inside will be automatically traced
+    result = my_tool(query)
+    return process_result(result)
+
+# No @observe needed - automatically traced when called from main_workflow
 def my_tool(query: str):
-    ...
-```
+    print(f"Tool executed with query: {query}")
+    return "Tool result"
 
-The `span_type` argument can be used to categorize the type of span for observability purposes and will be displayed 
+# No @observe needed - automatically traced when called from main_workflow
+def process_result(result: str):
+    return f"Processed: {result}"
+
+# Calling main_workflow("some query") will trace the entire call stack
+```
+```Typescript Typescript
+// Assume tracer = Tracer.getInstance(...) exists
+
+// Assume an equivalent decorator or wrapper for @tool exists if needed
+// e.g., const langchainTool = createLangchainToolWrapper();
+
+async function myTool(query: string): Promise<string> {
+    // ... tool logic ...
+    console.log(`Tool executed with query: ${query}`);
+    return "Tool result";
+}
+
+// Apply the observe wrapper
+const observedMyTool = tracer.observe({ spanType: "tool" })(myTool);
+
+// Apply other wrappers if necessary (order might matter depending on wrappers)
+// const finalWrappedTool = langchainTool(observedMyTool); 
+
+// Calling observedMyTool("some query") will now be traced.
+// (or finalWrappedTool if multiple wrappers are used)
+```
+</CodeGroup>
+
+You can also disable deep tracing if you prefer manual control:
+
+<CodeGroup>
+```Python Python
+# Disable deep tracing
+judgment = Tracer(project_name="my_project")
+
+# Even with deep tracing globally enabled (default)
+# You can disable it for specific functions so judgment would not trace any functions this selective_function calls
+@judgment.observe(span_type="function", deep_tracing=False)
+def selective_function():
+    helper_function()  # Won't be traced automatically
+    return "Done"
+```
+```Typescript Typescript
+// Disable deep tracing
+const judgment = Tracer.getInstance({ 
+    projectName: "my_project",
+    deepTracing: false  // Disable automatic deep tracing
+});
+```
+</CodeGroup>
+
+The `span_type` / `spanType` argument can be used to categorize the type of span for observability purposes and will be displayed 
 on the Judgment platform:
 
 ![span_type](/images/basic_trace_example.png)
-
-
-
-

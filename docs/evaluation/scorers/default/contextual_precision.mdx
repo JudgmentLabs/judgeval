@@ -1,0 +1,106 @@
+---
+title: Contextual Precision
+description: ""
+---
+
+The contextual precision scorer is a default LLM judge scorer that measures whether contexts in your `retrieval_context` are properly ranked by importance relative to the `input`. 
+
+In practice, this scorer helps determine whether your RAG pipeline's retriever is **effectively ordering the retrieved contexts**.
+
+<Tip>
+There are many factors to consider when evaluating the quality of your RAG pipeline. `judgeval` offers a suite of default scorers to construct a comprehensive 
+evaluation of each RAG component. Check out our guide on RAG system evaluation for a deep dive!
+</Tip>
+
+## Required Fields 
+
+To run the contextual precision scorer, you must include the following fields in your `Example`:
+- `input`
+- `actual_output`
+- `expected_output`
+- `retrieval_context`
+
+## Scorer Breakdown
+
+`ContextualPrecision` scores are calculated by first determining which contexts in `retrieval_context` are relevant to the `input` based on the information in `expected_output`. 
+
+Then, we compute the **weighted cumulative precision (WCP)** of the retrieved contexts. We use WCP because it:
+- **Emphasizes on top results**: WCP places a strong emphasis on the relevance of top-ranked results. This emphasis is important because LLMs tend to give more attention to earlier nodes in the `retrieval_context`. 
+Therefore, improper rankings can induce hallucinations in the `actual_output`.
+- **Rewards Effective Rankings**: WCP captures the comparative relevance of different contexts (highly relevant vs. somewhat relevant). This is preferable to other approaches such as standard precision, which weights all retrieved contexts as equally relevant.
+
+The score is calculated as:
+
+$$
+\text{Contextual Precision} = \frac{1}{\text{Number of Relevant Nodes}} \sum_{k=1}^n \left( \frac{\text{Number of Relevant Nodes Up to Position } k}{k} \times r_k \right)
+$$
+
+<Note>
+Our contextual precision scorer is based on Stanford NLP's [ARES](https://arxiv.org/abs/2311.09476) paper (Saad-Falcon et. al., 2024).
+</Note>
+
+## Sample Implementation
+
+<CodeGroup>
+```Python Python
+from judgeval import JudgmentClient
+from judgeval.data import Example
+from judgeval.scorers import ContextualPrecisionScorer
+
+client = JudgmentClient()
+
+example = Example(
+    input="What's your return policy for a pair of socks?",
+    # Replace this with your LLM system's output
+    actual_output="We offer a 30-day return policy for all items, including socks!",
+    # Replace this with the ideal output from your RAG generator model
+    expected_output="All customers are eligible for a 30-day return policy, no questions asked.",
+    # Replace this with the contexts retrieved by your RAG retriever
+    retrieval_context=["Return policy, all items: 30-day limit for full refund, no questions asked."]
+)
+# supply your own threshold
+scorer = ContextualPrecisionScorer(threshold=0.8)
+
+results = client.run_evaluation(
+    examples=[example],
+    scorers=[scorer],
+    model="gpt-4o",
+)
+print(results)
+```
+```Typescript Typescript
+import { JudgmentClient, ExampleBuilder, ContextualPrecisionScorer, logger } from 'judgeval';
+
+async function runContextualPrecision() {
+    const client = JudgmentClient.getInstance();
+    const example = new ExampleBuilder()
+        .input("What's your return policy for a pair of socks?")
+        // Replace this with your LLM system's output
+        .actualOutput("We offer a 30-day return policy for all items, including socks!")
+        // Replace this with the ideal output from your RAG generator model
+        .expectedOutput("All customers are eligible for a 30-day return policy, no questions asked.")
+        // Replace this with the contexts retrieved by your RAG retriever
+        .context(["Return policy, all items: 30-day limit for full refund, no questions asked."])
+        .build();
+
+    // supply your own threshold
+    const scorer = new ContextualPrecisionScorer(0.8);
+
+    const results = await client.evaluate({
+        examples: [example],
+        scorers: [scorer],
+        model: "gpt-4o",
+        projectName: "ctx-precision-ts-proj",
+        evalName: "ctx-precision-ts-eval"
+    });
+    logger.print(results); // Log results to console
+}
+
+runContextualPrecision();
+```
+</CodeGroup>
+
+<Note>
+The `ContextualPrecision` scorer uses an LLM judge, so you'll receive a reason for the score in the `reason` field of the results. 
+This allows you to double-check the accuracy of the evaluation and understand how the score was calculated.
+</Note>

@@ -85,6 +85,34 @@ class TestDatasetOperations:
 
         client.delete_dataset(alias="test_dataset_6", project_name=project_name)
 
+    def test_overwrite_dataset(self, client: JudgmentClient, project_name: str):
+        """Test dataset overwriting."""
+        dataset = client.create_dataset()
+        dataset.add_example(Example(input="input 1", actual_output="output 1"))
+        client.push_dataset(alias="test_dataset_7", dataset=dataset, project_name=project_name, overwrite=True)
+
+        dataset = client.create_dataset()
+        dataset.add_example(Example(input="input 2", actual_output="output 2"))
+        dataset.add_example(Example(input="input 3", actual_output="output 3"))
+        client.push_dataset(alias="test_dataset_7", dataset=dataset, project_name=project_name, overwrite=True)
+
+        dataset = client.pull_dataset(alias="test_dataset_7", project_name=project_name)
+        assert dataset, "Failed to pull dataset"
+        assert len(dataset.examples) == 2, "Dataset should have 2 examples"
+
+    def test_append_dataset(self, client: JudgmentClient, project_name: str):
+        """Test dataset appending."""
+        dataset = client.create_dataset()
+        dataset.add_example(Example(input="input 1", actual_output="output 1"))
+        client.push_dataset(alias="test_dataset_8", dataset=dataset, project_name=project_name, overwrite=True)     
+        
+        examples = [Example(input="input 2", actual_output="output 2"), Example(input="input 3", actual_output="output 3")]
+        client.append_dataset(alias="test_dataset_8", examples=examples, project_name=project_name)
+
+        dataset = client.pull_dataset(alias="test_dataset_8", project_name=project_name)
+        assert dataset, "Failed to pull dataset"
+        assert len(dataset.examples) == 3, "Dataset should have 3 examples"
+
     def test_export_jsonl(self, client: JudgmentClient, random_name: str, project_name: str):
         """Test JSONL dataset export functionality."""
         # Create and push test dataset

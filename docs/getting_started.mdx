@@ -120,20 +120,22 @@ from judgeval.common.tracer import Tracer, wrap
 from openai import OpenAI
 
 client = wrap(OpenAI())
-judgment = Tracer(project_name="my_project")
+judgment = Tracer(project_name="my_project")  # Deep tracing is enabled by default
 
-@judgment.observe(span_type="tool")
-def my_tool():
-    return "Hello world!"
-
+# With automatic deep tracing, you only need to observe the top-level function
 @judgment.observe(span_type="function")
 def main():
+    # my_tool will be automatically traced without @observe
     task_input = my_tool()
     res = client.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "user", "content": f"{task_input}"}]
     )
     return res.choices[0].message.content
+
+# No @observe needed - automatically traced when called from main
+def my_tool():
+    return "Hello world!"
 
 # Calling the observed function implicitly starts and saves the trace
 main()
@@ -180,6 +182,8 @@ async function runImplicitTrace() {
 runImplicitTrace();
 ```
 </CodeGroup>
+
+With automatic deep tracing, you only need to observe top-level functions, and all nested function calls will be automatically traced. This significantly reduces the amount of instrumentation needed in your code.
 
 Congratulations! You've just created your first trace. It should look like this:
 

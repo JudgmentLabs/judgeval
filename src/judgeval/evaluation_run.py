@@ -1,7 +1,7 @@
 from typing import List, Optional, Dict, Any, Union
 from pydantic import BaseModel, field_validator
 
-from judgeval.data import Example
+from judgeval.data import Example, CustomExample
 from judgeval.scorers import JudgevalScorer, APIJudgmentScorer
 from judgeval.constants import ACCEPTABLE_MODELS
 from judgeval.common.logger import debug, error
@@ -15,7 +15,7 @@ class EvaluationRun(BaseModel):
     Args: 
         project_name (str): The name of the project the evaluation results belong to
         eval_name (str): A name for this evaluation run
-        examples (List[Example]): The examples to evaluate
+        examples (Union[List[Example], List[CustomExample]]): The examples to evaluate
         scorers (List[Union[JudgmentScorer, JudgevalScorer]]): A list of scorers to use for evaluation
         model (str): The model used as a judge when using LLM as a Judge
         aggregator (Optional[str]): The aggregator to use for evaluation if using Mixture of Judges
@@ -29,14 +29,16 @@ class EvaluationRun(BaseModel):
     organization_id: Optional[str] = None
     project_name: Optional[str] = None
     eval_name: Optional[str] = None
-    examples: List[Example]
+    examples: Union[List[Example], List[CustomExample]]
     scorers: List[Union[APIJudgmentScorer, JudgevalScorer]]
     model: Union[str, List[str], JudgevalJudge]
     aggregator: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+    trace_span_id: Optional[str] = None
     # API Key will be "" until user calls client.run_eval(), then API Key will be set
     judgment_api_key: Optional[str] = ""
     override: Optional[bool] = False
+    append: Optional[bool] = False
     rules: Optional[List[Rule]] = None
     
     def model_dump(self, **kwargs):
@@ -77,13 +79,17 @@ class EvaluationRun(BaseModel):
             raise ValueError("Eval name is required when log_results is True. Please include the eval_run_name argument.")
         return v
 
-    @field_validator('examples')
+    @field_validator('examples', mode='before')
     def validate_examples(cls, v):
         if not v:
             raise ValueError("Examples cannot be empty.")
-        for ex in v:
-            if not isinstance(ex, Example):
-                raise ValueError(f"Invalid type for Example: {type(ex)}")
+        
+        first_type = type(v[0])
+        if first_type not in (Example, CustomExample):
+            raise ValueError(f"Invalid type for Example/CustomExample: {first_type}")
+        if not all(isinstance(ex, first_type) for ex in v):
+            raise ValueError("All examples must be of the same type, either all Example or all CustomExample.")
+        
         return v
 
     @field_validator('scorers')

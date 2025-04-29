@@ -1,0 +1,86 @@
+---
+title: Answer Correctness
+description: ""
+---
+
+The answer correctness scorer is a default LLM judge scorer that measures how correct/consistent the LLM system's `actual_output` is to the `expected_output`.
+In practice, this scorer helps determine whether your LLM application produces **answers that are consistent with golden/ground truth answers**.
+
+
+## Required Fields
+
+To run the answer relevancy scorer, you must include the following fields in your `Example`:
+- `input`
+- `actual_output`
+- `expected_output`
+
+## Scorer Breakdown
+
+`AnswerCorrectness` scores are calculated by extracting statements made in the `expected_output` and classifying how many are consistent/correct with respect to the `actual_output`.
+
+The score is calculated as:
+
+$$
+\text{correctness score} = \frac{\text{correct statements}}{\text{total statements}}
+$$
+
+## Sample Implementation
+
+<CodeGroup>
+```Python Python
+from judgeval import JudgmentClient
+from judgeval.data import Example
+from judgeval.scorers import AnswerCorrectnessScorer
+
+client = JudgmentClient()
+example = Example(
+    input="What's your return policy for a pair of socks?",
+    # Replace this with your LLM system's output
+    actual_output="We offer a 30-day return policy for all items, including socks!",
+    # Replace this with your golden/ground truth answer
+    expected_output="Socks can be returned within 30 days of purchase.",
+)
+# supply your own threshold
+scorer = AnswerCorrectnessScorer(threshold=0.8)
+
+results = client.run_evaluation(
+    examples=[example],
+    scorers=[scorer],
+    model="gpt-4o",
+)
+print(results)
+```
+```Typescript Typescript
+import { JudgmentClient, ExampleBuilder, AnswerCorrectnessScorer, logger } from 'judgeval';
+
+async function runAnswerCorrectness() {
+    const client = JudgmentClient.getInstance();
+    const example = new ExampleBuilder()
+        .input("What's your return policy for a pair of socks?")
+        // Replace this with your LLM system's output
+        .actualOutput("We offer a 30-day return policy for all items, including socks!")
+        // Replace this with your golden/ground truth answer
+        .expectedOutput("Socks can be returned within 30 days of purchase.")
+        .build();
+
+    // supply your own threshold
+    const scorer = new AnswerCorrectnessScorer(0.8);
+
+    const results = await client.evaluate({
+        examples: [example],
+        scorers: [scorer],
+        model: "gpt-4o",
+        projectName: "ans-correct-ts-proj",
+        evalName: "ans-correct-ts-eval"
+    });
+    logger.print(results); // Log results to console
+}
+
+runAnswerCorrectness();
+```
+</CodeGroup>
+
+<Note>
+The `AnswerCorrectness` scorer uses an LLM judge, so you'll receive a reason for the score in the `reason` field of the results. 
+This allows you to double-check the accuracy of the evaluation and understand how the score was calculated.
+</Note>

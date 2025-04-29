@@ -1,0 +1,283 @@
+---
+title: 'Notifications'
+description: 'Get alerted when your rules trigger through multiple communication channels'
+---
+
+# Notifications
+
+Notifications allow you to receive alerts through various communication channels when your [rules](/alerts/rules) are triggered. This feature helps you stay informed about potential issues with your AI system's performance in real-time.
+
+## Overview
+
+The notification system works with [rules](/alerts/rules) to:
+
+1. Monitor your evaluation metrics
+2. Check if they meet your defined [conditions](/alerts/rules#conditions)
+3. Send alerts through your preferred channels when conditions are met
+
+Notifications can be configured globally or per rule, allowing you to customize how you're alerted based on the specific rule that was triggered.
+
+<Warning>
+Rules and notifications only work with built-in APIScorers. Local scorers and custom scorers are not supported for triggering notifications.
+</Warning>
+
+## Notification Configuration
+
+Notifications are configured using the `NotificationConfig` class from the `judgeval.rules` (Python) or `judgeval` (Typescript) module.
+
+### Configuration Options
+
+| Parameter (Python) | Parameter (Typescript) | Type | Description |
+|--------------------|------------------------|------|-------------|
+| `enabled` | `enabled` | boolean | Whether notifications are enabled (default: `True`) |
+| `communication_methods` | `communicationMethods` | array of strings | The methods to use for sending notifications (e.g., `["email", "slack"]`) |
+| `email_addresses` | `emailAddresses` | array of strings | Email addresses to send notifications to |
+| `send_at` | `sendAt` | number (Unix timestamp) | Schedule notifications for a specific time ([learn more](#scheduled-notifications)) |
+
+<Note>
+For aggregated reports and periodic summaries of multiple alerts, use the [Scheduled Reports feature](/alerts/platform_notifications#scheduled-reports-recaps) in the Judgment Platform.
+</Note>
+
+### Basic Configuration
+
+<CodeGroup>
+```Python Python
+from judgeval.rules import NotificationConfig
+
+# Create a notification configuration
+notification_config = NotificationConfig(
+    enabled=True,
+    communication_methods=["slack", "email"],
+    email_addresses=["user@example.com"],
+    send_at=None  # Send immediately
+)
+```
+```Typescript Typescript
+import { NotificationConfig } from 'judgeval';
+
+// Create a notification configuration
+const notificationConfig: NotificationConfig = {
+    enabled: true,
+    communicationMethods: ["slack", "email"],
+    emailAddresses: ["user@example.com"],
+    sendAt: undefined // Send immediately
+};
+```
+</CodeGroup>
+
+## Communication Methods
+
+Judgeval supports multiple communication methods for notifications:
+
+- `"email"`: Send emails to specified email addresses
+- `"slack"`: Send messages to configured Slack channels
+
+You can configure multiple methods to be used simultaneously.
+
+## Slack Integration
+
+For detailed information on integrating Slack with Judgment notifications, see the [Platform Notification Center documentation](/alerts/platform_notifications#slack-integration).
+
+## Attaching Notifications to Rules
+
+Notifications can be attached to [rules](/alerts/rules) during rule creation or added/configured later.
+
+### During Rule Creation
+
+<CodeGroup>
+```Python Python
+from judgeval.rules import Rule, Condition, NotificationConfig
+from judgeval.scorers import FaithfulnessScorer
+
+# Create notification config
+notification_config = NotificationConfig(
+    enabled=True,
+    communication_methods=["slack", "email"],
+    email_addresses=["user@example.com"]
+)
+
+# Create rule with notification config
+rule = Rule(
+    name="Faithfulness Check",
+    description="Check if faithfulness meets threshold",
+    conditions=[
+        # Note: Only built-in APIScorers are supported
+        Condition(metric=FaithfulnessScorer(threshold=0.7))
+    ],
+    combine_type="all",  # Trigger when all conditions fail
+    notification=notification_config
+)
+```
+```Typescript Typescript
+import { Rule, Condition, NotificationConfig, FaithfulnessScorer } from 'judgeval';
+
+// Create notification config
+const notificationConfig: NotificationConfig = {
+    enabled: true,
+    communicationMethods: ["slack", "email"],
+    emailAddresses: ["user@example.com"]
+};
+
+// Create rule with notification config
+const rule = new Rule(
+    "Faithfulness Check", 
+    [ 
+        // Note: Only built-in APIScorers are supported
+        new Condition(new FaithfulnessScorer(0.7))
+    ],
+    "all", // Trigger when all conditions fail
+    "Check if faithfulness meets threshold", 
+    notificationConfig
+);
+```
+</CodeGroup>
+
+## Scheduled Notifications
+
+You can schedule one-time notifications to be sent at a specific time using the `send_at` / `sendAt` parameter:
+
+<CodeGroup>
+```Python Python
+from judgeval.rules import NotificationConfig
+import time
+
+# Schedule notification for 1 hour from now
+one_hour_from_now = int(time.time()) + 3600
+
+notification_config = NotificationConfig(
+    enabled=True,
+    communication_methods=["email"],
+    email_addresses=["user@example.com"],
+    send_at=one_hour_from_now
+)
+```
+```Typescript Typescript
+import { NotificationConfig } from 'judgeval';
+
+// Schedule notification for 1 hour from now
+const oneHourFromNow = Math.floor(Date.now() / 1000) + 3600;
+
+const notificationConfig: NotificationConfig = {
+    enabled: true,
+    communicationMethods: ["email"],
+    emailAddresses: ["user@example.com"],
+    sendAt: oneHourFromNow
+};
+```
+</CodeGroup>
+
+The `send_at` / `sendAt` parameter accepts a Unix timestamp (integer/number) that specifies when the notification should be sent. This is useful for delaying notifications or grouping them to be sent at a specific time of day.
+
+<Warning>
+The `send_at` parameter only delays when a single notification is sent. It doesn't create recurring notifications or group multiple alerts together. Each time a rule is triggered, a separate notification is generated.
+</Warning>
+
+## Notification Types in the Platform
+
+The Judgment Platform offers two main types of notifications:
+
+1. **Evaluation Alerts** - Real-time notifications sent when specific rules are triggered. When using the API, these can be scheduled for a specific time using the `send_at` parameter.
+
+2. **Custom Alert Recaps** - Periodic summaries (daily, weekly, monthly) of evaluation metrics and alerts. These are configured in the [Platform Notification Center](/alerts/platform_notifications).
+
+### Setting Up Custom Alert Recaps
+
+To set up periodic notification summaries:
+
+1. Navigate to the Notifications page in your Judgment account settings
+2. Under "Custom Alert Recaps," click the "+" button to create a new report
+3. Configure your preferred frequency (Daily, Weekly, Monthly) and delivery time
+4. Add recipient email addresses
+
+For more details, see the [Scheduled Reports](/alerts/platform_notifications#scheduled-reports-recaps) documentation.
+
+## Judgment Platform Features
+
+For information about configuring notifications in the Judgment web platform, including email alerts, scheduled reports, and Slack integration, see the [Platform Notification Center](/alerts/platform_notifications) documentation.
+
+## Practical Example
+
+Here's a complete example showing how to set up rules with notifications and integrate them with the Tracer:
+
+<CodeGroup>
+```Python Python
+import os
+from judgeval.common.tracer import Tracer, wrap
+from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
+from judgeval.rules import Rule, Condition, NotificationConfig
+from openai import OpenAI
+
+# Create notification config
+notification_config = NotificationConfig(
+    enabled=True,
+    communication_methods=["slack", "email"],
+    email_addresses=["alerts@example.com"],
+    send_at=None  # Send immediately
+)
+
+# Create rules with notification config
+rules = [
+    Rule(
+        name="Quality Check",
+        description="Check if all quality metrics meet thresholds",
+        conditions=[
+            # Only built-in APIScorers can be used as metrics
+            Condition(metric=FaithfulnessScorer(threshold=0.7)),
+            Condition(metric=AnswerRelevancyScorer(threshold=0.8))
+        ],
+        combine_type="all",  # Trigger when all conditions fail
+        notification=notification_config
+    )
+]
+
+# Initialize tracer with rules for notifications
+judgment = Tracer(
+    # api_key=os.getenv("JUDGMENT_API_KEY"), # Key read automatically
+    project_name="my_project", 
+    rules=rules
+)
+
+# Wrap OpenAI client for tracing
+client = wrap(OpenAI())
+
+# Now any evaluations that trigger the rules will send notifications
+``` 
+```Typescript Typescript
+import { Tracer, wrap, FaithfulnessScorer, AnswerRelevancyScorer, Rule, Condition, NotificationConfig } from 'judgeval';
+import OpenAI from 'openai';
+
+// Create notification config
+const notificationConfig: NotificationConfig = {
+    enabled: true,
+    communicationMethods: ["slack", "email"],
+    emailAddresses: ["alerts@example.com"],
+    sendAt: undefined // Send immediately
+};
+
+// Create rules with notification config
+const rules = [
+    new Rule(
+        "Quality Check", 
+        [ 
+            // Only built-in APIScorers can be used as metrics
+            new Condition(new FaithfulnessScorer(0.7)),
+            new Condition(new AnswerRelevancyScorer(0.8))
+        ],
+        "all", // Trigger when all conditions fail
+        "Check if all quality metrics meet thresholds", 
+        notificationConfig
+    )
+];
+
+// Initialize tracer with rules for notifications
+const judgment = Tracer.getInstance({
+    projectName: "my_project",
+    rules: rules
+});
+
+// Wrap OpenAI client for tracing
+const client = wrap(new OpenAI());
+
+// Now any evaluations that trigger the rules will send notifications
+``` 
+</CodeGroup>

@@ -4,7 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-litellm = "*"
+litellm = "==1.38.12"
 python-dotenv = "==1.0.1"
 fastapi = "*"
 uvicorn = "*"
@@ -24,6 +24,9 @@ langchain-openai = "*"
 langchain-anthropic = "*"
 langchain-core = "*"
 langchain-community = "*"
+langgraph = "*"
+google-genai = "*"
+boto3 = "*"
 
 [dev-packages]
 pytest = "*"

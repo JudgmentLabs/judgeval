@@ -26,7 +26,8 @@ class APIScorer(str, Enum):
     JSON_CORRECTNESS = "json_correctness"
     COMPARISON = "comparison"
     GROUNDEDNESS = "groundedness"
-
+    DERAILMENT = "derailment"
+    
     @classmethod
     def _missing_(cls, value):
         # Handle case-insensitive lookup
@@ -39,8 +40,10 @@ UNBOUNDED_SCORERS = set([APIScorer.COMPARISON])  # scorers whose scores are not 
 ROOT_API = os.getenv("JUDGMENT_API_URL", "https://api.judgmentlabs.ai")
 # API URLs
 JUDGMENT_EVAL_API_URL = f"{ROOT_API}/evaluate/"
+JUDGMENT_SEQUENCE_EVAL_API_URL = f"{ROOT_API}/evaluate_sequence/"
 JUDGMENT_DATASETS_PUSH_API_URL = f"{ROOT_API}/datasets/push/"
-JUDGMENT_DATASETS_PULL_API_URL = f"{ROOT_API}/datasets/pull/"
+JUDGMENT_DATASETS_APPEND_API_URL = f"{ROOT_API}/datasets/insert_examples/"
+JUDGMENT_DATASETS_PULL_API_URL = f"{ROOT_API}/datasets/pull_for_judgeval/"
 JUDGMENT_DATASETS_DELETE_API_URL = f"{ROOT_API}/datasets/delete/"
 JUDGMENT_DATASETS_EXPORT_JSONL_API_URL = f"{ROOT_API}/datasets/export_jsonl/"
 JUDGMENT_DATASETS_PROJECT_STATS_API_URL = f"{ROOT_API}/datasets/fetch_stats_by_project/"
@@ -54,7 +57,6 @@ JUDGMENT_PROJECT_CREATE_API_URL = f"{ROOT_API}/projects/add/"
 JUDGMENT_TRACES_FETCH_API_URL = f"{ROOT_API}/traces/fetch/"
 JUDGMENT_TRACES_SAVE_API_URL = f"{ROOT_API}/traces/save/"
 JUDGMENT_TRACES_DELETE_API_URL = f"{ROOT_API}/traces/delete/"
-JUDGMENT_TRACES_ADD_TO_EVAL_QUEUE_API_URL = f"{ROOT_API}/traces/add_to_trace_eval_queue/"
 JUDGMENT_ADD_TO_RUN_EVAL_QUEUE_API_URL = f"{ROOT_API}/add_to_run_eval_queue/"
 # RabbitMQ
 RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "rabbitmq-networklb-faa155df16ec9085.elb.us-west-1.amazonaws.com")

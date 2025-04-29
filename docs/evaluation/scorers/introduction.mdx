@@ -5,23 +5,7 @@ title: Introduction
 ## Overview
 
 Scorers act as measurement tools for evaluating LLM systems based on specific criteria. 
-`judgeval` comes with a set of **10+ built-in scorers** that you can easily start with, including:
-- [Answer Correctness](/evaluation/scorers/answer_correctness)
-- [Answer Relevancy](/evaluation/scorers/answer_relevancy)
-- [Comparison](/evaluation/scorers/comparison)
-- [Contextual Precision](/evaluation/scorers/contextual_precision)
-- [Contextual Recall](/evaluation/scorers/contextual_recall)
-- [Contextual Relevancy](/evaluation/scorers/contextual_relevancy)
-- [Execution Order](/evaluation/scorers/execution_order)
-- [Faithfulness](/evaluation/scorers/faithfulness)
-- [Hallucination](/evaluation/scorers/hallucination)
-- [JSON Correctness](/evaluation/scorers/json_correctness)
-- [Summarization](/evaluation/scorers/summarization)
-
-We also understand that you may need to evaluate your LLM system with metrics that are not covered by our default scorers. 
-To support this, we provide a flexible framework for creating these scorers:
-- [Custom Scorers](/evaluation/scorers/custom_scorers)
-- [Classifier Scorers](/evaluation/scorers/classifier_scorer)
+`judgeval` comes with a set of **10+ built-in scorers** that you can easily start with.
 
 <Tip>
 We're always adding new scorers to `judgeval`. If you have a suggestion, please [let us know](mailto:contact@judgmentlabs.ai)!
@@ -39,16 +23,55 @@ This enables you to **use evaluations as unit tests** by setting a `threshold` t
 In this section, we'll cover each kind of scorer and how to use them.
 
 ### Default Scorers
-Most of the built-in scorers in `judgeval` are **LLM judges**, meaning they use LLMs to evaluate your LLM system. 
-This is intentional since **LLM evaluations are flexible, scalable, and strongly correlate with human evaluation**.
 
-`judgeval`'s default scorers have been meticulously crafted by our research team based on leading work in the LLM evaluation community. 
+Most built-in scorers in **`judgeval`** are LLM systems, leveraging advanced prompt engineering to ensure evaluations are flexible, scalable, and aligned closely with human judgment. Each scorer provides transparent reasoning through detailed chains of thought, enabling clear validation of evaluation outcomes.
 
-Our implementations are described on their respective documentation pages. 
-Judgment implementations of default scorers are backed by **leading industry/academic research** and are preferable to other implementations because:
-- They are meticulously prompt-engineered to maximize evaluation quality and consistency
-- Provide a chain of thought for evaluation scores, so you can double-check the evaluation quality
-- Can be run using any LLM, including Judgment's **state-of-the-art LLM judges** developed in collaboration with **Stanford's AI Lab**.
+#### Introducing Osiris
+
+To push the frontier of LLM evaluation further, we've developed **Osiris**, our state-of-the-art hallucination detection system. Created in collaboration with researchers from **Judgment Labs** and the **Stanford Artificial Intelligence Laboratory (SAIL)** under Professor Chris Manning, Osiris integrates leading-edge techniques:
+
+- **Multi-agent system**
+- **Test-time scaling**
+- **Reinforcement learning**
+- **Data augmentation**
+
+These methods allow Osiris to significantly outperform traditional LLM-based evaluation methods—delivering higher accuracy in hallucination detection at substantially lower costs than closed-source models.
+
+We’ll be releasing a report soon detailing some of the novel techniques we’ve developed—stay tuned!
+
+We're actively extending Osiris's innovative techniques to our full suite of default scorers. Soon, you'll benefit from these improvements across all evaluation metrics, enhancing accuracy, reliability, and cost-effectiveness for your entire evaluation workflow.
+
+Check out Osiris-powered evaluations now through our [**Faithfulness**](#) scorer!
+
+---
+
+#### All Default Scorers in judgeval:
+
+- [**Answer Correctness**](#)
+- [**Answer Relevancy**](#)
+- [**Comparison**](#)
+- [**Contextual Precision**](#)
+- [**Contextual Recall**](#)
+- [**Contextual Relevancy**](#)
+- [**Execution Order**](#)
+- [**Faithfulness**](#)
+- [**Groundedness**](#)
+- [**JSON Correctness**](#)
+- [**Summarization**](#)
+
+### Agentic Scorers
+
+Agentic scorers are designed to evaluate multiple steps together within your LLM system—rather than evaluating one step at a time. They are especially useful for multi-step workflows, such as agents, chains, or graphs, where the quality of the overall process matters more than individual outputs.
+
+By grouping related steps into a single evaluation, agentic scorers allow you to:
+- Measure end-to-end correctness
+- Evaluate goal completion across multiple steps
+- Assess coherence and strategy in long chains of reasoning
+
+This makes them ideal for agentic systems, where individual tool calls or LLM responses should be judged as part of a larger goal-oriented behavior.
+
+Here are the agentic scorers in `judgeval`:
+- [Derailment](/evaluation/scorers/agent/derailment)
 
 ### Custom Scorers
 

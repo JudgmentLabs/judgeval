@@ -1,0 +1,80 @@
+---
+title: Sequence
+---
+
+## Overview
+An `Sequence` is a unit of data in `judgeval` that allows you to run agentic evaluations on your LLM system. 
+An `Sequence` is composed of a list of `Examples` and/or nested `Sequences`.
+**Here's a sample of creating a `Sequence`:**
+
+```python sequence_test.py
+from judgeval.data import Sequence
+
+example = Example(
+    input="Hello, world!",
+    actual_output="Hi there! How can I help you today?"
+)
+
+example2 = Example(
+    input="What is the capital of France?",
+    actual_output="The capital of France is Paris."
+)
+
+sequence = Sequence(
+    name="Chatbot",
+    items=[example, example2]
+)
+```
+## Sequence Fields
+
+Here are the fields that can be used to create a `Sequence`:
+
+### Name
+The `name` field is the name of the Sequence.
+
+### Inputs
+The `inputs` field is mainly used when exporting a `Trace` from the Judgment platform into a `Sequence`. It represents a functions inputs.
+
+### Outputs
+The `outputs` field is mainly used when exporting a `Trace` from the Judgment platform into a `Sequence`. It represents a functions outputs.
+
+### Items
+The `items` field is a list of either `Examples` or nested sequence objects. Here is an example of a nested sequence:
+
+
+```python nested_sequence.py
+from judgeval.data import Sequence
+
+example = Example(
+    input="Hello, world!",
+    actual_output="Hi there! How can I help you today?"
+)
+
+example2 = Example(
+    input="What is the capital of France?",
+    actual_output="The capital of France is Paris."
+)
+
+inner_sequence = Sequence(
+    name="Inner Sequence",
+    items=[example, example2]
+)
+
+outer_example = Example(
+    input="I want to plan a trip to Paris.",
+    actual_output="Great! Here are some options for your trip: XXX"
+)
+
+outer_sequence = Sequence(
+    name="Outer Sequence",
+    items=[inner_sequence, outer_example]
+)
+```
+
+With nested sequences, you have the ability to group multiple examples and sequences together to give you more flexibility in how you can evaluate your LLM system.
+
+<Note>
+When defining nested sequence objects, the scorer at the top level will be applied to the entire Sequence and all nested Sequences within it. Find a list of all our agentic scorers [here](/evaluation/scorers).
+</Note>
+
+

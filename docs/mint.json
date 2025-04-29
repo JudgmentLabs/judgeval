@@ -35,9 +35,7 @@
       "url": "https://judgmentlabs.ai/"
     }
   ],
-  "anchors": [
-    
-  ],
+  "anchors": [],
   "navigation": [
     {
       "group": "Welcome!",
@@ -51,22 +49,29 @@
       "pages": [
         "evaluation/introduction",
         "evaluation/data_examples",
+        "evaluation/data_sequences",
         "evaluation/data_datasets",
         {
           "group": "Scorers",
           "pages": [
             "evaluation/scorers/introduction",
-            "evaluation/scorers/answer_correctness",
-            "evaluation/scorers/answer_relevancy",
-            "evaluation/scorers/comparison",
-            "evaluation/scorers/contextual_precision",
-            "evaluation/scorers/contextual_recall",
-            "evaluation/scorers/contextual_relevancy",
-            "evaluation/scorers/execution_order",
-            "evaluation/scorers/faithfulness",
-            "evaluation/scorers/hallucination",
-            "evaluation/scorers/json_correctness",
-            "evaluation/scorers/summarization",
+            {
+              "group": "Default Scorer Definitions",
+              "pages": [
+                "evaluation/scorers/default/answer_correctness",
+                "evaluation/scorers/default/answer_relevancy",
+                "evaluation/scorers/default/comparison",
+                "evaluation/scorers/default/contextual_precision",
+                "evaluation/scorers/default/contextual_recall",
+                "evaluation/scorers/default/contextual_relevancy",
+                "evaluation/scorers/default/execution_order",
+                "evaluation/scorers/default/groundedness",
+                "evaluation/scorers/default/faithfulness",
+                "evaluation/scorers/default/json_correctness",
+                "evaluation/scorers/default/summarization",
+                "evaluation/scorers/agent/derailment"
+              ]
+            },
             "evaluation/scorers/custom_scorers",
             "evaluation/scorers/classifier_scorer"
           ]
@@ -80,7 +85,7 @@
       "pages": [
         "monitoring/introduction",
         "monitoring/tracing",
-        "monitoring/production_insights"
+        "monitoring/annotations"
       ]
     },
     {
@@ -90,9 +95,23 @@
       ]
     },
     {
-      "group": "Judgment Platform",
+      "group": "Alerts",
       "pages": [
-        "judgment/introduction"
+        "alerts/rules",
+        "alerts/notifications",
+        "alerts/platform_notifications"
+      ]
+    },
+    {
+      "group": "Clustering",
+      "pages": [
+        "clustering/clustering"
+      ]
+    },
+    {
+      "group": "MCP Server",
+      "pages": [
+        "mcp_server/mcp_server"
       ]
     },
     {
@@ -100,6 +119,12 @@
       "pages": [
         "api_reference/judgment_client",
         "api_reference/trace"
+      ]
+    },
+    {
+      "group": "Changelog",
+      "pages": [
+        "changelog/2025-04-21"
       ]
     }
   ],

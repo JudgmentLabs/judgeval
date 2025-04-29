@@ -1,0 +1,160 @@
+---
+title: 'Rules'
+description: 'Define custom triggers and conditions for your evaluation metrics'
+---
+
+# Rules
+
+Rules allow you to define specific conditions for your evaluation metrics that can trigger alerts and [notifications](/alerts/notifications) when met. They serve as the foundation for the alerting system and help you monitor your AI system's performance against predetermined thresholds.
+
+## Overview
+
+A rule consists of one or more [conditions](#conditions), each tied to a specific metric, that is supported by our Scorer (like Faithfulness or AnswerRelevancy). When evaluations are performed, the rules engine checks if the measured scores satisfy the conditions set in your rules. Based on the rule's configuration, alerts can be triggered and notifications sent through various channels.
+
+<Note>
+Rules and notifications only work with built-in APIScorers. Local scorers and custom scorers are not supported for triggering rules.
+</Note>
+
+## Creating Rules
+
+Rules can be created using the `Rule` class from the `judgeval.rules` (Python) or `judgeval` (Typescript) module. Each rule requires:
+
+- A name
+- A list of [conditions](#conditions)
+- A [combine type](#combine-types) (how conditions should be evaluated together)
+
+Optional parameters include:
+- A description
+- [Notification configuration](/alerts/notifications#notification-configuration)
+
+### Basic Rule Structure
+
+<CodeGroup>
+```Python Python
+from judgeval.rules import Rule, Condition
+from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
+
+# Create a rule
+rule = Rule(
+    name="Quality Check",
+    description="Check if quality metrics meet thresholds",
+    conditions=[
+        Condition(metric=FaithfulnessScorer(threshold=0.7)),
+        Condition(metric=AnswerRelevancyScorer(threshold=0.8))
+    ],
+    combine_type="all"  # "all" = AND, "any" = OR
+)
+```
+```Typescript Typescript
+import { Rule, Condition, FaithfulnessScorer, AnswerRelevancyScorer } from 'judgeval';
+
+// Create a rule
+const rule = new Rule(
+    "Quality Check", 
+    [ 
+        new Condition(new FaithfulnessScorer(0.7)),
+        new Condition(new AnswerRelevancyScorer(0.8))
+    ],
+    "all", // "all" = AND, "any" = OR
+    "Check if quality metrics meet thresholds"
+);
+```
+</CodeGroup>
+
+## Conditions
+
+Conditions are the building blocks of rules. Each condition specifies a metric (must be a built-in API Scorer like `FaithfulnessScorer` or `AnswerRelevancyScorer`). The condition is met when the score for that metric is greater than or equal to the threshold specified in the scorer.
+
+### Creating Conditions
+
+<CodeGroup>
+```Python Python
+from judgeval.rules import Condition
+from judgeval.scorers import FaithfulnessScorer
+
+# Create a condition that passes when faithfulness score is greater than or equal to 0.7
+condition = Condition(
+    metric=FaithfulnessScorer(threshold=0.7)
+)
+```
+```Typescript Typescript
+import { Condition, FaithfulnessScorer } from 'judgeval';
+
+// Create a condition that passes when faithfulness score is greater than or equal to 0.7
+const condition = new Condition(
+    new FaithfulnessScorer(0.7)
+);
+```
+</CodeGroup>
+
+### How Conditions are Evaluated
+
+When a condition is evaluated, it uses the scorer's threshold and internal evaluation logic:
+
+1. By default, a condition passes when the actual score is greater than or equal to the threshold
+2. If the scorer has a custom `success_check()` method, that method will be used instead
+3. The threshold is retrieved from the scorer's `threshold` attribute
+
+## Combine Types
+
+Rules support two combine types that determine how multiple conditions are evaluated:
+
+- `"all"`: The rule triggers when all conditions fail (logical AND)
+- `"any"`: The rule triggers when any condition fails (logical OR)
+
+This design is meant for setting up alerts that trigger when your metrics indicate a problem with your AI system's performance.
+
+## Using Rules with the Tracer
+
+Rules are most commonly used with the `Tracer` to monitor your AI system's performance:
+
+<CodeGroup>
+```Python Python
+from judgeval.common.tracer import Tracer
+from judgeval.rules import Rule, Condition
+from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
+
+# Create rules
+rules = [
+    Rule(
+        name="Quality Check",
+        description="Check if quality metrics meet thresholds",
+        conditions=[
+            Condition(metric=FaithfulnessScorer(threshold=0.7)),
+            Condition(metric=AnswerRelevancyScorer(threshold=0.8))
+        ],
+        combine_type="all"  # Trigger when all conditions fail
+    )
+]
+
+# Initialize tracer with rules
+judgment = Tracer(
+    project_name="your_project", 
+    rules=rules
+)
+```
+```Typescript Typescript
+import { Tracer, Rule, Condition, FaithfulnessScorer, AnswerRelevancyScorer } from 'judgeval';
+
+// Create rules
+const rules = [
+    new Rule(
+        "Quality Check", 
+        [ 
+            new Condition(new FaithfulnessScorer(0.7)),
+            new Condition(new AnswerRelevancyScorer(0.8))
+        ],
+        "all", // Trigger when all conditions fail
+        "Check if quality metrics meet thresholds"
+    )
+];
+
+// Initialize tracer with rules
+const judgment = Tracer.getInstance({
+    projectName: "your_project",
+    rules: rules
+});
+```
+</CodeGroup>
+
+For more information on configuring notifications with rules, see the [Notifications documentation](/alerts/notifications#attaching-notifications-to-rules). 

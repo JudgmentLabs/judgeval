@@ -6,7 +6,7 @@ from openai import OpenAI
 from anthropic import Anthropic
 import requests
 
-from judgeval.common.tracer import Tracer, TraceEntry, wrap
+from judgeval.common.tracer import Tracer, TraceEntry, wrap, current_span_var
 from judgeval.judgment_client import JudgmentClient
 from judgeval.common.exceptions import JudgmentAPIError
 
@@ -65,17 +65,17 @@ def test_tracer_requires_api_key():
 def test_trace_entry_print(capsys):
     """Test TraceEntry print formatting"""
     entries = [
-        TraceEntry(type="enter", function="test_func", depth=1, message="test", timestamp=0),
-        TraceEntry(type="exit", function="test_func", depth=1, message="test", timestamp=0, duration=0.5),
-        TraceEntry(type="output", function="test_func", depth=1, message="test", timestamp=0, output="result"),
-        TraceEntry(type="input", function="test_func", depth=1, message="test", timestamp=0, inputs={"arg": 1}),
+        TraceEntry(type="enter", function="test_func", span_id="test-span-1", depth=1, message="test", created_at=0),
+        TraceEntry(type="exit", function="test_func", span_id="test-span-1", depth=1, message="test", created_at=0, duration=0.5),
+        TraceEntry(type="output", function="test_func", span_id="test-span-1", depth=1, message="test", created_at=0, output="result"),
+        TraceEntry(type="input", function="test_func", span_id="test-span-1", depth=1, message="test", created_at=0, inputs={"arg": 1}),
     ]
     
     expected_outputs = [
-        "  → test_func (trace: test)\n",
-        "  ← test_func (0.500s)\n",
-        "  Output: result\n",
-        "  Input: {'arg': 1}\n",
+        "  → test_func (id: test-span-1) (trace: test)\n",
+        "  ← test_func (id: test-span-1) (0.500s)\n",
+        "  Output (for id: test-span-1): result\n",
+        "  Input (for id: test-span-1): {'arg': 1}\n",
     ]
     
     for entry, expected in zip(entries, expected_outputs):
@@ -89,13 +89,15 @@ def test_trace_entry_to_dict():
     entry = TraceEntry(
         type="enter",
         function="test_func",
+        span_id="test-span-1",
         depth=1,
         message="test",
-        timestamp=0
+        created_at=0
     )
     data = entry.to_dict()
     assert data["type"] == "enter"
     assert data["function"] == "test_func"
+    assert data["span_id"] == "test-span-1"
 
     # Test with non-serializable output
     class NonSerializable:
@@ -105,9 +107,10 @@ def test_trace_entry_to_dict():
     entry = TraceEntry(
         type="output",
         function="test_func",
+        span_id="test-span-2",
         depth=1,
         message="test",
-        timestamp=0,
+        created_at=0,
         output=non_serializable
     )
     
@@ -116,51 +119,143 @@ def test_trace_entry_to_dict():
 
 def test_trace_client_span(trace_client):
     """Test span context manager"""
-    initial_entries = len(trace_client.entries)  # Get initial count
-    
+    # The trace_client fixture starts with a trace "test_trace" and its 'enter' entry
+    initial_entries_count = len(trace_client.entries)
+    assert initial_entries_count == 1 # Should only have the 'enter' for "test_trace"
+
+    parent_before_span = current_span_var.get() # Should be the span_id of test_trace
+
     with trace_client.span("test_span") as span:
-        assert trace_client._current_span == "test_span"
-        assert len(trace_client.entries) == initial_entries + 1  # Compare to initial count
-    
-    assert len(trace_client.entries) == initial_entries + 2  # Account for both enter and exit
-    assert trace_client.entries[-1].type == "exit"
-    assert trace_client._current_span == "test_trace"
+        # Inside the span, the current span var should be updated to the new span_id
+        current_span_id = current_span_var.get()
+        assert current_span_id is not None
+        # Check the 'enter' entry for the new span
+        enter_entry = trace_client.entries[-1]
+        assert enter_entry.type == "enter"
+        assert enter_entry.function == "test_span"
+        assert enter_entry.span_id == current_span_id
+        assert enter_entry.parent_span_id == parent_before_span # Check parent relationship
+        assert enter_entry.depth == 1 # Depth relative to parent
+
+    # After the span, the context var should be reset
+    assert current_span_var.get() == parent_before_span
+
+    # Check the 'exit' entry
+    exit_entry = trace_client.entries[-1]
+    assert exit_entry.type == "exit"
+    assert exit_entry.function == "test_span"
+    assert exit_entry.span_id == current_span_id
+    assert exit_entry.depth == 1 # Depth after exiting is the same as the entry depth for that span
+
+    # Check total entries (1 enter root + 1 enter span + 1 exit span)
+    assert len(trace_client.entries) == initial_entries_count + 2
 
 def test_trace_client_nested_spans(trace_client):
-    """Test nested spans maintain proper depth"""
-    with trace_client.span("outer"):
-        assert trace_client.tracer.depth == 2  # 1 for trace + 1 for span
-        with trace_client.span("inner"):
-            assert trace_client.tracer.depth == 3
-        assert trace_client.tracer.depth == 2
-    assert trace_client.tracer.depth == 1
+    """Test nested spans maintain proper depth recorded in entries"""
+    root_span_id = current_span_var.get() # From the fixture
+
+    with trace_client.span("outer") as outer_span:
+        outer_span_id = current_span_var.get()
+        # Check 'enter' entry for 'outer' span
+        outer_enter_entry = trace_client.entries[-1]
+        assert outer_enter_entry.type == "enter"
+        assert outer_enter_entry.function == "outer"
+        assert outer_enter_entry.span_id == outer_span_id
+        assert outer_enter_entry.parent_span_id == root_span_id
+        assert outer_enter_entry.depth == 1 # Depth is 0(root) + 1
+
+        with trace_client.span("inner") as inner_span:
+            inner_span_id = current_span_var.get()
+            # Check 'enter' entry for 'inner' span
+            inner_enter_entry = trace_client.entries[-1]
+            assert inner_enter_entry.type == "enter"
+            assert inner_enter_entry.function == "inner"
+            assert inner_enter_entry.span_id == inner_span_id
+            assert inner_enter_entry.parent_span_id == outer_span_id
+            assert inner_enter_entry.depth == 2 # Depth is 1(outer) + 1
+
+        # Check 'exit' entry for 'inner' span
+        inner_exit_entry = trace_client.entries[-1]
+        assert inner_exit_entry.type == "exit"
+        assert inner_exit_entry.function == "inner"
+        assert inner_exit_entry.span_id == inner_span_id
+        assert inner_exit_entry.depth == 2 # Depth when exiting inner is inner's entry depth
+
+    # Check 'exit' entry for 'outer' span
+    outer_exit_entry = trace_client.entries[-1]
+    assert outer_exit_entry.type == "exit"
+    assert outer_exit_entry.function == "outer"
+    assert outer_exit_entry.span_id == outer_span_id
+    assert outer_exit_entry.depth == 1 # Depth when exiting outer is outer's entry depth
 
 def test_record_input_output(trace_client):
     """Test recording inputs and outputs"""
-    with trace_client.span("test_span"):
+    with trace_client.span("test_span") as span:
+        span_id = current_span_var.get()
         trace_client.record_input({"arg": 1})
         trace_client.record_output("result")
     
     # Filter entries to only include those for the current span
-    entries = [e.type for e in trace_client.entries if e.function == "test_span"]
-    assert entries == ["enter", "input", "output", "exit"]
+    entries = [e for e in trace_client.entries if e.span_id == span_id]
+    assert [e.type for e in entries] == ["enter", "input", "output", "exit"]
+    
+    # Verify the input and output entries have the correct span_id
+    input_entry = next(e for e in entries if e.type == "input")
+    output_entry = next(e for e in entries if e.type == "output")
+    assert input_entry.span_id == span_id
+    assert output_entry.span_id == span_id
+    assert input_entry.inputs == {"arg": 1}
+    assert output_entry.output == "result"
 
 def test_condense_trace(trace_client):
     """Test trace condensing functionality"""
     # Store the base depth from the enter event
     base_depth = 0
+    span_id = "test-span-1"
     entries = [
-        {"type": "enter", "function": "test_func", "depth": base_depth, "timestamp": 1.0},
-        {"type": "input", "function": "test_func", "depth": base_depth + 1, "timestamp": 1.1, "inputs": {"x": 1}},
-        {"type": "output", "function": "test_func", "depth": base_depth + 1, "timestamp": 1.2, "output": "result"},
-        {"type": "exit", "function": "test_func", "depth": base_depth, "timestamp": 2.0},
+        {
+            "type": "enter",
+            "function": "test_func",
+            "span_id": span_id,
+            "trace_id": trace_client.trace_id,
+            "depth": base_depth,
+            "created_at": "2024-01-01T00:00:01.000000",
+            "parent_span_id": None
+        },
+        {
+            "type": "input",
+            "function": "test_func",
+            "span_id": span_id,
+            "trace_id": trace_client.trace_id,
+            "depth": base_depth + 1,
+            "created_at": "2024-01-01T00:00:01.100000",
+            "inputs": {"x": 1}
+        },
+        {
+            "type": "output",
+            "function": "test_func",
+            "span_id": span_id,
+            "trace_id": trace_client.trace_id,
+            "depth": base_depth + 1,
+            "created_at": "2024-01-01T00:00:01.200000",
+            "output": "result"
+        },
+        {
+            "type": "exit",
+            "function": "test_func",
+            "span_id": span_id,
+            "trace_id": trace_client.trace_id,
+            "depth": base_depth,
+            "created_at": "2024-01-01T00:00:02.000000"
+        },
     ]
     
-    condensed = trace_client.condense_trace(entries)
+    condensed, evals = trace_client.condense_trace(entries)
     print(f"{condensed=}")
     # Test that the condensed entry's depth matches the enter event's depth
     assert len(condensed) == 1
     assert condensed[0]["function"] == "test_func"
+    assert condensed[0]["span_id"] == span_id
     assert condensed[0]["depth"] == entries[0]["depth"]  # Should match the input event's depth
     assert condensed[0]["inputs"] == {"x": 1}
     assert condensed[0]["output"] == "result"
@@ -247,17 +342,13 @@ def test_tracer_invalid_api_key(mocker):
     """Test that Tracer handles invalid API keys"""
     # Clear the singleton instance first
     Tracer._instance = None
+    JudgmentClient._instances = {}  # Clear JudgmentClient singleton too
     
-    # Create the mock response for invalid API key
-    mock_post_response = mocker.Mock(spec=requests.Response)
-    mock_post_response.status_code = 401
-    mock_post_response.json.return_value = {"detail": "API key is invalid"}
-    mock_post_response.raise_for_status.side_effect = requests.exceptions.HTTPError()
+    # Directly patch the _validate_api_key method in JudgmentClient
+    mocker.patch('judgeval.judgment_client.JudgmentClient._validate_api_key',
+                return_value=(False, "API key is invalid"))
     
-    # Create mock for POST request
-    mock_post = mocker.patch('requests.post', autospec=True)
-    mock_post.return_value = mock_post_response
-    
+    # Now when Tracer tries to initialize JudgmentClient, it will receive our mocked result
     with pytest.raises(JudgmentAPIError, match="Issue with passed in Judgment API key: API key is invalid"):
         Tracer(api_key="invalid_key", organization_id="test_org")
 
@@ -281,3 +372,41 @@ def test_observe_decorator_with_error(tracer):
     with tracer.trace("test_trace"):
         with pytest.raises(ValueError):
             failing_function()
+
+@patch('requests.post')
+def test_wrap_openai_responses_api(mock_post, tracer):
+    """Test wrapping OpenAI responses API"""
+    # Configure mock response properly
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.text = '{"message": "success"}'
+    mock_post.return_value = mock_response
+    
+    client = OpenAI()
+    # Create mock for responses.create method
+    mock_responses_result = MagicMock()
+    mock_responses_result.output = [MagicMock(type="text", text="test response")]
+    mock_responses_result.usage = MagicMock(prompt_tokens=15, completion_tokens=25, total_tokens=40)
+    
+    # Mock the responses.create method
+    client.responses = MagicMock()
+    original_mock = MagicMock(return_value=mock_responses_result)
+    client.responses.create = original_mock
+    
+    wrapped_client = wrap(client)
+    
+    # Test that the responses.create method is wrapped correctly
+    with tracer.trace("test_response_api"):
+        response = wrapped_client.responses.create(
+            model="gpt-4.1-mini",
+            input=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "What is the capital of France?"}
+            ]
+        )
+    
+    # Verify the response is correctly passed through
+    assert response == mock_responses_result
+    
+    # Verify that the original mock was called - check by examining call count
+    assert original_mock.call_count == 1, "responses.create should have been called exactly once"
