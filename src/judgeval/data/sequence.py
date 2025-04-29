@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import List, Optional, Union, Any
 from judgeval.data.example import Example
-from judgeval.scorers import ScorerWrapper, JudgevalScorer
+from judgeval.scorers import JudgevalScorer, APIJudgmentScorer
 from uuid import uuid4
 from datetime import datetime, timezone
 
@@ -16,42 +16,32 @@ class Sequence(BaseModel):
     scorers: Optional[Any] = None
     parent_sequence_id: Optional[str] = None
     sequence_order: Optional[int] = 0
+    root_sequence_id: Optional[str] = None
+    inputs: Optional[str] = None
+    output: Optional[str] = None
 
     @field_validator("scorers")
     def validate_scorer(cls, v):
-        loaded_scorers = []
         for scorer in v or []:
-            try:
-                if isinstance(scorer, ScorerWrapper):
-                    loaded_scorers.append(scorer.load_implementation())
-                else:
-                    loaded_scorers.append(scorer)
-            except Exception as e:
-                raise ValueError(f"Failed to load implementation for scorer {scorer}: {str(e)}")
-        return loaded_scorers
+            if not isinstance(scorer, APIJudgmentScorer) and not isinstance(scorer, JudgevalScorer):
+                raise ValueError(f"Invalid scorer type: {type(scorer)}")
+        return v
     
-    @model_validator(mode='after')
-    def set_parent_sequence_ids(self) -> "Sequence":
-        """Recursively set the parent_sequence_id for all nested Sequences."""
-        for item in self.items:
+    @model_validator(mode="after")
+    def populate_sequence_metadata(self) -> "Sequence":
+        """Recursively set parent_sequence_id, root_sequence_id, and sequence_order."""
+        # If root_sequence_id isn't already set, assign it to self
+        if self.root_sequence_id is None:
+            self.root_sequence_id = self.sequence_id
+
+        for idx, item in enumerate(self.items):
+            item.sequence_order = idx
             if isinstance(item, Sequence):
                 item.parent_sequence_id = self.sequence_id
-                # Recurse into deeper nested sequences
-                item.set_parent_sequence_ids()  
+                item.root_sequence_id = self.root_sequence_id
+                item.populate_sequence_metadata()
         return self
 
-    @model_validator(mode='after')
-    def set_parent_and_order(self) -> "Sequence":
-        """Set parent_sequence_id and sequence_order for all items."""
-        for idx, item in enumerate(self.items):
-            # Set sequence_order for both Example and Sequence objects
-            item.sequence_order = idx
-            
-            if isinstance(item, Sequence):
-                item.parent_sequence_id = self.sequence_id
-                item.set_parent_and_order()  # Recurse for nested sequences
-        return self
-    
     class Config:
         arbitrary_types_allowed = True
 

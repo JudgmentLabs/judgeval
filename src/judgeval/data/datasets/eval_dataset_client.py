@@ -13,7 +13,7 @@ from judgeval.constants import (
     JUDGMENT_DATASETS_INSERT_API_URL,
     JUDGMENT_DATASETS_EXPORT_JSONL_API_URL
 )
-from judgeval.data import Example
+from judgeval.data import Example, Sequence
 from judgeval.data.datasets import EvalDataset
 
 
@@ -201,8 +201,8 @@ class EvalDatasetClient:
 
                 info(f"Successfully pulled dataset with alias '{alias}'")
                 payload = response.json()
-
                 dataset.examples = [Example(**e) for e in payload.get("examples", [])]
+                dataset.sequences = [Sequence(**s) for s in payload.get("sequences", [])]
                 dataset._alias = payload.get("alias")
                 dataset._id = payload.get("id")
                 progress.update(

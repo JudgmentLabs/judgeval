@@ -72,6 +72,13 @@ results = client.run_evaluation(
     scorers=[faithfulness_scorer],
     model="gpt-4o",
 )
+
+# You also run evaluations asynchronously like so:
+results = client.a_run_evaluation(
+    examples=[example],
+    scorers=[faithfulness_scorer],
+    model="gpt-4o",
+)
 print(results)
 ```
 
@@ -157,8 +164,8 @@ from judgeval.scorers import FaithfulnessScorer
 
 client = JudgmentClient()
 scorer = FaithfulnessScorer(threshold=0.5)
-results = client.evaluate_dataset(
-    dataset=dataset,
+results = client.run_evaluation(
+    examples=dataset.examples,
     scorers=[scorer],
     model="Qwen/Qwen2.5-72B-Instruct-Turbo",
 )

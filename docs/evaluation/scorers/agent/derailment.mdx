@@ -37,12 +37,12 @@ weather_example = Example(
 )
 airline_sequence = Sequence(
     name="Flight Details",
-    items=[airlines_example, airline_followup, weather_example],
-    scorers=[DerailmentScorer(threshold=0.5)]
+    items=[airlines_example, airline_followup, weather_example]
 )
 
 results = client.run_sequence_evaluation(
     sequences=[airline_sequence],
+    scorers=[DerailmentScorer(threshold=0.5)],
     model="gpt-4o",
     log_results=True,
     override=True,
