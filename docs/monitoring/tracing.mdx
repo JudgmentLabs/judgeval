@@ -90,24 +90,17 @@ The `@observe` decorator (Python) or the `observe()` higher-order function (Type
 - Input/Output
 - Span type (e.g. `retriever`, `tool`, `LLM call`, etc.)
 
-With automatic deep tracing (enabled by default), you only need to observe top-level functions, and all nested function calls will be automatically traced. This significantly reduces the amount of instrumentation needed in your code.
-
 Here's an example of using the observer mechanism:
 <CodeGroup>
 ```Python Python
+from judgeval.tracer import Tracer
+
 # loads from JUDGMENT_API_KEY env var
-judgment = Tracer(project_name="my_project")  # Deep tracing is enabled by default
+judgment = Tracer(project_name="my_project")
 
-# With automatic deep tracing, you only need to observe the top-level function
-@judgment.observe(span_type="function")
-def my_workflow():
-    # All function calls inside will be automatically traced
-    my_tool()
-    print("Hello world!")
-
-# This function will be automatically traced when called from my_workflow
+@judgment.observe(span_type="tool")
 def my_tool():
-    print("Tool executed!")
+    print("Hello world!")
 
 ```
 ```Typescript Typescript
@@ -132,8 +125,9 @@ const observedMyTool = judgment.observe({ spanType: "tool" })(myTool);
     Common span types include `tool`, `function`, `retriever`, `database`, `web search`, etc.
 </Note>
 
+
 #### Putting it all Together
-Here's a complete example of using judgeval's tracing mechanisms with automatic deep tracing:
+Here's a complete example of using judgeval's tracing mechanisms:
 <CodeGroup>
 ```Python Python
 from judgeval.tracer import Tracer, wrap
@@ -141,16 +135,15 @@ from openai import OpenAI
 
 openai_client = wrap(OpenAI())
 # loads from JUDGMENT_API_KEY and JUDGMENT_ORG_ID env vars
-judgment = Tracer(project_name="my_project")  # Deep tracing is enabled by default
+judgment = Tracer(project_name="my_project")
 
-# Define a tool function that will be automatically traced when called from main
+@judgment.observe(span_type="tool")
 def my_tool():
     return "Hello world!"
 
-# With automatic deep tracing, only the main function needs to be observed
 @judgment.observe(span_type="function")
 def my_llm_call():
-    message = my_tool()  # This tool call will be automatically traced
+    message = my_tool()
     res = openai_client.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "user", "content": message}]
@@ -165,8 +158,8 @@ main_result = my_llm_call()
 import { Tracer, wrap } from 'judgeval';
 import OpenAI from 'openai';
 
-const judgment = Tracer.getInstance({ projectName: "my_project" });
 const openaiClient = wrap(new OpenAI());
+const judgment = Tracer.getInstance({ projectName: "my_project" });
 
 async function myTool(): Promise<string> {
     return "Hello world!";
