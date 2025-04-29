@@ -7,9 +7,9 @@ Self-hosting Judgment Labs' platform is a great way to have full control over yo
 ## Part 1: Infrastructure Skeleton Setup
 
 Please have the following infrastructure set up:
-1. A new/empty AWS account that you have admin access to. Please note down the account ID.
-2. A Supabase organization that you have admin access to.
-3. An available email address and the corresponding app password for the email address (e.g. no-reply@organization.com). This email address will be used to send email invitations to users on the self-hosted instance.
+1. A new/empty AWS account that you have admin access to: this will be used to host the self-hosted Judgment instance. Please note down the account ID.
+2. A Supabase organization that you have admin access to: this will be used to store and retrievedata for the self-hosted Judgment instance.
+3. An available email address and the corresponding *app password* (not the same as your *email password*) for the email address (e.g. no-reply@organization.com). This email address will be used to send email invitations to users on the self-hosted instance.
 
 <Note>
 Make sure to keep your AWS account ID and Supabase organization details secure and easily accessible, as you'll need them for the setup process.
@@ -30,15 +30,16 @@ Please contact us at [support@judgmentlabs.ai](mailto:support@judgmentlabs.ai) w
 The domain name you provide must be one that you own and have control over, as you'll need to add DNS records during the setup process.
 </Warning>
 
-We will review your request and get back to you ASAP with a backend Osiris API key that will be input as part of the setup process using the Judgment CLI (Part 3).
+We will review your email request ASAP. Once approved, we will do the following:
+1. Whitelist your AWS account ID to allow access to our Judgment ECR images.
+2. Email you back with a backend Osiris API key that will be input as part of the setup process using the Judgment CLI (Part 3).
 
 ## Part 3: Setting Up Your Self-Hosted Environment
 
+<Warning>
+Make sure the Judgment CLI is installed before proceeding. Please refer to [Installation](/docs/judgment_cli/installation) for more information.
+</Warning>
 For detailed instructions on setting up your self-hosted environment, please refer to the [self-hosting page](../judgment_cli/self-hosting) in the CLI section. This guide will walk you through the prerequisites, deployment process, and HTTPS listener setup for your self-hosted instance.
-
-<Tip>
-Make sure to follow the prerequisites section carefully before starting the deployment process. This includes installing and configuring AWS CLI and Terraform.
-</Tip>
 
 ## Part 4: Accessing Your Self-Hosted Environment
 
@@ -57,9 +58,9 @@ JUDGMENT_ORG_ID = "your_org_id"
 Afterwards, Judgeval can be used as you normally would.
 
 ### From the Judgment platform website
-Visit the url `https://app.judgmentlabs.ai/login/self-host?api_url={self_hosted_judgment_api_url}` to login to your self-hosted instance. Your self-hosted Judgment API URL will be whitelisted when we review your request from Part 2.
+Visit the url `https://app.judgmentlabs.ai/login?api_url={self_hosted_judgment_api_url}` to login to your self-hosted instance. Your self-hosted Judgment API URL will be whitelisted when we review your request from Part 2.
 
-You should be able to log in with the root user you created during the setup process. 
+You should be able to log in with the root user you configured during the setup process (`--root-judgment-email` and `--root-judgment-password` from the `self-host main` command). 
 
 #### Adding more users to the self-hosted instance
 <Note>
