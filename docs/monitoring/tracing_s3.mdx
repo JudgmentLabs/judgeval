@@ -1,0 +1,60 @@
+---
+title: Saving Traces in S3
+---
+
+The Tracer supports saving traces to Amazon S3 buckets for persistent storage and analysis. This is particularly useful for long-term storage of traces and for sharing traces across different environments.
+
+## Configuration
+
+To enable S3 storage for your traces, you'll need to configure the Tracer with your AWS credentials and bucket information:
+
+```python
+judgment = Tracer(
+    project_name="my_project",
+    use_s3=True,
+    s3_bucket_name="my-traces-bucket",  # Bucket will be created automatically if it doesn't exist
+    s3_aws_access_key_id="your-access-key",  # Optional
+    s3_aws_secret_access_key="your-secret-key",  # Optional
+    s3_region_name="us-west-1"  # Optional
+)
+```
+<Note>
+`s3_aws_access_key_id`, `s3_aws_secret_access_key`, and `s3_region_name` are *optional*. If they are not provided, your AWS credentials will be searched for in the following order:
+
+1. Environment variables: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_REGION`
+2. Configuration file: `~/.aws/credentials`
+
+</Note>
+
+## Trace Management in S3
+
+- Traces will be stored in the following folder structure: `{bucket_name}/traces/{s3_bucket_name}/{trace_id}_{timestamp}.json`
+- The specified S3 bucket will be created automatically if it doesn't exist
+- Make sure your AWS credentials have sufficient permissions to:
+  - Create buckets (if the bucket doesn't exist)
+  - Write objects to the bucket
+  - List objects in the bucket
+  - Read objects from the bucket
+- Traces stored in S3 can be accessed using standard AWS tools, such as the AWS CLI or the AWS Management Console. Each trace is stored as a separate object in the bucket, with a unique identifier and timestamp.
+
+<Note>
+For the folder structure of the saved traces, `timestamp` refers to the UTC timestamp of when the trace was saved in format `YYYYMMDD_HHMMSS`.
+</Note>
+
+## Example Usage
+
+```python
+from judgment import Tracer
+
+# Initialize with S3 storage
+tracer = Tracer(
+    project_name="my_project",
+    use_s3=True,
+    s3_bucket_name="my-traces-bucket"
+)
+
+# Use the tracer as normal - traces will be automatically saved to S3
+@judgment.observe(span_type="function")
+def my_workflow():
+    print("Hello world!")
+```
