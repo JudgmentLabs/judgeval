@@ -128,6 +128,12 @@
       ]
     },
     {
+      "group": "Security & Compliance",
+      "pages": [
+        "compliance/certifications"
+      ]
+    },
+    {
       "group": "Changelog",
       "pages": [
         "changelog/2025-04-21"
