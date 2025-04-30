@@ -90,24 +90,17 @@ The `@observe` decorator (Python) or the `observe()` higher-order function (Type
 - Input/Output
 - Span type (e.g. `retriever`, `tool`, `LLM call`, etc.)
 
-With automatic deep tracing (enabled by default), you only need to observe top-level functions, and all nested function calls will be automatically traced. This significantly reduces the amount of instrumentation needed in your code.
-
 Here's an example of using the observer mechanism:
 <CodeGroup>
 ```Python Python
+from judgeval.tracer import Tracer
+
 # loads from JUDGMENT_API_KEY env var
-judgment = Tracer(project_name="my_project")  # Deep tracing is enabled by default
+judgment = Tracer(project_name="my_project")
 
-# With automatic deep tracing, you only need to observe the top-level function
-@judgment.observe(span_type="function")
-def my_workflow():
-    # All function calls inside will be automatically traced
-    my_tool()
-    print("Hello world!")
-
-# This function will be automatically traced when called from my_workflow
+@judgment.observe(span_type="tool")
 def my_tool():
-    print("Tool executed!")
+    print("Hello world!")
 
 ```
 ```Typescript Typescript
@@ -132,8 +125,57 @@ const observedMyTool = judgment.observe({ spanType: "tool" })(myTool);
     Common span types include `tool`, `function`, `retriever`, `database`, `web search`, etc.
 </Note>
 
+#### Automatic Deep Tracing
+
+Judgeval includes automatic deep tracing, which significantly reduces the amount of instrumentation needed in your code. With deep tracing enabled (the default), you only need to observe top-level functions, and all nested function calls will be automatically traced.
+
+##### How Deep Tracing Works
+
+When you decorate a function with `@observe` (Python) or wrap it with `observe()` (TypeScript), the tracer automatically instruments all functions called within that function, creating a complete trace of your execution flow without requiring explicit decorators on every function.
+
+<CodeGroup>
+```Python Python
+# Deep tracing is enabled by default
+judgment = Tracer(project_name="my_project")
+
+# Only need to observe the top-level function
+@judgment.observe(span_type="function")
+def main():
+    # These functions will be automatically traced without @observe
+    result = helper_function()
+    return process_result(result)
+
+def helper_function():
+    return "Helper result"
+
+def process_result(result):
+    return f"Processed: {result}"
+
+main()  # Traces main, helper_function, and process_result
+```
+</CodeGroup>
+
+##### Disabling Deep Tracing
+
+If you prefer more control over what gets traced, you can disable deep tracing:
+
+<CodeGroup>
+```Python Python
+# Disable deep tracing globally
+judgment = Tracer(project_name="my_project", deep_tracing=False)
+
+# Or disable for specific functions
+@judgment.observe(span_type="function", deep_tracing=False)
+def selective_function():
+    helper_function()  # Won't be traced automatically
+```
+</CodeGroup>
+
+With deep tracing disabled, you'll need to explicitly observe each function you want to trace. You can still name and declare span types for each function using jdugement.observe().
+
+
 #### Putting it all Together
-Here's a complete example of using judgeval's tracing mechanisms with automatic deep tracing:
+Here's a complete example of using judgeval's tracing mechanisms:
 <CodeGroup>
 ```Python Python
 from judgeval.tracer import Tracer, wrap
@@ -141,16 +183,15 @@ from openai import OpenAI
 
 openai_client = wrap(OpenAI())
 # loads from JUDGMENT_API_KEY and JUDGMENT_ORG_ID env vars
-judgment = Tracer(project_name="my_project")  # Deep tracing is enabled by default
+judgment = Tracer(project_name="my_project")
 
-# Define a tool function that will be automatically traced when called from main
+@judgment.observe(span_type="tool")
 def my_tool():
     return "Hello world!"
 
-# With automatic deep tracing, only the main function needs to be observed
 @judgment.observe(span_type="function")
 def my_llm_call():
-    message = my_tool()  # This tool call will be automatically traced
+    message = my_tool()
     res = openai_client.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "user", "content": message}]
@@ -165,8 +206,8 @@ main_result = my_llm_call()
 import { Tracer, wrap } from 'judgeval';
 import OpenAI from 'openai';
 
-const judgment = Tracer.getInstance({ projectName: "my_project" });
 const openaiClient = wrap(new OpenAI());
+const judgment = Tracer.getInstance({ projectName: "my_project" });
 
 async function myTool(): Promise<string> {
     return "Hello world!";
@@ -272,6 +313,7 @@ To execute an asynchronous evaluation, you can use the `trace.asyncEvaluate()` m
 ```Python Python
 from judgeval.tracer import Tracer
 from judgeval.scorers import AnswerRelevancyScorer
+from judgeval.data import Example
 
 judgment = Tracer(project_name="my_project")
 
@@ -280,12 +322,17 @@ def main():
     query = "What is the capital of France?"
     res = "The capital of France is Paris."  # Replace with your workflow logic
     
-    # Assumes this runs within an active trace context implicitly started by @observe
-    judgment.async_evaluate(
-        scorers=[AnswerRelevancyScorer(threshold=1.0)],
+    # Create an Example object to pass to async_evaluate
+    example = Example(
         input=query,
-        actual_output=res,
-        model="gpt-4o",
+        actual_output=res
+    )
+    
+    # Run the evaluation with the Example object
+    judgment.async_evaluate(
+        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+        example=example,
+        model="gpt-4o"
     )
     return res
 

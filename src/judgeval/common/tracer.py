@@ -44,6 +44,7 @@ from openai import OpenAI, AsyncOpenAI
 from together import Together, AsyncTogether
 from anthropic import Anthropic, AsyncAnthropic
 from google import genai
+from judgeval.run_evaluation import check_examples
 
 # Local application/library-specific imports
 from judgeval.constants import (
@@ -467,9 +468,10 @@ class TraceClient:
     def async_evaluate(
         self,
         scorers: List[Union[APIJudgmentScorer, JudgevalScorer]],
+        example: Optional[Example] = None,
         input: Optional[str] = None,
-        actual_output: Optional[str] = None,
-        expected_output: Optional[str] = None,
+        actual_output: Optional[Union[str, List[str]]] = None,
+        expected_output: Optional[Union[str, List[str]]] = None,
         context: Optional[List[str]] = None,
         retrieval_context: Optional[List[str]] = None,
         tools_called: Optional[List[str]] = None,
@@ -482,17 +484,7 @@ class TraceClient:
             return
         
         start_time = time.time()  # Record start time
-        example = Example(
-            input=input,
-            actual_output=actual_output,
-            expected_output=expected_output,
-            context=context,
-            retrieval_context=retrieval_context,
-            tools_called=tools_called,
-            expected_tools=expected_tools,
-            additional_metadata=additional_metadata,
-            trace_id=self.trace_id
-        )
+
         try:
             # Load appropriate implementations for all scorers
             if not scorers:
@@ -506,6 +498,29 @@ class TraceClient:
         except Exception as e:
             warnings.warn(f"Failed to load scorers: {str(e)}")
             return
+        
+        # If example is not provided, create one from the individual parameters
+        if example is None:
+            # Check if any of the individual parameters are provided
+            if any(param is not None for param in [input, actual_output, expected_output, context, 
+                                                retrieval_context, tools_called, expected_tools, 
+                                                additional_metadata]):
+                example = Example(
+                    input=input,
+                    actual_output=actual_output,
+                    expected_output=expected_output,
+                    context=context,
+                    retrieval_context=retrieval_context,
+                    tools_called=tools_called,
+                    expected_tools=expected_tools,
+                    additional_metadata=additional_metadata,
+                    trace_id=self.trace_id
+                )
+            else:
+                raise ValueError("Either 'example' or at least one of the individual parameters (input, actual_output, etc.) must be provided")
+        
+        # Check examples before creating evaluation run
+        check_examples([example], scorers)
         
         # Combine the trace-level rules with any evaluation-specific rules)
         eval_run = EvaluationRun(
@@ -1312,32 +1327,6 @@ class Tracer:
                         # Reset in_traced_function_var
                         in_traced_function_var.reset(token)
                 
-            return wrapper
-        
-    def score(self, func=None, scorers: List[Union[APIJudgmentScorer, JudgevalScorer]] = None, model: str = None, log_results: bool = True, *, name: str = None, span_type: SpanType = "span"):
-        """
-        Decorator to trace function execution with detailed entry/exit information.
-        """
-        if func is None:
-            return lambda f: self.score(f, scorers=scorers, model=model, log_results=log_results, name=name, span_type=span_type)
-        
-        if asyncio.iscoroutinefunction(func):
-            @functools.wraps(func)
-            async def async_wrapper(*args, **kwargs):
-                # Get current trace from contextvars
-                current_trace = current_trace_var.get()
-                if current_trace and scorers:
-                    current_trace.async_evaluate(scorers=scorers, input=args, actual_output=kwargs, model=model, log_results=log_results)
-                return await func(*args, **kwargs)
-            return async_wrapper
-        else:
-            @functools.wraps(func)
-            def wrapper(*args, **kwargs):
-                # Get current trace from contextvars
-                current_trace = current_trace_var.get()
-                if current_trace and scorers:
-                    current_trace.async_evaluate(scorers=scorers, input=args, actual_output=kwargs, model=model, log_results=log_results)
-                return func(*args, **kwargs)
             return wrapper
         
     def async_evaluate(self, *args, **kwargs):
