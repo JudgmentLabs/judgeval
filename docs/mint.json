@@ -109,6 +109,12 @@
       ]
     },
     {
+      "group": "Synthetic Data",
+      "pages": [
+        "synthetic_data/synthetic_data"
+      ]
+    },
+    {
       "group": "MCP Server",
       "pages": [
         "mcp_server/mcp_server"
