@@ -115,6 +115,12 @@
       ]
     },
     {
+      "group": "Synthetic Data",
+      "pages": [
+        "synthetic_data/synthetic_data"
+      ]
+    },
+    {
       "group": "Optimization",
       "pages": [
         "optimization/osiris_agent"
@@ -125,6 +131,12 @@
       "pages": [
         "api_reference/judgment_client",
         "api_reference/trace"
+      ]
+    },
+    {
+      "group": "Security & Compliance",
+      "pages": [
+        "compliance/certifications"
       ]
     },
     {
