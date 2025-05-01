@@ -1,0 +1,66 @@
+---
+title: Synthetic Data Generation
+description: "Learn how to generate diverse, high-quality synthetic data for your evaluation datasets."
+---
+
+# Synthetic Data Generation
+
+Synthetic data generation allows you to create diverse test cases from a small set of examples while maintaining the statistical properties and patterns of your original data. This powerful capability offers several key advantages for agent evaluation:
+
+1. **Data Diversity**: Generate a wider range of test cases from limited initial examples
+2. **Controlled Variation**: Introduce specific types of variations to test agent robustness
+3. **Cost Efficiency**: Reduce the need for manual data collection and annotation
+4. **Privacy**: Create data that doesn't contain sensitive information
+5. **Edge Cases**: Generate challenging scenarios to test agent performance
+
+<Tip>
+Synthetic data is particularly valuable when you need to test your agents against rare but important scenarios that might be difficult to find in real-world data.
+</Tip>
+
+# Generate Your First Synthetic Dataset
+
+To generate synthetic data from your existing examples:
+
+1. Navigate to your project in the [Judgment Platform](https://app.judgmentlabs.ai)
+2. Select the dataset you want to expand
+3. Click the "Generate Data" button in the top right
+
+<Frame>
+  <img src="/images/synth_data_button.png" alt="Generate Data Button" />
+</Frame>
+
+4. In the configuration window, you can specify:
+   - Number of Examples: How many new examples to generate
+   - Data Diversity (0-1): Controls how different the generated examples will be from your seed data
+
+<Frame>
+  <img src="/images/synth_data_window.png" alt="Data Generation Window" />
+</Frame>
+
+<Tip>
+Higher diversity scores (closer to 1) will generate more varied examples. For instance, if your original dataset contains customer service questions about shoes, a high diversity score might generate questions about other products, while a low score will stay focused on shoe-related queries.
+</Tip>
+
+5. Click "Generate" and our system will automatically create and add the new examples to your dataset.
+
+<Note>
+Generated examples maintain the same structure as your original data. For example, if you're generating Q&A pairs for RAG evaluation, the synthetic data will follow the same Q&A format.
+</Note>
+
+# Best Practices
+
+When generating synthetic data for evaluation:
+
+1. **Start Small**: Begin with a small number of examples to verify the generation quality
+2. **Validate Examples**: Review generated examples to ensure they match your use case
+3. **Iterate on Diversity**: Adjust the diversity score based on how varied you need your examples to be
+
+<Tip>
+You can use synthetic data generation in combination with [unit testing](/evaluation/unit_testing) to create comprehensive test suites for your agents.
+</Tip>
+
+# Next Steps
+
+Now that you've learned about synthetic data generation, explore how to:
+- [Create experiments](/evaluation/introduction) with your expanded datasets
+- Set up [unit testing](/evaluation/unit_testing) with synthetic examples

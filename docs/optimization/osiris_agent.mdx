@@ -1,23 +1,23 @@
 ---
-title: 'Model Context Protocol'
+title: 'Osiris Agent'
 ---
 
 ## Overview
 
-The Model Context Protocol (MCP) is an open standard that standardizes how applications deliver context and tools to large language models (LLMs). 
-Judgment integrates seamlessly with MCP, enabling LLMs to provide actionable insights for improving workflows and agents through our MCP server. 
-For detailed information about the MCP specification, refer to the official [documentation](https://modelcontextprotocol.io/introduction).
+The Osiris Agent is an advanced analysis and optimization co-pilot that helps developers deliver better context and tools to large language models (LLMs). 
+Built on the Model Context Protocol (MCP) standard, Osiris Agent provides intelligent insights and automated optimizations for your LLM applications. 
+For detailed information about the underlying MCP specification, refer to the official [documentation](https://modelcontextprotocol.io/introduction).
 
-## Benefits of the Judgment MCP Server
+## Benefits of Osiris Agent
 
-The Judgment MCP server provides LLMs with comprehensive insights into workflows and agents, including detailed trace and evaluation data. This enables:
+Osiris Agent acts as your intelligent co-pilot, providing comprehensive analysis and optimization capabilities for workflows and agents. It enables:
 
-- **Enhanced Debugging**: Identify performance bottlenecks and issues in complex workflows
-- **Optimized Code Generation**: AI-powered IDEs can analyze trace data to suggest targeted code improvements
-- **Efficient Experimentation**: Rapidly iterate on LLM applications with automated evaluation feedback
-- **Reduced Development Time**: Minimize manual analysis of trace data across large-scale deployments
+- **Smart Debugging**: Automatically identifies performance bottlenecks and issues in complex workflows
+- **AI-Powered Optimization**: Analyzes trace data to suggest targeted code improvements
+- **Rapid Experimentation**: Provides automated evaluation feedback for faster iteration
+- **Development Acceleration**: Minimizes manual analysis of trace data across large-scale deployments
 
-For example, when working with a complex workflow containing thousands of traces, the MCP server allows your AI-powered IDE to analyze trace patterns, identify root causes of issues, and suggest specific code optimizations based on evaluation metrics.
+For example, when working with a complex workflow containing thousands of traces, Osiris Agent can analyze trace patterns, identify root causes of issues, and suggest specific code optimizations based on evaluation metrics.
 
 ## Integration Guide
 
@@ -29,7 +29,7 @@ For example, when working with a complex workflow containing thousands of traces
 
 ### Configuration
 
-To integrate the Judgment MCP server with your AI agent, create an MCP configuration file with the following structure:
+To integrate the Osiris agent functionality with an existing AI agent, create an MCP configuration file with the following structure:
 
 ```json
 {
@@ -59,16 +59,16 @@ The current implementation requires an LLM API key. We recommend using Gemini, b
 
 ### Supported AI Agents
 
-The MCP server is compatible with several AI agents, including:
+Osiris Agent is compatible with several AI agents, including:
 - Cursor
 - Windsurf
 - Claude Desktop
 
 ### Rule File Configuration
 
-For optimal performance, we recommend adding a rule file to your AI agent configuration. This file helps the AI agent understand the available tools and how to optimize your code based on trace analysis.
+For optimal performance, we recommend adding a rule file to your AI agent configuration. This file helps Osiris Agent understand the available tools and how to optimize your code based on trace analysis.
 
-<Accordion title="Judgment Rule File">
+<Accordion title="Osiris Agent Rule File">
     ````
     ---
     You are an expert in code debugging and data analysis. When you use tools for trace or experiment analysis, use the following rules as guidelines to ensure that when the user asks for code optimization, it can be done properly. **MAKE SURE TO FULLY READ THROUGH THE ENTIRETY OF THIS AND TRULY UNDERSTAND IT before using MCP tools.**
@@ -560,7 +560,7 @@ For optimal performance, we recommend adding a rule file to your AI agent config
 
 ## Available Tools
 
-The Judgment MCP server provides the following tools for analyzing and optimizing your LLM applications:
+Osiris Agent provides the following tools for analyzing and optimizing your LLM applications:
 
 ### Analysis Tools
 
@@ -575,7 +575,7 @@ The Judgment MCP server provides the following tools for analyzing and optimizin
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
-| `run_evaluation` | Executes an evaluation directly through the MCP server | `project_name`, `evaluation_run` |
+| `run_evaluation` | Executes an evaluation directly through Osiris Agent | `project_name`, `evaluation_run` |
 
 The `evaluation_run` parameter accepts a comprehensive configuration object that can include:
 - Examples with input/output pairs
@@ -584,3 +584,15 @@ The `evaluation_run` parameter accepts a comprehensive configuration object that
 - Logging preferences
 
 This tool enables rapid experimentation with different evaluation configurations without modifying your application code.
+
+## Learning Resources
+
+### Video Tutorials
+
+To help you get started with Osiris Agent, we've created a series of video tutorials that demonstrate key concepts and practical implementations:
+
+| Topic | Description | Duration |
+|-------|-------------|----------|
+| [Getting Started with Osiris](https://www.youtube.com/watch?v=neSDEho9RqI) | Learn the basics of setting up and configuring Osiris Agent for your first project | 7 min |
+
+
