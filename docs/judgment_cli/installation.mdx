@@ -21,13 +21,44 @@ git clone https://github.com/JudgmentLabs/judgment-cli.git
 ```bash
 cd judgment-cli
 ```
+
+3. Set up a fresh Python virtual environment:
+
+Choose one of the following methods to set up your virtual environment:
+
+<CodeGroup>
+```bash Built-In
+python -m venv venv
+source venv/bin/activate  # On Windows, use: venv\Scripts\activate
+```
+
+```bash pipenv
+pipenv shell
+```
+
+```bash uv
+uv venv
+source .venv/bin/activate  # On Windows, use: .venv\Scripts\activate
+```
+
+</CodeGroup>
+
 3. Install the package:
-<Warning>
-Make sure you run this command in a fresh Python virtual environment
-</Warning>
-```bash
+
+<CodeGroup>
+```bash Built-In
 pip install -e .
 ```
+
+```bash pipenv
+pipenv install -e .
+```
+
+```bash uv
+uv pip install -e .
+```
+
+</CodeGroup>
 
 ## Verifying the Installation
 
