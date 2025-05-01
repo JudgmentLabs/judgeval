@@ -50,6 +50,7 @@
         "evaluation/introduction",
         "evaluation/data_examples",
         "evaluation/data_sequences",
+        "evaluation/experiment_comparisons",
         "evaluation/data_datasets",
         {
           "group": "Scorers",
