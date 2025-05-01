@@ -115,7 +115,7 @@
       ]
     },
     {
-      "group": "MCP Server",
+      "group": "Osiris Agent",
       "pages": [
         "mcp_server/mcp_server"
       ]
