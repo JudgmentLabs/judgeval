@@ -115,9 +115,9 @@
       ]
     },
     {
-      "group": "Osiris Agent",
+      "group": "Optimization",
       "pages": [
-        "mcp_server/mcp_server"
+        "optimization/osiris_agent"
       ]
     },
     {
