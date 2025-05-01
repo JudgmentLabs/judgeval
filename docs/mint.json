@@ -84,7 +84,13 @@
       "group": "Monitoring",
       "pages": [
         "monitoring/introduction",
-        "monitoring/tracing",
+        {
+          "group": "Tracing",
+          "pages": [
+            "monitoring/tracing",
+            "monitoring/tracing_s3"
+          ]
+        },
         "monitoring/annotations"
       ]
     },

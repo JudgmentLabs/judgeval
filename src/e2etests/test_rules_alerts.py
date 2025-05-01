@@ -112,16 +112,18 @@ async def get_llm_response(question: str) -> str:
             {"role": "user", "content": question}
         ]
     )
-    
+    example = Example(
+        input=question,
+        actual_output=response.choices[0].message.content,
+        expected_output=None
+    )
     # Evaluate the response using the current trace
     judgment.async_evaluate(
         scorers=[
             FaithfulnessScorer(threshold=0.7),
             AnswerRelevancyScorer(threshold=0.7)
         ],
-        input=question,
-        actual_output=response.choices[0].message.content,
-        expected_output=None,  # No expected output for this test
+        example=example,
         model="gpt-4",
         log_results=True
     )
@@ -156,47 +158,45 @@ async def test_basic_rules(good_example, bad_example):
     """Test basic rule evaluation with different condition combinations."""
     
     # Start a trace for the test
-    with judgment.trace(name="basic_rules_test", project_name="rules_test", overwrite=True) as trace:
-        # Test metadata will be added to the test file output for now
-        print("\nRunning basic_rules_test with rules functionality and tracing")
-        
-        # Evaluate examples
-        with trace.span("evaluate_examples") as span:
-            # Evaluate good example
-            good_result = await evaluate_example(good_example)
-            
-            # Evaluate bad example
-            bad_result = await evaluate_example(bad_example)
-            
-            # Print results for debugging
-            print("\nGood Example Results:")
-            print(f"Success: {good_result['success']}")
-            print("Scores:")
-            for name, score in good_result["scores"].items():
-                print(f"  {name}: {score:.2f}")
-            
-            if good_result["alerts"]:
-                print("Alerts:")
-                for rule_id, alert in good_result["alerts"].items():
-                    status = alert.get('status', 'unknown')
-                    rule_name = alert.get('rule_name', rule_id)
-                    print(f"  Rule '{rule_name}': {status}")
-        
-        # Test assertions
-        # The good example should have high scores
-        assert good_result["scores"]["Answer Correctness"] > 0.7, "Good example should have high correctness score"
-        assert good_result["scores"]["Answer Relevancy"] > 0.7, "Good example should have high relevancy score"
-        
-        # The bad example should have lower scores
-        assert bad_result["scores"]["Answer Correctness"] < 0.7, "Bad example should have low correctness score"
-        
-        # Check for alerts in good example
-        if good_result["alerts"]:
-            any_rule_id = next((k for k, v in good_result["alerts"].items() 
-                                if v.get('rule_name') == "Any Metric Quality Check"), None)
-            if any_rule_id:
-                assert good_result["alerts"][any_rule_id]['status'] == 'triggered', \
-                    "Any Metric Quality Check should be triggered for good example"
+    # Test metadata will be added to the test file output for now
+    print("\nRunning basic_rules_test with rules functionality and tracing")
+    
+    # Evaluate examples
+    # Evaluate good example
+    good_result = await evaluate_example(good_example)
+    
+    # Evaluate bad example
+    bad_result = await evaluate_example(bad_example)
+    
+    # Print results for debugging
+    print("\nGood Example Results:")
+    print(f"Success: {good_result['success']}")
+    print("Scores:")
+    for name, score in good_result["scores"].items():
+        print(f"  {name}: {score:.2f}")
+    
+    if good_result["alerts"]:
+        print("Alerts:")
+        for rule_id, alert in good_result["alerts"].items():
+            status = alert.get('status', 'unknown')
+            rule_name = alert.get('rule_name', rule_id)
+            print(f"  Rule '{rule_name}': {status}")
+    
+    # Test assertions
+    # The good example should have high scores
+    assert good_result["scores"]["Answer Correctness"] > 0.7, "Good example should have high correctness score"
+    assert good_result["scores"]["Answer Relevancy"] > 0.7, "Good example should have high relevancy score"
+    
+    # The bad example should have lower scores
+    assert bad_result["scores"]["Answer Correctness"] < 0.7, "Bad example should have low correctness score"
+    
+    # Check for alerts in good example
+    if good_result["alerts"]:
+        any_rule_id = next((k for k, v in good_result["alerts"].items() 
+                            if v.get('rule_name') == "Any Metric Quality Check"), None)
+        if any_rule_id:
+            assert good_result["alerts"][any_rule_id]['status'] == 'triggered', \
+                "Any Metric Quality Check should be triggered for good example"
 
 
 @pytest.mark.asyncio
@@ -232,66 +232,59 @@ async def test_complex_rules():
         retrieval_context=["Paris is the capital city of France."]
     )
     
-    # Start a trace for the test
-    with judgment.trace(name="complex_rules_test", project_name="rules_test", overwrite=True) as trace:
-        # Print test info
-        print("\nRunning complex_rules_test with mixed operators")
-        
-        # Evaluate example
-        with trace.span("evaluate_example") as span:
-            # Create scorers
-            correctness_scorer = AnswerCorrectnessScorer(threshold=0.7)
-            relevancy_scorer = AnswerRelevancyScorer(threshold=0.7)
-            faithfulness_scorer = FaithfulnessScorer(threshold=0.7)
-            
-            # Initialize client
-            judgment_client = JudgmentClient()
-            
-            # Run evaluation
-            results = judgment_client.run_evaluation(
-                examples=[example],
-                scorers=[correctness_scorer, relevancy_scorer, faithfulness_scorer],
-                model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-                log_results=True,
-                project_name="rules-test-project",
-                eval_run_name=f"complex-rules-test-{uuid4().hex[:8]}",
-                override=True,
-                rules=complex_rules  # Pass rules explicitly
-            )
-            
-            # Get the result
-            result = results[0]
-            
-            # Check for alerts
-            alerts = {}
-            if hasattr(result, 'additional_metadata') and result.additional_metadata and 'alerts' in result.additional_metadata:
-                alerts = result.additional_metadata['alerts']
-            
-            # Test assertions
-            assert result.success, "Example evaluation should succeed"
-            
-            # The Mixed Operators Rule should be triggered
-            if alerts:
-                mixed_rule_id = next((k for k, v in alerts.items() 
-                                    if v.get('rule_name') == "Mixed Operators Rule"), None)
-                if mixed_rule_id:
-                    assert alerts[mixed_rule_id]['status'] == 'triggered', \
-                        "Mixed Operators Rule should be triggered"
+    # Print test info
+    print("\nRunning complex_rules_test with mixed operators")
+    
+    # Evaluate example
+    correctness_scorer = AnswerCorrectnessScorer(threshold=0.7)
+    relevancy_scorer = AnswerRelevancyScorer(threshold=0.7)
+    faithfulness_scorer = FaithfulnessScorer(threshold=0.7)
+    
+    # Initialize client
+    judgment_client = JudgmentClient()
+    
+    # Run evaluation
+    results = judgment_client.run_evaluation(
+        examples=[example],
+        scorers=[correctness_scorer, relevancy_scorer, faithfulness_scorer],
+        model="Qwen/Qwen2.5-72B-Instruct-Turbo",
+        log_results=True,
+        project_name="rules-test-project",
+        eval_run_name=f"complex-rules-test-{uuid4().hex[:8]}",
+        override=True,
+        rules=complex_rules  # Pass rules explicitly
+    )
+    
+    # Get the result
+    result = results[0]
+    
+    # Check for alerts
+    alerts = {}
+    if hasattr(result, 'additional_metadata') and result.additional_metadata and 'alerts' in result.additional_metadata:
+        alerts = result.additional_metadata['alerts']
+    
+    # Test assertions
+    assert result.success, "Example evaluation should succeed"
+    
+    # The Mixed Operators Rule should be triggered
+    if alerts:
+        mixed_rule_id = next((k for k, v in alerts.items() 
+                              if v.get('rule_name') == "Mixed Operators Rule"), None)
+        if mixed_rule_id:
+            assert alerts[mixed_rule_id]['status'] == 'triggered', \
+                "Mixed Operators Rule should be triggered"
 
 
 @pytest.mark.asyncio
 async def test_llm_response_with_evaluation():
     """Test LLM response with evaluation in a trace."""
     
-    # Start a trace for the test
-    with judgment.trace(name="llm_response_test", project_name="rules_test", overwrite=True) as trace:
-        # Print test info
-        print("\nRunning llm_response_test to evaluate LLM output")
-        
-        # Test LLM response with evaluation
-        with trace.span("test_llm_response") as span:
-            question = "What is the capital of France?"
-            response = await get_llm_response(question)
-            
-            # Test assertions
-            assert "Paris" in response, "Response should mention Paris as the capital of France" 
+    # Print test info
+    print("\nRunning llm_response_test to evaluate LLM output")
+    
+    # Test LLM response with evaluation
+    question = "What is the capital of France?"
+    response = await get_llm_response(question)
+    
+    # Test assertions
+    assert "Paris" in response, "Response should mention Paris as the capital of France"

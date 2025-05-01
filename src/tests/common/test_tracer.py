@@ -6,7 +6,7 @@ from openai import OpenAI
 from anthropic import Anthropic
 import requests
 
-from judgeval.common.tracer import Tracer, TraceEntry, wrap, current_span_var
+from judgeval.common.tracer import Tracer, TraceEntry, wrap, current_span_var, current_trace_var, TraceClient
 from judgeval.judgment_client import JudgmentClient
 from judgeval.common.exceptions import JudgmentAPIError
 
@@ -19,11 +19,11 @@ def tracer(mocker):
     mock_post_response.status_code = 200
     mock_post_response.json.return_value = {
         "message": "Trace saved successfully",
-        "trace_id": "test-trace-id"
+        "trace_id": "test-trace-id",
+        "ui_results_url": "http://example.com/results"
     }
     
     # Create mocks for POST requests
-    
     mock_post = mocker.patch('requests.post', autospec=True)
     mock_post.return_value = mock_post_response
     
@@ -36,8 +36,25 @@ def tracer(mocker):
 @pytest.fixture
 def trace_client(tracer):
     """Provide a trace client instance"""
-    with tracer.trace("test_trace") as client:
-        yield client
+    # Create a new trace client directly
+    trace_id = str(uuid4())
+    trace_client = TraceClient(
+        tracer=tracer,
+        trace_id=trace_id,
+        name="test_trace",
+        project_name="test_project"
+    )
+    
+    # Set the trace context
+    token = current_trace_var.set(trace_client)
+    
+    try:
+        # Create a root span without recording any data
+        with trace_client.span("root_span", span_type="test"):
+            yield trace_client
+    finally:
+        # Clean up the trace context
+        current_trace_var.reset(token)
 
 def test_tracer_singleton(mocker):
     """Test that Tracer maintains singleton pattern"""
@@ -121,9 +138,9 @@ def test_trace_client_span(trace_client):
     """Test span context manager"""
     # The trace_client fixture starts with a trace "test_trace" and its 'enter' entry
     initial_entries_count = len(trace_client.entries)
-    assert initial_entries_count == 1 # Should only have the 'enter' for "test_trace"
+    assert initial_entries_count == 1  # Should only have the 'enter' for "test_trace"
 
-    parent_before_span = current_span_var.get() # Should be the span_id of test_trace
+    parent_before_span = current_span_var.get()  # Should be the span_id of test_trace
 
     with trace_client.span("test_span") as span:
         # Inside the span, the current span var should be updated to the new span_id
@@ -134,8 +151,8 @@ def test_trace_client_span(trace_client):
         assert enter_entry.type == "enter"
         assert enter_entry.function == "test_span"
         assert enter_entry.span_id == current_span_id
-        assert enter_entry.parent_span_id == parent_before_span # Check parent relationship
-        assert enter_entry.depth == 1 # Depth relative to parent
+        assert enter_entry.parent_span_id == parent_before_span  # Check parent relationship
+        assert enter_entry.depth == 1  # Depth relative to parent
 
     # After the span, the context var should be reset
     assert current_span_var.get() == parent_before_span
@@ -145,14 +162,14 @@ def test_trace_client_span(trace_client):
     assert exit_entry.type == "exit"
     assert exit_entry.function == "test_span"
     assert exit_entry.span_id == current_span_id
-    assert exit_entry.depth == 1 # Depth after exiting is the same as the entry depth for that span
+    assert exit_entry.depth == 1  # Depth after exiting is the same as the entry depth for that span
 
     # Check total entries (1 enter root + 1 enter span + 1 exit span)
     assert len(trace_client.entries) == initial_entries_count + 2
 
 def test_trace_client_nested_spans(trace_client):
     """Test nested spans maintain proper depth recorded in entries"""
-    root_span_id = current_span_var.get() # From the fixture
+    root_span_id = current_span_var.get()  # From the fixture
 
     with trace_client.span("outer") as outer_span:
         outer_span_id = current_span_var.get()
@@ -162,7 +179,7 @@ def test_trace_client_nested_spans(trace_client):
         assert outer_enter_entry.function == "outer"
         assert outer_enter_entry.span_id == outer_span_id
         assert outer_enter_entry.parent_span_id == root_span_id
-        assert outer_enter_entry.depth == 1 # Depth is 0(root) + 1
+        assert outer_enter_entry.depth == 1  # Depth is 0(root) + 1
 
         with trace_client.span("inner") as inner_span:
             inner_span_id = current_span_var.get()
@@ -172,21 +189,21 @@ def test_trace_client_nested_spans(trace_client):
             assert inner_enter_entry.function == "inner"
             assert inner_enter_entry.span_id == inner_span_id
             assert inner_enter_entry.parent_span_id == outer_span_id
-            assert inner_enter_entry.depth == 2 # Depth is 1(outer) + 1
+            assert inner_enter_entry.depth == 2  # Depth is 1(outer) + 1
 
         # Check 'exit' entry for 'inner' span
         inner_exit_entry = trace_client.entries[-1]
         assert inner_exit_entry.type == "exit"
         assert inner_exit_entry.function == "inner"
         assert inner_exit_entry.span_id == inner_span_id
-        assert inner_exit_entry.depth == 2 # Depth when exiting inner is inner's entry depth
+        assert inner_exit_entry.depth == 2  # Depth when exiting inner is inner's entry depth
 
     # Check 'exit' entry for 'outer' span
     outer_exit_entry = trace_client.entries[-1]
     assert outer_exit_entry.type == "exit"
     assert outer_exit_entry.function == "outer"
     assert outer_exit_entry.span_id == outer_span_id
-    assert outer_exit_entry.depth == 1 # Depth when exiting outer is outer's entry depth
+    assert outer_exit_entry.depth == 1  # Depth when exiting outer is outer's entry depth
 
 def test_record_input_output(trace_client):
     """Test recording inputs and outputs"""
@@ -287,6 +304,11 @@ def test_wrap_openai(mock_post, tracer):
     mock_response = Mock()
     mock_response.status_code = 200
     mock_response.text = '{"message": "success"}'
+    mock_response.json.return_value = {
+        "message": "Trace saved successfully",
+        "trace_id": "test-trace-id",
+        "ui_results_url": "http://example.com/results"
+    }
     mock_post.return_value = mock_response
     
     client = OpenAI()
@@ -297,12 +319,15 @@ def test_wrap_openai(mock_post, tracer):
     
     wrapped_client = wrap(client)
     
-    with tracer.trace("test_trace"):
+    @tracer.observe(span_type="test")
+    def test_function():
         response = wrapped_client.chat.completions.create(
             model="gpt-4",
             messages=[{"role": "user", "content": "test"}]
         )
+        return response
     
+    response = test_function()
     assert response == mock_completion
 
 @patch('requests.post')
@@ -312,6 +337,11 @@ def test_wrap_anthropic(mock_post, tracer):
     mock_response = Mock()
     mock_response.status_code = 200
     mock_response.text = '{"message": "success"}'
+    mock_response.json.return_value = {
+        "message": "Trace saved successfully",
+        "trace_id": "test-trace-id",
+        "ui_results_url": "http://example.com/results"
+    }
     mock_post.return_value = mock_response
     
     client = Anthropic()
@@ -322,12 +352,15 @@ def test_wrap_anthropic(mock_post, tracer):
     
     wrapped_client = wrap(client)
     
-    with tracer.trace("test_trace"):
+    @tracer.observe(span_type="test")
+    def test_function():
         response = wrapped_client.messages.create(
             model="claude-3",
             messages=[{"role": "user", "content": "test"}]
         )
+        return response
     
+    response = test_function()
     assert response == mock_completion
 
 def test_wrap_unsupported_client(tracer):
@@ -358,9 +391,7 @@ def test_observe_decorator(tracer):
     def test_function(x, y):
         return x + y
     
-    with tracer.trace("test_trace"):
-        result = test_function(1, 2)
-    
+    result = test_function(1, 2)
     assert result == 3
 
 def test_observe_decorator_with_error(tracer):
