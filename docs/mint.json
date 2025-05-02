@@ -99,8 +99,7 @@
       "group": "Integrations",
       "pages": [
         "integration/langgraph",
-        "integration/tracing_integrations",
-        "integration/litellm_integration"
+        "integration/tracing_integrations"
       ]
     },
     {
