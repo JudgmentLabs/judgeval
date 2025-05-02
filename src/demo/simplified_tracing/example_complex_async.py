@@ -1,31 +1,22 @@
 import asyncio
 import time
-import sys
-import os
-import functools
-from unittest.mock import MagicMock, patch
-from typing import Dict, Optional, List
-import uuid
+import random
+import threading
+import concurrent.futures
+from typing import List, Dict, Any
 import json
 
-# Standard library imports needed for the new class
-import concurrent.futures
-import contextvars
-# Needed for partial in the executor
+from judgeval.tracer import Tracer, wrap
+from judgeval.common.tracer import TraceThreadPoolExecutor
+from openai import AsyncOpenAI
 
-# Add src directory to Python path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
-
-# Import and mock necessary components before initializing the tracer
-from judgeval.common.tracer import Tracer, JudgmentClient, TraceClient, current_trace_var, TraceEntry, TraceManagerClient, TraceThreadPoolExecutor # Import the new class
-
-# Initialize the tracer with test values
-tracer = Tracer(
-    project_name="complex_async_test"
-)
+# Initialize the tracer
+tracer = Tracer(project_name="complex_async_example")
 
 # In this example, we'll use a single trace with spans for all function calls
-@tracer.observe(name="root_function_custom_name", span_type="function")
+
+@tracer.observe(name="custom_root", span_type="function")
+
 async def root_function():
     print("Root function starting")
     
@@ -49,7 +40,7 @@ async def root_function():
 
 # Level 2 - Direct child of root
 # Using observe with same tracer - this will create spans in the parent trace
-@tracer.observe(name="level2_apple", span_type="llm")
+
 async def level2_function(param):
     # Capture this function in a span within the current trace
     print(f"Level 2 function with {param}")
@@ -95,7 +86,7 @@ async def level3_function(param):
     return f"level3:{result}"
 
 # Level 3 - First parallel function called by level2_parallel1
-@tracer.observe(name="john", span_type="function")
+
 async def level3_parallel1(param):
     # Capture this function in a span within the current trace
     print(f"Level 3 parallel 1 with {param}")
@@ -194,14 +185,39 @@ def sync_parent_func():
     return results
 
 # --- End Synchronous Test ---
+@tracer.observe(name="vision_analysis_observed") # Apply the decorator
+async def analyze_image_content(client, content_list: List[Dict[str, Any]]) -> str:
+    """
+    Calls the OpenAI vision model with a list of content items (text/image).
+    This function is automatically traced by the @judgment.observe decorator.
+    """
+    print(f"--- Calling OpenAI Vision API with mixed content list ---")
+    # print(f"Content List: {json.dumps(content_list, indent=2)}") # Optional: Print the list being sent
+    try:
+        response = await client.chat.completions.create( # Use await for async client
+            model="gpt-4.1-nano", # Or "gpt-4-vision-preview" or other vision model
+            messages=[
+                {
+                    "role": "user",
+                    "content": content_list, # Pass the list directly
+                }
+            ],
+            max_tokens=500, # Increased max tokens for potentially longer response
+        )
+        print("--- API Call Successful ---")
+        return response.choices[0].message.content
+    except Exception as e:
+        print(f"--- API Call Failed: {e} ---")
+        return f"Error analyzing image content: {e}"
 
 async def main():
     # Run the root function which has deep nesting and nested parallel calls
     start_time = time.time()
-    result_async = await root_function()
+    result = await root_function()
     end_time = time.time()
-    print(f"\nAsync Final result: {result_async}")
-    print(f"Async Total execution time: {end_time - start_time:.2f} seconds")
+    
+    print(f"\nFinal results: {result}")
+    print(f"Total execution time: {end_time - start_time:.2f} seconds")
     
     print("\n" + "="*20 + " Starting Sync ThreadPool Test " + "="*20 + "\n")
 
@@ -216,6 +232,18 @@ async def main():
     print(f"\nSync Final results: {result_sync}")
     print(f"Sync Total execution time: {end_time_sync - start_time_sync:.2f} seconds")
     # --- End synchronous test call ---
+    client = wrap(AsyncOpenAI())
+    content_list = [
+        {
+            "type": "text",
+            "text": "I want to plan a trip to Paris."
+        }
+    ]
+    start_time_vision = time.time()
+    result_vision = await analyze_image_content(client, content_list) # Properly await the async function
+    end_time_vision = time.time()
+    print(f"\nVision API results: {result_vision}")
+    print(f"Vision API execution time: {end_time_vision - start_time_vision:.2f} seconds")
 
 if __name__ == "__main__":
     # Run the complex async example

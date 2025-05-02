@@ -50,6 +50,7 @@
         "evaluation/introduction",
         "evaluation/data_examples",
         "evaluation/data_sequences",
+        "evaluation/experiment_comparisons",
         "evaluation/data_datasets",
         {
           "group": "Scorers",
@@ -84,7 +85,13 @@
       "group": "Monitoring",
       "pages": [
         "monitoring/introduction",
-        "monitoring/tracing",
+        {
+          "group": "Tracing",
+          "pages": [
+            "monitoring/tracing",
+            "monitoring/tracing_s3"
+          ]
+        },
         "monitoring/annotations"
       ]
     },
@@ -111,9 +118,28 @@
       ]
     },
     {
-      "group": "MCP Server",
+      "group": "Self-Hosting",
       "pages": [
-        "mcp_server/mcp_server"
+        "self_hosting/get_started"
+      ]
+    },
+    {
+      "group": "Judgment CLI",
+      "pages": [
+        "judgment_cli/installation",
+        "judgment_cli/self-hosting"
+      ]
+    },
+    {
+      "group": "Synthetic Data",
+      "pages": [
+        "synthetic_data/synthetic_data"
+      ]
+    },
+    {
+      "group": "Optimization",
+      "pages": [
+        "optimization/osiris_agent"
       ]
     },
     {
@@ -121,6 +147,12 @@
       "pages": [
         "api_reference/judgment_client",
         "api_reference/trace"
+      ]
+    },
+    {
+      "group": "Security & Compliance",
+      "pages": [
+        "compliance/certifications"
       ]
     },
     {

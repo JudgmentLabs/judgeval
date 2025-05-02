@@ -70,6 +70,20 @@ const client = wrap(new OpenAI());
 ```
 </CodeGroup>
 
+<Note>
+    When using OpenAI streaming with a wrapped client, you need to explicitly enable token usage tracking by setting `stream_options={"include_usage": True}`. Otherwise, token counts won't be captured for streaming calls.
+
+    ```python
+    # Enable token counting with streaming
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": "Hello"}],
+        stream=True,
+        stream_options={"include_usage": True}  # Required for token counting
+    )
+    ```
+</Note>
+
 #### `@observe` (Python) / `observe()` (Typescript) ####
 The `@observe` decorator (Python) or the `observe()` higher-order function (Typescript) wraps your functions/tools and captures metadata surrounding your function calls, such as:
 - Latency
@@ -110,6 +124,54 @@ const observedMyTool = judgment.observe({ spanType: "tool" })(myTool);
     Span types are displayed on the trace UI to easily navigate a visualization of your workflow. 
     Common span types include `tool`, `function`, `retriever`, `database`, `web search`, etc.
 </Note>
+
+#### Automatic Deep Tracing
+
+Judgeval includes automatic deep tracing, which significantly reduces the amount of instrumentation needed in your code. With deep tracing enabled (the default), you only need to observe top-level functions, and all nested function calls will be automatically traced.
+
+##### How Deep Tracing Works
+
+When you decorate a function with `@observe` (Python) or wrap it with `observe()` (TypeScript), the tracer automatically instruments all functions called within that function, creating a complete trace of your execution flow without requiring explicit decorators on every function.
+
+<CodeGroup>
+```Python Python
+# Deep tracing is enabled by default
+judgment = Tracer(project_name="my_project")
+
+# Only need to observe the top-level function
+@judgment.observe(span_type="function")
+def main():
+    # These functions will be automatically traced without @observe
+    result = helper_function()
+    return process_result(result)
+
+def helper_function():
+    return "Helper result"
+
+def process_result(result):
+    return f"Processed: {result}"
+
+main()  # Traces main, helper_function, and process_result
+```
+</CodeGroup>
+
+##### Disabling Deep Tracing
+
+If you prefer more control over what gets traced, you can disable deep tracing:
+
+<CodeGroup>
+```Python Python
+# Disable deep tracing globally
+judgment = Tracer(project_name="my_project", deep_tracing=False)
+
+# Or disable for specific functions
+@judgment.observe(span_type="function", deep_tracing=False)
+def selective_function():
+    helper_function()  # Won't be traced automatically
+```
+</CodeGroup>
+
+With deep tracing disabled, you'll need to explicitly observe each function you want to trace. You can still name and declare span types for each function using jdugement.observe().
 
 
 #### Putting it all Together
@@ -181,6 +243,61 @@ And the trace will appear on the Judgment platform as follows:
 
 ![Alt text](/images/basic_trace_example.png "Basic Trace Example")
 
+### Using Streaming with Token Counting
+
+When using streaming responses with a wrapped client, you need to explicitly enable token usage tracking:
+
+<CodeGroup>
+```Python Python
+@judgment.observe(span_type="function")
+def my_llm_streaming_call():
+    # Enable token counting with streaming API calls
+    stream = openai_client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": "Write a poem"}],
+        stream=True,
+        stream_options={"include_usage": True}  # Required for token counting
+    )
+    
+    # Process the stream
+    full_response = ""
+    for chunk in stream:
+        if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+            content = chunk.choices[0].delta.content
+            full_response += content
+            print(content, end="", flush=True)
+    
+    return full_response
+```
+```Typescript Typescript
+const observedStreamingCall = judgment.observe({ spanType: "function" })(async () => {
+    // Enable token counting with streaming API calls
+    const stream = await openaiClient.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: "Write a poem" }],
+        stream: true,
+        stream_options: { include_usage: true }  // Required for token counting
+    });
+    
+    // Process the stream
+    let fullResponse = "";
+    for await (const chunk of stream) {
+        if (chunk.choices[0]?.delta?.content) {
+            const content = chunk.choices[0].delta.content;
+            fullResponse += content;
+            process.stdout.write(content);
+        }
+    }
+    
+    return fullResponse;
+});
+```
+</CodeGroup>
+
+<Warning>
+  Without setting `stream_options={"include_usage": True}`, token counts will not be captured for streaming API calls, and your usage metrics in traces will be incomplete.
+</Warning>
+
 ### 3. Running Production Evaluations
 
 Optionally, you can run asynchronous evaluations directly inside your traces.
@@ -196,6 +313,7 @@ To execute an asynchronous evaluation, you can use the `trace.asyncEvaluate()` m
 ```Python Python
 from judgeval.tracer import Tracer
 from judgeval.scorers import AnswerRelevancyScorer
+from judgeval.data import Example
 
 judgment = Tracer(project_name="my_project")
 
@@ -204,12 +322,17 @@ def main():
     query = "What is the capital of France?"
     res = "The capital of France is Paris."  # Replace with your workflow logic
     
-    # Assumes this runs within an active trace context implicitly started by @observe
-    judgment.async_evaluate(
-        scorers=[AnswerRelevancyScorer(threshold=1.0)],
+    # Create an Example object to pass to async_evaluate
+    example = Example(
         input=query,
-        actual_output=res,
-        model="gpt-4o",
+        actual_output=res
+    )
+    
+    # Run the evaluation with the Example object
+    judgment.async_evaluate(
+        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+        example=example,
+        model="gpt-4o"
     )
     return res
 
@@ -365,10 +488,3 @@ main();
     over the trace lifecycle. In Typescript, explicit management via `startTrace()` and `trace.save()` is the standard way to gain this control.
     In most simple cases in Python, the `@observe` decorator is sufficient.
 </Warning>
-
-
-
-
-
-
-

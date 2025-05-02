@@ -1,8 +1,8 @@
-name: CI
+name: CI Tests
 
 on:
-  pull_request_review:
-    types: [submitted]
+  pull_request:
+    types: [opened, synchronize, reopened]
     branches:
       - main
 

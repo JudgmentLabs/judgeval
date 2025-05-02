@@ -4,7 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-litellm = "*"
+litellm = "==1.38.12"
 python-dotenv = "==1.0.1"
 fastapi = "*"
 uvicorn = "*"

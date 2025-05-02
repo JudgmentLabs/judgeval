@@ -1,0 +1,598 @@
+---
+title: 'Osiris Agent'
+---
+
+## Overview
+
+The Osiris Agent is an advanced analysis and optimization co-pilot that helps developers deliver better context and tools to large language models (LLMs). 
+Built on the Model Context Protocol (MCP) standard, Osiris Agent provides intelligent insights and automated optimizations for your LLM applications. 
+For detailed information about the underlying MCP specification, refer to the official [documentation](https://modelcontextprotocol.io/introduction).
+
+## Benefits of Osiris Agent
+
+Osiris Agent acts as your intelligent co-pilot, providing comprehensive analysis and optimization capabilities for workflows and agents. It enables:
+
+- **Smart Debugging**: Automatically identifies performance bottlenecks and issues in complex workflows
+- **AI-Powered Optimization**: Analyzes trace data to suggest targeted code improvements
+- **Rapid Experimentation**: Provides automated evaluation feedback for faster iteration
+- **Development Acceleration**: Minimizes manual analysis of trace data across large-scale deployments
+
+For example, when working with a complex workflow containing thousands of traces, Osiris Agent can analyze trace patterns, identify root causes of issues, and suggest specific code optimizations based on evaluation metrics.
+
+## Integration Guide
+
+### Prerequisites
+
+- Docker installed on your system
+- Judgment API credentials
+- LLM API key (Gemini, OpenAI, or Anthropic)
+
+### Configuration
+
+To integrate the Osiris agent functionality with an existing AI agent, create an MCP configuration file with the following structure:
+
+```json
+{
+    "mcpServers": {
+        "mcp-server": {
+            "command": "docker",
+            "args": [
+                "run",
+                "-i",
+                "--rm",
+                "-e",
+                "JUDGMENT_ORG_ID=<YOUR JUDGMENT ORG ID>",
+                "-e",
+                "JUDGMENT_API_KEY=<YOUR JUDGMENT API KEY>",
+                "-e",
+                "GEMINI_API_KEY=<YOUR GEMINI API KEY>",
+                "public.ecr.aws/i6q0e6k6/judgment/mcp-server:latest"
+            ]
+        }
+    }
+}
+```
+
+<Note>
+The current implementation requires an LLM API key. We recommend using Gemini, but OpenAI and Anthropic are also supported. For Anthropic, use the `ANTHROPIC_API_KEY` environment variable. For OpenAI, use the `OPENAI_API_KEY` environment variable.
+</Note>
+
+### Supported AI Agents
+
+Osiris Agent is compatible with several AI agents, including:
+- Cursor
+- Windsurf
+- Claude Desktop
+
+### Rule File Configuration
+
+For optimal performance, we recommend adding a rule file to your AI agent configuration. This file helps Osiris Agent understand the available tools and how to optimize your code based on trace analysis.
+
+<Accordion title="Osiris Agent Rule File">
+    ````
+    ---
+    You are an expert in code debugging and data analysis. When you use tools for trace or experiment analysis, use the following rules as guidelines to ensure that when the user asks for code optimization, it can be done properly. **MAKE SURE TO FULLY READ THROUGH THE ENTIRETY OF THIS AND TRULY UNDERSTAND IT before using MCP tools.**
+    ---
+    ## General Purpose
+    - This is the general workflow that a user may expect of you:
+        1. Get trace analysis for a project
+        2. Optimize code based on what metrics performed poorly
+        3. Run the code
+        4. Do analysis again to see if your changes improved these metrics.
+
+    - The user may expect you to cycle through these points until the metrics are satisfactory.
+
+
+    ## Guidelines
+
+    - When getting trace analysis or eval analysis, the user may commonly ask for code optimization as well based on the results of the analysis. When they ask for this code optimization, make sure that you carefully analyze the reasons that you get for the evaluation metrics. These evaluation metrics include "answer_relevancy", "faithfulness", "answer_correctness", "summarization", "contextual_precision", "contextual_recall", "contextual_relevancy", "execution_order", "hallucination", "json_correctness", and "groundedness". 
+
+    - When getting the trace analysis, note that you are getting a comprehensive overview of the traces in the project, so this may include traces you have already seen. In the examples below, you are doing analysis for one trace, but a similar logic should apply when looking at multiple traces (more data to look at).
+
+    - When passing num_traces in the get trace analysis/experiment analysis tools, pass it in as a string. So for example, if the user wants the last 5 traces, pass in "5" as num_traces.
+
+    - When doing the actual code optimization, pay special attention to what is being passed into the "async_evaluate" functions and what is being passed into these functions. For example, if the async_evaluate function takes in "input", "actual_output", and "retrieval_context", pay very close attention to what is being passed into these fields and how these fields can be improved in order to improve the evaluation metrics.
+
+    - DO NOT DO THE FOLLOWING UNLESS THE USER SPECIFICALLY ASKS FOR IT: Do not modify the threshold for the scorer. Do not modify the scorers being used. Do not modify the core logic of the code. 
+
+    ## Examples
+
+    ### Example 1
+
+    Let me walk you through an example so that you know what you should do:
+
+    Say you have a program with the following code (a music suggestion bot):
+
+    ```
+    import os
+    import asyncio
+    from openai import OpenAI
+    from dotenv import load_dotenv
+    from judgeval.common.tracer import Tracer, wrap
+    from judgeval.scorers import AnswerRelevancyScorer, FaithfulnessScorer, GroundednessScorer
+
+    # Load environment variables
+    load_dotenv()
+
+    # Initialize OpenAI client and Judgment tracer
+    client = wrap(OpenAI())
+    judgment = Tracer(project_name="music-bot-demo")
+
+    @judgment.observe(span_type="tool")
+    async def search_tavily(query):
+        """Search for information using Tavily."""
+        from tavily import TavilyClient
+        
+        tavily_client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
+        search_result = tavily_client.search(
+            query=query,
+            search_depth="advanced",
+            max_results=5
+        )
+        
+        return search_result
+
+    @judgment.observe(span_type="function")
+    async def ask_user_preferences():
+        """Ask the user a series of questions about their music preferences."""
+        questions = [
+            "What are some of your favorite artists or bands?",
+            "What genres of music do you enjoy the most?",
+            "Do you have any favorite songs currently?",
+            "Are there any moods or themes you're looking for in new music?",
+            "Do you prefer newer releases or classic songs?"
+        ]
+        
+        preferences = {}
+        for question in questions:
+            print(f"\n{question}")
+            answer = input("> ")
+            preferences[question] = answer
+        
+        return preferences
+
+    @judgment.observe(span_type="function")
+    async def search_music_recommendations(preferences):
+        """Search for music recommendations based on user preferences."""
+        # Construct search queries based on preferences
+        search_results = {}
+        
+        # Search for artist recommendations
+        if preferences.get("What are some of your favorite artists or bands?"):
+            artists_query = f"Music similar to {preferences['What are some of your favorite artists or bands?']}"
+            search_results["artist_based"] = await search_tavily(artists_query)
+        
+        # Search for genre recommendations
+        if preferences.get("What genres of music do you enjoy the most?"):
+            genre_query = f"Best {preferences['What genres of music do you enjoy the most?']} songs"
+            search_results["genre_based"] = await search_tavily(genre_query)
+        
+        # Search for mood-based recommendations
+        if preferences.get("Are there any moods or themes you're looking for in new music?"):
+            mood_query = f"""{preferences["Are there any moods or themes you're looking for in new music?"]} music recommendations"""
+            search_results["mood_based"] = await search_tavily(mood_query)
+        
+        return search_results
+
+    @judgment.observe(span_type="function")
+    async def generate_recommendations(preferences, search_results):
+        """Generate personalized music recommendations using the search results."""
+        # Prepare context from search results
+        context = ""
+        for category, results in search_results.items():
+            context += f"\n{category.replace('_', ' ').title()} Search Results:\n"
+            for result in results.get("results", []):
+                context += f"- {result.get('title')}: {result.get('content')[:200]}...\n"
+        
+        # Create a prompt for the LLM
+        prompt = f"""
+        Suggest 5-7 songs they could enjoy. Be creative and suggest whatever feels right. You should only recommend songs that are from the user's favorite artists/bands.
+        For each song, include the artist name, song title, and a brief explanation of why they might like it.
+        
+        User Preferences:
+        {preferences}
+        
+        Search Results:
+        {context}
+        
+        Provide recommendations in a clear, organized format. Focus on specific songs rather than just artists.
+        """
+        
+        # Generate recommendations using OpenAI
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a music recommendation expert with deep knowledge of various genres, artists, and songs. Your goal is to suggest songs that match the user's preferences; recommend songs from their favorite artists/bands."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        
+        recommendations = response.choices[0].message.content
+        
+        # Evaluate the recommendations
+        judgment.get_current_trace().async_evaluate(
+            scorers=[
+                AnswerRelevancyScorer(threshold=1.0),
+                GroundednessScorer(threshold=1.0)
+            ],
+            input=prompt,
+            actual_output=recommendations,
+            retrieval_context=[str(search_results)],
+            model="gpt-4o"
+        )
+        
+        return recommendations
+
+    @judgment.observe(span_type="Main Function")
+    async def music_recommendation_bot():
+        """Main function to run the music recommendation bot."""
+        print("🎵 Welcome to the Music Recommendation Bot! 🎵")
+        print("I'll ask you a few questions to understand your music taste, then suggest some songs you might enjoy.")
+        
+        # Get user preferences
+        preferences = await ask_user_preferences()
+        
+        print("\nSearching for music recommendations based on your preferences...")
+        search_results = await search_music_recommendations(preferences)
+        
+        print("\nGenerating personalized recommendations...")
+        recommendations = await generate_recommendations(preferences, search_results)
+        
+        print("\n🎧 Your Personalized Music Recommendations 🎧")
+        print(recommendations)
+        
+        return recommendations
+
+    if __name__ == "__main__":
+        asyncio.run(music_recommendation_bot())
+        
+    ```
+
+    In this file, the @judgment.observe tags indicate the functions that are part of the trace, and the async evaluate functions show which spans have an evaluation.
+
+    This program asks the user questions about their music preferences. Now say the user inputted these answers for these questions:
+
+    Q: "What are some of your favorite artists or bands?"
+    User Answer: "Mozart and Beethoven"
+
+    Q: "What genres of music do you enjoy the most?"
+    User Answer: "KPop, Rap, Hip Hop"
+            
+    Q: "Do you have any favorite songs currently?"
+    User Answer: "Not Like Us and Pure Water"
+
+    Q: "Are there any moods or themes you're looking for in new music?"
+    User Answer: "vibrant and intense"
+
+    "Do you prefer newer releases or classic songs?"
+    User Answer: "classics of course"
+
+
+    After getting these answers, the program runs, and evaluations are performed for both answer relevancy and groundedness.
+
+    Now you can take a look at the trace analysis using the mcp tool get_trace_analysis. With this tool, you can see that groundedness received a score of 0 because of the following reason:
+
+    The LLM hallucinated by providing recommendations of K-Pop and Rap artists (Itzy, BLACKPINK, BIBI, Sik-K, pH-1) that are not within the user's favorite artists, which are Mozart and Beethoven. Although genre preferences were noted, the explicit requirement to recommend songs only from the favorite artists was not met. 
+
+    Now why did the groundedness receive this score of 0? If we analyze the reason given and look at the prompt in the code, it should make some sense. This is the prompt in the code above:
+
+    ```
+    prompt = f"""
+        Suggest 5-7 songs they could enjoy. Be creative and suggest whatever feels right. You should only recommend songs that are from the user's favorite artists/bands.
+        For each song, include the artist name, song title, and a brief explanation of why they might like it.
+        
+        User Preferences:
+        {preferences}
+        
+        Search Results:
+        {context}
+        
+        Provide recommendations in a clear, organized format. Focus on specific songs rather than just artists.
+        """
+    ```
+
+    In this prompt, we can see that specifically, it says "You should only recommend songs that are from the user's favorite artists/bands". Well, this prompt is pretty clear about making sure the songs are ONLY from the user's favorite artists and bands, but all of the songs recommended based on the trace analysis seem to have been not from the user's favorite artists in this case (Beethoven and Mozart).
+
+    Now, YOUR JOB is to make sure that this groundedness performs better this time. One example of what you can do is modify the prompt to be more clear to the LLM that songs have to be from the user's favorite artists/bands. So you could modify the prompt to be this:
+
+    ```
+    better_prompt = f"""
+    Suggest 5-7 songs they could enjoy. Be creative and suggest whatever feels right. You should only recommend songs that are from the user's favorite artists/bands.
+    For each song, include the artist name, song title, and a brief explanation of why they might like it.
+
+    User Preferences:
+    {preferences}
+
+    Search Results:
+    {context}
+
+    Provide recommendations in a clear, organized format. Focus on specific songs rather than just artists.
+
+    **IMPORTANT**: You should only recommend songs that are from the user's favorite artists/bands. Even if the search results contain other songs by those artists, you should only recommend the ones that are listed in the user's favorite artists/bands. 
+    Try to recommend songs that are similar to the user's favorite songs, but in the context of the user's favorite artists/bands.
+    """
+    ```
+
+    Now after doing the changes, you can (with the user's permission) run the file again. And then, you can ask for the trace analysis once more using the MCP tool. Now, you might see that the groundedness is 1 with the following reason given:
+
+    The LLM provided song recommendations accurately based on the user's stated preferences, focusing on Mozart and Beethoven and aligning with the criteria for vibrant and intense classics. No hallucinations.
+
+    This would mean you did a great job, as the user had successfully improved their code with your optimizations.
+
+    ### Example 2
+
+    Let me walk you through another example.
+
+    Say you have a program with the following code (a travel agent bot):
+
+    ```
+    from uuid import uuid4
+    import openai
+    import os
+    import asyncio
+    from tavily import TavilyClient
+    from dotenv import load_dotenv
+    import chromadb
+    from chromadb.utils import embedding_functions
+
+    from judgeval.tracer import Tracer, wrap
+    from cookbooks.openai_travel_agent.populate_db import destinations_data
+    from cookbooks.openai_travel_agent.tools import search_tavily
+    from judgeval.scorers import AnswerRelevancyScorer, FaithfulnessScorer
+
+
+    client = wrap(openai.Client(api_key=os.getenv("OPENAI_API_KEY")))
+    judgment = Tracer(api_key=os.getenv("JUDGMENT_API_KEY"), project_name="travel_agent_demo")
+
+    def populate_vector_db(collection, destinations_data):
+        """
+        Populate the vector DB with travel information.
+        destinations_data should be a list of dictionaries with 'destination' and 'information' keys
+        """
+        for data in destinations_data:
+            collection.add(
+                documents=[data['information']],
+                metadatas=[{"destination": data['destination']}],
+                ids=[f"destination_{data['destination'].lower().replace(' ', '_')}"]
+            )
+
+    @judgment.observe(span_type="tool")
+    async def get_attractions(destination):
+        """Search for top attractions in the destination."""
+        prompt = f"Best tourist attractions in {destination}"
+        attractions_search = search_tavily(prompt)
+        return attractions_search
+
+    @judgment.observe(span_type="tool")
+    async def get_hotels(destination):
+        """Search for hotels in the destination."""
+        prompt = f"Best hotels in {destination}"
+        hotels_search = search_tavily(prompt)
+        return hotels_search
+
+    @judgment.observe(span_type="tool")
+    async def get_flights(destination):
+        """Search for flights to the destination."""
+        prompt = f"Flights to {destination} from major cities"
+        flights_search = search_tavily(prompt)
+        judgment.async_evaluate(
+            scorers=[AnswerRelevancyScorer(threshold=0.5)],
+            input=prompt,
+            actual_output=str(flights_search["results"]),
+            model="gpt-4o",
+        )
+        return flights_search
+
+    @judgment.observe(span_type="tool")
+    async def get_weather(destination, start_date, end_date):
+        """Search for weather information."""
+        prompt = f"Weather forecast for {destination} from {start_date} to {end_date}"
+        weather_search = search_tavily(prompt)
+        judgment.async_evaluate(
+            scorers=[AnswerRelevancyScorer(threshold=0.5)],
+            input=prompt,
+            actual_output=str(weather_search["results"]),
+            model="gpt-4o",
+        )
+        return weather_search
+
+    def initialize_vector_db():
+        """Initialize ChromaDB with OpenAI embeddings."""
+        client = chromadb.Client()
+        embedding_fn = embedding_functions.OpenAIEmbeddingFunction(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            model_name="text-embedding-3-small"
+        )
+        res = client.get_or_create_collection(
+            "travel_information",
+            embedding_function=embedding_fn
+        )
+        populate_vector_db(res, destinations_data)
+        return res
+
+    @judgment.observe(span_type="retriever")
+    def query_vector_db(collection, destination, k=3):
+        """Query the vector database for existing travel information."""
+        try:
+            results = collection.query(
+                query_texts=[destination],
+                n_results=k
+            )
+            return results['documents'][0] if results['documents'] else []
+        except Exception:
+            return []
+
+    @judgment.observe(span_type="Research")
+    async def research_destination(destination, start_date, end_date):
+        """Gather all necessary travel information for a destination."""
+        # First, check the vector database
+        collection = initialize_vector_db()
+        existing_info = query_vector_db(collection, destination)
+        
+        # Get real-time information from Tavily
+        tavily_data = {
+            "attractions": await get_attractions(destination),
+            "hotels": await get_hotels(destination),
+            "flights": await get_flights(destination),
+            "weather": await get_weather(destination, start_date, end_date)
+        }
+        
+        return {
+            "vector_db_results": existing_info,
+            **tavily_data
+        }
+
+    @judgment.observe(span_type="function")
+    async def create_travel_plan(destination, start_date, end_date, research_data):
+        """Generate a travel itinerary using the researched data."""
+        vector_db_context = "\n".join(research_data['vector_db_results']) if research_data['vector_db_results'] else "No pre-stored information available."
+        
+        prompt = f"""
+        Create a structured travel itinerary for a trip to {destination} from {start_date} to {end_date}.
+        
+        Pre-stored destination information:
+        {vector_db_context}
+        
+        Current travel data:
+        - Attractions: {research_data['attractions']}
+        - Hotels: {research_data['hotels']}
+        - Flights: {research_data['flights']}
+        - Weather: {research_data['weather']}
+        """
+        
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are an expert travel planner. Combine both historical and current information to create the best possible itinerary."},
+                {"role": "user", "content": prompt}
+            ]
+        ).choices[0].message.content
+
+        judgment.async_evaluate(
+            scorers=[FaithfulnessScorer(threshold=0.5)],
+            input=prompt,
+            actual_output=str(response),
+            retrieval_context=[str(vector_db_context), str(research_data)],
+            model="gpt-4o",
+        )
+        
+        return response
+
+    @judgment.observe(span_type="function")
+    async def generate_itinerary(destination, start_date, end_date):
+        """Main function to generate a travel itinerary."""
+        research_data = await research_destination(destination, start_date, end_date)
+        res = await create_travel_plan(destination, start_date, end_date, research_data)
+        return res
+
+
+    if __name__ == "__main__":
+        load_dotenv()
+        destination = input("Enter your travel destination: ")
+        start_date = input("Enter start date (YYYY-MM-DD): ")
+        end_date = input("Enter end date (YYYY-MM-DD): ")
+        itinerary = asyncio.run(generate_itinerary(destination, start_date, end_date))
+        print("\nGenerated Itinerary:\n", itinerary)
+
+    ```
+
+    Let's say the vector_db_context contained attractions, hotels, flights, and weather for each of the major cities.
+
+    In this file, the @judgment.observe tags indicate the functions that are part of the trace, and the async evaluate functions show which spans have an evaluation.
+
+    This program asks the user about where they'd like to travel and for how long (to generate an itinerary):
+
+    Program: "Enter your travel dstination: "
+    Answer: "Tokyo, Japan"
+
+    Program: "Enter start date (YYYY-MM-DD): "
+    Answer: "2025-06-01"
+
+    Program: "Enter end date (YYYY-MM-DD): "
+    Answer: "2025-07-01"
+
+    After getting these answers, the program runs, and evaluations are performed for both answer relevancy and faithfulness.
+
+    Now you can take a look at the trace analysis using the mcp tool get_trace_analysis. With this tool, you can see that faithfulness received a score of 0 because of the following reason:
+
+    The LLM hallucinated by mentioning that you can go and see the Gyeongbokgung Palace, which is in Seoul, not Tokyo. This directly contradicts the retrieval context, which shows that Seoul has the Gyeongbokgung Palace and therefore not Tokyo.
+
+    Now why did the faithfulness receive such a low score? Well, let's look at the prompt:
+    ```
+    prompt = f"""
+        Create a structured travel itinerary for a trip to {destination} from {start_date} to {end_date}.
+        
+        Pre-stored destination information:
+        {vector_db_context}
+        
+        Current travel data:
+        - Attractions: {research_data['attractions']}
+        - Hotels: {research_data['hotels']}
+        - Flights: {research_data['flights']}
+        - Weather: {research_data['weather']}
+        """
+    ```
+
+    Now, YOUR JOB is to make sure that the faithfulness metric performs better this time. One example of what you can do is modify the prompt to be more clear to the LLM that you cannot go to another city in this trip, the full trip must take place in the city provided by the user. So you could modify the prompt to be this:
+
+    ```
+    better_prompt = f"""
+        Create a structured travel itinerary for a trip to {destination} from {start_date} to {end_date}. Ensure that the trip only happens in {destination}.
+        
+        Pre-stored destination information:
+        {vector_db_context}
+        
+        Current travel data:
+        - Attractions: {research_data['attractions']}
+        - Hotels: {research_data['hotels']}
+        - Flights: {research_data['flights']}
+        - Weather: {research_data['weather']}
+        """
+    ```
+
+    Now after doing the changes, you can (with the user's permission) run the file again. And then, you can ask for the trace analysis once more using the MCP tool. Now, you might see that the faithfulness is 1 with the following reason given:
+
+    The score is 1.00 because there are no contradictions. The output is perfectly aligned with the retrieval context, ensuring high factual accuracy. Keep up the great work!
+
+    This would mean you did a great job, as the user had successfully improved their code with your optimizations.
+    ````
+</Accordion>
+
+## Available Tools
+
+Osiris Agent provides the following tools for analyzing and optimizing your LLM applications:
+
+### Analysis Tools
+
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `get_experiment_analysis` | Retrieves analysis for a specific experiment | `project_name`, `eval_name` |
+| `get_trace_analysis` | Retrieves analysis for a specific trace | `trace_id` |
+| `get_experiment_analysis_project` | Retrieves analysis for multiple experiments in a project | `project_name`, `num_exps` (default: "10") |
+| `get_trace_analysis_project` | Retrieves analysis for multiple traces in a project | `project_name`, `num_traces` (default: "10") |
+
+### Evaluation Tool
+
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `run_evaluation` | Executes an evaluation directly through Osiris Agent | `project_name`, `evaluation_run` |
+
+The `evaluation_run` parameter accepts a comprehensive configuration object that can include:
+- Examples with input/output pairs
+- Scorer configurations
+- Model specifications
+- Logging preferences
+
+This tool enables rapid experimentation with different evaluation configurations without modifying your application code.
+
+## Learning Resources
+
+### Video Tutorials
+
+To help you get started with Osiris Agent, we've created a series of video tutorials that demonstrate key concepts and practical implementations:
+
+| Topic | Description | Duration |
+|-------|-------------|----------|
+| [Getting Started with Osiris](https://www.youtube.com/watch?v=neSDEho9RqI) | Learn the basics of setting up and configuring Osiris Agent for your first project | 7 min |
+
+

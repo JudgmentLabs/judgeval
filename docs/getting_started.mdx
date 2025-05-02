@@ -196,6 +196,40 @@ There are many benefits of monitoring your LLM systems with `judgeval` tracing, 
 To learn more about `judgeval`'s tracing module, click [here](/tracing/introduction).
 </Tip>
 
+## Automatic Deep Tracing
+
+Judgeval supports automatic deep tracing, which significantly reduces the amount of instrumentation needed in your code. With deep tracing enabled (which is the default), you only need to observe top-level functions, and all nested function calls will be automatically traced.
+
+<CodeGroup>
+```Python Python
+from judgeval.tracer import Tracer, wrap
+from openai import OpenAI
+
+client = wrap(OpenAI())
+judgment = Tracer(project_name="my_project")
+
+# Define a function that will be automatically traced when called from main
+def helper_function():
+    return "This will be traced automatically"
+
+# Only need to observe the top-level function
+@judgment.observe(span_type="function")
+def main():
+    # helper_function will be automatically traced without @observe
+    result = helper_function()
+    res = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": result}]
+    )
+    return res.choices[0].message.content
+
+main()
+```
+</CodeGroup>
+
+To disable deep tracing, initialize the tracer with `deep_tracing=False`. You can still name and declare span types for each function using jdugement.observe().
+
+
 # Create Your First Online Evaluation
 
 In addition to tracing, `judgeval` allows you to run online evaluations on your LLM systems. This enables you to:
@@ -225,11 +259,14 @@ def main():
         messages=[{"role": "user", "content": f"{task_input}"}]
     ).choices[0].message.content
 
+    example = Example(
+        input=task_input,
+        actual_output=res
+    )
     # In Python, this likely operates on the implicit trace context
     judgment.async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
-        input=task_input,
-        actual_output=res,
+        example=example,
         model="gpt-4o"
     )
 

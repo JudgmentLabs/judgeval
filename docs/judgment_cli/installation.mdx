@@ -1,0 +1,91 @@
+---
+title: Introduction
+---
+
+The Judgment CLI is a command-line tool that allows you to manage your Judgment resources and backend infrastructure.
+
+## Installation
+
+<Warning>
+Make sure you have Python installed on your system before proceeding with the installation.
+</Warning>
+
+To install the Judgment CLI, follow these steps:
+
+1. Clone the repository:
+```bash
+git clone https://github.com/JudgmentLabs/judgment-cli.git
+```
+
+2. Navigate to the project directory:
+```bash
+cd judgment-cli
+```
+
+3. Set up a fresh Python virtual environment:
+
+Choose one of the following methods to set up your virtual environment:
+
+<CodeGroup>
+```bash Built-In
+python -m venv venv
+source venv/bin/activate  # On Windows, use: venv\Scripts\activate
+```
+
+```bash pipenv
+pipenv shell
+```
+
+```bash uv
+uv venv
+source .venv/bin/activate  # On Windows, use: .venv\Scripts\activate
+```
+
+</CodeGroup>
+
+3. Install the package:
+
+<CodeGroup>
+```bash Built-In
+pip install -e .
+```
+
+```bash pipenv
+pipenv install -e .
+```
+
+```bash uv
+uv pip install -e .
+```
+
+</CodeGroup>
+
+## Verifying the Installation
+
+To verify that the CLI was installed correctly, run:
+```bash
+judgment --help
+```
+
+You should see a list of available commands and their descriptions.
+
+## Available Commands
+
+The Judgment CLI provides the following commands:
+
+### Self-Hosting Commands
+
+| Command | Description |
+|---------|-------------|
+| `judgment self-host main` | Deploy a self-hosted instance of Judgment (and optionally set up the HTTPS listener) |
+| `judgment self-host https-listener` | Set up the HTTPS listener for a self-hosted Judgment instance |
+
+<Note>
+For detailed information about each command, refer to their respective documentation pages in this section.
+</Note>
+
+## Next Steps
+
+After installing the CLI, you can:
+- Learn about setting up a [self-hosted Judgment instance through the CLI](/judgment_cli/self-hosting)
+- Follow our [Getting Started with Self-Hosting](/self_hosting/get_started) guide

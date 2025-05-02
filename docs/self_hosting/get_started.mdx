@@ -1,0 +1,73 @@
+---
+title: Getting Started with Self-Hosting
+---
+
+Self-hosting Judgment Labs' platform is a great way to have full control over your LLM evaluation infrastructure. Instead of using our hosted platform, you can deploy your own instance of Judgment Labs' platform.
+
+## Part 1: Infrastructure Skeleton Setup
+
+Please have the following infrastructure set up:
+1. A new/empty [AWS account](http://console.aws.amazon.com/) that you have admin access to: this will be used to host the self-hosted Judgment instance. Please note down the account ID.
+2. A [Supabase](https://supabase.com/) organization that you have admin access to: this will be used to store and retrieve data for the self-hosted Judgment instance.
+3. An available email address and the corresponding *app password* (see note below) for the email address (e.g. no-reply@organization.com). This email address will be used to send email invitations to users on the self-hosted instance.
+<Note>
+    Your app password is not your normal email password; learn about app passwords for [Gmail](https://support.google.com/mail/answer/185833?hl=en), [Outlook](https://support.microsoft.com/en-us/account-billing/how-to-get-and-use-app-passwords-5896ed9b-4263-e681-128a-a6f2979a7944), [Yahoo](https://help.yahoo.com/kb/SLN15241.html), [Zoho](https://help.zoho.com/portal/en/kb/bigin/channels/email/articles/generate-an-app-specific-password#What_is_TFA_Two_factor_Authentication), or [Fastmail](https://www.fastmail.help/hc/en-us/articles/360058752854-App-passwords)
+</Note>
+
+<Note>
+Make sure to keep your AWS account ID and Supabase organization details secure and easily accessible, as you'll need them for the setup process.
+</Note>
+
+## Part 2: Request Self-Hosting Access from Judgment Labs
+
+Please contact us at [support@judgmentlabs.ai](mailto:support@judgmentlabs.ai) with the following information:
+
+- The name of your organization
+- An image of your organization's logo
+- [Optional] A subtitle for your organization
+- Domain name for your self-hosted instance (e.g. api.organization.com) (can be any domain/subdomain name you own; this domain will be linked to your self-hosted instance as part of the setup process)
+- The AWS account ID from Part 1
+- Purpose of self-hosting
+
+<Warning>
+The domain name you provide must be one that you own and have control over, as you'll need to add DNS records during the setup process.
+</Warning>
+
+We will review your email request ASAP. Once approved, we will do the following:
+1. Whitelist your AWS account ID to allow access to our Judgment ECR images.
+2. Email you back with a backend Osiris API key that will be input as part of the setup process using the Judgment CLI (Part 3).
+
+## Part 3: Setting Up Your Self-Hosted Environment
+
+<Warning>
+Make sure the Judgment CLI is installed before proceeding. Please refer to [Installation](/judgment_cli/installation) for more information.
+</Warning>
+For detailed instructions on setting up your self-hosted environment, please refer to the [self-hosting page](../judgment_cli/self-hosting) in the CLI section. This guide will walk you through the prerequisites, deployment process, and HTTPS listener setup for your self-hosted instance.
+
+## Part 4: Accessing Your Self-Hosted Environment
+
+<Note>
+Your self-hosted Judgment API URL (referenced as `self_hosted_judgment_api_url` in this section) should be in the format `https://{self_hosted_judgment_domain}` (e.g. `https://api.organization.com`).
+</Note>
+### From the Judgeval SDK
+You can access your self-hosted instance by setting the following environment variables:
+
+```
+JUDGMENT_API_URL = "self_hosted_judgment_api_url"
+JUDGMENT_API_KEY = "your_api_key"
+JUDGMENT_ORG_ID = "your_org_id"
+```
+
+Afterwards, Judgeval can be used as you normally would.
+
+### From the Judgment platform website
+Visit the url `https://app.judgmentlabs.ai/login?api_url={self_hosted_judgment_api_url}` to login to your self-hosted instance. Your self-hosted Judgment API URL will be whitelisted when we review your request from Part 2.
+
+You should be able to log in with the root user you configured during the setup process (`--root-judgment-email` and `--root-judgment-password` from the `self-host main` command). 
+
+#### Adding more users to the self-hosted instance
+<Note>
+    For security reasons, users cannot register themselves on the self-hosted instance. Instead, you can add new users via email invitations to organizations.
+</Note>
+
+To add a new user, make sure you're currently in the workspace/organization you want to add the new user to. Then, visit the [workspace member settings](https://app.judgmentlabs.ai/app/settings/members) and click the "Invite User" button. This process will send an email invitation to the new user to join the organization.

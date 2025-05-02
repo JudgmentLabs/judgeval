@@ -16,7 +16,7 @@ classifiers = [
 license = "Apache-2.0"
 license-files = ["LICENSE.md"]
 dependencies = [
-    "litellm",
+    "litellm==1.38.12",
     "python-dotenv==1.0.1",
     "fastapi",
     "uvicorn",
@@ -34,6 +34,7 @@ dependencies = [
     "langchain-openai",
     "langchain-anthropic",
     "langchain-core",
+    "google-genai"
 ]
 
 [project.optional-dependencies]
