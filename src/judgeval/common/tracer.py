@@ -864,18 +864,42 @@ class TraceClient:
                     completion_tokens = usage.get("completion_tokens", 0)
                     total_prompt_tokens += prompt_tokens
                     total_completion_tokens += completion_tokens
-                # Handle Anthropic format
+                # Handle Anthropic format - MAP values to standard keys
                 elif "input_tokens" in usage:
-                    prompt_tokens = usage.get("input_tokens", 0)
-                    completion_tokens = usage.get("output_tokens", 0)
-                    total_prompt_tokens += prompt_tokens
-                    total_completion_tokens += completion_tokens
-                
+                    prompt_tokens = usage.get("input_tokens", 0)       # Get value from input_tokens
+                    completion_tokens = usage.get("output_tokens", 0)    # Get value from output_tokens
+                    total_prompt_tokens += prompt_tokens             # Aggregate using standard var name
+                    total_completion_tokens += completion_tokens      # Aggregate using standard var name
+                    # *** Overwrite the usage dict in the entry to use standard keys ***
+                    original_total = usage.get("total_tokens", 0)
+                    original_total_cost = usage.get("total_cost_usd", 0.0) # Preserve if already calculated
+                    # Recalculate cost just in case it wasn't done correctly before
+                    temp_prompt_cost, temp_completion_cost = 0.0, 0.0
+                    if model_name:
+                        try:
+                           temp_prompt_cost, temp_completion_cost = cost_per_token(
+                                model=model_name,
+                                prompt_tokens=prompt_tokens,
+                                completion_tokens=completion_tokens
+                           )
+                        except Exception:
+                           pass # Ignore cost calculation errors here, focus on keys
+                    # Replace the usage dict with one using standard keys but Anthropic values
+                    output["usage"] = {
+                        "prompt_tokens": prompt_tokens,
+                        "completion_tokens": completion_tokens,
+                        "total_tokens": original_total,
+                        "prompt_tokens_cost_usd": temp_prompt_cost, # Use standard cost key
+                        "completion_tokens_cost_usd": temp_completion_cost, # Use standard cost key
+                        "total_cost_usd": original_total_cost if original_total_cost > 0 else (temp_prompt_cost + temp_completion_cost)
+                    }
+                    # Update the local 'usage' variable to reflect the change for the cost calculation below
+                    usage = output["usage"]
                 total_tokens += usage.get("total_tokens", 0)
-                
-                # Calculate costs if model name is available
+                # Calculate costs if model name is available and ensure they are stored with standard keys
                 if model_name:
                     try:
+                        # Recalculate costs based on potentially mapped tokens
                         prompt_cost, completion_cost = cost_per_token(
                             model=model_name, 
                             prompt_tokens=prompt_tokens, 
@@ -885,7 +909,7 @@ class TraceClient:
                         total_completion_tokens_cost += completion_cost
                         total_cost += prompt_cost + completion_cost
                         
-                        # Add cost information directly to the usage dictionary in the condensed entry
+                        # Add/Update cost information using standard keys
                         if "usage" not in output:
                             output["usage"] = {}
                         output["usage"]["prompt_tokens_cost_usd"] = prompt_cost
@@ -896,7 +920,7 @@ class TraceClient:
                         print(f"Error calculating cost for model '{model_name}': {str(e)}")
                         pass
 
-        # Create trace document
+        # Create trace document - Always use standard keys for top-level counts
         trace_data = {
             "trace_id": self.trace_id,
             "name": self.name,
@@ -920,7 +944,7 @@ class TraceClient:
         # --- Log trace data before saving ---
         try:
             rprint(f"[TraceClient.save] Saving trace data for trace_id {self.trace_id}:")
-            rprint(json.dumps(trace_data, indent=2))
+            # rprint(json.dumps(trace_data, indent=2)) # Optional: Disable detailed logging if too verbose
         except Exception as log_e:
             rprint(f"[TraceClient.save] Error logging trace data: {log_e}")
         # --- End logging ---
