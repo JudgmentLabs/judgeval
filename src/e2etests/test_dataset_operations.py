@@ -8,7 +8,7 @@ import random
 import string
 
 from judgeval.judgment_client import JudgmentClient
-from judgeval.data import Example
+from judgeval.data import Example, Sequence
 
 @pytest.fixture(scope="module", autouse=True)
 def setup_and_teardown_module(client: JudgmentClient):
@@ -37,6 +37,26 @@ class TestDatasetOperations:
         assert dataset, "Failed to pull dataset"
 
         client.delete_dataset(alias="test_dataset_5", project_name=project_name)
+
+    def test_dataset_with_sequence(self, client: JudgmentClient, project_name: str):
+        """Test dataset creation and manipulation with a sequence."""
+        dataset = client.create_dataset()
+        examples = [Example(input="input 1", actual_output="output 1"), Example(input="input 2", actual_output="output 2"), Example(input="input 3", actual_output="output 3")]
+        sequence = Sequence(
+            name="test_sequence",
+            items=examples
+        )
+        dataset.add_sequence(sequence)
+        client.push_dataset(alias="test_dataset_with_sequence", dataset=dataset, project_name=project_name, overwrite=True)
+
+        dataset = client.pull_dataset(alias="test_dataset_with_sequence", project_name=project_name)
+        assert dataset.sequences, "Failed to pull dataset"
+        assert len(dataset.sequences) == 1, "Dataset should have 1 sequence"
+        sequence = dataset.sequences[0]
+        assert sequence.name == "test_sequence", "Sequence should have the correct name"
+        assert len(sequence.items) == 3, "Sequence should have 3 items"
+        
+        client.delete_dataset(alias="test_dataset_with_sequence", project_name=project_name)
 
     def test_pull_all_project_dataset_stats(self, client: JudgmentClient, project_name: str):
         """Test pulling statistics for all project datasets."""

@@ -58,6 +58,8 @@ class EvalDatasetClient:
                     "dataset_alias": alias,
                     "project_name": project_name,
                     "examples": [e.to_dict() for e in dataset.examples],
+                    "sequences": [s.model_dump() for s in dataset.sequences],
+                    "is_sequence": len(dataset.sequences) > 0,
                     "overwrite": overwrite,
                 }
             try:

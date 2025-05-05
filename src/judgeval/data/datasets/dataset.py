@@ -224,6 +224,9 @@ class EvalDataset:
         self.examples = self.examples + [e]
         # TODO if we need to add rank, then we need to do it here
     
+    def add_sequence(self, s: Sequence) -> None:
+        self.sequences = self.sequences + [s]
+    
     def save_as(self, file_type: Literal["json", "csv", "yaml"], dir_path: str, save_name: str = None) -> None:
         """
         Saves the dataset as a file. Save only the examples.
