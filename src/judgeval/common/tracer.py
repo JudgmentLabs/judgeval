@@ -839,15 +839,6 @@ class TraceClient:
         
         condensed_entries, evaluation_runs = self.condense_trace(raw_entries)
 
-        # Calculate total token counts from LLM API calls
-        total_prompt_tokens = 0
-        total_completion_tokens = 0
-        total_tokens = 0
-        
-        total_prompt_tokens_cost = 0.0
-        total_completion_tokens_cost = 0.0
-        total_cost = 0.0
-        
         # Only count tokens for actual LLM API call spans
         llm_span_names = {"OPENAI_API_CALL", "TOGETHER_API_CALL", "ANTHROPIC_API_CALL", "GOOGLE_API_CALL"}
         for entry in condensed_entries:
@@ -862,14 +853,11 @@ class TraceClient:
                 if "prompt_tokens" in usage:
                     prompt_tokens = usage.get("prompt_tokens", 0)
                     completion_tokens = usage.get("completion_tokens", 0)
-                    total_prompt_tokens += prompt_tokens
-                    total_completion_tokens += completion_tokens
                 # Handle Anthropic format - MAP values to standard keys
                 elif "input_tokens" in usage:
                     prompt_tokens = usage.get("input_tokens", 0)       # Get value from input_tokens
                     completion_tokens = usage.get("output_tokens", 0)    # Get value from output_tokens
-                    total_prompt_tokens += prompt_tokens             # Aggregate using standard var name
-                    total_completion_tokens += completion_tokens      # Aggregate using standard var name
+
                     # *** Overwrite the usage dict in the entry to use standard keys ***
                     original_total = usage.get("total_tokens", 0)
                     original_total_cost = usage.get("total_cost_usd", 0.0) # Preserve if already calculated
@@ -893,10 +881,13 @@ class TraceClient:
                         "completion_tokens_cost_usd": temp_completion_cost, # Use standard cost key
                         "total_cost_usd": original_total_cost if original_total_cost > 0 else (temp_prompt_cost + temp_completion_cost)
                     }
-                    # Update the local 'usage' variable to reflect the change for the cost calculation below
                     usage = output["usage"]
-                total_tokens += usage.get("total_tokens", 0)
+
                 # Calculate costs if model name is available and ensure they are stored with standard keys
+                prompt_tokens = usage.get("prompt_tokens", 0)
+                completion_tokens = usage.get("completion_tokens", 0)
+                
+                # Calculate costs if model name is available
                 if model_name:
                     try:
                         # Recalculate costs based on potentially mapped tokens
@@ -905,9 +896,6 @@ class TraceClient:
                             prompt_tokens=prompt_tokens, 
                             completion_tokens=completion_tokens
                         )
-                        total_prompt_tokens_cost += prompt_cost
-                        total_completion_tokens_cost += completion_cost
-                        total_cost += prompt_cost + completion_cost
                         
                         # Add/Update cost information using standard keys
                         if "usage" not in output:
@@ -927,14 +915,6 @@ class TraceClient:
             "project_name": self.project_name,
             "created_at": datetime.utcfromtimestamp(self.start_time).isoformat(),
             "duration": total_duration,
-            "token_counts": {
-                "prompt_tokens": total_prompt_tokens,
-                "completion_tokens": total_completion_tokens,
-                "total_tokens": total_tokens,
-                "prompt_tokens_cost_usd": total_prompt_tokens_cost,
-                "completion_tokens_cost_usd": total_completion_tokens_cost,
-                "total_cost_usd": total_cost
-            },
             "entries": condensed_entries,
             "evaluation_runs": evaluation_runs,
             "overwrite": overwrite,
@@ -1613,8 +1593,8 @@ def _format_output_data(client: ApiClient, response: Any) -> dict:
     return {
         "content": response.content[0].text,
         "usage": {
-            "input_tokens": response.usage.input_tokens,
-            "output_tokens": response.usage.output_tokens,
+            "prompt_tokens": response.usage.input_tokens,
+            "completion_tokens": response.usage.output_tokens,
             "total_tokens": response.usage.input_tokens + response.usage.output_tokens
         }
     }
@@ -1904,8 +1884,8 @@ async def _async_stream_wrapper(
         anthropic_final_usage = None
         if isinstance(client, (AsyncAnthropic, Anthropic)) and (anthropic_input_tokens > 0 or anthropic_output_tokens > 0):
              anthropic_final_usage = {
-                 "input_tokens": anthropic_input_tokens,
-                 "output_tokens": anthropic_output_tokens,
+                 "prompt_tokens": anthropic_input_tokens,
+                 "completion_tokens": anthropic_output_tokens,
                  "total_tokens": anthropic_input_tokens + anthropic_output_tokens
              }
 

@@ -70,8 +70,8 @@ class TestEvalOperations:
 
         self.run_eval_helper(client, PROJECT_NAME, EVAL_RUN_NAME)
         results = client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
+        results = results['examples']
         assert results, f"No evaluation results found for {EVAL_RUN_NAME}"
-
         assert len(results) == 2
 
         example1 = Example(
@@ -92,10 +92,10 @@ class TestEvalOperations:
         )
 
         results = client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
-        print(results)
         assert results, f"No evaluation results found for {EVAL_RUN_NAME}"
-
+        results = results['examples']
         assert len(results) == 3
+        assert results[0]["scorer_data"][0]["score"] == 1.0
         client.delete_project(project_name=PROJECT_NAME)
 
     def test_delete_eval_by_project_and_run_names(self, client: JudgmentClient):

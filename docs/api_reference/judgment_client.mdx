@@ -31,6 +31,8 @@ const client = JudgmentClient.getInstance();
 
 ## Running an Evaluation
 
+### Example Level
+
 The `client.run_evaluation` (Python) or `client.evaluate` (Typescript) method is the primary method for executing evaluations.
 
 <CodeGroup>
@@ -99,3 +101,47 @@ In Judgment, **projects** are used to organize workflows, while **evaluation run
 are used to group versions of a workflow for comparative analysis of evaluations. 
 As a result, you can think of projects as folders, and evaluation runs as sub-folders that contain evaluation results.
 </Tip>
+
+
+### Sequence Level
+
+The `client.run_sequence_evaluation` (Python) or `client.evaluateSequence` (Typescript) method is the primary method for executing sequence evaluations.
+
+<CodeGroup>
+```Python Python
+from judgeval import JudgmentClient
+from judgeval.data import Example, Sequence
+from judgeval.scorers import DerailmentScorer
+
+client = JudgmentClient()
+
+airlines_example = Example(
+    input="Which airlines fly to Paris?",
+    actual_output="Air France, Delta, and American Airlines offer direct flights."
+)
+airline_followup = Example(
+    input="Which airline is the best for a family of 4?",
+    actual_output="Delta is the best airline for a family of 4."
+)
+weather_example = Example(
+    input="What is the weather like in Texas?",
+    actual_output="It's sunny with a high of 75°F in Texas."
+)
+airline_sequence = Sequence(
+    name="Flight Details",
+    items=[airlines_example, airline_followup, weather_example]
+)
+
+results = client.run_sequence_evaluation(
+    sequences=[airline_sequence],
+    scorers=[DerailmentScorer(threshold=0.5)],
+    model="gpt-4o",
+    log_results=True,
+    override=True,
+)
+```
+</CodeGroup>
+
+The `run_sequence_evaluation` (Python) / `evaluateSequence` (Typescript) method accepts the same arguments as the `run_evaluation` (Python) / `evaluate` (Typescript) method, with the following changes to the arguments:
+
+- `sequences`: A list/array of [Sequence](/evaluation/data_examples) objects to evaluate (instead of 'examples')

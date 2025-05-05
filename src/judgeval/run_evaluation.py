@@ -198,6 +198,40 @@ def check_missing_scorer_data(results: List[ScoringResult]) -> List[ScoringResul
             )
     return results
 
+def check_experiment_type(eval_name: str, project_name: str, judgment_api_key: str, organization_id: str, is_sequence: bool) -> None:
+    """
+    Checks if the current experiment, if one exists, has the same type (examples of sequences)
+    """
+    try:
+        response = requests.post(
+            f"{ROOT_API}/check_experiment_type/",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {judgment_api_key}",
+                "X-Organization-Id": organization_id
+            },
+            json={
+                "eval_name": eval_name,
+                "project_name": project_name,
+                "judgment_api_key": judgment_api_key,
+                "is_sequence": is_sequence
+            },
+            verify=True
+        )
+        
+        if response.status_code == 422:
+            error(f"{response.json()}")
+            raise ValueError(f"{response.json()}")
+        
+        if not response.ok:
+            response_data = response.json()
+            error_message = response_data.get('detail', 'An unknown error occurred.')
+            error(f"Error checking eval run name: {error_message}")
+            raise JudgmentAPIError(error_message)
+            
+    except requests.exceptions.RequestException as e:
+        error(f"Failed to check if experiment type exists: {str(e)}")
+        raise JudgmentAPIError(f"Failed to check if experiment type exists: {str(e)}")
 
 def check_eval_run_name_exists(eval_name: str, project_name: str, judgment_api_key: str, organization_id: str) -> None:
     """
@@ -264,7 +298,7 @@ def log_evaluation_results(merged_results: List[ScoringResult], run: Union[Evalu
                 "X-Organization-Id": run.organization_id
             },
             json={
-                "results": [result.model_dump(warnings=False) for result in merged_results],
+                "results": merged_results,
                 "run": run.model_dump(warnings=False)
             },
             verify=True
@@ -341,6 +375,17 @@ def run_sequence_eval(sequence_run: SequenceRun, override: bool = False, ignore_
             sequence_run.organization_id
         )
 
+    if sequence_run.append:
+        # Check that the current experiment, if one exists, has the same type (examples of sequences)
+        check_experiment_type(
+            sequence_run.eval_name,
+            sequence_run.project_name,
+            sequence_run.judgment_api_key,
+            sequence_run.organization_id,
+            True
+        )
+    
+
     # Execute evaluation using Judgment API
     info("Starting API evaluation")
     try:  # execute an EvaluationRun with just JudgmentScorers
@@ -356,13 +401,9 @@ def run_sequence_eval(sequence_run: SequenceRun, override: bool = False, ignore_
     
     # Convert the response data to `ScoringResult` objects
     debug("Processing API results")
-    api_results = []
-    for result in response_data["results"]:
-        api_results.append(ScoringResult(**result))
-        
     # TODO: allow for custom scorer on sequences
     if sequence_run.log_results:
-        pretty_str = run_with_spinner("Logging Results: ", log_evaluation_results, api_results, sequence_run)
+        pretty_str = run_with_spinner("Logging Results: ", log_evaluation_results, response_data["results"], sequence_run)
         rprint(pretty_str)
     
     
@@ -399,6 +440,16 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_error
             evaluation_run.project_name,
             evaluation_run.judgment_api_key,
             evaluation_run.organization_id
+        )
+    
+    if evaluation_run.append:
+        # Check that the current experiment, if one exists, has the same type (examples of sequences)
+        check_experiment_type(
+            evaluation_run.eval_name,
+            evaluation_run.project_name,
+            evaluation_run.judgment_api_key,
+            evaluation_run.organization_id,
+            False
         )
     
     # Set example IDs if not already set
@@ -536,7 +587,8 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_error
         #     )
         # print(merged_results)
         if evaluation_run.log_results:
-            pretty_str = run_with_spinner("Logging Results: ", log_evaluation_results, merged_results, evaluation_run)
+            send_results = [result.model_dump(warnings=False) for result in merged_results]
+            pretty_str = run_with_spinner("Logging Results: ", log_evaluation_results, send_results, evaluation_run)
             rprint(pretty_str)
 
         for i, result in enumerate(merged_results):
