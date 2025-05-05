@@ -957,7 +957,10 @@ async def test_token_counting():
         print(f"Trace saved with ID: {trace_id}")
     
     # Assertions block correctly dedented
-    if 'trace_data' in locals() and trace_data:
+if 'trace_data' not in locals() or not trace_data:
+    pytest.fail("trace_data was not generated, cannot perform assertions.")
+# Assertions block correctly dedented
+if 'trace_data' in locals() and trace_data:
         assert trace_data is not None
         assert "entries" in trace_data
         assert "token_counts" in trace_data
