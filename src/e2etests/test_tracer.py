@@ -325,11 +325,28 @@ async def test_evaluation_mixed(test_input):
                 output = entry["output"]
                 usage = output.get("usage", {})
                 if usage and "info" not in usage: # Check if it's actual usage data
-                    # Assume usage keys are already normalized to prompt_tokens, completion_tokens, total_tokens
-                    # by the wrap() function before being recorded.
-                    prompt_tokens = usage.get("prompt_tokens", 0)
-                    completion_tokens = usage.get("completion_tokens", 0)
-                    entry_total = usage.get("total_tokens", 0)
+                    # Correctly handle different key names from different providers
+                    prompt_tokens = 0
+                    completion_tokens = 0
+                    entry_total = 0
+
+                    if "prompt_tokens" in usage: # OpenAI, Together, etc.
+                        prompt_tokens = usage.get("prompt_tokens", 0)
+                        completion_tokens = usage.get("completion_tokens", 0)
+                        entry_total = usage.get("total_tokens", 0)
+                    elif "input_tokens" in usage: # Anthropic
+                        prompt_tokens = usage.get("input_tokens", 0)
+                        completion_tokens = usage.get("output_tokens", 0)
+                        # Anthropic usage dict in trace might already have total_tokens calculated by _format_output_data
+                        entry_total = usage.get("total_tokens", prompt_tokens + completion_tokens)
+                    # Add elif for Google if needed, assuming it also uses prompt/completion keys after formatting
+                    elif "usage_metadata" in output: # Check for Google format if keys aren't standard
+                         # This case might be redundant if _format_output_data already normalized keys
+                         # but adding defensively
+                         metadata = output.get("usage_metadata", {})
+                         prompt_tokens = metadata.get("prompt_token_count", 0)
+                         completion_tokens = metadata.get("candidates_token_count", 0)
+                         entry_total = metadata.get("total_token_count", 0)
 
                     # Accumulate separately
                     manual_prompt_tokens += prompt_tokens
@@ -349,10 +366,9 @@ async def test_evaluation_mixed(test_input):
              assert manual_prompt_tokens > 0, "Prompt tokens should be counted"
              assert manual_completion_tokens > 0, "Completion tokens should be counted"
              assert manual_total_tokens > 0, "Total tokens should be counted"
-             # REMOVED: Strict check between accumulated totals, as APIs might not guarantee total == prompt + completion.
-             # The fact that we accumulated values > 0 verifies the accumulation logic itself.
-             # assert manual_total_tokens == (manual_prompt_tokens + manual_completion_tokens), "Total tokens should equal prompt + completion"
-             print(f"Verification: Accumulation counts > 0 passed. (Note: manual_total [{manual_total_tokens}] vs prompt+completion [{manual_prompt_tokens + manual_completion_tokens}])")
+             # Reinstate the strict check now that manual calculation handles key differences
+             assert manual_total_tokens == (manual_prompt_tokens + manual_completion_tokens), "Total tokens should equal prompt + completion"
+             # REMOVED: print(f"Verification: Accumulation counts > 0 passed. (Note: manual_total [{manual_total_tokens}] vs prompt+completion [{manual_prompt_tokens + manual_completion_tokens}])")
         else:
              print("Warning: No LLM spans with usage found in condensed entries, skipping count assertions.")
 
