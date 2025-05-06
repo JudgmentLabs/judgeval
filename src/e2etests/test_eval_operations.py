@@ -187,7 +187,8 @@ class TestEvalOperations:
             model="Qwen/Qwen2.5-72B-Instruct-Turbo",
             metadata={"batch": "test"},
             project_name="test_project",
-            eval_run_name="test_eval_run"
+            eval_run_name="test_eval_run",
+            override=True
         )
         assert res, "Dataset evaluation failed"
 
