@@ -49,6 +49,14 @@ def client() -> JudgmentClient:
     client.delete_project(project_name="OutreachWorkflow")
     client.delete_project(project_name="test-langgraph-project")
     client.delete_project(project_name="test-trace-judgee-project")
+    client.delete_project(project_name="TestTogetherStreamUsage")
+    client.delete_project(project_name="TestAnthropicStreamUsage")
+    client.delete_project(project_name="TestTokenAggregation")
+    client.delete_project(project_name="TestAsyncStreamUsage")
+    client.delete_project(project_name="TestSyncStreamUsage")
+    client.delete_project(project_name="DeepTracingTest")
+    client.delete_project(project_name="ResponseAPITest")
+    client.delete_project(project_name="TestingPoemBotAsync")
 
 
 @pytest.fixture
