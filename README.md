@@ -61,10 +61,6 @@ Create a file named `traces.py` with the following code:
     client = wrap(OpenAI())
     judgment = Tracer(project_name="my_project")
 
-    judgment = Tracer(
-        project_name="my_project"
-    )
-
     @judgment.observe(span_type="tool")
     def my_tool():
         return "Hello world!"
