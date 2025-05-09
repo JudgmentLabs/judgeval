@@ -1,117 +1,190 @@
-# Judgeval SDK
+<div align="center"><b><a href="README.md">English</a>
+<h1 align="center" style="border-bottom: none">
+    <div>
+        <a href="https://www.judgmentlabs.ai/"><picture>
+            <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
+            <source media="(prefers-color-scheme: light)" srcset="assets/logo-light.svg">
+            <img alt="Judgment Logo" src="assets/logo-light.svg" width="200" />
+        </picture></a>
+        <br>
+        Judgment
+    </div>
+    Open-source framework for building evaluation pipelines for multi-step agent workflows<br>
+</h1>
 
-Judgeval is an open-source framework for building evaluation pipelines for multi-step agent workflows, supporting both real-time and experimental evaluation setups. To learn more about Judgment or sign up for free, visit our [website](https://www.judgmentlabs.ai/) or check out our [developer docs](https://judgment.mintlify.app/getting_started).
+<p align="center">
+Judgment supports both real-time and experimental evaluation setups, helping you build LLM systems that run better with comprehensive tracing, evaluations, and monitoring.
+</p>
 
-## Features
+<div align="center">
 
-- **Development and Production Evaluation Layer**: Offers a robust evaluation layer for multi-step agent applications, including unit-testing and performance monitoring.
-- **Plug-and-Evaluate**: Integrate LLM systems with 10+ research-backed metrics, including:
-  - Hallucination detection
-  - RAG retriever quality
-  - And more
-- **Custom Evaluation Pipelines**: Construct powerful custom evaluation pipelines tailored for your LLM systems.
-- **Monitoring in Production**: Utilize state-of-the-art real-time evaluation foundation models to monitor LLM systems effectively.
+[![Python SDK](https://img.shields.io/pypi/v/judgeval)](https://pypi.org/project/judgeval/)
+<!-- TODO: Replace with Judgeval's actual license badge URL -->
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](https://github.com/YOUR_ORG/judgeval/blob/main/LICENSE)
+<!-- TODO: Replace with Judgeval's actual build status badge URL -->
+[![Build](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/YOUR_ORG/judgeval/actions)
+<a target="_blank" href="https://judgment.mintlify.app/getting_started">
+  <!-- <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open Quickstart In Colab"/> -->
+</a>
 
-## Installation
+</div>
 
-   ```bash
-   pip install judgeval
-   ```
+<p align="center">
+    <a href="https://www.judgmentlabs.ai/"><b>Website</b></a>
+    <a href="https://x.com/JudgmentLabs"><b>Twitter/X</b></a> •
+    <a href="https://www.linkedin.com/company/judgmentlabs"><b>LinkedIn<b></a>
+    <a href="https://judgment.mintlify.app/getting_started"><b>Documentation</b></a> •
+    <a href="https://www.youtube.com/@AlexShan-j3o"><b>Demos</b></a>
+</p>
 
-## Quickstart: Evaluations
 
+## 🚀 What is Judgment?
+
+Judgment is an open-source framework for building evaluation pipelines for multi-step agent workflows, supporting both real-time and experimental evaluation setups.
+
+<br>
+
+You can use Judgment for:
+* **Development and Production Evaluation Layer**:
+  * Offers a robust evaluation layer for multi-step agent applications.
+  * Includes unit-testing and performance monitoring capabilities.
+* **Plug-and-Evaluate**:
+  * Easily integrate your LLM systems with 10+ research-backed metrics.
+  * Includes metrics for Hallucination detection, RAG retriever quality, and more.
+* **Custom Evaluation Pipelines**:
+  * Construct powerful and flexible custom evaluation pipelines tailored specifically for your LLM systems.
+* **Monitoring in Production**:
+  * Utilize state-of-the-art real-time evaluation foundation models to monitor your LLM systems effectively in production environments.
+
+> [!TIP]  
+> If you are looking for features that Judgment doesn't have today, please raise a new [Feature request](https://github.com/JudgmentLabs/judgeval/issues/new/choose) 🚀 
+
+<br>
+
+## 🛠️ Installation
+
+Get started with Judgeval by installing the SDK using pip:
+
+```bash
+pip install judgeval
+```
+
+Ensure you have your `JUDGMENT_API_KEY` environment variable set to connect to the Judgeval backend.
+
+## �� Get Started
+
+Here's how you can quickly start using Judgeval:
+
+### 📝 Evaluations
 You can evaluate your workflow execution data to measure quality metrics such as hallucination.
-
 Create a file named `evaluate.py` with the following code:
 
-   ```python
-    from judgeval import JudgmentClient
-    from judgeval.data import Example
-    from judgeval.scorers import FaithfulnessScorer
+```python
+from judgeval import JudgmentClient
+from judgeval.data import Example
+from judgeval.scorers import FaithfulnessScorer
 
-    client = JudgmentClient()
+client = JudgmentClient()
 
-    example = Example(
-        input="What if these shoes don't fit?",
-        actual_output="We offer a 30-day full refund at no extra cost.",
-        retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
-    )
+example = Example(
+    input="What if these shoes don't fit?",
+    actual_output="We offer a 30-day full refund at no extra cost.",
+    retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
+)
 
-    scorer = FaithfulnessScorer(threshold=0.5)
-    results = client.run_evaluation(
-        examples=[example],
-        scorers=[scorer],
-        model="gpt-4o",
-    )
-    print(results)
-   ```
-   Click [here](https://judgment.mintlify.app/getting_started#create-your-first-experiment) for a more detailed explanation
+scorer = FaithfulnessScorer(threshold=0.5)
+results = client.run_evaluation(
+    examples=[example],
+    scorers=[scorer],
+    model="gpt-4.1",
+)
+print(results)
+```
+Click [here](https://judgment.mintlify.app/getting_started#create-your-first-experiment) for a more detailed explanation.
 
-## Quickstart: Traces
-
+### 🛰️ Traces
 Track your workflow execution for full observability with just a few lines of code.
-
 Create a file named `traces.py` with the following code:
 
-   ```python
-    from judgeval.common.tracer import Tracer, wrap
-    from openai import OpenAI
+```python
+from judgeval.common.tracer import Tracer, wrap
+from openai import OpenAI
 
-    # Basic initialization
-    client = wrap(OpenAI())
-    judgment = Tracer(project_name="my_project")
+client = wrap(OpenAI())
+judgment = Tracer(project_name="my_project")
 
-    @judgment.observe(span_type="tool")
-    def my_tool():
-        return "Hello world!"
+@judgment.observe(span_type="tool")
+def my_tool():
+    return "Hello world!"
 
-    @judgment.observe(span_type="function")
-    def main():
-        task_input = my_tool()
-        res = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": f"{task_input}"}]
-        )
-        return res.choices[0].message.content
-   ```
-   Click [here](https://judgment.mintlify.app/getting_started#create-your-first-trace) for a more detailed explanation 
+@judgment.observe(span_type="function")
+def main():
+    task_input = my_tool()
+    res = client.chat.completions.create(
+        model="gpt-4.1",
+        messages=[{"role": "user", "content": f"{task_input}"}]
+    )
+    return res.choices[0].message.content
 
-## Quickstart: Online Evaluations
+if __name__ == "__main__":
+    main_result = main()
+    print(f"Main function output: {main_result}")
+    print("Trace sent to Judgeval!")
+```
+Click [here](https://judgment.mintlify.app/getting_started#create-your-first-trace) for a more detailed explanation.
 
+### 📡 Online Evaluations
 Apply performance monitoring to measure the quality of your systems in production, not just on historical data.
 
-Using the same traces.py file we created earlier:
+Using the same `traces.py` file we created earlier, modify `main` functio:n
 
-   ```python
-    from judgeval.common.tracer import Tracer, wrap
-    from judgeval.scorers import AnswerRelevancyScorer
-    from openai import OpenAI
+```python
+from judgeval.common.tracer import Tracer, wrap
+from judgeval.scorers import AnswerRelevancyScorer
+from openai import OpenAI
 
-    client = wrap(OpenAI())
-    judgment = Tracer(project_name="my_project")
+client = wrap(OpenAI())
+judgment = Tracer(project_name="my_project")
 
-    @judgment.observe(span_type="tool")
-    def my_tool():
-        return "Hello world!"
+@judgment.observe(span_type="tool")
+def my_tool():
+    return "Hello world!"
 
-    @judgment.observe(span_type="function")
-    def main():
-        task_input = my_tool()
-        res = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": f"{task_input}"}]
-        ).choices[0].message.content
+@judgment.observe(span_type="function")
+def main():
+    task_input = my_tool()
+    res = client.chat.completions.create(
+        model="gpt-4.1",
+        messages=[{"role": "user", "content": f"{task_input}"}]
+    ).choices[0].message.content
 
-        judgment.get_current_trace().async_evaluate(
-            scorers=[AnswerRelevancyScorer(threshold=0.5)],
-            input=task_input,
-            actual_output=res,
-            model="gpt-4o"
-        )
+    judgment.get_current_trace().async_evaluate(
+        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+        input=task_input,
+        actual_output=res,
+        model="gpt-4.1"
+    )
+    print("Online evaluation submitted.")
+    return res
 
-        return res
-   ```
-   Click [here](https://judgment.mintlify.app/getting_started#create-your-first-online-evaluation) for a more detailed explanation 
+if __name__ == "__main__":
+    main_result = main()
+    print(f"Main function output: {main_result}")
+```
+Click [here](https://judgment.mintlify.app/getting_started#create-your-first-online-evaluation) for a more detailed explanation.
+
+## ⭐ Star Us on GitHub
+
+If you find Judgment useful, please consider giving us a star on GitHub! Your support helps us grow our community and continue improving the product.
+
+## 🤝 Contributing
+
+There are many ways to contribute to Judgment:
+
+* Submit [bug reports](https://github.com/JudgmentLabs/judgeval/issues) and [feature requests](https://github.com/JudgmentLabs/judgeval/issues)
+* Review the documentation and submit [Pull Requests](https://github.com/JudgmentLabs/judgeval/pulls) to improve it
+* Speaking or writing about Judgment and letting us know
+* Upvoting [popular feature requests](https://github.com/YOUR_ORG/judgeval/issues?q=is%3Aissue+is%3Aopen+label%3A%22enhancement%22) to show your support
 
 ## Documentation and Demos
 
