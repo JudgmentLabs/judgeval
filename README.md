@@ -173,7 +173,6 @@ There are many ways to contribute to Judgment:
 * Submit [bug reports](https://github.com/JudgmentLabs/judgeval/issues) and [feature requests](https://github.com/JudgmentLabs/judgeval/issues)
 * Review the documentation and submit [Pull Requests](https://github.com/JudgmentLabs/judgeval/pulls) to improve it
 * Speaking or writing about Judgment and letting us know
-* Upvoting [popular feature requests](https://github.com/YOUR_ORG/judgeval/issues?q=is%3Aissue+is%3Aopen+label%3A%22enhancement%22) to show your support
 
 <h2 align="center">Documentation and Demos</h2>
 
