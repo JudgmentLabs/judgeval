@@ -256,6 +256,7 @@ async def music_recommendation_bot():
         # The handler instance needs to be accessible inside the node later
         config_with_callbacks = {"callbacks": [handler]}
         final_state = await graph.ainvoke(initial_state, config=config_with_callbacks) # Use ainvoke (async) and the async handler
+        print(f"{handler=}")
         
         print("\n🎧 Your Personalized Music Recommendations 🎧")
         print(final_state.get("recommendations", "No recommendations generated."))
@@ -266,4 +267,7 @@ async def music_recommendation_bot():
 
 
 if __name__ == "__main__":
-    asyncio.run(music_recommendation_bot()) 
+    result, trace = asyncio.run(music_recommendation_bot())
+    print(f"{result=}")
+    print(f"{trace=}")
+    

@@ -193,6 +193,19 @@ class JudgmentClient(metaclass=SingletonMeta):
             if rules and any(isinstance(scorer, JudgevalScorer) for scorer in scorers):
                 raise ValueError("Cannot use Judgeval scorers (only API scorers) when using rules. Please either remove rules or use only APIJudgmentScorer types.")
 
+            # 1. Assume we have some traces that already happen
+            traces = []
+            trace = music_recommendation_bot()
+            traces.append()
+            
+            # 2. Loop through each trace
+            for trace in traces:
+                print(f"{trace=}")
+                # For each trace, loop through the trace and check tool spans. Filter just by tool spans
+                for span in trace.spans:
+                    if span.category == "tool":
+                        print(f"{span=}")
+
             eval = EvaluationRun(
                 log_results=log_results,
                 append=append,
@@ -205,7 +218,8 @@ class JudgmentClient(metaclass=SingletonMeta):
                 metadata=metadata,
                 judgment_api_key=self.judgment_api_key,
                 rules=rules,
-                organization_id=self.organization_id
+                organization_id=self.organization_id,
+                traces=traces
             )
             return run_eval(eval, override, ignore_errors=ignore_errors, async_execution=async_execution)
         except ValueError as e:

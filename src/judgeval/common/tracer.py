@@ -1154,9 +1154,14 @@ class _DeepProfiler:
             inputs = {}
             try:
                 args_info = inspect.getargvalues(frame)
+                print(f"{args_info=}")
                 for arg in args_info.args:
                     try:
-                        inputs[arg] = args_info.locals.get(arg)
+                        arg_value = args_info.locals.get(arg)
+                        print(f"{arg_value=}")
+                        # Add the object type to the span, TraceSpan(..., object=args_info.locals.get(arg))
+                        type_name = type(arg_value).__name__ if arg_value is not None else "None"
+                        inputs[arg] = f"{type_name}"
                     except:
                         inputs[arg] = "<<Unserializable>>"
                 current_trace.record_input(inputs)
@@ -1471,8 +1476,8 @@ class Tracer:
                             span.record_output(result)
                             
                         # Save the completed trace
-                        current_trace.save(overwrite=overwrite)
-                        return result
+                        _, trace = current_trace.save(overwrite=overwrite)
+                        return result, trace
                     finally:
                         # Reset trace context (span context resets automatically)
                         current_trace_var.reset(trace_token)
@@ -1562,8 +1567,8 @@ class Tracer:
                             span.record_output(result)
                             
                         # Save the completed trace
-                        current_trace.save(overwrite=overwrite)
-                        return result
+                        _, trace = current_trace.save(overwrite=overwrite)
+                        return result, trace
                     finally:
                         # Reset trace context (span context resets automatically)
                         current_trace_var.reset(trace_token)

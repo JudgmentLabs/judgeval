@@ -1378,7 +1378,9 @@ class AsyncJudgevalCallbackHandler(AsyncCallbackHandler):
                 if self._trace_client and not self._trace_saved: # Check if not already saved
                     try:
                         # TODO: Check if trace_client.save needs await if TraceClient becomes async
-                        trace_id, _ = self._trace_client.save(overwrite=self._trace_client.overwrite) # Use client's overwrite setting
+                        trace_id, trace = self._trace_client.save(overwrite=self._trace_client.overwrite) # Use client's overwrite setting
+                        # print(f"{trace_id=}")
+                        # print(f"{trace=}")
                         self._log(f"Trace {trace_id} successfully saved.")
                         self._trace_saved = True # Set flag only after successful save
                         trace_saved_successfully = True # Mark success
