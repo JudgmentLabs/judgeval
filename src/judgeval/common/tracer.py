@@ -7,6 +7,9 @@ import functools
 import inspect
 import json
 import os
+import site
+import sysconfig
+import threading
 import time
 import uuid
 import warnings
@@ -68,7 +71,7 @@ import concurrent.futures
 from collections.abc import Iterator, AsyncIterator # Add Iterator and AsyncIterator
 
 # Define context variables for tracking the current trace and the current span within a trace
-current_trace_var = contextvars.ContextVar('current_trace', default=None)
+current_trace_var = contextvars.ContextVar[Optional['TraceClient']]('current_trace', default=None)
 current_span_var = contextvars.ContextVar('current_span', default=None) # ContextVar for the active span name
 in_traced_function_var = contextvars.ContextVar('in_traced_function', default=False) # Track if we're in a traced function
 
@@ -1020,6 +1023,221 @@ class TraceClient:
     def delete(self):
         return self.trace_manager_client.delete_trace(self.trace_id)
     
+
+class _DeepProfiler:
+    _instance: Optional["_DeepProfiler"] = None
+    _lock: threading.Lock = threading.Lock()
+    _refcount: int = 0
+    _active: bool = False
+    _span_stack: contextvars.ContextVar[List[Dict[str, Any]]] = contextvars.ContextVar("_deep_profiler_span_stack", default=[])
+    _skip_stack: contextvars.ContextVar[List[str]] = contextvars.ContextVar("_deep_profiler_skip_stack", default=[])
+
+    
+    def __new__(cls):
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = super().__new__(cls)
+        return cls._instance
+    
+    def _should_trace(self, frame):
+        # Skip stack is maintained by the tracer as an optimization to skip earlier
+        # frames in the call stack that we've already determined should be skipped
+        skip_stack = self._skip_stack.get()
+        if len(skip_stack) > 0:
+            return False
+        
+        func_name = frame.f_code.co_name
+        module_name = frame.f_globals.get("__name__", "")
+        module_root = module_name.split(".")[0] if module_name else ""
+
+        if (
+            module_name == ""
+            or func_name.startswith("<")
+            or func_name.startswith("_") and func_name != "__call__"
+            or module_root in _TRACE_STDLIB_MODULE_BLOCKLIST
+            or func_name in _TRACE_BLOCKLIST
+            or not self._is_user_code(frame.f_code.co_filename)
+        ):
+            return False
+                    
+        return True
+    
+    @functools.cache
+    def _is_user_code(self, filename: str):
+        return bool(filename) and not os.path.realpath(filename).startswith(_TRACE_NON_USER)
+    
+    def _profile(self, frame, event, arg):
+        if event not in ("call", "return"):
+            return
+        
+        current_trace = current_trace_var.get()
+        if not current_trace:
+            return
+        
+        parent_span_id = current_span_var.get()
+        if not parent_span_id:
+            return
+        
+        func_name = frame.f_code.co_name
+        module_name = frame.f_globals.get("__name__", "unknown_module")
+        qual_name = f"{module_name}.{func_name}"
+        
+        skip_stack = self._skip_stack.get()
+        
+        if event == "call":
+            # If we have entries in the skip stack and the current qual_name matches the top entry,
+            # push it again to track nesting depth and skip
+            # As an optimization, we only care about duplicate qual_names.
+            if skip_stack:
+                if qual_name == skip_stack[-1]:
+                    skip_stack.append(qual_name)
+                    self._skip_stack.set(skip_stack)
+                return
+            
+            should_trace = self._should_trace(frame)
+            
+            if not should_trace:
+                if not skip_stack:
+                    self._skip_stack.set([qual_name])
+                return
+
+                
+        elif event == "return":
+            # If we have entries in skip stack and current qual_name matches the top entry,
+            # pop it to track exiting from the skipped section
+            if skip_stack and qual_name == skip_stack[-1]:
+                skip_stack.pop()
+                self._skip_stack.set(skip_stack)
+                return
+            
+            if skip_stack:
+                return
+            
+        span_stack = self._span_stack.get()
+        if event == "call":
+            if not self._should_trace(frame):
+                return
+                
+            span_id = str(uuid.uuid4())
+            
+            parent_depth = current_trace._span_depths.get(parent_span_id, 0)
+            depth = parent_depth + 1
+            
+            current_trace._span_depths[span_id] = depth
+            
+            start_time = time.time()
+            
+            span_stack.append({
+                "span_id": span_id,
+                "parent_span_id": parent_span_id,
+                "function": qual_name,
+                "start_time": start_time
+            })
+            self._span_stack.set(span_stack)
+            
+            token = current_span_var.set(span_id)
+            frame.f_locals["_span_token"] = token
+            
+            entry = TraceEntry(
+                type="enter",
+                function=qual_name,
+                span_id=span_id,
+                trace_id=current_trace.trace_id,
+                depth=depth,
+                message=qual_name,
+                created_at=start_time,
+                span_type="span",
+                parent_span_id=parent_span_id
+            )
+            current_trace.add_entry(entry)
+            
+            inputs = {}
+            try:
+                args_info = inspect.getargvalues(frame)
+                for arg in args_info.args:
+                    try:
+                        inputs[arg] = args_info.locals.get(arg)
+                    except:
+                        inputs[arg] = "<<Unserializable>>"
+                current_trace.record_input(inputs)
+            except Exception as e:
+                current_trace.record_input({
+                    "error": str(e)
+                })
+                
+        elif event == "return":
+            if not span_stack:
+                return
+                
+            current_id = current_span_var.get()
+            
+            span_data = None
+            for i, entry in enumerate(reversed(span_stack)):
+                if entry["span_id"] == current_id:
+                    span_data = span_stack.pop(-(i+1))
+                    self._span_stack.set(span_stack)
+                    break
+            
+            if not span_data:
+                return
+                
+            start_time = span_data["start_time"]
+            duration = time.time() - start_time
+            
+            current_trace.add_entry(TraceEntry(
+                type="exit",
+                function=span_data["function"],
+                span_id=span_data["span_id"],
+                trace_id=current_trace.trace_id,
+                depth=current_trace._span_depths.get(span_data["span_id"], 0),
+                message=f"← {span_data['function']}",
+                created_at=time.time(),
+                duration=duration,
+                span_type="span",
+            ))
+
+            current_trace.record_output(arg)
+            
+            if span_data["span_id"] in current_trace._span_depths:
+                del current_trace._span_depths[span_data["span_id"]]
+                
+            if span_stack:
+                current_span_var.set(span_stack[-1]["span_id"])
+            else:
+                current_span_var.set(span_data["parent_span_id"])
+            
+            if "_span_token" in frame.f_locals:
+                current_span_var.reset(frame.f_locals["_span_token"])
+        
+        return
+    
+    def __enter__(self):
+        with self._lock:
+            self._refcount += 1
+            if self._refcount == 1:
+                sys.setprofile(self._profile)
+                threading.setprofile(self._profile)
+                self._active = True
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        with self._lock:
+            self._refcount -= 1
+            if self._refcount == 0 and self._active:
+                sys.setprofile(None)
+                threading.setprofile(None)
+                self._active = False
+
+
+def log(self, message: str, level: str = "info"):
+        """ Log a message with the span context """
+        current_trace = current_trace_var.get()
+        if current_trace:
+            current_trace.log(message, level)
+        else:
+            print(f"[{level}] {message}")
+        current_trace.record_output({"log": message})
+    
 class Tracer:
     _instance = None
 
@@ -1042,7 +1260,7 @@ class Tracer:
         s3_aws_access_key_id: Optional[str] = None,
         s3_aws_secret_access_key: Optional[str] = None,
         s3_region_name: Optional[str] = None,
-        deep_tracing: bool = True  # NEW: Enable deep tracing by default
+        deep_tracing: bool = False  # Deep tracing is disabled by default
         ):
         if not hasattr(self, 'initialized'):
             if not api_key:
@@ -1119,45 +1337,6 @@ class Tracer:
         """Returns the TraceClient instance currently marked as active by the handler."""
         return self._active_trace_client
 
-    def _apply_deep_tracing(self, func, span_type="span"):
-        """
-        Apply deep tracing to all functions in the same module as the given function.
-        
-        Args:
-            func: The function being traced
-            span_type: Type of span to use for traced functions
-            
-        Returns:
-            A tuple of (module, original_functions_dict) where original_functions_dict
-            contains the original functions that were replaced with traced versions.
-        """
-        module = inspect.getmodule(func)
-        if not module:
-            return None, {}
-            
-        # Save original functions
-        original_functions = {}
-        
-        # Find all functions in the module
-        for name, obj in inspect.getmembers(module, inspect.isfunction):
-            # Skip already wrapped functions
-            if hasattr(obj, '_judgment_traced'):
-                continue
-                
-            # Create a traced version of the function
-            # Always use default span type "span" for child functions
-            traced_func = _create_deep_tracing_wrapper(obj, self, "span")
-            
-            # Mark the function as traced to avoid double wrapping
-            traced_func._judgment_traced = True
-            
-            # Save the original function
-            original_functions[name] = obj
-            
-            # Replace with traced version
-            setattr(module, name, traced_func)
-            
-        return module, original_functions
 
     @contextmanager
     def trace(
@@ -1240,8 +1419,10 @@ class Tracer:
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
                 # Check if we're already in a traced function
-                if in_traced_function_var.get():
-                    return await func(*args, **kwargs)
+
+                # NOTE: question? why is this needed?
+                # if in_traced_function_var.get():
+                #     return await func(*args, **kwargs)
                 
                 # Set in_traced_function_var to True
                 token = in_traced_function_var.set(True)
@@ -1280,18 +1461,12 @@ class Tracer:
                                 'kwargs': kwargs
                             })
                             
-                            # If deep tracing is enabled, apply monkey patching
                             if use_deep_tracing:
-                                module, original_functions = self._apply_deep_tracing(func, span_type)
-                            
-                            # Execute function
-                            result = await func(*args, **kwargs)
-                            
-                            # Restore original functions if deep tracing was enabled
-                            if use_deep_tracing and module and 'original_functions' in locals():
-                                for name, obj in original_functions.items():
-                                    setattr(module, name, obj)
-                            
+                                with _DeepProfiler():
+                                    result = await func(*args, **kwargs)
+                            else:
+                                result = await func(*args, **kwargs)
+                                                        
                             # Record output
                             span.record_output(result)
                             
@@ -1315,17 +1490,11 @@ class Tracer:
                                 'kwargs': kwargs
                             })
                             
-                            # If deep tracing is enabled, apply monkey patching
                             if use_deep_tracing:
-                                module, original_functions = self._apply_deep_tracing(func, span_type)
-                            
-                            # Execute function
-                            result = await func(*args, **kwargs)
-                            
-                            # Restore original functions if deep tracing was enabled
-                            if use_deep_tracing and module and 'original_functions' in locals():
-                                for name, obj in original_functions.items():
-                                    setattr(module, name, obj)
+                                with _DeepProfiler():
+                                    result = await func(*args, **kwargs)
+                            else:
+                                result = await func(*args, **kwargs)
                             
                             # Record output
                             span.record_output(result)
@@ -1341,8 +1510,10 @@ class Tracer:
             @functools.wraps(func)
             def wrapper(*args, **kwargs):
                 # Check if we're already in a traced function
-                if in_traced_function_var.get():
-                    return func(*args, **kwargs)
+
+                # NOTE: question? why is this needed?
+                # if in_traced_function_var.get():
+                #     return func(*args, **kwargs)
                 
                 # Set in_traced_function_var to True
                 token = in_traced_function_var.set(True)
@@ -1381,18 +1552,12 @@ class Tracer:
                                 'kwargs': kwargs
                             })
                             
-                            # If deep tracing is enabled, apply monkey patching
                             if use_deep_tracing:
-                                module, original_functions = self._apply_deep_tracing(func, span_type)
-                            
-                            # Execute function
-                            result = func(*args, **kwargs)
-                            
-                            # Restore original functions if deep tracing was enabled
-                            if use_deep_tracing and module and 'original_functions' in locals():
-                                for name, obj in original_functions.items():
-                                    setattr(module, name, obj)
-                            
+                                with _DeepProfiler():
+                                    result = func(*args, **kwargs)
+                            else:
+                                result = func(*args, **kwargs)
+                                                        
                             # Record output
                             span.record_output(result)
                             
@@ -1416,17 +1581,11 @@ class Tracer:
                                 'kwargs': kwargs
                             })
                             
-                            # If deep tracing is enabled, apply monkey patching
                             if use_deep_tracing:
-                                module, original_functions = self._apply_deep_tracing(func, span_type)
-                            
-                            # Execute function
-                            result = func(*args, **kwargs)
-                            
-                            # Restore original functions if deep tracing was enabled
-                            if use_deep_tracing and module and 'original_functions' in locals():
-                                for name, obj in original_functions.items():
-                                    setattr(module, name, obj)
+                                with _DeepProfiler():
+                                    result = func(*args, **kwargs)
+                            else:
+                                result = func(*args, **kwargs)
                             
                             # Record output
                             span.record_output(result)
@@ -1735,98 +1894,19 @@ _TRACE_BLOCKLIST = {
     'append', 'extend', 'insert', 'remove', 'pop', 'clear', 'index', 'count', 'sort',
 }
 
+_TRACE_STDLIB_MODULE_BLOCKLIST = frozenset(sys.stdlib_module_names.union(sys.builtin_module_names).union({"judgeval"}))
 
-# Add a new function for deep tracing at the module level
-def _create_deep_tracing_wrapper(func, tracer, span_type="span"):
-    """
-    Creates a wrapper for a function that automatically traces it when called within a traced function.
-    This enables deep tracing without requiring explicit @observe decorators on every function.
-    
-    Args:
-        func: The function to wrap
-        tracer: The Tracer instance
-        span_type: Type of span (default "span")
-        
-    Returns:
-        A wrapped function that will be traced when called
-    """
-    # Skip wrapping if the function is not callable or is a built-in
-    if not callable(func) or isinstance(func, type) or func.__module__ == 'builtins':
-        return func
-    
-    # Skip functions in the blocklist
-    if func.__name__ in _TRACE_BLOCKLIST:
-        return func
-    
-    # Skip functions from certain modules (logging, sys, etc.)
-    if func.__module__ and any(func.__module__.startswith(m) for m in ['logging', 'sys', 'os', 'json', 'time', 'datetime']):
-        return func
-    
-
-    # Get function name for the span - check for custom name set by @observe
-    func_name = getattr(func, '_judgment_span_name', func.__name__)
-    
-    # Check for custom span_type set by @observe
-    func_span_type = getattr(func, '_judgment_span_type', "span")
-    
-    # Store original function to prevent losing reference
-    original_func = func
-    
-    # Create appropriate wrapper based on whether the function is async or not
-    if asyncio.iscoroutinefunction(func):
-        @functools.wraps(func)
-        async def async_deep_wrapper(*args, **kwargs):
-            # Get current trace from context
-            current_trace = current_trace_var.get()
-            
-            # If no trace context, just call the function
-            if not current_trace:
-                return await original_func(*args, **kwargs)
-            
-            # Create a span for this function call - use custom span_type if available
-            with current_trace.span(func_name, span_type=func_span_type) as span:
-                # Record inputs
-                span.record_input({
-                    'args': str(args),
-                    'kwargs': kwargs
-                })
-                
-                # Execute function
-                result = await original_func(*args, **kwargs)
-                
-                # Record output
-                span.record_output(result)
-                
-                return result
-                
-        return async_deep_wrapper
-    else:
-        @functools.wraps(func)
-        def deep_wrapper(*args, **kwargs):
-            # Get current trace from context
-            current_trace = current_trace_var.get()
-            
-            # If no trace context, just call the function
-            if not current_trace:
-                return original_func(*args, **kwargs)
-            
-            # Create a span for this function call - use custom span_type if available
-            with current_trace.span(func_name, span_type=func_span_type) as span:
-                # Record inputs
-                span.record_input({
-                    'args': str(args),
-                    'kwargs': kwargs
-                })
-                
-                # Execute function
-                result = original_func(*args, **kwargs)
-                
-                # Record output
-                span.record_output(result)
-                
-                return result
-                
-        return deep_wrapper
+# NOTE: This builds once, can be tweaked if we are missing / capturing other unncessary modules
+# @link https://docs.python.org/3.13/library/sysconfig.html
+_TRACE_NON_USER = tuple(
+    os.path.realpath(p) + os.sep
+    for p in {
+        sysconfig.get_paths()['stdlib'],
+        sysconfig.get_paths().get('platstdlib', ''),
+        *site.getsitepackages(),
+        site.getusersitepackages(),
+    } if p
+)
 
 # Add the new TraceThreadPoolExecutor class
 class TraceThreadPoolExecutor(concurrent.futures.ThreadPoolExecutor):
