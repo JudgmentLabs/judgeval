@@ -2,7 +2,7 @@
 Implements the JudgmentClient to interact with the Judgment API.
 """
 import os
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, List, Dict, Any, Union, Callable
 import requests
 
 from judgeval.constants import ROOT_API
@@ -165,7 +165,8 @@ class JudgmentClient(metaclass=SingletonMeta):
         append: bool = False,
         ignore_errors: bool = True,
         async_execution: bool = False,
-        rules: Optional[List[Rule]] = None
+        rules: Optional[List[Rule]] = None,
+        function: Callable = None
     ) -> List[ScoringResult]:
         """
         Executes an evaluation of `Example`s using one or more `Scorer`s
@@ -182,7 +183,7 @@ class JudgmentClient(metaclass=SingletonMeta):
             override (bool): Whether to override an existing evaluation run with the same name
             ignore_errors (bool): Whether to ignore errors during evaluation (safely handled)
             rules (Optional[List[Rule]]): Rules to evaluate against scoring results
-            
+            function (Callable): The function that executes the agent
         Returns:
             List[ScoringResult]: The results of the evaluation
         """
@@ -205,6 +206,7 @@ class JudgmentClient(metaclass=SingletonMeta):
                 metadata=metadata,
                 judgment_api_key=self.judgment_api_key,
                 rules=rules,
+                function=function,
                 organization_id=self.organization_id
             )
             return run_eval(eval, override, ignore_errors=ignore_errors, async_execution=async_execution)
@@ -508,7 +510,8 @@ class JudgmentClient(metaclass=SingletonMeta):
         project_name: str = "default_project",
         eval_run_name: str = "default_eval_run",
         override: bool = False,
-        rules: Optional[List[Rule]] = None
+        rules: Optional[List[Rule]] = None,
+        function: Callable = None
     ) -> None:
         """
         Asserts a test by running the evaluation and checking the results for success
@@ -524,6 +527,7 @@ class JudgmentClient(metaclass=SingletonMeta):
             eval_run_name (str): A name for this evaluation run
             override (bool): Whether to override an existing evaluation run with the same name
             rules (Optional[List[Rule]]): Rules to evaluate against scoring results
+            function (Callable): The function that executes the agent
         """
         results = self.run_evaluation(
             examples=examples,
@@ -535,7 +539,8 @@ class JudgmentClient(metaclass=SingletonMeta):
             project_name=project_name,
             eval_run_name=eval_run_name,
             override=override,
-            rules=rules
+            rules=rules,
+            function=function
         )
         
         assert_test(results)

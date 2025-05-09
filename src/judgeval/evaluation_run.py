@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Optional, Dict, Any, Union, Callable
 from pydantic import BaseModel, field_validator
 
 from judgeval.data import Example, CustomExample
@@ -40,6 +40,7 @@ class EvaluationRun(BaseModel):
     override: Optional[bool] = False
     append: Optional[bool] = False
     rules: Optional[List[Rule]] = None
+    function: Optional[Callable] = None
     
     def model_dump(self, **kwargs):
         data = super().model_dump(**kwargs)

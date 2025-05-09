@@ -428,10 +428,18 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_error
             judgment_api_key (Optional[str]): The API key for running evaluations on the Judgment API
             log_results (bool): Whether to log the results to the Judgment API
             rules (Optional[List[Rule]]): Rules to evaluate against scoring results
+            function (Callable): The function that executes the agent
 
     Returns:
         List[ScoringResult]: The results of the evaluation. Each result is a dictionary containing the fields of a `ScoringResult` object.
     """
+    if evaluation_run.function:
+        info("Running agent function")
+
+        for example in evaluation_run.examples:
+            # Run the agent function with progress tracking
+            result = run_with_spinner("Running agent function: ", evaluation_run.function, example.input)
+            
 
     # Call endpoint to check to see if eval run name exists (if we DON'T want to override and DO want to log results)
     if not override and evaluation_run.log_results and not evaluation_run.append:
