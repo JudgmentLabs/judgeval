@@ -19,7 +19,6 @@ Judgment supports both real-time and experimental evaluation setups, helping you
 
 <div>
 <a target="_blank" href="https://judgment.mintlify.app/getting_started">
-  <!-- <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open Quickstart In Colab"/> -->
 </a>
 
 </div>
@@ -37,7 +36,6 @@ Judgment supports both real-time and experimental evaluation setups, helping you
 
 Judgment is an open-source framework for building evaluation pipelines for multi-step agent workflows, supporting both real-time and experimental evaluation setups.
 
----
 <br>
 
 
