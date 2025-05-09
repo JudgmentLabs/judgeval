@@ -37,7 +37,7 @@ class APIScorer(str, Enum):
 
 UNBOUNDED_SCORERS = set([APIScorer.COMPARISON])  # scorers whose scores are not bounded between 0-1
 
-ROOT_API = os.getenv("JUDGMENT_API_URL", "https://api.judgmentlabs.ai")
+ROOT_API = "http://localhost:8000"
 # API URLs
 JUDGMENT_EVAL_API_URL = f"{ROOT_API}/evaluate/"
 JUDGMENT_SEQUENCE_EVAL_API_URL = f"{ROOT_API}/evaluate_sequence/"
