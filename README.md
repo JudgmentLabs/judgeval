@@ -1,28 +1,23 @@
-<div align="center"><b><a href="README.md">English</a>
-<h1 align="center" style="border-bottom: none">
-    <div>
+<h1 align="center" style="border-bottom: none; line-height: 1.2;">
+    <div style="margin-bottom: 0.2em;"> 
         <a href="https://www.judgmentlabs.ai/"><picture>
             <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
             <source media="(prefers-color-scheme: light)" srcset="assets/logo-light.svg">
             <img alt="Judgment Logo" src="assets/logo-light.svg" width="200" />
         </picture></a>
         <br>
-        Judgment
+        <span style="font-size: 1.4em; display: inline-block; margin-top: 0.1em;">Judgment</span>
     </div>
-    Open-source framework for building evaluation pipelines for multi-step agent workflows<br>
+    <br>
+    <div style="font-size: 0.85em; display: block; margin-bottom: 0.5em;"> 
+        Open-source framework for building evaluation pipelines for multi-step agent workflows
+    </div>
 </h1>
-
-<p align="center">
+<p>
 Judgment supports both real-time and experimental evaluation setups, helping you build LLM systems that run better with comprehensive tracing, evaluations, and monitoring.
 </p>
 
-<div align="center">
-
-[![Python SDK](https://img.shields.io/pypi/v/judgeval)](https://pypi.org/project/judgeval/)
-<!-- TODO: Replace with Judgeval's actual license badge URL -->
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](https://github.com/YOUR_ORG/judgeval/blob/main/LICENSE)
-<!-- TODO: Replace with Judgeval's actual build status badge URL -->
-[![Build](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/YOUR_ORG/judgeval/actions)
+<div>
 <a target="_blank" href="https://judgment.mintlify.app/getting_started">
   <!-- <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open Quickstart In Colab"/> -->
 </a>
@@ -30,38 +25,34 @@ Judgment supports both real-time and experimental evaluation setups, helping you
 </div>
 
 <p align="center">
-    <a href="https://www.judgmentlabs.ai/"><b>Website</b></a>
+    <a href="https://www.judgmentlabs.ai/"><b>Website</b></a> •
     <a href="https://x.com/JudgmentLabs"><b>Twitter/X</b></a> •
-    <a href="https://www.linkedin.com/company/judgmentlabs"><b>LinkedIn<b></a>
+    <a href="https://www.linkedin.com/company/judgmentlabs"><b>LinkedIn<b></a>•
     <a href="https://judgment.mintlify.app/getting_started"><b>Documentation</b></a> •
     <a href="https://www.youtube.com/@AlexShan-j3o"><b>Demos</b></a>
 </p>
 
 
-## 🚀 What is Judgment?
+<h2 align="center">🚀 What is Judgment?</h2>
 
 Judgment is an open-source framework for building evaluation pipelines for multi-step agent workflows, supporting both real-time and experimental evaluation setups.
 
+---
 <br>
 
-You can use Judgment for:
-* **Development and Production Evaluation Layer**:
-  * Offers a robust evaluation layer for multi-step agent applications.
-  * Includes unit-testing and performance monitoring capabilities.
-* **Plug-and-Evaluate**:
-  * Easily integrate your LLM systems with 10+ research-backed metrics.
-  * Includes metrics for Hallucination detection, RAG retriever quality, and more.
-* **Custom Evaluation Pipelines**:
-  * Construct powerful and flexible custom evaluation pipelines tailored specifically for your LLM systems.
-* **Monitoring in Production**:
-  * Utilize state-of-the-art real-time evaluation foundation models to monitor your LLM systems effectively in production environments.
 
-> [!TIP]  
-> If you are looking for features that Judgment doesn't have today, please raise a new [Feature request](https://github.com/JudgmentLabs/judgeval/issues/new/choose) 🚀 
+**Development and Production Evaluation Layer**: Offers a robust evaluation layer for multi-step agent applications, including unit-testing and performance monitoring capabilities.
+
+**Plug-and-Evaluate**: Easily integrate your LLM systems with 10+ research-backed metrics, including those for Hallucination detection, RAG retriever quality, and more.
+
+**Custom Evaluation Pipelines**: Construct powerful and flexible custom evaluation pipelines tailored specifically for your LLM systems.
+
+**Monitoring in Production**: Utilize state-of-the-art real-time evaluation foundation models to monitor your LLM systems effectively in production environments.
+
 
 <br>
 
-## 🛠️ Installation
+<h2 align="center">🛠️ Installation</h2>
 
 Get started with Judgeval by installing the SDK using pip:
 
@@ -71,11 +62,11 @@ pip install judgeval
 
 Ensure you have your `JUDGMENT_API_KEY` environment variable set to connect to the Judgeval backend.
 
-## �� Get Started
+<h2 align="center">🏁 Get Started</h2>
 
-Here's how you can quickly start using Judgeval:
+Here's how you can quickly start using Judgment:
 
-### 📝 Evaluations
+<h3 align="center">📝 Offline Evaluations</h3>
 You can evaluate your workflow execution data to measure quality metrics such as hallucination.
 Create a file named `evaluate.py` with the following code:
 
@@ -102,38 +93,8 @@ print(results)
 ```
 Click [here](https://judgment.mintlify.app/getting_started#create-your-first-experiment) for a more detailed explanation.
 
-### 🛰️ Traces
-Track your workflow execution for full observability with just a few lines of code.
-Create a file named `traces.py` with the following code:
 
-```python
-from judgeval.common.tracer import Tracer, wrap
-from openai import OpenAI
-
-client = wrap(OpenAI())
-judgment = Tracer(project_name="my_project")
-
-@judgment.observe(span_type="tool")
-def my_tool():
-    return "Hello world!"
-
-@judgment.observe(span_type="function")
-def main():
-    task_input = my_tool()
-    res = client.chat.completions.create(
-        model="gpt-4.1",
-        messages=[{"role": "user", "content": f"{task_input}"}]
-    )
-    return res.choices[0].message.content
-
-if __name__ == "__main__":
-    main_result = main()
-    print(f"Main function output: {main_result}")
-    print("Trace sent to Judgeval!")
-```
-Click [here](https://judgment.mintlify.app/getting_started#create-your-first-trace) for a more detailed explanation.
-
-### 📡 Online Evaluations
+<h3 align="center">📡 Online Evaluations</h3>
 Apply performance monitoring to measure the quality of your systems in production, not just on historical data.
 
 Using the same `traces.py` file we created earlier, modify `main` functio:n
@@ -173,11 +134,42 @@ if __name__ == "__main__":
 ```
 Click [here](https://judgment.mintlify.app/getting_started#create-your-first-online-evaluation) for a more detailed explanation.
 
-## ⭐ Star Us on GitHub
+<h3 align="center">🛰️ Traces</h3>
+Track your workflow execution for full observability with just a few lines of code.
+Create a file named `traces.py` with the following code:
+
+```python
+from judgeval.common.tracer import Tracer, wrap
+from openai import OpenAI
+
+client = wrap(OpenAI())
+judgment = Tracer(project_name="my_project")
+
+@judgment.observe(span_type="tool")
+def my_tool():
+    return "Hello world!"
+
+@judgment.observe(span_type="function")
+def main():
+    task_input = my_tool()
+    res = client.chat.completions.create(
+        model="gpt-4.1",
+        messages=[{"role": "user", "content": f"{task_input}"}]
+    )
+    return res.choices[0].message.content
+
+if __name__ == "__main__":
+    main_result = main()
+    print(f"Main function output: {main_result}")
+    print("Trace sent to Judgeval!")
+```
+Click [here](https://judgment.mintlify.app/getting_started#create-your-first-trace) for a more detailed explanation.
+
+<h2 align="center">⭐ Star Us on GitHub</h2>
 
 If you find Judgment useful, please consider giving us a star on GitHub! Your support helps us grow our community and continue improving the product.
 
-## 🤝 Contributing
+<h2 align="center">🤝 Contributing</h2>
 
 There are many ways to contribute to Judgment:
 
@@ -186,8 +178,8 @@ There are many ways to contribute to Judgment:
 * Speaking or writing about Judgment and letting us know
 * Upvoting [popular feature requests](https://github.com/YOUR_ORG/judgeval/issues?q=is%3Aissue+is%3Aopen+label%3A%22enhancement%22) to show your support
 
-## Documentation and Demos
+<h2 align="center">Documentation and Demos</h2>
 
 For more detailed documentation, please check out our [docs](https://judgment.mintlify.app/getting_started) and some of our [demo videos](https://www.youtube.com/@AlexShan-j3o) for reference!
 
-## 
+##
