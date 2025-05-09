@@ -94,7 +94,7 @@ Click [here](https://judgment.mintlify.app/getting_started#create-your-first-exp
 <h3 align="center">📡 Online Evaluations</h3>
 Apply performance monitoring to measure the quality of your systems in production, not just on historical data.
 
-Using the same `traces.py` file we created earlier, modify `main` functio:n
+Using the same `traces.py` file we created earlier, modify `main` function
 
 ```python
 from judgeval.common.tracer import Tracer, wrap
