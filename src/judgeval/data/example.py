@@ -31,7 +31,7 @@ class Example(BaseModel):
     retrieval_context: Optional[List[str]] = None
     additional_metadata: Optional[Dict[str, Any]] = None
     tools_called: Optional[List[str]] = None
-    expected_tools: Optional[List[str]] = None
+    expected_tools: Optional[List[Dict]] = None
     name: Optional[str] = None
     example_id: str = Field(default_factory=lambda: str(uuid4()))
     example_index: Optional[int] = None
@@ -73,7 +73,7 @@ class Example(BaseModel):
             raise ValueError(f"All items in expected_output must be strings but got {v}")
         return v
     
-    @field_validator('context', 'retrieval_context', 'tools_called', 'expected_tools', mode='before')
+    @field_validator('context', 'retrieval_context', 'tools_called', mode='before')
     @classmethod
     def validate_string_lists(cls, v, info):
         field_name = info.field_name
