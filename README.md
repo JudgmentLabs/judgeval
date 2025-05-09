@@ -6,7 +6,6 @@
             <img alt="Judgment Logo" src="assets/logo-light.svg" width="200" />
         </picture></a>
         <br>
-        <span style="font-size: 2em; display: inline-block; margin-top: 0.1em;">Judgment</span>
     </div>
     <br>
     <div style="font-size: 0.85em; display: block; margin-bottom: 0.5em;"> 
