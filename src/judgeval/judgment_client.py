@@ -8,6 +8,7 @@ import requests
 from judgeval.constants import ROOT_API
 from judgeval.data.datasets import EvalDataset, EvalDatasetClient
 from judgeval.data import (
+    ScorerData, 
     ScoringResult, 
     Example,
     CustomExample,
@@ -151,6 +152,78 @@ class JudgmentClient(metaclass=SingletonMeta):
         except Exception as e:
             raise Exception(f"An unexpected error occurred during evaluation: {str(e)}")
 
+    # TODO: Move this to Judgment as a metric
+    def check_tool_order(self, trace, example):
+        expected_tools = example.expected_tools
+        current_tool_index = 0
+        scorers_data = None
+        for span in trace['entries']:
+            if span['span_type'] == "tool":
+                # Check for which object in the "inputs"
+                # Ideally this is a separate field in the span
+                var = span['inputs']['args']
+                import re
+
+                match = re.match(r"\((.*),\s*'(.*)'\)", var)
+                if match:
+                    obj_repr, city = match.groups()
+                    tup = (obj_repr.strip(), city)
+                
+                obj_name, *args = tup
+                
+                if span['function'] != expected_tools[current_tool_index]['tool']:
+                    scorers_data = ScorerData(
+                        name='Tool-Order-Scorer',
+                        threshold=1.0,
+                        score=0.0,
+                        success=False,
+                        evaluation_model='gpt-4o-mini',
+                        reason=f"Tool {span['function']} called out of order"
+                    )
+                
+                if expected_tools[current_tool_index]['agent'] not in obj_name:
+                    scorers_data = ScorerData(
+                        name='Tool-Order-Scorer',
+                        threshold=1.0,
+                        score=0.0,
+                        success=False,
+                        evaluation_model='gpt-4o-mini',
+                        reason=f"Agent {obj_name} called out of order"
+                    )
+                
+                if args != list(expected_tools[current_tool_index]['params'].values()):
+                    scorers_data = ScorerData(
+                        name='Tool-Order-Scorer',
+                        threshold=1.0,
+                        score=0.0,
+                        success=False,
+                        evaluation_model='gpt-4o-mini',
+                        reason=f"Args {args} called out of order"
+                    )
+                
+                current_tool_index += 1
+        
+        if current_tool_index != len(expected_tools):
+            raise ValueError(f"Not all tools were called, expected {len(expected_tools)} but got {current_tool_index}")
+        
+        if scorers_data is None:
+            scorers_data = ScorerData(
+                name='Tool-Order-Scorer',
+                threshold=1.0,
+                score=1.0,
+                success=True,
+                evaluation_model='gpt-4o-mini',
+                reason="All tools called in order"
+            )
+        
+        example.context = [str(expected_tools)]
+        example.retrieval_context = [str(expected_tools)]
+        return ScoringResult(
+            success=scorers_data.success,
+            scorers_data=[scorers_data],
+            data_object=example
+        )
+
     def run_evaluation(
         self, 
         examples: Union[List[Example], List[CustomExample]],
@@ -193,18 +266,121 @@ class JudgmentClient(metaclass=SingletonMeta):
             if rules and any(isinstance(scorer, JudgevalScorer) for scorer in scorers):
                 raise ValueError("Cannot use Judgeval scorers (only API scorers) when using rules. Please either remove rules or use only APIJudgmentScorer types.")
 
-            # 1. Assume we have some traces that already happen
-            traces = []
-            trace = music_recommendation_bot()
-            traces.append()
+            # 1. Run the traces
+            import asyncio
+            import openai
+            import os
+            from dotenv import load_dotenv
+            from judgeval.tracer import Tracer, wrap
+
+            # Initialize clients
+            load_dotenv()
+            client = wrap(openai.Client(api_key=os.getenv("OPENAI_API_KEY")))
+            judgment = Tracer(
+                api_key=self.judgment_api_key, 
+                project_name="simple_trace_demo", 
+            )
+
+
+            class TravelAgent:
+                @judgment.observe(span_type="tool")
+                async def get_weather(self, city: str):
+                    """Simulated weather tool call."""
+                    weather_data = f"It is sunny and 72°F in {city}."
+                    return weather_data
+
+                @judgment.observe(span_type="tool")
+                async def get_attractions(self, city: str):
+                    """Simulated attractions tool call."""
+                    attractions = [
+                        "Eiffel Tower",
+                        "Louvre Museum",
+                        "Notre-Dame Cathedral",
+                        "Arc de Triomphe"
+                    ]
+                    return attractions
+
+                @judgment.observe(span_type="Research")
+                async def gather_information(self, city: str):
+                    """Gather all necessary travel information."""
+                    weather = await self.get_weather(city)
+                    attractions = await self.get_attractions(city)
+                    
+                    return {
+                        "weather": weather,
+                        "attractions": attractions
+                    }
+
+                @judgment.observe(span_type="function")
+                async def create_travel_plan(self, research_data):
+                    """Generate a travel itinerary using the researched data."""
+                    prompt = f"""
+                    Create a simple travel itinerary for Paris using this information:
+                    
+                    Weather: {research_data['weather']}
+                    Attractions: {research_data['attractions']}
+                    """
+                    
+                    response = client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=[
+                            {"role": "system", "content": "You are a travel planner. Create a simple itinerary."},
+                            {"role": "user", "content": prompt}
+                        ]
+                    ).choices[0].message.content
+                    
+                    return response
+
+                @judgment.observe(span_type="function")
+                async def generate_simple_itinerary(self, query: str = "I want to plan a trip to Paris."):
+                    """Main function to generate a travel itinerary."""
+                    research_data = await self.gather_information(city="Paris")
+                    itinerary = await self.create_travel_plan(research_data)
+                    return itinerary
             
+            agent1 = TravelAgent()
+            # TODO: Make this clean
+            itinerary, trace = asyncio.run(agent1.generate_simple_itinerary("I want to plan a trip to Paris."))
+            traces = [trace]
+
             # 2. Loop through each trace
+            results = []
             for trace in traces:
-                print(f"{trace=}")
-                # For each trace, loop through the trace and check tool spans. Filter just by tool spans
-                for span in trace.spans:
-                    if span.category == "tool":
-                        print(f"{span=}")
+                # 3. Run the check
+                print(f"Checking tool order for trace: {trace['trace_id']}")
+                results = self.check_tool_order(trace, examples[0])
+                print(f"Tool order result: {results=}")
+            
+            # 4. Log the results
+            from judgeval.run_evaluation import log_evaluation_results, run_with_spinner
+            from rich import print as rprint
+            eval = EvaluationRun(
+                log_results=log_results,
+                append=append,
+                project_name=project_name,
+                eval_name=eval_run_name,
+                examples=examples,
+                scorers=scorers,
+                model=model,
+                aggregator=aggregator,
+                metadata=metadata,
+                judgment_api_key=self.judgment_api_key,
+                rules=rules,
+                organization_id=self.organization_id
+            )
+            
+            # log_evaluation_results([results.model_dump()], eval)
+            
+            pretty_str = run_with_spinner("Logging Results: ", log_evaluation_results, [results.model_dump()], eval)
+            rprint(pretty_str)
+            
+            print(f"{examples=}")
+            
+            # 5. Return the results (ie the results of the evaluation link)
+            
+            
+            # 6. Temporary return
+            return
 
             eval = EvaluationRun(
                 log_results=log_results,
@@ -218,8 +394,7 @@ class JudgmentClient(metaclass=SingletonMeta):
                 metadata=metadata,
                 judgment_api_key=self.judgment_api_key,
                 rules=rules,
-                organization_id=self.organization_id,
-                traces=traces
+                organization_id=self.organization_id
             )
             return run_eval(eval, override, ignore_errors=ignore_errors, async_execution=async_execution)
         except ValueError as e:
