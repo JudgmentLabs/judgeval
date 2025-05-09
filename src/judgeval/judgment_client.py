@@ -115,23 +115,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         rules: Optional[List[Rule]] = None
     ) -> List[ScoringResult]:
         try:
-            def get_all_sequences(root: Sequence) -> List[Sequence]:
-                all_sequences = [root]
-
-                for item in root.items:
-                    if isinstance(item, Sequence):
-                        all_sequences.extend(get_all_sequences(item))
-
-                return all_sequences
-
-            def flatten_sequence_list(sequences: List[Sequence]) -> List[Sequence]:
-                flattened = []
-                for seq in sequences:
-                    flattened.extend(get_all_sequences(seq))
-                return flattened
-            
-            flattened_sequences = flatten_sequence_list(sequences)
-            for sequence in flattened_sequences:
+            for sequence in sequences:
                 sequence.scorers = scorers
                     
             sequence_run = SequenceRun(

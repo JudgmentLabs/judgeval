@@ -37,6 +37,8 @@ async def gather_information(city: str):
     weather = await get_weather(city)
     attractions = await get_attractions(city)
 
+    judgment.log(context="blah")
+
     # judgment.async_evaluate(
     #     scorers=[AnswerRelevancyScorer(threshold=0.5)],
     #     input="What is the weather in Paris?",

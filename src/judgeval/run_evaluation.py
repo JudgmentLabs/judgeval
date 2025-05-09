@@ -393,6 +393,9 @@ def run_sequence_eval(sequence_run: SequenceRun, override: bool = False, ignore_
         response_data: List[Dict] = run_with_spinner("Running Sequence Evaluation: ", execute_api_sequence_eval, sequence_run)
 
         info(f"Received {len(response_data['results'])} results from API")
+        for result in response_data["results"]:
+            if result["data_object"].get("items"):
+                print("Sequence found")
     except JudgmentAPIError as e:
         error(f"An error occurred while executing the Judgment API request: {str(e)}")
         raise JudgmentAPIError(f"An error occurred while executing the Judgment API request: {str(e)}")
