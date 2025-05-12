@@ -289,6 +289,15 @@ def log_evaluation_results(merged_results: List[ScoringResult], run: Union[Evalu
         JudgmentAPIError: If there's an API error during logging
         ValueError: If there's a validation error with the results
     """
+
+    print("merged_results")
+    print(merged_results)
+
+    print("--------------------------------")
+    print("run")
+    print(run.__dict__)
+    print("--------------------------------")
+
     try:
         res = requests.post(
             JUDGMENT_EVAL_LOG_API_URL,

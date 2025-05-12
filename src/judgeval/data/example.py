@@ -31,7 +31,7 @@ class Example(BaseModel):
     retrieval_context: Optional[List[str]] = None
     additional_metadata: Optional[Dict[str, Any]] = None
     tools_called: Optional[List[str]] = None
-    expected_tools: Optional[List[str]] = None
+    expected_tools: Optional[List[Dict[str, Any]]] = None
     name: Optional[str] = None
     example_id: str = Field(default_factory=lambda: str(uuid4()))
     example_index: Optional[int] = None
@@ -73,7 +73,7 @@ class Example(BaseModel):
             raise ValueError(f"All items in expected_output must be strings but got {v}")
         return v
     
-    @field_validator('context', 'retrieval_context', 'tools_called', 'expected_tools', mode='before')
+    @field_validator('context', 'retrieval_context', 'tools_called', mode='before')
     @classmethod
     def validate_string_lists(cls, v, info):
         field_name = info.field_name
@@ -83,6 +83,18 @@ class Example(BaseModel):
             for i, item in enumerate(v):
                 if not isinstance(item, str):
                     raise ValueError(f"All items in {field_name} must be strings but item at index {i} is {item} of type {type(item)}")
+        return v
+    
+    @field_validator('expected_tools', mode='before')
+    @classmethod
+    def validate_expected_tools(cls, v, info):
+        field_name = info.field_name
+        if v is not None:
+            if not isinstance(v, list):
+                raise ValueError(f"{field_name} must be a list of dictionaries or None but got {v} of type {type(v)}")
+            for i, item in enumerate(v):
+                if not isinstance(item, dict):
+                    raise ValueError(f"All items in {field_name} must be dictionaries but item at index {i} is {item} of type {type(item)}")
         return v
     
     @field_validator('additional_metadata', mode='before')
@@ -127,7 +139,7 @@ class Example(BaseModel):
             "example_id": self.example_id,
             "example_index": self.example_index,
             "timestamp": self.timestamp,
-            "trace_id": self.trace_id
+            "trace_id": self.trace_id,
         }
 
     def __str__(self):
@@ -144,5 +156,5 @@ class Example(BaseModel):
             f"example_id={self.example_id}, "
             f"example_index={self.example_index}, "
             f"timestamp={self.timestamp}, "
-            f"trace_id={self.trace_id})"
+            f"trace_id={self.trace_id}, "
         )

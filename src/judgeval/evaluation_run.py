@@ -54,8 +54,11 @@ class EvaluationRun(BaseModel):
 
         if self.rules:
             # Process rules to ensure proper serialization
-              data["rules"] = [rule.model_dump() for rule in self.rules]
-            
+            data["rules"] = [rule.model_dump() for rule in self.rules]
+
+        if self.function:
+            data["function"] = self.function.__name__
+        
         return data
 
     @field_validator('log_results', mode='before')
