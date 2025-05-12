@@ -13,7 +13,7 @@
     </div>
 </h1>
 <p>
-Judgment supports both real-time and experimental evaluation setups, helping you build LLM systems that run better with comprehensive tracing, evaluations, and monitoring.
+Judgeval supports both real-time and experimental evaluation setups, helping you build LLM systems that run better with comprehensive tracing, evaluations, and monitoring.
 </p>
 
 <div>
@@ -31,9 +31,9 @@ Judgment supports both real-time and experimental evaluation setups, helping you
 </p>
 
 
-<h2 align="center">🚀 What is Judgment?</h2>
+<h2 align="center">🚀 What is Judgeval?</h2>
 
-Judgment is an open-source framework for building evaluation pipelines for multi-step agent workflows, supporting both real-time and experimental evaluation setups.
+Judgeval is an open-source framework for building evaluation pipelines for multi-step agent workflows, supporting both real-time and experimental evaluation setups.
 
 <br>
 
@@ -61,7 +61,7 @@ Ensure you have your `JUDGMENT_API_KEY` environment variable set to connect to t
 
 <h2 align="center">🏁 Get Started</h2>
 
-Here's how you can quickly start using Judgment:
+Here's how you can quickly start using Judgeval:
 
 <h3 align="center">📝 Offline Evaluations</h3>
 You can evaluate your workflow execution data to measure quality metrics such as hallucination.
@@ -164,11 +164,11 @@ Click [here](https://judgment.mintlify.app/getting_started#create-your-first-tra
 
 <h2 align="center">⭐ Star Us on GitHub</h2>
 
-If you find Judgment useful, please consider giving us a star on GitHub! Your support helps us grow our community and continue improving the product.
+If you find Judgeval useful, please consider giving us a star on GitHub! Your support helps us grow our community and continue improving the product.
 
 <h2 align="center">🤝 Contributing</h2>
 
-There are many ways to contribute to Judgment:
+There are many ways to contribute to Judgeval:
 
 * Submit [bug reports](https://github.com/JudgmentLabs/judgeval/issues) and [feature requests](https://github.com/JudgmentLabs/judgeval/issues)
 * Review the documentation and submit [Pull Requests](https://github.com/JudgmentLabs/judgeval/pulls) to improve it
