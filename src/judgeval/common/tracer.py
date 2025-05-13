@@ -35,7 +35,6 @@ from rich import print as rprint
 import types # <--- Add this import
 
 # Third-party imports
-import pika
 import requests
 from litellm import cost_per_token
 from pydantic import BaseModel
