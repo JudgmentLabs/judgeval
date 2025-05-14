@@ -33,6 +33,7 @@ pytest = "*"
 pytest-asyncio = "*"
 pytest-mock = "*"
 tavily-python = "*"
+chromadb = "*"
 
 [requires]
 python_version = "3.11"
