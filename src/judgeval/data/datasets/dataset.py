@@ -273,7 +273,6 @@ class EvalDataset:
                             None,  # Example does not have comments
                             None,  # Example does not have source file
                             True,  # Adding an Example
-                            e.trace_id
                         ]
                     )
                 
@@ -295,7 +294,6 @@ class EvalDataset:
                             "comments": None,  # Example does not have comments
                             "source_file": None,  # Example does not have source file
                             "example": True,  # Adding an Example
-                            "trace_id": e.trace_id
                         }
                         for e in self.examples
                     ],

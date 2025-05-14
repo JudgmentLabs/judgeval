@@ -787,7 +787,6 @@ def mock_example():
         expected_output="expected output",
         context=["context1", "context2"],
         retrieval_context=["retrieval1"],
-        trace_id="test_trace_123"
     )
 
 @pytest.fixture

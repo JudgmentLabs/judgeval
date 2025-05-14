@@ -573,7 +573,6 @@ class TraceClient:
                     tools_called=tools_called,
                     expected_tools=expected_tools,
                     additional_metadata=additional_metadata,
-                    trace_id=self.trace_id
                 )
             else:
                 raise ValueError("Either 'example' or at least one of the individual parameters (input, actual_output, etc.) must be provided")
