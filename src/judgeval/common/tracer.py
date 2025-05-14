@@ -1869,7 +1869,7 @@ class _TracedAsyncStreamManagerWrapper(AbstractAsyncContextManager):
         # Manually create the 'exit' entry
         if hasattr(self, '_span_context_token'):
              span_id = current_span_var.get()
-             self._trace_client.spans[span_id].duration = time.time() - self._trace_client.spans[span_id].created_at
+             self._trace_client.span_id_to_span[span_id].duration = time.time() - self._trace_client.span_id_to_span[span_id].created_at
              if span_id in self._trace_client._span_depths: del self._trace_client._span_depths[span_id]
              current_span_var.reset(self._span_context_token)
              delattr(self, '_span_context_token')
@@ -1933,7 +1933,7 @@ class _TracedSyncStreamManagerWrapper(AbstractContextManager):
         # Manually create 'exit' entry
         if hasattr(self, '_span_context_token'):
              span_id = current_span_var.get()
-             self._trace_client.spans[span_id].duration = time.time() - self._trace_client.spans[span_id].created_at
+             self._trace_client.span_id_to_span[span_id].duration = time.time() - self._trace_client.span_id_to_span[span_id].created_at
              if span_id in self._trace_client._span_depths: del self._trace_client._span_depths[span_id]
              current_span_var.reset(self._span_context_token)
              delattr(self, '_span_context_token')
