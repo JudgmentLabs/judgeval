@@ -303,7 +303,7 @@ def log_evaluation_results(scoring_results: List[ScoringResult], run: Union[Eval
                 "X-Organization-Id": run.organization_id
             },
             json={
-                "results": [scoring_result.model_dump(warnings=False) for scoring_result in scoring_results],
+                "results": scoring_results,
                 "run": run.model_dump(warnings=False)
             },
             verify=True
@@ -470,10 +470,10 @@ def run_sequence_eval(sequence_run: SequenceRun, override: bool = False, ignore_
     debug("Processing API results")
     # TODO: allow for custom scorer on sequences
     if sequence_run.log_results:
-        pretty_str = run_with_spinner("Logging Results: ", log_evaluation_results, scoring_results, sequence_run)
+        pretty_str = run_with_spinner("Logging Results: ", log_evaluation_results, response_data["results"], sequence_run)
         rprint(pretty_str)
 
-    return response_data["results"]
+    return scoring_results
     
     
 
@@ -656,7 +656,8 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_error
         #     )
         # print(merged_results)
         if evaluation_run.log_results:
-            pretty_str = run_with_spinner("Logging Results: ", log_evaluation_results, merged_results, evaluation_run)
+            send_results = [scoring_result.model_dump(warnings=False) for scoring_result in merged_results]
+            pretty_str = run_with_spinner("Logging Results: ", log_evaluation_results, send_results, evaluation_run)
             rprint(pretty_str)
 
         for i, result in enumerate(merged_results):

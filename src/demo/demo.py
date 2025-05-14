@@ -40,11 +40,7 @@ other_sequence = Sequence(
 )
 
 results = client.run_sequence_evaluation(
-    eval_run_name="sequence-run1",
-    project_name="jnpr-demo-sequence",
     scorers=[DerailmentScorer(threshold=1)],
-    sequences=[top_level_sequence, other_sequence],
-    model="gpt-4o",
-    log_results=True,
+    sequences=[other_sequence],
     override=True,
 )

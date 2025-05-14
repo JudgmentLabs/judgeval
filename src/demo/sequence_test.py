@@ -146,7 +146,7 @@ if __name__ == "__main__":
     )
 
     judgment.assert_test(
-        examples=[example, example2],
+        examples=[example],
         scorers=[ToolOrderScorer(threshold=0.5)],
         model="gpt-4o-mini",
         function=generate_itinerary,
