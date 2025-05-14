@@ -369,8 +369,9 @@ def test_tracer_invalid_api_key(mocker):
     Tracer._instance = None
     
     # Now when Tracer tries to initialize JudgmentClient, it will receive our mocked result
-    with pytest.raises(JudgmentAPIError, match="Issue with passed in Judgment API key: Invalid API key"):
-        Tracer(api_key="invalid_key", organization_id="test_org")
+    with patch('judgeval.common.tracer.validate_api_key', return_value=(False, "Invalid API key")):
+        with pytest.raises(JudgmentAPIError, match="Issue with passed in Judgment API key: Invalid API key"):
+            Tracer(api_key="invalid_key", organization_id="test_org")
 
 def test_observe_decorator(tracer):
     """Test the @tracer.observe decorator"""
