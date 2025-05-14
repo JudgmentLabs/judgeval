@@ -607,6 +607,9 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         # More robust root detection: Often the first chain event with parent_run_id=None *is* the root.
         is_potential_root_event = parent_run_id is None
 
+        if 'langsmith:hidden' in tags:
+            pass
+
         if node_name:
             name = node_name # Use node name if available
             self._log(f"  LangGraph Node Start: '{name}', run_id={run_id}")
@@ -633,7 +636,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
 
             # --- Start Span Tracking ---
             combined_inputs = {'inputs': inputs, 'tags': tags, 'metadata': metadata, 'kwargs': kwargs, 'serialized': serialized}
-            self._start_span_tracking(trace_client, run_id, parent_run_id, name, span_type=span_type, inputs=combined_inputs)
+            self._start_span_tracking(trace_client, run_id, parent_run_id, name, span_type=span_type, inputs=inputs)
             # --- Store inputs for potential evaluation later --- 
             self._run_id_to_start_inputs[run_id] = inputs # Store the raw inputs dict
             self._log(f"  Stored inputs for run_id {run_id}")
@@ -652,6 +655,9 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
 
         # --- Define instance_id for logging --- 
         instance_id = handler_instance_id # Use the already obtained id
+
+        if 'langsmith:hidden' in tags:
+            pass
 
         try:
             # Pass parent_run_id
@@ -891,7 +897,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                 return
 
             combined_inputs = {'input_str': input_str, 'inputs': inputs, 'tags': tags, 'metadata': metadata, 'kwargs': kwargs, 'serialized': serialized}
-            self._start_span_tracking(trace_client, run_id, parent_run_id, name, span_type="tool", inputs=combined_inputs)
+            self._start_span_tracking(trace_client, run_id, parent_run_id, name, span_type="tool", inputs=inputs)
 
             # --- Track executed tools (remains the same) ---
             if name not in self.executed_tools: self.executed_tools.append(name)
