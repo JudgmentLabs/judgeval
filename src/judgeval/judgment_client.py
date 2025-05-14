@@ -2,6 +2,7 @@
 Implements the JudgmentClient to interact with the Judgment API.
 """
 import os
+from uuid import uuid4
 from typing import Optional, List, Dict, Any, Union, Callable
 import requests
 
@@ -494,8 +495,8 @@ class JudgmentClient(metaclass=SingletonMeta):
         aggregator: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
         log_results: bool = True,
-        project_name: str = "default_project",
-        eval_run_name: str = "default_eval_run",
+        project_name: str = "default_test",
+        eval_run_name: str = str(uuid4()),
         override: bool = False,
         rules: Optional[List[Rule]] = None,
         function: Optional[Callable] = None,
