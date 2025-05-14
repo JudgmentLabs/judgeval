@@ -971,7 +971,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                 # print(f"{log_prefix} No trace client obtained in on_llm_start for {run_id}.")
                 return
             inputs = {'prompts': prompts, 'invocation_params': invocation_params or kwargs, 'options': options, 'tags': tags, 'metadata': metadata, 'serialized': serialized}
-            self._start_span_tracking(trace_client, run_id, parent_run_id, llm_name, span_type="llm", inputs=inputs)
+            self._start_span_tracking(trace_client, run_id, parent_run_id, llm_name, span_type="llm", inputs=prompts)
         except Exception as e:
             tc_id_on_error = id(self._trace_client) if self._trace_client else 'None'
             self._log(f"{log_prefix} UNCAUGHT EXCEPTION in on_llm_start for run_id={run_id} (TraceClient ID: {tc_id_on_error}): {e}")
@@ -1102,7 +1102,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
             trace_client = self._ensure_trace_client(run_id, parent_run_id, chat_model_name) # Corrected call with parent_run_id
             if not trace_client: return
             inputs = {'messages': messages, 'invocation_params': invocation_params or kwargs, 'options': options, 'tags': tags, 'metadata': metadata, 'serialized': serialized}
-            self._start_span_tracking(trace_client, run_id, parent_run_id, chat_model_name, span_type="llm", inputs=inputs) # Use 'llm' span_type for consistency
+            self._start_span_tracking(trace_client, run_id, parent_run_id, chat_model_name, span_type="llm", inputs=messages) # Use 'llm' span_type for consistency
         except Exception as e:
             tc_id_on_error = id(self._trace_client) if self._trace_client else 'None'
             self._log(f"{log_prefix} UNCAUGHT EXCEPTION in on_chat_model_start for run_id={run_id} (TraceClient ID: {tc_id_on_error}): {e}")
