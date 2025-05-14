@@ -39,7 +39,7 @@ jobs:
       - name: Run tests
         run: |
           cd src
-          pipenv run pytest
+          pipenv run pytest tests
 
   run-e2e-tests:
     if: "!contains(github.actor, '[bot]')"  # Exclude if the actor is a bot
