@@ -18,31 +18,18 @@ license-files = ["LICENSE.md"]
 dependencies = [
     "litellm==1.38.12",
     "python-dotenv==1.0.1",
-    "fastapi",
-    "uvicorn",
-    "supabase",
     "requests",
     "pandas",
     "openai",
     "together",
     "anthropic",
     "nest-asyncio",
-    "pika",
-    "openpyxl",
-    "langchain",
     "langchain-huggingface",
     "langchain-openai",
     "langchain-anthropic",
     "langchain-core",
-    "google-genai"
-]
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=8.3.4",
-    "pytest-asyncio>=0.25.0",
-    "pytest-mock>=3.14.0",
-    "tavily-python"
+    "google-genai",
+    "boto3"
 ]
 
 [project.urls]
@@ -68,4 +55,5 @@ artifacts = [
 exclude = [
     "src/e2etests/*",
     "src/tests/*",
+    "src/demo/*"
 ]
