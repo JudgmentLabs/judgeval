@@ -58,12 +58,13 @@ from judgeval.constants import (
     JUDGMENT_TRACES_DELETE_API_URL,
     JUDGMENT_PROJECT_DELETE_API_URL,
 )
-from judgeval.judgment_client import JudgmentClient
-from judgeval.data import Example
+from judgeval.data import Example, Trace, TraceSpan
 from judgeval.scorers import APIJudgmentScorer, JudgevalScorer
 from judgeval.rules import Rule
 from judgeval.evaluation_run import EvaluationRun
 from judgeval.data.result import ScoringResult
+from judgeval.common.utils import validate_api_key
+from judgeval.common.exceptions import JudgmentAPIError
 
 # Standard library imports needed for the new class
 import concurrent.futures
@@ -451,7 +452,6 @@ class TraceClient:
         self.enable_evaluations = enable_evaluations
         self.parent_trace_id = parent_trace_id
         self.parent_name = parent_name
-        self.client: JudgmentClient = tracer.client
         self.entries: List[TraceEntry] = []
         self.annotations: List[TraceAnnotation] = []
         self.start_time = time.time()
@@ -1320,6 +1320,10 @@ class Tracer:
             if not api_key:
                 raise ValueError("Tracer must be configured with a Judgment API key")
             
+            result, response = validate_api_key(api_key)
+            if not result:
+                raise JudgmentAPIError(f"Issue with passed in Judgment API key: {response}")
+            
             if not organization_id:
                 raise ValueError("Tracer must be configured with an Organization ID")
             if use_s3 and not s3_bucket_name:
@@ -1331,11 +1335,11 @@ class Tracer:
             
             self.api_key: str = api_key
             self.project_name: str = project_name
-            self.client: JudgmentClient = JudgmentClient(judgment_api_key=api_key)
             self.organization_id: str = organization_id
             self._current_trace: Optional[str] = None
             self._active_trace_client: Optional[TraceClient] = None # Add active trace client attribute
             self.rules: List[Rule] = rules or []  # Store rules at tracer level
+            self.traces: List[Trace] = []
             self.initialized: bool = True
             self.enable_monitoring: bool = enable_monitoring
             self.enable_evaluations: bool = enable_evaluations
@@ -1532,7 +1536,8 @@ class Tracer:
                             
                         # Save the completed trace
                         trace_id, trace = current_trace.save(overwrite=overwrite)
-                        return result, trace
+                        self.traces.append(trace)
+                        return result
                     finally:
                         # Reset trace context (span context resets automatically)
                         current_trace_var.reset(trace_token)
@@ -1607,7 +1612,8 @@ class Tracer:
                         
                         # Save the completed trace
                         trace_id, trace = current_trace.save(overwrite=overwrite)
-                        return result, trace
+                        self.traces.append(trace)
+                        return result
                     finally:
                         # Reset trace context (span context resets automatically)
                         current_trace_var.reset(trace_token)

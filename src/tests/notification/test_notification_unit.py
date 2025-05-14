@@ -322,53 +322,52 @@ class TestNotificationWithJudgmentClient:
         mock_run_eval.return_value = [mock_result]
         
         # Create client with patched _validate_api_key method
-        with patch.object(JudgmentClient, '_validate_api_key', return_value=(True, {"detail": {"user_name": "test_user"}})):
-            client = JudgmentClient(judgment_api_key="test_key")
+        client = JudgmentClient(judgment_api_key="test_key")
+    
+        # Create example
+        example = Example(
+            input="Test input",
+            actual_output="Test output",
+            expected_output="Expected output"
+        )
+    
+        # Create scorers
+        scorers = [FaithfulnessScorer(threshold=0.7)]
+    
+        # Create rules with notification
+        notification = NotificationConfig(
+            enabled=True,
+            communication_methods=["slack", "email"],
+            email_addresses=["test@example.com"]
+        )
         
-            # Create example
-            example = Example(
-                input="Test input",
-                actual_output="Test output",
-                expected_output="Expected output"
+        rules = [
+            Rule(
+                name="Quality Check",
+                conditions=[
+                    Condition(metric=FaithfulnessScorer(threshold=0.7))
+                ],
+                combine_type="all",
+                notification=notification
             )
+        ]
+    
+        # Run evaluation
+        result = client.run_evaluation(
+            examples=[example],
+            scorers=scorers,
+            model="gpt-3.5-turbo",
+            rules=rules
+        )
+    
+        # Verify run_eval was called with the expected arguments
+        assert mock_run_eval.called
+        call_args = mock_run_eval.call_args[0][0]
+        assert hasattr(call_args, 'rules')
         
-            # Create scorers
-            scorers = [FaithfulnessScorer(threshold=0.7)]
-        
-            # Create rules with notification
-            notification = NotificationConfig(
-                enabled=True,
-                communication_methods=["slack", "email"],
-                email_addresses=["test@example.com"]
-            )
-            
-            rules = [
-                Rule(
-                    name="Quality Check",
-                    conditions=[
-                        Condition(metric=FaithfulnessScorer(threshold=0.7))
-                    ],
-                    combine_type="all",
-                    notification=notification
-                )
-            ]
-        
-            # Run evaluation
-            result = client.run_evaluation(
-                examples=[example],
-                scorers=scorers,
-                model="gpt-3.5-turbo",
-                rules=rules
-            )
-        
-            # Verify run_eval was called with the expected arguments
-            assert mock_run_eval.called
-            call_args = mock_run_eval.call_args[0][0]
-            assert hasattr(call_args, 'rules')
-            
-            # Check that rules in call_args have notification configs
-            assert len(call_args.rules) == 1
-            rule = call_args.rules[0]
-            assert rule.notification is not None
-            assert rule.notification.enabled is True
-            assert rule.notification.communication_methods == ["slack", "email"] 
+        # Check that rules in call_args have notification configs
+        assert len(call_args.rules) == 1
+        rule = call_args.rules[0]
+        assert rule.notification is not None
+        assert rule.notification.enabled is True
+        assert rule.notification.communication_methods == ["slack", "email"] 

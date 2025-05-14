@@ -12,10 +12,10 @@ from judgeval.scorers import AnswerRelevancyScorer, FaithfulnessScorer
 from judgeval.data import Example
 
 client = wrap(openai.Client(api_key=os.getenv("OPENAI_API_KEY")))
-judgment = Tracer(api_key=os.getenv("JUDGMENT_API_KEY"), project_name="travel_agent_demo")
+tracer = Tracer(api_key=os.getenv("JUDGMENT_API_KEY"), project_name="travel_agent_demo")
 
 
-@judgment.observe(span_type="tool")
+@tracer.observe(span_type="tool")
 def search_tavily(query):
     """Fetch travel data using Tavily API."""
     API_KEY = os.getenv("TAVILY_API_KEY")
@@ -94,7 +94,7 @@ def create_travel_plan(destination, start_date, end_date, research_data):
     
     return response
 
-@judgment.observe(span_type="function")
+@tracer.observe(span_type="function")
 def generate_itinerary(destination, start_date, end_date):
     """Main function to generate a travel itinerary."""
     research_data = research_destination(destination, start_date, end_date)
@@ -130,17 +130,27 @@ if __name__ == "__main__":
             {
                 "tool_name": "search_tavily",
                 "parameters": {
-                    "query": "Weather forecast for Paris from 2025-06-01 to 2025-06-03"
+                    "query": "Weather forecast for Paris from 2025-06-01 to 2025-06-02"
                 }
             }
         ]
     )
+    example2 = Example(
+        input={"destination": "Tokyo", "start_date": "2025-06-01", "end_date": "2025-06-02"},
+        expected_tools=[
+            {"tool_name": "search_tavily", "parameters": {"query": "Best tourist attractions in Tokyo"}},
+            {"tool_name": "search_tavily", "parameters": {"query": "Best hotels in Tokyo"}},
+            {"tool_name": "search_tavily", "parameters": {"query": "Flights to Tokyo from major cities"}},
+            {"tool_name": "search_tavily", "parameters": {"query": "Weather forecast for Tokyo from 2025-06-01 to 2025-06-02"}}
+        ]
+    )
 
     judgment.assert_test(
-        examples=[example],
+        examples=[example, example2],
         scorers=[ToolOrderScorer(threshold=0.5)],
         model="gpt-4o-mini",
         function=generate_itinerary,
+        tracer=tracer,
         override=True
     )
 

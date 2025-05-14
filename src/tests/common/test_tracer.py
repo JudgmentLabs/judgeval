@@ -27,10 +27,6 @@ def tracer(mocker):
     mock_post = mocker.patch('requests.post', autospec=True)
     mock_post.return_value = mock_post_response
     
-    # Mock the JudgmentClient
-    mock_judgment_client = mocker.Mock(spec=JudgmentClient)
-    mocker.patch('judgeval.common.tracer.JudgmentClient', return_value=mock_judgment_client)
-    
     yield Tracer(api_key=str(uuid4()), organization_id="test_org")
 
 @pytest.fixture
@@ -58,17 +54,13 @@ def trace_client(tracer):
 
 def test_tracer_singleton(mocker):
     """Test that Tracer maintains singleton pattern"""
-    # Clear any existing singleton instance first
     Tracer._instance = None
     
-    # Mock the JudgmentClient
-    mock_judgment_client = mocker.Mock(spec=JudgmentClient)
-    mocker.patch('judgeval.common.tracer.JudgmentClient', return_value=mock_judgment_client)
-    
-    tracer1 = Tracer(api_key=str(uuid4()), organization_id="test_org")
-    tracer2 = Tracer(api_key=str(uuid4()), organization_id="test_org")
-    assert tracer1 is tracer2
-    assert tracer1.api_key == tracer2.api_key
+    with patch('judgeval.common.tracer.validate_api_key', return_value=(True, "Valid API key")) as mock_validate_api_key:
+        tracer1 = Tracer(api_key=str(uuid4()), organization_id="test_org")
+        tracer2 = Tracer(api_key=str(uuid4()), organization_id="test_org")
+        assert tracer1 is tracer2
+        assert tracer1.api_key == tracer2.api_key
 
 def test_tracer_requires_api_key():
     """Test that Tracer requires an API key"""
@@ -375,14 +367,9 @@ def test_tracer_invalid_api_key(mocker):
     """Test that Tracer handles invalid API keys"""
     # Clear the singleton instance first
     Tracer._instance = None
-    JudgmentClient._instances = {}  # Clear JudgmentClient singleton too
-    
-    # Directly patch the _validate_api_key method in JudgmentClient
-    mocker.patch('judgeval.judgment_client.JudgmentClient._validate_api_key',
-                return_value=(False, "API key is invalid"))
     
     # Now when Tracer tries to initialize JudgmentClient, it will receive our mocked result
-    with pytest.raises(JudgmentAPIError, match="Issue with passed in Judgment API key: API key is invalid"):
+    with pytest.raises(JudgmentAPIError, match="Issue with passed in Judgment API key: Invalid API key"):
         Tracer(api_key="invalid_key", organization_id="test_org")
 
 def test_observe_decorator(tracer):

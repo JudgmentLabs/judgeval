@@ -289,6 +289,6 @@ if __name__ == "__main__":
         scorers=[ToolOrderScorer(threshold=0.5)],
         model="gpt-4o-mini",
         function=music_recommendation_bot,
-        handler=handler,
+        tracer=handler,
         override=True
     )

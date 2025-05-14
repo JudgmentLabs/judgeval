@@ -36,6 +36,8 @@ from judgeval.constants import (
 from judgeval.utils.data_utils import add_from_yaml
 from judgeval.common.exceptions import JudgmentAPIError
 from langchain_core.callbacks import BaseCallbackHandler
+from judgeval.common.tracer import Tracer
+from judgeval.common.utils import validate_api_key
 from pydantic import BaseModel
 from judgeval.rules import Rule
 
@@ -65,7 +67,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         self.eval_dataset_client = EvalDatasetClient(judgment_api_key, organization_id)
         
         # Verify API key is valid
-        result, response = self._validate_api_key()
+        result, response = validate_api_key(judgment_api_key)
         if not result:
             # May be bad to output their invalid API key...
             raise JudgmentAPIError(f"Issue with passed in Judgment API key: {response}")
@@ -118,7 +120,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         ignore_errors: bool = True,
         rules: Optional[List[Rule]] = None,
         function: Optional[Callable] = None,
-        handler: Optional[BaseCallbackHandler] = None
+        tracer: Optional[Union[Tracer, BaseCallbackHandler]] = None
     ) -> List[ScoringResult]:
         try:         
             
@@ -149,7 +151,7 @@ class JudgmentClient(metaclass=SingletonMeta):
                 judgment_api_key=self.judgment_api_key,
                 organization_id=self.organization_id,
             )
-            return run_sequence_eval(sequence_run, override, ignore_errors, function, handler, examples)
+            return run_sequence_eval(sequence_run, override, ignore_errors, function, tracer, examples)
         except ValueError as e:
             raise ValueError(f"Please check your SequenceRun object, one or more fields are invalid: \n{str(e)}")
         except Exception as e:
@@ -400,24 +402,6 @@ class JudgmentClient(metaclass=SingletonMeta):
             raise ValueError(f"Error deleting project: {response.json()}")
         return response.json()
         
-    def _validate_api_key(self):
-        """
-        Validates that the user api key is valid
-        """
-        response = requests.post(
-            f"{ROOT_API}/validate_api_key/",
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.judgment_api_key}",
-            },
-            json={},  # Empty body now
-            verify=True
-        )
-        if response.status_code == 200:
-            return True, response.json()
-        else:
-            return False, response.json().get("detail", "Error validating API key")
-
     def fetch_classifier_scorer(self, slug: str) -> ClassifierScorer:
         """
         Fetches a classifier scorer configuration from the Judgment API.
@@ -515,7 +499,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         override: bool = False,
         rules: Optional[List[Rule]] = None,
         function: Optional[Callable] = None,
-        handler: Optional[BaseCallbackHandler] = None
+        tracer: Optional[Union[Tracer, BaseCallbackHandler]] = None
     ) -> None:
         """
         Asserts a test by running the evaluation and checking the results for success
@@ -549,7 +533,7 @@ class JudgmentClient(metaclass=SingletonMeta):
                 override=override,
                 rules=rules,
                 function=function,
-                handler=handler,
+                tracer=tracer,
                 test_file=test_file
             )
         else:

@@ -86,46 +86,45 @@ class TestRulesWithAPIScorers:
         mock_run_eval.return_value = [mock_result]
         
         # Create client with patched _validate_api_key method
-        with patch.object(JudgmentClient, '_validate_api_key', return_value=(True, {"detail": {"user_name": "test_user"}})):
-            client = JudgmentClient(judgment_api_key="test_key")
-        
-            # Create example
-            example = Example(
-                input="Test input",
-                actual_output="Test output",
-                expected_output="Expected output"
+        client = JudgmentClient(judgment_api_key="test_key")
+    
+        # Create example
+        example = Example(
+            input="Test input",
+            actual_output="Test output",
+            expected_output="Expected output"
+        )
+    
+        # Create scorers
+        scorers = [
+            FaithfulnessScorer(threshold=0.7),
+            AnswerRelevancyScorer(threshold=0.8)
+        ]
+    
+        # Create rules
+        rules = [
+            Rule(
+                name="Quality Check",
+                conditions=[
+                    Condition(metric=FaithfulnessScorer(threshold=0.7)),
+                    Condition(metric=AnswerRelevancyScorer(threshold=0.8))
+                ],
+                combine_type="all"
             )
-        
-            # Create scorers
-            scorers = [
-                FaithfulnessScorer(threshold=0.7),
-                AnswerRelevancyScorer(threshold=0.8)
-            ]
-        
-            # Create rules
-            rules = [
-                Rule(
-                    name="Quality Check",
-                    conditions=[
-                        Condition(metric=FaithfulnessScorer(threshold=0.7)),
-                        Condition(metric=AnswerRelevancyScorer(threshold=0.8))
-                    ],
-                    combine_type="all"
-                )
-            ]
-        
-            # Run evaluation
-            result = client.run_evaluation(
-                examples=[example],
-                scorers=scorers,
-                model="gpt-3.5-turbo",
-                rules=rules
-            )
-        
-            # Verify run_eval was called with the expected arguments
-            assert mock_run_eval.called
-            call_args = mock_run_eval.call_args[0][0]
-            assert hasattr(call_args, 'rules')
+        ]
+    
+        # Run evaluation
+        result = client.run_evaluation(
+            examples=[example],
+            scorers=scorers,
+            model="gpt-3.5-turbo",
+            rules=rules
+        )
+    
+        # Verify run_eval was called with the expected arguments
+        assert mock_run_eval.called
+        call_args = mock_run_eval.call_args[0][0]
+        assert hasattr(call_args, 'rules')
                 
     def test_validation_with_correct_import(self):
         """Test that using JudgevalScorer with rules raises an error (with correct import)."""
@@ -138,38 +137,37 @@ class TestRulesWithAPIScorers:
         mock_judgeval_scorer.__class__ = JudgevalScorer
         
         # Create client with patched _validate_api_key method
-        with patch.object(JudgmentClient, '_validate_api_key', return_value=(True, {"detail": {"user_name": "test_user"}})):
-            client = JudgmentClient(judgment_api_key="test_key")
-        
-            # Create example
-            example = Example(
-                input="Test input",
-                actual_output="Test output",
-                expected_output="Expected output"
+        client = JudgmentClient(judgment_api_key="test_key")
+    
+        # Create example
+        example = Example(
+            input="Test input",
+            actual_output="Test output",
+            expected_output="Expected output"
+        )
+    
+        # Create scorers - mixing API scorer and JudgevalScorer
+        scorers = [
+            FaithfulnessScorer(threshold=0.7),  # API scorer
+            mock_judgeval_scorer  # JudgevalScorer (mocked)
+        ]
+    
+        # Create rules
+        rules = [
+            Rule(
+                name="Quality Check",
+                conditions=[
+                    Condition(metric=FaithfulnessScorer(threshold=0.7))
+                ],
+                combine_type="all"
             )
-        
-            # Create scorers - mixing API scorer and JudgevalScorer
-            scorers = [
-                FaithfulnessScorer(threshold=0.7),  # API scorer
-                mock_judgeval_scorer  # JudgevalScorer (mocked)
-            ]
-        
-            # Create rules
-            rules = [
-                Rule(
-                    name="Quality Check",
-                    conditions=[
-                        Condition(metric=FaithfulnessScorer(threshold=0.7))
-                    ],
-                    combine_type="all"
-                )
-            ]
-        
-            # Run evaluation should raise ValueError
-            with pytest.raises(ValueError, match="Cannot use Judgeval scorers .* when using rules"):
-                client.run_evaluation(
-                    examples=[example],
-                    scorers=scorers,
-                    model="gpt-3.5-turbo",
-                    rules=rules
-                ) 
+        ]
+    
+        # Run evaluation should raise ValueError
+        with pytest.raises(ValueError, match="Cannot use Judgeval scorers .* when using rules"):
+            client.run_evaluation(
+                examples=[example],
+                scorers=scorers,
+                model="gpt-3.5-turbo",
+                rules=rules
+            ) 

@@ -79,7 +79,6 @@ async def make_upper(input: str) -> str:
         actual_output="We offer a 30-day full refund at no extra cost.",
         retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
         expected_output="We offer a 30-day full refund at no extra cost.",
-        expected_tools=["refund"],
     )
     
     judgment.async_evaluate(
@@ -102,8 +101,6 @@ async def make_lower(input):
         expected_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
         context=["User Account"],
         retrieval_context=["Password reset instructions"],
-        tools_called=["authentication"],
-        expected_tools=["authentication"],
         additional_metadata={"difficulty": "medium"}
     )
     

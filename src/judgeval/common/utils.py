@@ -12,6 +12,7 @@ NOTE: any function beginning with 'a', e.g. 'afetch_together_api_response', is a
 import asyncio
 import concurrent.futures
 import os
+import requests
 import pprint
 from typing import Any, Dict, List, Literal, Mapping, Optional, Union
 
@@ -96,6 +97,23 @@ def read_file(file_path: str) -> str:
     with open(file_path, "r", encoding='utf-8') as file:
         return file.read()
 
+def validate_api_key(judgment_api_key: str):
+    """
+    Validates that the user api key is valid
+    """
+    response = requests.post(
+        f"{ROOT_API}/validate_api_key/",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {judgment_api_key}",
+        },
+        json={},  # Empty body now
+        verify=True
+    )
+    if response.status_code == 200:
+        return True, response.json()
+    else:
+        return False, response.json().get("detail", "Error validating API key")
 
 def fetch_together_api_response(model: str, messages: List[Mapping], response_format: pydantic.BaseModel = None) -> str:
     """

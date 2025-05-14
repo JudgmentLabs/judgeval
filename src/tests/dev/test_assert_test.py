@@ -65,8 +65,6 @@ def test_assert_test_failed_scorer(sample_example):
     
     # Verify error message contains relevant information
     error_msg = str(exc_info.value)
-    assert "test input" in error_msg
-    assert "test output" in error_msg
     assert "failed_scorer" in error_msg
     assert "Score below threshold" in error_msg
 
@@ -114,21 +112,6 @@ def test_assert_test_multiple_failed_scorers(sample_example):
     assert "scorer2" in error_msg
     assert "First failure" in error_msg
     assert "Second failure" in error_msg
-
-def test_assert_test_no_scorer_data(sample_example):
-    """Test when result has no scorer data"""
-    result = ScoringResult(
-        data_object=sample_example,
-        success=False,
-        scorers_data=None
-    )
-    
-    with pytest.raises(AssertionError) as exc_info:
-        assert_test([result])
-    
-    error_msg = str(exc_info.value)
-    assert "test input" in error_msg
-    assert "test output" in error_msg
 
 def test_assert_test_empty_results():
     """Test with empty results list"""

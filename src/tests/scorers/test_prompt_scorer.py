@@ -16,7 +16,7 @@ def example():
         context=["Some context"],
         retrieval_context=["Retrieved context"],
         tools_called=["tool1", "tool2"],
-        expected_tools=["tool1"]
+        expected_tools=[{"tool_name": "tool1"}, {"tool_name": "tool2"}]
     )
 
 @pytest.fixture

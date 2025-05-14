@@ -175,8 +175,6 @@ class TestEvalOperations:
             name="Password Reset",
             context=["User Account"],
             retrieval_context=["Password reset instructions"],
-            tools_called=["authentication"],
-            expected_tools=["authentication"],
             additional_metadata={"difficulty": "medium"}
         )
 

@@ -14,6 +14,14 @@ from judgeval.scorers.judgeval_scorers.api_scorers.answer_relevancy import Answe
 from judgeval.judgment_client import JudgmentClient
 from judgeval.data import Example
 
+@pytest.fixture
+def mock_validate_api_key(monkeypatch):
+    """Mock the validate_api_key function."""
+    def _mock_validate_api_key(judgment_api_key):
+        return True, "Valid API key"
+    
+    monkeypatch.setattr('judgeval.common.utils.validate_api_key', _mock_validate_api_key)
+    return _mock_validate_api_key
 
 class TestDirectNotificationIntegration:
     """Integration tests for notifications using the rules engine directly."""
@@ -206,7 +214,7 @@ class TestDirectNotificationIntegration:
 class TestNotificationWithAPICalls:
     """Tests for notifications with API calls to external services."""
     
-    def test_judgment_client_with_notification_rules(self, mock_post):
+    def test_judgment_client_with_notification_rules(self, mock_post, mock_validate_api_key):
         """Test JudgmentClient with notification rules."""
         # Mock API responses
         mock_auth_response = MagicMock()
@@ -262,62 +270,60 @@ class TestNotificationWithAPICalls:
         
         mock_post.side_effect = mock_post_side_effect
         
-        # Create JudgmentClient
-        with patch.object(JudgmentClient, '_validate_api_key', return_value=(True, {"detail": {"user_name": "test_user"}})):
-            client = JudgmentClient(judgment_api_key="test_key")
-            
-            # Create example
-            example = Example(
-                input="Test input",
-                actual_output="Test output",
-                expected_output="Expected output"
-            )
-            
-            # Create notification config
-            notification = NotificationConfig(
-                enabled=True,
-                communication_methods=["slack", "email"],
-                email_addresses=["test@example.com"]
-            )
-            
-            # Create rule with notification
-            rule = Rule(
-                name="Faithfulness Rule",
-                conditions=[
-                    Condition(metric=FaithfulnessScorer(threshold=0.7))
-                ],
-                combine_type="all",
-                notification=notification
-            )
-            
-            # Run evaluation
-            result = client.run_evaluation(
-                examples=[example],
-                scorers=[FaithfulnessScorer(threshold=0.7)],
-                model="gpt-3.5-turbo",
-                rules=[rule]
-            )
-            
-            # Verify the API was called
-            assert mock_post.called
-            
-            # Get the evaluation call (should be at least the second call)
-            eval_call = mock_post.call_args_list[1]
-            
-            # Extract the JSON payload - use 'json' parameter instead of 'data'
-            if 'json' in eval_call[1]:
-                payload = eval_call[1]["json"]
-            else:
-                payload = {}  # Default empty to avoid errors
-            
-            # Verify rules and notification config were included in the API call
-            assert "rules" in payload
-            assert len(payload["rules"]) == 1
-            rule_data = payload["rules"][0]
-            assert "notification" in rule_data
-            assert rule_data["notification"]["enabled"] is True
-            assert rule_data["notification"]["communication_methods"] == ["slack", "email"]
-            assert rule_data["notification"]["email_addresses"] == ["test@example.com"]
+        client = JudgmentClient(judgment_api_key="test_key")
+        
+        # Create example
+        example = Example(
+            input="Test input",
+            actual_output="Test output",
+            expected_output="Expected output"
+        )
+        
+        # Create notification config
+        notification = NotificationConfig(
+            enabled=True,
+            communication_methods=["slack", "email"],
+            email_addresses=["test@example.com"]
+        )
+        
+        # Create rule with notification
+        rule = Rule(
+            name="Faithfulness Rule",
+            conditions=[
+                Condition(metric=FaithfulnessScorer(threshold=0.7))
+            ],
+            combine_type="all",
+            notification=notification
+        )
+        
+        # Run evaluation
+        result = client.run_evaluation(
+            examples=[example],
+            scorers=[FaithfulnessScorer(threshold=0.7)],
+            model="gpt-3.5-turbo",
+            rules=[rule]
+        )
+        
+        # Verify the API was called
+        assert mock_post.called
+        
+        # Get the evaluation call (should be at least the second call)
+        eval_call = mock_post.call_args_list[1]
+        
+        # Extract the JSON payload - use 'json' parameter instead of 'data'
+        if 'json' in eval_call[1]:
+            payload = eval_call[1]["json"]
+        else:
+            payload = {}  # Default empty to avoid errors
+        
+        # Verify rules and notification config were included in the API call
+        assert "rules" in payload
+        assert len(payload["rules"]) == 1
+        rule_data = payload["rules"][0]
+        assert "notification" in rule_data
+        assert rule_data["notification"]["enabled"] is True
+        assert rule_data["notification"]["communication_methods"] == ["slack", "email"]
+        assert rule_data["notification"]["email_addresses"] == ["test@example.com"]
     
     def test_notification_with_multiple_methods(self, mock_post):
         """Test notifications with multiple communication methods."""
@@ -374,61 +380,60 @@ class TestNotificationWithAPICalls:
         mock_post.side_effect = mock_post_side_effect
         
         # Create JudgmentClient
-        with patch.object(JudgmentClient, '_validate_api_key', return_value=(True, {"detail": {"user_name": "test_user"}})):
-            client = JudgmentClient(judgment_api_key="test_key")
-            
-            # Create example
-            example = Example(
-                input="Test input",
-                actual_output="Test output",
-                expected_output="Expected output"
-            )
-            
-            # Create notification config with multiple methods
-            notification = NotificationConfig(
-                enabled=True,
-                communication_methods=["slack", "email", "broadcast_slack", "broadcast_email"],
-                email_addresses=["test1@example.com", "test2@example.com"]
-            )
-            
-            # Create rule with notification
-            rule = Rule(
-                name="Faithfulness Rule",
-                conditions=[
-                    Condition(metric=FaithfulnessScorer(threshold=0.7))
-                ],
-                combine_type="all",
-                notification=notification
-            )
-            
-            # Run evaluation
-            result = client.run_evaluation(
-                examples=[example],
-                scorers=[FaithfulnessScorer(threshold=0.7)],
-                model="gpt-3.5-turbo",
-                rules=[rule]
-            )
-            
-            # Verify the API was called
-            assert mock_post.called
-            
-            # Get the evaluation call
-            eval_call = mock_post.call_args_list[1]
-            
-            # Extract the JSON payload - use 'json' parameter instead of 'data'
-            if 'json' in eval_call[1]:
-                payload = eval_call[1]["json"]
-            else:
-                payload = {}  # Default empty to avoid errors
-            
-            # Verify notification config with multiple methods was included
-            assert "rules" in payload
-            rule_data = payload["rules"][0]
-            assert "notification" in rule_data
-            assert rule_data["notification"]["enabled"] is True
-            assert len(rule_data["notification"]["communication_methods"]) == 4
-            assert "slack" in rule_data["notification"]["communication_methods"]
-            assert "email" in rule_data["notification"]["communication_methods"]
-            assert "broadcast_slack" in rule_data["notification"]["communication_methods"]
-            assert "broadcast_email" in rule_data["notification"]["communication_methods"]
-            assert len(rule_data["notification"]["email_addresses"]) == 2 
+        client = JudgmentClient(judgment_api_key="test_key")
+        
+        # Create example
+        example = Example(
+            input="Test input",
+            actual_output="Test output",
+            expected_output="Expected output"
+        )
+        
+        # Create notification config with multiple methods
+        notification = NotificationConfig(
+            enabled=True,
+            communication_methods=["slack", "email", "broadcast_slack", "broadcast_email"],
+            email_addresses=["test1@example.com", "test2@example.com"]
+        )
+        
+        # Create rule with notification
+        rule = Rule(
+            name="Faithfulness Rule",
+            conditions=[
+                Condition(metric=FaithfulnessScorer(threshold=0.7))
+            ],
+            combine_type="all",
+            notification=notification
+        )
+        
+        # Run evaluation
+        result = client.run_evaluation(
+            examples=[example],
+            scorers=[FaithfulnessScorer(threshold=0.7)],
+            model="gpt-3.5-turbo",
+            rules=[rule]
+        )
+        
+        # Verify the API was called
+        assert mock_post.called
+        
+        # Get the evaluation call
+        eval_call = mock_post.call_args_list[1]
+        
+        # Extract the JSON payload - use 'json' parameter instead of 'data'
+        if 'json' in eval_call[1]:
+            payload = eval_call[1]["json"]
+        else:
+            payload = {}  # Default empty to avoid errors
+        
+        # Verify notification config with multiple methods was included
+        assert "rules" in payload
+        rule_data = payload["rules"][0]
+        assert "notification" in rule_data
+        assert rule_data["notification"]["enabled"] is True
+        assert len(rule_data["notification"]["communication_methods"]) == 4
+        assert "slack" in rule_data["notification"]["communication_methods"]
+        assert "email" in rule_data["notification"]["communication_methods"]
+        assert "broadcast_slack" in rule_data["notification"]["communication_methods"]
+        assert "broadcast_email" in rule_data["notification"]["communication_methods"]
+        assert len(rule_data["notification"]["email_addresses"]) == 2 
