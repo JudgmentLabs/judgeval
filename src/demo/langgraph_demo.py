@@ -8,7 +8,7 @@ from langgraph.graph import StateGraph, END
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from judgeval.common.tracer import Tracer, current_trace_var, prepare_evaluation_for_state, add_evaluation_to_state
-from judgeval.integrations.langgraph import JudgevalCallbackHandler
+from judgeval.integrations.langgraph import JudgevalCallbackHandler, AsyncJudgevalCallbackHandler
 from judgeval.scorers import AnswerRelevancyScorer, JudgevalScorer, APIJudgmentScorer
 from judgeval.data import Example
 
