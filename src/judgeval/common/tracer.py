@@ -1808,9 +1808,7 @@ async def _async_stream_wrapper(
             span.duration = time.time() - start_ts
         # else: # Handle error case if necessary, but remove debug print
 
-# --- Define Context Manager Wrapper Classes ---
-class _TracedAsyncStreamManagerWrapper(AbstractAsyncContextManager):
-    """Wraps an original async stream manager to add tracing."""
+class _BaseStreamManagerWrapper:
     def __init__(self, original_manager, client, span_name, trace_client, stream_wrapper_func, input_kwargs):
         self._original_manager = original_manager
         self._client = client
@@ -1820,127 +1818,77 @@ class _TracedAsyncStreamManagerWrapper(AbstractAsyncContextManager):
         self._input_kwargs = input_kwargs
         self._parent_span_id_at_entry = None
 
+    def _create_span(self):
+        start_time = time.time()
+        span_id = str(uuid.uuid4())
+        current_depth = 0
+        if self._parent_span_id_at_entry and self._parent_span_id_at_entry in self._trace_client._span_depths:
+            current_depth = self._trace_client._span_depths[self._parent_span_id_at_entry] + 1
+        self._trace_client._span_depths[span_id] = current_depth
+        span = TraceSpan(
+            function=self._span_name,
+            span_id=span_id,
+            trace_id=self._trace_client.trace_id,
+            depth=current_depth,
+            message=self._span_name,
+            created_at=start_time,
+            span_type="llm",
+            parent_span_id=self._parent_span_id_at_entry
+        )
+        self._trace_client.add_span(span)
+        return span_id, span
+
+    def _finalize_span(self, span_id):
+        span = self._trace_client.span_id_to_span.get(span_id)
+        if span:
+            span.duration = time.time() - span.created_at
+        if span_id in self._trace_client._span_depths:
+            del self._trace_client._span_depths[span_id]
+
+class _TracedAsyncStreamManagerWrapper(_BaseStreamManagerWrapper, AbstractAsyncContextManager):
     async def __aenter__(self):
         self._parent_span_id_at_entry = current_span_var.get()
         if not self._trace_client:
-             # If no trace, just delegate to the original manager
-             return await self._original_manager.__aenter__()
+            return await self._original_manager.__aenter__()
 
-        # --- Manually create the 'enter' entry ---
-        start_time = time.time()
-        span_id = str(uuid.uuid4())
-        current_depth = 0
-        if self._parent_span_id_at_entry and self._parent_span_id_at_entry in self._trace_client._span_depths:
-            current_depth = self._trace_client._span_depths[self._parent_span_id_at_entry] + 1
-        self._trace_client._span_depths[span_id] = current_depth
-        span = TraceSpan(
-            function=self._span_name,
-            span_id=span_id,
-            trace_id=self._trace_client.trace_id,
-            depth=current_depth,
-            message=self._span_name,
-            created_at=start_time,
-            span_type="llm",
-            parent_span_id=self._parent_span_id_at_entry
-        )
-        self._trace_client.add_span(span)
-        
-        # --- End manual 'enter' entry ---
-
-        # Set the current span ID in contextvars
+        span_id, span = self._create_span()
         self._span_context_token = current_span_var.set(span_id)
+        span.inputs = _format_input_data(self._client, **self._input_kwargs)
 
-        # Manually create 'input' entry
-        input_data = _format_input_data(self._client, **self._input_kwargs)
-        span.inputs = input_data
-
-        # Call the original __aenter__
+        # Call the original __aenter__ and expect it to be an async generator
         raw_iterator = await self._original_manager.__aenter__()
-
-        # Manually create pending 'output' entry
         span.output = "<pending stream>"
-
-        # Wrap the raw iterator
-        wrapped_iterator = self._stream_wrapper_func(raw_iterator, self._client, span)
-        return wrapped_iterator
+        return self._stream_wrapper_func(raw_iterator, self._client, span)
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        # Manually create the 'exit' entry
         if hasattr(self, '_span_context_token'):
-             span_id = current_span_var.get()
-             self._trace_client.span_id_to_span[span_id].duration = time.time() - self._trace_client.span_id_to_span[span_id].created_at
-             if span_id in self._trace_client._span_depths: del self._trace_client._span_depths[span_id]
-             current_span_var.reset(self._span_context_token)
-             delattr(self, '_span_context_token')
+            span_id = current_span_var.get()
+            self._finalize_span(span_id)
+            current_span_var.reset(self._span_context_token)
+            delattr(self, '_span_context_token')
+        return await self._original_manager.__aexit__(exc_type, exc_val, exc_tb)
 
-        # Delegate __aexit__
-        if hasattr(self._original_manager, "__aexit__"):
-             return await self._original_manager.__aexit__(exc_type, exc_val, exc_tb)
-        return None
-
-class _TracedSyncStreamManagerWrapper(AbstractContextManager):
-    """Wraps an original sync stream manager to add tracing."""
-    def __init__(self, original_manager, client, span_name, trace_client, stream_wrapper_func, input_kwargs):
-        self._original_manager = original_manager
-        self._client = client
-        self._span_name = span_name
-        self._trace_client = trace_client
-        self._stream_wrapper_func = stream_wrapper_func
-        self._input_kwargs = input_kwargs
-        self._parent_span_id_at_entry = None
-
+class _TracedSyncStreamManagerWrapper(_BaseStreamManagerWrapper, AbstractContextManager):
     def __enter__(self):
         self._parent_span_id_at_entry = current_span_var.get()
         if not self._trace_client:
-             return self._original_manager.__enter__()
+            return self._original_manager.__enter__()
 
-        # Manually create 'enter' entry
-        start_time = time.time()
-        span_id = str(uuid.uuid4())
-        current_depth = 0
-        if self._parent_span_id_at_entry and self._parent_span_id_at_entry in self._trace_client._span_depths:
-            current_depth = self._trace_client._span_depths[self._parent_span_id_at_entry] + 1
-        self._trace_client._span_depths[span_id] = current_depth
-        span = TraceSpan(
-            function=self._span_name,
-            span_id=span_id,
-            trace_id=self._trace_client.trace_id,
-            depth=current_depth,
-            message=self._span_name,
-            created_at=start_time,
-            span_type="llm",
-            parent_span_id=self._parent_span_id_at_entry
-        )
-        self._trace_client.add_span(span)
+        span_id, span = self._create_span()
         self._span_context_token = current_span_var.set(span_id)
+        span.inputs = _format_input_data(self._client, **self._input_kwargs)
 
-        # Manually create 'input' entry
-        input_data = _format_input_data(self._client, **self._input_kwargs)
-        span.inputs = input_data
-
-        # Call original __enter__
         raw_iterator = self._original_manager.__enter__()
-
-        # Manually create 'output' entry (pending)
         span.output = "<pending stream>"
-
-        # Wrap the raw iterator
-        wrapped_iterator = self._stream_wrapper_func(raw_iterator, self._client, span)
-        return wrapped_iterator
+        return self._stream_wrapper_func(raw_iterator, self._client, span)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        # Manually create 'exit' entry
         if hasattr(self, '_span_context_token'):
-             span_id = current_span_var.get()
-             self._trace_client.span_id_to_span[span_id].duration = time.time() - self._trace_client.span_id_to_span[span_id].created_at
-             if span_id in self._trace_client._span_depths: del self._trace_client._span_depths[span_id]
-             current_span_var.reset(self._span_context_token)
-             delattr(self, '_span_context_token')
-
-        # Delegate __exit__
-        if hasattr(self._original_manager, "__exit__"):
-             return self._original_manager.__exit__(exc_type, exc_val, exc_tb)
-        return None
+            span_id = current_span_var.get()
+            self._finalize_span(span_id)
+            current_span_var.reset(self._span_context_token)
+            delattr(self, '_span_context_token')
+        return self._original_manager.__exit__(exc_type, exc_val, exc_tb)
 
 # --- NEW Generalized Helper Function (Moved from demo) ---
 def prepare_evaluation_for_state(
