@@ -712,6 +712,10 @@ class _DeepTracer:
         func_name = frame.f_code.co_name
         module_name = frame.f_globals.get("__name__", None)
 
+        func = frame.f_globals.get(func_name)
+        if func and (hasattr(func, '_judgment_span_name') or hasattr(func, '_judgment_span_type')):
+            return False
+
         if (
             not module_name
             or func_name.startswith("<") # ex: <listcomp>
@@ -1106,7 +1110,6 @@ class Tracer:
             async def async_wrapper(*args, **kwargs):
                 # Get current trace from context
                 current_trace = current_trace_var.get()
-                trace_token = None
                 
                 # If there's no current trace, create a root trace
                 if not current_trace:
@@ -1147,14 +1150,26 @@ class Tracer:
                             span.record_output(result)
                         return result
                     finally:
-                        if trace_token is not None:
-                            # Save the completed trace
-                            trace_id, trace = current_trace.save(overwrite=overwrite)
-                            self.traces.append(trace)
+                        # Save the completed trace
+                        trace_id, trace = current_trace.save(overwrite=overwrite)
+                        self.traces.append(trace)
 
-                            # Reset trace context (span context resets automatically)
-                            current_trace_var.reset(trace_token)
-                
+                        # Reset trace context (span context resets automatically)
+                        current_trace_var.reset(trace_token)
+                else:
+                    with current_trace.span(span_name, span_type=span_type) as span:
+                        inputs = combine_args_kwargs(func, args, kwargs)
+                        span.record_input(inputs)
+                        
+                        if use_deep_tracing:
+                            with _DeepTracer():
+                                result = await func(*args, **kwargs)
+                        else:
+                            result = await func(*args, **kwargs)
+                            
+                        span.record_output(result)
+                    return result
+        
             return async_wrapper
         else:
             # Non-async function implementation with deep tracing
@@ -1162,7 +1177,6 @@ class Tracer:
             def wrapper(*args, **kwargs):                
                 # Get current trace from context
                 current_trace = current_trace_var.get()
-                trace_token = None
 
                 # If there's no current trace, create a root trace
                 if not current_trace:
@@ -1203,13 +1217,26 @@ class Tracer:
                             span.record_output(result)
                         return result
                     finally:
-                        if trace_token is not None:
-                            # Save the completed trace
-                            trace_id, trace = current_trace.save(overwrite=overwrite)
-                            self.traces.append(trace)
+                        # Save the completed trace
+                        trace_id, trace = current_trace.save(overwrite=overwrite)
+                        self.traces.append(trace)
 
-                            # Reset trace context (span context resets automatically)
-                            current_trace_var.reset(trace_token)
+                        # Reset trace context (span context resets automatically)
+                        current_trace_var.reset(trace_token)
+                else:
+                    with current_trace.span(span_name, span_type=span_type) as span:
+                        
+                        inputs = combine_args_kwargs(func, args, kwargs)
+                        span.record_input(inputs)
+                        
+                        if use_deep_tracing:
+                            with _DeepTracer():
+                                result = func(*args, **kwargs)
+                        else:
+                            result = func(*args, **kwargs)
+                            
+                        span.record_output(result)
+                    return result
     
             return wrapper
         
