@@ -34,7 +34,6 @@ def test_full_example_creation():
         name="test example",
         example_id="123",
         timestamp="20240101_120000",
-        trace_id="trace123"
     )
     
     assert example.input == "test input"
@@ -48,7 +47,6 @@ def test_full_example_creation():
     assert example.name == "test example"
     assert example.example_id == "123"
     assert example.timestamp == "20240101_120000"
-    assert example.trace_id == "trace123"
 
 
 def test_to_dict():

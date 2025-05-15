@@ -821,11 +821,6 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                 if eval_config and span_id: 
                     self._log(f"{log_prefix} Submitting evaluation for span_id={span_id}")
                     try:
-                        # Ensure example has trace_id set if not already present
-                        if not hasattr(eval_config.example, 'trace_id') or not eval_config.example.trace_id:
-                            # Use the correct variable name 'trace_client' here
-                            eval_config.example.trace_id = trace_client.trace_id 
-                            self._log(f"{log_prefix} Set trace_id={trace_client.trace_id} on evaluation example.")
                         
                         # Call async_evaluate on the TraceClient instance ('trace_client')
                         # Use the correct variable name 'trace_client' here
@@ -1721,11 +1716,6 @@ class AsyncJudgevalCallbackHandler(AsyncCallbackHandler):
             if eval_config and span_id: # Check eval_config *and* span_id again
                 self._log(f"{log_prefix} Submitting evaluation for span_id={span_id}")
                 try:
-                    # Ensure example has trace_id set if not already present
-                    if not hasattr(eval_config.example, 'trace_id') or not eval_config.example.trace_id:
-                        # Use the correct variable name 'client' here for the async handler
-                        eval_config.example.trace_id = client.trace_id 
-                        self._log(f"{log_prefix} Set trace_id={client.trace_id} on evaluation example.")
                     
                     # Call async_evaluate on the TraceClient instance ('client')
                     # Use the correct variable name 'client' here for the async handler

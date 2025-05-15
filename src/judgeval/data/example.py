@@ -151,7 +151,6 @@ class Example(BaseModel):
             "example_id": self.example_id,
             "example_index": self.example_index,
             "timestamp": self.timestamp,
-            "trace_id": self.trace_id
         }
 
     def __str__(self):
@@ -168,5 +167,4 @@ class Example(BaseModel):
             f"example_id={self.example_id}, "
             f"example_index={self.example_index}, "
             f"timestamp={self.timestamp}, "
-            f"trace_id={self.trace_id})"
         )
