@@ -88,4 +88,5 @@ jobs:
         run: |      
           SECRET_VARS=$(aws secretsmanager get-secret-value --secret-id gh-actions/api-keys/judgeval --query SecretString --output text)
           export $(echo "$SECRET_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
+          export JUDGMENT_DEV=true
           pipenv run pytest ./e2etests
