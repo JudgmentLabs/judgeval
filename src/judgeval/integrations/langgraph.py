@@ -4,7 +4,7 @@ import time
 import uuid
 import contextvars # <--- Import contextvars
 
-from judgeval.common.tracer import TraceClient, TraceEntry, Tracer, SpanType, EvaluationConfig
+from judgeval.common.tracer import TraceClient, TraceSpan, Tracer, SpanType, EvaluationConfig
 from judgeval.data import Example # Import Example
 
 from langchain_core.callbacks import BaseCallbackHandler
@@ -40,12 +40,10 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         self._run_id_to_span_id: Dict[UUID, str] = {}
         self._span_id_to_start_time: Dict[str, float] = {}
         self._span_id_to_depth: Dict[str, int] = {}
-        self._run_id_to_context_token: Dict[UUID, contextvars.Token] = {}
         self._root_run_id: Optional[UUID] = None
         self._trace_saved: bool = False # Flag to prevent actions after trace is saved
-        self._run_id_to_start_inputs: Dict[UUID, Dict] = {} # <<< ADDED input storage
 
-        self.executed_nodes: List[str] = []
+        self.executed_nodes: List[str] = [] # These last four members are only appended to and never accessed; can probably be removed but still might be useful for future reference?
         self.executed_tools: List[str] = []
         self.executed_node_tools: List[str] = []
         self.traces: List[Dict[str, Any]] = []
@@ -88,7 +86,6 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
             self._trace_client = None
             self._root_run_id = None
             return None
-    # --- END MODIFIED _ensure_trace_client ---
 
     def _start_span_tracking(
         self,
@@ -118,28 +115,26 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
 
         # --- Set SPAN context variable ONLY for chain (node) spans (Sync version) ---
         if span_type == "chain":
-            # token = current_span_var.set(span_id)
             self.tracer.set_current_span(span_id)
-            # self._run_id_to_context_token[run_id] = token
-        # --- END ---
 
-        # TODO: Check if trace_client.add_entry needs await if TraceClient becomes async
-        trace_client.add_entry(TraceEntry(
-            type="enter", span_id=span_id, trace_id=trace_client.trace_id,
-            parent_span_id=parent_span_id, function=name, depth=current_depth,
-            message=name, created_at=start_time, span_type=span_type
-        ))
+        new_trace = TraceSpan(
+            span_id=span_id,
+            trace_id=trace_client.trace_id,
+            parent_span_id=parent_span_id,
+            function=name,
+            depth=current_depth,
+            created_at=start_time,
+            span_type=span_type
+        )
 
-        if inputs:
-            # _record_input_data is also sync for now
-            self._record_input_data(trace_client, run_id, inputs)
+        new_trace.inputs = inputs
 
-    # --- NEW _end_span_tracking ---
+        trace_client.add_span(new_trace)
+
     def _end_span_tracking(
         self,
         trace_client: TraceClient,
         run_id: UUID,
-        span_type: SpanType = "span",
         outputs: Optional[Any] = None,
         error: Optional[BaseException] = None
     ) -> None:
@@ -147,39 +142,20 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
 
         # Get span ID and check if it exists
         span_id = self._run_id_to_span_id.get(run_id)
-        if not span_id:
-            if run_id != self._root_run_id:
-                return
-            span_id = None
 
         start_time = self._span_id_to_start_time.get(span_id) if span_id else None
-        depth = self._span_id_to_depth.get(span_id, 0) if span_id else 0 # Use 0 depth if span_id is None
         duration = time.time() - start_time if start_time is not None else None
-
-        # Record output/error first
-        if error:
-            self._record_output_data(trace_client, run_id, error)
-        elif outputs is not None:
-            self._record_output_data(trace_client, run_id, outputs)
 
         # Add exit entry (only if span was tracked)
         if span_id:
-            entry_function_name = "unknown"
-            if hasattr(trace_client, 'entries') and trace_client.entries:
-                entry_function_name = next((e.function for e in reversed(trace_client.entries) if e.span_id == span_id and e.type == "enter"), "unknown")
-
-            trace_client.add_entry(TraceEntry(
-                type="exit", span_id=span_id, trace_id=trace_client.trace_id,
-                depth=depth, created_at=time.time(), duration=duration,
-                span_type=span_type, function=entry_function_name
-            ))
+            trace_span = trace_client.span_id_to_span.get(span_id)
+            if trace_span:
+                trace_span.duration = duration
+                trace_span.output = error if error else outputs
 
             # Clean up dictionaries for this specific span
             if span_id in self._span_id_to_start_time: del self._span_id_to_start_time[span_id]
             if span_id in self._span_id_to_depth: del self._span_id_to_depth[span_id]
-
-            # Pop context token (Sync version) but don't reset
-            # token = self._run_id_to_context_token.pop(run_id, None)
 
         # Check if this is the root run ending
         if run_id == self._root_run_id:
@@ -187,12 +163,11 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                 # Reset root run id after attempt
                 self._root_run_id = None
                 # Reset input storage for this handler instance
-                self._run_id_to_start_inputs = {}
 
                 if self._trace_client and not self._trace_saved: # Check if not already saved
                     # TODO: Check if trace_client.save needs await if TraceClient becomes async
                     trace_id, trace_data = self._trace_client.save(overwrite=self._trace_client.overwrite) # Use client's overwrite setting
-                    self.traces.append(trace_data)
+                    self.traces.append(trace_data) # Leaving this in for now but can probably be removed
                     self._trace_saved = True # Set flag only after successful save
             finally:
                 # --- NEW: Consolidated Cleanup Logic --- 
@@ -200,73 +175,9 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                 # Reset root run id
                 self._root_run_id = None
                 # Reset input storage for this handler instance
-                self._run_id_to_start_inputs = {}
                 if self.tracer._active_trace_client == self._trace_client:
                     self.tracer._active_trace_client = None
                 # --- End Cleanup Logic ---
-        
-    def _record_input_data(self,
-                           trace_client: TraceClient,
-                           run_id: UUID,
-                           inputs: Dict[str, Any]):
-        if run_id not in self._run_id_to_span_id:
-            return
-
-        span_id = self._run_id_to_span_id[run_id]
-        depth = self._span_id_to_depth.get(span_id, 0)
-
-        function_name = "unknown"
-        span_type: SpanType = "span"
-        # Find the corresponding 'enter' entry to get the function name and span type
-        enter_entry = next((e for e in reversed(trace_client.entries) if e.span_id == span_id and e.type == "enter"), None)
-        if enter_entry:
-            function_name = enter_entry.function
-            span_type = enter_entry.span_type
-
-        input_entry = TraceEntry(
-            type="input",
-            span_id=span_id,
-            trace_id=trace_client.trace_id,
-            parent_span_id=next((e.parent_span_id for e in reversed(trace_client.entries) if e.span_id == span_id and e.type == "enter"), None), # Get parent from enter entry
-            function=function_name,
-            depth=depth,
-            message=f"Input to {function_name}",
-            created_at=time.time(),
-            inputs=inputs,
-            span_type=span_type
-        )
-        trace_client.add_entry(input_entry)
-
-    def _record_output_data(self,
-                            trace_client: TraceClient,
-                            run_id: UUID,
-                            output: Any):
-        if run_id not in self._run_id_to_span_id:
-            return
-
-        span_id = self._run_id_to_span_id[run_id]
-        depth = self._span_id_to_depth.get(span_id, 0)
-
-        function_name = "unknown"
-        span_type: SpanType = "span"
-        enter_entry = next((e for e in reversed(trace_client.entries) if e.span_id == span_id and e.type == "enter"), None)
-        if enter_entry:
-            function_name = enter_entry.function
-            span_type = enter_entry.span_type
-
-        output_entry = TraceEntry(
-            type="output",
-            span_id=span_id,
-            trace_id=trace_client.trace_id,
-            parent_span_id=next((e.parent_span_id for e in reversed(trace_client.entries) if e.span_id == span_id and e.type == "enter"), None), # Get parent from enter entry
-            function=function_name,
-            depth=depth,
-            message=f"Output from {function_name}",
-            created_at=time.time(),
-            output=output, # Langchain outputs are typically serializable directly
-            span_type=span_type
-        )
-        trace_client.add_entry(output_entry)
 
     # --- Callback Methods ---
     # Each method now ensures the trace client exists before proceeding
@@ -287,7 +198,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         if not trace_client: return
         doc_summary = [{"index": i, "page_content": doc.page_content[:100] + "..." if len(doc.page_content) > 100 else doc.page_content, "metadata": doc.metadata} for i, doc in enumerate(documents)]
         outputs = {"document_count": len(documents), "documents": doc_summary, "kwargs": kwargs}
-        self._end_span_tracking(trace_client, run_id, span_type="retriever", outputs=outputs)
+        self._end_span_tracking(trace_client, run_id, outputs=outputs)
 
     def on_chain_start(self, serialized: Dict[str, Any], inputs: Dict[str, Any], *, run_id: UUID, parent_run_id: Optional[UUID] = None, tags: Optional[List[str]] = None, metadata: Optional[Dict[str, Any]] = None, **kwargs: Any) -> None:
         serialized_name = serialized.get('name') if serialized else "Unknown (Serialized=None)"
@@ -302,7 +213,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
 
         if node_name:
             name = node_name # Use node name if available
-            if name not in self.executed_nodes: self.executed_nodes.append(name)
+            if name not in self.executed_nodes: self.executed_nodes.append(name) # Leaving this in for now but can probably be removed
         elif is_langgraph_root_kwarg and is_potential_root_event:
              name = "LangGraph" # Explicit root detected
         # Add handling for other potential LangChain internal chains if needed, e.g., "RunnableSequence"
@@ -321,9 +232,6 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         # --- Start Span Tracking ---
         combined_inputs = {'inputs': inputs, 'tags': tags, 'metadata': metadata, 'kwargs': kwargs, 'serialized': serialized}
         self._start_span_tracking(trace_client, run_id, parent_run_id, name, span_type=span_type, inputs=combined_inputs)
-        # --- Store inputs for potential evaluation later --- 
-        self._run_id_to_start_inputs[run_id] = inputs # Store the raw inputs dict
-        # --- End Store inputs --- 
 
 
     def on_chain_end(self, outputs: Dict[str, Any], *, run_id: UUID, parent_run_id: Optional[UUID] = None, tags: Optional[List[str]] = None, **kwargs: Any) -> Any:
@@ -333,28 +241,15 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         if not trace_client: return
 
         span_id = self._run_id_to_span_id.get(run_id)
-        if span_id:
-            if hasattr(trace_client, 'entries') and trace_client.entries:
-                enter_entry = next((e for e in reversed(trace_client.entries) if e.span_id == span_id and e.type == "enter"), None)
-                if enter_entry: span_type = enter_entry.span_type
-        else:
-            # If it's the root run ending, _end_span_tracking will handle cleanup/save
-            if run_id != self._root_run_id:
-                return # Don't call end tracking if it's not the root and span wasn't tracked
-
-        # --- Existing span ending logic --- 
-        # Determine span_type for end_span_tracking (copied from sync handler)
-        end_span_type: SpanType = "chain" # Default
-        if span_id: # Check if span_id was actually found
-            if hasattr(trace_client, 'entries') and trace_client.entries:
-                enter_entry = next((e for e in reversed(trace_client.entries) if e.span_id == span_id and e.type == "enter"), None)
-                if enter_entry: end_span_type = enter_entry.span_type
+        # If it's the root run ending, _end_span_tracking will handle cleanup/save
+        if not span_id and run_id != self._root_run_id:
+            return # Don't call end tracking if it's not the root and span wasn't tracked
 
         # Prepare outputs for end tracking (moved down)
         combined_outputs = {"outputs": outputs, "tags": tags, "kwargs": kwargs}
 
         # Call end_span_tracking with potentially determined span_type
-        self._end_span_tracking(trace_client, run_id, span_type=end_span_type, outputs=combined_outputs)
+        self._end_span_tracking(trace_client, run_id, outputs=combined_outputs)
 
         # --- Root node cleanup (Existing logic - slightly modified save call) ---
         if run_id == self._root_run_id:
@@ -362,7 +257,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                 # Save might need to be async if TraceClient methods become async
                 # Pass overwrite=True based on client's setting
                 trace_id_saved, trace_data = trace_client.save(overwrite=trace_client.overwrite)
-                self.traces.append(trace_data)
+                self.traces.append(trace_data) # Leaving this in for now but can probably be removed
                 self._trace_saved = True
                 # Reset tracer's active client *after* successful save
                 if self.tracer._active_trace_client == trace_client:
@@ -371,7 +266,6 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
             # Reset root run id after attempt
             self._root_run_id = None
             # Reset input storage for this handler instance
-            self._run_id_to_start_inputs = {} 
 
     def on_chain_error(self, error: BaseException, *, run_id: UUID, parent_run_id: Optional[UUID] = None, **kwargs: Any) -> Any:
         # Pass parent_run_id
@@ -380,17 +274,12 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
             return
 
         span_id = self._run_id_to_span_id.get(run_id)
-        span_type: SpanType = "chain" # Default
-        if span_id:
-            if hasattr(trace_client, 'entries') and trace_client.entries:
-                enter_entry = next((e for e in reversed(trace_client.entries) if e.span_id == span_id and e.type == "enter"), None)
-                if enter_entry: span_type = enter_entry.span_type
-        else:
-                # Let _end_span_tracking handle potential root run cleanup
-            if run_id != self._root_run_id:
-                return
+        
+        # Let _end_span_tracking handle potential root run cleanup
+        if not span_id and run_id != self._root_run_id:
+            return
 
-        self._end_span_tracking(trace_client, run_id, span_type=span_type, error=error)
+        self._end_span_tracking(trace_client, run_id, error=error)
 
     def on_tool_start(self, serialized: Dict[str, Any], input_str: str, *, run_id: UUID, parent_run_id: Optional[UUID] = None, tags: Optional[List[str]] = None, metadata: Optional[Dict[str, Any]] = None, inputs: Optional[Dict[str, Any]] = None, **kwargs: Any) -> Any:
         name = serialized.get("name", "Unnamed Tool") if serialized else "Unknown Tool (Serialized=None)"
@@ -403,17 +292,14 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         self._start_span_tracking(trace_client, run_id, parent_run_id, name, span_type="tool", inputs=combined_inputs)
 
         # --- Track executed tools (remains the same) ---
-        if name not in self.executed_tools: self.executed_tools.append(name)
+        if name not in self.executed_tools: self.executed_tools.append(name) # Leaving this in for now but can probably be removed
         parent_node_name = None
         if parent_run_id and parent_run_id in self._run_id_to_span_id:
             parent_span_id = self._run_id_to_span_id[parent_run_id]
-            if hasattr(trace_client, 'entries') and trace_client.entries:
-                parent_enter_entry = next((e for e in reversed(trace_client.entries) if e.span_id == parent_span_id and e.type == "enter" and e.span_type == "chain"), None)
-                if parent_enter_entry:
-                    parent_node_name = parent_enter_entry.function
+            parent_node_name = trace_client.span_id_to_span[parent_span_id].function
 
         node_tool = f"{parent_node_name}:{name}" if parent_node_name else name
-        if node_tool not in self.executed_node_tools: self.executed_node_tools.append(node_tool)
+        if node_tool not in self.executed_node_tools: self.executed_node_tools.append(node_tool) # Leaving this in for now but can probably be removed
         # --- End Track executed tools ---
 
 
@@ -422,14 +308,14 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         trace_client = self._ensure_trace_client(run_id, parent_run_id, "ToolEnd") # Corrected call
         if not trace_client: return
         outputs = {"output": output, "kwargs": kwargs}
-        self._end_span_tracking(trace_client, run_id, span_type="tool", outputs=outputs)
+        self._end_span_tracking(trace_client, run_id, outputs=outputs)
 
     def on_tool_error(self, error: BaseException, *, run_id: UUID, parent_run_id: Optional[UUID] = None, **kwargs: Any) -> Any:
 
         # Pass parent_run_id
         trace_client = self._ensure_trace_client(run_id, parent_run_id, "ToolError") # Corrected call
         if not trace_client: return
-        self._end_span_tracking(trace_client, run_id, span_type="tool", error=error)
+        self._end_span_tracking(trace_client, run_id, error=error)
 
     def on_llm_start(self, serialized: Dict[str, Any], prompts: List[str], *, run_id: UUID, parent_run_id: Optional[UUID] = None, tags: Optional[List[str]] = None, metadata: Optional[Dict[str, Any]] = None, invocation_params: Optional[Dict[str, Any]] = None, options: Optional[Dict[str, Any]] = None, name: Optional[str] = None, **kwargs: Any) -> Any:
 
@@ -479,7 +365,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                     'total_tokens': total_tokens
                 }
             
-        self._end_span_tracking(trace_client, run_id, span_type="llm", outputs=outputs)
+        self._end_span_tracking(trace_client, run_id, outputs=outputs)
         # --- End Token Usage ---
 
     def on_llm_error(self, error: BaseException, *, run_id: UUID, parent_run_id: Optional[UUID] = None, **kwargs: Any) -> Any:
@@ -487,7 +373,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         # Pass parent_run_id
         trace_client = self._ensure_trace_client(run_id, parent_run_id, "LLMError") # Corrected call
         if not trace_client: return
-        self._end_span_tracking(trace_client, run_id, span_type="llm", error=error)
+        self._end_span_tracking(trace_client, run_id, error=error)
 
     def on_chat_model_start(self, serialized: Dict[str, Any], messages: List[List[BaseMessage]], *, run_id: UUID, parent_run_id: Optional[UUID] = None, tags: Optional[List[str]] = None, metadata: Optional[Dict[str, Any]] = None, invocation_params: Optional[Dict[str, Any]] = None, options: Optional[Dict[str, Any]] = None, name: Optional[str] = None, **kwargs: Any) -> Any:
         # Reuse on_llm_start logic, adding message formatting if needed

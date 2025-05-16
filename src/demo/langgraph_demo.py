@@ -198,7 +198,7 @@ def generate_recommendations(state: State) -> State:
         input=user_prompt,
         actual_output=recommendations,
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
-        model="gpt-4"
+        model="gpt-4o"
     )
     # --- End Evaluation Setup ---
 
