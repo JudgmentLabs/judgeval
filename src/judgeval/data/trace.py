@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 from judgeval.evaluation_run import EvaluationRun
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 class TraceSpan(BaseModel):
     span_id: str
@@ -23,7 +23,7 @@ class TraceSpan(BaseModel):
             "span_id": self.span_id,
             "trace_id": self.trace_id,
             "depth": self.depth,
-            "created_at": datetime.fromtimestamp(self.created_at).isoformat(),
+            "created_at": datetime.fromtimestamp(self.created_at, tz=timezone.utc).isoformat(),
             "inputs": self._serialize_inputs(),
             "output": self._serialize_output(),
             "evaluation_runs": [run.model_dump() for run in self.evaluation_runs] if self.evaluation_runs else [],
@@ -41,6 +41,9 @@ class TraceSpan(BaseModel):
     
     def _serialize_inputs(self) -> dict:
         """Helper method to serialize input data safely."""
+        if self.inputs is None:
+            return {}
+            
         serialized_inputs = {}
         for key, value in self.inputs.items():
             if isinstance(value, BaseModel):
@@ -89,6 +92,9 @@ class TraceSpan(BaseModel):
         
     def _serialize_output(self) -> Any:
         """Helper method to serialize output data safely."""
+        if self.output is None:
+            return None
+            
         def serialize_value(value):
             if isinstance(value, BaseModel):
                 return value.model_dump()

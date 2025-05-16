@@ -75,7 +75,6 @@ current_span_var = contextvars.ContextVar('current_span', default=None) # Contex
 
 # Define type aliases for better code readability and maintainability
 ApiClient: TypeAlias = Union[OpenAI, Together, Anthropic, AsyncOpenAI, AsyncAnthropic, AsyncTogether, genai.Client, genai.client.AsyncClient]  # Supported API clients
-TraceEntryType = Literal['enter', 'exit', 'output', 'input', 'evaluation']  # Valid trace entry types
 SpanType = Literal['span', 'tool', 'llm', 'evaluation', 'chain']
 
 # --- Evaluation Config Dataclass (Moved from langgraph.py) ---
@@ -1443,7 +1442,7 @@ def wrap(client: Any) -> Any:
         if original_stream:
              client.messages.stream = traced_stream_async
     elif isinstance(client, genai.client.AsyncClient):
-        client.generate_content = traced_create_async
+        client.models.generate_content = traced_create_async
     elif isinstance(client, (OpenAI, Together)):
          client.chat.completions.create = traced_create_sync
          client.responses.create = traced_response_create_sync
@@ -1452,7 +1451,7 @@ def wrap(client: Any) -> Any:
          if original_stream:
              client.messages.stream = traced_stream_sync
     elif isinstance(client, genai.Client):
-         client.generate_content = traced_create_sync
+         client.models.generate_content = traced_create_sync
 
     return client
 
