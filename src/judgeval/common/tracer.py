@@ -459,6 +459,7 @@ class TraceClient:
         self.executed_tools = []
         self.executed_node_tools = []
         self._span_depths: Dict[str, int] = {} # NEW: To track depth of active spans
+
     def get_current_span(self):
         """Get the current span from the context var"""
         return current_span_var.get()
@@ -585,7 +586,8 @@ class TraceClient:
         # span_id_at_eval_call = current_span_var.get()
         # print(f"[TraceClient.async_evaluate] Captured span ID at eval call: {span_id_at_eval_call}")
         # Prioritize explicitly passed span_id, fallback to context var
-        span_id_to_use = span_id if span_id is not None else current_span_var.get()
+        current_span_ctx_var = current_span_var.get()
+        span_id_to_use = span_id if span_id is not None else current_span_ctx_var if current_span_ctx_var is not None else self.tracer.get_current_span()
         # print(f"[TraceClient.async_evaluate] Using span_id: {span_id_to_use}")
         # --- End Modification ---
 
@@ -595,7 +597,7 @@ class TraceClient:
             log_results=log_results,
             project_name=self.project_name,
             eval_name=f"{self.name.capitalize()}-"
-                f"{current_span_var.get()}-" # Keep original eval name format using context var if available
+                f"{span_id_to_use}-" # Keep original eval name format using context var if available
                 f"[{','.join(scorer.score_type.capitalize() for scorer in scorers)}]",
             examples=[example],
             scorers=scorers,
@@ -1361,6 +1363,12 @@ class Tracer:
                 "To use a different project name, ensure the first Tracer initialization uses the desired project name.",
                 RuntimeWarning
             )
+
+    def set_current_span(self, span_id: str):
+        self.current_span_id = span_id
+    
+    def get_current_span(self) -> Optional[str]:
+        return self.current_span_id
     
     def set_current_trace(self, trace: TraceClient):
         """

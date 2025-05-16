@@ -16,8 +16,9 @@ from langchain_core.documents import Document
 # --- Get context vars from tracer module ---
 # Assuming tracer.py defines these and they are accessible
 # If not, redefine them here or adjust import
-from judgeval.common.tracer import current_span_var, current_trace_var # <-- Import current_trace_var
-# TODO: Figure out how to handle context variables
+
+# from judgeval.common.tracer import current_span_var
+# TODO: Figure out how to handle context variables. Current solution is to keep track of current span id in Tracer class
 
 # --- NEW __init__ ---
 class JudgevalCallbackHandler(BaseCallbackHandler):
@@ -117,8 +118,9 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
 
         # --- Set SPAN context variable ONLY for chain (node) spans (Sync version) ---
         if span_type == "chain":
-            token = current_span_var.set(span_id)
-            self._run_id_to_context_token[run_id] = token
+            # token = current_span_var.set(span_id)
+            self.tracer.set_current_span(span_id)
+            # self._run_id_to_context_token[run_id] = token
         # --- END ---
 
         # TODO: Check if trace_client.add_entry needs await if TraceClient becomes async
@@ -177,7 +179,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
             if span_id in self._span_id_to_depth: del self._span_id_to_depth[span_id]
 
             # Pop context token (Sync version) but don't reset
-            token = self._run_id_to_context_token.pop(run_id, None)
+            # token = self._run_id_to_context_token.pop(run_id, None)
 
         # Check if this is the root run ending
         if run_id == self._root_run_id:
