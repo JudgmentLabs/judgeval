@@ -84,37 +84,50 @@ class TraceSpan(BaseModel):
             return repr(output)
         except (TypeError, OverflowError, ValueError):
             pass
-    
-        warnings.warn(
-            f"Output for function {function_name} is not JSON serializable and could not be converted to string. Setting to None."
-        )
+
         return None
         
     def _serialize_output(self) -> Any:
-        """Helper method to serialize output data safely."""
+        """Helper method to serialize output data safely using an iterative approach."""
         if self.output is None:
             return None
+        
+        if isinstance(self.output, (str, int, float, bool, type(None))):
+            return self.output
             
-        def serialize_value(value):
+        stack = [(self.output, None, None)] 
+        result = None
+        
+        while stack:
+            value, container, key_or_index = stack.pop()
+            processed_value = None
+            
             if isinstance(value, BaseModel):
-                return value.model_dump()
+                processed_value = value.model_dump()
             elif isinstance(value, dict):
-                # Recursively serialize dictionary values
-                return {k: serialize_value(v) for k, v in value.items()}
+                processed_value = {}
+                for k, v in value.items():
+                    stack.append((v, processed_value, k))
             elif isinstance(value, (list, tuple)):
-                # Recursively serialize list/tuple items
-                return [serialize_value(item) for item in value]
+                processed_value = [None] * len(value)
+                for i, v in enumerate(reversed(value)):
+                    stack.append((v, processed_value, len(value) - 1 - i))
             else:
-                # Try direct JSON serialization first
                 try:
                     json.dumps(value)
-                    return value
+                    processed_value = value
                 except (TypeError, OverflowError, ValueError):
-                    # Fallback to safe stringification
-                    return self.safe_stringify(value, self.function)
-
-        # Start serialization with the top-level output
-        return serialize_value(self.output)
+                    processed_value = self.safe_stringify(value, self.function)
+            
+            if container is not None:
+                if isinstance(container, dict):
+                    container[key_or_index] = processed_value
+                elif isinstance(container, list):
+                    container[key_or_index] = processed_value
+            else:
+                result = processed_value
+                
+        return result
 
 class Trace(BaseModel):
     trace_id: str
