@@ -401,9 +401,19 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         self._start_span_tracking(trace_client, run_id, parent_run_id, chat_model_name, span_type="llm", inputs=inputs) # Use 'llm' span_type for consistency
 
     def on_agent_action(self, action: AgentAction, *, run_id: UUID, parent_run_id: Optional[UUID] = None, **kwargs: Any) -> Any:
-        # TODO: Implement
-        pass
+        action_tool = action.tool
+        name = f"AGENT_ACTION_{(action_tool).upper()}"
+        # Pass parent_run_id
+        trace_client = self._ensure_trace_client(run_id, parent_run_id, name) # Corrected call
+        if not trace_client: return
+
+        inputs = {'tool_input': action.tool_input, 'log': action.log, 'messages': action.messages, 'kwargs': kwargs}
+        self._start_span_tracking(trace_client, run_id, parent_run_id, name, span_type="agent", inputs=inputs)
 
     def on_agent_finish(self, finish: AgentFinish, *, run_id: UUID, parent_run_id: Optional[UUID] = None, **kwargs: Any) -> Any:
-        # TODO: Implement
-        pass
+        # Pass parent_run_id
+        trace_client = self._ensure_trace_client(run_id, parent_run_id, "AgentFinish") # Corrected call
+        if not trace_client: return
+
+        outputs = {'return_values': finish.return_values, 'log': finish.log, 'messages': finish.messages, 'kwargs': kwargs}
+        self._end_span_tracking(trace_client, run_id, outputs=outputs)
