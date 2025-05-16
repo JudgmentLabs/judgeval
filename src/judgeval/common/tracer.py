@@ -1368,7 +1368,7 @@ class Tracer:
         self.current_span_id = span_id
     
     def get_current_span(self) -> Optional[str]:
-        return self.current_span_id
+        return getattr(self, 'current_span_id', None)
     
     def set_current_trace(self, trace: TraceClient):
         """
