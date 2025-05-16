@@ -1,20 +1,17 @@
 ---
 title: Integrating Judgeval with LangGraph
 ---
-Integrating Judgeval with LangGraph allows for detailed tracing and evaluation of your graph workflows. By adding either the `JudgevalCallbackHandler` (synchronous) or `AsyncJudgevalCallbackHandler` (asynchronous) to your LangGraph invocation, you can automatically trace node executions, tool calls, and LLM interactions within your graph using Judgeval.
+Integrating Judgeval with LangGraph allows for detailed tracing and evaluation of your graph workflows. By adding the `JudgevalCallbackHandler` to your LangGraph invocation, you can automatically trace node executions, tool calls, and LLM interactions within your graph for both synchronous (`graph.invoke`) and asynchronous (`graph.ainvoke`) workflows.
 
 <Note>
 We expect you to already be familiar with Judgeval and its core concepts. If not, please refer to the [Getting Started](/getting_started) guide.
 </Note>
 
-## Judgeval Callback Handlers
+## Judgeval Callback Handler
 
-Judgeval provides two callback handlers for LangGraph integration:
+Judgeval provides the `JudgevalCallbackHandler` for LangGraph integration. It works seamlessly with both synchronous (`graph.invoke`) and asynchronous (`graph.ainvoke`) graph executions.
 
-1. `JudgevalCallbackHandler`: For synchronous LangGraph workflows (`graph.invoke`)
-2. `AsyncJudgevalCallbackHandler`: For asynchronous LangGraph workflows (`graph.ainvoke`)
-
-Both handlers automatically capture:
+The handler automatically captures:
 
 *   Visits to each node in your graph.
 *   Calls made to any tools integrated with your LangGraph agents or nodes.
@@ -27,27 +24,26 @@ The handler instances store metadata about the execution, accessible after the g
 - `executed_node_tools`: A list detailing the sequence of node and tool executions, formatted like `['node_A', 'node_A:tool_X', 'node_B']`.
 
 <Tip>
-When using either callback handler, you do not need to add `@observe` decorators to your LangGraph nodes or tools for tracing purposes.
+When using the `JudgevalCallbackHandler`, you do not need to add `@observe` decorators to your LangGraph nodes or tools for tracing purposes.
 </Tip>
 
 ## Triggering Evaluations
 
-You can trigger Judgeval evaluations directly from within your graph nodes. This associates the evaluation results with the specific node's execution span in the trace. The recommended way is to use the `add_evaluation_to_state` helper function:
+You can trigger Judgeval evaluations directly from within your graph nodes. This associates the evaluation results with the specific node's execution span in the trace. Use the `async_evaluate` method on either the `judgment` tracer or the current trace:
 
 ```python
 # Inside your LangGraph node function
-from judgeval.integrations.langgraph import add_evaluation_to_state
 from judgeval.scorers import AnswerRelevancyScorer # Or other scorers
 
-# For synchronous nodes:
+# Option 1: Using the tracer directly (recommended)
 def my_node_function(state: State) -> State:
     # ... your node logic ...
     user_input = "some input"
     llm_output = "some output"
     model_name = "gpt-4"
 
-    add_evaluation_to_state(
-        state=state,
+    # The tracer automatically associates the evaluation with the current span
+    judgment.async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=0.7)],
         input=user_input,
         actual_output=llm_output,
@@ -56,15 +52,15 @@ def my_node_function(state: State) -> State:
     # ... potentially modify state further ...
     return state
 
-# For asynchronous nodes:
-async def my_async_node_function(state: State) -> State:
+# Option 2: Using the current trace explicitly
+def another_node_function(state: State) -> State:
     # ... your node logic ...
     user_input = "some input"
     llm_output = "some output"
     model_name = "gpt-4"
 
-    add_evaluation_to_state(
-        state=state,
+    # Get the current trace and evaluate
+    judgment.get_current_trace().async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=0.7)],
         input=user_input,
         actual_output=llm_output,
@@ -74,7 +70,7 @@ async def my_async_node_function(state: State) -> State:
     return state
 ```
 
-Alternatively, you can manually add an `EvaluationConfig` object to your node's output state under the key `_judgeval_eval`. The handler will detect this and trigger the evaluation.
+Both approaches work in both synchronous and asynchronous node functions.
 
 ## Example Workflows
 
@@ -87,9 +83,8 @@ from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 from langgraph.graph import StateGraph, END
 from judgeval.common.tracer import Tracer
-from judgeval.integrations.langgraph import JudgevalCallbackHandler # <-- Import sync handler
+from judgeval.integrations.langgraph import JudgevalCallbackHandler
 from judgeval.scorers import AnswerRelevancyScorer # Or other scorers
-from judgeval.data import Example
 
 # Define your state
 class State(TypedDict):
@@ -102,12 +97,12 @@ PROJECT_NAME = "my-langgraph-project"
 
 # Initialize Tracer and Handler
 judgment = Tracer(api_key=os.getenv("JUDGMENT_API_KEY"), project_name=PROJECT_NAME)
-handler = JudgevalCallbackHandler(judgment) # <-- Use sync handler
+handler = JudgevalCallbackHandler(judgment)
 
 # Define your node functions
 def node_1(state: State):
     # ... node logic ...
-    # Optionally add evaluation here using add_evaluation_to_state(state, ...)
+    # Optionally add evaluation using judgment.async_evaluate(...)
     return state
 
 def node_2(state: State):
@@ -152,9 +147,8 @@ from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 from langgraph.graph import StateGraph, END
 from judgeval.common.tracer import Tracer
-from judgeval.integrations.langgraph import AsyncJudgevalCallbackHandler # <-- Import async handler
+from judgeval.integrations.langgraph import JudgevalCallbackHandler # <-- Same handler works for async
 from judgeval.scorers import AnswerRelevancyScorer # Or other scorers
-from judgeval.data import Example
 
 # Define your state
 class State(TypedDict):
@@ -167,12 +161,12 @@ PROJECT_NAME = "my-langgraph-project"
 
 # Initialize Tracer and Handler
 judgment = Tracer(api_key=os.getenv("JUDGMENT_API_KEY"), project_name=PROJECT_NAME)
-handler = AsyncJudgevalCallbackHandler(judgment) # <-- Use async handler
+handler = JudgevalCallbackHandler(judgment) # <-- Same handler for async flows
 
 # Define your node functions (async)
 async def node_1(state: State):
     # ... node logic ...
-    # Optionally add evaluation here using add_evaluation_to_state(state, ...)
+    # Optionally add evaluation using judgment.async_evaluate(...)
     return state
 
 async def node_2(state: State):
