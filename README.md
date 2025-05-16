@@ -1,73 +1,97 @@
-<h1 align="center" style="border-bottom: none; line-height: 1.2;">
-    <div style="margin-bottom: 0.2em;"> 
-        <a href="https://www.judgmentlabs.ai/"><picture>
-            <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
-            <source media="(prefers-color-scheme: light)" srcset="assets/logo-light.svg">
-            <img alt="Judgment Logo" src="assets/logo-light.svg" width="200" />
-        </picture></a>
-        <br>
-    </div>
-    <br>
-    <div style="font-size: 0.85em; display: block; margin-bottom: 0.5em;"> 
-        Open-source framework for building evaluation pipelines for multi-step agent workflows
-    </div>
-</h1>
-<p>
-Judgeval supports both real-time and experimental evaluation setups, helping you build LLM systems that run better with comprehensive tracing, evaluations, and monitoring.
-</p>
+<div align="center">
 
-<div>
-<a target="_blank" href="https://judgment.mintlify.app/getting_started">
-</a>
+<img src="assets/logo-light.svg#gh-light-mode-only" alt="Judgment Logo" width="400" />
+<img src="assets/logo-dark.svg#gh-dark-mode-only" alt="Judgment Logo" width="400" />
+
+**Build monitoring & evaluation pipelines for complex agents**
+
+[Website](https://www.judgmentlabs.ai/) • [Twitter/X](https://x.com/JudgmentLabs) • [LinkedIn](https://www.linkedin.com/company/judgmentlabs) • [Documentation](https://judgment.mintlify.app/getting_started) • [Demos](https://www.youtube.com/@AlexShan-j3o)
 
 </div>
 
-<p align="center">
-    <a href="https://www.judgmentlabs.ai/"><b>Website</b></a> •
-    <a href="https://x.com/JudgmentLabs"><b>Twitter/X</b></a> •
-    <a href="https://www.linkedin.com/company/judgmentlabs"><b>LinkedIn<b></a>•
-    <a href="https://judgment.mintlify.app/getting_started"><b>Documentation</b></a> •
-    <a href="https://www.youtube.com/@AlexShan-j3o"><b>Demos</b></a>
-</p>
+## 🚀 What is Judgeval?
+
+Judgeval is an open-source tool for testing, monitoring, and optimizing AI agents. Judgeval is created and maintained by [Judgment Labs](https://judgmentlabs.ai/).
 
 
-<h2 align="center">🚀 What is Judgeval?</h2>
+**🔍 Tracing**
+* Automatic agent tracing for common agent frameworks and SDKs (LangGraph, OpenAI, Anthropic, etc.)
+* Track input/output, latency, cost, token usage at every step
+* Function tracing with `@judgment.observe` decorator
 
-Judgeval is an open-source framework for building evaluation pipelines for multi-step agent workflows, supporting both real-time and experimental evaluation setups.
+**🧪 Evals**
+* Plug-and-measure 15+ metrics, including:
+  * Tool call accuracy
+  * Hallucinations
+  * Instruction adherence
+  * Retrieval context recall
 
-<br>
+    Our metric implementations are research-backed by Stanford and Berkeley AI labs. Check out our [research](https://judgmentlabs.ai/research)!
+* Build custom evaluators that seamlessly connect with our infrastructure!
+* Use our evals for:
+    * ⚠️ Unit-testing your agent
+    * 🔬 Experimentally testing new prompts and models
+    * 🛡️ Online evaluations to guardrail your agent's actions and responses
+
+**📊 Datasets**
+* Export trace data to datasets hosted on Judgment's Platform and export to JSON, Parquet, S3, etc.
+* Run evals on datasets as unit-tests or to A/B test agent configs
+
+**💡 Insights**
+* Error clustering groups agent failures to uncover failure patterns and speed up root cause analysis
+* Trace agent failures to their exact source. Judgment's Osiris agent localizes errors to specific agent components, enabling precise, targeted fixes.
 
 
-**Development and Production Evaluation Layer**: Offers a robust evaluation layer for multi-step agent applications, including unit-testing and performance monitoring capabilities.
+## 🛠️ Installation
 
-**Plug-and-Evaluate**: Easily integrate your LLM systems with 10+ research-backed metrics, including those for Hallucination detection, RAG retriever quality, and more.
-
-**Custom Evaluation Pipelines**: Construct powerful and flexible custom evaluation pipelines tailored specifically for your LLM systems.
-
-**Monitoring in Production**: Utilize state-of-the-art real-time evaluation foundation models to monitor your LLM systems effectively in production environments.
-
-
-<br>
-
-<h2 align="center">🛠️ Installation</h2>
-
-Get started with Judgeval by installing the SDK using pip:
+Get started with Judgeval by installing our SDK using pip:
 
 ```bash
 pip install judgeval
 ```
 
-Ensure you have your `JUDGMENT_API_KEY` environment variable set to connect to the Judgeval backend.
+Ensure you have your `JUDGMENT_API_KEY` environment variable set to connect to the [Judgment platform](https://app.judgmentlabs.ai/). If you don't have a key, create an account on the platform!
 
-<h2 align="center">🏁 Get Started</h2>
+## 🏁 Get Started
 
 Here's how you can quickly start using Judgeval:
 
-<h3 align="center">📝 Offline Evaluations</h3>
-You can evaluate your workflow execution data to measure quality metrics such as hallucination.
-Create a file named `evaluate.py` with the following code:
+### 🛰️ Tracing
+
+Track your agent execution with full observability with just a few lines of code.
+Create a file named `traces.py` with the following code:
 
 ```python
+from judgeval.common.tracer import Tracer, wrap
+from openai import OpenAI
+
+client = wrap(OpenAI())
+judgment = Tracer(project_name="my_project")
+
+@judgment.observe(span_type="tool")
+def my_tool():
+    return "What's the capital of the U.S.?"
+
+@judgment.observe(span_type="function")
+def main():
+    task_input = my_tool()
+    res = client.chat.completions.create(
+        model="gpt-4.1",
+        messages=[{"role": "user", "content": f"{task_input}"}]
+    )
+    return res.choices[0].message.content
+
+main()
+```
+
+[Click here](https://judgment.mintlify.app/getting_started#create-your-first-trace) for a more detailed explanation.
+
+### 📝 Offline Evaluations
+
+You can evaluate your agent's execution to measure quality metrics such as hallucination.
+Create a file named `evaluate.py` with the following code:
+
+```python evaluate.py
 from judgeval import JudgmentClient
 from judgeval.data import Example
 from judgeval.scorers import FaithfulnessScorer
@@ -88,13 +112,14 @@ results = client.run_evaluation(
 )
 print(results)
 ```
-Click [here](https://judgment.mintlify.app/getting_started#create-your-first-experiment) for a more detailed explanation.
 
+[Click here](https://judgment.mintlify.app/getting_started#create-your-first-experiment) for a more detailed explanation.
 
-<h3 align="center">📡 Online Evaluations</h3>
-Apply performance monitoring to measure the quality of your systems in production, not just on historical data.
+### 📡 Online Evaluations
 
-Using the same `traces.py` file we created earlier, modify `main` function
+Apply performance monitoring to measure the quality of your systems in production, not just on traces.
+
+Using the same `traces.py` file we created earlier, modify `main` function:
 
 ```python
 from judgeval.common.tracer import Tracer, wrap
@@ -125,57 +150,37 @@ def main():
     print("Online evaluation submitted.")
     return res
 
-if __name__ == "__main__":
-    main_result = main()
-    print(f"Main function output: {main_result}")
+main()
 ```
-Click [here](https://judgment.mintlify.app/getting_started#create-your-first-online-evaluation) for a more detailed explanation.
 
-<h3 align="center">🛰️ Traces</h3>
-Track your workflow execution for full observability with just a few lines of code.
-Create a file named `traces.py` with the following code:
+[Click here](https://judgment.mintlify.app/getting_started#create-your-first-online-evaluation) for a more detailed explanation.
 
-```python
-from judgeval.common.tracer import Tracer, wrap
-from openai import OpenAI
+## 🏢 Self-Hosting
 
-client = wrap(OpenAI())
-judgment = Tracer(project_name="my_project")
+Run Judgment on your own infrastructure: we provide comprehensive self-hosting capabilities that give you full control over the backend and data plane that Judgeval interfaces with.
 
-@judgment.observe(span_type="tool")
-def my_tool():
-    return "Hello world!"
+### Key Features
+* Deploy Judgment on your own AWS account
+* Store data in your own Supabase instance
+* Access Judgment through your own custom domain
 
-@judgment.observe(span_type="function")
-def main():
-    task_input = my_tool()
-    res = client.chat.completions.create(
-        model="gpt-4.1",
-        messages=[{"role": "user", "content": f"{task_input}"}]
-    )
-    return res.choices[0].message.content
+### Getting Started
+1. Check out our [self-hosting documentation](https://judgment.mintlify.app/self_hosting/get_started) for detailed setup instructions, along with how your self-hosted instance can be accessed
+2. Use the [Judgment CLI](https://github.com/JudgmentLabs/judgment-cli) to deploy your self-hosted environment
+3. After your self-hosted instance is setup, make sure the `JUDGMENT_API_URL` environmental variable is set to your self-hosted backend endpoint
 
-if __name__ == "__main__":
-    main_result = main()
-    print(f"Main function output: {main_result}")
-    print("Trace sent to Judgeval!")
-```
-Click [here](https://judgment.mintlify.app/getting_started#create-your-first-trace) for a more detailed explanation.
-
-<h2 align="center">⭐ Star Us on GitHub</h2>
+## ⭐ Star Us on GitHub
 
 If you find Judgeval useful, please consider giving us a star on GitHub! Your support helps us grow our community and continue improving the product.
 
-<h2 align="center">🤝 Contributing</h2>
+## 🤝 Contributing
 
 There are many ways to contribute to Judgeval:
 
-* Submit [bug reports](https://github.com/JudgmentLabs/judgeval/issues) and [feature requests](https://github.com/JudgmentLabs/judgeval/issues)
-* Review the documentation and submit [Pull Requests](https://github.com/JudgmentLabs/judgeval/pulls) to improve it
-* Speaking or writing about Judgment and letting us know
+- Submit [bug reports](https://github.com/JudgmentLabs/judgeval/issues) and [feature requests](https://github.com/JudgmentLabs/judgeval/issues)
+- Review the documentation and submit [Pull Requests](https://github.com/JudgmentLabs/judgeval/pulls) to improve it
+- Speaking or writing about Judgment and letting us know!
 
-<h2 align="center">Documentation and Demos</h2>
+## Documentation and Demos
 
-For more detailed documentation, please check out our [docs](https://judgment.mintlify.app/getting_started) and some of our [demo videos](https://www.youtube.com/@AlexShan-j3o) for reference!
-
-##
+For more detailed documentation, please check out our [developer docs](https://judgment.mintlify.app/getting_started) and some of our [demo videos](https://www.youtube.com/@AlexShan-j3o) for reference!
