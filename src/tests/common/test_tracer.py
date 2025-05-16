@@ -13,9 +13,6 @@ from judgeval.judgment_client import JudgmentClient
 from judgeval.common.exceptions import JudgmentAPIError
 from judgeval.data.trace import TraceSpan
 
-import sys
-sys.setrecursionlimit(1000)
-
 @pytest.fixture
 def tracer(mocker):
     """Provide a configured tracer instance"""
