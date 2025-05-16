@@ -155,6 +155,19 @@ main()
 
 [Click here](https://judgment.mintlify.app/getting_started#create-your-first-online-evaluation) for a more detailed explanation.
 
+## 🏢 Self-Hosting
+
+Run Judgment on your own infrastructure: we provide comprehensive self-hosting capabilities that give you full control over the backend and data plane that Judgeval interfaces with.
+
+### Key Features
+* Deploy Judgment on your own AWS account
+* Store data in your own Supabase instance
+* Access Judgment through your own custom domain
+
+### Getting Started
+1. Check out our [self-hosting documentation](https://judgment.mintlify.app/self_hosting/get_started) for detailed setup instructions, along with how your self-hosted instance can be accessed
+2. Use the [Judgment CLI](https://github.com/JudgmentLabs/judgment-cli) to deploy your self-hosted environment
+3. After your self-hosted instance is setup, make sure the `JUDGMENT_API_URL` environmental variable is set to your self-hosted backend endpoint
 
 ## ⭐ Star Us on GitHub
 
