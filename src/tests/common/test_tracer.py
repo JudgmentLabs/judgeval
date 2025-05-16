@@ -5,7 +5,6 @@ from uuid import uuid4
 from openai import OpenAI
 from anthropic import Anthropic
 import requests
-import warnings
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any, Union
 
@@ -13,6 +12,9 @@ from judgeval.common.tracer import Tracer, wrap, current_span_var, current_trace
 from judgeval.judgment_client import JudgmentClient
 from judgeval.common.exceptions import JudgmentAPIError
 from judgeval.data.trace import TraceSpan
+
+import sys
+sys.setrecursionlimit(1000)
 
 @pytest.fixture
 def tracer(mocker):
