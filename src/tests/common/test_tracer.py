@@ -5,10 +5,13 @@ from uuid import uuid4
 from openai import OpenAI
 from anthropic import Anthropic
 import requests
+from pydantic import BaseModel
+from typing import List, Optional, Dict, Any, Union
 
-from judgeval.common.tracer import Tracer, TraceEntry, wrap, current_span_var, current_trace_var, TraceClient
+from judgeval.common.tracer import Tracer, wrap, current_span_var, current_trace_var, TraceClient
 from judgeval.judgment_client import JudgmentClient
 from judgeval.common.exceptions import JudgmentAPIError
+from judgeval.data.trace import TraceSpan
 
 @pytest.fixture
 def tracer(mocker):
@@ -71,66 +74,40 @@ def test_tracer_requires_api_key():
         tracer = Tracer(api_key=None)
         print(tracer.api_key)
 
-def test_trace_entry_print(capsys):
-    """Test TraceEntry print formatting"""
-    entries = [
-        TraceEntry(type="enter", function="test_func", span_id="test-span-1", depth=1, message="test", created_at=0),
-        TraceEntry(type="exit", function="test_func", span_id="test-span-1", depth=1, message="test", created_at=0, duration=0.5),
-        TraceEntry(type="output", function="test_func", span_id="test-span-1", depth=1, message="test", created_at=0, output="result"),
-        TraceEntry(type="input", function="test_func", span_id="test-span-1", depth=1, message="test", created_at=0, inputs={"arg": 1}),
-    ]
-    
-    expected_outputs = [
-        "  → test_func (id: test-span-1) (trace: test)\n",
-        "  ← test_func (id: test-span-1) (0.500s)\n",
-        "  Output (for id: test-span-1): result\n",
-        "  Input (for id: test-span-1): {'arg': 1}\n",
-    ]
-    
-    for entry, expected in zip(entries, expected_outputs):
-        entry.print_entry()
-        captured = capsys.readouterr()
-        assert captured.out == expected
-
-def test_trace_entry_to_dict():
-    """Test TraceEntry serialization"""
+def test_trace_span_to_dict():
+    """Test TraceSpan serialization"""
     # Test basic serialization
-    entry = TraceEntry(
-        type="enter",
-        function="test_func",
+    span = TraceSpan(
         span_id="test-span-1",
+        trace_id="test-trace-id",
         depth=1,
-        message="test",
-        created_at=0
-    )
-    data = entry.to_dict()
-    assert data["type"] == "enter"
-    assert data["function"] == "test_func"
-    assert data["span_id"] == "test-span-1"
-
-    # Test with non-serializable output
-    class NonSerializable:
-        pass
-
-    non_serializable = NonSerializable()
-    entry = TraceEntry(
-        type="output",
-        function="test_func",
-        span_id="test-span-2",
-        depth=1,
-        message="test",
         created_at=0,
-        output=non_serializable
+        duration=0.5,
+        inputs={"arg": 1},
+        output="result",
+        function="test_func",
+        span_type="test-span",
+        evaluation_runs=[],
+        parent_span_id="test-parent-span-id"
     )
-    
-    data = entry.to_dict()
-    assert data["output"] == non_serializable.__str__()
+    data = span.model_dump()
+    assert data["span_type"] == "test-span"
+    assert data["trace_id"] == "test-trace-id"
+    assert data["depth"] == 1
+    assert data["created_at"] == "1970-01-01T00:00:00+00:00"
+    assert data["duration"] == 0.5
+    assert data["inputs"] == {"arg": 1}
+    assert data["output"] == "result"
+    assert data["function"] == "test_func"
+    assert data["evaluation_runs"] == []
+    assert data["span_id"] == "test-span-1"
+    assert data["parent_span_id"] == "test-parent-span-id"
 
 def test_trace_client_span(trace_client):
     """Test span context manager"""
     # The trace_client fixture starts with a trace "test_trace" and its 'enter' entry
-    initial_entries_count = len(trace_client.entries)
-    assert initial_entries_count == 1  # Should only have the 'enter' for "test_trace"
+    initial_spans_count = len(trace_client.trace_spans)
+    assert initial_spans_count == 1  # Should only have the 'enter' for "test_trace"
 
     parent_before_span = current_span_var.get()  # Should be the span_id of test_trace
 
@@ -139,25 +116,17 @@ def test_trace_client_span(trace_client):
         current_span_id = current_span_var.get()
         assert current_span_id is not None
         # Check the 'enter' entry for the new span
-        enter_entry = trace_client.entries[-1]
-        assert enter_entry.type == "enter"
-        assert enter_entry.function == "test_span"
-        assert enter_entry.span_id == current_span_id
-        assert enter_entry.parent_span_id == parent_before_span  # Check parent relationship
-        assert enter_entry.depth == 1  # Depth relative to parent
+        new_span = trace_client.trace_spans[-1]
+        assert new_span.function == "test_span"
+        assert new_span.span_id == current_span_id
+        assert new_span.parent_span_id == parent_before_span  # Check parent relationship
+        assert new_span.depth == 1  # Depth relative to parent
 
     # After the span, the context var should be reset
     assert current_span_var.get() == parent_before_span
 
-    # Check the 'exit' entry
-    exit_entry = trace_client.entries[-1]
-    assert exit_entry.type == "exit"
-    assert exit_entry.function == "test_span"
-    assert exit_entry.span_id == current_span_id
-    assert exit_entry.depth == 1  # Depth after exiting is the same as the entry depth for that span
-
-    # Check total entries (1 enter root + 1 enter span + 1 exit span)
-    assert len(trace_client.entries) == initial_entries_count + 2
+    # Check total spans (1 parent span + 1 child span)
+    assert len(trace_client.trace_spans) == initial_spans_count + 1
 
 def test_trace_client_nested_spans(trace_client):
     """Test nested spans maintain proper depth recorded in entries"""
@@ -166,109 +135,22 @@ def test_trace_client_nested_spans(trace_client):
     with trace_client.span("outer") as outer_span:
         outer_span_id = current_span_var.get()
         # Check 'enter' entry for 'outer' span
-        outer_enter_entry = trace_client.entries[-1]
-        assert outer_enter_entry.type == "enter"
-        assert outer_enter_entry.function == "outer"
-        assert outer_enter_entry.span_id == outer_span_id
-        assert outer_enter_entry.parent_span_id == root_span_id
-        assert outer_enter_entry.depth == 1  # Depth is 0(root) + 1
+        outer_span = trace_client.trace_spans[-1]
+        assert outer_span.span_type == "span"
+        assert outer_span.function == "outer"
+        assert outer_span.span_id == outer_span_id
+        assert outer_span.parent_span_id == root_span_id
+        assert outer_span.depth == 1  # Depth is 0(root) + 1
 
         with trace_client.span("inner") as inner_span:
             inner_span_id = current_span_var.get()
             # Check 'enter' entry for 'inner' span
-            inner_enter_entry = trace_client.entries[-1]
-            assert inner_enter_entry.type == "enter"
-            assert inner_enter_entry.function == "inner"
-            assert inner_enter_entry.span_id == inner_span_id
-            assert inner_enter_entry.parent_span_id == outer_span_id
-            assert inner_enter_entry.depth == 2  # Depth is 1(outer) + 1
-
-        # Check 'exit' entry for 'inner' span
-        inner_exit_entry = trace_client.entries[-1]
-        assert inner_exit_entry.type == "exit"
-        assert inner_exit_entry.function == "inner"
-        assert inner_exit_entry.span_id == inner_span_id
-        assert inner_exit_entry.depth == 2  # Depth when exiting inner is inner's entry depth
-
-    # Check 'exit' entry for 'outer' span
-    outer_exit_entry = trace_client.entries[-1]
-    assert outer_exit_entry.type == "exit"
-    assert outer_exit_entry.function == "outer"
-    assert outer_exit_entry.span_id == outer_span_id
-    assert outer_exit_entry.depth == 1  # Depth when exiting outer is outer's entry depth
-
-def test_record_input_output(trace_client):
-    """Test recording inputs and outputs"""
-    with trace_client.span("test_span") as span:
-        span_id = current_span_var.get()
-        trace_client.record_input({"arg": 1})
-        trace_client.record_output("result")
-    
-    # Filter entries to only include those for the current span
-    entries = [e for e in trace_client.entries if e.span_id == span_id]
-    assert [e.type for e in entries] == ["enter", "input", "output", "exit"]
-    
-    # Verify the input and output entries have the correct span_id
-    input_entry = next(e for e in entries if e.type == "input")
-    output_entry = next(e for e in entries if e.type == "output")
-    assert input_entry.span_id == span_id
-    assert output_entry.span_id == span_id
-    assert input_entry.inputs == {"arg": 1}
-    assert output_entry.output == "result"
-
-def test_condense_trace(trace_client):
-    """Test trace condensing functionality"""
-    # Store the base depth from the enter event
-    base_depth = 0
-    span_id = "test-span-1"
-    entries = [
-        {
-            "type": "enter",
-            "function": "test_func",
-            "span_id": span_id,
-            "trace_id": trace_client.trace_id,
-            "depth": base_depth,
-            "created_at": "2024-01-01T00:00:01.000000",
-            "parent_span_id": None
-        },
-        {
-            "type": "input",
-            "function": "test_func",
-            "span_id": span_id,
-            "trace_id": trace_client.trace_id,
-            "depth": base_depth + 1,
-            "created_at": "2024-01-01T00:00:01.100000",
-            "inputs": {"x": 1}
-        },
-        {
-            "type": "output",
-            "function": "test_func",
-            "span_id": span_id,
-            "trace_id": trace_client.trace_id,
-            "depth": base_depth + 1,
-            "created_at": "2024-01-01T00:00:01.200000",
-            "output": "result"
-        },
-        {
-            "type": "exit",
-            "function": "test_func",
-            "span_id": span_id,
-            "trace_id": trace_client.trace_id,
-            "depth": base_depth,
-            "created_at": "2024-01-01T00:00:02.000000"
-        },
-    ]
-    
-    condensed, evals = trace_client.condense_trace(entries)
-    print(f"{condensed=}")
-    # Test that the condensed entry's depth matches the enter event's depth
-    assert len(condensed) == 1
-    assert condensed[0]["function"] == "test_func"
-    assert condensed[0]["span_id"] == span_id
-    assert condensed[0]["depth"] == entries[0]["depth"]  # Should match the input event's depth
-    assert condensed[0]["inputs"] == {"x": 1}
-    assert condensed[0]["output"] == "result"
-    assert condensed[0]["duration"] == 1.0
+            inner_span = trace_client.trace_spans[-1]
+            assert inner_span.span_type == "span"
+            assert inner_span.function == "inner"
+            assert inner_span.span_id == inner_span_id
+            assert inner_span.parent_span_id == outer_span_id
+            assert inner_span.depth == 2  # Depth is 1(outer) + 1
 
 @patch('requests.post')
 def test_save_trace(mock_post, trace_client):
@@ -284,7 +166,7 @@ def test_save_trace(mock_post, trace_client):
     with trace_client.span("test_span"):
         trace_client.record_input({"arg": 1})
         trace_client.record_output("result")
-    
+
     trace_id, data = trace_client.save()
     assert mock_post.called
     assert data["trace_id"] == trace_client.trace_id
