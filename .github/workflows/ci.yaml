@@ -53,11 +53,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Wait for turn
-          uses: softprops/turnstyle@v2
-          with:
-            poll-interval-seconds: 10
-            same-branch-only: false
-            job-to-wait-for: "E2E Tests"
+        uses: softprops/turnstyle@v2
+        with:
+          poll-interval-seconds: 10
+          same-branch-only: false
+          job-to-wait-for: "E2E Tests"
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
