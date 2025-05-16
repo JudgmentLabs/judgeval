@@ -12,7 +12,7 @@ from judgeval.data import (
     ScoringResult, 
     Example,
     CustomExample,
-    Sequence,
+    Trace,
 )
 from judgeval.scorers import (
     APIJudgmentScorer, 
@@ -23,9 +23,9 @@ from judgeval.evaluation_run import EvaluationRun
 from judgeval.run_evaluation import (
     run_eval, 
     assert_test,
-    run_sequence_eval
+    run_trace_eval
 )
-from judgeval.data.sequence_run import SequenceRun
+from judgeval.data.trace_run import TraceRun
 from judgeval.judges import JudgevalJudge
 from judgeval.constants import (
     JUDGMENT_EVAL_FETCH_API_URL, 
@@ -105,16 +105,16 @@ class JudgmentClient(metaclass=SingletonMeta):
             rules=rules
         )
 
-    def run_sequence_evaluation(
+    def run_trace_evaluation(
         self,
         scorers: List[Union[APIJudgmentScorer, JudgevalScorer]],
         model: Optional[Union[str, List[str], JudgevalJudge]] = "gpt-4.1",
-        sequences: Optional[List[Sequence]] = None,
+        traces: Optional[List[Trace]] = None,
         examples: Optional[List[Example]] = None,
         test_file: Optional[str] = None,
         aggregator: Optional[str] = None,
         project_name: str = "default_project",
-        eval_run_name: str = "default_eval_sequence",
+        eval_run_name: str = "default_eval_trace",
         log_results: bool = True,
         append: bool = False,
         override: bool = False,
@@ -134,16 +134,16 @@ class JudgmentClient(metaclass=SingletonMeta):
             if examples and not function:
                 raise ValueError("Cannot pass in examples without a function")
             
-            if sequences and function:
-                raise ValueError("Cannot pass in sequences and function")
+            if traces and function:
+                raise ValueError("Cannot pass in traces and function")
             
-            if examples and sequences:
-                raise ValueError("Cannot pass in both examples and sequences")
+            if examples and traces:
+                raise ValueError("Cannot pass in both examples and traces")
             
-            sequence_run = SequenceRun(
+            trace_run = TraceRun(
                 project_name=project_name,
                 eval_name=eval_run_name,
-                sequences=sequences,
+                traces=traces,
                 scorers=scorers,
                 model=model,
                 aggregator=aggregator,
@@ -152,9 +152,9 @@ class JudgmentClient(metaclass=SingletonMeta):
                 judgment_api_key=self.judgment_api_key,
                 organization_id=self.organization_id,
             )
-            return run_sequence_eval(sequence_run, override, ignore_errors, function, tracer, examples)
+            return run_trace_eval(trace_run, override, ignore_errors, function, tracer, examples)
         except ValueError as e:
-            raise ValueError(f"Please check your SequenceRun object, one or more fields are invalid: \n{str(e)}")
+            raise ValueError(f"Please check your TraceRun object, one or more fields are invalid: \n{str(e)}")
         except Exception as e:
             raise Exception(f"An unexpected error occurred during evaluation: {str(e)}")
 
@@ -244,12 +244,6 @@ class JudgmentClient(metaclass=SingletonMeta):
         Appends an `EvalDataset` to the Judgment platform for storage.
         """
         return self.eval_dataset_client.append_examples(alias, examples, project_name)
-    
-    def append_sequence_dataset(self, alias: str, sequences: List[Sequence], project_name: str) -> bool:
-        """
-        Appends a `Sequence` to the Judgment platform for storage.
-        """
-        return self.eval_dataset_client.append_sequences(alias, sequences, project_name)
     
     def pull_dataset(self, alias: str, project_name: str) -> EvalDataset:
         """
@@ -523,7 +517,7 @@ class JudgmentClient(metaclass=SingletonMeta):
             raise ValueError("Exactly one of 'examples' or 'test_file' must be provided, but not both")
 
         if function:
-            results = self.run_sequence_evaluation(
+            results = self.run_trace_evaluation(
                 examples=examples,
                 scorers=scorers,
                 model=model,

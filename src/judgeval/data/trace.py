@@ -17,6 +17,8 @@ class TraceSpan(BaseModel):
     duration: Optional[float] = None
     annotation: Optional[List[Dict[str, Any]]] = None
     evaluation_runs: Optional[List[EvaluationRun]] = []
+    expected_tools: Optional[List[Dict[str, Any]]] = None
+    additional_metadata: Optional[Dict[str, Any]] = None
 
     def model_dump(self, **kwargs):
         return {

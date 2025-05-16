@@ -3,7 +3,7 @@ from typing import List, Union, Optional, Dict, Any, Union
 from judgeval.common.logger import debug, error
 from pydantic import BaseModel
 from judgeval.data import ScorerData, Example, CustomExample
-from judgeval.data.sequence import Sequence
+from judgeval.data.trace import TraceSpan
 
 
 class ScoringResult(BaseModel):
@@ -24,7 +24,7 @@ class ScoringResult(BaseModel):
     name: Optional[str] = None
 
     # The original example object that was used to create the ScoringResult
-    data_object: Optional[Union[Sequence, CustomExample, Example]] = None
+    data_object: Optional[Union[TraceSpan, CustomExample, Example]] = None
     trace_id: Optional[str] = None
     
     # Additional fields for internal use
@@ -49,7 +49,7 @@ class ScoringResult(BaseModel):
 
 
 def generate_scoring_result(
-    data_object: Union[Example, Sequence],
+    data_object: Union[Example, TraceSpan],
     scorers_data: List[ScorerData],
     run_duration: float,
     success: bool,
