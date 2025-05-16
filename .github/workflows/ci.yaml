@@ -20,6 +20,7 @@ jobs:
       PYTHONPATH: "."
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       TOGETHER_API_KEY: ${{ secrets.TOGETHER_API_KEY }}
+      JUDGMENT_DEV: true
 
     steps:
       - name: Checkout code

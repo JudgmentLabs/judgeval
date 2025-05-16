@@ -75,7 +75,6 @@ current_span_var = contextvars.ContextVar('current_span', default=None) # Contex
 
 # Define type aliases for better code readability and maintainability
 ApiClient: TypeAlias = Union[OpenAI, Together, Anthropic, AsyncOpenAI, AsyncAnthropic, AsyncTogether, genai.Client, genai.client.AsyncClient]  # Supported API clients
-TraceEntryType = Literal['enter', 'exit', 'output', 'input', 'evaluation']  # Valid trace entry types
 SpanType = Literal['span', 'tool', 'llm', 'evaluation', 'chain']
 
 # --- Evaluation Config Dataclass (Moved from langgraph.py) ---
@@ -87,154 +86,6 @@ class EvaluationConfig:
     model: Optional[str] = None
     log_results: Optional[bool] = True
 # --- End Evaluation Config Dataclass ---
-
-@dataclass
-class TraceEntry:
-    """Represents a single trace entry with its visual representation.
-    
-    Visual representations:
-    - enter: → (function entry)
-    - exit: ← (function exit)
-    - output: Output: (function return value)
-    - input: Input: (function parameters)
-    - evaluation: Evaluation: (evaluation results)
-    """
-    type: TraceEntryType
-    span_id: str # Unique ID for this specific span instance
-    depth: int    # Indentation level for nested calls
-    created_at: float # Unix timestamp when entry was created, replacing the deprecated 'timestamp' field
-    function: Optional[str] = None  # Name of the function being traced
-    message: Optional[str] = None  # Human-readable description
-    duration: Optional[float] = None  # Time taken (for exit/evaluation entries)
-    trace_id: str = None # ID of the trace this entry belongs to
-    output: Any = None  # Function output value
-    # Use field() for mutable defaults to avoid shared state issues
-    inputs: dict = field(default_factory=dict)
-    span_type: SpanType = "span"
-    evaluation_runs: List[Optional[EvaluationRun]] = field(default=None)
-    parent_span_id: Optional[str] = None # ID of the parent span instance
-    
-    def print_entry(self):
-        """Print a trace entry with proper formatting and parent relationship information."""
-        indent = "  " * self.depth
-        
-        if self.type == "enter":
-            # Format parent info if present
-            parent_info = f" (parent_id: {self.parent_span_id})" if self.parent_span_id else ""
-            print(f"{indent}→ {self.function} (id: {self.span_id}){parent_info} (trace: {self.message})")
-        elif self.type == "exit":
-            print(f"{indent}← {self.function} (id: {self.span_id}) ({self.duration:.3f}s)")
-        elif self.type == "output":
-            # Format output to align properly
-            output_str = str(self.output)
-            print(f"{indent}Output (for id: {self.span_id}): {output_str}")
-        elif self.type == "input":
-            # Format inputs to align properly
-            print(f"{indent}Input (for id: {self.span_id}): {self.inputs}")
-        elif self.type == "evaluation":
-            for evaluation_run in self.evaluation_runs:
-                print(f"{indent}Evaluation (for id: {self.span_id}): {evaluation_run.model_dump()}")
-    
-    def _serialize_inputs(self) -> dict:
-        """Helper method to serialize input data safely.
-        
-        Returns a dict with serializable versions of inputs, converting non-serializable
-        objects to None with a warning.
-        """
-        serialized_inputs = {}
-        for key, value in self.inputs.items():
-            if isinstance(value, BaseModel):
-                serialized_inputs[key] = value.model_dump()
-            elif isinstance(value, (list, tuple)):
-                # Handle lists/tuples of arguments
-                serialized_inputs[key] = [
-                    item.model_dump() if isinstance(item, BaseModel)
-                    else None if not self._is_json_serializable(item)
-                    else item
-                    for item in value
-                ]
-            else:
-                if self._is_json_serializable(value):
-                    serialized_inputs[key] = value
-                else:
-                    serialized_inputs[key] = self.safe_stringify(value, self.function)
-        return serialized_inputs
-
-    def _is_json_serializable(self, obj: Any) -> bool:
-        """Helper method to check if an object is JSON serializable."""
-        try:
-            json.dumps(obj)
-            return True
-        except (TypeError, OverflowError, ValueError):
-            return False
-
-    def safe_stringify(self, output, function_name):
-        """
-        Safely converts an object to a string or repr, handling serialization issues gracefully.
-        """
-        try:
-            return str(output)
-        except (TypeError, OverflowError, ValueError):
-            pass
-    
-        try:
-            return repr(output)
-        except (TypeError, OverflowError, ValueError):
-            pass
-    
-        warnings.warn(
-            f"Output for function {function_name} is not JSON serializable and could not be converted to string. Setting to None."
-        )
-        return None
-
-    def to_dict(self) -> dict:
-        """Convert the trace entry to a dictionary format for storage/transmission."""
-        return {
-            "type": self.type,
-            "function": self.function,
-            "span_id": self.span_id,
-            "trace_id": self.trace_id,
-            "depth": self.depth,
-            "message": self.message,
-            "created_at": datetime.fromtimestamp(self.created_at).isoformat(),
-            "duration": self.duration,
-            "output": self._serialize_output(),
-            "inputs": self._serialize_inputs(),
-            "evaluation_runs": [evaluation_run.model_dump() for evaluation_run in self.evaluation_runs] if self.evaluation_runs else [],
-            "span_type": self.span_type,
-            "parent_span_id": self.parent_span_id,
-        }
-
-    def _serialize_output(self) -> Any:
-        """Helper method to serialize output data safely.
-        
-        Handles special cases:
-        - Pydantic models are converted using model_dump()
-        - Dictionaries are processed recursively to handle non-serializable values.
-        - We try to serialize into JSON, then string, then the base representation (__repr__)
-        - Non-serializable objects return None with a warning
-        """
-
-        def serialize_value(value):
-            if isinstance(value, BaseModel):
-                return value.model_dump()
-            elif isinstance(value, dict):
-                # Recursively serialize dictionary values
-                return {k: serialize_value(v) for k, v in value.items()}
-            elif isinstance(value, (list, tuple)):
-                # Recursively serialize list/tuple items
-                return [serialize_value(item) for item in value]
-            else:
-                # Try direct JSON serialization first
-                try:
-                    json.dumps(value)
-                    return value
-                except (TypeError, OverflowError, ValueError):
-                    # Fallback to safe stringification
-                    return self.safe_stringify(value, self.function)
-
-        # Start serialization with the top-level output
-        return serialize_value(self.output)
 
 # Temporary as a POC to have log use the existing annotations feature until log endpoints are ready
 @dataclass
@@ -451,7 +302,9 @@ class TraceClient:
         self.enable_evaluations = enable_evaluations
         self.parent_trace_id = parent_trace_id
         self.parent_name = parent_name
-        self.entries: List[TraceEntry] = []
+        self.trace_spans: List[TraceSpan] = []
+        self.span_id_to_span: Dict[str, TraceSpan] = {}
+        self.evaluation_runs: List[EvaluationRun] = []
         self.annotations: List[TraceAnnotation] = []
         self.start_time = time.time()
         self.trace_manager_client = TraceManagerClient(tracer.api_key, tracer.organization_id, tracer)
@@ -488,9 +341,7 @@ class TraceClient:
         
         self._span_depths[span_id] = current_depth # Store depth by span_id
             
-        entry = TraceEntry(
-            type="enter",
-            function=name,
+        span = TraceSpan(
             span_id=span_id,
             trace_id=self.trace_id,
             depth=current_depth,
@@ -498,25 +349,15 @@ class TraceClient:
             created_at=start_time,
             span_type=span_type,
             parent_span_id=parent_span_id,
+            function=name,
         )
-        self.add_entry(entry)
+        self.add_span(span)
         
         try:
             yield self
         finally:
             duration = time.time() - start_time
-            exit_depth = self._span_depths.get(span_id, 0) # Get depth using this span's ID
-            self.add_entry(TraceEntry(
-                type="exit",
-                function=name,
-                span_id=span_id, # Use the same span_id for exit
-                trace_id=self.trace_id, # Use the trace_id from the trace client
-                depth=exit_depth, 
-                message=f"← {name}",
-                created_at=time.time(),
-                duration=duration,
-                span_type=span_type,
-            ))
+            span.duration = duration
             # Clean up depth tracking for this span_id
             if span_id in self._span_depths:
                 del self._span_depths[span_id]
@@ -616,34 +457,9 @@ class TraceClient:
         # --- End Modification ---
 
         if current_span_id:
-            duration = time.time() - start_time
-            prev_entry = self.entries[-1] if self.entries else None
-            # Determine function name based on previous entry or context var (less ideal)
-            function_name = "unknown_function" # Default
-            if prev_entry and prev_entry.span_type == "llm":
-                 function_name = prev_entry.function
-            else:
-                 # Try to find the function name associated with the current span_id
-                 for entry in reversed(self.entries):
-                     if entry.span_id == current_span_id and entry.type == 'enter':
-                         function_name = entry.function
-                         break
-            
-            # Get depth for the current span
-            current_depth = self._span_depths.get(current_span_id, 0)
-
-            self.add_entry(TraceEntry(
-                type="evaluation",
-                function=function_name,
-                span_id=current_span_id, # Associate with current span
-                trace_id=self.trace_id, # Use the trace_id from the trace client
-                depth=current_depth,
-                message=f"Evaluation results for {function_name}",
-                created_at=time.time(),
-                evaluation_runs=[eval_run],
-                duration=duration,
-                span_type="evaluation"
-            ))
+            span = self.span_id_to_span[current_span_id]
+            span.evaluation_runs.append(eval_run)
+        self.evaluation_runs.append(eval_run)
 
     def add_annotation(self, annotation: TraceAnnotation):
        """Add an annotation to this trace context"""
@@ -653,258 +469,48 @@ class TraceClient:
     def record_input(self, inputs: dict):
         current_span_id = current_span_var.get()
         if current_span_id:
-            entry_span_type = "span"
-            current_depth = self._span_depths.get(current_span_id, 0)
-            function_name = "unknown_function" # Default
-            for entry in reversed(self.entries):
-                 if entry.span_id == current_span_id and entry.type == 'enter':
-                      entry_span_type = entry.span_type
-                      function_name = entry.function
-                      break
+            span = self.span_id_to_span[current_span_id]
+            span.inputs = inputs
 
-            self.add_entry(TraceEntry(
-                type="input",
-                function=function_name,
-                span_id=current_span_id, # Use current span_id from context
-                trace_id=self.trace_id, # Use the trace_id from the trace client
-                depth=current_depth,
-                message=f"Inputs to {function_name}",
-                created_at=time.time(),
-                inputs=inputs,
-                span_type=entry_span_type,
-            ))
-        # Removed else block - original didn't have one
-
-    async def _update_coroutine_output(self, entry: TraceEntry, coroutine: Any):
+    async def _update_coroutine_output(self, span: TraceSpan, coroutine: Any):
         """Helper method to update the output of a trace entry once the coroutine completes"""
         try:
             result = await coroutine
-            entry.output = result
+            span.output = result
             return result
         except Exception as e:
-            entry.output = f"Error: {str(e)}"
+            span.output = f"Error: {str(e)}"
             raise
 
     def record_output(self, output: Any):
         current_span_id = current_span_var.get()
         if current_span_id:
-            entry_span_type = "span"
-            current_depth = self._span_depths.get(current_span_id, 0)
-            function_name = "unknown_function" # Default
-            for entry in reversed(self.entries):
-                 if entry.span_id == current_span_id and entry.type == 'enter':
-                      entry_span_type = entry.span_type
-                      function_name = entry.function
-                      break
-
-            entry = TraceEntry(
-                type="output",
-                function=function_name,
-                span_id=current_span_id, # Use current span_id from context
-                depth=current_depth,
-                message=f"Output from {function_name}",
-                created_at=time.time(),
-                output="<pending>" if inspect.iscoroutine(output) else output,
-                span_type=entry_span_type,
-                trace_id=self.trace_id # Added trace_id for consistency 
-            )
-            self.add_entry(entry)
+            span = self.span_id_to_span[current_span_id]
+            span.output = "<pending>" if inspect.iscoroutine(output) else output
             
             if inspect.iscoroutine(output):
-                asyncio.create_task(self._update_coroutine_output(entry, output))
+                asyncio.create_task(self._update_coroutine_output(span, output))
             
-            return entry # Return the created entry
+            return span # Return the created entry
         # Removed else block - original didn't have one
         return None # Return None if no span_id found
 
-    def add_entry(self, entry: TraceEntry):
-        """Add a trace entry to this trace context"""
-        self.entries.append(entry)
+    def add_span(self, span: TraceSpan):
+        """Add a trace span to this trace context"""
+        self.trace_spans.append(span)
+        self.span_id_to_span[span.span_id] = span
         return self
         
     def print(self):
         """Print the complete trace with proper visual structure"""
-        for entry in self.entries:
-            entry.print_entry()
-            
-    def print_hierarchical(self):
-        """Print the trace in a hierarchical structure based on parent-child relationships"""
-        # First, build a map of spans
-        spans = {}
-        root_spans = []
-        
-        # Collect all enter events first
-        for entry in self.entries:
-            if entry.type == "enter":
-                spans[entry.function] = {
-                    "name": entry.function,
-                    "depth": entry.depth,
-                    "parent_id": entry.parent_span_id,
-                    "children": []
-                }
-                
-                # If no parent, it's a root span
-                if not entry.parent_span_id:
-                    root_spans.append(entry.function)
-                elif entry.parent_span_id not in spans:
-                    # If parent doesn't exist yet, temporarily treat as root
-                    # (we'll fix this later)
-                    root_spans.append(entry.function)
-        
-        # Build parent-child relationships
-        for span_name, span in spans.items():
-            parent = span["parent_id"]
-            if parent and parent in spans:
-                spans[parent]["children"].append(span_name)
-                # Remove from root spans if it was temporarily there
-                if span_name in root_spans:
-                    root_spans.remove(span_name)
-        
-        # Now print the hierarchy
-        def print_span(span_name, level=0):
-            if span_name not in spans:
-                return
-                
-            span = spans[span_name]
-            indent = "  " * level
-            parent_info = f" (parent_id: {span['parent_id']})" if span["parent_id"] else ""
-            print(f"{indent}→ {span_name}{parent_info}")
-            
-            # Print children
-            for child in span["children"]:
-                print_span(child, level + 1)
-        
-        # Print starting with root spans
-        print("\nHierarchical Trace Structure:")
-        for root in root_spans:
-            print_span(root)
+        for span in self.trace_spans:
+            span.print_span()
             
     def get_duration(self) -> float:
         """
         Get the total duration of this trace
         """
         return time.time() - self.start_time
-    
-    def condense_trace(self, entries: List[dict]) -> List[dict]:
-        """
-        Condenses trace entries into a single entry for each span instance,
-        preserving parent-child span relationships using span_id and parent_span_id.
-        """
-        spans_by_id: Dict[str, dict] = {}
-        evaluation_runs: List[EvaluationRun] = []
-
-        # First pass: Group entries by span_id and gather data
-        for entry in entries:
-            span_id = entry.get("span_id")
-            if not span_id:
-                continue # Skip entries without a span_id (should not happen)
-
-            if entry["type"] == "enter":
-                if span_id not in spans_by_id:
-                    spans_by_id[span_id] = {
-                        "span_id": span_id,
-                        "function": entry["function"],
-                        "depth": entry["depth"], # Use the depth recorded at entry time
-                        "created_at": entry["created_at"],
-                        "trace_id": entry["trace_id"],
-                        "parent_span_id": entry.get("parent_span_id"),
-                        "span_type": entry.get("span_type", "span"),
-                        "inputs": None,
-                        "output": None,
-                        "evaluation_runs": [],
-                        "duration": None
-                    }
-                # Handle potential duplicate enter events if necessary (e.g., log warning)
-
-            elif span_id in spans_by_id:
-                current_span_data = spans_by_id[span_id]
-                
-                if entry["type"] == "input" and entry["inputs"]:
-                    # Merge inputs if multiple are recorded, or just assign
-                    if current_span_data["inputs"] is None:
-                        current_span_data["inputs"] = entry["inputs"]
-                    elif isinstance(current_span_data["inputs"], dict) and isinstance(entry["inputs"], dict):
-                        current_span_data["inputs"].update(entry["inputs"])
-                    # Add more sophisticated merging if needed
-
-                elif entry["type"] == "output" and "output" in entry:
-                    current_span_data["output"] = entry["output"]
-
-                elif entry["type"] == "evaluation" and entry.get("evaluation_runs"):
-                    if current_span_data.get("evaluation_runs") is not None:
-                        evaluation_runs.extend(entry["evaluation_runs"])
-
-                elif entry["type"] == "exit":
-                    if current_span_data["duration"] is None: # Calculate duration only once
-                        start_time = datetime.fromisoformat(current_span_data.get("created_at", entry["created_at"]))
-                        end_time = datetime.fromisoformat(entry["created_at"])
-                        current_span_data["duration"] = (end_time - start_time).total_seconds()
-                    # Update depth if exit depth is different (though current span() implementation keeps it same)
-                    # current_span_data["depth"] = entry["depth"] 
-
-        # Convert dictionary to a list initially for easier access
-        spans_list = list(spans_by_id.values())
-
-        # Build tree structure (adjacency list) and find roots
-        children_map: Dict[Optional[str], List[dict]] = {}
-        roots = []
-        span_map = {span['span_id']: span for span in spans_list} # Map for quick lookup
-
-        for span in spans_list:
-            parent_id = span.get("parent_span_id")
-            if parent_id is None:
-                roots.append(span)
-            else:
-                if parent_id not in children_map:
-                    children_map[parent_id] = []
-                children_map[parent_id].append(span)
-
-        # Sort roots by timestamp
-        roots.sort(key=lambda x: datetime.fromisoformat(x.get("created_at", "1970-01-01T00:00:00")))
-
-        # Perform depth-first traversal to get the final sorted list
-        sorted_condensed_list = []
-        visited = set() # To handle potential cycles, though unlikely with UUIDs
-
-        def dfs(span_data):
-            span_id = span_data['span_id']
-            if span_id in visited:
-                return # Avoid infinite loops in case of cycles
-            visited.add(span_id)
-            
-            sorted_condensed_list.append(span_data) # Add parent before children
-
-            # Get children, sort them by created_at, and visit them
-            span_children = children_map.get(span_id, [])
-            span_children.sort(key=lambda x: datetime.fromisoformat(x.get("created_at", "1970-01-01T00:00:00")))
-            for child in span_children:
-                # Ensure the child exists in our map before recursing
-                if child['span_id'] in span_map: 
-                    dfs(child)
-                else:
-                    # This case might indicate an issue, but we'll add the child directly
-                    # if its parent was processed but the child itself wasn't in the initial list?
-                    # Or if the child's 'enter' event was missing. For robustness, add it.
-                    if child['span_id'] not in visited:
-                         visited.add(child['span_id'])
-                         sorted_condensed_list.append(child)
-
-
-        # Start DFS from each root
-        for root_span in roots:
-            if root_span['span_id'] not in visited:
-                dfs(root_span)
-                
-        # Handle spans that might not have been reachable from roots (orphans)
-        # Though ideally, all spans should descend from a root.
-        for span_data in spans_list:
-             if span_data['span_id'] not in visited:
-                  # Decide how to handle orphans, maybe append them at the end sorted by time?
-                  # For now, let's just add them to ensure they aren't lost.
-                  sorted_condensed_list.append(span_data)
-
-
-        return sorted_condensed_list, evaluation_runs
 
     def save(self, overwrite: bool = False) -> Tuple[str, dict]:
         """
@@ -913,19 +519,15 @@ class TraceClient:
         """
         # Calculate total elapsed time
         total_duration = self.get_duration()
-        
-        raw_entries = [entry.to_dict() for entry in self.entries]
-        
-        condensed_entries, evaluation_runs = self.condense_trace(raw_entries)
 
         # Only count tokens for actual LLM API call spans
         llm_span_names = {"OPENAI_API_CALL", "TOGETHER_API_CALL", "ANTHROPIC_API_CALL", "GOOGLE_API_CALL"}
-        for entry in condensed_entries:
-            entry_function_name = entry.get("function", "") # Get function name safely
+        for span in self.trace_spans:
+            span_function_name = span.function # Get function name safely
             # Check if it's an LLM span AND function name CONTAINS an API call suffix AND output is dict
-            is_llm_entry = entry.get("span_type") == "llm"
-            has_api_suffix = any(suffix in entry_function_name for suffix in llm_span_names)
-            output_is_dict = isinstance(entry.get("output"), dict)
+            is_llm_span = span.span_type == "llm"
+            has_api_suffix = any(suffix in span_function_name for suffix in llm_span_names)
+            output_is_dict = isinstance(span.output, dict)
 
             # --- DEBUG PRINT 1: Check if condition passes --- 
             # if is_llm_entry and has_api_suffix and output_is_dict:
@@ -933,8 +535,8 @@ class TraceClient:
             #      # Print why it failed if it was an LLM entry
             # # --- END DEBUG --- 
 
-            if is_llm_entry and has_api_suffix and output_is_dict:
-                output = entry["output"]
+            if is_llm_span and has_api_suffix and output_is_dict:
+                output = span.output
                 usage = output.get("usage", {}) # Gets the 'usage' dict from the 'output' field
 
                 # --- DEBUG PRINT 2: Check extracted usage --- 
@@ -942,11 +544,11 @@ class TraceClient:
 
                 # --- NEW: Extract model_name correctly from nested inputs ---
                 model_name = None
-                entry_inputs = entry.get("inputs", {})
-                if entry_inputs:
+                span_inputs = span.inputs
+                if span_inputs:
                     # Try common locations for model name within the inputs structure
-                    invocation_params = entry_inputs.get("invocation_params", {})
-                    serialized_data = entry_inputs.get("serialized", {})
+                    invocation_params = span_inputs.get("invocation_params", {})
+                    serialized_data = span_inputs.get("serialized", {})
 
                     # Look in invocation_params (often directly contains model)
                     if isinstance(invocation_params, dict):
@@ -966,7 +568,7 @@ class TraceClient:
 
                     # Fallback: Check top-level of inputs itself (less likely for callbacks)
                     if not model_name:
-                        model_name = entry_inputs.get("model")
+                        model_name = span_inputs.get("model")
 
 
                 # --- END NEW ---
@@ -1030,7 +632,7 @@ class TraceClient:
                         if "usage" not in output:
                             output["usage"] = {} # Initialize if missing
                         elif not isinstance(output["usage"], dict): # Handle cases where 'usage' might not be a dict (e.g., placeholder string)
-                            print(f"[WARN TraceClient.save] Output 'usage' for span {entry.get('span_id')} was not a dict ({type(output['usage'])}). Resetting before adding costs.")
+                            print(f"[WARN TraceClient.save] Output 'usage' for span {span.span_id} was not a dict ({type(output['usage'])}). Resetting before adding costs.")
                             output["usage"] = {} # Reset to dict
 
                         output["usage"]["prompt_tokens_cost_usd"] = prompt_cost
@@ -1038,10 +640,10 @@ class TraceClient:
                         output["usage"]["total_cost_usd"] = prompt_cost + completion_cost
                     except Exception as e:
                         # If cost calculation fails, continue without adding costs
-                        print(f"Error calculating cost for model '{model_name}' (span: {entry.get('span_id')}): {str(e)}")
+                        print(f"Error calculating cost for model '{model_name}' (span: {span.span_id}): {str(e)}")
                         pass
                 else:
-                     print(f"[WARN TraceClient.save] Could not determine model name for cost calculation (span: {entry.get('span_id')}). Inputs: {entry_inputs}")
+                     print(f"[WARN TraceClient.save] Could not determine model name for cost calculation (span: {span.span_id}). Inputs: {span_inputs}")
 
 
         # Create trace document - Always use standard keys for top-level counts
@@ -1051,8 +653,8 @@ class TraceClient:
             "project_name": self.project_name,
             "created_at": datetime.utcfromtimestamp(self.start_time).isoformat(),
             "duration": total_duration,
-            "entries": condensed_entries,
-            "evaluation_runs": evaluation_runs,
+            "entries": [span.model_dump() for span in self.trace_spans],
+            "evaluation_runs": [run.model_dump() for run in self.evaluation_runs],
             "overwrite": overwrite,
             "parent_trace_id": self.parent_trace_id,
             "parent_name": self.parent_name
@@ -1188,18 +790,17 @@ class _DeepProfiler:
             token = current_span_var.set(span_id)
             frame.f_locals["_span_token"] = token
             
-            entry = TraceEntry(
-                type="enter",
-                function=qual_name,
+            span = TraceSpan(
                 span_id=span_id,
                 trace_id=current_trace.trace_id,
                 depth=depth,
                 message=qual_name,
                 created_at=start_time,
                 span_type="span",
-                parent_span_id=parent_span_id
+                parent_span_id=parent_span_id,
+                function=qual_name
             )
-            current_trace.add_entry(entry)
+            current_trace.add_span(span)
             
             inputs = {}
             try:
@@ -1234,17 +835,7 @@ class _DeepProfiler:
             start_time = span_data["start_time"]
             duration = time.time() - start_time
             
-            current_trace.add_entry(TraceEntry(
-                type="exit",
-                function=span_data["function"],
-                span_id=span_data["span_id"],
-                trace_id=current_trace.trace_id,
-                depth=current_trace._span_depths.get(span_data["span_id"], 0),
-                message=f"← {span_data['function']}",
-                created_at=time.time(),
-                duration=duration,
-                span_type="span",
-            ))
+            current_trace.span_id_to_span[span_data["span_id"]].duration = duration
 
             # arg[0] should always be the full return object
             # TODO: look into other possible cases
@@ -1851,7 +1442,7 @@ def wrap(client: Any) -> Any:
         if original_stream:
              client.messages.stream = traced_stream_async
     elif isinstance(client, genai.client.AsyncClient):
-        client.generate_content = traced_create_async
+        client.models.generate_content = traced_create_async
     elif isinstance(client, (OpenAI, Together)):
          client.chat.completions.create = traced_create_sync
          client.responses.create = traced_response_create_sync
@@ -1860,7 +1451,7 @@ def wrap(client: Any) -> Any:
          if original_stream:
              client.messages.stream = traced_stream_sync
     elif isinstance(client, genai.Client):
-         client.generate_content = traced_create_sync
+         client.models.generate_content = traced_create_sync
 
     return client
 
@@ -2121,7 +1712,7 @@ def _extract_usage_from_final_chunk(client: ApiClient, chunk: Any) -> Optional[D
 def _sync_stream_wrapper(
     original_stream: Iterator,
     client: ApiClient,
-    output_entry: TraceEntry
+    span: TraceSpan
 ) -> Generator[Any, None, None]:
     """Wraps a synchronous stream iterator to capture content and update the trace."""
     content_parts = []  # Use a list instead of string concatenation
@@ -2140,7 +1731,7 @@ def _sync_stream_wrapper(
             final_usage = _extract_usage_from_final_chunk(client, last_chunk)
 
         # Update the trace entry with the accumulated content and usage
-        output_entry.output = {
+        span.output = {
             "content": "".join(content_parts),  # Join list at the end
             "usage": final_usage if final_usage else {"info": "Usage data not available in stream."}, # Provide placeholder if None
             "streamed": True
@@ -2152,7 +1743,7 @@ def _sync_stream_wrapper(
 async def _async_stream_wrapper(
     original_stream: AsyncIterator,
     client: ApiClient,
-    output_entry: TraceEntry
+    span: TraceSpan
 ) -> AsyncGenerator[Any, None]:
     # [Existing logic - unchanged]
     content_parts = []  # Use a list instead of string concatenation
@@ -2161,7 +1752,7 @@ async def _async_stream_wrapper(
     anthropic_input_tokens = 0
     anthropic_output_tokens = 0
 
-    target_span_id = getattr(output_entry, 'span_id', 'UNKNOWN')
+    target_span_id = span.span_id
 
     try:
         async for chunk in original_stream:
@@ -2206,19 +1797,17 @@ async def _async_stream_wrapper(
         elif last_content_chunk:
              usage_info = _extract_usage_from_final_chunk(client, last_content_chunk)
 
-        if output_entry and hasattr(output_entry, 'output'):
-            output_entry.output = {
+        if span and hasattr(span, 'output'):
+            span.output = {
                 "content": "".join(content_parts),  # Join list at the end
                 "usage": usage_info if usage_info else {"info": "Usage data not available in stream."},
                 "streamed": True
             }
-            start_ts = getattr(output_entry, 'created_at', time.time())
-            output_entry.duration = time.time() - start_ts
+            start_ts = getattr(span, 'created_at', time.time())
+            span.duration = time.time() - start_ts
         # else: # Handle error case if necessary, but remove debug print
 
-# --- Define Context Manager Wrapper Classes ---
-class _TracedAsyncStreamManagerWrapper(AbstractAsyncContextManager):
-    """Wraps an original async stream manager to add tracing."""
+class _BaseStreamManagerWrapper:
     def __init__(self, original_manager, client, span_name, trace_client, stream_wrapper_func, input_kwargs):
         self._original_manager = original_manager
         self._client = client
@@ -2228,160 +1817,77 @@ class _TracedAsyncStreamManagerWrapper(AbstractAsyncContextManager):
         self._input_kwargs = input_kwargs
         self._parent_span_id_at_entry = None
 
+    def _create_span(self):
+        start_time = time.time()
+        span_id = str(uuid.uuid4())
+        current_depth = 0
+        if self._parent_span_id_at_entry and self._parent_span_id_at_entry in self._trace_client._span_depths:
+            current_depth = self._trace_client._span_depths[self._parent_span_id_at_entry] + 1
+        self._trace_client._span_depths[span_id] = current_depth
+        span = TraceSpan(
+            function=self._span_name,
+            span_id=span_id,
+            trace_id=self._trace_client.trace_id,
+            depth=current_depth,
+            message=self._span_name,
+            created_at=start_time,
+            span_type="llm",
+            parent_span_id=self._parent_span_id_at_entry
+        )
+        self._trace_client.add_span(span)
+        return span_id, span
+
+    def _finalize_span(self, span_id):
+        span = self._trace_client.span_id_to_span.get(span_id)
+        if span:
+            span.duration = time.time() - span.created_at
+        if span_id in self._trace_client._span_depths:
+            del self._trace_client._span_depths[span_id]
+
+class _TracedAsyncStreamManagerWrapper(_BaseStreamManagerWrapper, AbstractAsyncContextManager):
     async def __aenter__(self):
         self._parent_span_id_at_entry = current_span_var.get()
         if not self._trace_client:
-             # If no trace, just delegate to the original manager
-             return await self._original_manager.__aenter__()
+            return await self._original_manager.__aenter__()
 
-        # --- Manually create the 'enter' entry ---
-        start_time = time.time()
-        span_id = str(uuid.uuid4())
-        current_depth = 0
-        if self._parent_span_id_at_entry and self._parent_span_id_at_entry in self._trace_client._span_depths:
-            current_depth = self._trace_client._span_depths[self._parent_span_id_at_entry] + 1
-        self._trace_client._span_depths[span_id] = current_depth
-        enter_entry = TraceEntry(
-             type="enter", function=self._span_name, span_id=span_id,
-             trace_id=self._trace_client.trace_id, depth=current_depth, message=self._span_name,
-             created_at=start_time, span_type="llm", parent_span_id=self._parent_span_id_at_entry
-        )
-        self._trace_client.add_entry(enter_entry)
-        # --- End manual 'enter' entry ---
-
-        # Set the current span ID in contextvars
+        span_id, span = self._create_span()
         self._span_context_token = current_span_var.set(span_id)
+        span.inputs = _format_input_data(self._client, **self._input_kwargs)
 
-        # Manually create 'input' entry
-        input_data = _format_input_data(self._client, **self._input_kwargs)
-        input_entry = TraceEntry(
-             type="input", function=self._span_name, span_id=span_id,
-             trace_id=self._trace_client.trace_id, depth=current_depth, message=f"Inputs to {self._span_name}",
-             created_at=time.time(), inputs=input_data, span_type="llm"
-        )
-        self._trace_client.add_entry(input_entry)
-
-        # Call the original __aenter__
+        # Call the original __aenter__ and expect it to be an async generator
         raw_iterator = await self._original_manager.__aenter__()
-
-        # Manually create pending 'output' entry
-        output_entry = TraceEntry(
-            type="output", function=self._span_name, span_id=span_id,
-            trace_id=self._trace_client.trace_id, depth=current_depth, message=f"Output from {self._span_name}",
-            created_at=time.time(), output="<pending stream>", span_type="llm"
-        )
-        self._trace_client.add_entry(output_entry)
-
-        # Wrap the raw iterator
-        wrapped_iterator = self._stream_wrapper_func(raw_iterator, self._client, output_entry)
-        return wrapped_iterator
+        span.output = "<pending stream>"
+        return self._stream_wrapper_func(raw_iterator, self._client, span)
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        # Manually create the 'exit' entry
         if hasattr(self, '_span_context_token'):
-             span_id = current_span_var.get()
-             start_time_for_duration = 0
-             for entry in reversed(self._trace_client.entries):
-                  if entry.span_id == span_id and entry.type == 'enter':
-                       start_time_for_duration = entry.created_at
-                       break
-             duration = time.time() - start_time_for_duration if start_time_for_duration else None
-             exit_depth = self._trace_client._span_depths.get(span_id, 0)
-             exit_entry = TraceEntry(
-                  type="exit", function=self._span_name, span_id=span_id,
-                  trace_id=self._trace_client.trace_id, depth=exit_depth, message=f"← {self._span_name}",
-                  created_at=time.time(), duration=duration, span_type="llm"
-             )
-             self._trace_client.add_entry(exit_entry)
-             if span_id in self._trace_client._span_depths: del self._trace_client._span_depths[span_id]
-             current_span_var.reset(self._span_context_token)
-             delattr(self, '_span_context_token')
+            span_id = current_span_var.get()
+            self._finalize_span(span_id)
+            current_span_var.reset(self._span_context_token)
+            delattr(self, '_span_context_token')
+        return await self._original_manager.__aexit__(exc_type, exc_val, exc_tb)
 
-        # Delegate __aexit__
-        if hasattr(self._original_manager, "__aexit__"):
-             return await self._original_manager.__aexit__(exc_type, exc_val, exc_tb)
-        return None
-
-class _TracedSyncStreamManagerWrapper(AbstractContextManager):
-    """Wraps an original sync stream manager to add tracing."""
-    def __init__(self, original_manager, client, span_name, trace_client, stream_wrapper_func, input_kwargs):
-        self._original_manager = original_manager
-        self._client = client
-        self._span_name = span_name
-        self._trace_client = trace_client
-        self._stream_wrapper_func = stream_wrapper_func
-        self._input_kwargs = input_kwargs
-        self._parent_span_id_at_entry = None
-
+class _TracedSyncStreamManagerWrapper(_BaseStreamManagerWrapper, AbstractContextManager):
     def __enter__(self):
         self._parent_span_id_at_entry = current_span_var.get()
         if not self._trace_client:
-             return self._original_manager.__enter__()
+            return self._original_manager.__enter__()
 
-        # Manually create 'enter' entry
-        start_time = time.time()
-        span_id = str(uuid.uuid4())
-        current_depth = 0
-        if self._parent_span_id_at_entry and self._parent_span_id_at_entry in self._trace_client._span_depths:
-            current_depth = self._trace_client._span_depths[self._parent_span_id_at_entry] + 1
-        self._trace_client._span_depths[span_id] = current_depth
-        enter_entry = TraceEntry(
-             type="enter", function=self._span_name, span_id=span_id,
-             trace_id=self._trace_client.trace_id, depth=current_depth, message=self._span_name,
-             created_at=start_time, span_type="llm", parent_span_id=self._parent_span_id_at_entry
-        )
-        self._trace_client.add_entry(enter_entry)
+        span_id, span = self._create_span()
         self._span_context_token = current_span_var.set(span_id)
+        span.inputs = _format_input_data(self._client, **self._input_kwargs)
 
-        # Manually create 'input' entry
-        input_data = _format_input_data(self._client, **self._input_kwargs)
-        input_entry = TraceEntry(
-             type="input", function=self._span_name, span_id=span_id,
-             trace_id=self._trace_client.trace_id, depth=current_depth, message=f"Inputs to {self._span_name}",
-             created_at=time.time(), inputs=input_data, span_type="llm"
-        )
-        self._trace_client.add_entry(input_entry)
-
-        # Call original __enter__
         raw_iterator = self._original_manager.__enter__()
-
-        # Manually create 'output' entry (pending)
-        output_entry = TraceEntry(
-            type="output", function=self._span_name, span_id=span_id,
-            trace_id=self._trace_client.trace_id, depth=current_depth, message=f"Output from {self._span_name}",
-            created_at=time.time(), output="<pending stream>", span_type="llm"
-        )
-        self._trace_client.add_entry(output_entry)
-
-        # Wrap the raw iterator
-        wrapped_iterator = self._stream_wrapper_func(raw_iterator, self._client, output_entry)
-        return wrapped_iterator
+        span.output = "<pending stream>"
+        return self._stream_wrapper_func(raw_iterator, self._client, span)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        # Manually create 'exit' entry
         if hasattr(self, '_span_context_token'):
-             span_id = current_span_var.get()
-             start_time_for_duration = 0
-             for entry in reversed(self._trace_client.entries):
-                  if entry.span_id == span_id and entry.type == 'enter':
-                       start_time_for_duration = entry.created_at
-                       break
-             duration = time.time() - start_time_for_duration if start_time_for_duration else None
-             exit_depth = self._trace_client._span_depths.get(span_id, 0)
-             exit_entry = TraceEntry(
-                  type="exit", function=self._span_name, span_id=span_id,
-                  trace_id=self._trace_client.trace_id, depth=exit_depth, message=f"← {self._span_name}",
-                  created_at=time.time(), duration=duration, span_type="llm"
-             )
-             self._trace_client.add_entry(exit_entry)
-             if span_id in self._trace_client._span_depths: del self._trace_client._span_depths[span_id]
-             current_span_var.reset(self._span_context_token)
-             delattr(self, '_span_context_token')
-
-        # Delegate __exit__
-        if hasattr(self._original_manager, "__exit__"):
-             return self._original_manager.__exit__(exc_type, exc_val, exc_tb)
-        return None
+            span_id = current_span_var.get()
+            self._finalize_span(span_id)
+            current_span_var.reset(self._span_context_token)
+            delattr(self, '_span_context_token')
+        return self._original_manager.__exit__(exc_type, exc_val, exc_tb)
 
 # --- NEW Generalized Helper Function (Moved from demo) ---
 def prepare_evaluation_for_state(
@@ -2506,3 +2012,4 @@ def add_evaluation_to_state(
 
      #   print("[Skipped adding _judgeval_eval to state: prepare_evaluation_for_state failed]")
 # --- End NEW Helper --- 
+
