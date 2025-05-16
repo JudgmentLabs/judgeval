@@ -373,46 +373,6 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
             # Reset input storage for this handler instance
             self._run_id_to_start_inputs = {} 
 
-        # --- SYNC: Attempt Evaluation by checking output metadata --- 
-        eval_config: Optional[EvaluationConfig] = None
-        # Ensure trace_client exists before proceeding with eval logic that uses it
-        if trace_client:
-            if span_id: # Try to find the node name from the 'enter' entry
-                if hasattr(trace_client, 'entries') and trace_client.entries:
-                    enter_entry = next((e for e in reversed(trace_client.entries) if e.span_id == span_id and e.type == "enter"), None)
-                    if enter_entry: node_name = enter_entry.function
-            
-            if span_id and "_judgeval_eval" in outputs: # Only attempt if span exists and key is present
-                raw_eval_config = outputs.get("_judgeval_eval")
-                if isinstance(raw_eval_config, EvaluationConfig):
-                    eval_config = raw_eval_config
-                elif isinstance(raw_eval_config, dict):
-                        # Attempt to reconstruct from dict
-                    if "scorers" in raw_eval_config and "example" in raw_eval_config:
-                        example_data = raw_eval_config["example"]
-                        reconstructed_example = Example(**example_data) if isinstance(example_data, dict) else example_data
-
-                        if isinstance(reconstructed_example, Example):
-                            eval_config = EvaluationConfig(
-                                scorers=raw_eval_config["scorers"], 
-                                example=reconstructed_example,
-                                model=raw_eval_config.get("model"),
-                                log_results=raw_eval_config.get("log_results", True)
-                            )
-
-            # Check eval_config *and* span_id again (this should be indented correctly)
-            if eval_config and span_id:                 
-                # Call async_evaluate on the TraceClient instance ('trace_client')
-                # Use the correct variable name 'trace_client' here
-                trace_client.async_evaluate( # <-- Fix: Use trace_client
-                    scorers=eval_config.scorers,
-                    example=eval_config.example,
-                    model=eval_config.model,
-                    log_results=eval_config.log_results,
-                    span_id=span_id # Pass the specific span_id for this node run
-                )
-        # --- End SYNC Evaluation Logic ---
-
     def on_chain_error(self, error: BaseException, *, run_id: UUID, parent_run_id: Optional[UUID] = None, **kwargs: Any) -> Any:
         # Pass parent_run_id
         trace_client = self._ensure_trace_client(run_id, parent_run_id, "ChainError") # Corrected call
@@ -554,7 +514,6 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         inputs = {'messages': messages, 'invocation_params': invocation_params or kwargs, 'options': options, 'tags': tags, 'metadata': metadata, 'serialized': serialized}
         self._start_span_tracking(trace_client, run_id, parent_run_id, chat_model_name, span_type="llm", inputs=inputs) # Use 'llm' span_type for consistency
 
-    # --- Agent Methods (Async versions - ensure parent_run_id passed if needed) ---
     def on_agent_action(self, action: AgentAction, *, run_id: UUID, parent_run_id: Optional[UUID] = None, **kwargs: Any) -> Any:
         # TODO: Implement
         pass
