@@ -7,10 +7,9 @@ from tavily import TavilyClient
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_openai import ChatOpenAI
-from judgeval.common.tracer import Tracer, current_trace_var, prepare_evaluation_for_state, add_evaluation_to_state
-from judgeval.integrations.langgraph import AsyncJudgevalCallbackHandler, EvaluationConfig
-from judgeval.scorers import AnswerRelevancyScorer, JudgevalScorer, APIJudgmentScorer
-from judgeval.data import Example
+from judgeval.common.tracer import Tracer
+from judgeval.integrations.langgraph import JudgevalCallbackHandler
+from judgeval.scorers import AnswerRelevancyScorer
 
 # Load environment variables
 load_dotenv()
@@ -187,12 +186,19 @@ def generate_recommendations(state: State) -> State:
     state["recommendations"] = recommendations
 
     # --- Prepare and Add Evaluation to State using the new helper ---
-    add_evaluation_to_state(
-        state=state, # Pass the current state dictionary
-        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+    # add_evaluation_to_state(
+    #     state=state, # Pass the current state dictionary
+    #     scorers=[AnswerRelevancyScorer(threshold=0.5)],
+    #     input=user_prompt,
+    #     actual_output=recommendations,
+    #     model="gpt-4"
+    # )
+
+    judgment.async_evaluate(
         input=user_prompt,
         actual_output=recommendations,
-        model="gpt-4"
+        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+        model="gpt-4o"
     )
     # --- End Evaluation Setup ---
 
@@ -238,12 +244,11 @@ workflow.set_entry_point("ask_question")
 graph = workflow.compile()
 
 # Main function
-def music_recommendation_bot(message2: str):
+def music_recommendation_bot(handler: JudgevalCallbackHandler):
     """Main function to run the music recommendation bot."""
     print("🎵 Welcome to the Music Recommendation Bot! 🎵")
     print("I'll ask you a few questions to understand your music taste, then suggest some songs you might enjoy.")
     print("\nRunning with predefined answers for testing...\n")
-    print(message2)
     
     # Initialize state with predefined answers
     initial_state = initialize_state()
@@ -267,28 +272,5 @@ def music_recommendation_bot(message2: str):
 
 
 if __name__ == "__main__":
-    from judgeval import JudgmentClient
-    from judgeval.data import Example
-    from judgeval.scorers import ToolOrderScorer
-    handler = AsyncJudgevalCallbackHandler(judgment) 
-    client = JudgmentClient()
-    example = Example(   
-        input={"message2": "temp"},
-        expected_tools=[
-            {
-                "tool_name": "search_tavily",
-                "parameters": {
-                    "query": "Best tourist attractions in Paris"
-                }
-            }
-        ]
-    )
-
-    client.assert_test(
-        examples=[example],
-        scorers=[ToolOrderScorer(threshold=0.5)],
-        model="gpt-4o-mini",
-        function=music_recommendation_bot,
-        tracer=handler,
-        override=True
-    )
+    handler = JudgevalCallbackHandler(judgment) 
+    music_recommendation_bot(handler)
