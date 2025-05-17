@@ -1279,32 +1279,28 @@ def wrap(client: Any) -> Any:
     """
     span_name, original_create, original_responses_create, original_stream = _get_client_config(client)
     
-    def _setup_trace(current_trace, kwargs, is_responses=False):
+    def _setup_span_and_check_streaming(span, kwargs, is_responses=False):
         """Set up the trace span and record inputs"""
         is_streaming = kwargs.get("stream", False)
-        
-        span = current_trace.span(span_name, span_type="llm")
-        
-        # Use context manager to get the actual span
-        with span as active_span:
+
             # Record input based on whether this is a responses endpoint
-            if is_responses:
-                active_span.record_input(kwargs)
-            else:
-                input_data = _format_input_data(client, **kwargs)
-                active_span.record_input(input_data)
+        if is_responses:
+            span.record_input(kwargs)
+        else:
+            input_data = _format_input_data(client, **kwargs)
+            span.record_input(input_data)
+        
+        # Warn about token counting limitations with streaming
+        if isinstance(client, (AsyncOpenAI, OpenAI)) and is_streaming:
+            if not kwargs.get("stream_options", {}).get("include_usage"):
+                warnings.warn(
+                    "OpenAI streaming calls don't include token counts by default. "
+                    "To enable token counting with streams, set stream_options={'include_usage': True} "
+                    "in your API call arguments.",
+                    UserWarning
+                )
             
-            # Warn about token counting limitations with streaming
-            if isinstance(client, (AsyncOpenAI, OpenAI)) and is_streaming:
-                if not kwargs.get("stream_options", {}).get("include_usage"):
-                    warnings.warn(
-                        "OpenAI streaming calls don't include token counts by default. "
-                        "To enable token counting with streams, set stream_options={'include_usage': True} "
-                        "in your API call arguments.",
-                        UserWarning
-                    )
-                
-            return active_span, is_streaming
+        return is_streaming
     
     def _format_and_record_output(span, response, is_streaming, is_async, is_responses):
         """Format and record the output in the span"""
@@ -1329,13 +1325,10 @@ def wrap(client: Any) -> Any:
     async def traced_create_async(*args, **kwargs):
         current_trace = current_trace_var.get()
         if not current_trace:
-            if asyncio.iscoroutinefunction(original_create):
-                return await original_create(*args, **kwargs)
-            else:
-                return original_create(*args, **kwargs)
+            return await original_create(*args, **kwargs)
         
         with current_trace.span(span_name, span_type="llm") as span:
-            span, is_streaming = _setup_trace(current_trace, kwargs)
+            is_streaming = _setup_span_and_check_streaming(span, kwargs)
             
             try:
                 response_or_iterator = await original_create(*args, **kwargs)
@@ -1350,7 +1343,7 @@ def wrap(client: Any) -> Any:
             return await original_responses_create(*args, **kwargs)
         
         with current_trace.span(span_name, span_type="llm") as span:
-            span, is_streaming = _setup_trace(current_trace, kwargs, is_responses=True)
+            is_streaming = _setup_span_and_check_streaming(span, kwargs, is_responses=True)
             
             try:
                 response_or_iterator = await original_create(*args, **kwargs)
@@ -1381,7 +1374,7 @@ def wrap(client: Any) -> Any:
             return original_create(*args, **kwargs)
         
         with current_trace.span(span_name, span_type="llm") as span:
-            span, is_streaming = _setup_trace(current_trace, kwargs)
+            is_streaming = _setup_span_and_check_streaming(span, kwargs)
             
             try:
                 response_or_iterator = original_create(*args, **kwargs)
@@ -1395,7 +1388,7 @@ def wrap(client: Any) -> Any:
             return original_responses_create(*args, **kwargs)
         
         with current_trace.span(span_name, span_type="llm") as span:
-            span, is_streaming = _setup_trace(current_trace, kwargs, is_responses=True)
+            is_streaming = _setup_span_and_check_streaming(span, kwargs, is_responses=True)
             
             try:
                 response_or_iterator = original_responses_create(*args, **kwargs)
