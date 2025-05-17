@@ -23,6 +23,7 @@ class TraceSpan(BaseModel):
             "span_id": self.span_id,
             "trace_id": self.trace_id,
             "depth": self.depth,
+#             "created_at": datetime.fromtimestamp(self.created_at).isoformat(),
             "created_at": datetime.fromtimestamp(self.created_at, tz=timezone.utc).isoformat(),
             "inputs": self._serialize_inputs(),
             "output": self._serialize_output(),
@@ -85,6 +86,9 @@ class TraceSpan(BaseModel):
         except (TypeError, OverflowError, ValueError):
             pass
 
+        warnings.warn(
+            f"Output for function {function_name} is not JSON serializable and could not be converted to string. Setting to None."
+        )
         return None
         
     def _serialize_output(self) -> Any:

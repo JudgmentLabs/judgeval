@@ -11,6 +11,7 @@ import site
 import sysconfig
 import threading
 import time
+import traceback
 import uuid
 import warnings
 import contextvars
@@ -49,6 +50,7 @@ from google import genai
 
 # Local application/library-specific imports
 from judgeval.constants import (
+    JUDGMENT_TRACES_ADD_ANNOTATION_API_URL,
     JUDGMENT_TRACES_SAVE_API_URL,
     JUDGMENT_TRACES_FETCH_API_URL,
     RABBITMQ_HOST,
@@ -197,7 +199,7 @@ class TraceManagerClient:
         }       
 
         response = requests.post(
-            'https://api.judgmentlabs.ai/traces/add_annotation/',
+            JUDGMENT_TRACES_ADD_ANNOTATION_API_URL,
             json=json_data,
             headers={
                 'Content-Type': 'application/json',
@@ -312,6 +314,7 @@ class TraceClient:
         self.executed_tools = []
         self.executed_node_tools = []
         self._span_depths: Dict[str, int] = {} # NEW: To track depth of active spans
+
     def get_current_span(self):
         """Get the current span from the context var"""
         return current_span_var.get()
@@ -426,7 +429,8 @@ class TraceClient:
         # span_id_at_eval_call = current_span_var.get()
         # print(f"[TraceClient.async_evaluate] Captured span ID at eval call: {span_id_at_eval_call}")
         # Prioritize explicitly passed span_id, fallback to context var
-        span_id_to_use = span_id if span_id is not None else current_span_var.get()
+        current_span_ctx_var = current_span_var.get()
+        span_id_to_use = span_id if span_id is not None else current_span_ctx_var if current_span_ctx_var is not None else self.tracer.get_current_span()
         # print(f"[TraceClient.async_evaluate] Using span_id: {span_id_to_use}")
         # --- End Modification ---
 
@@ -436,7 +440,7 @@ class TraceClient:
             log_results=log_results,
             project_name=self.project_name,
             eval_name=f"{self.name.capitalize()}-"
-                f"{current_span_var.get()}-" # Keep original eval name format using context var if available
+                f"{span_id_to_use}-" # Keep original eval name format using context var if available
                 f"[{','.join(scorer.score_type.capitalize() for scorer in scorers)}]",
             examples=[example],
             scorers=scorers,
@@ -673,8 +677,8 @@ class TraceClient:
         return self.trace_manager_client.delete_trace(self.trace_id)
     
 
-class _DeepProfiler:
-    _instance: Optional["_DeepProfiler"] = None
+class _DeepTracer:
+    _instance: Optional["_DeepTracer"] = None
     _lock: threading.Lock = threading.Lock()
     _refcount: int = 0
     _span_stack: contextvars.ContextVar[List[Dict[str, Any]]] = contextvars.ContextVar("_deep_profiler_span_stack", default=[])
@@ -707,10 +711,14 @@ class _DeepProfiler:
             return False
         
         func_name = frame.f_code.co_name
-        module_name = frame.f_globals.get("__name__", "")
+        module_name = frame.f_globals.get("__name__", None)
+
+        func = frame.f_globals.get(func_name)
+        if func and (hasattr(func, '_judgment_span_name') or hasattr(func, '_judgment_span_type')):
+            return False
 
         if (
-            module_name == ""
+            not module_name
             or func_name.startswith("<") # ex: <listcomp>
             or func_name.startswith("__") and func_name != "__call__" # dunders
             or not self._is_user_code(frame.f_code.co_filename)
@@ -721,10 +729,17 @@ class _DeepProfiler:
     
     @functools.cache
     def _is_user_code(self, filename: str):
-        return bool(filename) and not os.path.realpath(filename).startswith(_TRACE_FILEPATH_BLOCKLIST)
+        return bool(filename) and not filename.startswith("<") and not os.path.realpath(filename).startswith(_TRACE_FILEPATH_BLOCKLIST)
     
-    def _profile(self, frame, event, *arg):
-        if event not in ("call", "return"):
+    def _trace(self, frame: types.FrameType, event: str, arg: Any):
+        frame.f_trace_lines = False
+        frame.f_trace_opcodes = False
+
+
+        if not self._should_trace(frame):
+            return
+        
+        if event not in ("call", "return", "exception"):
             return
         
         current_trace = current_trace_var.get()
@@ -788,7 +803,7 @@ class _DeepProfiler:
             self._span_stack.set(span_stack)
             
             token = current_span_var.set(span_id)
-            frame.f_locals["_span_token"] = token
+            frame.f_locals["_judgment_span_token"] = token
             
             span = TraceSpan(
                 span_id=span_id,
@@ -837,9 +852,9 @@ class _DeepProfiler:
             
             current_trace.span_id_to_span[span_data["span_id"]].duration = duration
 
-            # arg[0] should always be the full return object
-            # TODO: look into other possible cases
-            current_trace.record_output(None if len(arg) == 0 else arg[0])
+            if arg is not None:
+                # exception handling will take priority. 
+                current_trace.record_output(arg)
             
             if span_data["span_id"] in current_trace._span_depths:
                 del current_trace._span_depths[span_data["span_id"]]
@@ -849,10 +864,22 @@ class _DeepProfiler:
             else:
                 current_span_var.set(span_data["parent_span_id"])
             
-            if "_span_token" in frame.f_locals:
-                current_span_var.reset(frame.f_locals["_span_token"])
+            if "_judgment_span_token" in frame.f_locals:
+                current_span_var.reset(frame.f_locals["_judgment_span_token"])
+
+        elif event == "exception":
+            exc_type, exc_value, exc_traceback = arg
+            formatted_exception = {
+                "type": exc_type.__name__,
+                "message": str(exc_value),
+                "traceback": traceback.format_tb(exc_traceback)
+            }
+            current_trace = current_trace_var.get()
+            current_trace.record_output({
+                "error": formatted_exception
+            })
         
-        return
+        return self._trace
     
     def __enter__(self):
         with self._lock:
@@ -860,16 +887,16 @@ class _DeepProfiler:
             if self._refcount == 1:
                 self._skip_stack.set([])
                 self._span_stack.set([])
-                sys.setprofile(self._profile)
-                threading.setprofile(self._profile)
+                sys.settrace(self._trace)
+                threading.settrace(self._trace)
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
         with self._lock:
             self._refcount -= 1
             if self._refcount == 0:
-                sys.setprofile(None)
-                threading.setprofile(None)
+                sys.settrace(None)
+                threading.settrace(None)
 
 
 def log(self, message: str, level: str = "info"):
@@ -952,6 +979,12 @@ class Tracer:
                 "To use a different project name, ensure the first Tracer initialization uses the desired project name.",
                 RuntimeWarning
             )
+
+    def set_current_span(self, span_id: str):
+        self.current_span_id = span_id
+    
+    def get_current_span(self) -> Optional[str]:
+        return getattr(self, 'current_span_id', None)
     
     def set_current_trace(self, trace: TraceClient):
         """
@@ -1115,44 +1148,35 @@ class Tracer:
                             span.record_input(inputs)
                             
                             if use_deep_tracing:
-                                with _DeepProfiler():
+                                with _DeepTracer():
                                     result = await func(*args, **kwargs)
                             else:
                                 result = await func(*args, **kwargs)
                                                         
                             # Record output
                             span.record_output(result)
-                            
+                        return result
+                    finally:
                         # Save the completed trace
                         trace_id, trace = current_trace.save(overwrite=overwrite)
                         self.traces.append(trace)
-                        return result
-                    finally:
+
                         # Reset trace context (span context resets automatically)
                         current_trace_var.reset(trace_token)
                 else:
-                    # Already have a trace context, just create a span in it
-                    # The span method handles current_span_var
-                    
-                    try:
-                        with current_trace.span(span_name, span_type=span_type) as span: # MODIFIED: Use span_name directly
-                            # Record inputs
-                            inputs = combine_args_kwargs(func, args, kwargs)
-                            span.record_input(inputs)
-                            
-                            if use_deep_tracing:
-                                with _DeepProfiler():
-                                    result = await func(*args, **kwargs)
-                            else:
-                                result = await func(*args, **kwargs)
-                            
-                            # Record output
-                            span.record_output(result)
+                    with current_trace.span(span_name, span_type=span_type) as span:
+                        inputs = combine_args_kwargs(func, args, kwargs)
+                        span.record_input(inputs)
                         
-                        return result
-                    finally:
-                        pass
-                
+                        if use_deep_tracing:
+                            with _DeepTracer():
+                                result = await func(*args, **kwargs)
+                        else:
+                            result = await func(*args, **kwargs)
+                            
+                        span.record_output(result)
+                    return result
+        
             return async_wrapper
         else:
             # Non-async function implementation with deep tracing
@@ -1160,7 +1184,7 @@ class Tracer:
             def wrapper(*args, **kwargs):                
                 # Get current trace from context
                 current_trace = current_trace_var.get()
-                
+
                 # If there's no current trace, create a root trace
                 if not current_trace:
                     trace_id = str(uuid.uuid4())
@@ -1191,44 +1215,36 @@ class Tracer:
                             span.record_input(inputs)
                             
                             if use_deep_tracing:
-                                with _DeepProfiler():
+                                with _DeepTracer():
                                     result = func(*args, **kwargs)
                             else:
                                 result = func(*args, **kwargs)
                             
                             # Record output
                             span.record_output(result)
-                        
+                        return result
+                    finally:
                         # Save the completed trace
                         trace_id, trace = current_trace.save(overwrite=overwrite)
                         self.traces.append(trace)
-                        return result
-                    finally:
+
                         # Reset trace context (span context resets automatically)
                         current_trace_var.reset(trace_token)
                 else:
-                    # Already have a trace context, just create a span in it
-                    # The span method handles current_span_var
-                    
-                    try:
-                        with current_trace.span(span_name, span_type=span_type) as span: # MODIFIED: Use span_name directly
-                            # Record inputs
-                            inputs = combine_args_kwargs(func, args, kwargs)
-                            span.record_input(inputs)
-                            
-                            if use_deep_tracing:
-                                with _DeepProfiler():
-                                    result = func(*args, **kwargs)
-                            else:
-                                result = func(*args, **kwargs)
-                            
-                            # Record output
-                            span.record_output(result)
+                    with current_trace.span(span_name, span_type=span_type) as span:
                         
-                        return result
-                    finally:
-                        pass
-                
+                        inputs = combine_args_kwargs(func, args, kwargs)
+                        span.record_input(inputs)
+                        
+                        if use_deep_tracing:
+                            with _DeepTracer():
+                                result = func(*args, **kwargs)
+                        else:
+                            result = func(*args, **kwargs)
+                            
+                        span.record_output(result)
+                    return result
+    
             return wrapper
         
     def async_evaluate(self, *args, **kwargs):
@@ -1888,128 +1904,3 @@ class _TracedSyncStreamManagerWrapper(_BaseStreamManagerWrapper, AbstractContext
             current_span_var.reset(self._span_context_token)
             delattr(self, '_span_context_token')
         return self._original_manager.__exit__(exc_type, exc_val, exc_tb)
-
-# --- NEW Generalized Helper Function (Moved from demo) ---
-def prepare_evaluation_for_state(
-    scorers: List[Union[APIJudgmentScorer, JudgevalScorer]],
-    example: Optional[Example] = None,
-    # --- Individual components (alternative to 'example') ---
-    input: Optional[str] = None,
-    actual_output: Optional[Union[str, List[str]]] = None,
-    expected_output: Optional[Union[str, List[str]]] = None,
-    context: Optional[List[str]] = None,
-    retrieval_context: Optional[List[str]] = None,
-    tools_called: Optional[List[str]] = None,
-    expected_tools: Optional[List[str]] = None,
-    additional_metadata: Optional[Dict[str, Any]] = None,
-    # --- Other eval parameters ---
-    model: Optional[str] = None,
-    log_results: Optional[bool] = True
-) -> Optional[EvaluationConfig]:
-    """
-    Prepares an EvaluationConfig object, similar to TraceClient.async_evaluate.
-
-    Accepts either a pre-made Example object or individual components to construct one.
-    Returns the EvaluationConfig object ready to be placed in the state, or None.
-    """
-    final_example = example
-
-    # If example is not provided, try to construct one from individual parts
-    if final_example is None:
-        # Basic validation: Ensure at least actual_output is present for most scorers
-        if actual_output is None:
-      #      print("[prepare_evaluation_for_state] Warning: 'actual_output' is required when 'example' is not provided. Skipping evaluation setup.")
-            return None
-        try:
-            final_example = Example(
-                input=input,
-                actual_output=actual_output,
-                expected_output=expected_output,
-                context=context,
-                retrieval_context=retrieval_context,
-                tools_called=tools_called,
-                expected_tools=expected_tools,
-                additional_metadata=additional_metadata,
-                # trace_id will be set by the handler later if needed
-            )
-       #     print("[prepare_evaluation_for_state] Constructed Example from individual components.")
-        except Exception as e:
-      #      print(f"[prepare_evaluation_for_state] Error constructing Example: {e}. Skipping evaluation setup.")
-            return None
-
-    # If we have a valid example (provided or constructed) and scorers
-    if final_example and scorers:
-        # TODO: Add validation like check_examples if needed here,
-        # although the handler might implicitly handle some checks via TraceClient.
-        return EvaluationConfig(
-            scorers=scorers,
-            example=final_example,
-            model=model,
-            log_results=log_results
-        )
-    elif not scorers:
-    #    print("[prepare_evaluation_for_state] No scorers provided. Skipping evaluation setup.")
-        return None
-    else: # No valid example
-    #   print("[prepare_evaluation_for_state] No valid Example available. Skipping evaluation setup.")
-        return None
-# --- End NEW Helper Function ---
-
-# --- NEW: Helper function to simplify adding eval config to state --- 
-def add_evaluation_to_state(
-    state: Dict[str, Any], # The LangGraph state dictionary
-    scorers: List[Union[APIJudgmentScorer, JudgevalScorer]],
-    # --- Evaluation components (same as prepare_evaluation_for_state) ---
-    input: Optional[str] = None,
-    actual_output: Optional[Union[str, List[str]]] = None,
-    expected_output: Optional[Union[str, List[str]]] = None,
-    context: Optional[List[str]] = None,
-    retrieval_context: Optional[List[str]] = None,
-    tools_called: Optional[List[str]] = None,
-    expected_tools: Optional[List[str]] = None,
-    additional_metadata: Optional[Dict[str, Any]] = None,
-    # --- Other eval parameters ---
-    model: Optional[str] = None,
-    log_results: Optional[bool] = True
-) -> None:
-    """
-    Prepares an EvaluationConfig and adds it to the state dictionary 
-    under the '_judgeval_eval' key if successful.
-
-    This simplifies the process of setting up evaluations within LangGraph nodes.
-
-    Args:
-        state: The LangGraph state dictionary to modify.
-        scorers: List of scorer instances.
-        input: Input for the evaluation example.
-        actual_output: Actual output for the evaluation example.
-        expected_output: Expected output for the evaluation example.
-        context: Context for the evaluation example.
-        retrieval_context: Retrieval context for the evaluation example.
-        tools_called: Tools called for the evaluation example.
-        expected_tools: Expected tools for the evaluation example.
-        additional_metadata: Additional metadata for the evaluation example.
-        model: Model name used for generation (optional).
-        log_results: Whether to log evaluation results (optional, defaults to True).
-    """
-    eval_config = prepare_evaluation_for_state(
-        scorers=scorers,
-        input=input,
-        actual_output=actual_output,
-        expected_output=expected_output,
-        context=context,
-        retrieval_context=retrieval_context,
-        tools_called=tools_called,
-        expected_tools=expected_tools,
-        additional_metadata=additional_metadata,
-        model=model,
-        log_results=log_results
-    )
-    
-    if eval_config:
-        state["_judgeval_eval"] = eval_config
-   #     print(f"[_judgeval_eval added to state for node]") # Optional: Log confirmation
-
-     #   print("[Skipped adding _judgeval_eval to state: prepare_evaluation_for_state failed]")
-# --- End NEW Helper --- 
-

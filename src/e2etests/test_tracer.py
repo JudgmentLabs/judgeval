@@ -250,7 +250,7 @@ def test_input():
     return "What if these shoes don't fit?"
 
 @pytest.mark.asyncio
-@judgment.observe(name="test_evaluation_mixed_trace", project_name="TestingPoemBot", overwrite=True)
+@judgment.observe(name="test_evaluation_mixed_trace", project_name="TestingPoemBot", overwrite=True, deep_tracing=False)
 async def test_evaluation_mixed(test_input):
     PROJECT_NAME = "TestingPoemBot"
     print(f"Using test input: {test_input}")
@@ -259,6 +259,9 @@ async def test_evaluation_mixed(test_input):
     result = await make_poem(upper)
     await answer_user_question("What if these shoes don't fit?")
 
+    # Add delay before validating trace tokens to allow spans to be properly populated
+    await asyncio.sleep(1.5)
+    
     # --- Attempt to assert based on current trace state ---
     trace = judgment.get_current_trace()
     validate_trace_tokens(trace)
@@ -267,7 +270,7 @@ async def test_evaluation_mixed(test_input):
     return result
 
 @pytest.mark.asyncio
-@judgment.observe(name="test_evaluation_mixed_async_trace", project_name="TestingPoemBotAsync", overwrite=True)
+@judgment.observe(name="test_evaluation_mixed_async_trace", project_name="TestingPoemBotAsync", overwrite=True, deep_tracing=False)
 async def test_evaluation_mixed_async(test_input):
     PROJECT_NAME = "TestingPoemBotAsync"
     print(f"Using test input: {test_input}")
@@ -276,6 +279,9 @@ async def test_evaluation_mixed_async(test_input):
     result = await make_poem_with_async_clients(upper)
     await answer_user_question("What if these shoes don't fit?")
 
+    # Add delay before validating trace tokens to allow spans to be properly populated
+    await asyncio.sleep(1.5)
+    
     # --- Attempt to assert based on current trace state ---
     trace = judgment.get_current_trace()
     validate_trace_tokens(trace)
@@ -507,7 +513,7 @@ async def test_deep_tracing_with_custom_spans():
 # --- NEW TESTS FOR STREAMING USAGE ---
 
 @pytest.mark.asyncio
-@judgment.observe(name="test_openai_sync_streaming_usage_trace", project_name="TestSyncStreamUsage", overwrite=True)
+@judgment.observe(name="test_openai_sync_streaming_usage_trace", project_name="TestSyncStreamUsage", overwrite=True, deep_tracing=False)
 async def test_openai_sync_streaming_usage(test_input):
     """Test that sync OpenAI streaming calls correctly capture usage."""
     PROJECT_NAME = "TestSyncStreamUsage"
@@ -516,7 +522,7 @@ async def test_openai_sync_streaming_usage(test_input):
     # Use the globally defined wrapped sync client
     sync_client = openai_client 
 
-    @judgment.observe(name="sync_stream_test_func", project_name=PROJECT_NAME, overwrite=True)
+    @judgment.observe(name="sync_stream_test_func", project_name=PROJECT_NAME, overwrite=True, deep_tracing=False)
     def run_sync_stream(prompt):
         stream = sync_client.chat.completions.create(
             model="gpt-4o-mini", 
@@ -534,6 +540,9 @@ async def test_openai_sync_streaming_usage(test_input):
     result = run_sync_stream(test_input)
     print(f"Sync Stream Result: {result[:100]}...") # Print start of result
 
+    # Add delay before validating trace tokens to allow spans to be properly populated
+    await asyncio.sleep(1.5)
+    
     # --- Attempt to assert based on current trace state ---
     trace = judgment.get_current_trace()
     validate_trace_tokens(trace)
@@ -543,7 +552,7 @@ async def test_openai_sync_streaming_usage(test_input):
 
 
 @pytest.mark.asyncio
-@judgment.observe(name="test_openai_async_streaming_usage_trace", project_name="TestAsyncStreamUsage", overwrite=True)
+@judgment.observe(name="test_openai_async_streaming_usage_trace", project_name="TestAsyncStreamUsage", overwrite=True, deep_tracing=False)
 async def test_openai_async_streaming_usage(test_input):
     """Test that async OpenAI streaming calls correctly capture usage."""
     PROJECT_NAME = "TestAsyncStreamUsage"
@@ -552,7 +561,7 @@ async def test_openai_async_streaming_usage(test_input):
     # Use the globally defined wrapped async client
     async_client = openai_client_async
 
-    @judgment.observe(name="async_stream_test_func", project_name=PROJECT_NAME, overwrite=True)
+    @judgment.observe(name="async_stream_test_func", project_name=PROJECT_NAME, overwrite=True, deep_tracing=False)
     async def run_async_stream(prompt):
         stream = await async_client.chat.completions.create(
             model="gpt-4o-mini", 
@@ -570,6 +579,9 @@ async def test_openai_async_streaming_usage(test_input):
     result = await run_async_stream(test_input)
     print(f"Async Stream Result: {result[:100]}...") # Print start of result
 
+    # Add delay before validating trace tokens to allow spans to be properly populated
+    await asyncio.sleep(1.5)
+    
     # --- Attempt to assert based on current trace state ---
     trace = judgment.get_current_trace()
     validate_trace_tokens(trace)
@@ -593,7 +605,7 @@ def print_trace_hierarchy(entries):
 # --- NEW COMPREHENSIVE TOKEN COUNTING TEST ---
 
 @pytest.mark.asyncio
-@judgment.observe(name="test_token_counting_trace", project_name="TestTokenAggregation", overwrite=True)
+@judgment.observe(name="test_token_counting_trace", project_name="TestTokenAggregation", overwrite=True, deep_tracing=False)
 async def test_token_counting():
     """Test aggregation of token counts and costs across mixed API calls."""
     PROJECT_NAME = "TestTokenAggregation"
@@ -659,8 +671,9 @@ async def test_token_counting():
     else:
          print("No async tasks to run.")
     
-    # Allow a brief moment for async output recording to complete
-    await asyncio.sleep(0.1) 
+    # Allow a longer moment for async output recording to complete
+    # This test mixes streaming and non-streaming calls, so we need a longer delay
+    await asyncio.sleep(2.0) 
     
     # --- Attempt to assert based on current trace state ---
     trace = judgment.get_current_trace()
@@ -674,7 +687,7 @@ async def test_token_counting():
 # --- NEW PROVIDER-SPECIFIC STREAMING TESTS ---
 
 @pytest.mark.asyncio
-@judgment.observe(name="test_anthropic_async_streaming_usage_trace", project_name="TestAnthropicStreamUsage", overwrite=True)
+@judgment.observe(name="test_anthropic_async_streaming_usage_trace", project_name="TestAnthropicStreamUsage", overwrite=True, deep_tracing=False)
 async def test_anthropic_async_streaming_usage(test_input):
     """Test Anthropic async streaming usage capture."""
     if not anthropic_client_async:
@@ -682,7 +695,7 @@ async def test_anthropic_async_streaming_usage(test_input):
     PROJECT_NAME = "TestAnthropicStreamUsage"
     print(f"\n{'='*20} Starting Anthropic Streaming Usage Test {'='*20}")
 
-    @judgment.observe(name="anthropic_stream_func", project_name=PROJECT_NAME, overwrite=True)
+    @judgment.observe(name="anthropic_stream_func", project_name=PROJECT_NAME, overwrite=True, deep_tracing=False)
     async def run_anthropic_stream(prompt):
         response_content = ""
         # Use the wrapped client directly with the .stream() context manager
@@ -705,6 +718,9 @@ async def test_anthropic_async_streaming_usage(test_input):
     result = await run_anthropic_stream(test_input)
     print(f"Anthropic Stream Result: {result}") # Result is now placeholder
     
+    # Add delay before validating trace tokens to allow spans to be properly populated
+    await asyncio.sleep(1.5)
+    
     # --- Attempt to assert based on current trace state ---
     trace = judgment.get_current_trace()
     validate_trace_tokens(trace)
@@ -715,7 +731,7 @@ async def test_anthropic_async_streaming_usage(test_input):
 
 
 @pytest.mark.asyncio
-@judgment.observe(name="test_together_async_streaming_usage_trace", project_name="TestTogetherStreamUsage", overwrite=True)
+@judgment.observe(name="test_together_async_streaming_usage_trace", project_name="TestTogetherStreamUsage", overwrite=True, deep_tracing=False)
 async def test_together_async_streaming_usage(test_input):
     """Test Together AI async streaming usage capture."""
     if not together_client_async:
@@ -723,7 +739,7 @@ async def test_together_async_streaming_usage(test_input):
     PROJECT_NAME = "TestTogetherStreamUsage"
     print(f"\n{'='*20} Starting Together Streaming Usage Test {'='*20}")
 
-    @judgment.observe(name="together_stream_func", project_name=PROJECT_NAME, overwrite=True)
+    @judgment.observe(name="together_stream_func", project_name=PROJECT_NAME, overwrite=True, deep_tracing=False)
     async def run_together_stream(prompt):
         # Use the wrapped client directly
         stream = await together_client_async.chat.completions.create(
@@ -740,6 +756,9 @@ async def test_together_async_streaming_usage(test_input):
     result = await run_together_stream(test_input)
     print(f"Together Stream Result: {result}")
 
+    # Add delay before validating trace tokens to allow spans to be properly populated
+    await asyncio.sleep(1.5)
+    
     # --- Attempt to assert based on current trace state ---
     trace = judgment.get_current_trace()
     validate_trace_tokens(trace)
@@ -750,7 +769,7 @@ async def test_together_async_streaming_usage(test_input):
 
 
 @pytest.mark.asyncio
-@judgment.observe(name="test_google_response_api", project_name="TestGoogleResponseAPI", overwrite=True)
+@judgment.observe(name="test_google_response_api", project_name="TestGoogleResponseAPI", overwrite=True, deep_tracing=False)
 async def test_google_response_api():
     """
     Test Google's Response API with token counting verification.
@@ -769,5 +788,9 @@ async def test_google_response_api():
     )
     content_chat = response_chat.text
     print(f"\nChat Completions Response: {content_chat}")
+    
+    # Add delay before validating trace tokens to allow spans to be properly populated
+    await asyncio.sleep(1.5)
+    
     trace = judgment.get_current_trace()
     validate_trace_tokens(trace)
