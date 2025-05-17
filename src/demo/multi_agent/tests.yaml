@@ -61,3 +61,14 @@ examples:
         parameters:
           self:
             name: "Wrong Order Agent"
+
+
+examples:
+  - input:
+      prompt: "Do something random"
+    expected_tools:
+      - tool_name: "tool_1"
+      - agent: Alice
+        parameters:
+          self:
+          name:

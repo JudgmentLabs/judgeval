@@ -34,6 +34,7 @@ from typing import (
     Union,
     AsyncGenerator,
     TypeAlias,
+    Set
 )
 from rich import print as rprint
 import types # <--- Add this import
@@ -959,6 +960,7 @@ class Tracer:
             self.initialized: bool = True
             self.enable_monitoring: bool = enable_monitoring
             self.enable_evaluations: bool = enable_evaluations
+            self.class_identifiers: Dict[str, str] = {}  # Dictionary to store class identifiers
 
             # Initialize S3 storage if enabled
             self.use_s3 = use_s3
@@ -1081,6 +1083,32 @@ class Tracer:
 
         rprint(f"[bold]{label}:[/bold] {msg}")
     
+    def identify(self, identifier: str):
+        """
+        Class decorator that associates a class with a custom identifier.
+        
+        This decorator creates a mapping between the class name and the provided
+        identifier, which can be useful for tagging, grouping, or referencing
+        classes in a standardized way.
+        
+        Args:
+            identifier: The identifier to associate with the decorated class
+            
+        Returns:
+            A decorator function that registers the class with the given identifier
+            
+        Example:
+            @tracer.identify(identifier="user_model")
+            class User:
+                # Class implementation
+        """
+        def decorator(cls):
+            class_name = cls.__name__
+            self.class_identifiers[class_name] = identifier
+            return cls
+        
+        return decorator
+    
     def observe(self, func=None, *, name=None, span_type: SpanType = "span", project_name: str = None, overwrite: bool = False, deep_tracing: bool = None):
         """
         Decorator to trace function execution with detailed entry/exit information.
@@ -1103,10 +1131,10 @@ class Tracer:
                                          overwrite=overwrite, deep_tracing=deep_tracing)
         
         # Use provided name or fall back to function name
-        span_name = name or func.__name__
+        original_span_name = name or func.__name__
         
         # Store custom attributes on the function object
-        func._judgment_span_name = span_name
+        func._judgment_span_name = original_span_name
         func._judgment_span_type = span_type
         
         # Use the provided deep_tracing value or fall back to the tracer's default
@@ -1115,6 +1143,20 @@ class Tracer:
         if asyncio.iscoroutinefunction(func):
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
+                nonlocal original_span_name
+                class_name = None
+                instance_name = None
+                span_name = original_span_name
+                
+                if args and hasattr(args[0], '__class__'):
+                    class_name = args[0].__class__.__name__
+                    if (class_name in self.class_identifiers):
+                        if hasattr(args[0], self.class_identifiers[class_name]):
+                            instance_name = getattr(args[0], self.class_identifiers[class_name])
+                            span_name = f"{instance_name}.{span_name}"
+                        else:
+                            raise Exception(f"Attribute {self.class_identifiers[class_name]} does not exist for {class_name}. Check your identify() decorator.")
+                    
                 # Get current trace from context
                 current_trace = current_trace_var.get()
                 
@@ -1138,7 +1180,7 @@ class Tracer:
                     # Save empty trace and set trace context
                     # current_trace.save(empty_save=True, overwrite=overwrite)
                     trace_token = current_trace_var.set(current_trace)
-                    
+
                     try:
                         # Use span for the function execution within the root trace
                         # This sets the current_span_var
@@ -1181,7 +1223,20 @@ class Tracer:
         else:
             # Non-async function implementation with deep tracing
             @functools.wraps(func)
-            def wrapper(*args, **kwargs):                
+            def wrapper(*args, **kwargs):
+                nonlocal original_span_name
+                class_name = None
+                instance_name = None
+                span_name = original_span_name
+                if args and hasattr(args[0], '__class__'):
+                    class_name = args[0].__class__.__name__
+                    if (class_name in self.class_identifiers):
+                        if hasattr(args[0], self.class_identifiers[class_name]):
+                            instance_name = getattr(args[0], self.class_identifiers[class_name])                   
+                            span_name = f"{instance_name}.{span_name}"
+                        else:
+                            raise Exception(f"Attribute {self.class_identifiers[class_name]} does not exist for {class_name}. Check your identify() decorator.")
+                
                 # Get current trace from context
                 current_trace = current_trace_var.get()
 

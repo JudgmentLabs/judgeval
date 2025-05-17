@@ -13,6 +13,7 @@ class Message(BaseModel):
     content: str
     recipient: str
 
+@judgment.identify(identifier="name")
 class SimpleAgent:
     def __init__(self, name: str, tracer: Tracer):
         self.name = name
