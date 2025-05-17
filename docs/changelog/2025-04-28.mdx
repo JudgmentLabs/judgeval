@@ -1,0 +1,37 @@
+# Changelog
+
+## Performance Improvements
+
+- Major overhaul to server architecture to maximize performance (5-10x improvement in speed/throughput).
+- Improved the latency and throughput for SDK evaluation and Platform Website.
+- Resolved autoscaling issues with backend ECS tasks and start up backend server with multiple workers.
+
+## Features
+
+- Integrated OpenTelemetry support for Vercel AI SDK.
+- Built token type usage estimation tools (image, text, tool use).
+- Users can easily evaluate on datasets either by example or sequence.
+- Developed custom integration cookbooks for Braintrust, Langsmith, Langfuse, and Arize.
+
+## Testing and Reliability
+
+- Developed and conducted major server reliability tests (LLM evaluation capability, website reliability).
+- Built out annotation and annotation queue unit tests.
+
+## Infrastructure
+
+- Deploy Osiris proxy server and staging server for async eval server.
+
+## UI/UX
+
+- Reworked and refactored the scorers page to operate on both the frontend and backend.
+
+## Tooling
+
+- Update Judgment CLI and documentation for CLI and self-hosting.
+
+## Bug Fixes and Improvements
+
+- Improved clustering logic.
+- Help implement email invitations for self-hosted environments.
+- Reviewed the export to datasets pull request.
