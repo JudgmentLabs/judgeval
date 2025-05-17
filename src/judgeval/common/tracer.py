@@ -1279,8 +1279,8 @@ def wrap(client: Any) -> Any:
     """
     span_name, original_create, original_responses_create, original_stream = _get_client_config(client)
     
-    def _setup_span_and_check_streaming(span, kwargs, is_responses=False):
-        """Set up the trace span and record inputs"""
+    def _record_input_and_check_streaming(span, kwargs, is_responses=False):
+        """Record input and check for streaming"""
         is_streaming = kwargs.get("stream", False)
 
             # Record input based on whether this is a responses endpoint
@@ -1328,7 +1328,7 @@ def wrap(client: Any) -> Any:
             return await original_create(*args, **kwargs)
         
         with current_trace.span(span_name, span_type="llm") as span:
-            is_streaming = _setup_span_and_check_streaming(span, kwargs)
+            is_streaming = _record_input_and_check_streaming(span, kwargs)
             
             try:
                 response_or_iterator = await original_create(*args, **kwargs)
@@ -1343,7 +1343,7 @@ def wrap(client: Any) -> Any:
             return await original_responses_create(*args, **kwargs)
         
         with current_trace.span(span_name, span_type="llm") as span:
-            is_streaming = _setup_span_and_check_streaming(span, kwargs, is_responses=True)
+            is_streaming = _record_input_and_check_streaming(span, kwargs, is_responses=True)
             
             try:
                 response_or_iterator = await original_create(*args, **kwargs)
@@ -1374,7 +1374,7 @@ def wrap(client: Any) -> Any:
             return original_create(*args, **kwargs)
         
         with current_trace.span(span_name, span_type="llm") as span:
-            is_streaming = _setup_span_and_check_streaming(span, kwargs)
+            is_streaming = _record_input_and_check_streaming(span, kwargs)
             
             try:
                 response_or_iterator = original_create(*args, **kwargs)
@@ -1388,7 +1388,7 @@ def wrap(client: Any) -> Any:
             return original_responses_create(*args, **kwargs)
         
         with current_trace.span(span_name, span_type="llm") as span:
-            is_streaming = _setup_span_and_check_streaming(span, kwargs, is_responses=True)
+            is_streaming = _record_input_and_check_streaming(span, kwargs, is_responses=True)
             
             try:
                 response_or_iterator = original_responses_create(*args, **kwargs)
