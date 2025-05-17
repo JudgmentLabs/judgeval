@@ -1277,7 +1277,7 @@ def wrap(client: Any) -> Any:
     Supports OpenAI, Together, Anthropic, and Google GenAI clients.
     Patches both '.create' and Anthropic's '.stream' methods using a wrapper class.
     """
-    span_name, original_create, responses_create, original_stream = _get_client_config(client)
+    span_name, original_create, original_responses_create, original_stream = _get_client_config(client)
     
     def _setup_trace(current_trace, kwargs, is_responses=False):
         """Set up the trace span and record inputs"""
@@ -1343,6 +1343,21 @@ def wrap(client: Any) -> Any:
             except Exception as e:
                 return _handle_error(span, e, True)
     
+    # Async responses for OpenAI clients
+    async def traced_response_create_async(*args, **kwargs):
+        current_trace = current_trace_var.get()
+        if not current_trace:
+            return await original_responses_create(*args, **kwargs)
+        
+        with current_trace.span(span_name, span_type="llm") as span:
+            span, is_streaming = _setup_trace(current_trace, kwargs, is_responses=True)
+            
+            try:
+                response_or_iterator = await original_create(*args, **kwargs)
+                return _format_and_record_output(span, response_or_iterator, is_streaming, True, False)
+            except Exception as e:
+                return _handle_error(span, e, True)
+    
     # Function replacing .stream() for async clients
     def traced_stream_async(*args, **kwargs):
         current_trace = current_trace_var.get()
@@ -1358,22 +1373,6 @@ def wrap(client: Any) -> Any:
             stream_wrapper_func=_async_stream_wrapper,
             input_kwargs=kwargs
         )
-    
-    # Async responses for OpenAI clients
-    async def traced_responses_async(*args, **kwargs):
-        current_trace = current_trace_var.get()
-        if not current_trace:
-            return await original_responses_create(*args, **kwargs)
-        
-        with current_trace.span(span_name, span_type="llm") as span:
-            span.record_input(kwargs)
-            
-            try:
-                response = await original_responses_create(*args, **kwargs)
-                span.record_output(response)
-                return response
-            except Exception as e:
-                return _handle_error(span, e, True)
     
     # --- Traced Sync Functions ---
     def traced_create_sync(*args, **kwargs):
@@ -1393,13 +1392,13 @@ def wrap(client: Any) -> Any:
     def traced_response_create_sync(*args, **kwargs):
         current_trace = current_trace_var.get()
         if not current_trace:
-            return responses_create(*args, **kwargs)
+            return original_responses_create(*args, **kwargs)
         
         with current_trace.span(span_name, span_type="llm") as span:
             span, is_streaming = _setup_trace(current_trace, kwargs, is_responses=True)
             
             try:
-                response_or_iterator = responses_create(*args, **kwargs)
+                response_or_iterator = original_responses_create(*args, **kwargs)
                 return _format_and_record_output(span, response_or_iterator, is_streaming, False, True)
             except Exception as e:
                 return _handle_error(span, e, False)
@@ -1424,8 +1423,7 @@ def wrap(client: Any) -> Any:
     if isinstance(client, (AsyncOpenAI, AsyncTogether)):
         client.chat.completions.create = traced_create_async
         if hasattr(client, "responses") and hasattr(client.responses, "create"):
-            original_responses_create = client.responses.create
-            client.responses.create = traced_responses_async
+            client.responses.create = traced_response_create_async
     elif isinstance(client, AsyncAnthropic):
         client.messages.create = traced_create_async
         if original_stream:
@@ -1434,7 +1432,8 @@ def wrap(client: Any) -> Any:
         client.models.generate_content = traced_create_async
     elif isinstance(client, (OpenAI, Together)):
         client.chat.completions.create = traced_create_sync
-        client.responses.create = traced_response_create_sync
+        if hasattr(client, "responses") and hasattr(client.responses, "create"):
+            client.responses.create = traced_response_create_sync
     elif isinstance(client, Anthropic):
         client.messages.create = traced_create_sync
         if original_stream:
