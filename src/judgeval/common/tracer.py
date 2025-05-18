@@ -1346,8 +1346,8 @@ def wrap(client: Any) -> Any:
             is_streaming = _record_input_and_check_streaming(span, kwargs, is_responses=True)
             
             try:
-                response_or_iterator = await original_create(*args, **kwargs)
-                return _format_and_record_output(span, response_or_iterator, is_streaming, True, False)
+                response_or_iterator = await original_responses_create(*args, **kwargs)
+                return _format_and_record_output(span, response_or_iterator, is_streaming, True, True)
             except Exception as e:
                 return _handle_error(span, e, True)
     
