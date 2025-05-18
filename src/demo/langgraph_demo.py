@@ -287,7 +287,7 @@ if __name__ == "__main__":
     client.assert_test(
         examples=[example],
         scorers=[ToolOrderScorer(threshold=0.5)],
-        model="gpt-4o-mini",
+        model="gpt-4.1-mini",
         function=music_recommendation_bot,
         tracer=handler,
         override=True

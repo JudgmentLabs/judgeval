@@ -59,7 +59,7 @@ async def get_menu_highlights(restaurant_name: str) -> List[str]:
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
          input=prompt,
         actual_output=response.choices[0].message.content,
-        model="gpt-4o-mini"
+        model="gpt-4.1-mini"
     )
 
     return response.choices[0].message.content.split("\n")
@@ -105,7 +105,7 @@ async def get_food_recommendations(cuisine: str) -> str:
         input=f"Create a recommendation for a restaurant and dishes based on the desired cuisine: {cuisine}",
         actual_output=recommendation,
         retrieval_context=[str(restaurants), str(menu_items)],
-        model="gpt-4o-mini"
+        model="gpt-4.1-mini"
     )
     return recommendation
 

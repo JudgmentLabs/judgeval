@@ -60,7 +60,7 @@ tone_scorer = ComparisonScorer(
 results = client.run_evaluation(
     examples=[example],
     scorers=[tone_scorer],
-    model="gpt-4o",
+    model="gpt-4.1",
 )
 print(results) # Add print to show results
 ```
@@ -90,7 +90,7 @@ async function runComparison() {
     const results = await client.evaluate({
         examples: [example],
         scorers: [toneScorer],
-        model: "gpt-4o",
+        model: "gpt-4.1",
         projectName: "comparison-ts-proj",
         evalName: "comparison-ts-eval"
     });

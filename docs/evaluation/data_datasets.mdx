@@ -253,7 +253,7 @@ from judgeval.scorers import FaithfulnessScorer # Added import
 res = client.run_evaluation(
     examples=dataset.examples,
     scorers=[FaithfulnessScorer(threshold=0.9)],
-    model="gpt-4o",
+    model="gpt-4.1",
 )
 ```
 ```Typescript Typescript
@@ -270,7 +270,7 @@ const dataset: Example[] = [
 const results = await client.evaluate({
     examples: dataset,
     scorers: [new FaithfulnessScorer(0.9)],
-    model: "gpt-4o",
+    model: "gpt-4.1",
     projectName: "dataset-eval-ts-proj",
     evalName: "dataset-eval-ts-run"
 });

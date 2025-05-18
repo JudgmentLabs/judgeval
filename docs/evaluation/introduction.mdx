@@ -70,14 +70,14 @@ faithfulness_scorer = FaithfulnessScorer(threshold=0.5)
 results = client.run_evaluation(
     examples=[example],
     scorers=[faithfulness_scorer],
-    model="gpt-4o",
+    model="gpt-4.1",
 )
 
 # You also run evaluations asynchronously like so:
 results = client.a_run_evaluation(
     examples=[example],
     scorers=[faithfulness_scorer],
-    model="gpt-4o",
+    model="gpt-4.1",
 )
 print(results)
 ```
@@ -102,7 +102,7 @@ const faithfulnessScorer = new FaithfulnessScorer(0.5);
 const results = await client.evaluate({
   examples: [example],
   scorers: [faithfulnessScorer],
-  model: "gpt-4o",
+  model: "gpt-4.1",
   projectName: "my-intro-project",
   evalName: "intro-evaluation-run"
 });

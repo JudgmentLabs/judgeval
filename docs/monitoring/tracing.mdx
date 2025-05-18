@@ -76,7 +76,7 @@ const client = wrap(new OpenAI());
     ```python
     # Enable token counting with streaming
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4.1",
         messages=[{"role": "user", "content": "Hello"}],
         stream=True,
         stream_options={"include_usage": True}  # Required for token counting
@@ -193,7 +193,7 @@ def my_tool():
 def my_llm_call():
     message = my_tool()
     res = openai_client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4.1",
         messages=[{"role": "user", "content": message}]
     )
     return res.choices[0].message.content
@@ -217,7 +217,7 @@ const observedMyTool = judgment.observe({ spanType: "tool" })(myTool);
 async function myLlmCall(): Promise<string | null | undefined> {
     const message = await observedMyTool();
     const res = await openaiClient.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4.1",
         messages: [{ role: "user", content: message }],
     });
     return res.choices[0]?.message?.content;
@@ -253,7 +253,7 @@ When using streaming responses with a wrapped client, you need to explicitly ena
 def my_llm_streaming_call():
     # Enable token counting with streaming API calls
     stream = openai_client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4.1",
         messages=[{"role": "user", "content": "Write a poem"}],
         stream=True,
         stream_options={"include_usage": True}  # Required for token counting
@@ -273,7 +273,7 @@ def my_llm_streaming_call():
 const observedStreamingCall = judgment.observe({ spanType: "function" })(async () => {
     // Enable token counting with streaming API calls
     const stream = await openaiClient.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4.1",
         messages: [{ role: "user", content: "Write a poem" }],
         stream: true,
         stream_options: { include_usage: true }  // Required for token counting
@@ -332,7 +332,7 @@ def main():
     judgment.async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
         example=example,
-        model="gpt-4o"
+        model="gpt-4.1"
     )
     return res
 
@@ -354,7 +354,7 @@ async function mainWithEval(): Promise<string> {
             {
                 input: query,
                 actualOutput: res,
-                model: "gpt-4o"
+                model: "gpt-4.1"
             }
         );
     } else {
@@ -430,7 +430,7 @@ def my_tool():
 def main():
     with judgment.trace(name="my_workflow") as trace:
         res = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4.1",
             messages=[{"role": "user", "content": f"{my_tool()}"}]
         )
     
@@ -460,7 +460,7 @@ async function main() {
     try {
         const toolOutput = await observedMyTool(); // observedMyTool is associated with the active trace
         const res = await client.chat.completions.create({
-            model: "gpt-4o",
+            model: "gpt-4.1",
             messages: [{ role: "user", content: toolOutput }],
         });
         resultMessage = res.choices[0]?.message?.content;

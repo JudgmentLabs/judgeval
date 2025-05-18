@@ -133,7 +133,7 @@ async def get_flights(destination):
     judgment.async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
         example=example,
-        model="gpt-4o"
+        model="gpt-4.1"
     )
     return flights_search
 
@@ -149,7 +149,7 @@ async def get_weather(destination, start_date, end_date):
     judgment.async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
         example=example,
-        model="gpt-4o"
+        model="gpt-4.1"
     )
     return weather_search
 
@@ -218,7 +218,7 @@ async def create_travel_plan(destination, start_date, end_date, research_data):
     """
     
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4.1",
         messages=[
             {"role": "system", "content": "You are an expert travel planner. Combine both historical and current information to create the best possible itinerary."},
             {"role": "user", "content": prompt}
@@ -233,7 +233,7 @@ async def create_travel_plan(destination, start_date, end_date, research_data):
     judgment.async_evaluate(
         scorers=[FaithfulnessScorer(threshold=0.5)],
         example=example,
-        model="gpt-4o"
+        model="gpt-4.1"
     )
     
     return response

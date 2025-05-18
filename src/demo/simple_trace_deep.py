@@ -69,7 +69,7 @@ async def create_travel_plan(research_data):
     
     judgment.log("Sending prompt to GPT-4")
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-4.1-mini",
         messages=[
             {"role": "system", "content": "You are a travel planner. Create a simple itinerary."},
             {"role": "user", "content": prompt}

@@ -37,7 +37,7 @@ def search_restaurants(location: str, cuisine: str) -> str:
     judgment.get_current_trace().async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=1)],
         example=example,
-        model="gpt-4o-mini"
+        model="gpt-4.1-mini"
     )
     return ans
 
@@ -53,7 +53,7 @@ def check_opening_hours(restaurant: str) -> str:
     judgment.get_current_trace().async_evaluate(
         scorers=[AnswerCorrectnessScorer(threshold=1)],
         example=example,
-        model="gpt-4o-mini"
+        model="gpt-4.1-mini"
     )
     return ans
 
@@ -68,7 +68,7 @@ def get_menu_items(restaurant: str) -> str:
     judgment.get_current_trace().async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=1)],
         example=example,
-        model="gpt-4o-mini"
+        model="gpt-4.1-mini"
     )
     return ans 
 
@@ -184,7 +184,7 @@ def test_eval_dataset():
     client.run_evaluation(
         examples=dataset.examples,
         scorers=[ExecutionOrderScorer(threshold=1, should_consider_ordering=True)],
-        model="gpt-4o-mini",
+        model="gpt-4.1-mini",
         project_name=PROJECT_NAME,
         eval_run_name="mist-demo-examples",
         override=True

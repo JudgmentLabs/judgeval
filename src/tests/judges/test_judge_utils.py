@@ -28,7 +28,7 @@ def test_create_judge_default_none():
     # Test default case when model=None
     judge, is_native = create_judge(model=None)
     assert isinstance(judge, LiteLLMJudge)
-    assert judge.model == "gpt-4o"
+    assert judge.model == "gpt-4.1"
     assert is_native is True
 
 def test_create_judge_existing_judge():
