@@ -6,6 +6,8 @@ on:
     branches:
       - main
 
+permissions: read-all
+
 jobs:
   run-tests:
     strategy:
@@ -44,17 +46,16 @@ jobs:
 
   run-e2e-tests:
     if: "!contains(github.actor, '[bot]')"  # Exclude if the actor is a bot
-    concurrency:
-      group: e2e-tests
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest]
-        python-version:
-          - "3.11"
     name: E2E Tests
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
+      - name: Wait for turn
+        uses: softprops/turnstyle@v2
+        with:
+          poll-interval-seconds: 10
+          same-branch-only: false
+          job-to-wait-for: "E2E Tests"
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -68,7 +69,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.11"
          
       - name: Install judgeval dependencies
         run: |
