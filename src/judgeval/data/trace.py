@@ -126,6 +126,7 @@ class Trace(BaseModel):
     duration: float
     entries: List[TraceSpan]
     overwrite: bool = False
+    offline_mode: bool = False
     rules: Optional[Dict[str, Any]] = None
     has_notification: Optional[bool] = False
     

@@ -18,7 +18,7 @@ tracer = Tracer(api_key=os.getenv("JUDGMENT_API_KEY"), project_name="travel_agen
 @tracer.observe(span_type="tool")
 def search_tavily(query):
     """Fetch travel data using Tavily API."""
-    return "results"
+    return "The weather in Tokyo is sunny with a high of 75°F."
 
 # @judgment.observe(span_type="tool")
 def get_attractions(destination):
@@ -46,6 +46,15 @@ def get_weather(destination, start_date, end_date):
     """Search for weather information."""
     prompt = f"Weather forecast for {destination} from {start_date} to {end_date}"
     weather_search = search_tavily(prompt)
+    example = Example(
+        input="What is the weather in Tokyo?",
+        actual_output=weather_search
+    )
+    tracer.async_evaluate(
+        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+        example=example,
+        model="gpt-4o-mini",
+    )
     return weather_search
 
 def research_destination(destination, start_date, end_date):
@@ -137,13 +146,13 @@ if __name__ == "__main__":
             {"tool_name": "search_tavily", "parameters": {"query": "Best tourist attractions in Tokyo"}},
             {"tool_name": "search_tavily", "parameters": {"query": "Best hotels in Tokyo"}},
             {"tool_name": "search_tavily", "parameters": {"query": "Flights to Tokyo from major cities"}},
-            {"tool_name": "search_tavily", "parameters": {"query": "Weather forecast for Tokyo from 2025-06-01 to 2025-06-02"}}
+            {"tool_name": "search_tavily", "parameters": {"query": "Weather forecast for Tokyo from 2025-06-01 to 2025-06-03"}}
         ]
     )
 
     judgment.assert_test(
         project_name="travel_agent_demo",
-        examples=[example],
+        examples=[example, example2],
         scorers=[ToolOrderScorer(threshold=0.5)],
         model="gpt-4.1-mini",
         function=generate_itinerary,

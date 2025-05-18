@@ -146,7 +146,7 @@ class TraceManagerClient:
         
         return response.json()
 
-    def save_trace(self, trace_data: dict):
+    def save_trace(self, trace_data: dict, offline_mode: bool = False):
         """
         Saves a trace to the Judgment Supabase and optionally to S3 if configured.
 
@@ -183,7 +183,7 @@ class TraceManagerClient:
             except Exception as e:
                 warnings.warn(f"Failed to save trace to S3: {str(e)}")
         
-        if "ui_results_url" in response.json():
+        if not offline_mode and "ui_results_url" in response.json():
             pretty_str = f"\n🔍 You can view your trace data here: [rgb(106,0,255)][link={response.json()['ui_results_url']}]View Trace[/link]\n"
             rprint(pretty_str)
 
@@ -665,8 +665,7 @@ class TraceClient:
             "parent_name": self.parent_name
         }        
         # --- Log trace data before saving ---
-        if not self.tracer.offline_mode:
-            self.trace_manager_client.save_trace(trace_data)
+        self.trace_manager_client.save_trace(trace_data, offline_mode=self.tracer.offline_mode)
 
         # upload annotations
         # TODO: batch to the log endpoint
