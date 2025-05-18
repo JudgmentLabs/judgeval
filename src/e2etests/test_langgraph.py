@@ -12,8 +12,7 @@ from langchain_openai import ChatOpenAI
 
 from judgeval.common.tracer import Tracer, TraceManagerClient, TraceClient
 from judgeval.integrations.langgraph import (
-    JudgevalCallbackHandler,
-    AsyncJudgevalCallbackHandler,
+    JudgevalCallbackHandler
 )
 
 # --- Test Configuration ---
@@ -167,10 +166,10 @@ def test_sync_graph_execution():
 # --- Asynchronous Test ---
 @pytest.mark.asyncio
 async def test_async_graph_execution():
-    """Tests asynchronous graph execution with AsyncJudgevalCallbackHandler."""
+    """Tests asynchronous graph execution with JudgevalCallbackHandler."""
     print("\n--- Running Async Test ---")
     tracer_async = Tracer(api_key=API_KEY, organization_id=ORG_ID, project_name=PROJECT_NAME_ASYNC)
-    handler_async = AsyncJudgevalCallbackHandler(tracer_async)
+    handler_async = JudgevalCallbackHandler(tracer_async)
     trace_client_async: TraceClient = None
     trace_id_async: str = None
 

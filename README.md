@@ -17,6 +17,7 @@ Judgeval is an open-source tool for testing, monitoring, and optimizing AI agent
 **🔍 Tracing**
 * Automatic agent tracing for common agent frameworks and SDKs (LangGraph, OpenAI, Anthropic, etc.)
 * Track input/output, latency, cost, token usage at every step
+    * Granular cost tracking per customer/per task
 * Function tracing with `@judgment.observe` decorator
 
 **🧪 Evals**
