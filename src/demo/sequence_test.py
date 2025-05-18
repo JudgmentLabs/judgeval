@@ -18,6 +18,10 @@ tracer = Tracer(api_key=os.getenv("JUDGMENT_API_KEY"), project_name="travel_agen
 @tracer.observe(span_type="tool")
 def search_tavily(query):
     """Fetch travel data using Tavily API."""
+    # API_KEY = os.getenv("TAVILY_API_KEY")
+    # client = TavilyClient(api_key=API_KEY)
+    # results = client.search(query, num_results=3)
+    # return results
     return "The weather in Tokyo is sunny with a high of 75°F."
 
 # @judgment.observe(span_type="tool")
