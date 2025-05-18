@@ -47,7 +47,7 @@ scorer = AnswerRelevancyScorer(threshold=0.8)
 results = client.run_evaluation(
     examples=[example],
     scorers=[scorer],
-    model="gpt-4o",
+    model="gpt-4.1",
 )
 print(results)
 ```
@@ -68,7 +68,7 @@ async function runAnswerRelevancy() {
     const results = await client.evaluate({
         examples: [example],
         scorers: [scorer],
-        model: "gpt-4o",
+        model: "gpt-4.1",
         projectName: "ans-relevancy-ts-proj",
         evalName: "ans-relevancy-ts-eval"
     });

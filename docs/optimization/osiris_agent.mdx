@@ -200,7 +200,7 @@ For optimal performance, we recommend adding a rule file to your AI agent config
         
         # Generate recommendations using OpenAI
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4.1-mini",
             messages=[
                 {"role": "system", "content": "You are a music recommendation expert with deep knowledge of various genres, artists, and songs. Your goal is to suggest songs that match the user's preferences; recommend songs from their favorite artists/bands."},
                 {"role": "user", "content": prompt}
@@ -218,7 +218,7 @@ For optimal performance, we recommend adding a rule file to your AI agent config
             input=prompt,
             actual_output=recommendations,
             retrieval_context=[str(search_results)],
-            model="gpt-4o"
+            model="gpt-4.1"
         )
         
         return recommendations
@@ -379,7 +379,7 @@ For optimal performance, we recommend adding a rule file to your AI agent config
             scorers=[AnswerRelevancyScorer(threshold=0.5)],
             input=prompt,
             actual_output=str(flights_search["results"]),
-            model="gpt-4o",
+            model="gpt-4.1",
         )
         return flights_search
 
@@ -392,7 +392,7 @@ For optimal performance, we recommend adding a rule file to your AI agent config
             scorers=[AnswerRelevancyScorer(threshold=0.5)],
             input=prompt,
             actual_output=str(weather_search["results"]),
-            model="gpt-4o",
+            model="gpt-4.1",
         )
         return weather_search
 
@@ -461,7 +461,7 @@ For optimal performance, we recommend adding a rule file to your AI agent config
         """
         
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4.1",
             messages=[
                 {"role": "system", "content": "You are an expert travel planner. Combine both historical and current information to create the best possible itinerary."},
                 {"role": "user", "content": prompt}
@@ -473,7 +473,7 @@ For optimal performance, we recommend adding a rule file to your AI agent config
             input=prompt,
             actual_output=str(response),
             retrieval_context=[str(vector_db_context), str(research_data)],
-            model="gpt-4o",
+            model="gpt-4.1",
         )
         
         return response

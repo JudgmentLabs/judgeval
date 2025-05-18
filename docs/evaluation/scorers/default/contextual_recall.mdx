@@ -62,7 +62,7 @@ scorer = ContextualRecallScorer(threshold=0.8)
 results = client.run_evaluation(
     examples=[example],
     scorers=[scorer],
-    model="gpt-4o",
+    model="gpt-4.1",
 )
 print(results)
 ```
@@ -87,7 +87,7 @@ async function runContextualRecall() {
     const results = await client.evaluate({
         examples: [example],
         scorers: [scorer],
-        model: "gpt-4o",
+        model: "gpt-4.1",
         projectName: "ctx-recall-ts-proj",
         evalName: "ctx-recall-ts-eval"
     });

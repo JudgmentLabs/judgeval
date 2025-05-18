@@ -62,7 +62,7 @@ scorer = FaithfulnessScorer(threshold=0.5)
 results = client.run_evaluation(
     examples=[example],
     scorers=[scorer],
-    model="gpt-4o",
+    model="gpt-4.1",
 )
 print(results)
 ```
@@ -82,7 +82,7 @@ async function runFirstExperiment() { // Wrap in async function for await
     const results = await client.evaluate({
         examples: [example],
         scorers: [scorer],
-        model: "gpt-4o",
+        model: "gpt-4.1",
         projectName: "my-first-ts-project", // Example project name
         evalName: "first-ts-experiment"   // Example eval name
     });
@@ -99,7 +99,7 @@ Congratulations! Your evaluation should have passed. Let's break down what happe
 - The variable `retrieval_context` (Python) or `context` (Typescript) represents the retrieved context from your RAG knowledge base.
 - `FaithfulnessScorer(threshold=0.5)` is a scorer that checks if the output is hallucinated relative to the retrieved context.
     - <Note>The threshold is used in the context of [unit testing](/evaluation/unit_testing).</Note>
-- We chose `gpt-4o` as our judge model to measure faithfulness. Judgment Labs offers ANY judge model for your evaluation needs. 
+- We chose `gpt-4.1` as our judge model to measure faithfulness. Judgment Labs offers ANY judge model for your evaluation needs. 
 Consider trying out our state-of-the-art [Osiris judge models](https://cs191.stanford.edu/projects/Shan,%20Alexander_NLP%20191W.pdf) for your next evaluation!
 
 <Tip>
@@ -130,7 +130,7 @@ def my_tool():
 def main():
     task_input = my_tool()
     res = client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4.1",
         messages=[{"role": "user", "content": f"{task_input}"}]
     )
     return res.choices[0].message.content
@@ -157,7 +157,7 @@ const observedMyTool = judgment.observe({ spanType: "tool" })(myTool);
 async function main(): Promise<string | null | undefined> {
     const taskInput = await observedMyTool();
     const res = await client.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4.1",
         messages: [{ role: "user", content: taskInput }],
     });
     return res.choices[0]?.message?.content;
@@ -218,7 +218,7 @@ def main():
     # helper_function will be automatically traced without @observe
     result = helper_function()
     res = client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4.1",
         messages=[{"role": "user", "content": result}]
     )
     return res.choices[0].message.content
@@ -255,7 +255,7 @@ def my_tool():
 def main():
     task_input = my_tool()
     res = client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4.1",
         messages=[{"role": "user", "content": f"{task_input}"}]
     ).choices[0].message.content
 
@@ -267,7 +267,7 @@ def main():
     judgment.async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
         example=example,
-        model="gpt-4o"
+        model="gpt-4.1"
     )
 
     return res
@@ -293,7 +293,7 @@ const observedMyTool = judgment.observe({ spanType: "tool" })(myTool);
 async function mainWithEval(): Promise<string | null | undefined> {
     const taskInput = await observedMyTool();
     const res = await client.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4.1",
         messages: [{ role: "user", content: taskInput }],
     });
     const actualOutput = res.choices[0]?.message?.content;
@@ -308,7 +308,7 @@ async function mainWithEval(): Promise<string | null | undefined> {
                 {
                     input: taskInput,
                     actualOutput: actualOutput,
-                    model: "gpt-4o"
+                    model: "gpt-4.1"
                 }
             );
         } else {
@@ -362,7 +362,7 @@ A Project keeps track of Experiments and Traces relating to a specific workflow.
 2. You can create separate Experiments for different iterations of your LLM system, allowing you to independently test each component of your LLM system.
 
 <Tip>
-You can try different models (e.g. `gpt-4o`, `claude-3-5-sonnet`, etc.) and prompt templates in each Experiment to find the 
+You can try different models (e.g. `gpt-4.1`, `claude-3-5-sonnet`, etc.) and prompt templates in each Experiment to find the 
 optimal setup for your LLM system. 
 </Tip>
 
