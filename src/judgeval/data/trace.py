@@ -9,7 +9,7 @@ class TraceSpan(BaseModel):
     trace_id: str
     function: Optional[str] = None
     depth: int
-    created_at: Optional[float] = None
+    created_at: Optional[Any] = None
     parent_span_id: Optional[str] = None
     span_type: Optional[str] = "span"
     inputs: Optional[Dict[str, Any]] = None
