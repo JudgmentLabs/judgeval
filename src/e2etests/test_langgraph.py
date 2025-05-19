@@ -22,7 +22,7 @@ API_KEY = os.getenv("JUDGMENT_API_KEY")
 ORG_ID = os.getenv("JUDGMENT_ORG_ID")
 
 # --- Shared Graph Definition ---
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+llm = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
 
 class SimpleState(TypedDict):
     messages: Sequence[HumanMessage | AIMessage]

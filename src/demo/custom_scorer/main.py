@@ -36,7 +36,7 @@ results = client.run_evaluation(
     eval_run_name="test-run4",
     examples=[example],
     scorers=[scorer],
-    model="gpt-4o-mini",
+    model="gpt-4.1-mini",
     override=True,
 )
 print(results)

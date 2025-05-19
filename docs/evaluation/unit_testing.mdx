@@ -33,7 +33,7 @@ def test_faithfulness():
             eval_run_name="test_faithfulness_fail",
             examples=[example],
             scorers=[FaithfulnessScorer(threshold=1.0)],
-            model="gpt-4o" # Added model parameter
+            model="gpt-4.1" # Added model parameter
         )
     
     # This should pass as the threshold is low
@@ -41,7 +41,7 @@ def test_faithfulness():
         eval_run_name="test_faithfulness_pass",
         examples=[example],
         scorers=[FaithfulnessScorer(threshold=0.1)],
-        model="gpt-4o" # Added model parameter
+        model="gpt-4.1" # Added model parameter
     )
 ```
 ```Typescript Typescript
@@ -64,7 +64,7 @@ describe('LLM Unit Tests', () => {
             evalRunName: "test_faithfulness_fail_ts",
             examples: [example],
             scorers: [new FaithfulnessScorer(1.0)],
-            model: "gpt-4o"
+            model: "gpt-4.1"
         })).rejects.toThrow(); // Check for any thrown error (AssertionError equivalent)
     });
 
@@ -80,7 +80,7 @@ describe('LLM Unit Tests', () => {
             evalRunName: "test_faithfulness_pass_ts",
             examples: [example],
             scorers: [new FaithfulnessScorer(0.1)],
-            model: "gpt-4o"
+            model: "gpt-4.1"
         })).resolves.toBeUndefined(); // Check that it completes without throwing
     });
 });

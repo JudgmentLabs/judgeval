@@ -12,7 +12,7 @@ BASE_CONVERSATION = [
 
 
 class LiteLLMJudge(JudgevalJudge):
-    def __init__(self, model: str = "gpt-4o-mini", **kwargs):
+    def __init__(self, model: str = "gpt-4.1-mini", **kwargs):
         debug(f"Initializing LiteLLMJudge with model={model}")
         self.model = model
         self.kwargs = kwargs

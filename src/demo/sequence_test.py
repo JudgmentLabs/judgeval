@@ -85,7 +85,7 @@ def create_travel_plan(destination, start_date, end_date, research_data):
     """
     
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4.1",
         messages=[
             {"role": "system", "content": "You are an expert travel planner. Combine both historical and current information to create the best possible itinerary."},
             {"role": "user", "content": prompt}
@@ -148,7 +148,7 @@ if __name__ == "__main__":
     judgment.assert_test(
         examples=[example],
         scorers=[ToolOrderScorer(threshold=0.5)],
-        model="gpt-4o-mini",
+        model="gpt-4.1-mini",
         function=generate_itinerary,
         tracer=tracer,
         override=True
