@@ -765,7 +765,7 @@ if __name__ == "__main__":
     # Batched single completion to multiple models
     pprint.pprint(get_completion_multiple_models(
         models=[
-            "LLAMA3_70B_INSTRUCT_TURBO", "LLAMA3_405B_INSTRUCT_TURBO", "gpt-4o-mini"
+            "LLAMA3_70B_INSTRUCT_TURBO", "LLAMA3_405B_INSTRUCT_TURBO", "gpt-4.1-mini"
         ],
         messages=[
             [

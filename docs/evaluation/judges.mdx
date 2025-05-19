@@ -15,7 +15,7 @@ Both `judgeval` (Python) and `judgeval-js` (TypeScript) support OpenAI models (l
 
 In Python, this is handled via LiteLLM integration. In TypeScript, the built-in `DefaultJudge` is used.
 
-You simply pass the model name (e.g., "gpt-4o") to the `model` parameter in your evaluation call:
+You simply pass the model name (e.g., "gpt-4.1") to the `model` parameter in your evaluation call:
 
 <CodeGroup>
 ```Python Python
@@ -29,7 +29,7 @@ example1 = Example(input="Q1", actual_output="A1")
 results = client.run_evaluation(
     examples=[example1],
     scorers=[AnswerRelevancyScorer(threshold=0.5)],
-    model="gpt-4o"  # Uses LiteLLM
+    model="gpt-4.1"  # Uses LiteLLM
 )
 ```
 ```Typescript Typescript
@@ -42,7 +42,7 @@ async function runOpenAIJudge() {
     const results = await client.evaluate({
         examples: [example1],
         scorers: [new AnswerRelevancyScorer(0.5)],
-        model: "gpt-4o", // Uses DefaultJudge internally
+        model: "gpt-4.1", // Uses DefaultJudge internally
         projectName: "openai-judge-ts-proj",
         evalName: "openai-judge-ts-eval"
     });
@@ -205,5 +205,5 @@ useCustomJudge();
 </CodeGroup>
 
 <Note>
-When providing a custom judge instance (like `VertexAIJudge` in Python or `MyCustomJudge` in TypeScript), pass the instance directly to the `model` parameter (Python) or the `judge` option (TypeScript) in the evaluation call. The built-in judges (`DefaultJudge`, `TogetherJudge`) are used automatically when you pass a model *name* string (like "gpt-4o" or "meta-llama/...") to the `model` option in TypeScript.
+When providing a custom judge instance (like `VertexAIJudge` in Python or `MyCustomJudge` in TypeScript), pass the instance directly to the `model` parameter (Python) or the `judge` option (TypeScript) in the evaluation call. The built-in judges (`DefaultJudge`, `TogetherJudge`) are used automatically when you pass a model *name* string (like "gpt-4.1" or "meta-llama/...") to the `model` option in TypeScript.
 </Note>

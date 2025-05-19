@@ -23,7 +23,7 @@ def create_judge(
     If no model is provided, uses GPT4o as the default judge.
     """
     if model is None:  # default option
-        return LiteLLMJudge(model="gpt-4o"), True
+        return LiteLLMJudge(model="gpt-4.1"), True
     if not isinstance(model, (str, list, JudgevalJudge)):
         raise InvalidJudgeModelError(f"Model must be a string, list of strings, or a judgeval judge object. Got: {type(model)} instead.")
     # If model is already a valid judge type, return it and mark native

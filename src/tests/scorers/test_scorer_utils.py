@@ -47,8 +47,8 @@ def mock_scorer():
 @pytest.fixture
 def mock_scorers():
     return [
-        MockJudgevalScorer(evaluation_model="gpt-4o"),
-        MockJudgevalScorer(evaluation_model="gpt-4o")
+        MockJudgevalScorer(evaluation_model="gpt-4.1"),
+        MockJudgevalScorer(evaluation_model="gpt-4.1")
     ]
 
 
