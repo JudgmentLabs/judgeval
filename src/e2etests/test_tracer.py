@@ -84,7 +84,7 @@ async def make_upper(input: str) -> str:
     judgment.async_evaluate(
         scorers=[FaithfulnessScorer(threshold=0.5)],
         example=example,
-        model="gpt-4o-mini",
+        model="gpt-4.1-mini",
         log_results=True
     )
 
@@ -107,7 +107,7 @@ async def make_lower(input):
     judgment.async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
         example=example,
-        model="gpt-4o-mini",
+        model="gpt-4.1-mini",
         log_results=True
     )
     return output
@@ -132,7 +132,7 @@ async def answer_user_question(input):
     judgment.async_evaluate(
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
         example=example,
-        model="gpt-4o-mini",
+        model="gpt-4.1-mini",
         log_results=True
     )
     return output
@@ -164,13 +164,13 @@ async def make_poem(input: str) -> str:
         judgment.async_evaluate(
             scorers=[AnswerRelevancyScorer(threshold=0.5)],
             example=example,
-            model="gpt-4o-mini",
+            model="gpt-4.1-mini",
             log_results=True
         )
         
         # Using OpenAI API
         openai_response = openai_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4.1-mini",
             messages=[
                 {"role": "system", "content": "Make a short sentence with the input."},
                 {"role": "user", "content": input}
@@ -201,7 +201,7 @@ async def make_poem_with_async_clients(input: str) -> str:
         
         # Using OpenAI API
         openai_task = openai_client_async.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4.1-mini",
             messages=[
                 {"role": "system", "content": "Make a short sentence with the input."},
                 {"role": "user", "content": input}
@@ -229,7 +229,7 @@ async def make_poem_with_async_clients(input: str) -> str:
             scorers=[AnswerRelevancyScorer(threshold=0.5)],
             input=input,
             actual_output=anthropic_result,
-            model="gpt-4o-mini",
+            model="gpt-4.1-mini",
             log_results=True
         )
 
@@ -309,14 +309,14 @@ async def test_openai_response_api():
     
     # Test chat.completions.create
     response_chat = openai_client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-4.1-mini",
         messages=messages
     )
     content_chat = response_chat.choices[0].message.content
     print(f"\nChat Completions Response: {content_chat}")
 
     response_resp = openai_client.responses.create(
-        model="gpt-4o-mini",
+        model="gpt-4.1-mini",
         input=messages
     )
         
@@ -525,7 +525,7 @@ async def test_openai_sync_streaming_usage(test_input):
     @judgment.observe(name="sync_stream_test_func", project_name=PROJECT_NAME, overwrite=True, deep_tracing=False)
     def run_sync_stream(prompt):
         stream = sync_client.chat.completions.create(
-            model="gpt-4o-mini", 
+            model="gpt-4.1-mini", 
             messages=[{"role": "user", "content": prompt}],
             stream=True,
             stream_options={"include_usage": True}  # Explicitly enable usage tracking
@@ -564,7 +564,7 @@ async def test_openai_async_streaming_usage(test_input):
     @judgment.observe(name="async_stream_test_func", project_name=PROJECT_NAME, overwrite=True, deep_tracing=False)
     async def run_async_stream(prompt):
         stream = await async_client.chat.completions.create(
-            model="gpt-4o-mini", 
+            model="gpt-4.1-mini", 
             messages=[{"role": "user", "content": prompt}],
             stream=True,
             stream_options={"include_usage": True}  # Explicitly enable usage tracking
@@ -622,7 +622,7 @@ async def test_token_counting():
     print("Adding async non-streaming OpenAI call...")
     if openai_client_async:
          tasks.append(openai_client_async.chat.completions.create(
-             model="gpt-4o-mini",
+             model="gpt-4.1-mini",
              messages=[{"role": "user", "content": prompt1}]
          ))
     else: print("Skipping OpenAI async call (client not available)")
@@ -633,7 +633,7 @@ async def test_token_counting():
     if openai_client:
         try:
             stream = openai_client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-4.1-mini",
                 messages=[{"role": "user", "content": prompt2}],
                 stream=True,
                 stream_options={"include_usage": True}  # Explicitly enable usage tracking

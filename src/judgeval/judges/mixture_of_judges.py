@@ -136,7 +136,7 @@ class MixtureOfJudges(JudgevalJudge):
     """
     def __init__(self, 
                  models: List[str] = ['QWEN', 'LLAMA3_70B_INSTRUCT_TURBO', 'MISTRAL_8x22B_INSTRUCT'],
-                 aggregator: str = 'gpt-4o', 
+                 aggregator: str = 'gpt-4.1', 
                  **kwargs):
         """
         `models` are the individual judge models to be used for generating responses.

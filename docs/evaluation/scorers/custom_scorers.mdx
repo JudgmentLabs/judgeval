@@ -318,7 +318,7 @@ sample_scorer = SampleScorer()
 results = client.run_evaluation(
     examples=[example1],
     scorers=[sample_scorer],
-    model="gpt-4o"
+    model="gpt-4.1"
 )
 ```
 ## Custom Scorers with Custom Examples
@@ -350,7 +350,7 @@ scorer = CustomScorer(threshold=0.5) # Your custom scorer
 results = client.run_evaluation(
     examples=[custom_example],
     scorers=[scorer],
-    model="gpt-4o-mini",
+    model="gpt-4.1-mini",
 )
 ```
 
