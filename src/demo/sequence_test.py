@@ -15,7 +15,7 @@ client = wrap(openai.Client(api_key=os.getenv("OPENAI_API_KEY")))
 tracer = Tracer(api_key=os.getenv("JUDGMENT_API_KEY"), project_name="travel_agent_demo")
 
 
-@tracer.observe(span_type="tool")
+# @tracer.observe(span_type="tool")
 def search_tavily(query):
     """Fetch travel data using Tavily API."""
     # API_KEY = os.getenv("TAVILY_API_KEY")
@@ -24,28 +24,28 @@ def search_tavily(query):
     # return results
     return "The weather in Tokyo is sunny with a high of 75°F."
 
-# @judgment.observe(span_type="tool")
+@tracer.observe(span_type="tool")
 def get_attractions(destination):
     """Search for top attractions in the destination."""
     prompt = f"Best tourist attractions in {destination}"
     attractions_search = search_tavily(prompt)
     return attractions_search
 
-# @judgment.observe(span_type="tool")
+@tracer.observe(span_type="tool")
 def get_hotels(destination):
     """Search for hotels in the destination."""
     prompt = f"Best hotels in {destination}"
     hotels_search = search_tavily(prompt)
     return hotels_search
 
-# @judgment.observe(span_type="tool")
+@tracer.observe(span_type="tool")
 def get_flights(destination):
     """Search for flights to the destination."""
     prompt = f"Flights to {destination} from major cities"
     flights_search = search_tavily(prompt)
     return flights_search
 
-# @judgment.observe(span_type="tool")
+@tracer.observe(span_type="tool")
 def get_weather(destination, start_date, end_date):
     """Search for weather information."""
     prompt = f"Weather forecast for {destination} from {start_date} to {end_date}"
@@ -119,27 +119,29 @@ if __name__ == "__main__":
         input={"destination": "Paris", "start_date": "2025-06-01", "end_date": "2025-06-02"},
         expected_tools=[
             {
-                "tool_name": "search_tavily",
+                "tool_name": "get_attractions",
                 "parameters": {
-                    "query": "Best tourist attractions in Paris"
+                    "destination": "Paris"
                 }
             },
             {
-                "tool_name": "search_tavily",
+                "tool_name": "get_hotels",
                 "parameters": {
-                    "query": "Best hotels in Paris"
+                    "destination": "Paris"
                 }
             },
             {
-                "tool_name": "search_tavily",
+                "tool_name": "get_flights",
                 "parameters": {
-                    "query": "Flights to Paris from major cities"
+                    "destination": "Paris"
                 }
             },
             {
-                "tool_name": "search_tavily",
+                "tool_name": "get_weather",
                 "parameters": {
-                    "query": "Weather forecast for Paris from 2025-06-01 to 2025-06-02"
+                    "destination": "Paris",
+                    "start_date": "2025-06-01",
+                    "end_date": "2025-06-02"
                 }
             }
         ]
@@ -156,7 +158,7 @@ if __name__ == "__main__":
 
     judgment.assert_test(
         project_name="travel_agent_demo",
-        examples=[example, example2],
+        examples=[example],
         scorers=[ToolOrderScorer(threshold=0.5)],
         model="gpt-4.1-mini",
         function=generate_itinerary,
