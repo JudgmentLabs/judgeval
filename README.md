@@ -23,18 +23,20 @@ We support tracing agents built with LangGraph, OpenAI SDK, Anthropic, ... and a
 Judgeval is created and maintained by [Judgment Labs](https://judgmentlabs.ai/).
 
 ## 📋 Table of Contents
+* [✨ Features](#-features)
+    * [🔍 Tracing](#-tracing)
+    * [🧪 Evals](#-evals)
+    * [📡 Monitoring](#-monitoring)
+    * [📊 Datasets](#-datasets)
+    * [💡 Insights](#-insights)
+* [🛠️ Installation](#️-installation)
+* [🏁 Get Started](#-get-started)
+* [🏢 Self-Hosting](#-self-hosting)
+* [📚 Cookbooks](#-cookbooks)
+* [⭐ Star Us on GitHub](#-star-us-on-github)
+* [❤️ Contributors](#️-contributors)
 
-- [✨ Features](#-features)
-  - [🔍 Tracing](#-tracing)
-  - [🧪 Evals](#-evals)
-  - [📡 Monitoring](#-monitoring)
-  - [📊 Datasets](#-datasets)
-  - [💡 Insights](#-insights)
-- [🛠️ Installation](#-installation)
-- [🏁 Get Started](#-get-started)
-- [🏢 Self-Hosting](#-self-hosting)
-- [📚 Cookbooks](#-cookbooks)
-- [❤️ Contributors](#-contributors)
+<!-- Created by https://github.com/ekalinin/github-markdown-toc -->
 
 
 ## ✨ Features
