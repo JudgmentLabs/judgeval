@@ -1271,64 +1271,94 @@ class Tracer:
         else:
             warnings.warn("No trace found (context var or fallback), skipping evaluation") # Modified warning
 
-
 def wrap(client: Any) -> Any:
     """
     Wraps an API client to add tracing capabilities.
     Supports OpenAI, Together, Anthropic, and Google GenAI clients.
     Patches both '.create' and Anthropic's '.stream' methods using a wrapper class.
     """
-    span_name, original_create, responses_create, original_stream = _get_client_config(client)
-
-    # --- Define Traced Async Functions ---
-    async def traced_create_async(*args, **kwargs):
-        # [Existing logic - unchanged]
-        current_trace = current_trace_var.get()
-        if not current_trace:
-            if asyncio.iscoroutinefunction(original_create):
-                 return await original_create(*args, **kwargs)
-            else:
-                 return original_create(*args, **kwargs)
-
+    span_name, original_create, original_responses_create, original_stream = _get_client_config(client)
+    
+    def _record_input_and_check_streaming(span, kwargs, is_responses=False):
+        """Record input and check for streaming"""
         is_streaming = kwargs.get("stream", False)
 
-        with current_trace.span(span_name, span_type="llm") as span:
+            # Record input based on whether this is a responses endpoint
+        if is_responses:
+            span.record_input(kwargs)
+        else:
             input_data = _format_input_data(client, **kwargs)
             span.record_input(input_data)
-
-            # Warn about token counting limitations with streaming
-            if isinstance(client, (AsyncOpenAI, OpenAI)) and is_streaming:
-                if not kwargs.get("stream_options", {}).get("include_usage"):
-                    warnings.warn(
-                        "OpenAI streaming calls don't include token counts by default. "
-                        "To enable token counting with streams, set stream_options={'include_usage': True} "
-                        "in your API call arguments.",
-                        UserWarning
-                    )
-
+        
+        # Warn about token counting limitations with streaming
+        if isinstance(client, (AsyncOpenAI, OpenAI)) and is_streaming:
+            if not kwargs.get("stream_options", {}).get("include_usage"):
+                warnings.warn(
+                    "OpenAI streaming calls don't include token counts by default. "
+                    "To enable token counting with streams, set stream_options={'include_usage': True} "
+                    "in your API call arguments.",
+                    UserWarning
+                )
+            
+        return is_streaming
+    
+    def _format_and_record_output(span, response, is_streaming, is_async, is_responses):
+        """Format and record the output in the span"""
+        if is_streaming:
+            output_entry = span.record_output("<pending stream>")
+            wrapper_func = _async_stream_wrapper if is_async else _sync_stream_wrapper
+            return wrapper_func(response, client, output_entry)
+        else:
+            format_func = _format_response_output_data if is_responses else _format_output_data
+            output_data = format_func(client, response)
+            span.record_output(output_data)
+            return response
+    
+    def _handle_error(span, e, is_async):
+        """Handle and record errors"""
+        call_type = "async" if is_async else "sync"
+        print(f"Error during wrapped {call_type} API call ({span_name}): {e}")
+        span.record_output({"error": str(e)})
+        raise
+    
+    # --- Traced Async Functions ---
+    async def traced_create_async(*args, **kwargs):
+        current_trace = current_trace_var.get()
+        if not current_trace:
+            return await original_create(*args, **kwargs)
+        
+        with current_trace.span(span_name, span_type="llm") as span:
+            is_streaming = _record_input_and_check_streaming(span, kwargs)
+            
             try:
-                if is_streaming:
-                    stream_iterator = await original_create(*args, **kwargs)
-                    output_entry = span.record_output("<pending stream>")
-                    return _async_stream_wrapper(stream_iterator, client, output_entry)
-                else:
-                    awaited_response = await original_create(*args, **kwargs)
-                    output_data = _format_output_data(client, awaited_response)
-                    span.record_output(output_data)
-                    return awaited_response
+                response_or_iterator = await original_create(*args, **kwargs)
+                return _format_and_record_output(span, response_or_iterator, is_streaming, True, False)
             except Exception as e:
-                print(f"Error during wrapped async API call ({span_name}): {e}")
-                span.record_output({"error": str(e)})
-                raise
-
-
-    # Function replacing .stream() - NOW returns the wrapper class instance
+                return _handle_error(span, e, True)
+    
+    # Async responses for OpenAI clients
+    async def traced_response_create_async(*args, **kwargs):
+        current_trace = current_trace_var.get()
+        if not current_trace:
+            return await original_responses_create(*args, **kwargs)
+        
+        with current_trace.span(span_name, span_type="llm") as span:
+            is_streaming = _record_input_and_check_streaming(span, kwargs, is_responses=True)
+            
+            try:
+                response_or_iterator = await original_responses_create(*args, **kwargs)
+                return _format_and_record_output(span, response_or_iterator, is_streaming, True, True)
+            except Exception as e:
+                return _handle_error(span, e, True)
+    
+    # Function replacing .stream() for async clients
     def traced_stream_async(*args, **kwargs):
         current_trace = current_trace_var.get()
         if not current_trace or not original_stream:
             return original_stream(*args, **kwargs)
+        
         original_manager = original_stream(*args, **kwargs)
-        wrapper_manager = _TracedAsyncStreamManagerWrapper(
+        return _TracedAsyncStreamManagerWrapper(
             original_manager=original_manager,
             client=client,
             span_name=span_name,
@@ -1336,139 +1366,74 @@ def wrap(client: Any) -> Any:
             stream_wrapper_func=_async_stream_wrapper,
             input_kwargs=kwargs
         )
-        return wrapper_manager
-
-    # --- Define Traced Sync Functions ---
+    
+    # --- Traced Sync Functions ---
     def traced_create_sync(*args, **kwargs):
-         # [Existing logic - unchanged]
         current_trace = current_trace_var.get()
         if not current_trace:
-             return original_create(*args, **kwargs)
-
-        is_streaming = kwargs.get("stream", False)
-
+            return original_create(*args, **kwargs)
+        
         with current_trace.span(span_name, span_type="llm") as span:
-             input_data = _format_input_data(client, **kwargs)
-             span.record_input(input_data)
-
-             # Warn about token counting limitations with streaming
-             if isinstance(client, (AsyncOpenAI, OpenAI)) and is_streaming:
-                 if not kwargs.get("stream_options", {}).get("include_usage"):
-                     warnings.warn(
-                         "OpenAI streaming calls don't include token counts by default. "
-                         "To enable token counting with streams, set stream_options={'include_usage': True} "
-                         "in your API call arguments.",
-                         UserWarning
-                     )
-
-             try:
-                 response_or_iterator = original_create(*args, **kwargs)
-             except Exception as e:
-                 print(f"Error during wrapped sync API call ({span_name}): {e}")
-                 span.record_output({"error": str(e)})
-                 raise
-
-             if is_streaming:
-                 output_entry = span.record_output("<pending stream>")
-                 return _sync_stream_wrapper(response_or_iterator, client, output_entry)
-             else:
-                 output_data = _format_output_data(client, response_or_iterator)
-                 span.record_output(output_data)
-                 return response_or_iterator
-
-        # --- Define Traced Sync Functions ---
+            is_streaming = _record_input_and_check_streaming(span, kwargs)
+            
+            try:
+                response_or_iterator = original_create(*args, **kwargs)
+                return _format_and_record_output(span, response_or_iterator, is_streaming, False, False)
+            except Exception as e:
+                return _handle_error(span, e, False)
+    
     def traced_response_create_sync(*args, **kwargs):
-         # [Existing logic - unchanged]
         current_trace = current_trace_var.get()
         if not current_trace:
-             return responses_create(*args, **kwargs)
-
-        is_streaming = kwargs.get("stream", False)
+            return original_responses_create(*args, **kwargs)
+        
         with current_trace.span(span_name, span_type="llm") as span:
-             span.record_input(kwargs)
-
-             # Warn about token counting limitations with streaming
-             if isinstance(client, (AsyncOpenAI, OpenAI)) and is_streaming:
-                 if not kwargs.get("stream_options", {}).get("include_usage"):
-                     warnings.warn(
-                         "OpenAI streaming calls don't include token counts by default. "
-                         "To enable token counting with streams, set stream_options={'include_usage': True} "
-                         "in your API call arguments.",
-                         UserWarning
-                     )
-
-             try:
-                 response_or_iterator = responses_create(*args, **kwargs)
-             except Exception as e:
-                 print(f"Error during wrapped sync API call ({span_name}): {e}")
-                 span.record_output({"error": str(e)})
-                 raise
-             if is_streaming:
-                 output_entry = span.record_output("<pending stream>")
-                 return _sync_stream_wrapper(response_or_iterator, client, output_entry)
-             else:
-                 output_data = _format_response_output_data(client, response_or_iterator)
-                 span.record_output(output_data)
-                 return response_or_iterator
-             
+            is_streaming = _record_input_and_check_streaming(span, kwargs, is_responses=True)
+            
+            try:
+                response_or_iterator = original_responses_create(*args, **kwargs)
+                return _format_and_record_output(span, response_or_iterator, is_streaming, False, True)
+            except Exception as e:
+                return _handle_error(span, e, False)
+    
     # Function replacing sync .stream()
     def traced_stream_sync(*args, **kwargs):
-         current_trace = current_trace_var.get()
-         if not current_trace or not original_stream:
-             return original_stream(*args, **kwargs)
-         original_manager = original_stream(*args, **kwargs)
-         wrapper_manager = _TracedSyncStreamManagerWrapper(
-             original_manager=original_manager,
-             client=client,
-             span_name=span_name,
-             trace_client=current_trace,
-             stream_wrapper_func=_sync_stream_wrapper,
-             input_kwargs=kwargs
-         )
-         return wrapper_manager
-
-
+        current_trace = current_trace_var.get()
+        if not current_trace or not original_stream:
+            return original_stream(*args, **kwargs)
+        
+        original_manager = original_stream(*args, **kwargs)
+        return _TracedSyncStreamManagerWrapper(
+            original_manager=original_manager,
+            client=client,
+            span_name=span_name,
+            trace_client=current_trace,
+            stream_wrapper_func=_sync_stream_wrapper,
+            input_kwargs=kwargs
+        )
+    
     # --- Assign Traced Methods to Client Instance ---
-    # [Assignment logic remains the same]
     if isinstance(client, (AsyncOpenAI, AsyncTogether)):
         client.chat.completions.create = traced_create_async
-        # Wrap the Responses API endpoint for OpenAI clients
         if hasattr(client, "responses") and hasattr(client.responses, "create"):
-            # Capture the original responses.create
-            original_responses_create = client.responses.create
-            def traced_responses(*args, **kwargs):
-                # Get the current trace from contextvars
-                current_trace = current_trace_var.get()
-                # If no active trace, call the original
-                if not current_trace:
-                    return original_responses_create(*args, **kwargs)
-                # Trace this responses.create call
-                with current_trace.span(span_name, span_type="llm") as span:
-                    # Record raw input kwargs
-                    span.record_input(kwargs)
-                    # Make the actual API call
-                    response = original_responses_create(*args, **kwargs)
-                    # Record the output object
-                    span.record_output(response)
-                    return response
-            # Assign the traced wrapper
-            client.responses.create = traced_responses
+            client.responses.create = traced_response_create_async
     elif isinstance(client, AsyncAnthropic):
         client.messages.create = traced_create_async
         if original_stream:
-             client.messages.stream = traced_stream_async
+            client.messages.stream = traced_stream_async
     elif isinstance(client, genai.client.AsyncClient):
         client.models.generate_content = traced_create_async
     elif isinstance(client, (OpenAI, Together)):
-         client.chat.completions.create = traced_create_sync
-         client.responses.create = traced_response_create_sync
+        client.chat.completions.create = traced_create_sync
+        if hasattr(client, "responses") and hasattr(client.responses, "create"):
+            client.responses.create = traced_response_create_sync
     elif isinstance(client, Anthropic):
-         client.messages.create = traced_create_sync
-         if original_stream:
-             client.messages.stream = traced_stream_sync
+        client.messages.create = traced_create_sync
+        if original_stream:
+            client.messages.stream = traced_stream_sync
     elif isinstance(client, genai.Client):
-         client.models.generate_content = traced_create_sync
-
+        client.models.generate_content = traced_create_sync
+    
     return client
 
 # Helper functions for client-specific operations
