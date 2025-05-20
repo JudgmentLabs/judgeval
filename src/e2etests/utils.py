@@ -30,21 +30,19 @@ def validate_trace_token_counts(trace_client) -> Dict[str, int]:
     llm_span_names = {"OPENAI_API_CALL", "ANTHROPIC_API_CALL", "TOGETHER_API_CALL", "GOOGLE_API_CALL"}
 
     for span in trace_spans:
-        if span.span_type == "llm" and span.function in llm_span_names and isinstance(span.output, dict):
-            output = span.output
-            usage = output.get("usage", {})
+        if span.span_type == "llm" and span.function in llm_span_names:
+            usage = span.usage
             if usage and "info" not in usage:  # Check if it's actual usage data
                 # Correctly handle different key names from different providers
 
-                prompt_tokens = usage.get("prompt_tokens", 0)
-                completion_tokens = usage.get("completion_tokens", 0)
-                entry_total = usage.get("total_tokens", 0)
+                prompt_tokens = usage.prompt_tokens
+                completion_tokens = usage.completion_tokens
+                total_tokens = usage.total_tokens
 
                 # Accumulate separately
                 manual_prompt_tokens += prompt_tokens
                 manual_completion_tokens += completion_tokens
-                # Accumulate the reported total_tokens from the usage dict
-                manual_total_tokens += entry_total
+                manual_total_tokens += total_tokens
 
     # Check if LLM spans were found before asserting counts
     # llm_spans_found = any(

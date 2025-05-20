@@ -36,6 +36,7 @@ def stream_openai_response(prompt: str):
             model="gpt-4", # Or your preferred model
             messages=[{"role": "user", "content": prompt}],
             stream=True,
+            stream_options={"include_usage": True},
         )
         print("Streaming response:")
         full_response = ""

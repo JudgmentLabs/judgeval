@@ -4,6 +4,15 @@ from judgeval.evaluation_run import EvaluationRun
 import json
 from datetime import datetime, timezone
 
+class TraceUsage(BaseModel):
+    prompt_tokens: Optional[int] = None
+    completion_tokens: Optional[int] = None
+    total_tokens: Optional[int] = None
+    prompt_tokens_cost_usd: Optional[float] = None
+    completion_tokens_cost_usd: Optional[float] = None
+    total_cost_usd: Optional[float] = None
+    model_name: Optional[str] = None
+
 class TraceSpan(BaseModel):
     span_id: str
     trace_id: str
@@ -14,6 +23,7 @@ class TraceSpan(BaseModel):
     span_type: Optional[str] = "span"
     inputs: Optional[Dict[str, Any]] = None
     output: Optional[Any] = None
+    usage: Optional[TraceUsage] = None
     duration: Optional[float] = None
     annotation: Optional[List[Dict[str, Any]]] = None
     evaluation_runs: Optional[List[EvaluationRun]] = []
@@ -33,7 +43,8 @@ class TraceSpan(BaseModel):
             "parent_span_id": self.parent_span_id,
             "function": self.function,
             "duration": self.duration,
-            "span_type": self.span_type
+            "span_type": self.span_type,
+            "usage": self.usage.model_dump() if self.usage else None
         }
     
     def print_span(self):

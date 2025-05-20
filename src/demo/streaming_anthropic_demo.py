@@ -40,7 +40,7 @@ async def stream_anthropic_response(prompt: str):
         async with wrapped_client.messages.stream(
             model="claude-3-haiku-20240307",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=100, 
+            max_tokens=4096, 
         ) as stream:
             print("Streaming response:")
             async for chunk in stream: # Iterate over the stream provided by the context manager
@@ -70,7 +70,7 @@ async def stream_anthropic_response(prompt: str):
         return None
 
 async def main():
-    test_prompt = "Write a very short poem about asynchronous streams."
+    test_prompt = "Explain the concept of quantum entanglement in simple terms."
     result = await stream_anthropic_response(test_prompt)
     if result:
         print(f"\n--- Final Content ---")

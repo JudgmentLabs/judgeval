@@ -10,7 +10,6 @@ import logging
 from dotenv import load_dotenv
 
 from judgeval.judgment_client import JudgmentClient
-
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -57,6 +56,7 @@ def client() -> JudgmentClient:
     client.delete_project(project_name="DeepTracingTest")
     client.delete_project(project_name="ResponseAPITest")
     client.delete_project(project_name="TestingPoemBotAsync")
+    client.delete_project(project_name="TestGoogleResponseAPI")
 
 
 @pytest.fixture
