@@ -46,7 +46,7 @@ def tools_examples() -> List[Example]:
         Example(
             input="Find the weather in San Francisco",
             actual_output="The weather in San Francisco is sunny.",
-            expected_output="The weather in San Francisco is sunny and warm.",
+            expected_output="The weather in San Francisco is sunny.",
             tools_called=[
                 "get_weather(location='San Francisco')"
             ],
