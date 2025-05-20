@@ -1,20 +1,20 @@
 
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any, Union, Callable
-from judgeval.data import Sequence
+from judgeval.data import Trace
 from judgeval.scorers import APIJudgmentScorer, JudgevalScorer
 from judgeval.judges import JudgevalJudge
 from judgeval.rules import Rule
 
 
-class SequenceRun(BaseModel):
+class TraceRun(BaseModel):
     """
     Stores example and evaluation scorers together for running an eval task
     
     Args: 
         project_name (str): The name of the project the evaluation results belong to
         eval_name (str): A name for this evaluation run
-        sequences (List[Sequence]): The sequences to evaluate
+        traces (List[Trace]): The traces to evaluate
         scorers (List[Union[JudgmentScorer, JudgevalScorer]]): A list of scorers to use for evaluation
         model (str): The model used as a judge when using LLM as a Judge
         aggregator (Optional[str]): The aggregator to use for evaluation if using Mixture of Judges
@@ -29,7 +29,7 @@ class SequenceRun(BaseModel):
     organization_id: Optional[str] = None
     project_name: Optional[str] = None
     eval_name: Optional[str] = None
-    sequences: Optional[List[Sequence]] = None
+    traces: Optional[List[Trace]] = None
     scorers: List[Union[APIJudgmentScorer, JudgevalScorer]]
     model: Optional[Union[str, List[str], JudgevalJudge]] = "gpt-4.1"
     aggregator: Optional[str] = None

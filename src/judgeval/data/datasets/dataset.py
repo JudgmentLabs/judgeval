@@ -7,13 +7,12 @@ import yaml
 from dataclasses import dataclass, field
 from typing import List, Union, Literal
 
-from judgeval.data import Example, Sequence
+from judgeval.data import Example
 from judgeval.common.logger import debug, error, warning, info
 
 @dataclass
 class EvalDataset:
     examples: List[Example]
-    sequences: List[Sequence]
     _alias: Union[str, None] = field(default=None)
     _id: Union[str, None] = field(default=None)
     judgment_api_key: str = field(default="")
@@ -22,13 +21,11 @@ class EvalDataset:
                  judgment_api_key: str = os.getenv("JUDGMENT_API_KEY"),  
                  organization_id: str = os.getenv("JUDGMENT_ORG_ID"),
                  examples: List[Example] = [],
-                 sequences: List[Sequence] = []
                  ):
         debug(f"Initializing EvalDataset with {len(examples)} examples")
         if not judgment_api_key:
             warning("No judgment_api_key provided")
         self.examples = examples
-        self.sequences = sequences
         self._alias = None
         self._id = None
         self.judgment_api_key = judgment_api_key
@@ -223,10 +220,7 @@ class EvalDataset:
     def add_example(self, e: Example) -> None:
         self.examples = self.examples + [e]
         # TODO if we need to add rank, then we need to do it here
-    
-    def add_sequence(self, s: Sequence) -> None:
-        self.sequences = self.sequences + [s]
-    
+
     def save_as(self, file_type: Literal["json", "csv", "yaml"], dir_path: str, save_name: str = None) -> None:
         """
         Saves the dataset as a file. Save only the examples.
@@ -313,7 +307,6 @@ class EvalDataset:
         return (
             f"{self.__class__.__name__}("
             f"examples={self.examples}, "
-            f"sequences={self.sequences}, "
             f"_alias={self._alias}, "
             f"_id={self._id}"
             f")"

@@ -79,7 +79,7 @@ class EvaluationRun(BaseModel):
             raise ValueError("Eval name is required when log_results is True. Please include the eval_run_name argument.")
         return v
 
-    @field_validator('examples', mode='before')
+    @field_validator('examples')
     def validate_examples(cls, v):
         if not v:
             raise ValueError("Examples cannot be empty.")
