@@ -722,9 +722,12 @@ async def _poll_evaluation_until_complete(eval_name: str, project_name: str, jud
                             example_dict = {k: v for k, v in example_data.items() if k != "scorer_data"}
                             example = Example(**example_dict)
                         
+                        # Calculate success based on whether all scorer_data entries were successful
+                        success = all(scorer_data.success for scorer_data in scorer_data_list) if scorer_data_list else False
+                        
                         # Create ScoringResult
                         scoring_result = ScoringResult(
-                            success=True,  # Assume success if we have results
+                            success=success,  # Set based on all scorer data success values
                             scorers_data=scorer_data_list,
                             data_object=example
                         )
