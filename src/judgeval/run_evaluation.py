@@ -201,9 +201,9 @@ def check_missing_scorer_data(results: List[ScoringResult]) -> List[ScoringResul
             )
     return results
 
-def check_experiment_type(eval_name: str, project_name: str, judgment_api_key: str, organization_id: str, is_sequence: bool) -> None:
+def check_experiment_type(eval_name: str, project_name: str, judgment_api_key: str, organization_id: str, is_trace: bool) -> None:
     """
-    Checks if the current experiment, if one exists, has the same type (examples of sequences)
+    Checks if the current experiment, if one exists, has the same type (examples of traces)
     """
     try:
         response = requests.post(
@@ -217,7 +217,7 @@ def check_experiment_type(eval_name: str, project_name: str, judgment_api_key: s
                 "eval_name": eval_name,
                 "project_name": project_name,
                 "judgment_api_key": judgment_api_key,
-                "is_sequence": is_sequence
+                "is_trace": is_trace
             },
             verify=True
         )
@@ -379,7 +379,7 @@ def run_trace_eval(trace_run: TraceRun, override: bool = False, ignore_errors: b
         )
 
     if trace_run.append:
-        # Check that the current experiment, if one exists, has the same type (examples of sequences)
+        # Check that the current experiment, if one exists, has the same type (examples or traces)
         check_experiment_type(
             trace_run.eval_name,
             trace_run.project_name,
@@ -462,7 +462,7 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_error
         )
     
     if evaluation_run.append:
-        # Check that the current experiment, if one exists, has the same type (examples of sequences)
+        # Check that the current experiment, if one exists, has the same type (examples of traces)
         check_experiment_type(
             evaluation_run.eval_name,
             evaluation_run.project_name,

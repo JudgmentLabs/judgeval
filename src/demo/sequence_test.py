@@ -146,24 +146,12 @@ if __name__ == "__main__":
             }
         ]
     )
-    example2 = Example(
-        input={"destination": "Tokyo", "start_date": "2025-06-01", "end_date": "2025-06-02"},
-        expected_tools=[
-            {"tool_name": "search_tavily", "parameters": {"query": "Best tourist attractions in Tokyo"}},
-            {"tool_name": "search_tavily", "parameters": {"query": "Best hotels in Tokyo"}},
-            {"tool_name": "search_tavily", "parameters": {"query": "Flights to Tokyo from major cities"}},
-            {"tool_name": "search_tavily", "parameters": {"query": "Weather forecast for Tokyo from 2025-06-01 to 2025-06-03"}}
-        ]
-    )
 
     judgment.assert_test(
-        project_name="travel_agent_demo",
         examples=[example],
         scorers=[ToolOrderScorer()],
-        model="gpt-4.1-mini",
         function=generate_itinerary,
         tracer=tracer,
-        override=True
     )
 
 
