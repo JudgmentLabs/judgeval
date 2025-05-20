@@ -8,6 +8,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 from datetime import datetime
+from judgeval.data.tool import Tool
 import time
 
 
@@ -31,7 +32,7 @@ class Example(BaseModel):
     retrieval_context: Optional[List[str]] = None
     additional_metadata: Optional[Dict[str, Any]] = None
     tools_called: Optional[List[str]] = None
-    expected_tools: Optional[List[Dict[str, Any]]] = None
+    expected_tools: Optional[List[Tool]] = None
     name: Optional[str] = None
     example_id: str = Field(default_factory=lambda: str(uuid4()))
     example_index: Optional[int] = None
