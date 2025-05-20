@@ -33,7 +33,7 @@ Judgeval is created and maintained by [Judgment Labs](https://judgmentlabs.ai/).
 * [🏁 Get Started](#-get-started)
 * [🏢 Self-Hosting](#-self-hosting)
 * [📚 Cookbooks](#-cookbooks)
-* [💻 Development with Cursor](#-dev-with-cursor)
+* [💻 Development with Cursor](#-development-with-cursor)
 * [⭐ Star Us on GitHub](#-star-us-on-github)
 * [❤️ Contributors](#️-contributors)
 
@@ -202,7 +202,7 @@ Detecting and evaluating Personal Identifiable Information (PII) leakage.
 
 Evaluates if a cold email generator properly utilizes all relevant information about the target recipient.
 
-## 💻 Development with Cursor IDE
+## 💻 Development with Cursor
 When building agents and LLM workflows in Cursor, providing proper context to your coding assistant helps ensure seamless integration with Judgment. This rule file supplies the essential context your coding assistant needs for successful implementation.
 
 To implement this rule file, simply copy the text below and save it in a ".cursor/rules" directory in your project's root directory.
