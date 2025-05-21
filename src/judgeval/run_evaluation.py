@@ -471,7 +471,7 @@ async def get_evaluation_status(eval_name: str, project_name: str, judgment_api_
         error(f"Failed to check evaluation status: {str(e)}")
         raise JudgmentAPIError(f"Failed to check evaluation status: {str(e)}")
 
-async def _poll_evaluation_until_complete(eval_name: str, project_name: str, judgment_api_key: str, organization_id: str, poll_interval_seconds: int = 5, original_examples: Optional[List[Example]] = None) -> List[ScoringResult]:
+async def _poll_evaluation_until_complete(eval_name: str, project_name: str, judgment_api_key: str, organization_id: str, poll_interval_seconds: int = 5, original_examples: Optional[List[Example]] = None, expected_scorers: Optional[List[Union[str, Any]]] = None) -> List[ScoringResult]:
     """
     Polls until the evaluation is complete and returns the results.
     
@@ -483,6 +483,8 @@ async def _poll_evaluation_until_complete(eval_name: str, project_name: str, jud
         poll_interval_seconds (int, optional): Time between status checks in seconds. Defaults to 5.
         original_examples (List[Example], optional): The original examples sent for evaluation. 
                                                     If provided, will match results with original examples.
+        expected_scorers (List[Union[str, Any]], optional): List of expected scorer names or scorer objects.
+                                                          Used to verify all scorer data is present.
     
     Returns:
         List[ScoringResult]: The evaluation results
@@ -493,6 +495,19 @@ async def _poll_evaluation_until_complete(eval_name: str, project_name: str, jud
     if original_examples:
         for example in original_examples:
             original_example_map[example.example_id] = example
+    
+    # Extract expected scorer names if provided
+    expected_scorer_names = []
+    if expected_scorers:
+        for scorer in expected_scorers:
+            if isinstance(scorer, str):
+                expected_scorer_names.append(scorer)
+            elif hasattr(scorer, 'name'):
+                expected_scorer_names.append(scorer.name)
+            elif hasattr(scorer, 'score_type') and hasattr(scorer.score_type, 'value'):
+                expected_scorer_names.append(scorer.score_type.value)
+        
+        debug(f"Expecting results for these scorers: {expected_scorer_names}")
             
     while True:
         poll_count += 1
@@ -528,7 +543,7 @@ async def _poll_evaluation_until_complete(eval_name: str, project_name: str, jud
             
             # If complete, get results and return
             if status == "completed" or status == "complete":
-                info(f"Evaluation '{eval_name}' completed, fetching results...")
+                info(f"Evaluation '{eval_name}' reported as completed, fetching and verifying results...")
                 results_response = requests.post(
                     JUDGMENT_EVAL_FETCH_API_URL,
                     headers={
@@ -580,6 +595,34 @@ async def _poll_evaluation_until_complete(eval_name: str, project_name: str, jud
                             await asyncio.sleep(poll_interval_seconds)
                             continue
                     
+                    # Verify all scorer data is present if expected_scorer_names is provided
+                    if expected_scorer_names:
+                        has_incomplete_scorer_data = False
+                        for example_data in examples_data:
+                            scorer_data_list = example_data.get("scorer_data", [])
+                            
+                            # Extract scorer names from the retrieved data
+                            retrieved_scorer_names = set()
+                            for scorer_data in scorer_data_list:
+                                name = scorer_data.get("name")
+                                if name:
+                                    retrieved_scorer_names.add(name)
+                            
+                            # Check if all expected scorers are present
+                            missing_scorers = set(expected_scorer_names) - retrieved_scorer_names
+                            if missing_scorers:
+                                example_id = example_data.get("example_id", "unknown")
+                                warning(f"Example {example_id} is missing scorer data for: {missing_scorers}. " +
+                                        f"Continuing to poll for complete data...")
+                                has_incomplete_scorer_data = True
+                                break
+                        
+                        # If any example has incomplete scorer data, continue polling
+                        if has_incomplete_scorer_data:
+                            info("Detected incomplete scorer data. Waiting before polling again...")
+                            await asyncio.sleep(poll_interval_seconds)
+                            continue
+                    
                     # Create ScoringResult objects from the raw data
                     scoring_results = []
                     
@@ -612,6 +655,8 @@ async def _poll_evaluation_until_complete(eval_name: str, project_name: str, jud
                         )
                         scoring_results.append(scoring_result)
                     
+                    # If we got here, all validation checks passed
+                    info(f"Verified complete results for all {len(scoring_results)} examples with all expected scorer data")
                     return scoring_results
                 else:
                     # No examples found
@@ -762,7 +807,8 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_error
                 project_name=evaluation_run.project_name,
                 judgment_api_key=evaluation_run.judgment_api_key,
                 organization_id=evaluation_run.organization_id,
-                original_examples=evaluation_run.examples  # Pass the original examples
+                original_examples=evaluation_run.examples,  # Pass the original examples
+                expected_scorers=evaluation_run.scorers    # Pass the expected scorers for verification
             )
         
         # Create and return a task that can be awaited
