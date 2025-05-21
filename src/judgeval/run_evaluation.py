@@ -471,7 +471,7 @@ async def get_evaluation_status(eval_name: str, project_name: str, judgment_api_
         error(f"Failed to check evaluation status: {str(e)}")
         raise JudgmentAPIError(f"Failed to check evaluation status: {str(e)}")
 
-async def _poll_evaluation_until_complete(eval_name: str, project_name: str, judgment_api_key: str, organization_id: str, poll_interval_seconds: int = 5, original_examples: Optional[List[Example]] = None, expected_scorers: Optional[List[Union[str, Any]]] = None) -> List[ScoringResult]:
+async def _poll_evaluation_until_complete(eval_name: str, project_name: str, judgment_api_key: str, organization_id: str, poll_interval_seconds: int = 5, original_examples: Optional[List[Example]] = None) -> List[ScoringResult]:
     """
     Polls until the evaluation is complete and returns the results.
     
@@ -483,8 +483,6 @@ async def _poll_evaluation_until_complete(eval_name: str, project_name: str, jud
         poll_interval_seconds (int, optional): Time between status checks in seconds. Defaults to 5.
         original_examples (List[Example], optional): The original examples sent for evaluation. 
                                                     If provided, will match results with original examples.
-        expected_scorers (List[Union[str, Any]], optional): List of expected scorer names or scorer objects.
-                                                          Used to verify all scorer data is present.
     
     Returns:
         List[ScoringResult]: The evaluation results
@@ -496,19 +494,8 @@ async def _poll_evaluation_until_complete(eval_name: str, project_name: str, jud
         for example in original_examples:
             original_example_map[example.example_id] = example
     
-    # Extract expected scorer names if provided
-    expected_scorer_names = []
-    if expected_scorers:
-        for scorer in expected_scorers:
-            if isinstance(scorer, str):
-                expected_scorer_names.append(scorer)
-            elif hasattr(scorer, 'name'):
-                expected_scorer_names.append(scorer.name)
-            elif hasattr(scorer, 'score_type') and hasattr(scorer.score_type, 'value'):
-                expected_scorer_names.append(scorer.score_type.value)
-        
-        debug(f"Expecting results for these scorers: {expected_scorer_names}")
-            
+    # Remove the expected scorer names extraction and checking
+    # We'll instead verify all examples have consistent scorer data
     while True:
         poll_count += 1
         try:
@@ -567,6 +554,7 @@ async def _poll_evaluation_until_complete(eval_name: str, project_name: str, jud
                 
                 if "examples" in result_data:
                     examples_data = result_data.get("examples", [])
+             
                     
                     info(f"Successfully fetched {len(examples_data)} results for evaluation '{eval_name}'")
                     
@@ -576,6 +564,7 @@ async def _poll_evaluation_until_complete(eval_name: str, project_name: str, jud
                         has_invalid_results = False
                         for example_data in examples_data:
                             example_id = example_data.get("example_id")
+                            
                             if example_id not in original_example_map:
                                 warning(f"Server returned example with ID {example_id} not found in original examples. " +
                                         f"This indicates stale or incorrect data. Continuing to poll...")
@@ -594,32 +583,28 @@ async def _poll_evaluation_until_complete(eval_name: str, project_name: str, jud
                                     f"This indicates incomplete data. Continuing to poll...")
                             await asyncio.sleep(poll_interval_seconds)
                             continue
-                    
-                    # Verify all scorer data is present if expected_scorer_names is provided
-                    if expected_scorer_names:
-                        has_incomplete_scorer_data = False
+                        
+                        # Collect all example IDs from scorer data
+                        scorer_example_ids = set()
                         for example_data in examples_data:
                             scorer_data_list = example_data.get("scorer_data", [])
-                            
-                            # Extract scorer names from the retrieved data
-                            retrieved_scorer_names = set()
                             for scorer_data in scorer_data_list:
-                                name = scorer_data.get("name")
-                                if name:
-                                    retrieved_scorer_names.add(name)
-                            
-                            # Check if all expected scorers are present
-                            missing_scorers = set(expected_scorer_names) - retrieved_scorer_names
-                            if missing_scorers:
-                                example_id = example_data.get("example_id", "unknown")
-                                warning(f"Example {example_id} is missing scorer data for: {missing_scorers}. " +
-                                        f"Continuing to poll for complete data...")
-                                has_incomplete_scorer_data = True
-                                break
+                                if "example_id" in scorer_data:
+                                    scorer_example_ids.add(scorer_data["example_id"])
                         
-                        # If any example has incomplete scorer data, continue polling
-                        if has_incomplete_scorer_data:
-                            info("Detected incomplete scorer data. Waiting before polling again...")
+                        # Get the set of original example IDs
+                        original_example_ids = set(original_example_map.keys())
+                        
+                        # Check if the sets are equal
+                        missing_in_scorer = original_example_ids - scorer_example_ids
+                        extra_in_scorer = scorer_example_ids - original_example_ids
+                        
+                        if missing_in_scorer or extra_in_scorer:
+                            if missing_in_scorer:
+                                warning(f"Examples missing in scorer data: {missing_in_scorer}")
+                            if extra_in_scorer:
+                                warning(f"Extra examples in scorer data: {extra_in_scorer}")
+                            info("Detected mismatched example IDs in scorer data. Waiting before polling again...")
                             await asyncio.sleep(poll_interval_seconds)
                             continue
                     
@@ -807,8 +792,7 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_error
                 project_name=evaluation_run.project_name,
                 judgment_api_key=evaluation_run.judgment_api_key,
                 organization_id=evaluation_run.organization_id,
-                original_examples=evaluation_run.examples,  # Pass the original examples
-                expected_scorers=evaluation_run.scorers    # Pass the expected scorers for verification
+                original_examples=evaluation_run.examples  # Pass the original examples
             )
         
         # Create and return a task that can be awaited
