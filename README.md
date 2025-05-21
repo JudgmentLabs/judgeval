@@ -9,7 +9,7 @@
 
 <br>
 
-## [🌐 Landing Page](https://www.judgmentlabs.ai/) • [Twitter/X](https://x.com/JudgmentLabs) • [💼 LinkedIn](https://www.linkedin.com/company/judgmentlabs) • [📚 Docs](https://judgment.mintlify.app/getting_started) • [🚀 Demos](https://www.youtube.com/@AlexShan-j3o) • [🎮 Discord](https://discord.gg/taAufyhf)
+## [🌐 Landing Page](https://www.judgmentlabs.ai/) • [Twitter/X](https://x.com/JudgmentLabs) • [💼 LinkedIn](https://www.linkedin.com/company/judgmentlabs) • [📚 Docs](https://docs.judgmentlabs.ai/introduction) • [🚀 Demos](https://www.youtube.com/@AlexShan-j3o) • [🎮 Discord](https://discord.gg/taAufyhf)
 </div>
 
 ## Judgeval: open-source testing, monitoring, and optimization for AI agents
@@ -18,7 +18,7 @@ Judgeval offers robust tooling for evaluating and tracing LLM agent systems. It 
 
 Judgeval gets you started in five minutes, after which you'll be ready to use all of its features as your agent becomes more complex. Judgeval is natively connected to the [Judgment Platform](https://www.judgmentlabs.ai/) for free and you can export your data and self-host at any time.
 
-We support tracing agents built with LangGraph, OpenAI SDK, Anthropic, ... and allow custom eval integrations for any use case. Check out our quickstarts below or our [setup guide](https://judgment.mintlify.app/getting_started) to get started.
+We support tracing agents built with LangGraph, OpenAI SDK, Anthropic, ... and allow custom eval integrations for any use case. Check out our quickstarts below or our [setup guide](https://docs.judgmentlabs.ai/getting-started) to get started.
 
 Judgeval is created and maintained by [Judgment Labs](https://judgmentlabs.ai/).
 
@@ -93,7 +93,7 @@ def main():
 main()
 ```
 
-[Click here](https://judgment.mintlify.app/getting_started#create-your-first-trace) for a more detailed explanation.
+[Click here](https://docs.judgmentlabs.ai/getting-started#create-your-first-trace) for a more detailed explanation.
 
 ### 📝 Offline Evaluations
 
@@ -122,7 +122,7 @@ results = client.run_evaluation(
 print(results)
 ```
 
-[Click here](https://judgment.mintlify.app/getting_started#create-your-first-experiment) for a more detailed explanation.
+[Click here](https://docs.judgmentlabs.ai/getting-started#create-your-first-experiment) for a more detailed explanation.
 
 ### 📡 Online Evaluations
 
@@ -162,7 +162,7 @@ def main():
 main()
 ```
 
-[Click here](https://judgment.mintlify.app/getting_started#create-your-first-online-evaluation) for a more detailed explanation.
+[Click here](https://docs.judgmentlabs.ai/getting-started#create-your-first-online-evaluation) for a more detailed explanation.
 
 ## 🏢 Self-Hosting
 
@@ -174,7 +174,7 @@ Run Judgment on your own infrastructure: we provide comprehensive self-hosting c
 * Access Judgment through your own custom domain
 
 ### Getting Started
-1. Check out our [self-hosting documentation](https://judgment.mintlify.app/self_hosting/get_started) for detailed setup instructions, along with how your self-hosted instance can be accessed
+1. Check out our [self-hosting documentation](https://docs.judgmentlabs.ai/self-hosting/get_started) for detailed setup instructions, along with how your self-hosted instance can be accessed
 2. Use the [Judgment CLI](https://github.com/JudgmentLabs/judgment-cli) to deploy your self-hosted environment
 3. After your self-hosted instance is setup, make sure the `JUDGMENT_API_URL` environmental variable is set to your self-hosted backend endpoint
 
