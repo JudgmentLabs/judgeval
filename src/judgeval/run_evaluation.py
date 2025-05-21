@@ -674,6 +674,62 @@ async def _poll_evaluation_until_complete(eval_name: str, project_name: str, jud
             # Continue polling after a delay
             await asyncio.sleep(poll_interval_seconds)
 
+async def await_with_spinner(task, message: str = "Awaiting async task: "):
+    """
+    Display a spinner while awaiting an async task.
+    
+    Args:
+        task: The asyncio task to await
+        message (str): Message to display with the spinner
+    
+    Returns:
+        Any: The result of the awaited task
+    """
+    spinner = itertools.cycle(['|', '/', '-', '\\'])
+    
+    # Create an event to signal when to stop the spinner
+    stop_spinner_event = asyncio.Event()
+    
+    async def display_spinner():
+        while not stop_spinner_event.is_set():
+            sys.stdout.write(f'\r{message}{next(spinner)}')
+            sys.stdout.flush()
+            await asyncio.sleep(0.1)
+    
+    # Start the spinner in a separate task
+    spinner_task = asyncio.create_task(display_spinner())
+    
+    try:
+        # Await the actual task
+        result = await task
+    finally:
+        # Signal the spinner to stop and wait for it to finish
+        stop_spinner_event.set()
+        await spinner_task
+        
+        # Clear the spinner line
+        sys.stdout.write('\r' + ' ' * (len(message) + 1) + '\r')
+        sys.stdout.flush()
+    
+    return result
+
+class SpinnerWrappedTask:
+    """
+    A wrapper for an asyncio task that displays a spinner when awaited.
+    """
+    def __init__(self, task, message: str):
+        self.task = task
+        self.message = message
+        
+    def __await__(self):
+        async def _spin_and_await():
+            return await await_with_spinner(self.task, self.message)
+        return _spin_and_await().__await__()
+        
+    # Proxy all Task attributes and methods to the underlying task
+    def __getattr__(self, name):
+        return getattr(self.task, name)
+
 def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_errors: bool = True, async_execution: bool = False) -> Union[List[ScoringResult], asyncio.Task]:
     """
     Executes an evaluation of `Example`s using one or more `Scorer`s
@@ -685,7 +741,7 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_error
         async_execution (bool, optional): Whether to execute the evaluation asynchronously. Defaults to False.
     
     Returns:
-        Union[List[ScoringResult], asyncio.Task]: 
+        Union[List[ScoringResult], Union[asyncio.Task, SpinnerWrappedTask]]: 
             - If async_execution is False, returns a list of ScoringResult objects
             - If async_execution is True, returns a Task that will resolve to a list of ScoringResult objects when awaited
     """
@@ -795,8 +851,14 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_error
                 original_examples=evaluation_run.examples  # Pass the original examples
             )
         
-        # Create and return a task that can be awaited
-        return asyncio.create_task(_async_evaluation_workflow())
+        # Create a regular task
+        task = asyncio.create_task(_async_evaluation_workflow())
+        
+        # Wrap it in our custom awaitable that will show a spinner only when awaited
+        return SpinnerWrappedTask(
+            task, 
+            f"Processing evaluation '{evaluation_run.eval_name}': "
+        )
     else:
         if judgment_scorers:
             # Execute evaluation using Judgment API
