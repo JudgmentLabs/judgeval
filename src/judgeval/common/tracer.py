@@ -498,7 +498,15 @@ class TraceClient:
             return span # Return the created entry
         # Removed else block - original didn't have one
         return None # Return None if no span_id found
-
+    
+    def record_error(self, error: Any):
+        current_span_id = current_span_var.get()
+        if current_span_id:
+            span = self.span_id_to_span[current_span_id]
+            span.error = error
+            return span
+        return None
+    
     def add_span(self, span: TraceSpan):
         """Add a trace span to this trace context"""
         self.trace_spans.append(span)
