@@ -8,6 +8,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 from datetime import datetime
+from judgeval.data.tool import Tool
 import time
 
 
@@ -31,7 +32,7 @@ class Example(BaseModel):
     retrieval_context: Optional[List[str]] = None
     additional_metadata: Optional[Dict[str, Any]] = None
     tools_called: Optional[List[str]] = None
-    expected_tools: Optional[List[Dict[str, Any]]] = None
+    expected_tools: Optional[List[Tool]] = None
     name: Optional[str] = None
     example_id: str = Field(default_factory=lambda: str(uuid4()))
     example_index: Optional[int] = None
@@ -82,17 +83,17 @@ class Example(BaseModel):
             raise ValueError(f"All items in expected_output must be strings but got {v}")
         return v
     
-    @field_validator('expected_tools', mode='before')
+    @field_validator('expected_tools')
     @classmethod
     def validate_expected_tools(cls, v):
         if v is not None:
             if not isinstance(v, list):
-                raise ValueError(f"Expected tools must be a list of dictionaries or None but got {v} of type {type(v)}")
+                raise ValueError(f"Expected tools must be a list of Tools or None but got {v} of type {type(v)}")
             
-            # Check that each item in the list is a dictionary
+            # Check that each item in the list is a Tool
             for i, item in enumerate(v):
-                if not isinstance(item, dict):
-                    raise ValueError(f"Expected tools must be a list of dictionaries, but item at index {i} is {item} of type {type(item)}")
+                if not isinstance(item, Tool):
+                    raise ValueError(f"Expected tools must be a list of Tools, but item at index {i} is {item} of type {type(item)}")
         
         return v
     
