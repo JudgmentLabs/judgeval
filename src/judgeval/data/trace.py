@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 from judgeval.evaluation_run import EvaluationRun
+from judgeval.data.tool import Tool
 import json
 from datetime import datetime, timezone
 
@@ -9,7 +10,7 @@ class TraceSpan(BaseModel):
     trace_id: str
     function: Optional[str] = None
     depth: int
-    created_at: Optional[float] = None
+    created_at: Optional[Any] = None
     parent_span_id: Optional[str] = None
     span_type: Optional[str] = "span"
     inputs: Optional[Dict[str, Any]] = None
@@ -17,6 +18,8 @@ class TraceSpan(BaseModel):
     duration: Optional[float] = None
     annotation: Optional[List[Dict[str, Any]]] = None
     evaluation_runs: Optional[List[EvaluationRun]] = []
+    expected_tools: Optional[List[Tool]] = None
+    additional_metadata: Optional[Dict[str, Any]] = None
 
     def model_dump(self, **kwargs):
         return {
@@ -124,6 +127,7 @@ class Trace(BaseModel):
     duration: float
     entries: List[TraceSpan]
     overwrite: bool = False
+    offline_mode: bool = False
     rules: Optional[Dict[str, Any]] = None
     has_notification: Optional[bool] = False
     

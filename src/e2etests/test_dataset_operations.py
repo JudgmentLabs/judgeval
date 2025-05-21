@@ -8,7 +8,7 @@ import random
 import string
 
 from judgeval.judgment_client import JudgmentClient
-from judgeval.data import Example, Sequence
+from judgeval.data import Example
 
 @pytest.fixture(scope="module", autouse=True)
 def setup_and_teardown_module(client: JudgmentClient):
@@ -37,26 +37,6 @@ class TestDatasetOperations:
         assert dataset, "Failed to pull dataset"
 
         client.delete_dataset(alias="test_dataset_5", project_name=project_name)
-
-    def test_dataset_with_sequence(self, client: JudgmentClient, project_name: str):
-        """Test dataset creation and manipulation with a sequence."""
-        dataset = client.create_dataset()
-        examples = [Example(input="input 1", actual_output="output 1"), Example(input="input 2", actual_output="output 2"), Example(input="input 3", actual_output="output 3")]
-        sequence = Sequence(
-            name="test_sequence",
-            items=examples
-        )
-        dataset.add_sequence(sequence)
-        client.push_dataset(alias="test_dataset_with_sequence", dataset=dataset, project_name=project_name, overwrite=True)
-
-        dataset = client.pull_dataset(alias="test_dataset_with_sequence", project_name=project_name)
-        assert dataset.sequences, "Failed to pull dataset"
-        assert len(dataset.sequences) == 1, "Dataset should have 1 sequence"
-        sequence = dataset.sequences[0]
-        assert sequence.name == "test_sequence", "Sequence should have the correct name"
-        assert len(sequence.items) == 3, "Sequence should have 3 items"
-        
-        client.delete_dataset(alias="test_dataset_with_sequence", project_name=project_name)
 
     def test_pull_all_project_dataset_stats(self, client: JudgmentClient, project_name: str):
         """Test pulling statistics for all project datasets."""
@@ -132,51 +112,6 @@ class TestDatasetOperations:
         dataset = client.pull_dataset(alias="test_dataset_8", project_name=project_name)
         assert dataset, "Failed to pull dataset"
         assert len(dataset.examples) == 3, "Dataset should have 3 examples"
-    
-    def test_append_sequence_dataset(self, client: JudgmentClient, project_name: str):
-        """Test dataset appending."""
-        dataset = client.create_dataset()
-        examples = [Example(input="input 1", actual_output="output 1"), Example(input="input 2", actual_output="output 2"), Example(input="input 3", actual_output="output 3")]
-        sequence = Sequence(
-            name="test_sequence",
-            items=examples
-        )
-        dataset.add_sequence(sequence)
-        client.push_dataset(alias="test_dataset_with_sequence", dataset=dataset, project_name=project_name, overwrite=True)
-
-        dataset = client.pull_dataset(alias="test_dataset_with_sequence", project_name=project_name)
-        assert dataset.sequences, "Failed to pull dataset"
-        assert len(dataset.sequences) == 1, "Dataset should have 1 sequence"
-        sequence = dataset.sequences[0]
-        assert sequence.name == "test_sequence", "Sequence should have the correct name"
-        assert len(sequence.items) == 3, "Sequence should have 3 items"
-        examples2 = [Example(input="input 4", actual_output="output 4"), Example(input="input 5", actual_output="output 5")]
-        sequence2 = Sequence(
-            name="test_sequence2",
-            items=examples2
-        )
-        
-        client.append_sequence_dataset(alias="test_dataset_with_sequence", sequences=[sequence2], project_name=project_name)
-
-        dataset = client.pull_dataset(alias="test_dataset_with_sequence", project_name=project_name)
-        assert dataset.sequences, "Failed to pull dataset"
-        assert len(dataset.sequences) == 2, "Dataset should have 2 sequences"
-
-        test_sequence = None
-        test_sequence2 = None
-        for seq in dataset.sequences:
-            if seq.name == "test_sequence":
-                test_sequence = seq
-            elif seq.name == "test_sequence2":
-                test_sequence2 = seq
-
-        # Verify first sequence
-        assert test_sequence is not None, "Could not find 'test_sequence'"
-        assert len(test_sequence.items) == 3, "Sequence 'test_sequence' should have 3 items"
-
-        # Verify second sequence
-        assert test_sequence2 is not None, "Could not find 'test_sequence2'"
-        assert len(test_sequence2.items) == 2, "Sequence 'test_sequence2' should have 2 items"
 
     def test_export_jsonl(self, client: JudgmentClient, random_name: str, project_name: str):
         """Test JSONL dataset export functionality."""

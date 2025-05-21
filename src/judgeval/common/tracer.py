@@ -146,7 +146,7 @@ class TraceManagerClient:
         
         return response.json()
 
-    def save_trace(self, trace_data: dict):
+    def save_trace(self, trace_data: dict, offline_mode: bool = False):
         """
         Saves a trace to the Judgment Supabase and optionally to S3 if configured.
 
@@ -183,7 +183,7 @@ class TraceManagerClient:
             except Exception as e:
                 warnings.warn(f"Failed to save trace to S3: {str(e)}")
         
-        if "ui_results_url" in response.json():
+        if not offline_mode and "ui_results_url" in response.json():
             pretty_str = f"\n🔍 You can view your trace data here: [rgb(106,0,255)][link={response.json()['ui_results_url']}]View Trace[/link]\n"
             rprint(pretty_str)
 
@@ -660,11 +660,12 @@ class TraceClient:
             "entries": [span.model_dump() for span in self.trace_spans],
             "evaluation_runs": [run.model_dump() for run in self.evaluation_runs],
             "overwrite": overwrite,
+            "offline_mode": self.tracer.offline_mode,
             "parent_trace_id": self.parent_trace_id,
             "parent_name": self.parent_name
         }        
         # --- Log trace data before saving ---
-        self.trace_manager_client.save_trace(trace_data)
+        self.trace_manager_client.save_trace(trace_data, offline_mode=self.tracer.offline_mode)
 
         # upload annotations
         # TODO: batch to the log endpoint
@@ -930,6 +931,7 @@ class Tracer:
         s3_aws_access_key_id: Optional[str] = None,
         s3_aws_secret_access_key: Optional[str] = None,
         s3_region_name: Optional[str] = None,
+        offline_mode: bool = False,
         deep_tracing: bool = True  # Deep tracing is enabled by default
         ):
         if not hasattr(self, 'initialized'):
@@ -970,6 +972,7 @@ class Tracer:
                     aws_secret_access_key=s3_aws_secret_access_key,
                     region_name=s3_region_name
                 )
+            self.offline_mode: bool = offline_mode
             self.deep_tracing: bool = deep_tracing  # NEW: Store deep tracing setting
 
         elif hasattr(self, 'project_name') and self.project_name != project_name:
