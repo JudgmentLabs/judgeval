@@ -1,0 +1,23 @@
+import sys
+
+if len(sys.argv) != 2:
+    print("Usage: python set_version.py <new_version>")
+    sys.exit(1)
+
+new_version = sys.argv[1]
+version_placeholder = "<version_placeholder>"
+found = False
+
+with open("pyproject.toml", "r") as f:
+    lines = f.readlines()
+
+with open("pyproject.toml", "w") as f:
+    for line in lines:
+        if not found and version_placeholder in line:
+            f.write(line.replace(version_placeholder, new_version))
+            found = True
+        else:
+            f.write(line)
+
+if not found:
+    print("Warning: No '<version_placeholder>' found in pyproject.toml")
