@@ -5,9 +5,6 @@ on:
     types: [opened, synchronize, reopened]
     branches:
       - staging
-  push:
-    branches:
-      - justin/staging-and-auto-release
 
 permissions: read-all
 
