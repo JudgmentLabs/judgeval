@@ -4,7 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-litellm = "==1.38.12"
+litellm = "==1.61.15"
 python-dotenv = "==1.0.1"
 requests = "*"
 pandas = "*"
