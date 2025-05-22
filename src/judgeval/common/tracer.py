@@ -697,6 +697,14 @@ class _DeepTracer:
                  return f"{module_name}.{func.__qualname__}"
         except Exception:
             return f"{module_name}.{func_name}"
+        # if args and hasattr(args[0], '__class__'):
+        #     class_name = args[0].__class__.__name__
+        #     if (class_name in self.class_identifiers):
+        #         if hasattr(args[0], self.class_identifiers[class_name]):
+        #             instance_name = getattr(args[0], self.class_identifiers[class_name])
+        #             span_name = f"{instance_name}.{span_name}"
+        #         else:
+        #             raise Exception(f"Attribute {self.class_identifiers[class_name]} does not exist for {class_name}. Check your identify() decorator.")
     
     def __new__(cls):
         with cls._lock:
@@ -752,6 +760,12 @@ class _DeepTracer:
             return
 
         qual_name = self._get_qual_name(frame)
+        instance_name = None
+        if 'self' in frame.f_locals:
+            instance = frame.f_locals['self']
+            class_name = instance.__class__.__name__
+            class_identifiers = getattr(Tracer._instance, 'class_identifiers', {})
+            qual_name = get_instance_prefixed_name(instance, class_name, class_identifiers, qual_name)
         skip_stack = self._skip_stack.get()
         
         if event == "call":
@@ -1153,12 +1167,7 @@ class Tracer:
 
                 if args and hasattr(args[0], '__class__'):
                     class_name = args[0].__class__.__name__
-                    if (class_name in self.class_identifiers):
-                        if hasattr(args[0], self.class_identifiers[class_name]):
-                            instance_name = getattr(args[0], self.class_identifiers[class_name])
-                            span_name = f"{instance_name}.{span_name}"
-                        else:
-                            raise Exception(f"Attribute {self.class_identifiers[class_name]} does not exist for {class_name}. Check your identify() decorator.")
+                    span_name = get_instance_prefixed_name(args[0], class_name, self.class_identifiers, span_name)
 
                 # Get current trace from context
                 current_trace = current_trace_var.get()
@@ -1233,12 +1242,7 @@ class Tracer:
                 span_name = original_span_name
                 if args and hasattr(args[0], '__class__'):
                     class_name = args[0].__class__.__name__
-                    if (class_name in self.class_identifiers):
-                        if hasattr(args[0], self.class_identifiers[class_name]):
-                            instance_name = getattr(args[0], self.class_identifiers[class_name])                   
-                            span_name = f"{instance_name}.{span_name}"
-                        else:
-                            raise Exception(f"Attribute {self.class_identifiers[class_name]} does not exist for {class_name}. Check your identify() decorator.")                
+                    span_name = get_instance_prefixed_name(args[0], class_name, self.class_identifiers, span_name)               
                 # Get current trace from context
                 current_trace = current_trace_var.get()
 
@@ -1926,3 +1930,18 @@ class _TracedSyncStreamManagerWrapper(_BaseStreamManagerWrapper, AbstractContext
             current_span_var.reset(self._span_context_token)
             delattr(self, '_span_context_token')
         return self._original_manager.__exit__(exc_type, exc_val, exc_tb)
+
+# --- Helper function for instance-prefixed qual_name ---
+def get_instance_prefixed_name(instance, class_name, class_identifiers, name):
+    """
+    Returns the name prefixed with the instance name if the class and attribute are found in class_identifiers.
+    Otherwise, returns the original name.
+    """
+    if class_name in class_identifiers:
+        attr = class_identifiers[class_name]
+        if hasattr(instance, attr):
+            instance_name = getattr(instance, attr)
+            return f"{instance_name}.{name}"
+        else:
+            raise Exception(f"Attribute {class_identifiers[class_name]} does not exist for {class_name}. Check your identify() decorator.")
+    return name
