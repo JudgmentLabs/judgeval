@@ -22,5 +22,5 @@ class Tool(BaseModel):
     @field_validator('agent_name')
     def validate_agent_name(cls, v):
         if v is not None and not isinstance(v, str):
-            warnings.warn("Agent name should be a string, got {type(v)}", UserWarning)
+            warnings.warn(f"Agent name should be a string, got {type(v)}", UserWarning)
         return v

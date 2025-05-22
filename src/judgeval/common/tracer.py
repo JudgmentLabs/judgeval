@@ -697,14 +697,6 @@ class _DeepTracer:
                  return f"{module_name}.{func.__qualname__}"
         except Exception:
             return f"{module_name}.{func_name}"
-        # if args and hasattr(args[0], '__class__'):
-        #     class_name = args[0].__class__.__name__
-        #     if (class_name in self.class_identifiers):
-        #         if hasattr(args[0], self.class_identifiers[class_name]):
-        #             instance_name = getattr(args[0], self.class_identifiers[class_name])
-        #             span_name = f"{instance_name}.{span_name}"
-        #         else:
-        #             raise Exception(f"Attribute {self.class_identifiers[class_name]} does not exist for {class_name}. Check your identify() decorator.")
     
     def __new__(cls):
         with cls._lock:
