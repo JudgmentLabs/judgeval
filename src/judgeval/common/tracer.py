@@ -884,9 +884,7 @@ class _DeepTracer:
                 "traceback": traceback.format_tb(exc_traceback)
             }
             current_trace = current_trace_var.get()
-            current_trace.record_output({
-                "error": formatted_exception
-            })
+            current_trace.record_error(formatted_exception)
         
         return self._trace
     
@@ -1162,8 +1160,19 @@ class Tracer:
                                 with _DeepTracer():
                                     result = await func(*args, **kwargs)
                             else:
-                                result = await func(*args, **kwargs)
-                                                        
+                                try:
+                                    result = await func(*args, **kwargs)
+                                except Exception as e:
+                                    exc_type, exc_value, exc_traceback = sys.exc_info()
+                                    formatted_exception = {
+                                        "type": exc_type.__name__,
+                                        "message": str(exc_value),
+                                        "traceback": traceback.format_tb(exc_traceback)
+                                    }
+                                    current_trace = current_trace_var.get()
+                                    current_trace.record_error(formatted_exception)
+                                    raise e
+                                                   
                             # Record output
                             span.record_output(result)
                         return result
@@ -1183,7 +1192,18 @@ class Tracer:
                             with _DeepTracer():
                                 result = await func(*args, **kwargs)
                         else:
-                            result = await func(*args, **kwargs)
+                            try:
+                                result = await func(*args, **kwargs)
+                            except Exception as e:
+                                exc_type, exc_value, exc_traceback = sys.exc_info()
+                                formatted_exception = {
+                                    "type": exc_type.__name__,
+                                    "message": str(exc_value),
+                                    "traceback": traceback.format_tb(exc_traceback)
+                                }
+                                current_trace = current_trace_var.get()
+                                current_trace.record_error(formatted_exception)
+                                raise e
                             
                         span.record_output(result)
                     return result
@@ -1229,7 +1249,18 @@ class Tracer:
                                 with _DeepTracer():
                                     result = func(*args, **kwargs)
                             else:
-                                result = func(*args, **kwargs)
+                                try:
+                                    result = func(*args, **kwargs)
+                                except Exception as e:
+                                    exc_type, exc_value, exc_traceback = sys.exc_info()
+                                    formatted_exception = {
+                                        "type": exc_type.__name__,
+                                        "message": str(exc_value),
+                                        "traceback": traceback.format_tb(exc_traceback)
+                                    }
+                                    current_trace = current_trace_var.get()
+                                    current_trace.record_error(formatted_exception)
+                                    raise e
                             
                             # Record output
                             span.record_output(result)
@@ -1251,7 +1282,18 @@ class Tracer:
                             with _DeepTracer():
                                 result = func(*args, **kwargs)
                         else:
-                            result = func(*args, **kwargs)
+                            try:
+                                result = func(*args, **kwargs)
+                            except Exception as e:
+                                exc_type, exc_value, exc_traceback = sys.exc_info()
+                                formatted_exception = {
+                                    "type": exc_type.__name__,
+                                    "message": str(exc_value),
+                                    "traceback": traceback.format_tb(exc_traceback)
+                                }
+                                current_trace = current_trace_var.get()
+                                current_trace.record_error(formatted_exception)
+                                raise e
                             
                         span.record_output(result)
                     return result
