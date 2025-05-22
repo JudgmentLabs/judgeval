@@ -159,7 +159,7 @@ if __name__ == "__main__":
     judgment.assert_test(
         project_name="travel_agent_demo",
         examples=[example],
-        scorers=[ToolOrderScorer(threshold=0.5)],
+        scorers=[ToolOrderScorer()],
         model="gpt-4.1-mini",
         function=generate_itinerary,
         tracer=tracer,

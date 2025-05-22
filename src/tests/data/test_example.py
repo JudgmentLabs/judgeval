@@ -6,7 +6,7 @@ import pytest
 from datetime import datetime
 from pydantic import ValidationError
 from judgeval.data import Example
-
+from judgeval.data.tool import Tool
 
 def test_basic_example_creation():
     example = Example(
@@ -30,7 +30,7 @@ def test_full_example_creation():
         retrieval_context=["retrieval1", "retrieval2"],
         additional_metadata={"key": "value"},
         tools_called=["tool1", "tool2"],
-        expected_tools=[{"tool_name": "expected_tool1"}, {"tool_name": "expected_tool2"}],
+        expected_tools=[Tool(tool_name="expected_tool1"), Tool(tool_name="expected_tool2")],
         name="test example",
         example_id="123",
         timestamp="20240101_120000",
@@ -43,7 +43,7 @@ def test_full_example_creation():
     assert example.retrieval_context == ["retrieval1", "retrieval2"]
     assert example.additional_metadata == {"key": "value"}
     assert example.tools_called == ["tool1", "tool2"]
-    assert example.expected_tools == [{"tool_name": "expected_tool1"}, {"tool_name": "expected_tool2"}]
+    assert example.expected_tools == [Tool(tool_name="expected_tool1"), Tool(tool_name="expected_tool2")]
     assert example.name == "test example"
     assert example.example_id == "123"
     assert example.timestamp == "20240101_120000"
