@@ -21,3 +21,4 @@ with open("pyproject.toml", "w") as f:
 
 if not found:
     print("Warning: No '<version_placeholder>' found in pyproject.toml")
+    sys.exit(1)
