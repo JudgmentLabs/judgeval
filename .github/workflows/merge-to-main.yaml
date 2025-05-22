@@ -1,0 +1,32 @@
+name: Enforce Main Branch Protection
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  validate-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch name
+        run: |
+          # Get the base and source branch names
+          BASE_BRANCH="${{ github.base_ref }}"
+          SOURCE_BRANCH="${{ github.head_ref }}"
+
+          echo "BASE_BRANCH: $BASE_BRANCH"
+          echo "SOURCE_BRANCH: $SOURCE_BRANCH"
+          
+          # Only run validation if the base branch is main
+          if [[ "$BASE_BRANCH" != "main" ]]; then
+            echo "Skipping branch validation - not targeting main branch"
+            exit 0
+          fi
+          
+          # Check if the source branch is staging or starts with hotfix/
+          if [[ "$SOURCE_BRANCH" != "staging" && ! "$SOURCE_BRANCH" =~ ^hotfix/ ]]; then
+            echo "::error::Pull requests to main can only be created from 'staging' or 'hotfix/*' branches. Current branch: $SOURCE_BRANCH"
+            exit 1
+          fi
+          
+          echo "Branch validation passed. Source branch: $SOURCE_BRANCH"

@@ -78,16 +78,16 @@ jobs:
 
       - name: Check if server is running
         run: |
-          if ! curl -s https://api.judgmentlabs.ai/health > /dev/null; then
-            echo "Production Judgment server is not running properly. Check logs on AWS CloudWatch for more details."
+          if ! curl -s https://staging.api.judgmentlabs.ai/health > /dev/null; then
+            echo "Staging Judgment server is not running properly. Check logs on AWS CloudWatch for more details."
             exit 1
           else
-            echo "Server is running."
+            echo "Staging server is running."
           fi
         
       - name: Run E2E tests
         working-directory: src
         run: |      
-          SECRET_VARS=$(aws secretsmanager get-secret-value --secret-id gh-actions-judgeval/api-keys/judgeval --query SecretString --output text)
+          SECRET_VARS=$(aws secretsmanager get-secret-value --secret-id gh-actions-stg-judgeval/api-keys/judgeval --query SecretString --output text)
           export $(echo "$SECRET_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
           pipenv run pytest --durations=0 ./e2etests
