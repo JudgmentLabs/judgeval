@@ -155,9 +155,29 @@ class TraceManagerClient:
             NOTE we save empty traces in order to properly handle async operations; we need something in the DB to associate the async results with
         """
         # Save to Judgment API
+        
+        def fallback_encoder(obj):
+            """
+            Custom JSON encoder fallback.
+            Tries to use obj.__repr__(), then str(obj) if that fails or for a simpler string.
+            You can choose which one you prefer or try them in sequence.
+            """
+            try:
+                # Option 1: Prefer __repr__ for a more detailed representation
+                return repr(obj)
+            except Exception:
+                # Option 2: Fallback to str() if __repr__ fails or if you prefer str()
+                try:
+                    return str(obj)
+                except Exception as e:
+                    # If both fail, you might return a placeholder or re-raise
+                    return f"<Unserializable object of type {type(obj).__name__}: {e}>"
+        
+        serialized_trace_data = json.dumps(trace_data, default=fallback_encoder)
+
         response = requests.post(
             JUDGMENT_TRACES_SAVE_API_URL,
-            json=trace_data,
+            data=serialized_trace_data,
             headers={
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {self.judgment_api_key}",
@@ -474,6 +494,9 @@ class TraceClient:
         current_span_id = current_span_var.get()
         if current_span_id:
             span = self.span_id_to_span[current_span_id]
+            # Ignore self parameter
+            if "self" in inputs:
+                del inputs["self"]
             span.inputs = inputs
 
     async def _update_coroutine(self, span: TraceSpan, coroutine: Any, field: str):
