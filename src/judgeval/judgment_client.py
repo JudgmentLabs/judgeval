@@ -550,9 +550,11 @@ class JudgmentClient(metaclass=SingletonMeta):
             )
         
         if async_execution:
-            # 'results' is an asyncio.Task here, awaiting it gives List[ScoringResult]
-            actual_results = await results
-            assert_test(actual_results)  # Call the synchronous imported function
+            # 'results' is an asyncio.Task here (SpinnerWrappedTask)
+            # Awaiting it now directly gives List[ScoringResult],
+            # as SpinnerWrappedTask handles the tuple and printing internally.
+            actual_results = await results 
+            assert_test(actual_results)  # Call the synchronous imported assert_test function
         else:
-            # 'results' is already List[ScoringResult] here
+            # 'results' is already List[ScoringResult] here (synchronous path)
             assert_test(results)  # Call the synchronous imported function
