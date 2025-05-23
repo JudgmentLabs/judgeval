@@ -304,6 +304,8 @@ class TraceClient:
         self.enable_evaluations = enable_evaluations
         self.parent_trace_id = parent_trace_id
         self.parent_name = parent_name
+        self.customer_id: Optional[str] = None  # Added customer_id attribute
+        self.tags: Optional[List[str]] = None  # Added tags attribute
         self.trace_spans: List[TraceSpan] = []
         self.span_id_to_span: Dict[str, TraceSpan] = {}
         self.evaluation_runs: List[EvaluationRun] = []
@@ -326,7 +328,74 @@ class TraceClient:
     def reset_current_span(self, token: Any):
         """Reset the current span from the context var"""
         return current_span_var.reset(token)
+    
+
+    def set_metadata(self, key: str = None, value: Any = None, **kwargs) -> None:
+        """
+        Set metadata on the trace.
         
+        Supported keys:
+        - customer_id: ID of the customer using this trace
+        - tags: List of tags for this trace
+        - has_notification: Whether this trace has a notification
+        - overwrite: Whether to overwrite existing traces
+        - rules: Rules for this trace
+        - name: Name of the trace
+        
+        Args:
+            key: The metadata key to set (if using single key-value pair)
+            value: The value to set for the metadata key (if using single key-value pair)
+            **kwargs: Multiple metadata fields to set at once
+            
+        Examples:
+            ```python
+            # Single key-value pair
+            trace.set_metadata("customer_id", "customer-123")
+            
+            # Setting tags
+            trace.set_metadata("tags", ["production", "api-v2"])
+            
+            # Multiple fields at once
+            trace.set_metadata(
+                customer_id="customer-123",
+                tags=["production", "api-v2"],
+                has_notification=True
+            )
+            ```
+        """
+        # Handle both calling styles
+        metadata = {}
+        if key is not None and value is not None:
+            metadata[key] = value
+        metadata.update(kwargs)
+        
+        # Process each metadata field
+        for k, v in metadata.items():
+            if k == "customer_id":
+                self.customer_id = v
+            elif k == "tags":
+                self.tags = v
+            elif k == "has_notification":
+                self.has_notification = bool(v)
+            elif k == "overwrite":
+                self.overwrite = bool(v)
+            elif k == "rules":
+                self.rules = v
+            elif k == "name":
+                self.name = v
+            else:
+                supported_keys = ["customer_id", "tags", "has_notification", "overwrite", "rules", "name"]
+                raise ValueError(f"Unsupported metadata key: {k}. Supported keys: {supported_keys}")
+        
+    def set_tags(self, tags: List[str]) -> None:
+        """
+        Convenience method for setting tags on the trace.
+        
+        Args:
+            tags: List of tags for this trace
+        """
+        self.tags = tags
+
     @contextmanager
     def span(self, name: str, span_type: SpanType = "span"):
         """Context manager for creating a trace span, managing the current span via contextvars"""
@@ -662,7 +731,8 @@ class TraceClient:
             "overwrite": overwrite,
             "offline_mode": self.tracer.offline_mode,
             "parent_trace_id": self.parent_trace_id,
-            "parent_name": self.parent_name
+            "customer_id": self.customer_id,
+            "tags": self.tags
         }        
         # --- Log trace data before saving ---
         self.trace_manager_client.save_trace(trace_data, offline_mode=self.tracer.offline_mode)
@@ -676,6 +746,23 @@ class TraceClient:
 
     def delete(self):
         return self.trace_manager_client.delete_trace(self.trace_id)
+    
+    def print_metadata(self):
+        """
+        Print the metadata associated with this trace in a readable format.
+        
+        This is useful for debugging and verifying that metadata was set correctly.
+        """
+        print(f"\n=== Trace Metadata for {self.trace_id} ===\n")
+        print(f"Name: {self.name}")
+        print(f"Project: {self.project_name}")
+        print(f"Customer ID: {self.customer_id or 'Not set'}")
+        print(f"Tags: {self.tags or 'Not set'}")
+        print(f"Has Notification: {self.has_notification if hasattr(self, 'has_notification') else False}")
+        print(f"Overwrite: {self.overwrite}")
+        print(f"Rules: {self.rules}")
+        print(f"Parent Trace ID: {self.parent_trace_id or 'None'}")
+        print("\n")
     
 
 class _DeepTracer:
@@ -1079,10 +1166,113 @@ class Tracer:
                 label=label,
                 score=score
             )
-
             current_trace.add_annotation(annotation)
+        else:
+            print(f"[{label}] {msg}")
+            
+    def set_customer_id(self, customer_id: str):
+        """
+        Set the customer ID for the current trace.
+        
+        Args:
+            customer_id: A string identifier for the customer using this trace
+            
+        Example:
+            ```python
+            judgment.set_customer_id("customer-123")
+            ```
+            
+        This is a convenience method that calls set_metadata("customer_id", customer_id)
+        on the current trace.
+        """
+        trace = self.get_current_trace()
+        if not trace:
+            raise ValueError("No active trace found. Create a trace first before setting metadata.")
+        trace.set_metadata("customer_id", customer_id)
+        
+    def set_tags(self, tags: List[str]):
+        """
+        Set tags for the current trace.
+        
+        Args:
+            tags: A list of string tags to associate with this trace
+            
+        Example:
+            ```python
+            judgment.set_tags(["production", "api-v2"])
+            ```
+            
+        This is a convenience method that calls set_metadata("tags", tags)
+        on the current trace.
+        """
+        trace = self.get_current_trace()
+        if not trace:
+            raise ValueError("No active trace found. Create a trace first before setting metadata.")
+        trace.set_metadata("tags", tags)
+            
+    def set_metadata(self, key: str = None, value: Any = None, **kwargs) -> None:
+        """
+        Set metadata on the current trace.
+        
+        Supported keys:
+        - customer_id: ID of the customer using this trace
+        - tags: List of tags for this trace
+        - has_notification: Whether this trace has a notification
+        - overwrite: Whether to overwrite existing traces
+        - rules: Rules for this trace
+        - name: Name of the trace
+        
+        Args:
+            key: The metadata key to set (if using single key-value pair)
+            value: The value to set for the metadata key (if using single key-value pair)
+            **kwargs: Multiple metadata fields to set at once
+            
+        Examples:
+            ```python
+            # Single key-value pair
+            judgment.set_metadata("customer_id", "customer-123")
+            
+            # Setting tags
+            judgment.set_metadata("tags", ["production", "api-v2"])
+            
+            # Multiple fields at once
+            judgment.set_metadata(
+                customer_id="customer-123",
+                tags=["production", "api-v2"],
+                has_notification=True
+            )
+            ```
+        """
+        current_trace = self.get_current_trace()
+        if not current_trace:
+            raise ValueError("No active trace found. Create a trace first before setting metadata.")
+            
+        if key and value is not None:
+            current_trace.set_metadata(key, value)
+        elif kwargs:
+            current_trace.set_metadata(**kwargs)
+        else:
+            raise ValueError("Either provide a key-value pair or keyword arguments.")
 
-        rprint(f"[bold]{label}:[/bold] {msg}")
+    def print_metadata(self) -> None:
+        """
+        Print the metadata of the current trace.
+        
+{{ ... }}
+        This is a convenience method that calls print_metadata() on the current trace.
+        Useful for debugging and verifying that metadata was set correctly.
+        
+        Example:
+            ```python
+            judgment.print_metadata()
+            ```
+        """
+        current_trace = self.get_current_trace()
+        if current_trace:
+            current_trace.print_metadata()
+        else:
+            print("No active trace found. Create a trace first before printing metadata.")
+
     
     def observe(self, func=None, *, name=None, span_type: SpanType = "span", project_name: str = None, overwrite: bool = False, deep_tracing: bool = None):
         """

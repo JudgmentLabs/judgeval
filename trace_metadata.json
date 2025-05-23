@@ -1,0 +1,11 @@
+{
+  "trace_id": "2619930e-c576-4311-9702-38e385a09587",
+  "name": "test_metadata",
+  "project_name": "metadata-test",
+  "created_at": 1747623066.983828,
+  "customer_id": "customer-9047",
+  "tags": [
+    "demo",
+    "development"
+  ]
+}
