@@ -397,7 +397,12 @@ def run_trace_eval(trace_run: TraceRun, override: bool = False, ignore_errors: b
         tracer.traces = []
         for example in examples:
             if example.input:
-                result = run_with_spinner("Running agent function: ", function, **example.input)
+                if isinstance(example.input, str):
+                    result = run_with_spinner("Running agent function: ", function, example.input)
+                elif isinstance(example.input, dict):
+                    result = run_with_spinner("Running agent function: ", function, **example.input)
+                else:
+                    raise ValueError(f"Input must be string or dict, got {type(example.input)}")
             else:
                 result = run_with_spinner("Running agent function: ", function)
         for i, trace in enumerate(tracer.traces):
