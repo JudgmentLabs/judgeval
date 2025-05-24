@@ -72,7 +72,7 @@ class TraceSpan(BaseModel):
         return None
         
     def _serialize_value(self, value: Any) -> Any:
-        """Helper method to serialize output data safely."""
+        """Helper method to deep serialize a value safely supporting Pydantic Models / regular PyObjects."""
         if value is None:
             return None
             
