@@ -8,7 +8,8 @@ import requests
 import asyncio
 
 from judgeval.constants import ROOT_API
-from judgeval.data.datasets import EvalDataset, EvalDatasetClient
+from judgeval.data.datasets import EvalDataset
+from judgeval.eval_dataset_client import EvalDatasetClient
 from judgeval.data import (
     ScoringResult, 
     Example,
@@ -26,7 +27,7 @@ from judgeval.run_evaluation import (
     assert_test,
     run_trace_eval
 )
-from judgeval.data.trace_run import TraceRun
+from judgeval.trace_run import TraceRun
 from judgeval.judges import JudgevalJudge
 from judgeval.constants import (
     JUDGMENT_EVAL_FETCH_API_URL, 

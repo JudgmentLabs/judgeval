@@ -1,0 +1,3 @@
+[submodule "src/judgeval/data"]
+	path = src/judgeval/data
+	url = https://github.com/JudgmentLabs/judgment-datatypes.git

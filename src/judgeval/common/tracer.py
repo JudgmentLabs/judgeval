@@ -455,14 +455,6 @@ class TraceClient:
         self.add_eval_run(eval_run, start_time)  # Pass start_time to record_evaluation
             
     def add_eval_run(self, eval_run: EvaluationRun, start_time: float):
-        # --- Modification: Use span_id from eval_run --- 
-        current_span_id = eval_run.trace_span_id # Get ID from the eval_run object
-        # print(f"[TraceClient.add_eval_run] Using span_id from eval_run: {current_span_id}")
-        # --- End Modification ---
-
-        if current_span_id:
-            span = self.span_id_to_span[current_span_id]
-            span.evaluation_runs.append(eval_run)
         self.evaluation_runs.append(eval_run)
 
     def add_annotation(self, annotation: TraceAnnotation):
