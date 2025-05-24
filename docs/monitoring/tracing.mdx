@@ -87,7 +87,7 @@ const client = wrap(new OpenAI());
 #### `@observe` (Python) / `observe()` (Typescript) ####
 The `@observe` decorator (Python) or the `observe()` higher-order function (Typescript) wraps your functions/tools and captures metadata surrounding your function calls, such as:
 - Latency
-- Input/Output
+- Input/Output/Error
 - Span type (e.g. `retriever`, `tool`, `LLM call`, etc.)
 
 Here's an example of using the observer mechanism:
