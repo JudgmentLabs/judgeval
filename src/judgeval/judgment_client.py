@@ -122,7 +122,8 @@ class JudgmentClient(metaclass=SingletonMeta):
         ignore_errors: bool = True,
         rules: Optional[List[Rule]] = None,
         function: Optional[Callable] = None,
-        tracer: Optional[Union[Tracer, BaseCallbackHandler]] = None
+        tracer: Optional[Union[Tracer, BaseCallbackHandler]] = None,
+        tools: Optional[List[Dict[str, Any]]] = None
     ) -> List[ScoringResult]:
         try:         
             
@@ -152,6 +153,7 @@ class JudgmentClient(metaclass=SingletonMeta):
                 append=append,
                 judgment_api_key=self.judgment_api_key,
                 organization_id=self.organization_id,
+                tools=tools
             )
             return run_trace_eval(trace_run, override, ignore_errors, function, tracer, examples)
         except ValueError as e:
@@ -481,7 +483,7 @@ class JudgmentClient(metaclass=SingletonMeta):
             
         return response.json()["slug"]
     
-    async def assert_test(
+    def assert_test(
         self, 
         scorers: List[Union[APIJudgmentScorer, JudgevalScorer]],
         examples: Optional[List[Example]] = None,
@@ -496,6 +498,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         rules: Optional[List[Rule]] = None,
         function: Optional[Callable] = None,
         tracer: Optional[Union[Tracer, BaseCallbackHandler]] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
         async_execution: bool = False
     ) -> None:
         """
@@ -532,7 +535,8 @@ class JudgmentClient(metaclass=SingletonMeta):
                 rules=rules,
                 function=function,
                 tracer=tracer,
-                test_file=test_file
+                test_file=test_file,
+                tools=tools
             )
         else:
             results = self.run_evaluation(
@@ -551,7 +555,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         
         if async_execution:
             # 'results' is an asyncio.Task here, awaiting it gives List[ScoringResult]
-            actual_results = await results
+            actual_results = asyncio.run(results)
             assert_test(actual_results)  # Call the synchronous imported function
         else:
             # 'results' is already List[ScoringResult] here

@@ -371,7 +371,7 @@ def check_examples(examples: List[Example], scorers: List[Union[APIJudgmentScore
             if missing_params:
                 print(f"WARNING: Example {example.example_id} is missing the following parameters: {missing_params} for scorer {scorer.score_type.value}")
 
-def run_trace_eval(trace_run: TraceRun, override: bool = False, ignore_errors: bool = True, function: Optional[Callable] = None, tracer: Optional[Union[Tracer, BaseCallbackHandler]] = None, examples: Optional[List[Example]] = None) -> List[ScoringResult]:
+def run_trace_eval(trace_run: TraceRun, override: bool = False, ignore_errors: bool = True, function: Optional[Callable] = None, tracer: Optional[Union[Tracer, BaseCallbackHandler]] = None, examples: Optional[List[Example]] = None, tools: Optional[List[Dict[str, Any]]] = None) -> List[ScoringResult]:
     # Call endpoint to check to see if eval run name exists (if we DON'T want to override and DO want to log results)
     if not override and trace_run.log_results and not trace_run.append:
         check_eval_run_name_exists(
@@ -390,7 +390,6 @@ def run_trace_eval(trace_run: TraceRun, override: bool = False, ignore_errors: b
             trace_run.organization_id,
             True
         )
-
     if function and tracer:
         new_traces: List[Trace] = []
         tracer.offline_mode = True
