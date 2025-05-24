@@ -6,6 +6,12 @@ import pytest
 import random
 import string
 import uuid
+import asyncio
+import os
+import tempfile
+import yaml
+from typing import Callable
+import time
 
 from judgeval.judgment_client import JudgmentClient
 from judgeval.data import Example
@@ -13,11 +19,22 @@ from judgeval.scorers import (
     FaithfulnessScorer,
     HallucinationScorer,
     AnswerRelevancyScorer,
-    JSONCorrectnessScorer
+    JSONCorrectnessScorer,
+    ToolOrderScorer,
 )
 from judgeval.data.datasets.dataset import EvalDataset
 from pydantic import BaseModel
 from judgeval.scorers.prompt_scorer import ClassifierScorer
+from judgeval.tracer import Tracer
+
+# Initialize a tracer instance for this test file
+tracer = Tracer()
+
+@tracer.observe(span_type="tool", project_name="TraceEvalProjectFromYAMLTest")
+def simple_traced_function_for_yaml_eval(text: str):
+    """A simple function to be traced and evaluated from YAML."""
+    time.sleep(0.01) # Simulate minimal sync work
+    return f"Processed: {text.upper()}"
 
 @pytest.mark.basic
 class TestEvalOperations:
@@ -191,6 +208,59 @@ class TestEvalOperations:
         )
         assert res, "Dataset evaluation failed"
 
+    @pytest.mark.asyncio
+    async def test_run_trace_eval_from_yaml(self, client: JudgmentClient, random_name: str):
+        """Test run_trace_evaluation with a YAML configuration file."""
+        PROJECT_NAME_EVAL = "TraceEvalProjectFromYAMLTest" 
+        EVAL_RUN_NAME = random_name
+
+        yaml_content = f"""
+examples:
+  - input: "hello from yaml"
+    expected_tools:
+      - tool_name: "simple_traced_function_for_yaml_eval"
+        agent_name: "Agent 1"
+        parameters:
+          text: "hello from yaml"
+    retrieval_context: ["Context for hello from yaml"]
+  - input: "another yaml test"
+    expected_tools:
+      - tool_name: "simple_traced_function_for_yaml_eval"
+        agent_name: "Agent 1"
+    retrieval_context: ["Context for another yaml test"]
+"""
+        
+        temp_yaml_file_path = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as tmpfile:
+                tmpfile.write(yaml_content)
+                temp_yaml_file_path = tmpfile.name  
+            scorer = ToolOrderScorer(threshold=0.5)       
+            client.run_trace_evaluation(
+                test_file=temp_yaml_file_path,
+                function=simple_traced_function_for_yaml_eval,
+                tracer=tracer,
+                scorers=[scorer],
+                project_name=PROJECT_NAME_EVAL,
+                eval_run_name=EVAL_RUN_NAME,
+                override=True,
+                log_results=True
+            )
+
+            results = client.pull_eval(project_name=PROJECT_NAME_EVAL, eval_run_name=EVAL_RUN_NAME)
+            assert results, f"No evaluation results found for {EVAL_RUN_NAME} in project {PROJECT_NAME_EVAL}"
+            assert isinstance(results, list), "Expected results to be a list of experiment/trace data"
+            assert len(results) == 2, f"Expected 2 trace results but got {len(results)}"
+            
+            
+        finally:
+            if temp_yaml_file_path and os.path.exists(temp_yaml_file_path):
+                os.remove(temp_yaml_file_path)
+            try:
+               client.delete_project(project_name=PROJECT_NAME_EVAL)
+            except Exception as e:
+                print(f"Failed to delete project {PROJECT_NAME_EVAL}: {e}")
+                
     def test_override_eval(self, client: JudgmentClient, random_name: str):
         """Test evaluation override behavior."""
         example1 = Example(
