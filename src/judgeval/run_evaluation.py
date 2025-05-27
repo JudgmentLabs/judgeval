@@ -788,8 +788,7 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_error
     debug("Initializing examples with IDs and timestamps")
     for idx, example in enumerate(evaluation_run.examples):
         example.example_index = idx  # Set numeric index
-        example.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        with example_logging_context(example.timestamp, example.example_id):
+        with example_logging_context(example.created_at, example.example_id):
             debug(f"Initialized example {example.example_id} (index: {example.example_index})")
             debug(f"Input: {example.input}")
             debug(f"Actual output: {example.actual_output}")
@@ -930,7 +929,7 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_error
             # We should be removing local scorers soon
             info("Starting local evaluation")
             for example in evaluation_run.examples:
-                with example_logging_context(example.timestamp, example.example_id):
+                with example_logging_context(example.created_at, example.example_id):
                     debug(f"Processing example {example.example_id}: {example.input}")
             
             results: List[ScoringResult] = asyncio.run(

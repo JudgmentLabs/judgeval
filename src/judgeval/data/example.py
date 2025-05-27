@@ -36,15 +36,15 @@ class Example(BaseModel):
     name: Optional[str] = None
     example_id: str = Field(default_factory=lambda: str(uuid4()))
     example_index: Optional[int] = None
-    timestamp: Optional[str] = None
+    created_at: Optional[str] = None
     trace_id: Optional[str] = None
     
     def __init__(self, **data):
         if 'example_id' not in data:
             data['example_id'] = str(uuid4())
         # Set timestamp if not provided
-        if 'timestamp' not in data:
-            data['timestamp'] = datetime.now().strftime("%Y%m%d_%H%M%S")
+        if 'created_at' not in data:
+            data['created_at'] = datetime.now().isoformat()
         super().__init__(**data)
     
     @field_validator('input', mode='before')
@@ -123,9 +123,9 @@ class Example(BaseModel):
             raise ValueError(f"Example index must be an integer or None but got {v} of type {type(v)}")
         return v
     
-    @field_validator('timestamp', mode='before')
+    @field_validator('created_at', mode='before')
     @classmethod
-    def validate_timestamp(cls, v):
+    def validate_created_at(cls, v):
         if v is not None and not isinstance(v, str):
             raise ValueError(f"Timestamp must be a string or None but got {v} of type {type(v)}")
         return v
@@ -150,7 +150,7 @@ class Example(BaseModel):
             "name": self.name,
             "example_id": self.example_id,
             "example_index": self.example_index,
-            "timestamp": self.timestamp,
+            "created_at": self.created_at,
         }
 
     def __str__(self):
@@ -166,5 +166,5 @@ class Example(BaseModel):
             f"name={self.name}, "
             f"example_id={self.example_id}, "
             f"example_index={self.example_index}, "
-            f"timestamp={self.timestamp}, "
+            f"created_at={self.created_at}, "
         )

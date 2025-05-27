@@ -48,7 +48,7 @@ async def safe_a_score_example(
         info(f"Successfully scored example {example.example_id}")
     except MissingTestCaseParamsError as e:
         if skip_on_missing_params:  # Skip the example if the scorer requires parameters that are missing
-            with example_logging_context(example.timestamp, example.example_id):
+            with example_logging_context(example.created_at, example.example_id):
                 warning(f"Skipping example {example.example_id} due to missing parameters")
             scorer.skipped = True
             return
@@ -56,10 +56,10 @@ async def safe_a_score_example(
             if ignore_errors:  # Gracefully handle the error, does not stop the evaluation
                 scorer.error = str(e)
                 scorer.success = False
-                with example_logging_context(example.timestamp, example.example_id):
+                with example_logging_context(example.created_at, example.example_id):
                     warning(f"Ignoring errors for example {example.example_id}: {str(e)} due to missing parameters")
             else:  # Raise the error and stop the evaluation
-                with example_logging_context(example.timestamp, example.example_id):
+                with example_logging_context(example.created_at, example.example_id):
                     error(f"Stopping example {example.example_id}: {str(e)} due to missing parameters")
                 raise
     except TypeError:  # in case a_score_example does not accept _show_indicator
@@ -68,27 +68,27 @@ async def safe_a_score_example(
         except MissingTestCaseParamsError as e:
             if skip_on_missing_params:
                 scorer.skipped = True
-                with example_logging_context(example.timestamp, example.example_id):
+                with example_logging_context(example.created_at, example.example_id):
                     warning(f"Skipping example {example.example_id} due to missing parameters")
                 return
             else:
                 if ignore_errors:
                     scorer.error = str(e)
                     scorer.success = False  
-                    with example_logging_context(example.timestamp, example.example_id):
+                    with example_logging_context(example.created_at, example.example_id):
                         warning(f"Ignoring errors for example {example.example_id}: {str(e)} due to missing parameters")
                 else:
-                    with example_logging_context(example.timestamp, example.example_id):
+                    with example_logging_context(example.created_at, example.example_id):
                         error(f"Stopping example {example.example_id}: {str(e)} due to missing parameters")
                     raise
     except Exception as e:
         if ignore_errors:
             scorer.error = str(e)
             scorer.success = False  # Assuming you want to set success to False
-            with example_logging_context(example.timestamp, example.example_id):
+            with example_logging_context(example.created_at, example.example_id):
                 warning(f"Ignoring errors for example {example.example_id}: {str(e)}")
         else:
-            with example_logging_context(example.timestamp, example.example_id):
+            with example_logging_context(example.created_at, example.example_id):
                 error(f"Stopping example {example.example_id}: {str(e)}")
             raise
 
@@ -128,7 +128,7 @@ async def score_task(
         except MissingTestCaseParamsError as e:
             if skip_on_missing_params:
                 scorer.skipped = True
-                with example_logging_context(example.timestamp, example.example_id):
+                with example_logging_context(example.created_at, example.example_id):
                     debug(f"Skipping example {example.example_id} due to missing parameters")
                 return
             else:
@@ -137,7 +137,7 @@ async def score_task(
                     scorer.success = False  # Override success
                     finish_text = "Failed"
                 else:
-                    with example_logging_context(example.timestamp, example.example_id):
+                    with example_logging_context(example.created_at, example.example_id):
                         error(f"Stopping example {example.example_id}: {str(e)} due to missing parameters")
                     raise
         except TypeError:
@@ -147,7 +147,7 @@ async def score_task(
             except MissingTestCaseParamsError as e:
                 if skip_on_missing_params:
                     scorer.skipped = True
-                    with example_logging_context(example.timestamp, example.example_id):
+                    with example_logging_context(example.created_at, example.example_id):
                         debug(f"Skipping example {example.example_id} due to missing parameters")
                     return
                 else:
@@ -156,7 +156,7 @@ async def score_task(
                         scorer.success = False  # Override success
                         finish_text = "Failed"
                     else:
-                        with example_logging_context(example.timestamp, example.example_id):
+                        with example_logging_context(example.created_at, example.example_id):
                             error(f"Stopping example {example.example_id}: {str(e)} due to missing parameters")
                         raise
         except Exception as e:
@@ -164,10 +164,10 @@ async def score_task(
                 scorer.error = str(e)
                 scorer.success = False  # Override success
                 finish_text = "Failed"
-                with example_logging_context(example.timestamp, example.example_id):
+                with example_logging_context(example.created_at, example.example_id):
                     warning(f"Ignoring errors for example {example.example_id}: {str(e)}")
             else:
-                with example_logging_context(example.timestamp, example.example_id):
+                with example_logging_context(example.created_at, example.example_id):
                     error(f"Stopping example {example.example_id}: {str(e)}")
                 raise
 
@@ -305,7 +305,7 @@ async def a_execute_scoring(
             bar_format="{desc}: |{bar}|{percentage:3.0f}% ({n_fmt}/{total_fmt}) [Time Taken: {elapsed}, {rate_fmt}{postfix}]",
         ) as pbar:
             for i, ex in enumerate(examples):
-                with example_logging_context(ex.timestamp, ex.example_id):
+                with example_logging_context(ex.created_at, ex.example_id):
                     debug(f"Starting scoring for example {ex.example_id}")
                     debug(f"Input: {ex.input}")
                     debug(f"Using {len(scorers)} scorers")
