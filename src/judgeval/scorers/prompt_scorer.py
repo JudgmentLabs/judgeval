@@ -266,7 +266,7 @@ class PromptScorer(JudgevalScorer, BaseModel):
         pass
 
     @abstractmethod
-    def _success_check(self, **kwargs) -> bool:
+    def success_check(self, **kwargs) -> bool:
         """
         Determines whether or not the PromptScorer should consider the evaluation of a single example successful.
         """
@@ -387,7 +387,7 @@ class ClassifierScorer(PromptScorer):
         reason = response.get("reason", "No reason could be found in model response.")
         return self.options[choice], reason
 
-    def _success_check(self, **kwargs) -> bool:
+    def success_check(self, **kwargs) -> bool:
         return self.score >= self.threshold
     
     def update_name(self, name: str):

@@ -4,7 +4,7 @@ class CustomScorer(JudgevalScorer):
     def __init__(
         self,
         threshold=0.5,
-        score_type="Sample Scorer",
+        score_type="Custom Scorer",
         include_reason=True,
         async_mode=True,
         strict_mode=False,
@@ -35,10 +35,10 @@ class CustomScorer(JudgevalScorer):
             self.error = str(e)
             self.success = False
 
-    def _success_check(self):
+    def success_check(self):
         return self.score >= self.threshold
     
 
     @property
     def __name__(self):
-        return "Alan Scorer"
+        return f"{self.score_type}"

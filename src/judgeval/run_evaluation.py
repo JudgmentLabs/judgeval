@@ -40,7 +40,7 @@ from judgeval.common.logger import (
     example_logging_context
 )
 from judgeval.evaluation_run import EvaluationRun
-from judgeval.data.trace_run import TraceRun
+from judgeval.trace_run import TraceRun
 from judgeval.common.tracer import Tracer
 from langchain_core.callbacks import BaseCallbackHandler
 

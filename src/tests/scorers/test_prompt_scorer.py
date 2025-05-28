@@ -47,7 +47,7 @@ class SampleScorer(PromptScorer):
     def _process_response(self, response: dict):
         return response["score"], response["reason"]
     
-    def _success_check(self, **kwargs) -> bool:
+    def success_check(self, **kwargs) -> bool:
         return self._result >= self.threshold
 
 # Tests for PromptScorer
@@ -152,7 +152,7 @@ class TestClassifierScorer:
         with pytest.raises(ValueError):
             scorer._process_response(response)
             
-    def test_success_check(self, classifier_conversation, classifier_options):
+    def testsuccess_check(self, classifier_conversation, classifier_options):
         scorer = ClassifierScorer(
             name="test_classifier",
             slug="test_classifier_slug",
@@ -161,7 +161,7 @@ class TestClassifierScorer:
         )
         
         scorer.score = 1.0
-        assert scorer._success_check() is True
+        assert scorer.success_check() is True
         
         scorer.score = 0.0
-        assert scorer._success_check() is False
+        assert scorer.success_check() is False

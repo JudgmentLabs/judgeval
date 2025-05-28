@@ -114,13 +114,13 @@ class JudgevalScorer:
         raise NotImplementedError("You must implement the `a_score` method in your custom scorer") 
     
     @abstractmethod
-    def _success_check(self) -> bool:
+    def success_check(self) -> bool:
         """
         For unit testing, determines whether the test case passes or fails
         """
         warning("Attempting to call unimplemented success_check method")
-        error("_success_check method not implemented")
-        raise NotImplementedError("You must implement the `_success_check` method in your custom scorer")
+        error("success_check method not implemented")
+        raise NotImplementedError("You must implement the `success_check` method in your custom scorer")
 
     def __str__(self):
         debug("Converting JudgevalScorer instance to string representation")

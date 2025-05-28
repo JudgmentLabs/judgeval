@@ -22,7 +22,7 @@ class MockJudgevalScorer(JudgevalScorer):
     async def a_score_example(self, example, *args, **kwargs):
         pass
 
-    def _success_check(self):
+    def success_check(self):
         return True
 
 
@@ -799,7 +799,7 @@ def mock_scorer():
     scorer.evaluation_model = "test-model"
     scorer.score = 0.9
     scorer.reason = "Test reason"
-    scorer._success_check.return_value = True
+    scorer.success_check.return_value = True
     scorer.evaluation_cost = 0.1
     scorer.verbose_logs = "Test logs"
     scorer.additional_metadata = {"key": "value"}

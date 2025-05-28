@@ -34,6 +34,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Initialize git submodules
+        run: |
+          git submodule update --init --recursive
+
       - name: Install dependencies
         run: |
           pip install pipenv
@@ -73,6 +77,10 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
+      
+      - name: Initialize git submodules
+        run: |
+          git submodule update --init --recursive
          
       - name: Install judgeval dependencies
         run: |

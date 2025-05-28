@@ -62,7 +62,7 @@ class SentimentScorer(PromptScorer):
     def _process_response(self, response):
         return response["score"], response["reason"]
     
-    def _success_check(self):
+    def success_check(self):
         POSITIVITY_THRESHOLD = 3  # we want all model responses to be somewhat positive in tone
         return self.score <= POSITIVITY_THRESHOLD
 
