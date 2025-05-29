@@ -17,6 +17,7 @@ from judgeval.scorers.judgeval_scorers.api_scorers import (
     GroundednessScorer,
     DerailmentScorer,
     ToolOrderScorer,
+    ToolDependencyScorer,
 )
 from judgeval.scorers.judgeval_scorers.classifiers import (
     Text2SQLScorer,
@@ -43,4 +44,5 @@ __all__ = [
     "GroundednessScorer",
     "DerailmentScorer",
     "ToolOrderScorer",
+    "ToolDependencyScorer",
 ]

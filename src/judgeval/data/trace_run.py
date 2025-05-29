@@ -1,4 +1,3 @@
-
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any, Union, Callable
 from judgeval.data import Trace
@@ -22,6 +21,7 @@ class TraceRun(BaseModel):
         judgment_api_key (Optional[str]): The API key for running evaluations on the Judgment API
         rules (Optional[List[Rule]]): Rules to evaluate against scoring results
         append (Optional[bool]): Whether to append to existing evaluation results
+        tools (Optional[List[Dict[str, Any]]]): List of tools to use for evaluation
     """
 
     # The user will specify whether they want log_results when they call run_eval
@@ -40,6 +40,7 @@ class TraceRun(BaseModel):
     judgment_api_key: Optional[str] = ""
     override: Optional[bool] = False
     rules: Optional[List[Rule]] = None
+    tools: Optional[List[Dict[str, Any]]] = None
 
     class Config:
         arbitrary_types_allowed = True

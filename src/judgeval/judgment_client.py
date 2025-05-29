@@ -122,7 +122,8 @@ class JudgmentClient(metaclass=SingletonMeta):
         ignore_errors: bool = True,
         rules: Optional[List[Rule]] = None,
         function: Optional[Callable] = None,
-        tracer: Optional[Union[Tracer, BaseCallbackHandler]] = None
+        tracer: Optional[Union[Tracer, BaseCallbackHandler]] = None,
+        tools: Optional[List[Dict[str, Any]]] = None
     ) -> List[ScoringResult]:
         try:         
             
@@ -152,6 +153,7 @@ class JudgmentClient(metaclass=SingletonMeta):
                 append=append,
                 judgment_api_key=self.judgment_api_key,
                 organization_id=self.organization_id,
+                tools=tools
             )
             return run_trace_eval(trace_run, override, ignore_errors, function, tracer, examples)
         except ValueError as e:
@@ -481,7 +483,7 @@ class JudgmentClient(metaclass=SingletonMeta):
             
         return response.json()["slug"]
     
-    async def assert_test(
+    def assert_test(
         self, 
         scorers: List[Union[APIJudgmentScorer, JudgevalScorer]],
         examples: Optional[List[Example]] = None,
@@ -496,6 +498,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         rules: Optional[List[Rule]] = None,
         function: Optional[Callable] = None,
         tracer: Optional[Union[Tracer, BaseCallbackHandler]] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
         async_execution: bool = False
     ) -> None:
         """
@@ -515,6 +518,13 @@ class JudgmentClient(metaclass=SingletonMeta):
             rules (Optional[List[Rule]]): Rules to evaluate against scoring results
         """
 
+        # Check for enable_param_checking and tools
+        for scorer in scorers:
+            if hasattr(scorer, "kwargs") and scorer.kwargs is not None:
+                if scorer.kwargs.get("enable_param_checking") is True:
+                    if not tools:
+                        raise ValueError(f"You must provide the 'tools' argument to assert_test when using a scorer with enable_param_checking=True. If you do not want to do param checking, explicitly set enable_param_checking=False for the {scorer.__name__} scorer.")
+
         # Validate that exactly one of examples or test_file is provided
         if (examples is None and test_file is None) or (examples is not None and test_file is not None):
             raise ValueError("Exactly one of 'examples' or 'test_file' must be provided, but not both")
@@ -532,7 +542,8 @@ class JudgmentClient(metaclass=SingletonMeta):
                 rules=rules,
                 function=function,
                 tracer=tracer,
-                test_file=test_file
+                test_file=test_file,
+                tools=tools
             )
         else:
             results = self.run_evaluation(
@@ -550,11 +561,9 @@ class JudgmentClient(metaclass=SingletonMeta):
             )
         
         if async_execution:
-            # 'results' is an asyncio.Task here (SpinnerWrappedTask)
-            # Awaiting it now directly gives List[ScoringResult],
-            # as SpinnerWrappedTask handles the tuple and printing internally.
-            actual_results = await results 
-            assert_test(actual_results)  # Call the synchronous imported assert_test function
+            # 'results' is an asyncio.Task here, awaiting it gives List[ScoringResult]
+            actual_results = asyncio.run(results)
+            assert_test(actual_results)  # Call the synchronous imported function
         else:
             # 'results' is already List[ScoringResult] here (synchronous path)
             assert_test(results)  # Call the synchronous imported function

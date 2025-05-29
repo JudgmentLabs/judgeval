@@ -390,7 +390,6 @@ def run_trace_eval(trace_run: TraceRun, override: bool = False, ignore_errors: b
             trace_run.organization_id,
             True
         )
-
     if function and tracer:
         new_traces: List[Trace] = []
         tracer.offline_mode = True

@@ -34,6 +34,7 @@ from typing import (
     Union,
     AsyncGenerator,
     TypeAlias,
+    Set
 )
 from rich import print as rprint
 import types # <--- Add this import
@@ -1009,9 +1010,8 @@ class Tracer:
             class_name = cls.__name__
             self.class_identifiers[class_name] = identifier
             return cls
-
+        
         return decorator
-
     
     def observe(self, func=None, *, name=None, span_type: SpanType = "span", project_name: str = None, overwrite: bool = False, deep_tracing: bool = None):
         """
@@ -1079,7 +1079,7 @@ class Tracer:
                     # Save empty trace and set trace context
                     # current_trace.save(empty_save=True, overwrite=overwrite)
                     trace_token = current_trace_var.set(current_trace)
-                    
+
                     try:
                         # Use span for the function execution within the root trace
                         # This sets the current_span_var

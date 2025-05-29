@@ -103,10 +103,6 @@ class TraceSpan(BaseModel):
             return repr(output)
         except (TypeError, OverflowError, ValueError):
             pass
-
-        warnings.warn(
-            f"Output for function {function_name} is not JSON serializable and could not be converted to string. Setting to None."
-        )
         return None
         
     def _serialize_output(self) -> Any:
