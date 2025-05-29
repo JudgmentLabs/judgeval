@@ -1051,6 +1051,7 @@ class Tracer:
                 class_name = None
                 instance_name = None
                 span_name = original_span_name
+                agent_name = None
 
                 if args and hasattr(args[0], '__class__'):
                     class_name = args[0].__class__.__name__
@@ -1131,6 +1132,7 @@ class Tracer:
                 class_name = None
                 instance_name = None
                 span_name = original_span_name
+                agent_name = None
                 if args and hasattr(args[0], '__class__'):
                     class_name = args[0].__class__.__name__
                     agent_name = get_instance_prefixed_name(args[0], class_name, self.class_identifiers, span_name)               
