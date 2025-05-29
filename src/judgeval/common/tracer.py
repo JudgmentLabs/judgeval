@@ -651,7 +651,7 @@ class _DeepTracer:
             instance = frame.f_locals['self']
             class_name = instance.__class__.__name__
             class_identifiers = getattr(Tracer._instance, 'class_identifiers', {})
-            instance_name = get_instance_prefixed_name(instance, class_name, class_identifiers, qual_name)
+            instance_name = get_instance_prefixed_name(instance, class_name, class_identifiers)
         skip_stack = self._skip_stack.get()
         
         if event == "call":
@@ -1055,7 +1055,7 @@ class Tracer:
 
                 if args and hasattr(args[0], '__class__'):
                     class_name = args[0].__class__.__name__
-                    agent_name = get_instance_prefixed_name(args[0], class_name, self.class_identifiers, span_name)
+                    agent_name = get_instance_prefixed_name(args[0], class_name, self.class_identifiers)
 
                 # Get current trace from context
                 current_trace = current_trace_var.get()
@@ -1135,7 +1135,7 @@ class Tracer:
                 agent_name = None
                 if args and hasattr(args[0], '__class__'):
                     class_name = args[0].__class__.__name__
-                    agent_name = get_instance_prefixed_name(args[0], class_name, self.class_identifiers, span_name)               
+                    agent_name = get_instance_prefixed_name(args[0], class_name, self.class_identifiers)               
                 # Get current trace from context
                 current_trace = current_trace_var.get()
 
@@ -1887,7 +1887,7 @@ class _TracedSyncStreamManagerWrapper(_BaseStreamManagerWrapper, AbstractContext
         return self._original_manager.__exit__(exc_type, exc_val, exc_tb)
 
 # --- Helper function for instance-prefixed qual_name ---
-def get_instance_prefixed_name(instance, class_name, class_identifiers, name):
+def get_instance_prefixed_name(instance, class_name, class_identifiers):
     """
     Returns the agent name (prefix) if the class and attribute are found in class_identifiers.
     Otherwise, returns None.
