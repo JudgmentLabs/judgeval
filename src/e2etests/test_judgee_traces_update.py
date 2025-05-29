@@ -185,7 +185,7 @@ async def test_trace_save_increment(client, cleanup_traces):
                 {
                     "timestamp": datetime.fromtimestamp(timestamp).isoformat(),
                     "type": "span",
-                    "name": "test_span",
+                    "function": "test_span",
                     "inputs": {"test": "input"},
                     "outputs": {"test": "output"},
                     "duration": 0.1,
@@ -276,7 +276,7 @@ async def test_concurrent_trace_saves(client, cleanup_traces):
                         {
                             "timestamp": datetime.fromtimestamp(timestamp).isoformat(),
                             "type": "span",
-                            "name": f"test_span_{index}",
+                            "function": f"test_span_{index}",
                             "inputs": {"test": f"input_{index}"},
                             "outputs": {"test": f"output_{index}"},
                             "duration": 0.1,
@@ -467,7 +467,7 @@ async def test_burst_request_handling(client):
             {
                 "timestamp": datetime.fromtimestamp(timestamp).isoformat(),
                 "type": "span",
-                "name": "test_span",
+                "function": "test_span",
                 "inputs": {"test": "input"},
                 "outputs": {"test": "output"},
                 "duration": 0.1,

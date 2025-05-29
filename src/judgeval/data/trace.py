@@ -17,7 +17,7 @@ class TraceUsage(BaseModel):
 class TraceSpan(BaseModel):
     span_id: str
     trace_id: str
-    function: Optional[str] = None
+    function: str
     depth: int
     created_at: Optional[Any] = None
     parent_span_id: Optional[str] = None
