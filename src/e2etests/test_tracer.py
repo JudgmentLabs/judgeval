@@ -590,17 +590,6 @@ async def test_openai_async_streaming_usage(test_input):
     return result
 
 # --- END NEW TESTS ---
-
-# Helper function to print trace hierarchy
-def print_trace_hierarchy(entries):
-    """Print a hierarchical representation of the trace for debugging."""
-    # First, organize entries by parent_span_id
-    entries_by_parent = {}
-    for entry in entries:
-        parent_id = entry["parent_span_id"]
-        if parent_id not in entries_by_parent:
-            entries_by_parent[parent_id] = []
-        entries_by_parent[parent_id].append(entry)
     
 # --- NEW COMPREHENSIVE TOKEN COUNTING TEST ---
 

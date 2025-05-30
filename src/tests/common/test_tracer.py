@@ -135,7 +135,7 @@ def test_trace_client_span(trace_client):
     assert len(trace_client.trace_spans) == initial_spans_count + 1
 
 def test_trace_client_nested_spans(trace_client):
-    """Test nested spans maintain proper depth recorded in entries"""
+    """Test nested spans maintain proper depth recorded in trace_spans"""
     root_span_id = current_span_var.get()  # From the fixture
 
     with trace_client.span("outer") as outer_span:
