@@ -429,7 +429,7 @@ def run_trace_eval(trace_run: TraceRun, override: bool = False, ignore_errors: b
     debug("Processing API results")
     # TODO: allow for custom scorer on traces
     if trace_run.log_results:
-        pretty_str = run_with_spinner("Logging Results: ", log_evaluation_results, response_data["global_results"], trace_run)
+        pretty_str = run_with_spinner("Logging Results: ", log_evaluation_results, response_data["agent_results"], trace_run)
         rprint(pretty_str)
 
     return scoring_results
