@@ -202,7 +202,6 @@ class EvalDatasetClient:
 
                 info(f"Successfully pulled dataset with alias '{alias}'")
                 payload = response.json()
-                print(payload)
                 dataset.examples = [Example(**e) for e in payload.get("examples", [])]
                 dataset.traces = [Trace(**t) for t in payload.get("traces", [])]
                 dataset._alias = payload.get("alias")

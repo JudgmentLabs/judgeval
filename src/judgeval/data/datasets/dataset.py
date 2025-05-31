@@ -221,11 +221,11 @@ class EvalDataset:
             self.add_example(e)
 
     def add_example(self, e: Example) -> None:
-        self.examples = self.examples + [e]
+        self.examples.append(e)
         # TODO if we need to add rank, then we need to do it here
     
     def add_trace(self, t: Trace) -> None:
-        self.traces = self.traces + [t]
+        self.traces.append(t)
 
     def save_as(self, file_type: Literal["json", "csv", "yaml"], dir_path: str, save_name: str = None) -> None:
         """

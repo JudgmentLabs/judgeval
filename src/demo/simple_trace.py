@@ -38,12 +38,12 @@ async def gather_information(city: str):
     weather = await get_weather(city)
     attractions = await get_attractions(city)
 
-    # judgment.async_evaluate(
-    #     scorers=[AnswerRelevancyScorer(threshold=0.5)],
-    #     input="What is the weather in Paris?",
-    #     actual_output=weather,
-    #     model="gpt-4",
-    # )
+    judgment.async_evaluate(
+        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+        input="What is the weather in Paris?",
+        actual_output=weather,
+        model="gpt-4",
+    )
     
     return {
         "weather": weather,
