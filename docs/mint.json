@@ -156,7 +156,12 @@
     {
       "group": "Changelog",
       "pages": [
-        "changelog/2025-04-21"
+        "changelog/2025-04-21",
+        "changelog/2025-04-28",
+        "changelog/2025-05-05",
+        "changelog/2025-05-12",
+        "changelog/2025-05-19",
+        "changelog/2025-05-26"
       ]
     }
   ],
