@@ -16,11 +16,12 @@ from judgeval.data import Example
 
 @pytest.fixture
 def mock_validate_api_key(monkeypatch):
-    """Mock the validate_api_key function."""
+    """Mock the validate_api_key function and organization ID."""
     def _mock_validate_api_key(judgment_api_key):
         return True, "Valid API key"
     
     monkeypatch.setattr('judgeval.common.utils.validate_api_key', _mock_validate_api_key)
+    monkeypatch.setenv('JUDGMENT_ORG_ID', 'test_org_id')
     return _mock_validate_api_key
 
 class TestDirectNotificationIntegration:
