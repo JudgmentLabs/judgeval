@@ -9,7 +9,7 @@
 
 <br>
 
-## [🌐 Landing Page](https://www.judgmentlabs.ai/)  • [📚 Docs](https://judgment.mintlify.app/getting_started) • [🚀 Demos](https://www.youtube.com/@AlexShan-j3o) 
+## [🌐 Landing Page](https://www.judgmentlabs.ai/)  • [📚 Docs](https://docs.judgmentlabs.ai/introduction) • [🚀 Demos](https://www.youtube.com/@AlexShan-j3o) 
 
 [![X](https://img.shields.io/badge/-X/Twitter-000?logo=x&logoColor=white)](https://x.com/JudgmentLabs)
 [![LinkedIn](https://custom-icon-badges.demolab.com/badge/LinkedIn%20-0A66C2?logo=linkedin-white&logoColor=fff)](https://www.linkedin.com/company/judgmentlabs)
