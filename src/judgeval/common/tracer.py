@@ -632,18 +632,7 @@ def _capture_exception_for_trace(current_trace: Optional['TraceClient'], exc_inf
     
     # Most clients (requests, httpx, urllib) support the standard format of exposing error.request.url and error.response.status_code 
     # The alternative is to hand select libraries we want from sys.modules and check for them:
-    # As an example:
-    
-    # try:
-    #     requests_module = sys.modules.get("requests", None)
-    #     if requests_module and isinstance(exc_value, getattr(requests_module, "RequestException", object)):
-    #         formatted_exception["http"] = {
-    #             "url": getattr(getattr(exc_value, "request", None), "url", "Unknown URL"),
-    #             "status_code": getattr(getattr(exc_value, "response", None), "status_code", None),
-    #         }
-    # except Exception as e:
-    #     pass
-    
+    # As an example:  requests_module = sys.modules.get("requests", None) // then do things with requests_module;
 
      # General HTTP Like errors
     try:
