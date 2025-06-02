@@ -63,7 +63,15 @@ class SingletonMeta(type):
         return cls._instances[cls]
 
 class JudgmentClient(metaclass=SingletonMeta):
-    def __init__(self, judgment_api_key: str = os.getenv("JUDGMENT_API_KEY"), organization_id: str = os.getenv("JUDGMENT_ORG_ID")):
+    def __init__(self, judgment_api_key: Optional[str] = os.getenv("JUDGMENT_API_KEY"), organization_id: Optional[str] = os.getenv("JUDGMENT_ORG_ID")):
+        # Check if API key is None
+        if judgment_api_key is None:
+            raise ValueError("JUDGMENT_API_KEY cannot be None. Please provide a valid API key or set the JUDGMENT_API_KEY environment variable.")
+        
+        # Check if organization ID is None
+        if organization_id is None:
+            raise ValueError("JUDGMENT_ORG_ID cannot be None. Please provide a valid organization ID or set the JUDGMENT_ORG_ID environment variable.")
+        
         self.judgment_api_key = judgment_api_key
         self.organization_id = organization_id
         self.eval_dataset_client = EvalDatasetClient(judgment_api_key, organization_id)

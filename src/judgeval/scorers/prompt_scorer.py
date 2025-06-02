@@ -37,6 +37,7 @@ from judgeval.scorers.utils import (
     get_or_create_event_loop,
     create_verbose_logs
 )
+from judgeval.judges import JudgevalJudge
 
 
 class ReasonScore(BaseModel):
@@ -49,7 +50,8 @@ class PromptScorer(JudgevalScorer, BaseModel):
     score_type: str
     threshold: float = Field(default=0.5)
     using_native_model: bool = Field(default=True)
-
+    model: Optional[JudgevalJudge] = Field(default=None)
+    skipped: bool = Field(default=False)
     # DO NOT SET THESE FIELDS MANUALLY, THEY ARE SET BY THE SCORE_EXAMPLE METHOD
     _response: Optional[dict] = None
     _result: Optional[float] = None
@@ -276,166 +278,5 @@ class PromptScorer(JudgevalScorer, BaseModel):
     def __name__(self):
         return self.name
 
-
-class ClassifierScorer(PromptScorer):
-
-    """
-    This is a PromptScorer that takes 
-    1. a system role that may involve the Example object
-    2. options for scores on the example
-    
-    and uses a judge to execute the evaluation from the system role and classify into one of the options
-
-    ex:
-    system_role = "You are a judge that evaluates whether the response is positive or negative. The response is: {example.actual_output}"
-    options = {"positive": 1, "negative": 0}
-    """
-
-    conversation: List[dict]
-    options: Mapping[str, float]
-    
-    def __init__(self, name: str, slug: str, conversation: List[dict], options: Mapping[str, float], 
-                 threshold: float = 0.5, include_reason: bool = True, 
-                 async_mode: bool = True, strict_mode: bool = False, verbose_mode: bool = False):
-        # Initialize BaseModel first with all fields
-        BaseModel.__init__(
-            self,
-            name=name,
-            slug=slug,
-            score_type=name,
-            conversation=conversation,
-            options=options,
-            threshold=threshold,
-            include_reason=include_reason,
-            async_mode=async_mode,
-            strict_mode=strict_mode,
-            verbose_mode=verbose_mode,
-        )
-        # Then initialize JudgevalScorer
-        JudgevalScorer.__init__(
-            self,
-            score_type=name,
-            threshold=threshold,
-            include_reason=include_reason,
-            async_mode=async_mode,
-            strict_mode=strict_mode,
-            verbose_mode=verbose_mode,
-        )
-
-    def _build_measure_prompt(self, example: Example) -> List[dict]:
-        """
-        Builds the measure prompt for the classifier scorer.
-
-        Args:
-            example (Example): The example to build the prompt for
-
-        Returns:
-            List[dict]: The measure prompt for the classifier scorer
-        """
-        replacement_words = {
-            "{{actual_output}}": example.actual_output,
-            "{{expected_output}}": example.expected_output,
-            "{{context}}": example.context,
-            "{{retrieval_context}}": example.retrieval_context,
-            "{{tools_called}}": example.tools_called,
-            "{{expected_tools}}": example.expected_tools,
-        }
-        # Make a copy of the conversation to avoid modifying the original
-        conversation_copy = [dict(message) for message in self.conversation]
-        
-        # Only replace if double brackets are found in the content
-        for message in conversation_copy:
-            content = message["content"]
-            if "{{" in content:
-                for key, value in replacement_words.items():
-                    if key in content:
-                        message["content"] = content.replace(key, str(value))
-        return conversation_copy
-
-    def _build_schema(self) -> dict:
-        return self.options
-    
-    def _enforce_prompt_format(self, judge_prompt: List[dict], schema: dict) -> List[dict]:
-        """
-        Enforces the judge model to choose an option from the schema.
-
-        We want the model to choose an option from the schema and a reason for the choice.
-        """
-        options = list(schema.keys())
-        options_str = ", ".join(options)
-        
-        system_role = judge_prompt[0]["content"]
-        system_role += (
-            f"\n\nYou must choose one of the following options: {options_str}. "
-            "Format your response as a JSON object with two fields:\n"
-            "1. 'choice': Your selected option (must be one of the provided choices)\n"
-            "2. 'reason': A brief explanation for why you made this choice\n\n"
-            "Example response format:\n"
-            "{\n"
-            '    "choice": "<one of the valid options>",\n'
-            '    "reason": "<your explanation>"\n'
-            "}"
-        )
-        
-        judge_prompt[0]["content"] = system_role
-        return judge_prompt
-
-    def _process_response(self, response: dict) -> Tuple[float, str]:
-        choice = response.get("choice")
-        if choice not in self.options:
-            raise ValueError(f"Invalid choice: {choice}. Expected one of: {self.options.keys()}")
-        reason = response.get("reason", "No reason could be found in model response.")
-        return self.options[choice], reason
-
-    def _success_check(self, **kwargs) -> bool:
-        return self.score >= self.threshold
-    
-    def update_name(self, name: str):
-        """
-        Updates the name of the scorer.
-        """
-        self.name = name
-        
-    def update_threshold(self, threshold: float):
-        """
-        Updates the threshold of the scorer.
-        """
-        self.threshold = threshold
-    
-    def update_conversation(self, conversation: List[dict]):
-        """
-        Updates the conversation with the new conversation.
-        
-        Sample conversation:
-        [{'role': 'system', 'content': "Did the chatbot answer the user's question in a kind way?: {{actual_output}}."}]
-        """
-        self.conversation = conversation
-        
-    def update_options(self, options: Mapping[str, float]):
-        """
-        Updates the options with the new options.
-        
-        Sample options:
-        {"yes": 1, "no": 0}
-        """
-        self.options = options
-
-    def __str__(self):
-        return f"ClassifierScorer(name={self.name}, slug={self.slug}, conversation={self.conversation}, threshold={self.threshold}, options={self.options})"
-
-    @model_serializer
-    def serialize_model(self) -> dict:
-        """
-        Defines how the ClassifierScorer should be serialized when model_dump() is called.
-        """
-        return {
-            "name": self.name,
-            "score_type": self.score_type,
-            "conversation": self.conversation,
-            "options": self.options,
-            "threshold": self.threshold,
-            "include_reason": self.include_reason,
-            "async_mode": self.async_mode,
-            "strict_mode": self.strict_mode,
-            "verbose_mode": self.verbose_mode,
-        }
+    class Config:
+        arbitrary_types_allowed = True

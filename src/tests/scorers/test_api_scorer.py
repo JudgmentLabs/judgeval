@@ -63,3 +63,9 @@ def test_judgment_scorer_threshold_validation():
     # Test integer values (should be converted to float)
     scorer = APIJudgmentScorer(threshold=1, score_type=APIScorer.FAITHFULNESS)
     assert scorer.threshold == 1.0 
+
+    with pytest.raises(ValueError, match="must be greater than 0"):
+        scorer = APIJudgmentScorer(threshold=-1, score_type=APIScorer.COMPARISON)
+    
+    with pytest.raises(ValueError, match="must be between 0 and 1"):
+        scorer = APIJudgmentScorer(threshold=1.5, score_type=APIScorer.FAITHFULNESS)

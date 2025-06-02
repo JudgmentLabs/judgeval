@@ -57,6 +57,10 @@ def client() -> JudgmentClient:
     client.delete_project(project_name="ResponseAPITest")
     client.delete_project(project_name="TestingPoemBotAsync")
     client.delete_project(project_name="TestGoogleResponseAPI")
+    client.delete_project(project_name="TraceEvalProjectFromYAMLTest")
+    client.delete_project(project_name="test_s3_trace_saving")
+    client.delete_project(project_name="test-langgraph-project-sync")
+    client.delete_project(project_name="test-langgraph-project-async")
 
 
 @pytest.fixture
