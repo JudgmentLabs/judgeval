@@ -505,7 +505,7 @@ class TraceClient:
         # Removed else block - original didn't have one
         return None # Return None if no span_id found
     
-    def record_error(self, error: Any):
+    def record_error(self, error: Dict[str, Any]):
         current_span_id = current_span_var.get()
         if current_span_id:
             span = self.span_id_to_span[current_span_id]
