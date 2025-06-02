@@ -39,6 +39,8 @@ class JudgevalScorer:
     evaluation_cost: Optional[float] = None  # The cost of running the scorer
     verbose_logs: Optional[str] = None  # The verbose logs of the scorer
     additional_metadata: Optional[Dict] = None  # Additional metadata for the scorer
+    error: Optional[str] = None
+    success: Optional[bool] = None
 
     def __init__(
         self, 
@@ -145,3 +147,9 @@ class JudgevalScorer:
             "additional_metadata": self.additional_metadata,
         }
         return f"JudgevalScorer({attributes})"
+    
+    def to_dict(self):
+        return {
+            "score_type": str(self.score_type),  # Convert enum to string for serialization
+            "threshold": self.threshold
+        }

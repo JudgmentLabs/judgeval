@@ -1,6 +1,6 @@
 from judgeval.scorers.api_scorer import APIJudgmentScorer
 from judgeval.scorers.judgeval_scorer import JudgevalScorer
-from judgeval.scorers.prompt_scorer import PromptScorer, ClassifierScorer
+from judgeval.scorers.prompt_scorer import PromptScorer
 from judgeval.scorers.judgeval_scorers.api_scorers import (
     ExecutionOrderScorer,
     JSONCorrectnessScorer,
@@ -17,6 +17,7 @@ from judgeval.scorers.judgeval_scorers.api_scorers import (
     GroundednessScorer,
     DerailmentScorer,
     ToolOrderScorer,
+    ClassifierScorer,
     ToolDependencyScorer,
 )
 from judgeval.scorers.judgeval_scorers.classifiers import (

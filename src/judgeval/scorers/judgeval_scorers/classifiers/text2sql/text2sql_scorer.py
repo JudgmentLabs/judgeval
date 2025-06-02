@@ -7,7 +7,7 @@ Determines if the LLM-generated SQL query is valid and works for the natural lan
 from judgeval.scorers import ClassifierScorer
 
 Text2SQLScorer = ClassifierScorer(
-    "Text to SQL",
+    name="Text to SQL",
     slug="text2sql-1010101010",
     threshold=1.0,
     conversation=[{

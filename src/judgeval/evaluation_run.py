@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any, Union
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field
 
 from judgeval.data import Example, CustomExample
 from judgeval.scorers import JudgevalScorer, APIJudgmentScorer
@@ -27,12 +27,12 @@ class EvaluationRun(BaseModel):
     # The user will specify whether they want log_results when they call run_eval
     log_results: bool = False  # NOTE: log_results has to be set first because it is used to validate project_name and eval_name
     organization_id: Optional[str] = None
-    project_name: Optional[str] = None
-    eval_name: Optional[str] = None
+    project_name: Optional[str] = Field(default=None, validate_default=True)
+    eval_name: Optional[str] = Field(default=None, validate_default=True)
     examples: Union[List[Example], List[CustomExample]]
     scorers: List[Union[APIJudgmentScorer, JudgevalScorer]]
     model: Optional[Union[str, List[str], JudgevalJudge]] = "gpt-4.1"
-    aggregator: Optional[str] = None
+    aggregator: Optional[str] = Field(default=None, validate_default=True)
     metadata: Optional[Dict[str, Any]] = None
     trace_span_id: Optional[str] = None
     # API Key will be "" until user calls client.run_eval(), then API Key will be set
@@ -96,9 +96,6 @@ class EvaluationRun(BaseModel):
     def validate_scorers(cls, v):
         if not v:
             raise ValueError("Scorers cannot be empty.")
-        for s in v:
-            if not isinstance(s, APIJudgmentScorer) and not isinstance(s, JudgevalScorer):
-                raise ValueError(f"Invalid type for Scorer: {type(s)}")
         return v
 
     @field_validator('model')

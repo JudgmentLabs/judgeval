@@ -18,6 +18,17 @@ from judgeval.judgment_client import JudgmentClient
 from judgeval.data import Example
 
 
+@pytest.fixture
+def mock_validate_api_key(monkeypatch):
+    """Mock the validate_api_key function and organization ID."""
+    def _mock_validate_api_key(judgment_api_key):
+        return True, "Valid API key"
+    
+    monkeypatch.setattr('judgeval.common.utils.validate_api_key', _mock_validate_api_key)
+    monkeypatch.setenv('JUDGMENT_ORG_ID', 'test_org_id')
+    return _mock_validate_api_key
+
+
 class TestNotificationConfig:
     """Tests for the NotificationConfig class."""
     
@@ -295,12 +306,16 @@ class TestNotificationInAlertResults:
         assert results["test_rule"].notification is None
 
 
+@patch('judgeval.judgment_client.validate_api_key')
 @patch('judgeval.judgment_client.run_eval')
 class TestNotificationWithJudgmentClient:
     """Tests for notification with JudgmentClient."""
     
-    def test_judgment_client_with_rules_and_notification(self, mock_run_eval):
+    def test_judgment_client_with_rules_and_notification(self, mock_run_eval, mock_validate_api_key_direct):
         """Test that JudgmentClient works with rules that have notification configs."""
+        
+        # Mock the validate_api_key function directly
+        mock_validate_api_key_direct.return_value = (True, "Valid API key")
         
         # Mock the run_eval function
         mock_result = MagicMock()
@@ -322,7 +337,7 @@ class TestNotificationWithJudgmentClient:
         mock_run_eval.return_value = [mock_result]
         
         # Create client with patched _validate_api_key method
-        client = JudgmentClient(judgment_api_key="test_key")
+        client = JudgmentClient(judgment_api_key="test_key", organization_id="test_org_id")
     
         # Create example
         example = Example(

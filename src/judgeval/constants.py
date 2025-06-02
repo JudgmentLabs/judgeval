@@ -28,6 +28,7 @@ class APIScorer(str, Enum):
     GROUNDEDNESS = "groundedness"
     DERAILMENT = "derailment"
     TOOL_ORDER = "tool_order"
+    CLASSIFIER = "classifier"
     TOOL_DEPENDENCY = "tool_dependency"
     @classmethod
     def _missing_(cls, value):

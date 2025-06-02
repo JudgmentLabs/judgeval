@@ -2,6 +2,7 @@
 base e2e tests for all default judgeval scorers
 """
 import uuid
+from typing import List
 
 from judgeval.judgment_client import JudgmentClient
 from pydantic import BaseModel
@@ -21,6 +22,7 @@ from judgeval.scorers import (
     DerailmentScorer,
     JSONCorrectnessScorer,
     ClassifierScorer,
+    PromptScorer,
 )
 
 from judgeval.data import Example
@@ -573,40 +575,134 @@ def test_json_scorer(client: JudgmentClient):
 def test_classifier_scorer(client: JudgmentClient, random_name: str):
     """Test classifier scorer functionality."""
     random_slug = random_name
-    faithfulness_scorer = FaithfulnessScorer(threshold=0.5)
     
     # Creating a classifier scorer from SDK
-    classifier_scorer_custom = ClassifierScorer(
+    classifier_scorer= ClassifierScorer(
         name="Test Classifier Scorer",
         slug=random_slug,
         threshold=0.5,
         conversation=[],
         options={}
     )
-    
-    classifier_scorer_custom.update_conversation(conversation=[{"role": "user", "content": "What is the capital of France?"}])
-    classifier_scorer_custom.update_options(options={"yes": 1, "no": 0})
-    
-    slug = client.push_classifier_scorer(scorer=classifier_scorer_custom)
-    
-    classifier_scorer_custom = client.fetch_classifier_scorer(slug=slug)
-    
-    example1 = Example(
-        input="What is the capital of France?",
-        actual_output="Paris",
-        retrieval_context=["The capital of France is Paris."],
+
+    # Update the conversation with the helpfulness evaluation template
+    classifier_scorer.update_conversation([
+        {
+            "role": "system",
+            "content": "You are a judge that evaluates whether the response is helpful to the user's question. Consider if the response is relevant, accurate, and provides useful information."
+        },
+        {
+            "role": "user",
+            "content": "Question: {{input}}\nResponse: {{actual_output}}\n\nIs this response helpful?"
+        }
+    ])
+
+    # Update the options with helpfulness classification choices
+    classifier_scorer.update_options({
+        "yes": 1.0,  # Helpful response
+        "no": 0.0    # Unhelpful response
+    })
+
+    # Create test examples
+    helpful_example = Example(
+        input="What's the capital of France?",
+        actual_output="The capital of France is Paris. It's one of the most populous cities in Europe and is known for landmarks like the Eiffel Tower and the Louvre Museum.",
     )
 
+    unhelpful_example = Example(
+        input="What's the capital of France?",
+        actual_output="I don't know much about geography, but I think it might be somewhere in Europe.",
+    )
+
+    # Run evaluation
     res = client.run_evaluation(
-        examples=[example1],
-        scorers=[faithfulness_scorer, classifier_scorer_custom],
+        examples=[helpful_example, unhelpful_example],
+        scorers=[classifier_scorer],
         model="Qwen/Qwen2.5-72B-Instruct-Turbo",
         log_results=True,
-        eval_run_name="ToneScorerTest",
-        project_name="ToneScorerTest",
+        project_name="test-project",
+        eval_run_name="test-run-helpfulness",
         override=True,
     )
-    assert res, "Classifier scorer evaluation failed" 
+
+    # Verify results
+    assert res[0].success == True, "Helpful example should pass classification"
+    assert res[1].success == False, "Unhelpful example should fail classification"
+    
+    # Print debug info if any test fails
+    print_debug_on_failure(res[0])
+    print_debug_on_failure(res[1])
+
+def test_local_prompt_scorer(client: JudgmentClient):
+    """Test custom prompt scorer functionality."""
+    class SentimentScorer(PromptScorer):
+        def _build_measure_prompt(self, example: Example) -> List[dict]:
+            return [
+                {
+                    "role": "system",
+                    "content": "You are a judge that evaluates whether the response has a positive or negative sentiment. Rate the sentiment on a scale of 1-5, where 1 is very negative and 5 is very positive."
+                },
+                {
+                    "role": "user",
+                    "content": f"Response: {example.actual_output}\n\nYour judgment: "
+                }
+            ]
+        
+        def _build_schema(self) -> dict:
+            return {
+                "score": int,
+                "reason": str
+            }
+        
+        def _process_response(self, response: dict):
+            score = response["score"]
+            reason = response["reason"]
+            # Convert 1-5 scale to 0-1 scale
+            normalized_score = (score - 1) / 4
+            self.score = normalized_score
+            return normalized_score, reason
+        
+        def _success_check(self, **kwargs) -> bool:
+            return self.score >= self.threshold
+
+    # Create test examples
+    positive_example = Example(
+        input="How was your day?",
+        actual_output="I had a wonderful day! The weather was perfect and I got to spend time with friends.",
+    )
+
+    negative_example = Example(
+        input="How was your day?",
+        actual_output="It was terrible. Everything went wrong and I'm feeling really down.",
+    )
+
+    # Create and configure the scorer
+    sentiment_scorer = SentimentScorer(
+        name="Sentiment Scorer",
+        threshold=0.5,  # Expect positive sentiment (3 or higher on 1-5 scale)
+        include_reason=True,
+        strict_mode=False,
+        verbose_mode=True
+    )
+
+    # Run evaluation
+    res = client.run_evaluation(
+        examples=[positive_example, negative_example],
+        scorers=[sentiment_scorer],
+        model="Qwen/Qwen2.5-72B-Instruct-Turbo",
+        log_results=True,
+        project_name="test-project",
+        eval_run_name="test-run-sentiment",
+        override=True,
+    )
+
+    # Verify results
+    assert res[0].success == True, "Positive example should pass sentiment check"
+    assert res[1].success == False, "Negative example should fail sentiment check"
+    
+    # Print debug info if any test fails
+    print_debug_on_failure(res[0])
+    print_debug_on_failure(res[1])
 
 def print_debug_on_failure(result) -> bool:
     """

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, AsyncMock
 from typing import List, Any
 
 from judgeval.data import Example
-from judgeval.scorers.prompt_scorer import PromptScorer, ClassifierScorer
+from judgeval.scorers import PromptScorer, ClassifierScorer
 
 # Test fixtures
 @pytest.fixture
@@ -115,53 +115,3 @@ class TestClassifierScorer:
         )
         assert scorer.conversation == classifier_conversation
         assert scorer.options == classifier_options
-        
-    def test_build_measure_prompt(self, example, classifier_conversation, classifier_options):
-        scorer = ClassifierScorer(
-            name="test_classifier",
-            slug="test_classifier_slug",
-            conversation=classifier_conversation,
-            options=classifier_options
-        )
-        
-        prompt = scorer._build_measure_prompt(example)
-        assert "This is a test response" in prompt[0]["content"]
-        
-    def test_process_response(self, classifier_conversation, classifier_options):
-        scorer = ClassifierScorer(
-            name="test_classifier",
-            slug="test_classifier_slug",
-            conversation=classifier_conversation,
-            options=classifier_options
-        )
-        
-        response = {"choice": "positive", "reason": "Test reason"}
-        score, reason = scorer._process_response(response)
-        assert score == 1.0
-        assert reason == "Test reason"
-        
-    def test_process_response_invalid_choice(self, classifier_conversation, classifier_options):
-        scorer = ClassifierScorer(
-            name="test_classifier",
-            slug="test_classifier_slug",
-            conversation=classifier_conversation,
-            options=classifier_options
-        )
-        
-        response = {"choice": "invalid", "reason": "Test reason"}
-        with pytest.raises(ValueError):
-            scorer._process_response(response)
-            
-    def test_success_check(self, classifier_conversation, classifier_options):
-        scorer = ClassifierScorer(
-            name="test_classifier",
-            slug="test_classifier_slug",
-            conversation=classifier_conversation,
-            options=classifier_options
-        )
-        
-        scorer.score = 1.0
-        assert scorer._success_check() is True
-        
-        scorer.score = 0.0
-        assert scorer._success_check() is False

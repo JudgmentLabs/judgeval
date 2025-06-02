@@ -24,7 +24,6 @@ from judgeval.scorers import (
 )
 from judgeval.data.datasets.dataset import EvalDataset
 from pydantic import BaseModel
-from judgeval.scorers.prompt_scorer import ClassifierScorer
 from judgeval.tracer import Tracer
 
 # Initialize a tracer instance for this test file
@@ -327,3 +326,4 @@ examples:
                 log_results=True,
                 override=False,
             )
+            
