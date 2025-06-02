@@ -15,6 +15,7 @@ import uuid
 import warnings
 import contextvars
 import sys
+import json
 from contextlib import contextmanager, asynccontextmanager, AbstractAsyncContextManager, AbstractContextManager # Import context manager bases
 from dataclasses import dataclass, field
 from datetime import datetime
