@@ -13,7 +13,7 @@
 
 [![X](https://img.shields.io/badge/-X/Twitter-000?logo=x&logoColor=white)](https://x.com/JudgmentLabs)
 [![LinkedIn](https://custom-icon-badges.demolab.com/badge/LinkedIn%20-0A66C2?logo=linkedin-white&logoColor=fff)](https://www.linkedin.com/company/judgmentlabs)
-[![Discord](https://img.shields.io/badge/-Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/FMxHkYTtFE)
+[![Discord](https://img.shields.io/badge/-Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/ZCnSXYug)
 
 </div>
 
@@ -28,19 +28,28 @@ We support tracing agents built with LangGraph, OpenAI SDK, Anthropic, ... and a
 Judgeval is created and maintained by [Judgment Labs](https://judgmentlabs.ai/).
 
 ## 📋 Table of Contents
-* [✨ Features](#-features)
-    * [🔍 Tracing](#-tracing)
-    * [🧪 Evals](#-evals)
-    * [📡 Monitoring](#-monitoring)
-    * [📊 Datasets](#-datasets)
-    * [💡 Insights](#-insights)
-* [🛠️ Installation](#️-installation)
-* [🏁 Get Started](#-get-started)
-* [🏢 Self-Hosting](#-self-hosting)
-* [📚 Cookbooks](#-cookbooks)
-* [💻 Development with Cursor](#-development-with-cursor)
-* [⭐ Star Us on GitHub](#-star-us-on-github)
-* [❤️ Contributors](#️-contributors)
+- [🌐 Landing Page  • 📚 Docs • 🚀 Demos](#-landing-page----docs---demos)
+- [Judgeval: open-source testing, monitoring, and optimization for AI agents](#judgeval-open-source-testing-monitoring-and-optimization-for-ai-agents)
+- [📋 Table of Contents](#-table-of-contents)
+- [✨ Features](#-features)
+- [🛠️ Installation](#️-installation)
+- [🏁 Get Started](#-get-started)
+  - [🛰️ Tracing](#️-tracing)
+  - [📝 Offline Evaluations](#-offline-evaluations)
+  - [📡 Online Evaluations](#-online-evaluations)
+- [🏢 Self-Hosting](#-self-hosting)
+  - [Key Features](#key-features)
+  - [Getting Started](#getting-started)
+- [📚 Cookbooks](#-cookbooks)
+  - [Sample Agents](#sample-agents)
+    - [💰 LangGraph Financial QA Agent](#-langgraph-financial-qa-agent)
+    - [✈️ OpenAI Travel Agent](#️-openai-travel-agent)
+  - [Custom Evaluators](#custom-evaluators)
+    - [🔍 PII Detection](#-pii-detection)
+    - [📧 Cold Email Generation](#-cold-email-generation)
+- [💻 Development with Cursor](#-development-with-cursor)
+- [⭐ Star Us on GitHub](#-star-us-on-github)
+- [❤️ Contributors](#️-contributors)
 
 <!-- Created by https://github.com/ekalinin/github-markdown-toc -->
 
