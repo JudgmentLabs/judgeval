@@ -5,7 +5,7 @@ import json
 import os
 import yaml
 from dataclasses import dataclass, field
-from typing import List, Union, Literal
+from typing import List, Union, Literal, Optional
 
 from judgeval.data import Example, Trace
 from judgeval.common.logger import debug, error, warning, info
@@ -21,14 +21,13 @@ class EvalDataset:
     def __init__(self, 
                  judgment_api_key: str = os.getenv("JUDGMENT_API_KEY"),  
                  organization_id: str = os.getenv("JUDGMENT_ORG_ID"),
-                 examples: List[Example] = [],
-                 traces: List[Trace] = []
+                 examples: Optional[List[Example]] = None,
+                 traces: Optional[List[Trace]] = None
                  ):
-        debug(f"Initializing EvalDataset with {len(examples)} examples")
         if not judgment_api_key:
             warning("No judgment_api_key provided")
-        self.examples = examples
-        self.traces = traces
+        self.examples = examples or []
+        self.traces = traces or []
         self._alias = None
         self._id = None
         self.judgment_api_key = judgment_api_key
