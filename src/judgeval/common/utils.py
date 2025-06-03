@@ -12,9 +12,10 @@ NOTE: any function beginning with 'a', e.g. 'afetch_together_api_response', is a
 import asyncio
 import concurrent.futures
 import os
+from types import TracebackType
 import requests
 import pprint
-from typing import Any, Dict, List, Literal, Mapping, Optional, Union
+from typing import Any, Dict, List, Literal, Mapping, Optional, TypeAlias, Union
 
 # Third-party imports
 import litellm
@@ -782,3 +783,6 @@ if __name__ == "__main__":
             ]
         ]
     ))
+    
+ExcInfo: TypeAlias = tuple[type[BaseException], BaseException, TracebackType]
+OptExcInfo: TypeAlias = ExcInfo | tuple[None, None, None]

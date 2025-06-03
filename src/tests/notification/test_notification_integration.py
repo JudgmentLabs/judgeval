@@ -291,7 +291,7 @@ class TestNotificationWithAPICalls:
         rule = Rule(
             name="Faithfulness Rule",
             conditions=[
-                Condition(metric=FaithfulnessScorer(threshold=0.7))
+                Condition(metric=AnswerRelevancyScorer(threshold=0.7))
             ],
             combine_type="all",
             notification=notification
@@ -300,7 +300,7 @@ class TestNotificationWithAPICalls:
         # Run evaluation
         result = client.run_evaluation(
             examples=[example],
-            scorers=[FaithfulnessScorer(threshold=0.7)],
+            scorers=[AnswerRelevancyScorer(threshold=0.7)],
             model="gpt-3.5-turbo",
             rules=[rule]
         )
@@ -402,7 +402,7 @@ class TestNotificationWithAPICalls:
         rule = Rule(
             name="Faithfulness Rule",
             conditions=[
-                Condition(metric=FaithfulnessScorer(threshold=0.7))
+                Condition(metric=AnswerRelevancyScorer(threshold=0.7))
             ],
             combine_type="all",
             notification=notification
@@ -411,7 +411,7 @@ class TestNotificationWithAPICalls:
         # Run evaluation
         result = client.run_evaluation(
             examples=[example],
-            scorers=[FaithfulnessScorer(threshold=0.7)],
+            scorers=[AnswerRelevancyScorer(threshold=0.7)],
             model="gpt-3.5-turbo",
             rules=[rule]
         )

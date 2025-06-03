@@ -5,7 +5,6 @@ Tracing system for judgeval that allows for function tracing using decorators.
 import asyncio
 import functools
 import inspect
-import json
 import os
 import site
 import sysconfig
@@ -16,6 +15,7 @@ import uuid
 import warnings
 import contextvars
 import sys
+import json
 from contextlib import contextmanager, asynccontextmanager, AbstractAsyncContextManager, AbstractContextManager # Import context manager bases
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -29,20 +29,16 @@ from typing import (
     Literal,
     Optional,
     Tuple,
-    Type,
-    TypeVar,
     Union,
     AsyncGenerator,
     TypeAlias,
-    Set
 )
 from rich import print as rprint
-import types # <--- Add this import
+import types
 
 # Third-party imports
 import requests
 from litellm import cost_per_token as _original_cost_per_token
-from pydantic import BaseModel
 from rich import print as rprint
 from openai import OpenAI, AsyncOpenAI
 from together import Together, AsyncTogether
@@ -64,8 +60,7 @@ from judgeval.data import Example, Trace, TraceSpan, TraceUsage
 from judgeval.scorers import APIJudgmentScorer, JudgevalScorer
 from judgeval.rules import Rule
 from judgeval.evaluation_run import EvaluationRun
-from judgeval.data.result import ScoringResult
-from judgeval.common.utils import validate_api_key
+from judgeval.common.utils import ExcInfo, validate_api_key
 from judgeval.common.exceptions import JudgmentAPIError
 
 # Standard library imports needed for the new class
@@ -562,7 +557,7 @@ class TraceClient:
         # Removed else block - original didn't have one
         return None # Return None if no span_id found
     
-    def record_error(self, error: Any):
+    def record_error(self, error: Dict[str, Any]):
         current_span_id = current_span_var.get()
         if current_span_id:
             span = self.span_id_to_span[current_span_id]
@@ -621,7 +616,7 @@ class TraceClient:
     def delete(self):
         return self.trace_manager_client.delete_trace(self.trace_id)
     
-def _capture_exception_for_trace(current_trace: Optional['TraceClient'], exc_info: Tuple[Optional[type], Optional[BaseException], Optional[types.TracebackType]]):
+def _capture_exception_for_trace(current_trace: Optional['TraceClient'], exc_info: ExcInfo):
     if not current_trace:
         return
 
@@ -631,6 +626,27 @@ def _capture_exception_for_trace(current_trace: Optional['TraceClient'], exc_inf
         "message": str(exc_value) if exc_value else "No exception message",
         "traceback": traceback.format_tb(exc_traceback_obj) if exc_traceback_obj else []
     }
+    
+    # This is where we specially handle exceptions that we might want to collect additional data for.
+    # When we do this, always try checking the module from sys.modules instead of importing. This will
+    # Let us support a wider range of exceptions without needing to import them for all clients.
+    
+    # Most clients (requests, httpx, urllib) support the standard format of exposing error.request.url and error.response.status_code 
+    # The alternative is to hand select libraries we want from sys.modules and check for them:
+    # As an example:  requests_module = sys.modules.get("requests", None) // then do things with requests_module;
+
+     # General HTTP Like errors
+    try:
+        url = getattr(getattr(exc_value, "request", None), "url", None)
+        status_code = getattr(getattr(exc_value, "response", None), "status_code", None)
+        if status_code:
+            formatted_exception["http"] = {
+                "url": url if url else "Unknown URL",
+                "status_code": status_code if status_code else None,
+            }
+    except Exception as e:
+        pass
+
     current_trace.record_error(formatted_exception)
 class _DeepTracer:
     _instance: Optional["_DeepTracer"] = None
@@ -1476,13 +1492,6 @@ def wrap(client: Any) -> Any:
             span.record_usage(usage)
             return response
     
-    def _handle_error(span, e, is_async):
-        """Handle and record errors"""
-        call_type = "async" if is_async else "sync"
-        print(f"Error during wrapped {call_type} API call ({span_name}): {e}")
-        span.record_output({"error": str(e)})
-        raise
-    
     # --- Traced Async Functions ---
     async def traced_create_async(*args, **kwargs):
         current_trace = current_trace_var.get()
@@ -1496,7 +1505,8 @@ def wrap(client: Any) -> Any:
                 response_or_iterator = await original_create(*args, **kwargs)
                 return _format_and_record_output(span, response_or_iterator, is_streaming, True, False)
             except Exception as e:
-                return _handle_error(span, e, True)
+                _capture_exception_for_trace(span, sys.exc_info())
+                raise e
     
     # Async responses for OpenAI clients
     async def traced_response_create_async(*args, **kwargs):
@@ -1511,7 +1521,8 @@ def wrap(client: Any) -> Any:
                 response_or_iterator = await original_responses_create(*args, **kwargs)
                 return _format_and_record_output(span, response_or_iterator, is_streaming, True, True)
             except Exception as e:
-                return _handle_error(span, e, True)
+                _capture_exception_for_trace(span, sys.exc_info())
+                raise e
     
     # Function replacing .stream() for async clients
     def traced_stream_async(*args, **kwargs):
@@ -1542,7 +1553,8 @@ def wrap(client: Any) -> Any:
                 response_or_iterator = original_create(*args, **kwargs)
                 return _format_and_record_output(span, response_or_iterator, is_streaming, False, False)
             except Exception as e:
-                return _handle_error(span, e, False)
+                _capture_exception_for_trace(span, sys.exc_info())
+                raise e
     
     def traced_response_create_sync(*args, **kwargs):
         current_trace = current_trace_var.get()
@@ -1556,7 +1568,8 @@ def wrap(client: Any) -> Any:
                 response_or_iterator = original_responses_create(*args, **kwargs)
                 return _format_and_record_output(span, response_or_iterator, is_streaming, False, True)
             except Exception as e:
-                return _handle_error(span, e, False)
+                _capture_exception_for_trace(span, sys.exc_info())
+                raise e
     
     # Function replacing sync .stream()
     def traced_stream_sync(*args, **kwargs):

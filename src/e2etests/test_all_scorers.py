@@ -26,7 +26,7 @@ from judgeval.scorers import (
 )
 
 from judgeval.data import Example
-
+from judgeval.data.example import ExampleParams
 
 def test_ac_scorer(client: JudgmentClient):
     
@@ -682,7 +682,8 @@ def test_local_prompt_scorer(client: JudgmentClient):
         threshold=0.5,  # Expect positive sentiment (3 or higher on 1-5 scale)
         include_reason=True,
         strict_mode=False,
-        verbose_mode=True
+        verbose_mode=True,
+        required_params=[ExampleParams.INPUT, ExampleParams.ACTUAL_OUTPUT]
     )
 
     # Run evaluation

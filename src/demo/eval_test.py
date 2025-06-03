@@ -1,6 +1,6 @@
 from judgeval.judgment_client import JudgmentClient
 from judgeval.data.example import Example
-from judgeval.scorers import AnswerRelevancyScorer
+from judgeval.scorers import AnswerRelevancyScorer, FaithfulnessScorer
 from judgeval.common.tracer import Tracer
 
 judgment = JudgmentClient()
@@ -9,7 +9,7 @@ judgment = JudgmentClient()
 qa_pairs = [
     ("What is the capital of France?", "Paris"),
     ("What is the largest planet in our solar system?", "Jupiter"),
-    # ("Who wrote 'Romeo and Juliet'?", "William Shakespeare"),
+    ("Who wrote 'Romeo and Juliet'?", "William Shakespeare"),
     # ("What is the chemical symbol for gold?", "Au"),
     # ("What is the square root of 144?", "12"),
     # ("Who painted the Mona Lisa?", "Leonardo da Vinci"),
@@ -61,10 +61,10 @@ qa_pairs = [
 
 # Create a list of Example objects
 examples = [Example(input=question, actual_output=answer) for question, answer in qa_pairs]
-for example in examples:
-    print(example.model_dump())
+
+
 judgment.run_evaluation(
     examples=examples,
-    scorers=[AnswerRelevancyScorer(threshold=0.5)],
-    append=True
+    scorers=[AnswerRelevancyScorer(threshold=0.5), FaithfulnessScorer(threshold=0.5)],
+    override=True
 )
