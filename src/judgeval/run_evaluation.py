@@ -1,6 +1,7 @@
 import asyncio
 import requests
 import time
+import json
 import sys
 import itertools
 import threading
@@ -362,14 +363,26 @@ def check_examples(examples: List[Example], scorers: List[Union[APIJudgmentScore
     """
     Checks if the example contains the necessary parameters for the scorer.
     """
+    prompt_user = False
     for scorer in scorers:
         for example in examples:
             missing_params = []
             for param in scorer.required_params:
                 if getattr(example, param.value) is None:
-                    missing_params.append(f"'{param.value}'")
+                    missing_params.append(f"{param.value}")
             if missing_params:
-                print(f"WARNING: Example {example.example_id} is missing the following parameters: {missing_params} for scorer {scorer.score_type.value}")
+                rprint(f"[yellow]⚠️  WARNING:[/yellow] Example is missing required parameters for scorer [bold]{scorer.score_type.value}[/bold]")
+                rprint(f"Missing parameters: {', '.join(missing_params)}")
+                rprint(f"Example: {json.dumps(example.model_dump(), indent=2)}")
+                rprint("-"*40)
+                prompt_user = True
+
+    if prompt_user:
+        user_input = input("Do you want to continue? (y/n)")
+        if user_input.lower() != "y":
+            sys.exit(0)  
+        else:
+            rprint("[green]Continuing...[/green]")
 
 def run_trace_eval(trace_run: TraceRun, override: bool = False, ignore_errors: bool = True, function: Optional[Callable] = None, tracer: Optional[Union[Tracer, BaseCallbackHandler]] = None, examples: Optional[List[Example]] = None) -> List[ScoringResult]:
     # Call endpoint to check to see if eval run name exists (if we DON'T want to override and DO want to log results)
@@ -894,6 +907,7 @@ def run_eval(evaluation_run: EvaluationRun, override: bool = False, ignore_error
             f"Processing evaluation '{evaluation_run.eval_name}': "
         )
     else:
+        check_examples(evaluation_run.examples, evaluation_run.scorers)
         if judgment_scorers:
             # Execute evaluation using Judgment API
             info("Starting API evaluation")
