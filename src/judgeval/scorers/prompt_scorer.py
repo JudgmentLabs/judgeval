@@ -30,6 +30,7 @@ from typing import List, Optional, Tuple, Any, Mapping
 from pydantic import BaseModel, model_serializer, Field
 
 from judgeval.data import Example
+from judgeval.data.example import ExampleParams
 from judgeval.scorers import JudgevalScorer
 from judgeval.scorers.utils import (
     scorer_progress_meter, 
@@ -64,6 +65,7 @@ class PromptScorer(JudgevalScorer, BaseModel):
         async_mode: bool = True,
         strict_mode: bool = False,
         verbose_mode: bool = False,
+        required_params: Optional[List[ExampleParams]] = None,
     ):
         # Initialize BaseModel first
         BaseModel.__init__(
@@ -85,6 +87,7 @@ class PromptScorer(JudgevalScorer, BaseModel):
             async_mode=async_mode,
             strict_mode=strict_mode,
             verbose_mode=verbose_mode,
+            required_params=required_params,
         )
 
     def score_example(
