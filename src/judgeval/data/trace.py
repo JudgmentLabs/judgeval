@@ -117,7 +117,7 @@ class Trace(BaseModel):
     name: str
     created_at: str
     duration: float
-    entries: List[TraceSpan]
+    trace_spans: List[TraceSpan]
     overwrite: bool = False
     offline_mode: bool = False
     rules: Optional[Dict[str, Any]] = None

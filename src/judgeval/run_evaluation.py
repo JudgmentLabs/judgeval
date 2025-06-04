@@ -420,7 +420,7 @@ def run_trace_eval(trace_run: TraceRun, override: bool = False, ignore_errors: b
         for i, trace in enumerate(tracer.traces):
             # We set the root-level trace span with the expected tools of the Trace
             trace = Trace(**trace)
-            trace.entries[0].expected_tools = examples[i].expected_tools
+            trace.trace_spans[0].expected_tools = examples[i].expected_tools
             new_traces.append(trace)
         trace_run.traces = new_traces
         tracer.traces = []

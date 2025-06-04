@@ -596,7 +596,7 @@ class TraceClient:
             "project_name": self.project_name,
             "created_at": datetime.utcfromtimestamp(self.start_time).isoformat(),
             "duration": total_duration,
-            "entries": [span.model_dump() for span in self.trace_spans],
+            "trace_spans": [span.model_dump() for span in self.trace_spans],
             "evaluation_runs": [run.model_dump() for run in self.evaluation_runs],
             "overwrite": overwrite,
             "offline_mode": self.tracer.offline_mode,

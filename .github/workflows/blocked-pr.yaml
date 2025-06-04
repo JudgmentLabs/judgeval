@@ -6,6 +6,7 @@ on:
       - opened
       - labeled
       - unlabeled
+      - synchronize
 
 jobs:
   fail-for-blocked:

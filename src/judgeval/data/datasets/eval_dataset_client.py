@@ -13,7 +13,7 @@ from judgeval.constants import (
     JUDGMENT_DATASETS_INSERT_API_URL,
     JUDGMENT_DATASETS_EXPORT_JSONL_API_URL
 )
-from judgeval.data import Example
+from judgeval.data import Example, Trace
 from judgeval.data.datasets import EvalDataset
 
 
@@ -58,6 +58,7 @@ class EvalDatasetClient:
                     "dataset_alias": alias,
                     "project_name": project_name,
                     "examples": [e.to_dict() for e in dataset.examples],
+                    "traces": [t.model_dump() for t in dataset.traces],
                     "overwrite": overwrite,
                 }
             try:
@@ -202,6 +203,7 @@ class EvalDatasetClient:
                 info(f"Successfully pulled dataset with alias '{alias}'")
                 payload = response.json()
                 dataset.examples = [Example(**e) for e in payload.get("examples", [])]
+                dataset.traces = [Trace(**t) for t in payload.get("traces", [])]
                 dataset._alias = payload.get("alias")
                 dataset._id = payload.get("id")
                 progress.update(
