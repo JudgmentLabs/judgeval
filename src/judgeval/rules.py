@@ -12,10 +12,8 @@ import uuid
 
 from judgeval.scorers import APIJudgmentScorer, JudgevalScorer
 
-class AlertStatus(str, Enum):
-    """Status of an alert evaluation."""
-    TRIGGERED = "triggered"
-    NOT_TRIGGERED = "not_triggered"
+# Alert status - using boolean instead of string enum
+AlertStatus = bool  # True = triggered, False = not triggered
 
 class Condition(BaseModel):
     """
@@ -205,7 +203,7 @@ class AlertResult(BaseModel):
     
     Example:
         {
-            "status": "triggered",
+            "status": true,
             "rule_name": "Quality Check",
             "conditions_result": [
                 {"metric": "faithfulness", "value": 0.6, "threshold": 0.7, "passed": False},
@@ -220,15 +218,19 @@ class AlertResult(BaseModel):
                 "enabled": true,
                 "communication_methods": ["slack", "email"],
                 "email_addresses": ["user1@example.com", "user2@example.com"]
-            }
+            },
+            "combined_type": "all"
         }
     """
-    status: AlertStatus
+    status: bool  # Changed to pure boolean
     rule_id: Optional[str] = None  # The unique identifier of the rule
     rule_name: str
     conditions_result: List[Dict[str, Any]]
     metadata: Dict[str, Any] = {}
-    notification: Optional[NotificationConfig] = None  # Configuration for notifications
+    notification: Optional[NotificationConfig] = None
+    combined_type: Optional[str] = None  # Changed from types to combined_type
+    project_id: Optional[str] = None  # Added project_id
+    trace_span_id: Optional[str] = None  # Added trace_span_id
     
     @property
     def example_id(self) -> Optional[str]:
@@ -239,6 +241,10 @@ class AlertResult(BaseModel):
     def timestamp(self) -> Optional[str]:
         """Get timestamp from metadata for backward compatibility"""
         return self.metadata.get("timestamp")
+    
+    def model_dump(self, **kwargs):
+        """Convert the AlertResult to a dictionary - status is already boolean."""
+        return super().model_dump(**kwargs)
 
 class RulesEngine:
     """
@@ -407,7 +413,7 @@ class RulesEngine:
                 notification_config = rule.notification
             
             # Set the alert status based on whether the rule was triggered
-            status = AlertStatus.TRIGGERED if triggered else AlertStatus.NOT_TRIGGERED
+            status = triggered  # Now using boolean directly
             
             # Create the alert result
             alert_result = AlertResult(
@@ -416,7 +422,10 @@ class RulesEngine:
                 rule_name=rule.name,
                 conditions_result=condition_results,
                 notification=notification_config,
-                metadata=example_metadata or {}
+                metadata=example_metadata or {},
+                combined_type=rule.combine_type,
+                project_id=example_metadata.get("project_id") if example_metadata else None,
+                trace_span_id=example_metadata.get("trace_span_id") if example_metadata else None
             )
             
             results[rule_id] = alert_result
