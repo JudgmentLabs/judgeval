@@ -3,7 +3,8 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
-from judgeval.rules import Rule, Condition, RulesEngine, AlertStatus
+from judgeval.rules import Rule, Condition, RulesEngine
+from judgeval.utils.alerts import AlertStatus
 from judgeval.scorers.judgeval_scorers.api_scorers.faithfulness import FaithfulnessScorer
 from judgeval.scorers.judgeval_scorers.api_scorers.answer_relevancy import AnswerRelevancyScorer
 from judgeval.judgment_client import JudgmentClient

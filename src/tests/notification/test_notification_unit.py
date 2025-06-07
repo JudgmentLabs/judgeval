@@ -9,9 +9,9 @@ from judgeval.rules import (
     Rule, 
     Condition, 
     RulesEngine, 
-    AlertStatus, 
     NotificationConfig
 )
+from judgeval.utils.alerts import AlertStatus
 from judgeval.scorers.judgeval_scorers.api_scorers.faithfulness import FaithfulnessScorer
 from judgeval.scorers.judgeval_scorers.api_scorers.answer_relevancy import AnswerRelevancyScorer
 from judgeval.judgment_client import JudgmentClient

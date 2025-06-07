@@ -18,7 +18,7 @@ import sys
 import json
 from contextlib import contextmanager, asynccontextmanager, AbstractAsyncContextManager, AbstractContextManager # Import context manager bases
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from http import HTTPStatus
 from typing import (
     Any,
@@ -594,7 +594,7 @@ class TraceClient:
             "trace_id": self.trace_id,
             "name": self.name,
             "project_name": self.project_name,
-            "created_at": datetime.utcfromtimestamp(self.start_time).isoformat(),
+            "created_at": datetime.fromtimestamp(self.start_time, timezone.utc).isoformat(),
             "duration": total_duration,
             "trace_spans": [span.model_dump() for span in self.trace_spans],
             "evaluation_runs": [run.model_dump() for run in self.evaluation_runs],
