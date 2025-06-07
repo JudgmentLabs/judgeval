@@ -387,7 +387,7 @@ class RulesEngine:
                 conditions_result=condition_results,
                 notification=notification_config,
                 metadata=example_metadata or {},
-                combined_type=rule.combine_type,
+                combine_type=rule.combine_type,
                 project_id=example_metadata.get("project_id") if example_metadata else None,
                 trace_span_id=example_metadata.get("trace_span_id") if example_metadata else None
             )
