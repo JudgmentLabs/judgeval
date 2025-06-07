@@ -9,11 +9,13 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import time
 import uuid
+import os
+import re
+import json
+from datetime import datetime
 
 from judgeval.scorers import APIJudgmentScorer, JudgevalScorer
-
-# Alert status - using boolean instead of string enum
-AlertStatus = bool  # True = triggered, False = not triggered
+from judgeval.utils.alerts import AlertStatus, AlertResult
 
 class Condition(BaseModel):
     """
@@ -208,55 +210,6 @@ class Rule(BaseModel):
             raise ValueError(f"combine_type must be 'all' or 'any', got: {v}")
         return v
 
-class AlertResult(BaseModel):
-    """
-    Result of evaluating a rule.
-    
-    Example:
-        {
-            "status": true,
-            "rule_name": "Quality Check",
-            "conditions_result": [
-                {"metric": "faithfulness", "value": 0.6, "threshold": 0.7, "passed": False},
-                {"metric": "relevancy", "value": 0.9, "threshold": 0.8, "passed": True}
-            ],
-            "rule_id": "123e4567-e89b-12d3-a456-426614174000",
-            "metadata": {
-                "example_id": "example_123",
-                "timestamp": "20240321_123456"
-            },
-            "notification": {
-                "enabled": true,
-                "communication_methods": ["slack", "email"],
-                "email_addresses": ["user1@example.com", "user2@example.com"]
-            },
-            "combined_type": "all"
-        }
-    """
-    status: bool  # Changed to pure boolean
-    rule_id: Optional[str] = None  # The unique identifier of the rule
-    rule_name: str
-    conditions_result: List[Dict[str, Any]]
-    metadata: Dict[str, Any] = {}
-    notification: Optional[NotificationConfig] = None
-    combined_type: Optional[str] = None  # Changed from types to combined_type
-    project_id: Optional[str] = None  # Added project_id
-    trace_span_id: Optional[str] = None  # Added trace_span_id
-    
-    @property
-    def example_id(self) -> Optional[str]:
-        """Get example_id from metadata for backward compatibility"""
-        return self.metadata.get("example_id")
-        
-    @property
-    def timestamp(self) -> Optional[str]:
-        """Get timestamp from metadata for backward compatibility"""
-        return self.metadata.get("timestamp")
-    
-    def model_dump(self, **kwargs):
-        """Convert the AlertResult to a dictionary - status is already boolean."""
-        return super().model_dump(**kwargs)
-
 class RulesEngine:
     """
     Engine for creating and evaluating rules against metrics.
@@ -423,8 +376,8 @@ class RulesEngine:
                 # If rule has a notification config and the alert is triggered, include it in the result
                 notification_config = rule.notification
             
-            # Set the alert status based on whether the rule was triggered
-            status = triggered  # Now using boolean directly
+            # Set the alert status based on whether the rule was triggered using proper enum values
+            status = AlertStatus.TRIGGERED if triggered else AlertStatus.NOT_TRIGGERED
             
             # Create the alert result
             alert_result = AlertResult(

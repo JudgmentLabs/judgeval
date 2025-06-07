@@ -8,10 +8,9 @@ from typing import Dict, List, Any, Optional
 from judgeval.rules import (
     Rule, 
     Condition, 
-    NotificationConfig,
-    AlertStatus,
-    AlertResult
+    NotificationConfig
 )
+from judgeval.utils.alerts import AlertStatus, AlertResult
 from judgeval.scorers.judgeval_scorers.api_scorers.faithfulness import FaithfulnessScorer
 from judgeval.scorers.judgeval_scorers.api_scorers.answer_relevancy import AnswerRelevancyScorer
 
