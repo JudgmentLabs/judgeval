@@ -142,7 +142,8 @@ class Rule(BaseModel):
                     # Create standardized metric representation needed by server API
                     metric_data = {
                         "score_type": "",
-                        "threshold": 0.0
+                        "threshold": 0.0,
+                        "name": ""
                     }
                     
                     # First try to use object's own serialization methods
@@ -179,6 +180,16 @@ class Rule(BaseModel):
                         else:
                             # Use condition threshold if metric doesn't have one
                             metric_data['threshold'] = self.conditions[i].threshold
+                    
+                    # Make sure name is set
+                    if not metric_data.get('name'):
+                        if hasattr(metric_obj, '__name__'):
+                            metric_data['name'] = metric_obj.__name__
+                        elif hasattr(metric_obj, 'name'):
+                            metric_data['name'] = metric_obj.name
+                        else:
+                            # Fallback to score_type if available
+                            metric_data['name'] = metric_data.get('score_type', str(metric_obj))
                     
                     # Update the condition with our properly serialized metric
                     condition["metric"] = metric_data
