@@ -1,6 +1,6 @@
 [project]
 name = "judgeval"
-version = "<version_placeholder>"
+version = "0.0.1"
 authors = [
     { name="Andrew Li", email="andrew@judgmentlabs.ai" },
     { name="Alex Shan", email="alex@judgmentlabs.ai" },
@@ -45,6 +45,17 @@ packages = ["src/judgeval"]
 include = [
     "/src/judgeval",
     "/src/judgeval/**/*.py",
+]
+
+[dependency-groups]
+dev = [
+    "chromadb>=1.0.12",
+    "langchain-community>=0.3.24",
+    "pytest>=8.4.0",
+    "pytest-asyncio>=1.0.0",
+    "pytest-cov>=6.1.1",
+    "pytest-mock>=3.14.1",
+    "tavily-python>=0.7.5",
 ]
 
 [tool.hatch.build]
