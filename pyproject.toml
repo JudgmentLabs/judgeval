@@ -1,6 +1,6 @@
 [project]
 name = "judgeval"
-version = "0.0.1"
+version = "0.0.0"
 authors = [
     { name="Andrew Li", email="andrew@judgmentlabs.ai" },
     { name="Alex Shan", email="alex@judgmentlabs.ai" },
@@ -56,6 +56,7 @@ dev = [
     "pytest-cov>=6.1.1",
     "pytest-mock>=3.14.1",
     "tavily-python>=0.7.5",
+    "langgraph>=0.4.3",
 ]
 
 [tool.hatch.build]

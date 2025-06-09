@@ -5,7 +5,7 @@ if len(sys.argv) != 2:
     sys.exit(1)
 
 new_version = sys.argv[1]
-version_placeholder = "<version_placeholder>"
+version_placeholder = "0.0.0"
 found = False
 
 try:

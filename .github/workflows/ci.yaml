@@ -36,14 +36,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pipenv
-          pipenv install --dev
+          pip install uv
+          uv sync --dev
           
 
       - name: Run tests
         run: |
           cd src
-          pipenv run pytest tests
+          uv run pytest tests
 
   run-e2e-tests:
     if: "!contains(github.actor, '[bot]')"  # Exclude if the actor is a bot
@@ -76,8 +76,8 @@ jobs:
          
       - name: Install judgeval dependencies
         run: |
-          pip install pipenv
-          pipenv install --dev
+          pip install uv
+          uv sync --dev
 
       - name: Check if server is running
         run: |
@@ -93,7 +93,7 @@ jobs:
         run: |      
           SECRET_VARS=$(aws secretsmanager get-secret-value --secret-id gh-actions-judgeval/api-keys/judgeval --query SecretString --output text)
           export $(echo "$SECRET_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
-          timeout ${TEST_TIMEOUT_SECONDS}s pipenv run pytest --durations=0 --cov=. --cov-config=.coveragerc --cov-report=html ./e2etests
+          timeout ${TEST_TIMEOUT_SECONDS}s uv run pytest --durations=0 --cov=. --cov-config=.coveragerc --cov-report=html ./e2etests
 
       - name: Upload coverage HTML report
         if: always()
