@@ -333,15 +333,15 @@ class TraceClient:
 
     def get_current_span(self):
         """Get the current span from the context var"""
-        return current_span_var.get()
+        return self.tracer.get_current_span()
     
     def set_current_span(self, span: Any):
         """Set the current span from the context var"""
-        return current_span_var.set(span)
+        return self.tracer.set_current_span(span)
     
     def reset_current_span(self, token: Any):
         """Reset the current span from the context var"""
-        return current_span_var.reset(token)
+        self.tracer.reset_current_span(token)
         
     @contextmanager
     def span(self, name: str, span_type: SpanType = "span"):
@@ -351,8 +351,8 @@ class TraceClient:
         # Generate a unique ID for *this specific span invocation*
         span_id = str(uuid.uuid4())
         
-        parent_span_id = current_span_var.get() # Get ID of the parent span from context var
-        token = current_span_var.set(span_id) # Set *this* span's ID as the current one
+        parent_span_id = self.get_current_span() # Get ID of the parent span from context var
+        token = self.set_current_span(span_id) # Set *this* span's ID as the current one
         
         current_depth = 0
         if parent_span_id and parent_span_id in self._span_depths:
@@ -381,7 +381,7 @@ class TraceClient:
             if span_id in self._span_depths:
                 del self._span_depths[span_id]
             # Reset context var
-            current_span_var.reset(token)
+            self.reset_current_span(token)
 
     def async_evaluate(
         self,
@@ -657,6 +657,9 @@ class _DeepTracer:
     _original_sys_trace: Optional[Callable] = None
     _original_threading_trace: Optional[Callable] = None
 
+    def __init__(self, tracer: 'Tracer'):
+        self._tracer = tracer
+
     def _get_qual_name(self, frame) -> str:
         func_name = frame.f_code.co_name
         module_name = frame.f_globals.get("__name__", "unknown_module")
@@ -670,7 +673,7 @@ class _DeepTracer:
         except Exception:
             return f"{module_name}.{func_name}"
     
-    def __new__(cls):
+    def __new__(cls, tracer: 'Tracer' = None):
         with cls._lock:
             if cls._instance is None:
                 cls._instance = super().__new__(cls)
@@ -822,7 +825,7 @@ class _DeepTracer:
             })
             self._span_stack.set(span_stack)
             
-            token = current_span_var.set(span_id)
+            token = self._tracer.set_current_span(span_id)
             frame.f_locals["_judgment_span_token"] = token
             
             span = TraceSpan(
@@ -856,7 +859,7 @@ class _DeepTracer:
             if not span_stack:
                 return
                 
-            current_id = current_span_var.get()
+            current_id = self._tracer.get_current_span()
             
             span_data = None
             for i, entry in enumerate(reversed(span_stack)):
@@ -881,12 +884,12 @@ class _DeepTracer:
                 del current_trace._span_depths[span_data["span_id"]]
                 
             if span_stack:
-                current_span_var.set(span_stack[-1]["span_id"])
+                self._tracer.set_current_span(span_stack[-1]["span_id"])
             else:
-                current_span_var.set(span_data["parent_span_id"])
+                self._tracer.set_current_span(span_data["parent_span_id"])
             
             if "_judgment_span_token" in frame.f_locals:
-                current_span_var.reset(frame.f_locals["_judgment_span_token"])
+                self._tracer.reset_current_span(frame.f_locals["_judgment_span_token"])
 
         elif event == "exception":
             exc_type = arg[0]
@@ -925,17 +928,27 @@ class _DeepTracer:
                 self._original_threading_trace = None
 
 
-def log(self, message: str, level: str = "info"):
-        """ Log a message with the span context """
-        current_trace = current_trace_var.get()
-        if current_trace:
-            current_trace.log(message, level)
-        else:
-            print(f"[{level}] {message}")
-        current_trace.record_output({"log": message})
+# Below commented out function isn't used anymore?
+
+# def log(self, message: str, level: str = "info"): 
+#         """ Log a message with the span context """
+#         current_trace = self._tracer.get_current_trace()
+#         if current_trace:
+#             current_trace.log(message, level)
+#         else:
+#             print(f"[{level}] {message}")
+#         current_trace.record_output({"log": message})
     
 class Tracer:
     _instance = None
+
+    # Tracer.current_trace class variable is currently used in wrap()
+    # TODO: Keep track of cross-context state for current trace and current span ID solely through class variables instead of instance variables?
+    # Should be fine to do so as long as we keep Tracer as a singleton
+    current_trace: Optional[TraceClient] = None
+    # current_span_id: Optional[str] = None
+
+    trace_across_async_contexts: bool = False # BY default, we don't trace across async contexts
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
@@ -957,7 +970,8 @@ class Tracer:
         s3_aws_secret_access_key: Optional[str] = None,
         s3_region_name: Optional[str] = None,
         offline_mode: bool = False,
-        deep_tracing: bool = True  # Deep tracing is enabled by default
+        deep_tracing: bool = True,  # Deep tracing is enabled by default
+        trace_across_async_contexts: bool = False # BY default, we don't trace across async contexts
         ):
         if not hasattr(self, 'initialized'):
             if not api_key:
@@ -975,14 +989,18 @@ class Tracer:
             self.api_key: str = api_key
             self.project_name: str = project_name or str(uuid.uuid4())
             self.organization_id: str = organization_id
-            self._current_trace: Optional[str] = None
-            self._active_trace_client: Optional[TraceClient] = None # Add active trace client attribute
             self.rules: List[Rule] = rules or []  # Store rules at tracer level
             self.traces: List[Trace] = []
             self.initialized: bool = True
             self.enable_monitoring: bool = enable_monitoring
             self.enable_evaluations: bool = enable_evaluations
             self.class_identifiers: Dict[str, str] = {}  # Dictionary to store class identifiers
+            self.span_id_to_previous_span_id: Dict[str, str] = {}
+            self.trace_id_to_previous_trace: Dict[str, TraceClient] = {}
+            self.current_span_id: Optional[str] = None
+            self.current_trace: Optional[TraceClient] = None
+            self.trace_across_async_contexts: bool = trace_across_async_contexts
+            Tracer.trace_across_async_contexts = trace_across_async_contexts
 
             # Initialize S3 storage if enabled
             self.use_s3 = use_s3
@@ -1006,16 +1024,42 @@ class Tracer:
             )
 
     def set_current_span(self, span_id: str):
+        self.span_id_to_previous_span_id[span_id] = getattr(self, 'current_span_id', None)
         self.current_span_id = span_id
+        Tracer.current_span_id = span_id
+        try:
+            token = current_span_var.set(span_id)
+        except:
+            token = None
+        return token
     
     def get_current_span(self) -> Optional[str]:
-        return getattr(self, 'current_span_id', None)
+        try:
+            current_span_var_val = current_span_var.get()
+        except:
+            current_span_var_val = None
+        return (self.current_span_id or current_span_var_val) if self.trace_across_async_contexts else current_span_var_val
+    
+    def reset_current_span(self, token: Optional[str] = None, span_id: Optional[str] = None):
+        try:
+            current_span_var.reset(token)
+        except:
+            pass
+        self.current_span_id = self.span_id_to_previous_span_id.get(span_id)
+        Tracer.current_span_id = self.current_span_id
     
     def set_current_trace(self, trace: TraceClient):
         """
         Set the current trace context in contextvars
         """
-        current_trace_var.set(trace)
+        self.trace_id_to_previous_trace[trace.trace_id] = getattr(self, 'current_trace', None)
+        self.current_trace = trace
+        Tracer.current_trace = trace
+        try:
+            token = current_trace_var.set(trace)
+        except:
+            token = None
+        return token
     
     def get_current_trace(self) -> Optional[TraceClient]:
         """
@@ -1025,23 +1069,32 @@ class Tracer:
         If not found (e.g., context lost across threads/tasks),
         it falls back to the active trace client managed by the callback handler.
         """
-        trace_from_context = current_trace_var.get()
-        if trace_from_context:
-            return trace_from_context
+        # trace_from_context = current_trace_var.get()
+        # if trace_from_context:
+        #     return trace_from_context
         
-        # Fallback: Check the active client potentially set by a callback handler
-        if hasattr(self, '_active_trace_client') and self._active_trace_client:
-            # warnings.warn("Falling back to _active_trace_client in get_current_trace. ContextVar might be lost.", RuntimeWarning)
-            return self._active_trace_client
+        # # Fallback: Check the active client potentially set by a callback handler
+        # if hasattr(self, '_active_trace_client') and self._active_trace_client:
+        #     # warnings.warn("Falling back to _active_trace_client in get_current_trace. ContextVar might be lost.", RuntimeWarning)
+        #     return self._active_trace_client
             
-        # If neither is available
-        # warnings.warn("No current trace found in context variable or active client fallback.", RuntimeWarning)
-        return None
-        
-    def get_active_trace_client(self) -> Optional[TraceClient]:
-        """Returns the TraceClient instance currently marked as active by the handler."""
-        return self._active_trace_client
+        # # If neither is available
+        # # warnings.warn("No current trace found in context variable or active client fallback.", RuntimeWarning)
+        # return None
 
+        try:
+            current_trace_var_val = current_trace_var.get()
+        except:
+            current_trace_var_val = None
+        return (self.current_trace or current_trace_var_val) if self.trace_across_async_contexts else current_trace_var_val
+    
+    def reset_current_trace(self, token: Optional[str] = None, trace_id: Optional[str] = None):
+        try:
+            current_trace_var.reset(token)
+        except:
+            pass
+        self.current_trace = self.trace_id_to_previous_trace.get(trace_id)
+        Tracer.current_trace = self.current_trace
 
     @contextmanager
     def trace(
@@ -1056,7 +1109,7 @@ class Tracer:
         project = project_name if project_name is not None else self.project_name
         
         # Get parent trace info from context
-        parent_trace = current_trace_var.get()
+        parent_trace = self.get_current_trace()
         parent_trace_id = None
         parent_name = None
         
@@ -1078,7 +1131,7 @@ class Tracer:
         )
         
         # Set the current trace in context variables
-        token = current_trace_var.set(trace)
+        token = self.set_current_trace(trace)
         
         # Automatically create top-level span
         with trace.span(name or "unnamed_trace") as span:
@@ -1087,13 +1140,13 @@ class Tracer:
                 yield trace
             finally:
                 # Reset the context variable
-                current_trace_var.reset(token)
+                self.reset_current_trace(token)
 
 
     def log(self, msg: str, label: str = "log", score: int = 1):
         """Log a message with the current span context"""
-        current_span_id = current_span_var.get()
-        current_trace = current_trace_var.get()
+        current_span_id = self.get_current_span()
+        current_trace = self.get_current_trace()
         if current_span_id:
             annotation = TraceAnnotation(
                 span_id=current_span_id,
@@ -1237,7 +1290,7 @@ class Tracer:
                     agent_name = get_instance_prefixed_name(args[0], class_name, self.class_identifiers)
 
                 # Get current trace from context
-                current_trace = current_trace_var.get()
+                current_trace = self.get_current_trace()
                 
                 # If there's no current trace, create a root trace
                 if not current_trace:
@@ -1258,7 +1311,7 @@ class Tracer:
                     
                     # Save empty trace and set trace context
                     # current_trace.save(empty_save=True, overwrite=overwrite)
-                    trace_token = current_trace_var.set(current_trace)
+                    trace_token = self.set_current_trace(current_trace)
 
                     try:
                         # Use span for the function execution within the root trace
@@ -1274,7 +1327,7 @@ class Tracer:
                             self._conditionally_capture_and_record_state(span, args, is_before=True)
                             
                             if use_deep_tracing:
-                                with _DeepTracer():
+                                with _DeepTracer(self):
                                     result = await func(*args, **kwargs)
                             else:
                                 try:
@@ -1295,7 +1348,7 @@ class Tracer:
                         self.traces.append(trace)
 
                         # Reset trace context (span context resets automatically)
-                        current_trace_var.reset(trace_token)
+                        self.reset_current_trace(trace_token)
                 else:
                     with current_trace.span(span_name, span_type=span_type) as span:
                         inputs = combine_args_kwargs(func, args, kwargs)
@@ -1307,7 +1360,7 @@ class Tracer:
                         self._conditionally_capture_and_record_state(span, args, is_before=True)
                             
                         if use_deep_tracing:
-                            with _DeepTracer():
+                            with _DeepTracer(self):
                                 result = await func(*args, **kwargs)
                         else:
                             try:
@@ -1336,7 +1389,7 @@ class Tracer:
                     class_name = args[0].__class__.__name__
                     agent_name = get_instance_prefixed_name(args[0], class_name, self.class_identifiers)               
                 # Get current trace from context
-                current_trace = current_trace_var.get()
+                current_trace = self.get_current_trace()
 
                 # If there's no current trace, create a root trace
                 if not current_trace:
@@ -1357,7 +1410,7 @@ class Tracer:
                     
                     # Save empty trace and set trace context
                     # current_trace.save(empty_save=True, overwrite=overwrite)
-                    trace_token = current_trace_var.set(current_trace)
+                    trace_token = self.set_current_trace(current_trace)
                     
                     try:
                         # Use span for the function execution within the root trace
@@ -1372,7 +1425,7 @@ class Tracer:
                             self._conditionally_capture_and_record_state(span, args, is_before=True)
                                     
                             if use_deep_tracing:
-                                with _DeepTracer():
+                                with _DeepTracer(self):
                                     result = func(*args, **kwargs)
                             else:
                                 try:
@@ -1394,7 +1447,7 @@ class Tracer:
                         self.traces.append(trace)
 
                         # Reset trace context (span context resets automatically)
-                        current_trace_var.reset(trace_token)
+                        self.reset_current_trace(trace_token)
                 else:
                     with current_trace.span(span_name, span_type=span_type) as span:
                         
@@ -1407,7 +1460,7 @@ class Tracer:
                         self._conditionally_capture_and_record_state(span, args, is_before=True)
 
                         if use_deep_tracing:
-                            with _DeepTracer():
+                            with _DeepTracer(self):
                                 result = func(*args, **kwargs)
                         else:
                             try:
@@ -1431,13 +1484,7 @@ class Tracer:
         # --- Get trace_id passed explicitly (if any) ---
         passed_trace_id = kwargs.pop('trace_id', None) # Get and remove trace_id from kwargs
 
-        # --- Get current trace from context FIRST ---
-        current_trace = current_trace_var.get()
-
-        # --- Fallback Logic: Use active client only if context var is empty ---
-        if not current_trace:
-            current_trace = self._active_trace_client # Use the fallback
-        # --- End Fallback Logic ---
+        current_trace = self.get_current_trace()
 
         if current_trace:
             # Pass the explicitly provided trace_id if it exists, otherwise let async_evaluate handle it
@@ -1448,13 +1495,19 @@ class Tracer:
         else:
             warnings.warn("No trace found (context var or fallback), skipping evaluation") # Modified warning
 
-def wrap(client: Any) -> Any:
+def wrap(client: Any, trace_across_async_contexts: bool = Tracer.trace_across_async_contexts) -> Any:
     """
     Wraps an API client to add tracing capabilities.
     Supports OpenAI, Together, Anthropic, and Google GenAI clients.
     Patches both '.create' and Anthropic's '.stream' methods using a wrapper class.
     """
     span_name, original_create, original_responses_create, original_stream = _get_client_config(client)
+
+    def _get_current_trace():
+        if trace_across_async_contexts:
+            return Tracer.current_trace
+        else:
+            return current_trace_var.get()
     
     def _record_input_and_check_streaming(span, kwargs, is_responses=False):
         """Record input and check for streaming"""
@@ -1494,7 +1547,7 @@ def wrap(client: Any) -> Any:
     
     # --- Traced Async Functions ---
     async def traced_create_async(*args, **kwargs):
-        current_trace = current_trace_var.get()
+        current_trace = _get_current_trace()
         if not current_trace:
             return await original_create(*args, **kwargs)
         
@@ -1510,7 +1563,7 @@ def wrap(client: Any) -> Any:
     
     # Async responses for OpenAI clients
     async def traced_response_create_async(*args, **kwargs):
-        current_trace = current_trace_var.get()
+        current_trace = _get_current_trace()
         if not current_trace:
             return await original_responses_create(*args, **kwargs)
         
@@ -1526,7 +1579,7 @@ def wrap(client: Any) -> Any:
     
     # Function replacing .stream() for async clients
     def traced_stream_async(*args, **kwargs):
-        current_trace = current_trace_var.get()
+        current_trace = _get_current_trace()
         if not current_trace or not original_stream:
             return original_stream(*args, **kwargs)
         
@@ -1542,7 +1595,7 @@ def wrap(client: Any) -> Any:
     
     # --- Traced Sync Functions ---
     def traced_create_sync(*args, **kwargs):
-        current_trace = current_trace_var.get()
+        current_trace = _get_current_trace()
         if not current_trace:
             return original_create(*args, **kwargs)
         
@@ -1557,7 +1610,7 @@ def wrap(client: Any) -> Any:
                 raise e
     
     def traced_response_create_sync(*args, **kwargs):
-        current_trace = current_trace_var.get()
+        current_trace = _get_current_trace()
         if not current_trace:
             return original_responses_create(*args, **kwargs)
         
@@ -2060,12 +2113,12 @@ class _BaseStreamManagerWrapper:
 
 class _TracedAsyncStreamManagerWrapper(_BaseStreamManagerWrapper, AbstractAsyncContextManager):
     async def __aenter__(self):
-        self._parent_span_id_at_entry = current_span_var.get()
+        self._parent_span_id_at_entry = self._trace_client.get_current_span()
         if not self._trace_client:
             return await self._original_manager.__aenter__()
 
         span_id, span = self._create_span()
-        self._span_context_token = current_span_var.set(span_id)
+        self._span_context_token = self._trace_client.set_current_span(span_id)
         span.inputs = _format_input_data(self._client, **self._input_kwargs)
 
         # Call the original __aenter__ and expect it to be an async generator
@@ -2077,7 +2130,7 @@ class _TracedAsyncStreamManagerWrapper(_BaseStreamManagerWrapper, AbstractAsyncC
         if hasattr(self, '_span_context_token'):
             span_id = current_span_var.get()
             self._finalize_span(span_id)
-            current_span_var.reset(self._span_context_token)
+            self._trace_client.reset_current_span(self._span_context_token)
             delattr(self, '_span_context_token')
         return await self._original_manager.__aexit__(exc_type, exc_val, exc_tb)
 
@@ -2088,7 +2141,7 @@ class _TracedSyncStreamManagerWrapper(_BaseStreamManagerWrapper, AbstractContext
             return self._original_manager.__enter__()
 
         span_id, span = self._create_span()
-        self._span_context_token = current_span_var.set(span_id)
+        self._span_context_token = self._trace_client.set_current_span(span_id)
         span.inputs = _format_input_data(self._client, **self._input_kwargs)
 
         raw_iterator = self._original_manager.__enter__()
@@ -2099,7 +2152,7 @@ class _TracedSyncStreamManagerWrapper(_BaseStreamManagerWrapper, AbstractContext
         if hasattr(self, '_span_context_token'):
             span_id = current_span_var.get()
             self._finalize_span(span_id)
-            current_span_var.reset(self._span_context_token)
+            self._trace_client.reset_current_span(self._span_context_token)
             delattr(self, '_span_context_token')
         return self._original_manager.__exit__(exc_type, exc_val, exc_tb)
 

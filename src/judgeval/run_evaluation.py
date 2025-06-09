@@ -100,9 +100,9 @@ def execute_api_eval(evaluation_run: EvaluationRun) -> List[Dict]:
         raise JudgmentAPIError(error_message)
     return response_data
 
-def execute_api_trace_eval(trace_run: TraceRun) -> List[Dict]:
+def execute_api_trace_eval(trace_run: TraceRun) -> Dict:
     """
-    Executes an evaluation of a list of `Example`s using one or more `JudgmentScorer`s via the Judgment API.
+    Executes an evaluation of a list of `Trace`s using one or more `JudgmentScorer`s via the Judgment API.
     """
         
     try:
@@ -146,46 +146,47 @@ def merge_results(api_results: List[ScoringResult], local_results: List[ScoringR
     """
     # No merge required
     if not local_results and api_results:
-        return api_results
+        return [result.model_copy() for result in api_results]
     if not api_results and local_results:
-        return local_results
+        return [result.model_copy() for result in local_results]
 
     if len(api_results) != len(local_results):
         # Results should be of same length because each ScoringResult is a 1-1 mapping to an Example
         raise ValueError(f"The number of API and local results do not match: {len(api_results)} vs {len(local_results)}")
     
+    # Create a copy of api_results to avoid modifying the input
+    merged_results = [result.model_copy() for result in api_results]
+    
     # Each ScoringResult in api and local have all the same fields besides `scorers_data`
-    for api_result, local_result in zip(api_results, local_results):
-        if not (api_result.data_object and local_result.data_object):
+    for merged_result, local_result in zip(merged_results, local_results):
+        if not (merged_result.data_object and local_result.data_object):
             raise ValueError("Data object is None in one of the results.")
-        if api_result.data_object.input != local_result.data_object.input:
+        if merged_result.data_object.input != local_result.data_object.input:
             raise ValueError("The API and local results are not aligned.")
-        if api_result.data_object.actual_output != local_result.data_object.actual_output:
+        if merged_result.data_object.actual_output != local_result.data_object.actual_output:
             raise ValueError("The API and local results are not aligned.")
-        if api_result.data_object.expected_output != local_result.data_object.expected_output:
+        if merged_result.data_object.expected_output != local_result.data_object.expected_output:
             raise ValueError("The API and local results are not aligned.")
-        if api_result.data_object.context != local_result.data_object.context:
+        if merged_result.data_object.context != local_result.data_object.context:
             raise ValueError("The API and local results are not aligned.")
-        if api_result.data_object.retrieval_context != local_result.data_object.retrieval_context:
+        if merged_result.data_object.retrieval_context != local_result.data_object.retrieval_context:
             raise ValueError("The API and local results are not aligned.")
-        if api_result.data_object.additional_metadata != local_result.data_object.additional_metadata:
+        if merged_result.data_object.additional_metadata != local_result.data_object.additional_metadata:
             raise ValueError("The API and local results are not aligned.")
-        if api_result.data_object.tools_called != local_result.data_object.tools_called:
+        if merged_result.data_object.tools_called != local_result.data_object.tools_called:
             raise ValueError("The API and local results are not aligned.")
-        if api_result.data_object.expected_tools != local_result.data_object.expected_tools:
+        if merged_result.data_object.expected_tools != local_result.data_object.expected_tools:
             raise ValueError("The API and local results are not aligned.")
-        
         
         # Merge ScorerData from the API and local scorers together
-        api_scorer_data = api_result.scorers_data
+        api_scorer_data = merged_result.scorers_data
         local_scorer_data = local_result.scorers_data
         if api_scorer_data is None and local_scorer_data is not None:
-            api_result.scorers_data = local_scorer_data
-
-        if api_scorer_data is not None and local_scorer_data is not None:
-            api_result.scorers_data = api_scorer_data + local_scorer_data
+            merged_result.scorers_data = local_scorer_data
+        elif api_scorer_data is not None and local_scorer_data is not None:
+            merged_result.scorers_data = api_scorer_data + local_scorer_data
     
-    return api_results
+    return merged_results
 
 
 def check_missing_scorer_data(results: List[ScoringResult]) -> List[ScoringResult]:
@@ -429,7 +430,7 @@ def run_trace_eval(trace_run: TraceRun, override: bool = False, ignore_errors: b
     info("Starting API evaluation")
     try:  # execute an EvaluationRun with just JudgmentScorers
         debug("Sending request to Judgment API")    
-        response_data: List[Dict] = run_with_spinner("Running Trace Evaluation: ", execute_api_trace_eval, trace_run)
+        response_data: Dict = run_with_spinner("Running Trace Evaluation: ", execute_api_trace_eval, trace_run)
         scoring_results = [ScoringResult(**result) for result in response_data["results"]]
         info(f"Received {len(scoring_results)} results from API")
     except JudgmentAPIError as e:
