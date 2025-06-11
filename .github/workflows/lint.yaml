@@ -4,9 +4,6 @@ on:
   pull_request:
     branches: [ main, staging ]
 
-  push:
-    branches: [justin/add-linting]
-
 jobs:
   lint:
     runs-on: ubuntu-latest
