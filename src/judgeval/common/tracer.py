@@ -1005,7 +1005,6 @@ class BackgroundSpanService:
         pending_task_count = 0  # Track how many tasks we've taken from queue but not marked done
         
         while not self._shutdown_event.is_set() or self._span_queue.qsize() > 0:
-            print(f"Worker loop queue size: {self._span_queue.qsize()}")
             try:
                 # First, do a blocking get to wait for at least one item
                 if not batch:  # Only block if we don't have items already
