@@ -1,7 +1,6 @@
 import pytest
 import boto3
 import uuid
-import os
 import asyncio
 from botocore.exceptions import ClientError
 from judgeval.tracer import Tracer
@@ -50,7 +49,6 @@ def judgment(test_bucket):
         s3_bucket_name=test_bucket,
         s3_region_name=TEST_REGION,
         use_s3=True,
-        # deep_tracing=False
     )
     Tracer._instance = None
 
@@ -62,7 +60,6 @@ def judgment_no_bucket_yet(test_bucket_name, s3_client):
         s3_bucket_name=test_bucket_name,
         s3_region_name=TEST_REGION,
         use_s3=True,
-        # deep_tracing=False
     )
     Tracer._instance = None
     try:

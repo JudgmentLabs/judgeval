@@ -3,9 +3,11 @@ from uuid import UUID
 import time
 import uuid
 import contextvars # <--- Import contextvars
+from datetime import datetime
 
-from judgeval.common.tracer import TraceClient, TraceSpan, Tracer, SpanType, EvaluationConfig
+from judgeval.common.tracer import TraceClient, TraceSpan, Tracer, SpanType, EvaluationConfig, cost_per_token
 from judgeval.data import Example # Import Example
+from judgeval.data.trace import TraceUsage
 
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.agents import AgentAction, AgentFinish
@@ -42,6 +44,8 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         self._span_id_to_depth: Dict[str, int] = {}
         self._root_run_id: Optional[UUID] = None
         self._trace_saved: bool = False # Flag to prevent actions after trace is saved
+        self.span_id_to_token: Dict[str, Any] = {}
+        self.trace_id_to_token: Dict[str, Any] = {}
 
         self.executed_nodes: List[str] = [] # These last four members are only appended to and never accessed; can probably be removed but still might be useful for future reference?
         self.executed_tools: List[str] = []
@@ -73,11 +77,25 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                 enable_evaluations=self.tracer.enable_evaluations
             )
             self._trace_client = client_instance
+            token = self.tracer.set_current_trace(self._trace_client)
+            if token:
+                self.trace_id_to_token[trace_id] = token
             if self._trace_client:
                 self._root_run_id = run_id # Assign the first run_id encountered as the tentative root
                 self._trace_saved = False # Ensure flag is reset
                 # Set active client on Tracer (important for potential fallbacks)
                 self.tracer._active_trace_client = self._trace_client
+                
+                # NEW: Initial save for live tracking (follows the new practice)
+                try:
+                    trace_id_saved, server_response = self._trace_client.save_with_rate_limiting(
+                        overwrite=self._trace_client.overwrite, 
+                        final_save=False  # Initial save for live tracking
+                    )
+                except Exception as e:
+                    import warnings
+                    warnings.warn(f"Failed to save initial trace for live tracking: {e}")
+                
                 return self._trace_client
             else:
                 return None
@@ -114,10 +132,12 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
 
 
         # --- Set SPAN context variable ONLY for chain (node) spans (Sync version) ---
-        if span_type == "chain":
-            self.tracer.set_current_span(span_id)
+        # if span_type == "chain":
+        #     token = self.tracer.set_current_span(span_id)
+        #     if token:
+        #         self.span_id_to_token[span_id] = token
 
-        new_trace = TraceSpan(
+        new_span = TraceSpan(
             span_id=span_id,
             trace_id=trace_client.trace_id,
             parent_span_id=parent_span_id,
@@ -127,9 +147,17 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
             span_type=span_type
         )
 
-        new_trace.inputs = inputs
+        new_span.inputs = inputs
 
-        trace_client.add_span(new_trace)
+        trace_client.add_span(new_span)
+        
+        # Queue span with initial state (input phase) through background service
+        if trace_client.background_span_service:
+            trace_client.background_span_service.queue_span(new_span, span_state="input")
+        
+        token = self.tracer.set_current_span(span_id)
+        if token:
+            self.span_id_to_token[span_id] = token
 
     def _end_span_tracking(
         self,
@@ -142,6 +170,8 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
 
         # Get span ID and check if it exists
         span_id = self._run_id_to_span_id.get(run_id)
+        token = self.span_id_to_token.pop(span_id, None)
+        self.tracer.reset_current_span(token, span_id)
 
         start_time = self._span_id_to_start_time.get(span_id) if span_id else None
         duration = time.time() - start_time if start_time is not None else None
@@ -152,6 +182,11 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
             if trace_span:
                 trace_span.duration = duration
                 trace_span.output = error if error else outputs
+                
+                # Queue span with completed state through background service
+                if trace_client.background_span_service:
+                    span_state = "error" if error else "completed"
+                    trace_client.background_span_service.queue_span(trace_span, span_state=span_state)
 
             # Clean up dictionaries for this specific span
             if span_id in self._span_id_to_start_time: del self._span_id_to_start_time[span_id]
@@ -165,9 +200,34 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                 # Reset input storage for this handler instance
 
                 if self._trace_client and not self._trace_saved: # Check if not already saved
-                    # TODO: Check if trace_client.save needs await if TraceClient becomes async
-                    trace_id, trace_data = self._trace_client.save(overwrite=self._trace_client.overwrite) # Use client's overwrite setting
-                    self.traces.append(trace_data) # Leaving this in for now but can probably be removed
+                    # Flush background spans before saving the final trace
+
+                    complete_trace_data = {
+                        "trace_id": self._trace_client.trace_id,
+                        "name": self._trace_client.name,
+                        "created_at": datetime.utcfromtimestamp(self._trace_client.start_time).isoformat(),
+                        "duration": self._trace_client.get_duration(),
+                        "trace_spans": [span.model_dump() for span in self._trace_client.trace_spans],
+                        "overwrite": self._trace_client.overwrite,
+                        "offline_mode": self.tracer.offline_mode,
+                        "parent_trace_id": self._trace_client.parent_trace_id,
+                        "parent_name": self._trace_client.parent_name
+                    }
+
+                    # NEW: Use save_with_rate_limiting with final_save=True for final save
+                    trace_id, trace_data = self._trace_client.save_with_rate_limiting(
+                        overwrite=self._trace_client.overwrite, 
+                        final_save=True  # Final save with usage counter updates
+                    )
+                    token = self.trace_id_to_token.pop(trace_id, None)
+                    self.tracer.reset_current_trace(token, trace_id)
+                    # current_trace_var.set(None)
+                    
+                    # Store complete trace data instead of server response
+                    
+                    if self._trace_client.background_span_service:
+                        self._trace_client.background_span_service.flush()
+                    self.tracer.traces.append(complete_trace_data)
                     self._trace_saved = True # Set flag only after successful save
             finally:
                 # --- NEW: Consolidated Cleanup Logic --- 
@@ -254,10 +314,26 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         # --- Root node cleanup (Existing logic - slightly modified save call) ---
         if run_id == self._root_run_id:
             if trace_client and not self._trace_saved:
-                # Save might need to be async if TraceClient methods become async
-                # Pass overwrite=True based on client's setting
-                trace_id_saved, trace_data = trace_client.save(overwrite=trace_client.overwrite)
-                self.traces.append(trace_data) # Leaving this in for now but can probably be removed
+                # Store complete trace data instead of server response
+                complete_trace_data = {
+                    "trace_id": trace_client.trace_id,
+                    "name": trace_client.name,
+                    "created_at": datetime.utcfromtimestamp(trace_client.start_time).isoformat(),
+                    "duration": trace_client.get_duration(),
+                    "trace_spans": [span.model_dump() for span in trace_client.trace_spans],
+                    "overwrite": trace_client.overwrite,
+                    "offline_mode": self.tracer.offline_mode,
+                    "parent_trace_id": trace_client.parent_trace_id,
+                    "parent_name": trace_client.parent_name
+                }
+                # NEW: Use save_with_rate_limiting with final_save=True for final save
+                trace_id_saved, trace_data = trace_client.save_with_rate_limiting(
+                    overwrite=trace_client.overwrite,
+                    final_save=True  # Final save with usage counter updates
+                )
+                
+                
+                self.tracer.traces.append(complete_trace_data)
                 self._trace_saved = True
                 # Reset tracer's active client *after* successful save
                 if self.tracer._active_trace_client == trace_client:
@@ -333,11 +409,23 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         if not trace_client:
             return
         outputs = {"response": response, "kwargs": kwargs}
-        # --- Token Usage Extraction and Accumulation ---
-        token_usage = None
-        prompt_tokens = None  # Use standard name
-        completion_tokens = None # Use standard name
+        
+        # --- Token Usage Extraction and Cost Calculation ---
+        prompt_tokens = None
+        completion_tokens = None
         total_tokens = None
+        model_name = None
+        
+        # Extract model name from response if available
+        if hasattr(response, 'llm_output') and response.llm_output and isinstance(response.llm_output, dict):
+            model_name = response.llm_output.get('model_name') or response.llm_output.get('model')
+        
+        # Try to get model from the first generation if available
+        if not model_name and response.generations and len(response.generations) > 0:
+            if hasattr(response.generations[0][0], 'generation_info') and response.generations[0][0].generation_info:
+                gen_info = response.generations[0][0].generation_info
+                model_name = gen_info.get('model') or gen_info.get('model_name')
+
         if response.llm_output and isinstance(response.llm_output, dict):
             # Check for OpenAI/standard 'token_usage' first
             if 'token_usage' in response.llm_output:
@@ -356,14 +444,43 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                     if prompt_tokens is not None and completion_tokens is not None:
                         total_tokens = prompt_tokens + completion_tokens
 
-            # --- Store individual usage in span output and Accumulate --- 
+            # --- Create TraceUsage object and set on span ---
             if prompt_tokens is not None or completion_tokens is not None:
-                # Store individual usage for this span
-                outputs['usage'] = { 
-                    'prompt_tokens': prompt_tokens,
-                    'completion_tokens': completion_tokens,
-                    'total_tokens': total_tokens
-                }
+                # Calculate costs if model name is available
+                prompt_cost = None
+                completion_cost = None
+                total_cost_usd = None
+                
+                if model_name and prompt_tokens is not None and completion_tokens is not None:
+                    try:
+                        prompt_cost, completion_cost = cost_per_token(
+                            model=model_name,
+                            prompt_tokens=prompt_tokens,
+                            completion_tokens=completion_tokens
+                        )
+                        total_cost_usd = (prompt_cost + completion_cost) if prompt_cost and completion_cost else None
+                    except Exception as e:
+                        # If cost calculation fails, continue without costs
+                        import warnings
+                        warnings.warn(f"Failed to calculate token costs for model {model_name}: {e}")
+                
+                # Create TraceUsage object
+                usage = TraceUsage(
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens or (prompt_tokens + completion_tokens if prompt_tokens and completion_tokens else None),
+                    prompt_tokens_cost_usd=prompt_cost,
+                    completion_tokens_cost_usd=completion_cost,
+                    total_cost_usd=total_cost_usd,
+                    model_name=model_name
+                )
+                
+                # Set usage on the actual span (not in outputs)
+                span_id = self._run_id_to_span_id.get(run_id)
+                if span_id and span_id in trace_client.span_id_to_span:
+                    trace_span = trace_client.span_id_to_span[span_id]
+                    trace_span.usage = usage
+                    
             
         self._end_span_tracking(trace_client, run_id, outputs=outputs)
         # --- End Token Usage ---

@@ -2,14 +2,8 @@
 import os
 import time
 import asyncio
-from typing import List
+from typing import Dict
 import pytest
-import re
-import sys
-from io import StringIO
-import json
-import inspect # Added for function signature inspection
-import pytest_asyncio # For async fixtures if needed later
 
 # Third-party imports
 from openai import OpenAI, AsyncOpenAI
@@ -18,12 +12,9 @@ from together import AsyncTogether
 from google import genai
 
 # Local imports
-from judgeval.tracer import Tracer, wrap, TraceClient, TraceManagerClient
-from judgeval.constants import APIScorer
+from judgeval.tracer import Tracer, wrap, TraceManagerClient
 from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
 from judgeval.data import Example
-# Import the utility functions from the new location
-from e2etests.utils import validate_trace_token_counts, validate_trace_tokens
 
 # Initialize the tracer and clients
 # Ensure relevant API keys (OPENAI_API_KEY, ANTHROPIC_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY) are set
@@ -59,6 +50,87 @@ if google_api_key:
 else:
     print("Warning: GOOGLE_API_KEY not found. Skipping Google tests.")
 
+# Helper function
+def validate_trace_token_counts(trace_client) -> Dict[str, int]:
+    """
+    Validates token counts from trace spans and performs assertions.
+    
+    Args:
+        trace_client: The trace client instance containing trace spans
+        
+    Returns:
+        Dict with calculated token counts (prompt_tokens, completion_tokens, total_tokens)
+        
+    Raises:
+        AssertionError: If token count validations fail
+    """
+    if not trace_client:
+        pytest.fail("Failed to get trace client for token count validation")
+        
+    # Get spans from the trace client
+    trace_spans = trace_client.trace_spans
+
+    # Manually calculate token counts from trace spans
+    manual_prompt_tokens = 0
+    manual_completion_tokens = 0 
+    manual_total_tokens = 0
+    
+    # Known LLM API call function names
+    llm_span_names = {"OPENAI_API_CALL", "ANTHROPIC_API_CALL", "TOGETHER_API_CALL", "GOOGLE_API_CALL"}
+
+    for span in trace_spans:
+        if span.span_type == "llm" and span.function in llm_span_names:
+            usage = span.usage
+            if usage and "info" not in usage:  # Check if it's actual usage data
+                # Correctly handle different key names from different providers
+
+                prompt_tokens = usage.prompt_tokens
+                completion_tokens = usage.completion_tokens
+                total_tokens = usage.total_tokens
+
+                # Accumulate separately
+                manual_prompt_tokens += prompt_tokens
+                manual_completion_tokens += completion_tokens
+                manual_total_tokens += total_tokens
+    
+    assert manual_prompt_tokens > 0, "Prompt tokens should be counted"
+    assert manual_completion_tokens > 0, "Completion tokens should be counted"
+    assert manual_total_tokens > 0, "Total tokens should be counted"
+    assert manual_total_tokens == (manual_prompt_tokens + manual_completion_tokens), \
+        "Total tokens should equal prompt + completion"
+    
+    return {
+        "prompt_tokens": manual_prompt_tokens,
+        "completion_tokens": manual_completion_tokens,
+        "total_tokens": manual_total_tokens
+    }
+
+# Helper function
+def validate_trace_tokens(trace, fail_on_missing=True):
+    """
+    Helper function to validate token counts in a trace
+    
+    Args:
+        trace: The trace client to validate
+        fail_on_missing: Whether to fail the test if no trace is available
+        
+    Returns:
+        The token counts if validation succeeded
+    """
+    if not trace:
+        print("Warning: Could not get current trace to perform assertions.")
+        if fail_on_missing:
+            pytest.fail("Failed to get current trace within decorated function.")
+        return None
+        
+    print("\nAttempting assertions on current trace state (before decorator save)...")
+    
+    # Use the utility function for token count validation
+    token_counts = validate_trace_token_counts(trace)
+    
+    print(f"Calculated token counts: P={token_counts['prompt_tokens']}, C={token_counts['completion_tokens']}, T={token_counts['total_tokens']}")
+        
+    return token_counts 
 
 # --- Test Functions ---
 

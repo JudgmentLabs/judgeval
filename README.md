@@ -28,9 +28,6 @@ We support tracing agents built with LangGraph, OpenAI SDK, Anthropic, ... and a
 Judgeval is created and maintained by [Judgment Labs](https://judgmentlabs.ai/).
 
 ## 📋 Table of Contents
-- [🌐 Landing Page  • 📚 Docs • 🚀 Demos](#-landing-page----docs---demos)
-- [Judgeval: open-source testing, monitoring, and optimization for AI agents](#judgeval-open-source-testing-monitoring-and-optimization-for-ai-agents)
-- [📋 Table of Contents](#-table-of-contents)
 - [✨ Features](#-features)
 - [🛠️ Installation](#️-installation)
 - [🏁 Get Started](#-get-started)
@@ -41,12 +38,6 @@ Judgeval is created and maintained by [Judgment Labs](https://judgmentlabs.ai/).
   - [Key Features](#key-features)
   - [Getting Started](#getting-started)
 - [📚 Cookbooks](#-cookbooks)
-  - [Sample Agents](#sample-agents)
-    - [💰 LangGraph Financial QA Agent](#-langgraph-financial-qa-agent)
-    - [✈️ OpenAI Travel Agent](#️-openai-travel-agent)
-  - [Custom Evaluators](#custom-evaluators)
-    - [🔍 PII Detection](#-pii-detection)
-    - [📧 Cold Email Generation](#-cold-email-generation)
 - [💻 Development with Cursor](#-development-with-cursor)
 - [⭐ Star Us on GitHub](#-star-us-on-github)
 - [❤️ Contributors](#️-contributors)
@@ -201,20 +192,8 @@ You can access our repo of cookbooks [here](https://github.com/JudgmentLabs/judg
 
 ### Sample Agents
 
-#### 💰 [LangGraph Financial QA Agent](https://github.com/JudgmentLabs/judgment-cookbook/blob/main/cookbooks/financial_agent/demo.py)
-A LangGraph-based agent for financial queries, featuring RAG capabilities with a vector database for contextual data retrieval and evaluation of its reasoning and data accuracy.
-
-#### ✈️ [OpenAI Travel Agent](https://github.com/JudgmentLabs/judgment-cookbook/blob/main/cookbooks/openai_travel_agent/agent.py)
-A travel planning agent using OpenAI API calls, custom tool functions, and RAG with a vector database for up-to-date and contextual travel information. Evaluated for itinerary quality and information relevance.
-
-### Custom Evaluators
-
-#### 🔍 [PII Detection](https://github.com/JudgmentLabs/judgment-cookbook/blob/main/cookbooks/classifier_scorer/pii_checker.py)
-Detecting and evaluating Personal Identifiable Information (PII) leakage.
-
-#### 📧 [Cold Email Generation](https://github.com/JudgmentLabs/judgment-cookbook/blob/main/cookbooks/custom_scorers/cold_email_scorer.py)
-
-Evaluates if a cold email generator properly utilizes all relevant information about the target recipient.
+#### [Multi-Agent System](https://github.com/JudgmentLabs/judgment-cookbook/tree/main/cookbooks/agents/multi-agent)
+A multi-agent system augmented with tool calls designed for general purpose tasks like financial research and math. Traced and evaluated on Faithfulness (factual adherence to retrieval context).
 
 ## 💻 Development with Cursor
 When building agents and LLM workflows in Cursor, providing proper context to your coding assistant helps ensure seamless integration with Judgment. This rule file supplies the essential context your coding assistant needs for successful implementation.
