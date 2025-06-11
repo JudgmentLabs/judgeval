@@ -2,6 +2,7 @@ import pytest
 from judgeval.data import ScorerData, Example, ScoringResult
 from judgeval.data.result import generate_scoring_result
 
+
 @pytest.fixture
 def sample_scorer_data():
     return ScorerData(
@@ -9,8 +10,9 @@ def sample_scorer_data():
         threshold=1.0,
         success=True,
         score=0.8,
-        metadata={"key": "value"}
+        metadata={"key": "value"},
     )
+
 
 @pytest.fixture
 def sample_example():
@@ -22,6 +24,7 @@ def sample_example():
         context=["context1", "context2"],
         retrieval_context=["retrieval1"],
     )
+
 
 class TestScoringResult:
     def test_basic_initialization(self):
@@ -38,9 +41,9 @@ class TestScoringResult:
             success=True,
             scorers_data=[sample_scorer_data],
             data_object=sample_example,
-            trace_id="trace123"
+            trace_id="trace123",
         )
-        
+
         assert result.success is True
         assert len(result.scorers_data) == 1
         assert result.data_object.input == "test input"
@@ -53,11 +56,9 @@ class TestScoringResult:
     def test_to_dict_conversion(self, sample_scorer_data, sample_example):
         """Test conversion to dictionary"""
         result = ScoringResult(
-            success=True,
-            scorers_data=[sample_scorer_data],
-            data_object=sample_example
+            success=True, scorers_data=[sample_scorer_data], data_object=sample_example
         )
-        
+
         dict_result = result.to_dict()
         assert isinstance(dict_result, dict)
         assert dict_result["success"] is True
@@ -78,11 +79,12 @@ class TestScoringResult:
         assert "ScoringResult" in str_result
         assert "success=True" in str_result
 
+
 class TestGenerateScoringResult:
     def test_generate_from_example(self, sample_example):
         """Test generating ScoringResult from Example"""
         result = generate_scoring_result(sample_example, [], 0.0, True)
-        
+
         assert isinstance(result, ScoringResult)
         assert result.data_object.input == sample_example.input
         assert result.data_object.actual_output == sample_example.actual_output
@@ -98,9 +100,9 @@ class TestGenerateScoringResult:
             input="test",
             actual_output="output",
             success=True,
-            scorers_data=[]
+            scorers_data=[],
         )
-        
+
         result = generate_scoring_result(minimal_example, [], 0.0, True)
         assert isinstance(result, ScoringResult)
         assert result.success is True

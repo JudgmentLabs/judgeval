@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any, Union, Callable
+from typing import List, Optional, Dict, Any, Union
 from judgeval.data import Trace
 from judgeval.scorers import APIJudgmentScorer, JudgevalScorer
 from judgeval.judges import JudgevalJudge
@@ -9,8 +9,8 @@ from judgeval.rules import Rule
 class TraceRun(BaseModel):
     """
     Stores example and evaluation scorers together for running an eval task
-    
-    Args: 
+
+    Args:
         project_name (str): The name of the project the evaluation results belong to
         eval_name (str): A name for this evaluation run
         traces (List[Trace]): The traces to evaluate

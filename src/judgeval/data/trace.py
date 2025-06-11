@@ -5,6 +5,7 @@ from judgeval.data.tool import Tool
 import json
 from datetime import datetime, timezone
 
+
 class TraceUsage(BaseModel):
     prompt_tokens: Optional[int] = None
     completion_tokens: Optional[int] = None
@@ -13,6 +14,7 @@ class TraceUsage(BaseModel):
     completion_tokens_cost_usd: Optional[float] = None
     total_cost_usd: Optional[float] = None
     model_name: Optional[str] = None
+
 
 class TraceSpan(BaseModel):
     span_id: str
@@ -41,11 +43,15 @@ class TraceSpan(BaseModel):
             "span_id": self.span_id,
             "trace_id": self.trace_id,
             "depth": self.depth,
-            "created_at": datetime.fromtimestamp(self.created_at, tz=timezone.utc).isoformat(),
+            "created_at": datetime.fromtimestamp(
+                self.created_at, tz=timezone.utc
+            ).isoformat(),
             "inputs": self._serialize_value(self.inputs),
             "output": self._serialize_value(self.output),
             "error": self._serialize_value(self.error),
-            "evaluation_runs": [run.model_dump() for run in self.evaluation_runs] if self.evaluation_runs else [],
+            "evaluation_runs": [run.model_dump() for run in self.evaluation_runs]
+            if self.evaluation_runs
+            else [],
             "parent_span_id": self.parent_span_id,
             "function": self.function,
             "duration": self.duration,
@@ -54,13 +60,15 @@ class TraceSpan(BaseModel):
             "has_evaluation": self.has_evaluation,
             "agent_name": self.agent_name,
             "state_before": self.state_before,
-            "state_after": self.state_after 
+            "state_after": self.state_after,
         }
-    
+
     def print_span(self):
         """Print the span with proper formatting and parent relationship information."""
         indent = "  " * self.depth
-        parent_info = f" (parent_id: {self.parent_span_id})" if self.parent_span_id else ""
+        parent_info = (
+            f" (parent_id: {self.parent_span_id})" if self.parent_span_id else ""
+        )
         print(f"{indent}→ {self.function} (id: {self.span_id}){parent_info}")
 
     def _is_json_serializable(self, obj: Any) -> bool:
@@ -79,18 +87,18 @@ class TraceSpan(BaseModel):
             return str(output)
         except (TypeError, OverflowError, ValueError):
             pass
-    
+
         try:
             return repr(output)
         except (TypeError, OverflowError, ValueError):
             pass
         return None
-        
+
     def _serialize_value(self, value: Any) -> Any:
         """Helper method to deep serialize a value safely supporting Pydantic Models / regular PyObjects."""
         if value is None:
             return None
-            
+
         def serialize_value(value):
             if isinstance(value, BaseModel):
                 return value.model_dump()
@@ -112,6 +120,7 @@ class TraceSpan(BaseModel):
         # Start serialization with the top-level value
         return serialize_value(value)
 
+
 class Trace(BaseModel):
     trace_id: str
     name: str
@@ -122,4 +131,3 @@ class Trace(BaseModel):
     offline_mode: bool = False
     rules: Optional[Dict[str, Any]] = None
     has_notification: Optional[bool] = False
-    

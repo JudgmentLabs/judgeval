@@ -9,10 +9,11 @@ TODO add link to docs page for this scorer
 from judgeval.scorers.api_scorer import APIJudgmentScorer
 from judgeval.constants import APIScorer
 
+
 class DerailmentScorer(APIJudgmentScorer):
     def __init__(self, threshold: float):
         super().__init__(
-            threshold=threshold, 
+            threshold=threshold,
             score_type=APIScorer.DERAILMENT,
         )
 
