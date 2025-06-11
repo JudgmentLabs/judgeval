@@ -53,9 +53,14 @@ from google import genai
 from judgeval.constants import (
     JUDGMENT_TRACES_ADD_ANNOTATION_API_URL,
     JUDGMENT_TRACES_SAVE_API_URL,
+    JUDGMENT_TRACES_UPSERT_API_URL,
+    JUDGMENT_TRACES_USAGE_CHECK_API_URL,
+    JUDGMENT_TRACES_USAGE_UPDATE_API_URL,
     JUDGMENT_TRACES_FETCH_API_URL,
     JUDGMENT_TRACES_DELETE_API_URL,
     JUDGMENT_PROJECT_DELETE_API_URL,
+    JUDGMENT_TRACES_SPANS_BATCH_API_URL,
+    JUDGMENT_TRACES_EVALUATION_RUNS_BATCH_API_URL,
 )
 from judgeval.data import Example, Trace, TraceSpan, TraceUsage
 from judgeval.scorers import APIJudgmentScorer, JudgevalScorer
@@ -67,6 +72,8 @@ from judgeval.common.exceptions import JudgmentAPIError
 # Standard library imports needed for the new class
 import concurrent.futures
 from collections.abc import Iterator, AsyncIterator  # Add Iterator and AsyncIterator
+import queue
+import atexit
 
 # Define context variables for tracking the current trace and the current span within a trace
 current_trace_var = contextvars.ContextVar[Optional["TraceClient"]](
@@ -165,13 +172,20 @@ class TraceManagerClient:
 
         return response.json()
 
-    def save_trace(self, trace_data: dict, offline_mode: bool = False):
+    def save_trace(
+        self, trace_data: dict, offline_mode: bool = False, final_save: bool = True
+    ):
         """
         Saves a trace to the Judgment Supabase and optionally to S3 if configured.
 
         Args:
             trace_data: The trace data to save
+            offline_mode: Whether running in offline mode
+            final_save: Whether this is the final save (controls S3 saving)
             NOTE we save empty traces in order to properly handle async operations; we need something in the DB to associate the async results with
+
+        Returns:
+            dict: Server response containing UI URL and other metadata
         """
         # Save to Judgment API
 
@@ -193,7 +207,6 @@ class TraceManagerClient:
                     return f"<Unserializable object of type {type(obj).__name__}: {e}>"
 
         serialized_trace_data = json.dumps(trace_data, default=fallback_encoder)
-
         response = requests.post(
             JUDGMENT_TRACES_SAVE_API_URL,
             data=serialized_trace_data,
@@ -212,8 +225,11 @@ class TraceManagerClient:
         elif response.status_code != HTTPStatus.OK:
             raise ValueError(f"Failed to save trace data: {response.text}")
 
-        # If S3 storage is enabled, save to S3 as well
-        if self.tracer and self.tracer.use_s3:
+        # Parse server response
+        server_response = response.json()
+
+        # If S3 storage is enabled, save to S3 only on final save
+        if self.tracer and self.tracer.use_s3 and final_save:
             try:
                 s3_key = self.tracer.s3_storage.save_trace(
                     trace_data=trace_data,
@@ -224,9 +240,145 @@ class TraceManagerClient:
             except Exception as e:
                 warnings.warn(f"Failed to save trace to S3: {str(e)}")
 
-        if not offline_mode and "ui_results_url" in response.json():
-            pretty_str = f"\n🔍 You can view your trace data here: [rgb(106,0,255)][link={response.json()['ui_results_url']}]View Trace[/link]\n"
+        if not offline_mode and "ui_results_url" in server_response:
+            pretty_str = f"\n🔍 You can view your trace data here: [rgb(106,0,255)][link={server_response['ui_results_url']}]View Trace[/link]\n"
             rprint(pretty_str)
+
+        return server_response
+
+    def check_usage_limits(self, count: int = 1):
+        """
+        Check if the organization can use the requested number of traces without exceeding limits.
+
+        Args:
+            count: Number of traces to check for (default: 1)
+
+        Returns:
+            dict: Server response with rate limit status and usage info
+
+        Raises:
+            ValueError: If rate limits would be exceeded or other errors occur
+        """
+        response = requests.post(
+            JUDGMENT_TRACES_USAGE_CHECK_API_URL,
+            json={"count": count},
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.judgment_api_key}",
+                "X-Organization-Id": self.organization_id,
+            },
+            verify=True,
+        )
+
+        if response.status_code == HTTPStatus.FORBIDDEN:
+            # Rate limits exceeded
+            error_data = response.json()
+            raise ValueError(
+                f"Rate limit exceeded: {error_data.get('detail', 'Monthly trace limit reached')}"
+            )
+        elif response.status_code != HTTPStatus.OK:
+            raise ValueError(f"Failed to check usage limits: {response.text}")
+
+        return response.json()
+
+    def upsert_trace(
+        self,
+        trace_data: dict,
+        offline_mode: bool = False,
+        show_link: bool = True,
+        final_save: bool = True,
+    ):
+        """
+        Upserts a trace to the Judgment API (always overwrites if exists).
+
+        Args:
+            trace_data: The trace data to upsert
+            offline_mode: Whether running in offline mode
+            show_link: Whether to show the UI link (for live tracing)
+            final_save: Whether this is the final save (controls S3 saving)
+
+        Returns:
+            dict: Server response containing UI URL and other metadata
+        """
+
+        def fallback_encoder(obj):
+            """
+            Custom JSON encoder fallback.
+            Tries to use obj.__repr__(), then str(obj) if that fails or for a simpler string.
+            """
+            try:
+                return repr(obj)
+            except Exception:
+                try:
+                    return str(obj)
+                except Exception as e:
+                    return f"<Unserializable object of type {type(obj).__name__}: {e}>"
+
+        serialized_trace_data = json.dumps(trace_data, default=fallback_encoder)
+
+        response = requests.post(
+            JUDGMENT_TRACES_UPSERT_API_URL,
+            data=serialized_trace_data,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.judgment_api_key}",
+                "X-Organization-Id": self.organization_id,
+            },
+            verify=True,
+        )
+
+        if response.status_code != HTTPStatus.OK:
+            raise ValueError(f"Failed to upsert trace data: {response.text}")
+
+        # Parse server response
+        server_response = response.json()
+
+        # If S3 storage is enabled, save to S3 only on final save
+        if self.tracer and self.tracer.use_s3 and final_save:
+            try:
+                s3_key = self.tracer.s3_storage.save_trace(
+                    trace_data=trace_data,
+                    trace_id=trace_data["trace_id"],
+                    project_name=trace_data["project_name"],
+                )
+                print(f"Trace also saved to S3 at key: {s3_key}")
+            except Exception as e:
+                warnings.warn(f"Failed to save trace to S3: {str(e)}")
+
+        if not offline_mode and show_link and "ui_results_url" in server_response:
+            pretty_str = f"\n🔍 You can view your trace data here: [rgb(106,0,255)][link={server_response['ui_results_url']}]View Trace[/link]\n"
+            rprint(pretty_str)
+
+        return server_response
+
+    def update_usage_counters(self, count: int = 1):
+        """
+        Update trace usage counters after successfully saving traces.
+
+        Args:
+            count: Number of traces to count (default: 1)
+
+        Returns:
+            dict: Server response with updated usage information
+
+        Raises:
+            ValueError: If the update fails
+        """
+        response = requests.post(
+            JUDGMENT_TRACES_USAGE_UPDATE_API_URL,
+            json={"count": count},
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.judgment_api_key}",
+                "X-Organization-Id": self.organization_id,
+            },
+            verify=True,
+        )
+
+        if response.status_code != HTTPStatus.OK:
+            raise ValueError(f"Failed to update usage counters: {response.text}")
+
+        return response.json()
 
     ## TODO: Should have a log endpoint, endpoint should also support batched payloads
     def save_annotation(self, annotation: TraceAnnotation):
@@ -349,11 +501,18 @@ class TraceClient:
         self.span_id_to_span: Dict[str, TraceSpan] = {}
         self.evaluation_runs: List[EvaluationRun] = []
         self.annotations: List[TraceAnnotation] = []
-        self.start_time = time.time()
+        self.start_time: Optional[float] = (
+            None  # Will be set after first successful save
+        )
         self.trace_manager_client = TraceManagerClient(
             tracer.api_key, tracer.organization_id, tracer
         )
         self._span_depths: Dict[str, int] = {}  # NEW: To track depth of active spans
+
+        # Get background span service from tracer
+        self.background_span_service = (
+            tracer.get_background_span_service() if tracer else None
+        )
 
     def get_current_span(self):
         """Get the current span from the context var"""
@@ -370,6 +529,18 @@ class TraceClient:
     @contextmanager
     def span(self, name: str, span_type: SpanType = "span"):
         """Context manager for creating a trace span, managing the current span via contextvars"""
+        is_first_span = len(self.trace_spans) == 0
+        if is_first_span:
+            try:
+                trace_id, server_response = self.save_with_rate_limiting(
+                    overwrite=self.overwrite, final_save=False
+                )
+                # Set start_time after first successful save
+                if self.start_time is None:
+                    self.start_time = time.time()
+                # Link will be shown by upsert_trace method
+            except Exception as e:
+                warnings.warn(f"Failed to save initial trace for live tracking: {e}")
         start_time = time.time()
 
         # Generate a unique ID for *this specific span invocation*
@@ -400,11 +571,20 @@ class TraceClient:
         )
         self.add_span(span)
 
+        # Queue span with initial state (input phase)
+        if self.background_span_service:
+            self.background_span_service.queue_span(span, span_state="input")
+
         try:
             yield self
         finally:
             duration = time.time() - start_time
             span.duration = duration
+
+            # Queue span with completed state (output phase)
+            if self.background_span_service:
+                self.background_span_service.queue_span(span, span_state="completed")
+
             # Clean up depth tracking for this span_id
             if span_id in self._span_depths:
                 del self._span_depths[span_id]
@@ -513,6 +693,15 @@ class TraceClient:
 
         self.add_eval_run(eval_run, start_time)  # Pass start_time to record_evaluation
 
+        # Queue evaluation run through background service
+        if self.background_span_service and span_id_to_use:
+            # Get the current span data to avoid race conditions
+            current_span = self.span_id_to_span.get(span_id_to_use)
+            if current_span:
+                self.background_span_service.queue_evaluation_run(
+                    eval_run, span_id=span_id_to_use, span_data=current_span
+                )
+
     def add_eval_run(self, eval_run: EvaluationRun, start_time: float):
         # --- Modification: Use span_id from eval_run ---
         current_span_id = eval_run.trace_span_id  # Get ID from the eval_run object
@@ -539,11 +728,19 @@ class TraceClient:
                 del inputs["self"]
             span.inputs = inputs
 
+            # Queue span with input data
+            if self.background_span_service:
+                self.background_span_service.queue_span(span, span_state="input")
+
     def record_agent_name(self, agent_name: str):
         current_span_id = self.get_current_span()
         if current_span_id:
             span = self.span_id_to_span[current_span_id]
             span.agent_name = agent_name
+
+            # Queue span with agent_name data
+            if self.background_span_service:
+                self.background_span_service.queue_span(span, span_state="agent_name")
 
     def record_state_before(self, state: dict):
         """Records the agent's state before a tool execution on the current span.
@@ -556,6 +753,10 @@ class TraceClient:
             span = self.span_id_to_span[current_span_id]
             span.state_before = state
 
+            # Queue span with state_before data
+            if self.background_span_service:
+                self.background_span_service.queue_span(span, span_state="state_before")
+
     def record_state_after(self, state: dict):
         """Records the agent's state after a tool execution on the current span.
 
@@ -567,14 +768,28 @@ class TraceClient:
             span = self.span_id_to_span[current_span_id]
             span.state_after = state
 
+            # Queue span with state_after data
+            if self.background_span_service:
+                self.background_span_service.queue_span(span, span_state="state_after")
+
     async def _update_coroutine(self, span: TraceSpan, coroutine: Any, field: str):
         """Helper method to update the output of a trace entry once the coroutine completes"""
         try:
             result = await coroutine
             setattr(span, field, result)
+
+            # Queue span with output data now that coroutine is complete
+            if self.background_span_service and field == "output":
+                self.background_span_service.queue_span(span, span_state="output")
+
             return result
         except Exception as e:
             setattr(span, field, f"Error: {str(e)}")
+
+            # Queue span even if there was an error
+            if self.background_span_service and field == "output":
+                self.background_span_service.queue_span(span, span_state="output")
+
             raise
 
     def record_output(self, output: Any):
@@ -586,6 +801,10 @@ class TraceClient:
             if inspect.iscoroutine(output):
                 asyncio.create_task(self._update_coroutine(span, output, "output"))
 
+            # # Queue span with output data (unless it's pending)
+            if self.background_span_service and not inspect.iscoroutine(output):
+                self.background_span_service.queue_span(span, span_state="output")
+
             return span  # Return the created entry
         # Removed else block - original didn't have one
         return None  # Return None if no span_id found
@@ -596,6 +815,10 @@ class TraceClient:
             span = self.span_id_to_span[current_span_id]
             span.usage = usage
 
+            # Queue span with usage data
+            if self.background_span_service:
+                self.background_span_service.queue_span(span, span_state="usage")
+
             return span  # Return the created entry
         # Removed else block - original didn't have one
         return None  # Return None if no span_id found
@@ -605,6 +828,11 @@ class TraceClient:
         if current_span_id:
             span = self.span_id_to_span[current_span_id]
             span.error = error
+
+            # Queue span with error data
+            if self.background_span_service:
+                self.background_span_service.queue_span(span, span_state="error")
+
             return span
         return None
 
@@ -623,13 +851,19 @@ class TraceClient:
         """
         Get the total duration of this trace
         """
+        if self.start_time is None:
+            return 0.0  # No duration if trace hasn't been saved yet
         return time.time() - self.start_time
 
     def save(self, overwrite: bool = False) -> Tuple[str, dict]:
         """
         Save the current trace to the database.
-        Returns a tuple of (trace_id, trace_data) where trace_data is the trace data that was saved.
+        Returns a tuple of (trace_id, server_response) where server_response contains the UI URL and other metadata.
         """
+        # Set start_time if this is the first save
+        if self.start_time is None:
+            self.start_time = time.time()
+
         # Calculate total elapsed time
         total_duration = self.get_duration()
         # Create trace document - Always use standard keys for top-level counts
@@ -647,8 +881,8 @@ class TraceClient:
             "parent_name": self.parent_name,
         }
         # --- Log trace data before saving ---
-        self.trace_manager_client.save_trace(
-            trace_data, offline_mode=self.tracer.offline_mode
+        server_response = self.trace_manager_client.save_trace(
+            trace_data, offline_mode=self.tracer.offline_mode, final_save=True
         )
 
         # upload annotations
@@ -656,7 +890,75 @@ class TraceClient:
         for annotation in self.annotations:
             self.trace_manager_client.save_annotation(annotation)
 
-        return self.trace_id, trace_data
+        return self.trace_id, server_response
+
+    def save_with_rate_limiting(
+        self, overwrite: bool = False, final_save: bool = False
+    ) -> Tuple[str, dict]:
+        """
+        Save the current trace to the database with rate limiting checks.
+        First checks usage limits, then upserts the trace if allowed.
+
+        Args:
+            overwrite: Whether to overwrite existing traces
+            final_save: Whether this is the final save (updates usage counters)
+
+        Returns a tuple of (trace_id, server_response) where server_response contains the UI URL and other metadata.
+        """
+
+        # Calculate total elapsed time
+        total_duration = self.get_duration()
+
+        # Create trace document
+        trace_data = {
+            "trace_id": self.trace_id,
+            "name": self.name,
+            "project_name": self.project_name,
+            "created_at": datetime.utcfromtimestamp(time.time()).isoformat(),
+            "duration": total_duration,
+            "trace_spans": [span.model_dump() for span in self.trace_spans],
+            "evaluation_runs": [run.model_dump() for run in self.evaluation_runs],
+            "overwrite": overwrite,
+            "offline_mode": self.tracer.offline_mode,
+            "parent_trace_id": self.parent_trace_id,
+            "parent_name": self.parent_name,
+        }
+
+        # Check usage limits first
+        try:
+            self.trace_manager_client.check_usage_limits(count=1)
+            # Usage check passed silently - no need to show detailed info
+        except ValueError as e:
+            # Rate limit exceeded
+            warnings.warn(f"Rate limit check failed for live tracing: {e}")
+            raise e
+
+        # If usage check passes, upsert the trace
+        server_response = self.trace_manager_client.upsert_trace(
+            trace_data,
+            offline_mode=self.tracer.offline_mode,
+            show_link=not final_save,  # Show link only on initial save, not final save
+            final_save=final_save,  # Pass final_save to control S3 saving
+        )
+
+        # Update usage counters only on final save
+        if final_save:
+            try:
+                self.trace_manager_client.update_usage_counters(count=1)
+                # Usage updated silently - no need to show detailed usage info
+            except ValueError as e:
+                # Log warning but don't fail the trace save since the trace was already saved
+                warnings.warn(
+                    f"Usage counter update failed (trace was still saved): {e}"
+                )
+
+        # Upload annotations
+        # TODO: batch to the log endpoint
+        for annotation in self.annotations:
+            self.trace_manager_client.save_annotation(annotation)
+        if self.start_time is None:
+            self.start_time = time.time()
+        return self.trace_id, server_response
 
     def delete(self):
         return self.trace_manager_client.delete_trace(self.trace_id)
@@ -698,6 +1000,338 @@ def _capture_exception_for_trace(
         pass
 
     current_trace.record_error(formatted_exception)
+
+    # Queue the span with error state through background service
+    if current_trace.background_span_service:
+        current_span_id = current_trace.get_current_span()
+        if current_span_id and current_span_id in current_trace.span_id_to_span:
+            error_span = current_trace.span_id_to_span[current_span_id]
+            current_trace.background_span_service.queue_span(
+                error_span, span_state="error"
+            )
+
+
+class BackgroundSpanService:
+    """
+    Background service for queueing and batching trace spans for efficient saving.
+
+    This service:
+    - Queues spans as they complete
+    - Batches them for efficient network usage
+    - Sends spans periodically or when batches reach a certain size
+    - Handles automatic flushing when the main event terminates
+    """
+
+    def __init__(
+        self,
+        judgment_api_key: str,
+        organization_id: str,
+        batch_size: int = 10,
+        flush_interval: float = 5.0,
+        num_workers: int = 1,
+    ):
+        """
+        Initialize the background span service.
+
+        Args:
+            judgment_api_key: API key for Judgment service
+            organization_id: Organization ID
+            batch_size: Number of spans to batch before sending (default: 10)
+            flush_interval: Time in seconds between automatic flushes (default: 5.0)
+            num_workers: Number of worker threads to process the queue (default: 1)
+        """
+        self.judgment_api_key = judgment_api_key
+        self.organization_id = organization_id
+        self.batch_size = batch_size
+        self.flush_interval = flush_interval
+        self.num_workers = max(1, num_workers)  # Ensure at least 1 worker
+
+        # Queue for pending spans
+        self._span_queue: queue.Queue[Dict[str, Any]] = queue.Queue()
+
+        # Background threads for processing spans
+        self._worker_threads: List[threading.Thread] = []
+        self._shutdown_event = threading.Event()
+
+        # Track spans that have been sent
+        # self._sent_spans = set()
+
+        # Register cleanup on exit
+        atexit.register(self.shutdown)
+
+        # Start the background workers
+        self._start_workers()
+
+    def _start_workers(self):
+        """Start the background worker threads."""
+        for i in range(self.num_workers):
+            if len(self._worker_threads) < self.num_workers:
+                worker_thread = threading.Thread(
+                    target=self._worker_loop, daemon=True, name=f"SpanWorker-{i + 1}"
+                )
+                worker_thread.start()
+                self._worker_threads.append(worker_thread)
+
+    def _worker_loop(self):
+        """Main worker loop that processes spans in batches."""
+        batch = []
+        last_flush_time = time.time()
+        pending_task_count = (
+            0  # Track how many tasks we've taken from queue but not marked done
+        )
+
+        while not self._shutdown_event.is_set():
+            # print(f"Worker loop queue size: {self._span_queue.qsize()}")
+            try:
+                # Try to get a span with timeout
+                try:
+                    span_data = self._span_queue.get(timeout=1.0)
+                    batch.append(span_data)
+                    pending_task_count += (
+                        1  # Increment instead of calling task_done() immediately
+                    )
+                except queue.Empty:
+                    # No new spans, continue to check for flush conditions
+                    pass
+
+                current_time = time.time()
+                should_flush = len(batch) >= self.batch_size or (
+                    batch and (current_time - last_flush_time) >= self.flush_interval
+                )
+
+                if should_flush and batch:
+                    self._send_batch(batch)
+
+                    # Only mark tasks as done after successful sending
+                    for _ in range(pending_task_count):
+                        self._span_queue.task_done()
+                    pending_task_count = 0  # Reset counter
+
+                    batch.clear()
+                    last_flush_time = current_time
+
+            except Exception as e:
+                warnings.warn(f"Error in span service worker loop: {e}")
+                # On error, still need to mark tasks as done to prevent hanging
+                for _ in range(pending_task_count):
+                    self._span_queue.task_done()
+                pending_task_count = 0
+                batch.clear()
+
+        # Final flush on shutdown
+        if batch:
+            self._send_batch(batch)
+            # Mark remaining tasks as done
+            for _ in range(pending_task_count):
+                self._span_queue.task_done()
+
+    def _send_batch(self, batch: List[Dict[str, Any]]):
+        """
+        Send a batch of spans to the server.
+
+        Args:
+            batch: List of span dictionaries to send
+        """
+        if not batch:
+            return
+
+        try:
+            # Group spans by type for different endpoints
+            spans_to_send = []
+            evaluation_runs_to_send = []
+
+            for item in batch:
+                if item["type"] == "span":
+                    spans_to_send.append(item["data"])
+                elif item["type"] == "evaluation_run":
+                    evaluation_runs_to_send.append(item["data"])
+
+            # Send spans if any
+            if spans_to_send:
+                self._send_spans_batch(spans_to_send)
+
+            # Send evaluation runs if any
+            if evaluation_runs_to_send:
+                self._send_evaluation_runs_batch(evaluation_runs_to_send)
+
+        except Exception as e:
+            warnings.warn(f"Failed to send span batch: {e}")
+
+    def _send_spans_batch(self, spans: List[Dict[str, Any]]):
+        """Send a batch of spans to the spans endpoint."""
+        payload = {"spans": spans, "organization_id": self.organization_id}
+
+        # Serialize with fallback encoder
+        def fallback_encoder(obj):
+            try:
+                return repr(obj)
+            except Exception:
+                try:
+                    return str(obj)
+                except Exception as e:
+                    return f"<Unserializable object of type {type(obj).__name__}: {e}>"
+
+        try:
+            serialized_data = json.dumps(payload, default=fallback_encoder)
+
+            # Send the actual HTTP request to the batch endpoint
+            response = requests.post(
+                JUDGMENT_TRACES_SPANS_BATCH_API_URL,
+                data=serialized_data,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.judgment_api_key}",
+                    "X-Organization-Id": self.organization_id,
+                },
+                verify=True,
+                timeout=30,  # Add timeout to prevent hanging
+            )
+
+            if response.status_code != HTTPStatus.OK:
+                warnings.warn(
+                    f"Failed to send spans batch: HTTP {response.status_code} - {response.text}"
+                )
+
+        except requests.RequestException as e:
+            warnings.warn(f"Network error sending spans batch: {e}")
+        except Exception as e:
+            warnings.warn(f"Failed to serialize or send spans batch: {e}")
+
+    def _send_evaluation_runs_batch(self, evaluation_runs: List[Dict[str, Any]]):
+        """Send a batch of evaluation runs with their associated span data to the endpoint."""
+        # Structure payload to include both evaluation run data and span data
+        evaluation_entries = []
+        for eval_data in evaluation_runs:
+            # eval_data already contains the evaluation run data (no need to access ['data'])
+            entry = {
+                "evaluation_run": {
+                    # Extract evaluation run fields (excluding span-specific fields)
+                    key: value
+                    for key, value in eval_data.items()
+                    if key not in ["associated_span_id", "span_data", "queued_at"]
+                },
+                "associated_span": {
+                    "span_id": eval_data.get("associated_span_id"),
+                    "span_data": eval_data.get("span_data"),
+                },
+                "queued_at": eval_data.get("queued_at"),
+            }
+            evaluation_entries.append(entry)
+
+        payload = {
+            "organization_id": self.organization_id,
+            "evaluation_entries": evaluation_entries,  # Each entry contains both eval run + span data
+        }
+
+        # Serialize with fallback encoder
+        def fallback_encoder(obj):
+            try:
+                return repr(obj)
+            except Exception:
+                try:
+                    return str(obj)
+                except Exception as e:
+                    return f"<Unserializable object of type {type(obj).__name__}: {e}>"
+
+        try:
+            serialized_data = json.dumps(payload, default=fallback_encoder)
+
+            # Send the actual HTTP request to the batch endpoint
+            response = requests.post(
+                JUDGMENT_TRACES_EVALUATION_RUNS_BATCH_API_URL,
+                data=serialized_data,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.judgment_api_key}",
+                    "X-Organization-Id": self.organization_id,
+                },
+                verify=True,
+                timeout=30,  # Add timeout to prevent hanging
+            )
+
+            if response.status_code != HTTPStatus.OK:
+                warnings.warn(
+                    f"Failed to send evaluation runs batch: HTTP {response.status_code} - {response.text}"
+                )
+
+        except requests.RequestException as e:
+            warnings.warn(f"Network error sending evaluation runs batch: {e}")
+        except Exception as e:
+            warnings.warn(f"Failed to send evaluation runs batch: {e}")
+
+    def queue_span(self, span: TraceSpan, span_state: str = "input"):
+        """
+        Queue a span for background sending.
+
+        Args:
+            span: The TraceSpan object to queue
+            span_state: State of the span ("input", "output", "completed")
+        """
+        if not self._shutdown_event.is_set():
+            span_data = {
+                "type": "span",
+                "data": {
+                    **span.model_dump(),
+                    "span_state": span_state,
+                    "queued_at": time.time(),
+                },
+            }
+            self._span_queue.put(span_data)
+
+    def queue_evaluation_run(
+        self, evaluation_run: EvaluationRun, span_id: str, span_data: TraceSpan
+    ):
+        """
+        Queue an evaluation run for background sending.
+
+        Args:
+            evaluation_run: The EvaluationRun object to queue
+            span_id: The span ID associated with this evaluation run
+            span_data: The span data at the time of evaluation (to avoid race conditions)
+        """
+        if not self._shutdown_event.is_set():
+            eval_data = {
+                "type": "evaluation_run",
+                "data": {
+                    **evaluation_run.model_dump(),
+                    "associated_span_id": span_id,
+                    "span_data": span_data.model_dump(),  # Include span data to avoid race conditions
+                    "queued_at": time.time(),
+                },
+            }
+            self._span_queue.put(eval_data)
+
+    def flush(self):
+        """Force immediate sending of all queued spans."""
+        try:
+            # Wait for the queue to be processed
+            self._span_queue.join()
+        except Exception as e:
+            warnings.warn(f"Error during flush: {e}")
+
+    def shutdown(self):
+        """Shutdown the background service and flush remaining spans."""
+        if self._shutdown_event.is_set():
+            return
+
+        try:
+            # Signal shutdown to stop new items from being queued
+            self._shutdown_event.set()
+
+            # Try to flush any remaining spans
+            try:
+                self.flush()
+            except Exception as e:
+                warnings.warn(f"Error during final flush: {e}")
+        except Exception as e:
+            warnings.warn(f"Error during BackgroundSpanService shutdown: {e}")
+        finally:
+            # Clear the worker threads list (daemon threads will be killed automatically)
+            self._worker_threads.clear()
+
+    def get_queue_size(self) -> int:
+        """Get the current size of the span queue."""
+        return self._span_queue.qsize()
 
 
 class _DeepTracer:
@@ -1046,6 +1680,11 @@ class Tracer:
         offline_mode: bool = False,
         deep_tracing: bool = True,  # Deep tracing is enabled by default
         trace_across_async_contexts: bool = False,  # BY default, we don't trace across async contexts
+        # Background span service configuration
+        enable_background_spans: bool = True,  # Enable background span service by default
+        span_batch_size: int = 50,  # Number of spans to batch before sending
+        span_flush_interval: float = 1.0,  # Time in seconds between automatic flushes
+        span_num_workers: int = 10,  # Number of worker threads for span processing
     ):
         if not hasattr(self, "initialized"):
             if not api_key:
@@ -1093,6 +1732,18 @@ class Tracer:
                 )
             self.offline_mode: bool = offline_mode
             self.deep_tracing: bool = deep_tracing  # NEW: Store deep tracing setting
+
+            # Initialize background span service
+            self.enable_background_spans: bool = enable_background_spans
+            self.background_span_service: Optional[BackgroundSpanService] = None
+            if enable_background_spans and not offline_mode:
+                self.background_span_service = BackgroundSpanService(
+                    judgment_api_key=api_key,
+                    organization_id=organization_id,
+                    batch_size=span_batch_size,
+                    flush_interval=span_flush_interval,
+                    num_workers=span_num_workers,
+                )
 
         elif hasattr(self, "project_name") and self.project_name != project_name:
             warnings.warn(
@@ -1162,19 +1813,6 @@ class Tracer:
         If not found (e.g., context lost across threads/tasks),
         it falls back to the active trace client managed by the callback handler.
         """
-        # trace_from_context = current_trace_var.get()
-        # if trace_from_context:
-        #     return trace_from_context
-
-        # # Fallback: Check the active client potentially set by a callback handler
-        # if hasattr(self, '_active_trace_client') and self._active_trace_client:
-        #     # warnings.warn("Falling back to _active_trace_client in get_current_trace. ContextVar might be lost.", RuntimeWarning)
-        #     return self._active_trace_client
-
-        # # If neither is available
-        # # warnings.warn("No current trace found in context variable or active client fallback.", RuntimeWarning)
-        # return None
-
         try:
             current_trace_var_val = current_trace_var.get()
         except Exception:
@@ -1486,9 +2124,36 @@ class Tracer:
                             span.record_output(result)
                         return result
                     finally:
+                        # Flush background spans before saving the trace
+
+                        complete_trace_data = {
+                            "trace_id": current_trace.trace_id,
+                            "name": current_trace.name,
+                            "created_at": datetime.utcfromtimestamp(
+                                current_trace.start_time
+                            ).isoformat(),
+                            "duration": current_trace.get_duration(),
+                            "trace_spans": [
+                                span.model_dump() for span in current_trace.trace_spans
+                            ],
+                            "overwrite": overwrite,
+                            "offline_mode": self.offline_mode,
+                            "parent_trace_id": current_trace.parent_trace_id,
+                            "parent_name": current_trace.parent_name,
+                        }
                         # Save the completed trace
-                        trace_id, trace = current_trace.save(overwrite=overwrite)
-                        self.traces.append(trace)
+                        trace_id, server_response = (
+                            current_trace.save_with_rate_limiting(
+                                overwrite=overwrite, final_save=True
+                            )
+                        )
+
+                        # Store the complete trace data instead of just server response
+
+                        self.traces.append(complete_trace_data)
+
+                        # if self.background_span_service:
+                        #     self.background_span_service.flush()
 
                         # Reset trace context (span context resets automatically)
                         self.reset_current_trace(trace_token)
@@ -1601,10 +2266,32 @@ class Tracer:
                             span.record_output(result)
                         return result
                     finally:
-                        # Save the completed trace
-                        trace_id, trace = current_trace.save(overwrite=overwrite)
-                        self.traces.append(trace)
+                        # Flush background spans before saving the trace
 
+                        # Save the completed trace
+                        trace_id, server_response = (
+                            current_trace.save_with_rate_limiting(
+                                overwrite=overwrite, final_save=True
+                            )
+                        )
+
+                        # Store the complete trace data instead of just server response
+                        complete_trace_data = {
+                            "trace_id": current_trace.trace_id,
+                            "name": current_trace.name,
+                            "created_at": datetime.utcfromtimestamp(
+                                current_trace.start_time
+                            ).isoformat(),
+                            "duration": current_trace.get_duration(),
+                            "trace_spans": [
+                                span.model_dump() for span in current_trace.trace_spans
+                            ],
+                            "overwrite": overwrite,
+                            "offline_mode": self.offline_mode,
+                            "parent_trace_id": current_trace.parent_trace_id,
+                            "parent_name": current_trace.parent_name,
+                        }
+                        self.traces.append(complete_trace_data)
                         # Reset trace context (span context resets automatically)
                         self.reset_current_trace(trace_token)
                 else:
@@ -1665,6 +2352,21 @@ class Tracer:
                 "No trace found (context var or fallback), skipping evaluation"
             )  # Modified warning
 
+    def get_background_span_service(self) -> Optional[BackgroundSpanService]:
+        """Get the background span service instance."""
+        return self.background_span_service
+
+    def flush_background_spans(self):
+        """Flush all pending spans in the background service."""
+        if self.background_span_service:
+            self.background_span_service.flush()
+
+    def shutdown_background_service(self):
+        """Shutdown the background span service."""
+        if self.background_span_service:
+            self.background_span_service.shutdown()
+            self.background_span_service = None
+
 
 def wrap(
     client: Any, trace_across_async_contexts: bool = Tracer.trace_across_async_contexts
@@ -1720,6 +2422,18 @@ def wrap(
             output, usage = format_func(client, response)
             span.record_output(output)
             span.record_usage(usage)
+
+            # Queue the completed LLM span now that it has all data (input, output, usage)
+            current_trace = _get_current_trace()
+            if current_trace and current_trace.background_span_service:
+                # Get the current span from the trace client
+                current_span_id = current_trace.get_current_span()
+                if current_span_id and current_span_id in current_trace.span_id_to_span:
+                    completed_span = current_trace.span_id_to_span[current_span_id]
+                    current_trace.background_span_service.queue_span(
+                        completed_span, span_state="completed"
+                    )
+
             return response
 
     # --- Traced Async Functions ---
@@ -2212,6 +2926,18 @@ def _sync_stream_wrapper(
         # Update the trace entry with the accumulated content and usage
         span.output = "".join(content_parts)
         span.usage = final_usage
+
+        # Queue the completed LLM span now that streaming is done and all data is available
+        # Note: We need to get the TraceClient that owns this span to access the background service
+        # We can find this through the tracer singleton since spans are associated with traces
+        from judgeval.common.tracer import Tracer
+
+        tracer_instance = Tracer._instance
+        if tracer_instance and tracer_instance.background_span_service:
+            tracer_instance.background_span_service.queue_span(
+                span, span_state="completed"
+            )
+
         # Note: We might need to adjust _serialize_output if this dict causes issues,
         # but Pydantic's model_dump should handle dicts.
 
@@ -2309,6 +3035,15 @@ async def _async_stream_wrapper(
             span.usage = usage_info
             start_ts = getattr(span, "created_at", time.time())
             span.duration = time.time() - start_ts
+
+            # Queue the completed LLM span now that async streaming is done and all data is available
+            from judgeval.common.tracer import Tracer
+
+            tracer_instance = Tracer._instance
+            if tracer_instance and tracer_instance.background_span_service:
+                tracer_instance.background_span_service.queue_span(
+                    span, span_state="completed"
+                )
         # else: # Handle error case if necessary, but remove debug print
 
 

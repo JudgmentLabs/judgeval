@@ -29,7 +29,8 @@ dependencies = [
     "langchain-anthropic",
     "langchain-core",
     "google-genai",
-    "boto3"
+    "boto3",
+    "matplotlib>=3.10.3",
 ]
 
 [project.urls]

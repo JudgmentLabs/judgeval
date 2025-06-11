@@ -174,7 +174,10 @@ def test_save_trace(mock_post, trace_client):
     mock_response = Mock()
     mock_response.status_code = 200
     mock_response.text = '{"message": "success"}'
-    mock_response.json.return_value = {"ui_results_url": "http://example.com/results"}
+    mock_response.json.return_value = {
+        "ui_results_url": "http://example.com/results",
+        "trace_id": trace_client.trace_id,
+    }
     mock_response.raise_for_status.return_value = None
     mock_post.return_value = mock_response
 
