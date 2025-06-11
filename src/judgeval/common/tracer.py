@@ -745,8 +745,8 @@ class TraceClient:
                 asyncio.create_task(self._update_coroutine(span, output, "output"))
             
             # # Queue span with output data (unless it's pending)
-            # if self.background_span_service and not inspect.iscoroutine(output):
-            #     self.background_span_service.queue_span(span, span_state="output")
+            if self.background_span_service and not inspect.iscoroutine(output):
+                self.background_span_service.queue_span(span, span_state="output")
 
             return span # Return the created entry
         # Removed else block - original didn't have one
@@ -1005,6 +1005,7 @@ class BackgroundSpanService:
         pending_task_count = 0  # Track how many tasks we've taken from queue but not marked done
         
         while not self._shutdown_event.is_set():
+            # print(f"Worker loop queue size: {self._span_queue.qsize()}")
             try:
                 # Try to get a span with timeout
                 try:
