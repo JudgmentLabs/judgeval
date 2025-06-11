@@ -104,9 +104,9 @@ async def test_save_trace_to_s3(judgment, s3_client):
         trace_files = [
             obj for obj in response["Contents"] if "test_s3_trace_saving" in obj["Key"]
         ]
-        assert (
-            len(trace_files) > 0
-        ), "Trace file with ID test_s3_trace_saving not found in bucket"
+        assert len(trace_files) > 0, (
+            "Trace file with ID test_s3_trace_saving not found in bucket"
+        )
 
         # Get the trace file content
         trace_file = trace_files[0]
@@ -167,9 +167,9 @@ async def test_auto_bucket_creation(judgment_no_bucket_yet, s3_client):
         trace_files = [
             obj for obj in response["Contents"] if "test_s3_trace_saving" in obj["Key"]
         ]
-        assert (
-            len(trace_files) > 0
-        ), "Trace file with ID test_s3_trace_saving not found in bucket"
+        assert len(trace_files) > 0, (
+            "Trace file with ID test_s3_trace_saving not found in bucket"
+        )
 
         # Get the trace file content
         trace_file = trace_files[0]
@@ -190,23 +190,26 @@ async def test_auto_bucket_creation(judgment_no_bucket_yet, s3_client):
 async def test_bucket_already_owned_by_you(judgment, s3_client):
     """Test handling of BucketAlreadyOwnedByYou error during bucket creation."""
     # Mock the S3 client to simulate BucketAlreadyOwnedByYou error
-    with patch.object(
-        judgment.s3_storage.s3_client,
-        "head_bucket",
-        side_effect=ClientError(
-            {"Error": {"Code": "404", "Message": "Not Found"}}, "HeadBucket"
+    with (
+        patch.object(
+            judgment.s3_storage.s3_client,
+            "head_bucket",
+            side_effect=ClientError(
+                {"Error": {"Code": "404", "Message": "Not Found"}}, "HeadBucket"
+            ),
         ),
-    ), patch.object(
-        judgment.s3_storage.s3_client,
-        "create_bucket",
-        side_effect=ClientError(
-            {
-                "Error": {
-                    "Code": "BucketAlreadyOwnedByYou",
-                    "Message": "Bucket already owned by you",
-                }
-            },
-            "CreateBucket",
+        patch.object(
+            judgment.s3_storage.s3_client,
+            "create_bucket",
+            side_effect=ClientError(
+                {
+                    "Error": {
+                        "Code": "BucketAlreadyOwnedByYou",
+                        "Message": "Bucket already owned by you",
+                    }
+                },
+                "CreateBucket",
+            ),
         ),
     ):
         test_output = "test output"

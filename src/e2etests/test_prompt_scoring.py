@@ -139,7 +139,7 @@ def main():
 
     print("\nClient Evaluation Results:")
     for i, result in enumerate(results):
-        print(f"\nExample {i+1}:")
+        print(f"\nExample {i + 1}:")
         print(f"Input: {[pos_example, neg_example][i].input}")
         print(f"Output: {[pos_example, neg_example][i].actual_output}")
         # Access score data directly from result

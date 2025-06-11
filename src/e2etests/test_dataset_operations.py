@@ -80,12 +80,12 @@ class TestDatasetOperations:
         all_datasets_stats = client.pull_project_dataset_stats(project_name)
 
         assert all_datasets_stats, "Failed to pull dataset"
-        assert (
-            all_datasets_stats[random_name1]["example_count"] == 3
-        ), f"{random_name1} should have 3 examples"
-        assert (
-            all_datasets_stats[random_name2]["example_count"] == 2
-        ), f"{random_name2} should have 2 examples"
+        assert all_datasets_stats[random_name1]["example_count"] == 3, (
+            f"{random_name1} should have 3 examples"
+        )
+        assert all_datasets_stats[random_name2]["example_count"] == 2, (
+            f"{random_name2} should have 2 examples"
+        )
 
         client.delete_dataset(alias=random_name1, project_name=project_name)
         client.delete_dataset(alias=random_name2, project_name=project_name)
@@ -115,9 +115,9 @@ class TestDatasetOperations:
         )
         dataset = client.pull_dataset(alias="test_dataset_6", project_name=project_name)
         assert dataset, "Failed to pull dataset"
-        assert (
-            len(dataset.examples) == initial_example_count + 1
-        ), f"Dataset should have {initial_example_count + 1} examples, but has {len(dataset.examples)}"
+        assert len(dataset.examples) == initial_example_count + 1, (
+            f"Dataset should have {initial_example_count + 1} examples, but has {len(dataset.examples)}"
+        )
 
         client.delete_dataset(alias="test_dataset_6", project_name=project_name)
 

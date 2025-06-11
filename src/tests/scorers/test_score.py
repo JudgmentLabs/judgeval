@@ -857,13 +857,13 @@ async def test_a_eval_examples_helper_success(
     scorers = [mock_scorer_2]
 
     # Mock the external functions
-    with patch(
-        "judgeval.scorers.score.score_with_indicator", new_callable=AsyncMock
-    ) as mock_score_with_indicator, patch(
-        "judgeval.scorers.score.create_scorer_data"
-    ) as mock_create_scorer_data, patch(
-        "judgeval.scorers.score.generate_scoring_result"
-    ) as mock_generate_result:
+    with (
+        patch(
+            "judgeval.scorers.score.score_with_indicator", new_callable=AsyncMock
+        ) as mock_score_with_indicator,
+        patch("judgeval.scorers.score.create_scorer_data") as mock_create_scorer_data,
+        patch("judgeval.scorers.score.generate_scoring_result") as mock_generate_result,
+    ):
         # Setup mock returns
         mock_scorer_data = ScorerData(
             name=mock_scorer_2.__name__,
@@ -925,12 +925,12 @@ async def test_a_eval_examples_helper_with_skipped_scorer(
 
     scorers = [mock_scorer_2]
 
-    with patch(
-        "judgeval.scorers.score.score_with_indicator", new_callable=AsyncMock
-    ) as mock_score_with_indicator, patch(
-        "judgeval.scorers.score.create_scorer_data"
-    ) as mock_create_scorer_data, patch(
-        "judgeval.scorers.score.generate_scoring_result"
+    with (
+        patch(
+            "judgeval.scorers.score.score_with_indicator", new_callable=AsyncMock
+        ) as mock_score_with_indicator,
+        patch("judgeval.scorers.score.create_scorer_data") as mock_create_scorer_data,
+        patch("judgeval.scorers.score.generate_scoring_result"),
     ):
         # Mock score_with_indicator to simulate skipped scorer behavior
         async def mock_score(*args, **kwargs):
@@ -967,10 +967,10 @@ async def test_a_eval_examples_helper_with_progress_bar(
     scorers = [mock_scorer_2]
     mock_pbar = Mock()
 
-    with patch(
-        "judgeval.scorers.score.score_with_indicator", new_callable=AsyncMock
-    ), patch("judgeval.scorers.score.create_scorer_data"), patch(
-        "judgeval.scorers.score.generate_scoring_result"
+    with (
+        patch("judgeval.scorers.score.score_with_indicator", new_callable=AsyncMock),
+        patch("judgeval.scorers.score.create_scorer_data"),
+        patch("judgeval.scorers.score.generate_scoring_result"),
     ):
         await a_eval_examples_helper(
             scorers=scorers,

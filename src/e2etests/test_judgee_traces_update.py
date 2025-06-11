@@ -75,9 +75,9 @@ async def get_client():
             # Test server health before proceeding
             logger.debug("Testing server health")
             response = await client.get(f"{SERVER_URL}/health")
-            assert (
-                response.status_code == 200
-            ), f"Server is not healthy: {response.status_code}"
+            assert response.status_code == 200, (
+                f"Server is not healthy: {response.status_code}"
+            )
             logger.debug("Server health check passed")
             yield client
         except Exception as e:

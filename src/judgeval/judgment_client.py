@@ -543,9 +543,11 @@ class JudgmentClient(metaclass=SingletonMeta):
         )
 
         if response.status_code == 500:
-            raise JudgmentAPIError(f"The server is temporarily unavailable. \
+            raise JudgmentAPIError(
+                f"The server is temporarily unavailable. \
                                    Please try your request again in a few moments. \
-                                   Error details: {response.json().get('detail', '')}")
+                                   Error details: {response.json().get('detail', '')}"
+            )
         elif response.status_code != 200:
             raise JudgmentAPIError(
                 f"Failed to save classifier scorer: {response.json().get('detail', '')}"

@@ -312,9 +312,9 @@ def test_hallucination_scorer(client: JudgmentClient):
     print_debug_on_failure(res[0])
 
     # Add more detailed assertion error message
-    assert res[
-        0
-    ].success, f"Hallucination test failed: score={res[0].scorers_data[0].score}, threshold={res[0].scorers_data[0].threshold}, reason={res[0].scorers_data[0].reason}"
+    assert res[0].success, (
+        f"Hallucination test failed: score={res[0].scorers_data[0].score}, threshold={res[0].scorers_data[0].threshold}, reason={res[0].scorers_data[0].reason}"
+    )
 
 
 def test_instruction_adherence_scorer(client: JudgmentClient):
@@ -367,9 +367,9 @@ def test_summarization_scorer(client: JudgmentClient):
     print_debug_on_failure(res[0])
 
     # Add detailed assertion error message
-    assert res[
-        0
-    ].success, f"Summarization test failed: score={res[0].scorers_data[0].score}, threshold={res[0].scorers_data[0].threshold}, reason={res[0].scorers_data[0].reason}"
+    assert res[0].success, (
+        f"Summarization test failed: score={res[0].scorers_data[0].score}, threshold={res[0].scorers_data[0].threshold}, reason={res[0].scorers_data[0].reason}"
+    )
 
 
 def test_text2sql_scorer(client: JudgmentClient):

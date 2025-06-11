@@ -357,8 +357,9 @@ class TestRunEvaluation:
             assert_test([failing_result])
 
     def test_run_eval_sync(self, mock_evaluation_run):
-        with patch("judgeval.run_evaluation.execute_api_eval") as mock_execute, patch(
-            "builtins.input", return_value="y"
+        with (
+            patch("judgeval.run_evaluation.execute_api_eval") as mock_execute,
+            patch("builtins.input", return_value="y"),
         ):  # Mock input to return 'y'
             mock_execute.return_value = {
                 "results": [
@@ -415,11 +416,14 @@ class TestRunEvaluation:
             )
         ]
 
-        with patch(
-            "judgeval.run_evaluation.SpinnerWrappedTask", return_value=asyncio.Future()
-        ) as mock_spinner, patch(
-            "asyncio.create_task", return_value=asyncio.Future()
-        ), patch("builtins.input", return_value="y"):
+        with (
+            patch(
+                "judgeval.run_evaluation.SpinnerWrappedTask",
+                return_value=asyncio.Future(),
+            ) as mock_spinner,
+            patch("asyncio.create_task", return_value=asyncio.Future()),
+            patch("builtins.input", return_value="y"),
+        ):
             # Set the result of the future
             mock_spinner.return_value.set_result(mock_results)
 

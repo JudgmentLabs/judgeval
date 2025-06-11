@@ -283,10 +283,12 @@ examples:
             results = client.pull_eval(
                 project_name=PROJECT_NAME_EVAL, eval_run_name=EVAL_RUN_NAME
             )
-            assert results, f"No evaluation results found for {EVAL_RUN_NAME} in project {PROJECT_NAME_EVAL}"
-            assert isinstance(
-                results, list
-            ), "Expected results to be a list of experiment/trace data"
+            assert results, (
+                f"No evaluation results found for {EVAL_RUN_NAME} in project {PROJECT_NAME_EVAL}"
+            )
+            assert isinstance(results, list), (
+                "Expected results to be a list of experiment/trace data"
+            )
             assert len(results) == 2, f"Expected 2 trace results but got {len(results)}"
 
         finally:

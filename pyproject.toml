@@ -70,3 +70,6 @@ exclude = [
     "src/tests/*",
     "src/demo/*"
 ]
+
+[tool.ruff]
+exclude = ["docs"]

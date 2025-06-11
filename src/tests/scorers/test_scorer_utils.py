@@ -52,7 +52,7 @@ def test_clone_scorers(mock_scorers):
 
     assert len(cloned) == len(mock_scorers)
     for original, clone in zip(mock_scorers, cloned):
-        assert type(original) == type(clone)
+        assert type(original) is type(clone)
         assert original.score_type == clone.score_type
         assert original.threshold == clone.threshold
         assert original.evaluation_model == clone.evaluation_model

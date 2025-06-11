@@ -58,9 +58,9 @@ def validate_trace_token_counts(trace_client) -> Dict[str, int]:
     assert manual_prompt_tokens > 0, "Prompt tokens should be counted"
     assert manual_completion_tokens > 0, "Completion tokens should be counted"
     assert manual_total_tokens > 0, "Total tokens should be counted"
-    assert manual_total_tokens == (
-        manual_prompt_tokens + manual_completion_tokens
-    ), "Total tokens should equal prompt + completion"
+    assert manual_total_tokens == (manual_prompt_tokens + manual_completion_tokens), (
+        "Total tokens should equal prompt + completion"
+    )
 
     return {
         "prompt_tokens": manual_prompt_tokens,

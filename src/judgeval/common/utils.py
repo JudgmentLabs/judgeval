@@ -548,7 +548,7 @@ def validate_chat_messages(messages, batched: bool = False):
             )
 
 
-def validate_batched_chat_messages(messages: List[List[Mapping]]):
+def validate_batched_chat_messages(messages):
     """
     Validate format of batched chat messages before API call
 
@@ -614,14 +614,10 @@ def get_chat_completion(
         raise ValueError("Messages cannot be empty")
 
     # Add validation
-    if batched and is_batched_messages(messages):
+    if batched:
         validate_batched_chat_messages(messages)
-    elif not batched and is_simple_messages(messages):
-        validate_chat_messages(messages)
     else:
-        raise ValueError(
-            "Messages must be either of type List[Mapping] or List[List[Mapping]]"
-        )
+        validate_chat_messages(messages)
 
     if (
         batched
@@ -687,14 +683,10 @@ async def aget_chat_completion(
     """
     debug(f"Starting chat completion for model {model_type}, batched={batched}")
 
-    if batched and is_batched_messages(messages):
+    if batched:
         validate_batched_chat_messages(messages)
-    elif not batched and is_simple_messages(messages):
-        validate_chat_messages(messages)
     else:
-        raise ValueError(
-            "Messages must be either of type List[Mapping] or List[List[Mapping]]"
-        )
+        validate_chat_messages(messages)
 
     if (
         batched

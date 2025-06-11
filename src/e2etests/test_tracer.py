@@ -514,7 +514,7 @@ async def test_deep_tracing_with_custom_spans():
     PROJECT_NAME = "DeepTracingTest"
     test_input = "deep_tracing_test"
 
-    print(f"\n{'='*20} Starting Deep Tracing Test {'='*20}")
+    print(f"\n{'=' * 20} Starting Deep Tracing Test {'=' * 20}")
 
     # Set the project name for the root function's trace
     # First, update the decorator to include the project name
@@ -541,12 +541,12 @@ async def test_deep_tracing_with_custom_spans():
 
     # Let's just verify that the root function returns the expected result
     assert "level2:level3:level4" in result, "Level 2-3-4 chain not found in result"
-    assert (
-        "level2_parallel1:level3_p1" in result
-    ), "Level 2-3 parallel chain not found in result"
-    assert (
-        "level2_parallel2:level3:level4" in result
-    ), "Level 2-3-4 parallel chain not found in result"
+    assert "level2_parallel1:level3_p1" in result, (
+        "Level 2-3 parallel chain not found in result"
+    )
+    assert "level2_parallel2:level3:level4" in result, (
+        "Level 2-3-4 parallel chain not found in result"
+    )
     assert "level5" in result, "Level 5 function result not found"
 
     print("\nDeep tracing test passed - verified through output inspection")
@@ -568,7 +568,7 @@ async def test_deep_tracing_with_custom_spans():
 async def test_openai_sync_streaming_usage(test_input):
     """Test that sync OpenAI streaming calls correctly capture usage."""
     PROJECT_NAME = "TestSyncStreamUsage"
-    print(f"\n{'='*20} Starting Sync Streaming Usage Test {'='*20}")
+    print(f"\n{'=' * 20} Starting Sync Streaming Usage Test {'=' * 20}")
 
     # Use the globally defined wrapped sync client
     sync_client = openai_client
@@ -621,7 +621,7 @@ async def test_openai_sync_streaming_usage(test_input):
 async def test_openai_async_streaming_usage(test_input):
     """Test that async OpenAI streaming calls correctly capture usage."""
     PROJECT_NAME = "TestAsyncStreamUsage"
-    print(f"\n{'='*20} Starting Async Streaming Usage Test {'='*20}")
+    print(f"\n{'=' * 20} Starting Async Streaming Usage Test {'=' * 20}")
 
     # Use the globally defined wrapped async client
     async_client = openai_client_async
@@ -678,7 +678,7 @@ async def test_openai_async_streaming_usage(test_input):
 )
 async def test_token_counting():
     """Test aggregation of token counts and costs across mixed API calls."""
-    print(f"\n{'='*20} Starting Token Aggregation Test {'='*20}")
+    print(f"\n{'=' * 20} Starting Token Aggregation Test {'=' * 20}")
 
     prompt1 = "Explain black holes briefly."
     prompt2 = "List 3 species of penguins."
@@ -746,7 +746,7 @@ async def test_token_counting():
         # Optional: print results/errors for debugging
         for i, res in enumerate(results):
             if isinstance(res, Exception):
-                print(f"Task {i+1} failed: {res}")
+                print(f"Task {i + 1} failed: {res}")
             # else: print(f"Task {i+1} succeeded.") # Verbose
     else:
         print("No async tasks to run.")
@@ -780,7 +780,7 @@ async def test_anthropic_async_streaming_usage(test_input):
     if not anthropic_client_async:
         pytest.skip("Anthropic client not initialized.")
     PROJECT_NAME = "TestAnthropicStreamUsage"
-    print(f"\n{'='*20} Starting Anthropic Streaming Usage Test {'='*20}")
+    print(f"\n{'=' * 20} Starting Anthropic Streaming Usage Test {'=' * 20}")
 
     @judgment.observe(
         name="anthropic_stream_func",
@@ -833,7 +833,7 @@ async def test_together_async_streaming_usage(test_input):
     if not together_client_async:
         pytest.skip("Together client not initialized. Set TOGETHER_API_KEY.")
     PROJECT_NAME = "TestTogetherStreamUsage"
-    print(f"\n{'='*20} Starting Together Streaming Usage Test {'='*20}")
+    print(f"\n{'=' * 20} Starting Together Streaming Usage Test {'=' * 20}")
 
     @judgment.observe(
         name="together_stream_func",

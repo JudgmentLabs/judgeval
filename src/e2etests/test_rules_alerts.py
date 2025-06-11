@@ -185,17 +185,17 @@ async def test_basic_rules(good_example, bad_example):
 
     # Test assertions
     # The good example should have high scores
-    assert (
-        good_result["scores"]["Answer Correctness"] > 0.7
-    ), "Good example should have high correctness score"
-    assert (
-        good_result["scores"]["Answer Relevancy"] > 0.7
-    ), "Good example should have high relevancy score"
+    assert good_result["scores"]["Answer Correctness"] > 0.7, (
+        "Good example should have high correctness score"
+    )
+    assert good_result["scores"]["Answer Relevancy"] > 0.7, (
+        "Good example should have high relevancy score"
+    )
 
     # The bad example should have lower scores
-    assert (
-        bad_result["scores"]["Answer Correctness"] < 0.7
-    ), "Bad example should have low correctness score"
+    assert bad_result["scores"]["Answer Correctness"] < 0.7, (
+        "Bad example should have low correctness score"
+    )
 
     # Check for alerts in good example
     if good_result["alerts"]:
@@ -208,9 +208,9 @@ async def test_basic_rules(good_example, bad_example):
             None,
         )
         if any_rule_id:
-            assert (
-                good_result["alerts"][any_rule_id]["status"] == "triggered"
-            ), "Any Metric Quality Check should be triggered for good example"
+            assert good_result["alerts"][any_rule_id]["status"] == "triggered", (
+                "Any Metric Quality Check should be triggered for good example"
+            )
 
 
 @pytest.mark.asyncio
@@ -295,9 +295,9 @@ async def test_complex_rules():
             None,
         )
         if mixed_rule_id:
-            assert (
-                alerts[mixed_rule_id]["status"] == "triggered"
-            ), "Mixed Operators Rule should be triggered"
+            assert alerts[mixed_rule_id]["status"] == "triggered", (
+                "Mixed Operators Rule should be triggered"
+            )
 
 
 @pytest.mark.asyncio

@@ -87,13 +87,13 @@ def fetch_and_validate_trace(trace_id: str, expected_project: str):
         # assert trace_data.get("project_name") == expected_project # Commenting out: Seems fetch API doesn't return project_name
 
         # --- MODIFIED CHECK: Look for 'trace_spans' instead of 'entries' ---
-        assert (
-            "trace_spans" in trace_data
-        ), f"Fetched trace {trace_id} should contain 'trace_spans' key."
+        assert "trace_spans" in trace_data, (
+            f"Fetched trace {trace_id} should contain 'trace_spans' key."
+        )
         trace_spans = trace_data.get("trace_spans")
-        assert (
-            trace_spans is not None
-        ), f"Trace {trace_id} field 'trace_spans' should not be None."
+        assert trace_spans is not None, (
+            f"Trace {trace_id} field 'trace_spans' should not be None."
+        )
         # assert len(trace_spans) > 0, f"Trace {trace_id} should have at least one span in 'trace_spans'." # Can be 0 if only root span
         # --- END MODIFIED CHECK ---
 
@@ -143,9 +143,9 @@ def test_sync_graph_execution():
         trace_client_sync = getattr(
             handler_sync, "_trace_client", None
         )  # Use getattr for safety
-        assert (
-            trace_client_sync is not None
-        ), "Sync handler should have an active trace client after invoke."
+        assert trace_client_sync is not None, (
+            "Sync handler should have an active trace client after invoke."
+        )
         trace_id_sync = trace_client_sync.trace_id
         assert isinstance(trace_id_sync, str), "Trace ID should be a string."
         print(f"Sync test generated Trace ID: {trace_id_sync}")
@@ -176,9 +176,9 @@ def test_sync_graph_execution():
         time.sleep(5)
         fetched_trace = fetch_and_validate_trace(trace_id_sync, PROJECT_NAME_SYNC)
         # Add more specific trace content assertions
-        assert (
-            fetched_trace.get("trace_spans") is not None
-        ), f"Trace {trace_id_sync} should have trace_spans."
+        assert fetched_trace.get("trace_spans") is not None, (
+            f"Trace {trace_id_sync} should have trace_spans."
+        )
         assert any(
             "call_llm" in span.get("function", "")
             for span in fetched_trace["trace_spans"]
@@ -236,9 +236,9 @@ async def test_async_graph_execution():
         trace_client_async = getattr(
             handler_async, "_trace_client", None
         )  # Use getattr for safety
-        assert (
-            trace_client_async is not None
-        ), "Async handler should have an active trace client after ainvoke."
+        assert trace_client_async is not None, (
+            "Async handler should have an active trace client after ainvoke."
+        )
         trace_id_async = trace_client_async.trace_id
         assert isinstance(trace_id_async, str), "Async Trace ID should be a string."
         print(f"Async test generated Trace ID: {trace_id_async}")
@@ -251,18 +251,18 @@ async def test_async_graph_execution():
         pytest.fail(fail_msg)
 
     # Fetch and validate the trace
-    assert (
-        trace_id_async is not None
-    ), "trace_id_async was not set during the async test run."
+    assert trace_id_async is not None, (
+        "trace_id_async was not set during the async test run."
+    )
     if trace_id_async:
         # Add a small delay before fetching
         print("Waiting 5 seconds before fetching async trace...")
         time.sleep(5)
         fetched_trace = fetch_and_validate_trace(trace_id_async, PROJECT_NAME_ASYNC)
         # Add more specific trace content assertions
-        assert (
-            fetched_trace.get("trace_spans") is not None
-        ), f"Trace {trace_id_async} should have trace_spans."
+        assert fetched_trace.get("trace_spans") is not None, (
+            f"Trace {trace_id_async} should have trace_spans."
+        )
         assert any(
             "async_call_llm" in span.get("function", "")
             for span in fetched_trace["trace_spans"]
