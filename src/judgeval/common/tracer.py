@@ -646,14 +646,11 @@ class TraceClient:
                 )
             
     def add_eval_run(self, eval_run: EvaluationRun, start_time: float):
-        # --- Modification: Use span_id from eval_run --- 
         current_span_id = eval_run.trace_span_id # Get ID from the eval_run object
-        # print(f"[TraceClient.add_eval_run] Using span_id from eval_run: {current_span_id}")
-        # --- End Modification ---
+        print(f"Current span id: {current_span_id}")
 
         if current_span_id:
             span = self.span_id_to_span[current_span_id]
-            span.evaluation_runs.append(eval_run)
             span.has_evaluation = True  # Set the has_evaluation flag
         self.evaluation_runs.append(eval_run)
 

@@ -62,8 +62,8 @@ class Condition(BaseModel):
         # Use the scorer's success check function if available
         if hasattr(self.metric, 'success_check'):
             return self.metric.success_check()
-        elif hasattr(self.metric, '_success_check'):
-            return self.metric._success_check()
+        elif hasattr(self.metric, 'success_check'):
+            return self.metric.success_check()
         else:
             # Fallback to default comparison (greater than or equal)
             return value >= self.threshold if self.threshold is not None else False

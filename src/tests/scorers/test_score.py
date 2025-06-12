@@ -22,7 +22,7 @@ class MockJudgevalScorer(JudgevalScorer):
     async def a_score_example(self, example, *args, **kwargs):
         pass
 
-    def _success_check(self):
+    def success_check(self):
         return True
 
 
@@ -799,7 +799,7 @@ def mock_scorer():
     scorer.evaluation_model = "test-model"
     scorer.score = 0.9
     scorer.reason = "Test reason"
-    scorer._success_check.return_value = True
+    scorer.success_check.return_value = True
     scorer.evaluation_cost = 0.1
     scorer.verbose_logs = "Test logs"
     scorer.additional_metadata = {"key": "value"}
@@ -829,7 +829,7 @@ async def test_a_eval_examples_helper_success(
          patch('judgeval.scorers.score.generate_scoring_result') as mock_generate_result:
         
         # Setup mock returns
-        mock_scorer_data = ScorerData(
+        mock_scorer_data = [ScorerData(
             name=mock_scorer.__name__,
             threshold=mock_scorer.threshold,
             success=True,
@@ -841,12 +841,12 @@ async def test_a_eval_examples_helper_success(
             evaluation_cost=mock_scorer.evaluation_cost,
             verbose_logs=mock_scorer.verbose_logs,
             additional_metadata=mock_scorer.additional_metadata
-        )
+        )]
         mock_create_scorer_data.return_value = mock_scorer_data
         
         mock_scoring_result = ScoringResult(
             success=True,
-            scorers_data=[mock_scorer_data],
+            scorers_data=[mock_scorer_data[0]],
             data_object=mock_example,
             trace_id=mock_example.trace_id
         )

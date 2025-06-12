@@ -27,7 +27,7 @@ from judgeval.data import (
     Trace
 )
 from judgeval.evaluation_run import EvaluationRun
-from judgeval.data.trace_run import TraceRun
+from judgeval.trace_run import TraceRun
 from judgeval.scorers import (
     FaithfulnessScorer
 )

@@ -79,7 +79,7 @@ If you find that none of the default scorers meet your evaluation needs, setting
 You can create a custom scorer by inheritng from the `JudgevalScorer` class and implementing three methods:
 - `score_example()`: produces a score for a single `Example`.
 - `a_score_example()`: async version of `score_example()`. You may use the same implementation logic as `score_example()`.
-- `_success_check()`: determines whether an evaluation was successful.
+- `success_check()`: determines whether an evaluation was successful.
 
 Custom scorers can be as simple or complex as you want, and **do not need to use LLMs**. 
 For sample implementations, check out the [Custom Scorers](/evaluation/scorers/custom_scorers) documentation page.

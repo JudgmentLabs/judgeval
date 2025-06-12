@@ -662,7 +662,7 @@ def test_local_prompt_scorer(client: JudgmentClient):
             self.score = normalized_score
             return normalized_score, reason
         
-        def _success_check(self, **kwargs) -> bool:
+        def success_check(self, **kwargs) -> bool:
             return self.score >= self.threshold
 
     # Create test examples

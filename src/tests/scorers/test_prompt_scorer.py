@@ -47,7 +47,7 @@ class SampleScorer(PromptScorer):
     def _process_response(self, response: dict):
         return response["score"], response["reason"]
     
-    def _success_check(self, **kwargs) -> bool:
+    def success_check(self, **kwargs) -> bool:
         return self._result >= self.threshold
 
 # Tests for PromptScorer

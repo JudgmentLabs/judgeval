@@ -419,8 +419,9 @@ async def a_eval_examples_helper(
         if getattr(scorer, 'skipped', False):
             continue
         scorer_data = create_scorer_data(scorer)  # Fetch scorer data from completed scorer evaluation
-        success = success and scorer_data.success
-        scorer_data_list.append(scorer_data)
+        for s in scorer_data:
+            success = success and s.success
+        scorer_data_list.extend(scorer_data)
         
     scoring_end_time = time.perf_counter()
     run_duration = scoring_end_time - scoring_start_time

@@ -271,7 +271,7 @@ class PromptScorer(JudgevalScorer, BaseModel):
         pass
 
     @abstractmethod
-    def _success_check(self, **kwargs) -> bool:
+    def success_check(self, **kwargs) -> bool:
         """
         Determines whether or not the PromptScorer should consider the evaluation of a single example successful.
         """
