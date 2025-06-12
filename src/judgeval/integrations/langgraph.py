@@ -130,13 +130,6 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         self._span_id_to_start_time[span_id] = start_time
         self._span_id_to_depth[span_id] = current_depth
 
-
-        # --- Set SPAN context variable ONLY for chain (node) spans (Sync version) ---
-        # if span_type == "chain":
-        #     token = self.tracer.set_current_span(span_id)
-        #     if token:
-        #         self.span_id_to_token[span_id] = token
-
         new_span = TraceSpan(
             span_id=span_id,
             trace_id=trace_client.trace_id,
@@ -147,7 +140,26 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
             span_type=span_type
         )
 
-        new_span.inputs = inputs
+        # Separate metadata from inputs
+        if inputs:
+            metadata = {}
+            clean_inputs = {}
+            
+            # Extract metadata fields
+            metadata_fields = ['tags', 'metadata', 'kwargs', 'serialized']
+            for field in metadata_fields:
+                if field in inputs:
+                    metadata[field] = inputs.pop(field)
+            
+            # Store the remaining inputs
+            clean_inputs = inputs
+            
+            # Set both fields on the span
+            new_span.inputs = clean_inputs
+            new_span.additional_metadata = metadata
+        else:
+            new_span.inputs = {}
+            new_span.additional_metadata = {}
 
         trace_client.add_span(new_span)
         
@@ -181,7 +193,33 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
             trace_span = trace_client.span_id_to_span.get(span_id)
             if trace_span:
                 trace_span.duration = duration
-                trace_span.output = error if error else outputs
+                
+                # Handle outputs and error
+                if error:
+                    trace_span.output = error
+                elif outputs:
+                    # Separate metadata from outputs
+                    metadata = {}
+                    clean_outputs = {}
+                    
+                    # Extract metadata fields
+                    metadata_fields = ['tags', 'kwargs']
+                    if isinstance(outputs, dict):
+                        for field in metadata_fields:
+                            if field in outputs:
+                                metadata[field] = outputs.pop(field)
+                        
+                        # Store the remaining outputs
+                        clean_outputs = outputs
+                    else:
+                        clean_outputs = outputs
+                    
+                    # Set both fields on the span
+                    trace_span.output = clean_outputs
+                    if metadata:
+                        # Merge with existing metadata
+                        existing_metadata = trace_span.additional_metadata or {}
+                        trace_span.additional_metadata = {**existing_metadata, **metadata}
                 
                 # Queue span with completed state through background service
                 if trace_client.background_span_service:
@@ -221,12 +259,8 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                     )
                     token = self.trace_id_to_token.pop(trace_id, None)
                     self.tracer.reset_current_trace(token, trace_id)
-                    # current_trace_var.set(None)
                     
                     # Store complete trace data instead of server response
-                    
-                    if self._trace_client.background_span_service:
-                        self._trace_client.background_span_service.flush()
                     self.tracer.traces.append(complete_trace_data)
                     self._trace_saved = True # Set flag only after successful save
             finally:
