@@ -2,7 +2,8 @@
 
 import json
 
-from judgeval.rules import Rule, Condition, NotificationConfig, AlertStatus, AlertResult
+from judgeval.rules import Rule, Condition, NotificationConfig
+from judgeval.utils.alerts import AlertStatus, AlertResult
 from judgeval.scorers.judgeval_scorers.api_scorers.faithfulness import (
     FaithfulnessScorer,
 )

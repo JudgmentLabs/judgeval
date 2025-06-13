@@ -61,6 +61,7 @@ class TraceSpan(BaseModel):
             "agent_name": self.agent_name,
             "state_before": self.state_before,
             "state_after": self.state_after,
+            "additional_metadata": self._serialize_value(self.additional_metadata),
         }
 
     def print_span(self):

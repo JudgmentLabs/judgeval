@@ -4,7 +4,8 @@ import pytest
 from unittest.mock import patch, MagicMock
 import asyncio
 
-from judgeval.rules import Rule, Condition, NotificationConfig, AlertStatus, RulesEngine
+from judgeval.rules import Rule, Condition, NotificationConfig, RulesEngine
+from judgeval.utils.alerts import AlertStatus
 from judgeval.scorers import AnswerRelevancyScorer, FaithfulnessScorer
 from judgeval.judgment_client import JudgmentClient
 from judgeval.data import Example

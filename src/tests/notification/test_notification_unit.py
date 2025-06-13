@@ -4,7 +4,8 @@ import pytest
 from unittest.mock import MagicMock, patch
 import uuid
 
-from judgeval.rules import Rule, Condition, RulesEngine, AlertStatus, NotificationConfig
+from judgeval.rules import Rule, Condition, RulesEngine, NotificationConfig
+from judgeval.utils.alerts import AlertStatus
 from judgeval.scorers.judgeval_scorers.api_scorers.faithfulness import (
     FaithfulnessScorer,
 )
