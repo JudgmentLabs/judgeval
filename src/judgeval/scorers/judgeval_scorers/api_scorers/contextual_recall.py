@@ -14,15 +14,16 @@ from judgeval.data import ExampleParams
 class ContextualRecallScorer(APIJudgmentScorer):
     def __init__(self, threshold: float):
         super().__init__(
-            threshold=threshold, 
+            threshold=threshold,
             score_type=APIScorer.CONTEXTUAL_RECALL,
             required_params=[
                 ExampleParams.INPUT,
                 ExampleParams.ACTUAL_OUTPUT,
                 ExampleParams.EXPECTED_OUTPUT,
                 ExampleParams.RETRIEVAL_CONTEXT,
-            ]
+            ],
         )
+
     @property
     def __name__(self):
         return "Contextual Recall"

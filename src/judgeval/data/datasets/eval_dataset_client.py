@@ -1,4 +1,3 @@
-
 from typing import Optional, List
 import requests
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -7,16 +6,14 @@ from judgeval.common.logger import debug, error, warning, info
 from judgeval.constants import (
     JUDGMENT_DATASETS_PUSH_API_URL,
     JUDGMENT_DATASETS_APPEND_EXAMPLES_API_URL,
-    JUDGMENT_DATASETS_PULL_API_URL, 
+    JUDGMENT_DATASETS_PULL_API_URL,
     JUDGMENT_DATASETS_PROJECT_STATS_API_URL,
     JUDGMENT_DATASETS_DELETE_API_URL,
     JUDGMENT_DATASETS_INSERT_API_URL,
-    JUDGMENT_DATASETS_EXPORT_JSONL_API_URL
+    JUDGMENT_DATASETS_EXPORT_JSONL_API_URL,
 )
 from judgeval.data import Example, Trace
 from judgeval.data.datasets import EvalDataset
-
-
 
 
 class EvalDatasetClient:
@@ -26,8 +23,14 @@ class EvalDatasetClient:
 
     def create_dataset(self) -> EvalDataset:
         return EvalDataset(judgment_api_key=self.judgment_api_key)
-    
-    def push(self, dataset: EvalDataset, alias: str, project_name: str, overwrite: Optional[bool] = False) -> bool:
+
+    def push(
+        self,
+        dataset: EvalDataset,
+        alias: str,
+        project_name: str,
+        overwrite: Optional[bool] = False,
+    ) -> bool:
         debug(f"Pushing dataset with alias '{alias}' (overwrite={overwrite})")
         if overwrite:
             warning(f"Overwrite enabled for alias '{alias}'")
@@ -55,22 +58,22 @@ class EvalDatasetClient:
                 total=100,
             )
             content = {
-                    "dataset_alias": alias,
-                    "project_name": project_name,
-                    "examples": [e.to_dict() for e in dataset.examples],
-                    "traces": [t.model_dump() for t in dataset.traces],
-                    "overwrite": overwrite,
-                }
+                "dataset_alias": alias,
+                "project_name": project_name,
+                "examples": [e.to_dict() for e in dataset.examples],
+                "traces": [t.model_dump() for t in dataset.traces],
+                "overwrite": overwrite,
+            }
             try:
                 response = requests.post(
-                    JUDGMENT_DATASETS_PUSH_API_URL, 
+                    JUDGMENT_DATASETS_PUSH_API_URL,
                     json=content,
                     headers={
                         "Content-Type": "application/json",
                         "Authorization": f"Bearer {self.judgment_api_key}",
-                        "X-Organization-Id": self.organization_id
+                        "X-Organization-Id": self.organization_id,
                     },
-                    verify=True
+                    verify=True,
                 )
                 if response.status_code != 200:
                     error(f"Server error during push: {response.json()}")
@@ -81,19 +84,20 @@ class EvalDatasetClient:
                     error(f"Validation error during push: {err.response.json()}")
                 else:
                     error(f"HTTP error during push: {err}")
-            
+
             info(f"Successfully pushed dataset with alias '{alias}'")
             payload = response.json()
             dataset._alias = payload.get("_alias")
             dataset._id = payload.get("_id")
             progress.update(
-                    task_id,
-                    description=f"{progress.tasks[task_id].description} [rgb(25,227,160)]Done!)",
-                )
+                task_id,
+                description=f"{progress.tasks[task_id].description} [rgb(25,227,160)]Done!)",
+            )
             return True
-        
 
-    def append_examples(self, alias: str, examples: List[Example], project_name: str) -> bool:
+    def append_examples(
+        self, alias: str, examples: List[Example], project_name: str
+    ) -> bool:
         debug(f"Appending dataset with alias '{alias}'")
         """
         Appends the dataset to Judgment platform
@@ -119,20 +123,20 @@ class EvalDatasetClient:
                 total=100,
             )
             content = {
-                    "dataset_alias": alias,
-                    "project_name": project_name,
-                    "examples": [e.to_dict() for e in examples],
-                }
+                "dataset_alias": alias,
+                "project_name": project_name,
+                "examples": [e.to_dict() for e in examples],
+            }
             try:
                 response = requests.post(
-                    JUDGMENT_DATASETS_APPEND_EXAMPLES_API_URL, 
+                    JUDGMENT_DATASETS_APPEND_EXAMPLES_API_URL,
                     json=content,
                     headers={
                         "Content-Type": "application/json",
                         "Authorization": f"Bearer {self.judgment_api_key}",
-                        "X-Organization-Id": self.organization_id
+                        "X-Organization-Id": self.organization_id,
                     },
-                    verify=True
+                    verify=True,
                 )
                 if response.status_code != 200:
                     error(f"Server error during append: {response.json()}")
@@ -143,13 +147,13 @@ class EvalDatasetClient:
                     error(f"Validation error during append: {err.response.json()}")
                 else:
                     error(f"HTTP error during append: {err}")
-            
+
             progress.update(
-                    task_id,
-                    description=f"{progress.tasks[task_id].description} [rgb(25,227,160)]Done!)",
-                )
+                task_id,
+                description=f"{progress.tasks[task_id].description} [rgb(25,227,160)]Done!)",
+            )
             return True
-        
+
     def pull(self, alias: str, project_name: str) -> EvalDataset:
         debug(f"Pulling dataset with alias '{alias}'")
         """
@@ -171,81 +175,75 @@ class EvalDatasetClient:
         dataset = self.create_dataset()
 
         with Progress(
-                SpinnerColumn(style="rgb(106,0,255)"),
-                TextColumn("[progress.description]{task.description}"),
-                transient=False,
-            ) as progress:
-                task_id = progress.add_task(
-                    f"Pulling [rgb(106,0,255)]'{alias}'[/rgb(106,0,255)] from Judgment...",
-                    total=100,
+            SpinnerColumn(style="rgb(106,0,255)"),
+            TextColumn("[progress.description]{task.description}"),
+            transient=False,
+        ) as progress:
+            task_id = progress.add_task(
+                f"Pulling [rgb(106,0,255)]'{alias}'[/rgb(106,0,255)] from Judgment...",
+                total=100,
+            )
+            request_body = {"dataset_alias": alias, "project_name": project_name}
+
+            try:
+                response = requests.post(
+                    JUDGMENT_DATASETS_PULL_API_URL,
+                    json=request_body,
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {self.judgment_api_key}",
+                        "X-Organization-Id": self.organization_id,
+                    },
+                    verify=True,
                 )
-                request_body = {
-                    "dataset_alias": alias,
-                    "project_name": project_name
-                }
+                response.raise_for_status()
+            except requests.exceptions.RequestException as e:
+                error(f"Error pulling dataset: {str(e)}")
+                raise
 
-                try:
-                    response = requests.post(
-                        JUDGMENT_DATASETS_PULL_API_URL, 
-                        json=request_body,
-                        headers={
-                            "Content-Type": "application/json",
-                            "Authorization": f"Bearer {self.judgment_api_key}",
-                            "X-Organization-Id": self.organization_id
-                        },
-                        verify=True
-                    )
-                    response.raise_for_status()
-                except requests.exceptions.RequestException as e:
-                    error(f"Error pulling dataset: {str(e)}")
-                    raise
+            info(f"Successfully pulled dataset with alias '{alias}'")
+            payload = response.json()
+            dataset.examples = [Example(**e) for e in payload.get("examples", [])]
+            dataset.traces = [Trace(**t) for t in payload.get("traces", [])]
+            dataset._alias = payload.get("alias")
+            dataset._id = payload.get("id")
+            progress.update(
+                task_id,
+                description=f"{progress.tasks[task_id].description} [rgb(25,227,160)]Done!)",
+            )
 
-                info(f"Successfully pulled dataset with alias '{alias}'")
-                payload = response.json()
-                dataset.examples = [Example(**e) for e in payload.get("examples", [])]
-                dataset.traces = [Trace(**t) for t in payload.get("traces", [])]
-                dataset._alias = payload.get("alias")
-                dataset._id = payload.get("id")
-                progress.update(
-                    task_id,
-                    description=f"{progress.tasks[task_id].description} [rgb(25,227,160)]Done!)",
-                )
+            return dataset
 
-                return dataset
-    
     def delete(self, alias: str, project_name: str) -> bool:
         with Progress(
-                SpinnerColumn(style="rgb(106,0,255)"),
-                TextColumn("[progress.description]{task.description}"),
-                transient=False,
-            ) as progress:
-                task_id = progress.add_task(
-                    f"Deleting [rgb(106,0,255)]'{alias}'[/rgb(106,0,255)] from Judgment...",
-                    total=100,
+            SpinnerColumn(style="rgb(106,0,255)"),
+            TextColumn("[progress.description]{task.description}"),
+            transient=False,
+        ) as progress:
+            progress.add_task(
+                f"Deleting [rgb(106,0,255)]'{alias}'[/rgb(106,0,255)] from Judgment...",
+                total=100,
+            )
+            request_body = {"dataset_alias": alias, "project_name": project_name}
+
+            try:
+                response = requests.post(
+                    JUDGMENT_DATASETS_DELETE_API_URL,
+                    json=request_body,
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {self.judgment_api_key}",
+                        "X-Organization-Id": self.organization_id,
+                    },
+                    verify=True,
                 )
-                request_body = {
-                    "dataset_alias": alias,
-                    "project_name": project_name
-                }
+                response.raise_for_status()
+            except requests.exceptions.RequestException as e:
+                error(f"Error deleting dataset: {str(e)}")
+                raise
 
-                try:
-                    response = requests.post(
-                        JUDGMENT_DATASETS_DELETE_API_URL, 
-                        json=request_body,
-                        headers={
-                            "Content-Type": "application/json",
-                            "Authorization": f"Bearer {self.judgment_api_key}",
-                            "X-Organization-Id": self.organization_id
-                        },
-                        verify=True
-                    )
-                    response.raise_for_status()
-                except requests.exceptions.RequestException as e:
-                    error(f"Error deleting dataset: {str(e)}")
-                    raise
+            return True
 
-                return True
-        
     def pull_project_dataset_stats(self, project_name: str) -> dict:
         debug(f"Pulling project datasets stats for project_name: {project_name}'")
         """
@@ -265,45 +263,45 @@ class EvalDatasetClient:
         # Make a POST request to the Judgment API to get the dataset
 
         with Progress(
-                SpinnerColumn(style="rgb(106,0,255)"),
-                TextColumn("[progress.description]{task.description}"),
-                transient=False,
-            ) as progress:
-                task_id = progress.add_task(
-                    f"Pulling [rgb(106,0,255)]' datasets'[/rgb(106,0,255)] from Judgment...",
-                    total=100,
+            SpinnerColumn(style="rgb(106,0,255)"),
+            TextColumn("[progress.description]{task.description}"),
+            transient=False,
+        ) as progress:
+            task_id = progress.add_task(
+                "Pulling [rgb(106,0,255)]' datasets'[/rgb(106,0,255)] from Judgment...",
+                total=100,
+            )
+            request_body = {"project_name": project_name}
+
+            try:
+                response = requests.post(
+                    JUDGMENT_DATASETS_PROJECT_STATS_API_URL,
+                    json=request_body,
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {self.judgment_api_key}",
+                        "X-Organization-Id": self.organization_id,
+                    },
+                    verify=True,
                 )
-                request_body = {
-                    "project_name": project_name
-                }
+                response.raise_for_status()
+            except requests.exceptions.RequestException as e:
+                error(f"Error pulling dataset: {str(e)}")
+                raise
 
-                try:
-                    response = requests.post(
-                        JUDGMENT_DATASETS_PROJECT_STATS_API_URL, 
-                        json=request_body,
-                        headers={
-                            "Content-Type": "application/json",
-                            "Authorization": f"Bearer {self.judgment_api_key}",
-                            "X-Organization-Id": self.organization_id
-                        },
-                        verify=True
-                    )
-                    response.raise_for_status()
-                except requests.exceptions.RequestException as e:
-                    error(f"Error pulling dataset: {str(e)}")
-                    raise
+            info(f"Successfully pulled datasets for userid: {self.judgment_api_key}'")
+            payload = response.json()
 
-                info(f"Successfully pulled datasets for userid: {self.judgment_api_key}'")
-                payload = response.json()
+            progress.update(
+                task_id,
+                description=f"{progress.tasks[task_id].description} [rgb(25,227,160)]Done!)",
+            )
 
-                progress.update(
-                    task_id,
-                    description=f"{progress.tasks[task_id].description} [rgb(25,227,160)]Done!)",
-                )
+            return payload
 
-                return payload
-
-    def insert_dataset(self, alias: str, examples: List[Example], project_name: str) -> bool:
+    def insert_dataset(
+        self, alias: str, examples: List[Example], project_name: str
+    ) -> bool:
         """
         Edits the dataset on Judgment platform by adding new examples
 
@@ -315,19 +313,19 @@ class EvalDatasetClient:
         }
         """
         with Progress(
-                SpinnerColumn(style="rgb(106,0,255)"),
-                TextColumn("[progress.description]{task.description}"),
-                transient=False,
-            ) as progress:
-            task_id = progress.add_task(
+            SpinnerColumn(style="rgb(106,0,255)"),
+            TextColumn("[progress.description]{task.description}"),
+            transient=False,
+        ) as progress:
+            progress.add_task(
                 f"Editing dataset [rgb(106,0,255)]'{alias}'[/rgb(106,0,255)] on Judgment...",
                 total=100,
             )
-            
+
             content = {
                 "dataset_alias": alias,
                 "examples": [e.to_dict() for e in examples],
-                "project_name": project_name
+                "project_name": project_name,
             }
 
             try:
@@ -337,15 +335,15 @@ class EvalDatasetClient:
                     headers={
                         "Content-Type": "application/json",
                         "Authorization": f"Bearer {self.judgment_api_key}",
-                        "X-Organization-Id": self.organization_id
+                        "X-Organization-Id": self.organization_id,
                     },
-                    verify=True
+                    verify=True,
                 )
                 response.raise_for_status()
             except requests.exceptions.RequestException as e:
                 error(f"Error editing dataset: {str(e)}")
                 return False
-        
+
             info(f"Successfully edited dataset '{alias}'")
             return True
 
@@ -368,10 +366,10 @@ class EvalDatasetClient:
                     headers={
                         "Content-Type": "application/json",
                         "Authorization": f"Bearer {self.judgment_api_key}",
-                        "X-Organization-Id": self.organization_id
+                        "X-Organization-Id": self.organization_id,
                     },
                     stream=True,
-                    verify=True
+                    verify=True,
                 )
                 response.raise_for_status()
             except requests.exceptions.HTTPError as err:
@@ -383,11 +381,11 @@ class EvalDatasetClient:
             except Exception as e:
                 error(f"Error during export: {str(e)}")
                 raise
-                
+
             info(f"Successfully exported dataset with alias '{alias}'")
             progress.update(
                 task_id,
                 description=f"{progress.tasks[task_id].description} [rgb(25,227,160)]Done!)",
             )
-            
+
             return response

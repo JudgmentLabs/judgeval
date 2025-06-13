@@ -10,6 +10,7 @@ from typing import List, Union, Literal, Optional
 from judgeval.data import Example, Trace
 from judgeval.common.logger import debug, error, warning, info
 
+
 @dataclass
 class EvalDataset:
     examples: List[Example]
@@ -18,12 +19,14 @@ class EvalDataset:
     _id: Union[str, None] = field(default=None)
     judgment_api_key: str = field(default="")
     organization_id: str = field(default="")
-    def __init__(self, 
-                 judgment_api_key: str = os.getenv("JUDGMENT_API_KEY"),  
-                 organization_id: str = os.getenv("JUDGMENT_ORG_ID"),
-                 examples: Optional[List[Example]] = None,
-                 traces: Optional[List[Trace]] = None
-                 ):
+
+    def __init__(
+        self,
+        judgment_api_key: str = os.getenv("JUDGMENT_API_KEY", ""),
+        organization_id: str = os.getenv("JUDGMENT_ORG_ID", ""),
+        examples: Optional[List[Example]] = None,
+        traces: Optional[List[Trace]] = None,
+    ):
         if not judgment_api_key:
             warning("No judgment_api_key provided")
         self.examples = examples or []
@@ -88,14 +91,14 @@ class EvalDataset:
         new_examples = [Example(**e) for e in examples]
         for e in new_examples:
             self.add_example(e)
-  
+
     def add_from_csv(
-        self, 
+        self,
         file_path: str,
         header_mapping: dict,
         primary_delimiter: str = ",",
-        secondary_delimiter: str = ";"
-        ) -> None:
+        secondary_delimiter: str = ";",
+    ) -> None:
         """
         Add Examples from a CSV file.
 
@@ -111,9 +114,9 @@ class EvalDataset:
             raise ModuleNotFoundError(
                 "Please install pandas to use this method. 'pip install pandas'"
             )
-        
+
         # Pandas naturally reads numbers in data files as ints, not strings (can lead to unexpected behavior)
-        df = pd.read_csv(file_path, dtype={'trace_id': str}, sep=primary_delimiter)
+        df = pd.read_csv(file_path, dtype={"trace_id": str}, sep=primary_delimiter)
         """
         The user should pass in a dict mapping from Judgment Example headers to their custom defined headers.
         Available headers for Example objects are as follows:
@@ -131,42 +134,55 @@ class EvalDataset:
         This can be adjusted using the `secondary_delimiter` parameter.
         """
         examples = []
-        
+
         def process_csv_row(value, header):
             """
             Maps a singular value in the CSV file to the appropriate type based on the header.
             If value exists and can be split into type List[*], we will split upon the user's provided secondary delimiter.
             """
             # check that the CSV value is not null for entry
-            null_replacement = dict() if header == 'additional_metadata' else None
-            if pd.isna(value) or value == '':
+            null_replacement = dict() if header == "additional_metadata" else None
+            if pd.isna(value) or value == "":
                 return null_replacement
             try:
-                value = ast.literal_eval(value) if header == 'additional_metadata' else str(value)
+                value = (
+                    ast.literal_eval(value)
+                    if header == "additional_metadata"
+                    else str(value)
+                )
             except (ValueError, SyntaxError):
                 value = str(value)
-            if header in ["context", "retrieval_context", "tools_called", "expected_tools"]:
+            if header in [
+                "context",
+                "retrieval_context",
+                "tools_called",
+                "expected_tools",
+            ]:
                 # attempt to split the value by the secondary delimiter
                 value = value.split(secondary_delimiter)
-                    
+
             return value
-            
+
         for _, row in df.iterrows():
             data = {
-                header: process_csv_row(
-                    row[header_mapping[header]], header
-                )
+                header: process_csv_row(row[header_mapping[header]], header)
                 for header in header_mapping
             }
             if "example" in header_mapping and row[header_mapping["example"]]:
                 if "name" in header_mapping:
-                    data["name"] = row[header_mapping["name"]] if pd.notna(row[header_mapping["name"]]) else None
+                    data["name"] = (
+                        row[header_mapping["name"]]
+                        if pd.notna(row[header_mapping["name"]])
+                        else None
+                    )
                 # every Example has `input` and `actual_output` fields
                 if data["input"] is not None and data["actual_output"] is not None:
                     e = Example(**data)
                     examples.append(e)
                 else:
-                    raise ValueError("Every example must have an 'input' and 'actual_output' field.")
+                    raise ValueError(
+                        "Every example must have an 'input' and 'actual_output' field."
+                    )
 
         for e in examples:
             self.add_example(e)
@@ -222,11 +238,16 @@ class EvalDataset:
     def add_example(self, e: Example) -> None:
         self.examples.append(e)
         # TODO if we need to add rank, then we need to do it here
-    
+
     def add_trace(self, t: Trace) -> None:
         self.traces.append(t)
 
-    def save_as(self, file_type: Literal["json", "csv", "yaml"], dir_path: str, save_name: str = None) -> None:
+    def save_as(
+        self,
+        file_type: Literal["json", "csv", "yaml"],
+        dir_path: str,
+        save_name: str | None = None,
+    ) -> None:
         """
         Saves the dataset as a file. Save only the examples.
 
@@ -237,7 +258,11 @@ class EvalDataset:
         """
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
-        file_name = datetime.datetime.now().strftime("%Y%m%d_%H%M%S") if save_name is None else save_name
+        file_name = (
+            datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            if save_name is None
+            else save_name
+        )
         complete_path = os.path.join(dir_path, f"{file_name}.{file_type}")
         if file_type == "json":
             with open(complete_path, "w") as file:
@@ -251,12 +276,23 @@ class EvalDataset:
         elif file_type == "csv":
             with open(complete_path, "w", newline="") as file:
                 writer = csv.writer(file)
-                writer.writerow([
-                    "input", "actual_output", "expected_output", "context", \
-                    "retrieval_context", "additional_metadata", "tools_called", \
-                    "expected_tools", "name", "comments", "source_file", "example", \
-                    "trace_id"
-                ])
+                writer.writerow(
+                    [
+                        "input",
+                        "actual_output",
+                        "expected_output",
+                        "context",
+                        "retrieval_context",
+                        "additional_metadata",
+                        "tools_called",
+                        "expected_tools",
+                        "name",
+                        "comments",
+                        "source_file",
+                        "example",
+                        "trace_id",
+                    ]
+                )
                 for e in self.examples:
                     writer.writerow(
                         [
@@ -274,8 +310,7 @@ class EvalDataset:
                             True,  # Adding an Example
                         ]
                     )
-                
-                
+
         elif file_type == "yaml":
             with open(complete_path, "w") as file:
                 yaml_data = {
@@ -300,14 +335,16 @@ class EvalDataset:
                 yaml.dump(yaml_data, file, default_flow_style=False)
         else:
             ACCEPTABLE_FILE_TYPES = ["json", "csv", "yaml"]
-            raise TypeError(f"Invalid file type: {file_type}. Please choose from {ACCEPTABLE_FILE_TYPES}")
-        
+            raise TypeError(
+                f"Invalid file type: {file_type}. Please choose from {ACCEPTABLE_FILE_TYPES}"
+            )
+
     def __iter__(self):
         return iter(self.examples)
-    
+
     def __len__(self):
         return len(self.examples)
-    
+
     def __str__(self):
         return (
             f"{self.__class__.__name__}("

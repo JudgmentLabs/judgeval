@@ -6,44 +6,46 @@ import pytest
 import random
 import string
 import uuid
-import asyncio
 import os
 import tempfile
-import yaml
-from typing import Callable
 import time
 
 from judgeval.judgment_client import JudgmentClient
 from judgeval.data import Example
 from judgeval.scorers import (
     FaithfulnessScorer,
-    HallucinationScorer,
     AnswerRelevancyScorer,
-    JSONCorrectnessScorer,
     ToolOrderScorer,
 )
 from judgeval.data.datasets.dataset import EvalDataset
-from pydantic import BaseModel
 from judgeval.tracer import Tracer
 
 # Initialize a tracer instance for this test file
 tracer = Tracer()
 
+
 @tracer.observe(span_type="tool", project_name="TraceEvalProjectFromYAMLTest")
 def simple_traced_function_for_yaml_eval(text: str):
     """A simple function to be traced and evaluated from YAML."""
-    time.sleep(0.01) # Simulate minimal sync work
+    time.sleep(0.01)  # Simulate minimal sync work
     return f"Processed: {text.upper()}"
+
 
 @pytest.mark.basic
 class TestEvalOperations:
-    def run_eval_helper(self, client: JudgmentClient, project_name: str, eval_run_name: str):
+    def run_eval_helper(
+        self, client: JudgmentClient, project_name: str, eval_run_name: str
+    ):
         """Helper function to run evaluation."""
         # Single step in our workflow, an outreach Sales Agent
         example1 = Example(
             input="Generate a cold outreach email for TechCorp. Facts: They recently launched an AI-powered analytics platform. Their CEO Sarah Chen previously worked at Google. They have 50+ enterprise clients.",
             actual_output="Dear Ms. Chen,\n\nI noticed TechCorp's recent launch of your AI analytics platform and was impressed by its enterprise-focused approach. Your experience from Google clearly shines through in building scalable solutions, as evidenced by your impressive 50+ enterprise client base.\n\nWould you be open to a brief call to discuss how we could potentially collaborate?\n\nBest regards,\nAlex",
-            retrieval_context=["TechCorp launched AI analytics platform in 2024", "Sarah Chen is CEO, ex-Google executive", "Current client base: 50+ enterprise customers"],
+            retrieval_context=[
+                "TechCorp launched AI analytics platform in 2024",
+                "Sarah Chen is CEO, ex-Google executive",
+                "Current client base: 50+ enterprise customers",
+            ],
         )
 
         example2 = Example(
@@ -51,7 +53,11 @@ class TestEvalOperations:
             actual_output="Dear GreenEnergy Solutions team,\n\nCongratulations on your 2023 sustainability award! Your innovative solar panel technology with 30% higher efficiency is exactly what the European market needs right now.\n\nI'd love to discuss how we could support your European expansion plans.\n\nBest regards,\nAlex",
             expected_output="A professional cold email mentioning the sustainability award, solar technology innovation, and European expansion plans",
             context=["Business Development"],
-            retrieval_context=["GreenEnergy Solutions won 2023 sustainability award", "New solar technology 30% more efficient", "Planning European market expansion"],
+            retrieval_context=[
+                "GreenEnergy Solutions won 2023 sustainability award",
+                "New solar technology 30% more efficient",
+                "Planning European market expansion",
+            ],
         )
 
         scorer = FaithfulnessScorer(threshold=0.5)
@@ -74,7 +80,9 @@ class TestEvalOperations:
         EVAL_RUN_NAME = "ColdEmailGenerator-Improve-BasePrompt"
 
         self.run_eval_helper(client, PROJECT_NAME, EVAL_RUN_NAME)
-        results = client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
+        results = client.pull_eval(
+            project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME
+        )
         assert results, f"No evaluation results found for {EVAL_RUN_NAME}"
 
         client.delete_project(project_name=PROJECT_NAME)
@@ -85,18 +93,24 @@ class TestEvalOperations:
         EVAL_RUN_NAME = "ColdEmailGenerator-Improve-BasePrompt"
 
         self.run_eval_helper(client, PROJECT_NAME, EVAL_RUN_NAME)
-        results = client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
-        results = results['examples']
+        results = client.pull_eval(
+            project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME
+        )
+        results = results["examples"]
         assert results, f"No evaluation results found for {EVAL_RUN_NAME}"
         assert len(results) == 2
 
         example1 = Example(
             input="Generate a cold outreach email for TechCorp. Facts: They recently launched an AI-powered analytics platform. Their CEO Sarah Chen previously worked at Google. They have 50+ enterprise clients.",
             actual_output="Dear Ms. Chen,\n\nI noticed TechCorp's recent launch of your AI analytics platform and was impressed by its enterprise-focused approach. Your experience from Google clearly shines through in building scalable solutions, as evidenced by your impressive 50+ enterprise client base.\n\nWould you be open to a brief call to discuss how we could potentially collaborate?\n\nBest regards,\nAlex",
-            retrieval_context=["TechCorp launched AI analytics platform in 2024", "Sarah Chen is CEO, ex-Google executive", "Current client base: 50+ enterprise customers"],
+            retrieval_context=[
+                "TechCorp launched AI analytics platform in 2024",
+                "Sarah Chen is CEO, ex-Google executive",
+                "Current client base: 50+ enterprise customers",
+            ],
         )
         scorer = FaithfulnessScorer(threshold=0.5)
-        
+
         client.run_evaluation(
             examples=[example1],
             scorers=[scorer],
@@ -107,17 +121,24 @@ class TestEvalOperations:
             append=True,
         )
 
-        results = client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
+        results = client.pull_eval(
+            project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME
+        )
         assert results, f"No evaluation results found for {EVAL_RUN_NAME}"
-        results = results['examples']
+        results = results["examples"]
         assert len(results) == 3
         assert results[0]["scorer_data"][0]["score"] == 1.0
         client.delete_project(project_name=PROJECT_NAME)
 
     def test_delete_eval_by_project_and_run_names(self, client: JudgmentClient):
         """Test delete evaluation by project and run name workflow."""
-        PROJECT_NAME = ''.join(random.choices(string.ascii_letters + string.digits, k=20))
-        EVAL_RUN_NAMES = [''.join(random.choices(string.ascii_letters + string.digits, k=20)) for _ in range(3)]
+        PROJECT_NAME = "".join(
+            random.choices(string.ascii_letters + string.digits, k=20)
+        )
+        EVAL_RUN_NAMES = [
+            "".join(random.choices(string.ascii_letters + string.digits, k=20))
+            for _ in range(3)
+        ]
 
         for eval_run_name in EVAL_RUN_NAMES:
             self.run_eval_helper(client, PROJECT_NAME, eval_run_name)
@@ -130,9 +151,15 @@ class TestEvalOperations:
 
     def test_delete_eval_by_project(self, client: JudgmentClient):
         """Test delete evaluation by project workflow."""
-        PROJECT_NAME = ''.join(random.choices(string.ascii_letters + string.digits, k=20))
-        EVAL_RUN_NAME = ''.join(random.choices(string.ascii_letters + string.digits, k=20))
-        EVAL_RUN_NAME2 = ''.join(random.choices(string.ascii_letters + string.digits, k=20))
+        PROJECT_NAME = "".join(
+            random.choices(string.ascii_letters + string.digits, k=20)
+        )
+        EVAL_RUN_NAME = "".join(
+            random.choices(string.ascii_letters + string.digits, k=20)
+        )
+        EVAL_RUN_NAME2 = "".join(
+            random.choices(string.ascii_letters + string.digits, k=20)
+        )
 
         self.run_eval_helper(client, PROJECT_NAME, EVAL_RUN_NAME)
         self.run_eval_helper(client, PROJECT_NAME, EVAL_RUN_NAME2)
@@ -140,7 +167,7 @@ class TestEvalOperations:
         client.delete_project(project_name=PROJECT_NAME)
         with pytest.raises(ValueError, match="Error fetching eval results"):
             client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
-        
+
         with pytest.raises(ValueError, match="Error fetching eval results"):
             client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME2)
 
@@ -151,7 +178,9 @@ class TestEvalOperations:
         example = Example(
             input="What if these shoes don't fit?",
             actual_output="We offer a 30-day full refund at no extra cost.",
-            retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
+            retrieval_context=[
+                "All customers are eligible for a 30 day full refund at no extra cost."
+            ],
         )
 
         example1 = Example(
@@ -173,7 +202,7 @@ class TestEvalOperations:
                 examples=[example, example1, example2],
                 scorers=[scorer],
                 model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-                override=True
+                override=True,
             )
 
     def test_evaluate_dataset(self, client: JudgmentClient):
@@ -181,7 +210,9 @@ class TestEvalOperations:
         example1 = Example(
             input="What if these shoes don't fit?",
             actual_output="We offer a 30-day full refund at no extra cost.",
-            retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
+            retrieval_context=[
+                "All customers are eligible for a 30 day full refund at no extra cost."
+            ],
         )
 
         example2 = Example(
@@ -191,28 +222,30 @@ class TestEvalOperations:
             name="Password Reset",
             context=["User Account"],
             retrieval_context=["Password reset instructions"],
-            additional_metadata={"difficulty": "medium"}
+            additional_metadata={"difficulty": "medium"},
         )
 
         dataset = EvalDataset(examples=[example1, example2])
         res = client.run_evaluation(
-            examples = dataset.examples,
+            examples=dataset.examples,
             scorers=[FaithfulnessScorer(threshold=0.5)],
             model="Qwen/Qwen2.5-72B-Instruct-Turbo",
             metadata={"batch": "test"},
             project_name="test_project",
             eval_run_name="test_eval_run",
-            override=True
+            override=True,
         )
         assert res, "Dataset evaluation failed"
 
     @pytest.mark.asyncio
-    async def test_run_trace_eval_from_yaml(self, client: JudgmentClient, random_name: str):
+    async def test_run_trace_eval_from_yaml(
+        self, client: JudgmentClient, random_name: str
+    ):
         """Test run_trace_evaluation with a YAML configuration file."""
-        PROJECT_NAME_EVAL = "TraceEvalProjectFromYAMLTest" 
+        PROJECT_NAME_EVAL = "TraceEvalProjectFromYAMLTest"
         EVAL_RUN_NAME = random_name
 
-        yaml_content = f"""
+        yaml_content = """
 examples:
   - input: "hello from yaml"
     expected_tools:
@@ -227,13 +260,15 @@ examples:
         agent_name: "Agent 1"
     retrieval_context: ["Context for another yaml test"]
 """
-        
+
         temp_yaml_file_path = None
         try:
-            with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as tmpfile:
+            with tempfile.NamedTemporaryFile(
+                mode="w", delete=False, suffix=".yaml"
+            ) as tmpfile:
                 tmpfile.write(yaml_content)
-                temp_yaml_file_path = tmpfile.name  
-            scorer = ToolOrderScorer(threshold=0.5)       
+                temp_yaml_file_path = tmpfile.name
+            scorer = ToolOrderScorer(threshold=0.5)
             client.run_trace_evaluation(
                 test_file=temp_yaml_file_path,
                 function=simple_traced_function_for_yaml_eval,
@@ -242,31 +277,38 @@ examples:
                 project_name=PROJECT_NAME_EVAL,
                 eval_run_name=EVAL_RUN_NAME,
                 override=True,
-                log_results=True
+                log_results=True,
             )
 
-            results = client.pull_eval(project_name=PROJECT_NAME_EVAL, eval_run_name=EVAL_RUN_NAME)
-            assert results, f"No evaluation results found for {EVAL_RUN_NAME} in project {PROJECT_NAME_EVAL}"
-            assert isinstance(results, list), "Expected results to be a list of experiment/trace data"
+            results = client.pull_eval(
+                project_name=PROJECT_NAME_EVAL, eval_run_name=EVAL_RUN_NAME
+            )
+            assert results, (
+                f"No evaluation results found for {EVAL_RUN_NAME} in project {PROJECT_NAME_EVAL}"
+            )
+            assert isinstance(results, list), (
+                "Expected results to be a list of experiment/trace data"
+            )
             assert len(results) == 2, f"Expected 2 trace results but got {len(results)}"
-            
-            
+
         finally:
             if temp_yaml_file_path and os.path.exists(temp_yaml_file_path):
                 os.remove(temp_yaml_file_path)
             try:
-               client.delete_project(project_name=PROJECT_NAME_EVAL)
+                client.delete_project(project_name=PROJECT_NAME_EVAL)
             except Exception as e:
                 print(f"Failed to delete project {PROJECT_NAME_EVAL}: {e}")
-                
+
     def test_override_eval(self, client: JudgmentClient, random_name: str):
         """Test evaluation override behavior."""
         example1 = Example(
             input="What if these shoes don't fit?",
             actual_output="We offer a 30-day full refund at no extra cost.",
-            retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
+            retrieval_context=[
+                "All customers are eligible for a 30 day full refund at no extra cost."
+            ],
         )
-        
+
         scorer = FaithfulnessScorer(threshold=0.5)
 
         PROJECT_NAME = "test_eval_run_naming_collisions"
@@ -283,7 +325,7 @@ examples:
             log_results=True,
             override=False,
         )
-        
+
         # Second run with log_results=False should succeed
         client.run_evaluation(
             examples=[example1],
@@ -295,7 +337,7 @@ examples:
             log_results=False,
             override=False,
         )
-        
+
         # Third run with override=True should succeed
         try:
             example1.example_id = str(uuid.uuid4())
@@ -312,7 +354,7 @@ examples:
         except ValueError as e:
             print(f"Unexpected error in override run: {e}")
             raise
-        
+
         # Final non-override run should fail
         with pytest.raises(ValueError, match="already exists"):
             client.run_evaluation(
@@ -325,4 +367,3 @@ examples:
                 log_results=True,
                 override=False,
             )
-            

@@ -2,11 +2,14 @@ import importlib.metadata
 import requests
 import threading
 
+
 def check_latest_version(package_name: str = "judgeval"):
     def _check():
         try:
             current_version = importlib.metadata.version(package_name)
-            response = requests.get(f"https://pypi.org/pypi/{package_name}/json", timeout=2)
+            response = requests.get(
+                f"https://pypi.org/pypi/{package_name}/json", timeout=2
+            )
             latest_version = response.json()["info"]["version"]
 
             if current_version != latest_version:

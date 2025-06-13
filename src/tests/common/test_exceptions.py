@@ -30,4 +30,3 @@ def test_invalid_judge_model_error():
     except InvalidJudgeModelError as e:
         assert str(e) == error_message
         assert e.message == error_message
-    

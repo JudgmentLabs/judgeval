@@ -7,6 +7,7 @@ from judgeval.scorers.judgeval_scorer import JudgevalScorer
 
 class MockJudgevalScorer(JudgevalScorer):
     """Mock implementation of JudgevalScorer for testing"""
+
     def __init__(
         self,
         score_type: str = "mock_scorer",
@@ -20,7 +21,7 @@ class MockJudgevalScorer(JudgevalScorer):
         error: Optional[str] = None,
         evaluation_cost: Optional[float] = None,
         verbose_logs: Optional[str] = None,
-        additional_metadata: Optional[Dict] = None
+        additional_metadata: Optional[Dict] = None,
     ):
         super().__init__(
             score_type=score_type,
@@ -34,7 +35,7 @@ class MockJudgevalScorer(JudgevalScorer):
             error=error,
             evaluation_cost=evaluation_cost,
             verbose_logs=verbose_logs,
-            additional_metadata=additional_metadata
+            additional_metadata=additional_metadata,
         )
         self.__name__ = score_type
 
@@ -62,7 +63,7 @@ def successful_scorer():
         strict_mode=True,
         evaluation_cost=0.1,
         verbose_logs="Detailed test logs",
-        additional_metadata={"key": "value"}
+        additional_metadata={"key": "value"},
     )
 
 
@@ -79,7 +80,7 @@ def failed_scorer():
         evaluation_model="gpt-4",
         strict_mode=True,
         evaluation_cost=0.1,
-        verbose_logs="Detailed test logs"
+        verbose_logs="Detailed test logs",
     )
 
 
@@ -94,14 +95,14 @@ def error_scorer():
         error="Test execution failed",
         evaluation_model="gpt-4",
         evaluation_cost=0.1,
-        verbose_logs="Error logs"
+        verbose_logs="Error logs",
     )
 
 
 def test_scorer_data_successful_case(successful_scorer):
     """Test ScorerData creation for a successful evaluation"""
     scorer_data = create_scorer_data(successful_scorer)
-    
+
     assert scorer_data.name == "test_scorer"
     assert scorer_data.threshold == 0.7
     assert scorer_data.score == 0.8
@@ -118,7 +119,7 @@ def test_scorer_data_successful_case(successful_scorer):
 def test_scorer_data_failed_case(failed_scorer):
     """Test ScorerData creation for a failed evaluation"""
     scorer_data = create_scorer_data(failed_scorer)
-    
+
     assert scorer_data.name == "test_scorer"
     assert scorer_data.threshold == 0.7
     assert scorer_data.score == 0.6
@@ -130,7 +131,7 @@ def test_scorer_data_failed_case(failed_scorer):
 def test_scorer_data_error_case(error_scorer):
     """Test ScorerData creation when an error occurs"""
     scorer_data = create_scorer_data(error_scorer)
-    
+
     assert scorer_data.name == "test_scorer"
     assert scorer_data.threshold == 0.7
     assert scorer_data.score is None
@@ -143,7 +144,7 @@ def test_scorer_data_to_dict(successful_scorer):
     """Test the to_dict method of ScorerData"""
     scorer_data = create_scorer_data(successful_scorer)
     data_dict = scorer_data.to_dict()
-    
+
     assert isinstance(data_dict, dict)
     assert data_dict["name"] == "test_scorer"
     assert data_dict["threshold"] == 0.7
@@ -171,9 +172,9 @@ def test_scorer_data_direct_creation():
         error=None,
         evaluation_cost=0.2,
         verbose_logs="Test logs",
-        additional_metadata={"test": "data"}
+        additional_metadata={"test": "data"},
     )
-    
+
     assert scorer_data.name == "direct_test"
     assert scorer_data.threshold == 0.5
     assert scorer_data.success is True
@@ -182,12 +183,8 @@ def test_scorer_data_direct_creation():
 
 def test_scorer_data_minimal_creation():
     """Test creation of ScorerData with minimal required fields"""
-    scorer_data = ScorerData(
-        name="minimal_test",
-        threshold=0.5,
-        success=True
-    )
-    
+    scorer_data = ScorerData(name="minimal_test", threshold=0.5, success=True)
+
     assert scorer_data.name == "minimal_test"
     assert scorer_data.threshold == 0.5
     assert scorer_data.success is True
@@ -203,13 +200,9 @@ def test_scorer_data_minimal_creation():
 
 def test_scorer_data_to_dict_minimal():
     """Test to_dict method with minimal required fields"""
-    scorer_data = ScorerData(
-        name="minimal_test",
-        threshold=0.5,
-        success=True
-    )
+    scorer_data = ScorerData(name="minimal_test", threshold=0.5, success=True)
     data_dict = scorer_data.to_dict()
-    
+
     assert isinstance(data_dict, dict)
     assert data_dict["name"] == "minimal_test"
     assert data_dict["threshold"] == 0.5
@@ -223,29 +216,28 @@ def test_scorer_data_to_dict_minimal():
     assert data_dict["verbose_logs"] is None
     assert data_dict["additional_metadata"] is None
 
+
 def test_scorer_data_to_dict_with_list_model():
     """Test to_dict method when evaluation_model is a list"""
     scorer_data = ScorerData(
         name="list_model_test",
         threshold=0.5,
         success=True,
-        evaluation_model=["gpt-4", "gpt-3.5-turbo"]
+        evaluation_model=["gpt-4", "gpt-3.5-turbo"],
     )
     data_dict = scorer_data.to_dict()
-    
+
     assert isinstance(data_dict["evaluation_model"], list)
     assert data_dict["evaluation_model"] == ["gpt-4", "gpt-3.5-turbo"]
+
 
 def test_scorer_data_to_dict_with_error():
     """Test to_dict method with error information"""
     scorer_data = ScorerData(
-        name="error_test",
-        threshold=0.5,
-        success=False,
-        error="Test error message"
+        name="error_test", threshold=0.5, success=False, error="Test error message"
     )
     data_dict = scorer_data.to_dict()
-    
+
     assert data_dict["error"] == "Test error message"
     assert data_dict["success"] is False
     assert data_dict["score"] is None
@@ -256,9 +248,9 @@ def test_scorer_data_to_dict_all_parameters():
     test_metadata = {
         "model_tokens": 150,
         "completion_tokens": 50,
-        "custom_field": "custom_value"
+        "custom_field": "custom_value",
     }
-    
+
     scorer_data = ScorerData(
         name="full_test",
         threshold=0.75,
@@ -270,10 +262,10 @@ def test_scorer_data_to_dict_all_parameters():
         error=None,
         evaluation_cost=0.123,
         verbose_logs="Detailed execution logs\nwith multiple lines",
-        additional_metadata=test_metadata
+        additional_metadata=test_metadata,
     )
     data_dict = scorer_data.to_dict()
-    
+
     # Verify all fields are present and have correct values
     assert isinstance(data_dict, dict)
     assert data_dict["name"] == "full_test"
@@ -287,7 +279,7 @@ def test_scorer_data_to_dict_all_parameters():
     assert data_dict["evaluation_cost"] == 0.123
     assert data_dict["verbose_logs"] == "Detailed execution logs\nwith multiple lines"
     assert data_dict["additional_metadata"] == test_metadata
-    
+
     # Verify the metadata dictionary contains all expected fields
     assert data_dict["additional_metadata"]["model_tokens"] == 150
     assert data_dict["additional_metadata"]["completion_tokens"] == 50

@@ -4,15 +4,17 @@ ClassifierScorer implementation for basic Text-to-SQL evaluation.
 Takes a natural language query, a corresponding LLM-generated SQL query, and a table schema + (optional) metadata.
 Determines if the LLM-generated SQL query is valid and works for the natural language query.
 """
+
 from judgeval.scorers import ClassifierScorer
 
 Text2SQLScorer = ClassifierScorer(
     name="Text to SQL",
     slug="text2sql-1010101010",
     threshold=1.0,
-    conversation=[{
-        "role": "system",
-        "content": """You will be given a natural language query, a corresponding LLM-generated SQL query, and a table schema + (optional) metadata.
+    conversation=[
+        {
+            "role": "system",
+            "content": """You will be given a natural language query, a corresponding LLM-generated SQL query, and a table schema + (optional) metadata.
 
 ** TASK INSTRUCTIONS **
 Your task is to decide whether the LLM generated SQL query properly filters for what the natural language query is asking, based on the table schema + (optional) metadata. 
@@ -44,11 +46,8 @@ LLM generated SQL query:
 
 Table schema:
 {{context}}
-        """
-    }],
-    options={
-        "Y": 1.0, 
-        "N": 0.0
-    }
+        """,
+        }
+    ],
+    options={"Y": 1.0, "N": 0.0},
 )
-

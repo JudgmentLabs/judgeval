@@ -2,6 +2,7 @@ import pytest
 from judgeval.data import ScoringResult, ScorerData, Example
 from judgeval.run_evaluation import assert_test
 
+
 @pytest.fixture
 def sample_example():
     return Example(
@@ -12,6 +13,7 @@ def sample_example():
         context=["context1", "context2"],
         retrieval_context=["retrieval1"],
     )
+
 
 def test_assert_test_all_passing(sample_example):
     """Test when all results are successful"""
@@ -26,17 +28,16 @@ def test_assert_test_all_passing(sample_example):
         error=None,
         evaluation_cost=0.1,
         verbose_logs="test logs",
-        additional_metadata={}
+        additional_metadata={},
     )
 
     result = ScoringResult(
-        data_object=sample_example,
-        success=True,
-        scorers_data=[scorer_data]
+        data_object=sample_example, success=True, scorers_data=[scorer_data]
     )
-    
+
     # Should not raise any exception
     assert_test([result])
+
 
 def test_assert_test_failed_scorer(sample_example):
     """Test when a scorer fails"""
@@ -51,22 +52,21 @@ def test_assert_test_failed_scorer(sample_example):
         error=None,
         evaluation_cost=0.1,
         verbose_logs="test logs",
-        additional_metadata={}
+        additional_metadata={},
     )
-    
+
     result = ScoringResult(
-        data_object=sample_example,
-        success=False,
-        scorers_data=[failed_scorer]
+        data_object=sample_example, success=False, scorers_data=[failed_scorer]
     )
-    
+
     with pytest.raises(AssertionError) as exc_info:
         assert_test([result])
-    
+
     # Verify error message contains relevant information
     error_msg = str(exc_info.value)
     assert "failed_scorer" in error_msg
     assert "Score below threshold" in error_msg
+
 
 def test_assert_test_multiple_failed_scorers(sample_example):
     """Test when multiple scorers fail"""
@@ -81,9 +81,9 @@ def test_assert_test_multiple_failed_scorers(sample_example):
         error=None,
         evaluation_cost=0.1,
         verbose_logs="test logs",
-        additional_metadata={}
+        additional_metadata={},
     )
-    
+
     failed_scorer2 = ScorerData(
         name="scorer2",
         success=False,
@@ -95,26 +95,26 @@ def test_assert_test_multiple_failed_scorers(sample_example):
         error=None,
         evaluation_cost=0.1,
         verbose_logs="test logs",
-        additional_metadata={}
+        additional_metadata={},
     )
-    
-    result = ScoringResult( 
+
+    result = ScoringResult(
         data_object=sample_example,
         success=False,
-        scorers_data=[failed_scorer1, failed_scorer2]
+        scorers_data=[failed_scorer1, failed_scorer2],
     )
-    
+
     with pytest.raises(AssertionError) as exc_info:
         assert_test([result])
-    
+
     error_msg = str(exc_info.value)
     assert "scorer1" in error_msg
     assert "scorer2" in error_msg
     assert "First failure" in error_msg
     assert "Second failure" in error_msg
 
+
 def test_assert_test_empty_results():
     """Test with empty results list"""
     # Should not raise any exception
     assert_test([])
-

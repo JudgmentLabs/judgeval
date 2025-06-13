@@ -9,18 +9,19 @@ load_dotenv(dotenv_path=PATH_TO_DOTENV)
 
 
 # Initialize optional OpenAI client
-client: Optional['OpenAI'] = None
+client: Optional["OpenAI"] = None
 if os.getenv("OPENAI_API_KEY"):
     try:
         from openai import OpenAI
+
         client = OpenAI()
     except ImportError:
         # openai package not installed
         pass
-    
+
 # Initialize optional Together clients
-together_client: Optional['Together'] = None
-async_together_client: Optional['AsyncTogether'] = None
+together_client: Optional["Together"] = None
+async_together_client: Optional["AsyncTogether"] = None
 
 # Only initialize Together clients if API key is available
 
@@ -29,6 +30,5 @@ if together_api_key:
     try:
         together_client = Together(api_key=together_api_key)
         async_together_client = AsyncTogether(api_key=together_api_key)
-    except Exception as e:
+    except Exception:
         pass
-

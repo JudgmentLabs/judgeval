@@ -37,8 +37,7 @@ class JudgevalJudge(ABC):
             A string.
         """
         pass
-    
+
     @abstractmethod
     def get_model_name(self, *args, **kwargs) -> str:
         pass
-    
