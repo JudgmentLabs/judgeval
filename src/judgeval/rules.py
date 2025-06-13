@@ -68,6 +68,36 @@ class Condition(BaseModel):
             # Fallback to default comparison (greater than or equal)
             return value >= self.threshold if self.threshold is not None else False
 
+class PagerDutyConfig(BaseModel):
+    """
+    Configuration for PagerDuty notifications.
+    
+    Attributes:
+        routing_key: PagerDuty integration routing key
+        severity: Severity level (critical, error, warning, info)
+        source: Source of the alert (defaults to "judgeval")
+        component: Optional component that triggered the alert
+        group: Optional logical grouping for the alert
+        class_type: Optional class/type of alert event
+    """
+    routing_key: str
+    severity: str = "error"  # critical, error, warning, info
+    source: str = "judgeval"
+    component: Optional[str] = None
+    group: Optional[str] = None
+    class_type: Optional[str] = None
+    
+    def model_dump(self, **kwargs):
+        """Convert the PagerDutyConfig to a dictionary for JSON serialization."""
+        return {
+            "routing_key": self.routing_key,
+            "severity": self.severity,
+            "source": self.source,
+            "component": self.component,
+            "group": self.group,
+            "class_type": self.class_type
+        }
+
 class NotificationConfig(BaseModel):
     """
     Configuration for notifications when a rule is triggered.
@@ -75,8 +105,12 @@ class NotificationConfig(BaseModel):
     Example:
         {
             "enabled": true,
-            "communication_methods": ["email", "broadcast_slack", "broadcast_email"],
+            "communication_methods": ["email", "broadcast_slack", "broadcast_email", "pagerduty"],
             "email_addresses": ["user1@example.com", "user2@example.com"],
+            "pagerduty_config": {
+                "routing_key": "R0ABCD1234567890123456789",
+                "severity": "error"
+            },
             "send_at": 1632150000  # Unix timestamp (specific date/time)
         }
         
@@ -84,10 +118,12 @@ class NotificationConfig(BaseModel):
         - "email": Send emails to specified email addresses
         - "broadcast_slack": Send broadcast notifications to all configured Slack channels
         - "broadcast_email": Send broadcast emails to all organization emails
+        - "pagerduty": Send alerts to PagerDuty using the configured routing key
     """
     enabled: bool = True
     communication_methods: List[str] = []
     email_addresses: Optional[List[str]] = None
+    pagerduty_config: Optional[PagerDutyConfig] = None
     send_at: Optional[int] = None  # Unix timestamp for scheduled notifications
     
     def model_dump(self, **kwargs):
@@ -96,6 +132,7 @@ class NotificationConfig(BaseModel):
             "enabled": self.enabled,
             "communication_methods": self.communication_methods,
             "email_addresses": self.email_addresses,
+            "pagerduty_config": self.pagerduty_config.model_dump() if self.pagerduty_config else None,
             "send_at": self.send_at
         }
 
