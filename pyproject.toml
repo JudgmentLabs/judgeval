@@ -1,6 +1,6 @@
 [project]
 name = "judgeval"
-version = "<version_placeholder>"
+version = "0.0.0"
 authors = [
     { name="Andrew Li", email="andrew@judgmentlabs.ai" },
     { name="Alex Shan", email="alex@judgmentlabs.ai" },
@@ -29,7 +29,8 @@ dependencies = [
     "langchain-anthropic",
     "langchain-core",
     "google-genai",
-    "boto3"
+    "boto3",
+    "matplotlib>=3.10.3",
 ]
 
 [project.urls]
@@ -45,6 +46,18 @@ packages = ["src/judgeval"]
 include = [
     "/src/judgeval",
     "/src/judgeval/**/*.py",
+]
+
+[dependency-groups]
+dev = [
+    "chromadb>=1.0.12",
+    "langchain-community>=0.3.24",
+    "pytest>=8.4.0",
+    "pytest-asyncio>=1.0.0",
+    "pytest-cov>=6.1.1",
+    "pytest-mock>=3.14.1",
+    "tavily-python>=0.7.5",
+    "langgraph>=0.4.3",
 ]
 
 [tool.hatch.build]

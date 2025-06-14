@@ -7,7 +7,8 @@ import asyncio
 import json
 from typing import Dict, List, Optional
 
-from judgeval.rules import Rule, Condition, NotificationConfig, AlertStatus, RulesEngine
+from judgeval.rules import Rule, Condition, NotificationConfig, RulesEngine
+from judgeval.utils.alerts import AlertStatus
 from judgeval.scorers import AnswerRelevancyScorer, FaithfulnessScorer, AnswerCorrectnessScorer
 from judgeval.scorers.judgeval_scorers.api_scorers.faithfulness import FaithfulnessScorer
 from judgeval.scorers.judgeval_scorers.api_scorers.answer_relevancy import AnswerRelevancyScorer

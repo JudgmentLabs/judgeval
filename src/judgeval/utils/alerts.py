@@ -20,12 +20,20 @@ class AlertResult(BaseModel):
         status: Status of the alert (triggered or not)
         conditions_result: List of condition evaluation results
         metadata: Dictionary containing example_id, timestamp, and other metadata
+        notification: Optional notification configuration for triggered alerts
+        combine_type: The combination type used ("all" or "any")
+        project_id: Optional project identifier
+        trace_span_id: Optional trace span identifier
     """
     rule_name: str
     rule_id: Optional[str] = None  # The unique identifier of the rule
     status: AlertStatus
     conditions_result: List[Dict[str, Any]] = []
     metadata: Dict[str, Any] = {}
+    notification: Optional[Any] = None  # NotificationConfig when triggered, None otherwise
+    combine_type: Optional[str] = None  # "all" or "any"
+    project_id: Optional[str] = None  # Project identifier
+    trace_span_id: Optional[str] = None  # Trace span identifier
     
     @property
     def example_id(self) -> Optional[str]:
