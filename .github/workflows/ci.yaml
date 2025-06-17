@@ -1,23 +1,25 @@
-
-name: CI Tests
+name: CI
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    branches:
-      - main
 
 permissions: read-all
 
 jobs:
+  validate-branch:
+    uses: ./.github/workflows/merge-branch-check.yaml
+
   run-tests:
+    needs: [validate-branch]
+    if: needs.validate-branch.result == 'success' || needs.validate-branch.result == 'skipped'
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
         python-version:
           - "3.11"
-    name: Test
+    name: Unit Tests
     runs-on: ${{ matrix.os }}
     env:
       PYTHONPATH: "."
@@ -38,16 +40,16 @@ jobs:
         run: |
           pip install uv
           uv sync --dev
-          
 
       - name: Run tests
         run: |
           cd src
           uv run pytest tests
 
-  run-e2e-tests:
-    if: "!contains(github.actor, '[bot]')"  # Exclude if the actor is a bot
-    name: E2E Tests
+  run-e2e-tests-staging:
+    needs: [validate-branch]
+    if: "github.base_ref == 'staging' && !contains(github.actor, '[bot]') && (needs.validate-branch.result == 'success' || needs.validate-branch.result == 'skipped')"
+    name: Staging E2E Tests
     runs-on: ubuntu-latest
     env:
       TEST_TIMEOUT_SECONDS: ${{ secrets.TEST_TIMEOUT_SECONDS }}
@@ -57,7 +59,65 @@ jobs:
         with:
           poll-interval-seconds: 10
           same-branch-only: false
-          job-to-wait-for: "E2E Tests"
+          job-to-wait-for: "Staging E2E Tests"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-1
+          
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+         
+      - name: Install judgeval dependencies
+        run: |
+          pip install uv
+          uv sync --dev
+
+      - name: Check if server is running
+        run: |
+          if ! curl -s https://staging.api.judgmentlabs.ai/health > /dev/null; then
+            echo "Staging Judgment server is not running properly. Check logs on AWS CloudWatch for more details."
+            exit 1
+          else
+            echo "Staging server is running."
+          fi
+        
+      - name: Run E2E tests
+        working-directory: src
+        run: |      
+          SECRET_VARS=$(aws secretsmanager get-secret-value --secret-id gh-actions-stg-judgeval/api-keys/judgeval --query SecretString --output text)
+          export $(echo "$SECRET_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
+          timeout ${TEST_TIMEOUT_SECONDS}s uv run pytest --durations=0 --cov=. --cov-config=.coveragerc --cov-report=html ./e2etests
+
+      - name: Upload coverage HTML report (staging)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html-staging
+          path: src/htmlcov
+
+  run-e2e-tests-main:
+    needs: [validate-branch]
+    if: "github.base_ref == 'main' && !contains(github.actor, '[bot]') && needs.validate-branch.result == 'success'"
+    name: Production E2E Tests
+    runs-on: ubuntu-latest
+    env:
+      TEST_TIMEOUT_SECONDS: ${{ secrets.TEST_TIMEOUT_SECONDS }}
+    steps:
+      - name: Wait for turn
+        uses: softprops/turnstyle@v2
+        with:
+          poll-interval-seconds: 10
+          same-branch-only: false
+          job-to-wait-for: "Production E2E Tests"
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -85,7 +145,7 @@ jobs:
             echo "Production Judgment server is not running properly. Check logs on AWS CloudWatch for more details."
             exit 1
           else
-            echo "Server is running."
+            echo "Production server is running."
           fi
         
       - name: Run E2E tests
@@ -95,9 +155,9 @@ jobs:
           export $(echo "$SECRET_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
           timeout ${TEST_TIMEOUT_SECONDS}s uv run pytest --durations=0 --cov=. --cov-config=.coveragerc --cov-report=html ./e2etests
 
-      - name: Upload coverage HTML report
+      - name: Upload coverage HTML report (production)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-html
+          name: coverage-html-production
           path: src/htmlcov

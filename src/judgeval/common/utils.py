@@ -103,7 +103,7 @@ def validate_api_key(judgment_api_key: str):
     Validates that the user api key is valid
     """
     response = requests.post(
-        f"{ROOT_API}/validate_api_key/",
+        f"{ROOT_API}/auth/validate_api_key/",
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {judgment_api_key}",

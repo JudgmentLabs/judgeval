@@ -2149,6 +2149,55 @@ class Tracer:
     
             return wrapper
         
+    def observe_tools(self, cls=None, *, exclude_methods: Optional[List[str]] = None, 
+                  include_private: bool = False, warn_on_double_decoration: bool = True):
+        """
+        Automatically adds @observe(span_type="tool") to all methods in a class.
+
+        Args:
+            cls: The class to decorate (automatically provided when used as decorator)
+            exclude_methods: List of method names to skip decorating. Defaults to common magic methods
+            include_private: Whether to decorate methods starting with underscore. Defaults to False
+            warn_on_double_decoration: Whether to print warnings when skipping already-decorated methods. Defaults to True
+        """
+
+        if exclude_methods is None:
+            exclude_methods = ['__init__', '__new__', '__del__', '__str__', '__repr__']
+        
+        def decorate_class(cls):
+            if not self.enable_monitoring:
+                return cls
+                
+            decorated = []
+            skipped = []
+            
+            for name in dir(cls):
+                method = getattr(cls, name)
+                
+                if (not callable(method) or 
+                    name in exclude_methods or 
+                    (name.startswith('_') and not include_private) or
+                    not hasattr(cls, name)):
+                    continue
+                    
+                if hasattr(method, '_judgment_span_name'):
+                    skipped.append(name)
+                    if warn_on_double_decoration:
+                        print(f"Warning: {cls.__name__}.{name} already decorated, skipping")
+                    continue
+
+                try:
+                    decorated_method = self.observe(method, span_type="tool")
+                    setattr(cls, name, decorated_method)
+                    decorated.append(name)
+                except Exception as e:
+                    if warn_on_double_decoration:
+                        print(f"Warning: Failed to decorate {cls.__name__}.{name}: {e}")
+            
+            return cls
+        
+        return decorate_class if cls is None else decorate_class(cls)
+
     def async_evaluate(self, *args, **kwargs):
         if not self.enable_evaluations:
             return
