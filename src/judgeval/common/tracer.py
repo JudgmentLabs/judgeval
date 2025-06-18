@@ -2391,6 +2391,8 @@ def wrap(client: Any, trace_across_async_contexts: bool = Tracer.trace_across_as
         client.chat.completions.create = traced_create_async
         if hasattr(client, "responses") and hasattr(client.responses, "create"):
             client.responses.create = traced_response_create_async
+        if hasattr(client, "beta") and hasattr(client.beta, "chat") and hasattr(client.beta.chat, "completions") and hasattr(client.beta.chat.completions, "parse"):
+            client.beta.chat.completions.parse = traced_create_async
     elif isinstance(client, AsyncAnthropic):
         client.messages.create = traced_create_async
         if original_stream:
@@ -2401,6 +2403,8 @@ def wrap(client: Any, trace_across_async_contexts: bool = Tracer.trace_across_as
         client.chat.completions.create = traced_create_sync
         if hasattr(client, "responses") and hasattr(client.responses, "create"):
             client.responses.create = traced_response_create_sync
+        if hasattr(client, "beta") and hasattr(client.beta, "chat") and hasattr(client.beta.chat, "completions") and hasattr(client.beta.chat.completions, "parse"):
+            client.beta.chat.completions.parse = traced_create_sync
     elif isinstance(client, Anthropic):
         client.messages.create = traced_create_sync
         if original_stream:
