@@ -1305,7 +1305,6 @@ class _DeepTracer:
         
         func_name = frame.f_code.co_name
         module_name = frame.f_globals.get("__name__", None)
-
         func = frame.f_globals.get(func_name)
         if func and (hasattr(func, '_judgment_span_name') or hasattr(func, '_judgment_span_type')):
             return False
@@ -1315,6 +1314,7 @@ class _DeepTracer:
             or func_name.startswith("<") # ex: <listcomp>
             or func_name.startswith("__") and func_name != "__call__" # dunders
             or not self._is_user_code(frame.f_code.co_filename)
+            or module_name == "__main__"
         ):
             return False
                     
