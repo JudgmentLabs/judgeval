@@ -46,7 +46,9 @@ class S3Storage:
                         Bucket=self.bucket_name,
                         CreateBucketConfiguration={
                             'LocationConstraint': self.s3_client.meta.region_name
-                        }
+                        }               
+                    ) if self.s3_client.meta.region_name != "us-east-1" else self.s3_client.create_bucket(
+                        Bucket=self.bucket_name
                     )
                     info(f"Created S3 bucket: {self.bucket_name}")
                 except ClientError as create_error:
