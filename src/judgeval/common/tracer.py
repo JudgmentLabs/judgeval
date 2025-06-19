@@ -1587,7 +1587,7 @@ class Tracer:
         s3_aws_secret_access_key: Optional[str] = None,
         s3_region_name: Optional[str] = None,
         offline_mode: bool = False,
-        deep_tracing: bool = True,  # Deep tracing is enabled by default
+        deep_tracing: bool = False,  # Deep tracing is disabled by default
         trace_across_async_contexts: bool = False, # BY default, we don't trace across async contexts
         # Background span service configuration
         enable_background_spans: bool = True,  # Enable background span service by default
