@@ -1393,7 +1393,6 @@ class _DeepTracer:
             or func_name.startswith("<") # ex: <listcomp>
             or func_name.startswith("__") and func_name != "__call__" # dunders
             or not self._is_user_code(frame.f_code.co_filename)
-            or module_name == "__main__"
         ):
             return False
                     
