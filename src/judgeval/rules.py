@@ -64,8 +64,6 @@ class Condition(BaseModel):
             # Fallback to default comparison (greater than or equal)
             return value >= self.threshold if self.threshold is not None else False
 
-<<<<<<< HEAD
-=======
 class PagerDutyConfig(BaseModel):
     """
     Configuration for PagerDuty notifications.
@@ -95,7 +93,6 @@ class PagerDutyConfig(BaseModel):
             "group": self.group,
             "class_type": self.class_type
         }
->>>>>>> 007206bb1fc8ddebe4d29ea037dea87e6f23cd66
 
 class NotificationConfig(BaseModel):
     """
@@ -132,12 +129,8 @@ class NotificationConfig(BaseModel):
             "enabled": self.enabled,
             "communication_methods": self.communication_methods,
             "email_addresses": self.email_addresses,
-<<<<<<< HEAD
-            "send_at": self.send_at,
-=======
             "pagerduty_config": self.pagerduty_config.model_dump() if self.pagerduty_config else None,
             "send_at": self.send_at
->>>>>>> 007206bb1fc8ddebe4d29ea037dea87e6f23cd66
         }
 
 
