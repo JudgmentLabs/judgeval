@@ -1,0 +1,9 @@
+name: Branch Protection
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  branch-protection:
+    uses: ./.github/workflows/merge-branch-check.yaml
