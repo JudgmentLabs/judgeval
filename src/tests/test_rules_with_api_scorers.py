@@ -131,13 +131,22 @@ class TestRulesWithAPIScorers:
         ]
 
         # Run evaluation
+<<<<<<< HEAD
         client.run_evaluation(
             examples=[example], scorers=scorers, model="gpt-3.5-turbo", rules=rules
+=======
+        result = client.run_evaluation(
+            examples=[example],
+            scorers=scorers,
+            model="gpt-4.1-mini",
+            rules=rules
+>>>>>>> 007206bb1fc8ddebe4d29ea037dea87e6f23cd66
         )
 
         # Verify run_eval was called with the expected arguments
         assert mock_run_eval.called
         call_args = mock_run_eval.call_args[0][0]
+<<<<<<< HEAD
         assert hasattr(call_args, "rules")
 
     def test_validation_with_correct_import(self):
@@ -182,3 +191,7 @@ class TestRulesWithAPIScorers:
             client.run_evaluation(
                 examples=[example], scorers=scorers, model="gpt-3.5-turbo", rules=rules
             )
+=======
+        assert hasattr(call_args, 'rules')
+                
+>>>>>>> 007206bb1fc8ddebe4d29ea037dea87e6f23cd66

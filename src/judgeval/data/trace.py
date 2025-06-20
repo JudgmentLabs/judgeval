@@ -132,3 +132,6 @@ class Trace(BaseModel):
     offline_mode: bool = False
     rules: Optional[Dict[str, Any]] = None
     has_notification: Optional[bool] = False
+    customer_id: Optional[str] = None
+    tags: Optional[List[str]] = None
+    

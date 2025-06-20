@@ -43,6 +43,18 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
     # --- NEW __init__ ---
     def __init__(self, tracer: Tracer):
         self.tracer = tracer
+        # Initialize tracking/logging variables (preserved across resets)
+        self.executed_nodes: List[str] = []
+        self.executed_tools: List[str] = []
+        self.executed_node_tools: List[str] = []
+        self.traces: List[Dict[str, Any]] = []
+        # Initialize execution state (reset between runs)
+        self._reset_state()
+    # --- END NEW __init__ ---
+
+    def _reset_state(self):
+        """Reset only the critical execution state for reuse across multiple executions"""
+        # Reset core execution state that must be cleared between runs
         self._trace_client: Optional[TraceClient] = None
         self._run_id_to_span_id: Dict[UUID, str] = {}
         self._span_id_to_start_time: Dict[str, float] = {}
@@ -51,7 +63,17 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         self._trace_saved: bool = False  # Flag to prevent actions after trace is saved
         self.span_id_to_token: Dict[str, Any] = {}
         self.trace_id_to_token: Dict[str, Any] = {}
+        
+        # Add timestamp to track when we last reset
+        self._last_reset_time: float = time.time()
+        
+        # Preserve tracking/logging variables across executions:
+        # - self.executed_nodes: List[str] = [] # Keep as running log
+        # - self.executed_tools: List[str] = [] # Keep as running log  
+        # - self.executed_node_tools: List[str] = [] # Keep as running log
+        # - self.traces: List[Dict[str, Any]] = [] # Keep for collecting multiple traces
 
+        # Also reset tracking/logging variables
         self.executed_nodes: List[
             str
         ] = []  # These last four members are only appended to and never accessed; can probably be removed but still might be useful for future reference?
@@ -60,6 +82,13 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         self.traces: List[Dict[str, Any]] = []
 
     # --- END NEW __init__ ---
+    def reset(self):
+        """Public method to manually reset handler execution state for reuse"""
+        self._reset_state()
+
+    def reset_all(self):
+        """Public method to reset ALL handler state including tracking/logging data"""
+        self._reset_state()
 
     # --- MODIFIED _ensure_trace_client ---
     def _ensure_trace_client(
@@ -70,6 +99,11 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         per handler instance lifecycle (effectively per graph invocation).
         Returns the client or None.
         """
+
+        # If this is a potential new root execution (no parent_run_id) and we had a previous trace saved,
+        # reset state to allow reuse of the handler
+        if parent_run_id is None and self._trace_saved:
+            self._reset_state()
 
         # If a client already exists, return it.
         if self._trace_client:

@@ -273,25 +273,3 @@ async def test_async_graph_execution():
         ), f"Trace {trace_id_async} should contain 'OPENAI_API_CALL' span."
 
 
-# --- Optional Cleanup ---
-# You might add a fixture to delete traces/projects after tests,
-# but fetching and verifying is often safer for CI/debugging.
-# Example (use with caution):
-# @pytest.fixture(scope="session", autouse=True)
-# def cleanup_projects():
-#     yield
-#     print("\n--- Cleaning up test projects ---")
-#     if not API_KEY or not ORG_ID:
-#         print("Skipping cleanup.")
-#         return
-#     client = TraceManagerClient(judgment_api_key=API_KEY, organization_id=ORG_ID)
-#     try:
-#         client.delete_project(project_name=PROJECT_NAME_SYNC)
-#         print(f"Deleted project: {PROJECT_NAME_SYNC}")
-#     except Exception as e:
-#         print(f"Failed to delete project {PROJECT_NAME_SYNC}: {e}")
-#     try:
-#         client.delete_project(project_name=PROJECT_NAME_ASYNC)
-#         print(f"Deleted project: {PROJECT_NAME_ASYNC}")
-#     except Exception as e:
-#         print(f"Failed to delete project {PROJECT_NAME_ASYNC}: {e}")
