@@ -461,6 +461,9 @@ class TraceClient:
         self.enable_evaluations = enable_evaluations
         self.parent_trace_id = parent_trace_id
         self.parent_name = parent_name
+        self.customer_id: Optional[str] = None  # Added customer_id attribute
+        self.tags: Optional[List[str]] = None  # Added tags attribute
+        self.has_notification: Optional[bool] = False  # Initialize has_notification
         self.trace_spans: List[TraceSpan] = []
         self.span_id_to_span: Dict[str, TraceSpan] = {}
         self.evaluation_runs: List[EvaluationRun] = []
@@ -821,7 +824,9 @@ class TraceClient:
             "overwrite": overwrite,
             "offline_mode": self.tracer.offline_mode,
             "parent_trace_id": self.parent_trace_id,
-            "parent_name": self.parent_name
+            "parent_name": self.parent_name,
+            "customer_id": self.customer_id,
+            "tags": self.tags
         }        
         # --- Log trace data before saving ---
         server_response = self.trace_manager_client.save_trace(trace_data, offline_mode=self.tracer.offline_mode, final_save=True)
@@ -861,7 +866,9 @@ class TraceClient:
             "overwrite": overwrite,
             "offline_mode": self.tracer.offline_mode,
             "parent_trace_id": self.parent_trace_id,
-            "parent_name": self.parent_name
+            "parent_name": self.parent_name,
+            "customer_id": self.customer_id,
+            "tags": self.tags
         }
         
         # Check usage limits first
@@ -901,6 +908,74 @@ class TraceClient:
     def delete(self):
         return self.trace_manager_client.delete_trace(self.trace_id)
     
+    def set_metadata(self, key: str = None, value: Any = None, **kwargs):
+        """
+        Set metadata for this trace.
+        
+        Args:
+            key: The metadata key to set
+            value: The metadata value to set (can be None to unset/clear the value)
+            **kwargs: Additional metadata as keyword arguments
+        
+        Supported keys:
+        - customer_id: ID of the customer using this trace
+        - tags: List of tags for this trace
+        - has_notification: Whether this trace has a notification
+        - overwrite: Whether to overwrite existing traces
+        - name: Name of the trace
+        """
+        metadata = {}
+        if key is not None:  # Only check if key is not None, allow value to be None
+            metadata[key] = value
+        metadata.update(kwargs)
+        
+        for k, v in metadata.items():
+            if k == "customer_id":
+                self.customer_id = str(v) if v is not None else None
+            elif k == "tags":
+                if isinstance(v, list):
+                    self.tags = v
+                elif isinstance(v, str):
+                    self.tags = [v]
+                else:
+                    raise ValueError(f"Tags must be a list or string, got {type(v)}")
+            elif k == "has_notification":
+                if not isinstance(v, bool):
+                    raise ValueError(f"has_notification must be a boolean, got {type(v)}")
+                self.has_notification = v
+            elif k == "overwrite":
+                if not isinstance(v, bool):
+                    raise ValueError(f"overwrite must be a boolean, got {type(v)}")
+                self.overwrite = v
+            elif k == "name":
+                self.name = v
+            else:
+                supported_keys = ["customer_id", "tags", "has_notification", "overwrite", "name"]
+                raise ValueError(f"Unsupported metadata key: {k}. Supported keys: {supported_keys}")
+        
+        # Metadata changes are stored in memory and will be included
+        # when the trace is saved at completion - no immediate persistence needed
+
+    def set_customer_id(self, customer_id: str):
+        """
+        Set the customer ID for this trace.
+        
+        Args:
+            customer_id: The customer ID to set
+        """
+        self.set_metadata(customer_id=customer_id)
+
+    def set_tags(self, tags: List[str]):
+        """
+        Set the tags for this trace.
+        
+        Args:
+            tags: List of tags to set
+        """
+        self.set_metadata(tags=tags)
+
+
+
 def _capture_exception_for_trace(current_trace: Optional['TraceClient'], exc_info: ExcInfo):
     if not current_trace:
         return
@@ -1070,7 +1145,7 @@ class BackgroundSpanService:
             return
             
         try:
-            # Group spans by type for different endpoints
+            # Group items by type for different endpoints
             spans_to_send = []
             evaluation_runs_to_send = []
             
@@ -1089,7 +1164,7 @@ class BackgroundSpanService:
                 self._send_evaluation_runs_batch(evaluation_runs_to_send)
                 
         except Exception as e:
-            warnings.warn(f"Failed to send span batch: {e}")
+            warnings.warn(f"Failed to send batch: {e}")
     
     def _send_spans_batch(self, spans: List[Dict[str, Any]]):
         """Send a batch of spans to the spans endpoint."""
@@ -1193,6 +1268,8 @@ class BackgroundSpanService:
         except Exception as e:
             warnings.warn(f"Failed to send evaluation runs batch: {e}")
     
+
+    
     def queue_span(self, span: TraceSpan, span_state: str = "input"):
         """
         Queue a span for background sending.
@@ -1232,6 +1309,8 @@ class BackgroundSpanService:
                 }
             }
             self._span_queue.put(eval_data)
+    
+
     
     def flush(self):
         """Force immediate sending of all queued spans."""
@@ -1792,7 +1871,6 @@ class Tracer:
                 label=label,
                 score=score
             )
-
             current_trace.add_annotation(annotation)
 
         rprint(f"[bold]{label}:[/bold] {msg}")
@@ -2215,6 +2293,49 @@ class Tracer:
             current_trace.async_evaluate(*args, **kwargs)
         else:
             warnings.warn("No trace found (context var or fallback), skipping evaluation") # Modified warning
+
+    def set_metadata(self, key: str = None, value: Any = None, **kwargs):
+        """
+        Set metadata for the current trace.
+        
+        Args:
+            key: The metadata key to set
+            value: The metadata value to set
+            **kwargs: Additional metadata as keyword arguments
+        """
+        current_trace = self.get_current_trace()
+        if current_trace:
+            current_trace.set_metadata(key=key, value=value, **kwargs)
+        else:
+            warnings.warn("No current trace found, cannot set metadata")
+
+    def set_customer_id(self, customer_id: str):
+        """
+        Set the customer ID for the current trace.
+        
+        Args:
+            customer_id: The customer ID to set
+        """
+        current_trace = self.get_current_trace()
+        if current_trace:
+            current_trace.set_customer_id(customer_id)
+        else:
+            warnings.warn("No current trace found, cannot set customer ID")
+
+    def set_tags(self, tags: List[str]):
+        """
+        Set the tags for the current trace.
+        
+        Args:
+            tags: List of tags to set
+        """
+        current_trace = self.get_current_trace()
+        if current_trace:
+            current_trace.set_tags(tags)
+        else:
+            warnings.warn("No current trace found, cannot set tags")
+
+
 
     def get_background_span_service(self) -> Optional[BackgroundSpanService]:
         """Get the background span service instance."""
