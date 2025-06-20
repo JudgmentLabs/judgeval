@@ -1,6 +1,5 @@
 """Tests to verify rules work correctly with API scorers."""
 
-import pytest
 from unittest.mock import MagicMock, patch
 
 from judgeval.rules import Rule, Condition, RulesEngine
@@ -131,15 +130,11 @@ class TestRulesWithAPIScorers:
         ]
 
         # Run evaluation
-        result = client.run_evaluation(
-            examples=[example],
-            scorers=scorers,
-            model="gpt-4.1-mini",
-            rules=rules
+        client.run_evaluation(
+            examples=[example], scorers=scorers, model="gpt-4.1-mini", rules=rules
         )
 
         # Verify run_eval was called with the expected arguments
         assert mock_run_eval.called
         call_args = mock_run_eval.call_args[0][0]
-        assert hasattr(call_args, 'rules')
-                
+        assert hasattr(call_args, "rules")

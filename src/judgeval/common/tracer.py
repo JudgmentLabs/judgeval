@@ -885,8 +885,8 @@ class TraceClient:
             "parent_trace_id": self.parent_trace_id,
             "parent_name": self.parent_name,
             "customer_id": self.customer_id,
-            "tags": self.tags
-        }        
+            "tags": self.tags,
+        }
         # --- Log trace data before saving ---
         server_response = self.trace_manager_client.save_trace(
             trace_data, offline_mode=self.tracer.offline_mode, final_save=True
@@ -930,7 +930,7 @@ class TraceClient:
             "parent_trace_id": self.parent_trace_id,
             "parent_name": self.parent_name,
             "customer_id": self.customer_id,
-            "tags": self.tags
+            "tags": self.tags,
         }
 
         # Check usage limits first
@@ -971,16 +971,16 @@ class TraceClient:
 
     def delete(self):
         return self.trace_manager_client.delete_trace(self.trace_id)
-    
-    def set_metadata(self, key: str = None, value: Any = None, **kwargs):
+
+    def set_metadata(self, **kwargs):
         """
         Set metadata for this trace.
-        
+
         Args:
             key: The metadata key to set
             value: The metadata value to set (can be None to unset/clear the value)
             **kwargs: Additional metadata as keyword arguments
-        
+
         Supported keys:
         - customer_id: ID of the customer using this trace
         - tags: List of tags for this trace
@@ -989,10 +989,8 @@ class TraceClient:
         - name: Name of the trace
         """
         metadata = {}
-        if key is not None:  # Only check if key is not None, allow value to be None
-            metadata[key] = value
         metadata.update(kwargs)
-        
+
         for k, v in metadata.items():
             if k == "customer_id":
                 self.customer_id = str(v) if v is not None else None
@@ -1005,7 +1003,9 @@ class TraceClient:
                     raise ValueError(f"Tags must be a list or string, got {type(v)}")
             elif k == "has_notification":
                 if not isinstance(v, bool):
-                    raise ValueError(f"has_notification must be a boolean, got {type(v)}")
+                    raise ValueError(
+                        f"has_notification must be a boolean, got {type(v)}"
+                    )
                 self.has_notification = v
             elif k == "overwrite":
                 if not isinstance(v, bool):
@@ -1014,16 +1014,24 @@ class TraceClient:
             elif k == "name":
                 self.name = v
             else:
-                supported_keys = ["customer_id", "tags", "has_notification", "overwrite", "name"]
-                raise ValueError(f"Unsupported metadata key: {k}. Supported keys: {supported_keys}")
-        
+                supported_keys = [
+                    "customer_id",
+                    "tags",
+                    "has_notification",
+                    "overwrite",
+                    "name",
+                ]
+                raise ValueError(
+                    f"Unsupported metadata key: {k}. Supported keys: {supported_keys}"
+                )
+
         # Metadata changes are stored in memory and will be included
         # when the trace is saved at completion - no immediate persistence needed
 
     def set_customer_id(self, customer_id: str):
         """
         Set the customer ID for this trace.
-        
+
         Args:
             customer_id: The customer ID to set
         """
@@ -1032,15 +1040,16 @@ class TraceClient:
     def set_tags(self, tags: List[str]):
         """
         Set the tags for this trace.
-        
+
         Args:
             tags: List of tags to set
         """
         self.set_metadata(tags=tags)
 
 
-
-def _capture_exception_for_trace(current_trace: Optional['TraceClient'], exc_info: ExcInfo):
+def _capture_exception_for_trace(
+    current_trace: Optional["TraceClient"], exc_info: ExcInfo
+):
     if not current_trace:
         return
 
@@ -1239,7 +1248,7 @@ class BackgroundSpanService:
 
         except Exception as e:
             warnings.warn(f"Failed to send batch: {e}")
-    
+
     def _send_spans_batch(self, spans: List[Dict[str, Any]]):
         """Send a batch of spans to the spans endpoint."""
         payload = {"spans": spans, "organization_id": self.organization_id}
@@ -1341,7 +1350,7 @@ class BackgroundSpanService:
             warnings.warn(f"Network error sending evaluation runs batch: {e}")
         except Exception as e:
             warnings.warn(f"Failed to send evaluation runs batch: {e}")
-            
+
     def queue_span(self, span: TraceSpan, span_state: str = "input"):
         """
         Queue a span for background sending.
@@ -1383,9 +1392,7 @@ class BackgroundSpanService:
                 },
             }
             self._span_queue.put(eval_data)
-    
 
-    
     def flush(self):
         """Force immediate sending of all queued spans."""
         try:
@@ -1763,7 +1770,7 @@ class Tracer:
         s3_region_name: Optional[str] = None,
         offline_mode: bool = False,
         deep_tracing: bool = False,  # Deep tracing is disabled by default
-        trace_across_async_contexts: bool = False, # BY default, we don't trace across async contexts
+        trace_across_async_contexts: bool = False,  # BY default, we don't trace across async contexts
         # Background span service configuration
         enable_background_spans: bool = True,  # Enable background span service by default
         span_batch_size: int = 50,  # Number of spans to batch before sending
@@ -2411,9 +2418,15 @@ class Tracer:
                     return result
 
             return wrapper
-        
-    def observe_tools(self, cls=None, *, exclude_methods: Optional[List[str]] = None, 
-                  include_private: bool = False, warn_on_double_decoration: bool = True):
+
+    def observe_tools(
+        self,
+        cls=None,
+        *,
+        exclude_methods: Optional[List[str]] = None,
+        include_private: bool = False,
+        warn_on_double_decoration: bool = True,
+    ):
         """
         Automatically adds @observe(span_type="tool") to all methods in a class.
 
@@ -2425,28 +2438,32 @@ class Tracer:
         """
 
         if exclude_methods is None:
-            exclude_methods = ['__init__', '__new__', '__del__', '__str__', '__repr__']
-        
+            exclude_methods = ["__init__", "__new__", "__del__", "__str__", "__repr__"]
+
         def decorate_class(cls):
             if not self.enable_monitoring:
                 return cls
-                
+
             decorated = []
             skipped = []
-            
+
             for name in dir(cls):
                 method = getattr(cls, name)
-                
-                if (not callable(method) or 
-                    name in exclude_methods or 
-                    (name.startswith('_') and not include_private) or
-                    not hasattr(cls, name)):
+
+                if (
+                    not callable(method)
+                    or name in exclude_methods
+                    or (name.startswith("_") and not include_private)
+                    or not hasattr(cls, name)
+                ):
                     continue
-                    
-                if hasattr(method, '_judgment_span_name'):
+
+                if hasattr(method, "_judgment_span_name"):
                     skipped.append(name)
                     if warn_on_double_decoration:
-                        print(f"Warning: {cls.__name__}.{name} already decorated, skipping")
+                        print(
+                            f"Warning: {cls.__name__}.{name} already decorated, skipping"
+                        )
                     continue
 
                 try:
@@ -2456,9 +2473,9 @@ class Tracer:
                 except Exception as e:
                     if warn_on_double_decoration:
                         print(f"Warning: Failed to decorate {cls.__name__}.{name}: {e}")
-            
+
             return cls
-        
+
         return decorate_class if cls is None else decorate_class(cls)
 
     def async_evaluate(self, *args, **kwargs):
@@ -2485,10 +2502,10 @@ class Tracer:
                 "No trace found (context var or fallback), skipping evaluation"
             )  # Modified warning
 
-    def set_metadata(self, key: str = None, value: Any = None, **kwargs):
+    def set_metadata(self, **kwargs):
         """
         Set metadata for the current trace.
-        
+
         Args:
             key: The metadata key to set
             value: The metadata value to set
@@ -2496,14 +2513,14 @@ class Tracer:
         """
         current_trace = self.get_current_trace()
         if current_trace:
-            current_trace.set_metadata(key=key, value=value, **kwargs)
+            current_trace.set_metadata(**kwargs)
         else:
             warnings.warn("No current trace found, cannot set metadata")
 
     def set_customer_id(self, customer_id: str):
         """
         Set the customer ID for the current trace.
-        
+
         Args:
             customer_id: The customer ID to set
         """
@@ -2516,7 +2533,7 @@ class Tracer:
     def set_tags(self, tags: List[str]):
         """
         Set the tags for the current trace.
-        
+
         Args:
             tags: List of tags to set
         """
@@ -2525,8 +2542,6 @@ class Tracer:
             current_trace.set_tags(tags)
         else:
             warnings.warn("No current trace found, cannot set tags")
-
-
 
     def get_background_span_service(self) -> Optional[BackgroundSpanService]:
         """Get the background span service instance."""
@@ -2724,7 +2739,12 @@ def wrap(
         client.chat.completions.create = traced_create_async
         if hasattr(client, "responses") and hasattr(client.responses, "create"):
             client.responses.create = traced_response_create_async
-        if hasattr(client, "beta") and hasattr(client.beta, "chat") and hasattr(client.beta.chat, "completions") and hasattr(client.beta.chat.completions, "parse"):
+        if (
+            hasattr(client, "beta")
+            and hasattr(client.beta, "chat")
+            and hasattr(client.beta.chat, "completions")
+            and hasattr(client.beta.chat.completions, "parse")
+        ):
             client.beta.chat.completions.parse = traced_create_async
     elif isinstance(client, AsyncAnthropic):
         client.messages.create = traced_create_async
@@ -2736,7 +2756,12 @@ def wrap(
         client.chat.completions.create = traced_create_sync
         if hasattr(client, "responses") and hasattr(client.responses, "create"):
             client.responses.create = traced_response_create_sync
-        if hasattr(client, "beta") and hasattr(client.beta, "chat") and hasattr(client.beta.chat, "completions") and hasattr(client.beta.chat.completions, "parse"):
+        if (
+            hasattr(client, "beta")
+            and hasattr(client.beta, "chat")
+            and hasattr(client.beta.chat, "completions")
+            and hasattr(client.beta.chat.completions, "parse")
+        ):
             client.beta.chat.completions.parse = traced_create_sync
     elif isinstance(client, Anthropic):
         client.messages.create = traced_create_sync

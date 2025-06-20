@@ -64,10 +64,11 @@ class Condition(BaseModel):
             # Fallback to default comparison (greater than or equal)
             return value >= self.threshold if self.threshold is not None else False
 
+
 class PagerDutyConfig(BaseModel):
     """
     Configuration for PagerDuty notifications.
-    
+
     Attributes:
         routing_key: PagerDuty integration routing key
         severity: Severity level (critical, error, warning, info)
@@ -76,13 +77,14 @@ class PagerDutyConfig(BaseModel):
         group: Optional logical grouping for the alert
         class_type: Optional class/type of alert event
     """
+
     routing_key: str
     severity: str = "error"  # critical, error, warning, info
     source: str = "judgeval"
     component: Optional[str] = None
     group: Optional[str] = None
     class_type: Optional[str] = None
-    
+
     def model_dump(self, **kwargs):
         """Convert the PagerDutyConfig to a dictionary for JSON serialization."""
         return {
@@ -91,8 +93,9 @@ class PagerDutyConfig(BaseModel):
             "source": self.source,
             "component": self.component,
             "group": self.group,
-            "class_type": self.class_type
+            "class_type": self.class_type,
         }
+
 
 class NotificationConfig(BaseModel):
     """
@@ -129,8 +132,10 @@ class NotificationConfig(BaseModel):
             "enabled": self.enabled,
             "communication_methods": self.communication_methods,
             "email_addresses": self.email_addresses,
-            "pagerduty_config": self.pagerduty_config.model_dump() if self.pagerduty_config else None,
-            "send_at": self.send_at
+            "pagerduty_config": self.pagerduty_config.model_dump()
+            if self.pagerduty_config
+            else None,
+            "send_at": self.send_at,
         }
 
 

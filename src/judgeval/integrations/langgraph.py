@@ -50,6 +50,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         self.traces: List[Dict[str, Any]] = []
         # Initialize execution state (reset between runs)
         self._reset_state()
+
     # --- END NEW __init__ ---
 
     def _reset_state(self):
@@ -63,13 +64,13 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         self._trace_saved: bool = False  # Flag to prevent actions after trace is saved
         self.span_id_to_token: Dict[str, Any] = {}
         self.trace_id_to_token: Dict[str, Any] = {}
-        
+
         # Add timestamp to track when we last reset
         self._last_reset_time: float = time.time()
-        
+
         # Preserve tracking/logging variables across executions:
         # - self.executed_nodes: List[str] = [] # Keep as running log
-        # - self.executed_tools: List[str] = [] # Keep as running log  
+        # - self.executed_tools: List[str] = [] # Keep as running log
         # - self.executed_node_tools: List[str] = [] # Keep as running log
         # - self.traces: List[Dict[str, Any]] = [] # Keep for collecting multiple traces
 

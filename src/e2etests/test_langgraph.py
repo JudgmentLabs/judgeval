@@ -271,5 +271,3 @@ async def test_async_graph_execution():
             "OPENAI_API_CALL" in span.get("function", "")
             for span in fetched_trace["trace_spans"]
         ), f"Trace {trace_id_async} should contain 'OPENAI_API_CALL' span."
-
-

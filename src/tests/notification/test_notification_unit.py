@@ -5,11 +5,11 @@ from unittest.mock import MagicMock, patch
 import uuid
 
 from judgeval.rules import (
-    Rule, 
-    Condition, 
-    RulesEngine, 
+    Rule,
+    Condition,
+    RulesEngine,
     NotificationConfig,
-    PagerDutyConfig
+    PagerDutyConfig,
 )
 from judgeval.utils.alerts import AlertStatus
 from judgeval.scorers.judgeval_scorers.api_scorers.faithfulness import (
@@ -38,7 +38,7 @@ def mock_validate_api_key(monkeypatch):
 
 class TestPagerDutyConfig:
     """Tests for the PagerDutyConfig class."""
-    
+
     def test_pagerduty_config_creation(self):
         """Test creating a PagerDuty config with different parameters."""
         # Minimal config (only routing key required)
@@ -49,7 +49,7 @@ class TestPagerDutyConfig:
         assert config.component is None
         assert config.group is None
         assert config.class_type is None
-        
+
         # Full config
         config = PagerDutyConfig(
             routing_key="R0ABCD1234567890123456789",
@@ -57,24 +57,24 @@ class TestPagerDutyConfig:
             source="ml-pipeline",
             component="faithfulness-checker",
             group="production",
-            class_type="ml-alert"
+            class_type="ml-alert",
         )
-        
+
         assert config.routing_key == "R0ABCD1234567890123456789"
         assert config.severity == "critical"
         assert config.source == "ml-pipeline"
         assert config.component == "faithfulness-checker"
         assert config.group == "production"
         assert config.class_type == "ml-alert"
-    
+
     def test_pagerduty_config_serialization(self):
         """Test that PagerDutyConfig can be serialized to a dictionary."""
         config = PagerDutyConfig(
             routing_key="R0ABCD1234567890123456789",
             severity="critical",
-            component="test-component"
+            component="test-component",
         )
-        
+
         # Test the model_dump method
         data = config.model_dump()
         assert isinstance(data, dict)
@@ -111,36 +111,35 @@ class TestNotificationConfig:
         assert config.communication_methods == ["slack", "email"]
         assert config.email_addresses == email_addresses
         assert config.send_at == 1632150000
-    
+
     def test_notification_config_with_pagerduty(self):
         """Test creating a notification config with PagerDuty configuration."""
         # Create PagerDuty config
         pagerduty_config = PagerDutyConfig(
-            routing_key="R0ABCD1234567890123456789",
-            severity="critical"
+            routing_key="R0ABCD1234567890123456789", severity="critical"
         )
-        
+
         # Create notification config with PagerDuty
         config = NotificationConfig(
             enabled=True,
             communication_methods=["pagerduty", "email"],
             email_addresses=["test@example.com"],
-            pagerduty_config=pagerduty_config
+            pagerduty_config=pagerduty_config,
         )
-        
+
         assert config.enabled is True
         assert config.communication_methods == ["pagerduty", "email"]
         assert config.email_addresses == ["test@example.com"]
         assert config.pagerduty_config is not None
         assert config.pagerduty_config.routing_key == "R0ABCD1234567890123456789"
         assert config.pagerduty_config.severity == "critical"
-        
+
         # Test serialization includes PagerDuty config
         data = config.model_dump()
         assert data["pagerduty_config"] is not None
         assert data["pagerduty_config"]["routing_key"] == "R0ABCD1234567890123456789"
         assert data["pagerduty_config"]["severity"] == "critical"
-    
+
     def test_notification_config_serialization(self):
         """Test that NotificationConfig can be serialized to a dictionary."""
         config = NotificationConfig(

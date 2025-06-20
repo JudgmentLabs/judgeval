@@ -134,4 +134,3 @@ class Trace(BaseModel):
     has_notification: Optional[bool] = False
     customer_id: Optional[str] = None
     tags: Optional[List[str]] = None
-    
