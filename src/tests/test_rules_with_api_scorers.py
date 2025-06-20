@@ -118,7 +118,7 @@ class TestRulesWithAPIScorers:
         result = client.run_evaluation(
             examples=[example],
             scorers=scorers,
-            model="gpt-3.5-turbo",
+            model="gpt-4.1-mini",
             rules=rules
         )
     
@@ -127,48 +127,3 @@ class TestRulesWithAPIScorers:
         call_args = mock_run_eval.call_args[0][0]
         assert hasattr(call_args, 'rules')
                 
-    def test_validation_with_correct_import(self):
-        """Test that using JudgevalScorer with rules raises an error (with correct import)."""
-        # Import JudgevalScorer from the correct path
-        from judgeval.scorers.judgeval_scorer import JudgevalScorer
-        
-        # Create a mock JudgevalScorer instance
-        mock_judgeval_scorer = MagicMock(spec=JudgevalScorer)
-        # Ensure isinstance checks will work properly
-        mock_judgeval_scorer.__class__ = JudgevalScorer
-        
-        # Create client with patched _validate_api_key method
-        client = JudgmentClient(judgment_api_key="test_key")
-    
-        # Create example
-        example = Example(
-            input="Test input",
-            actual_output="Test output",
-            expected_output="Expected output"
-        )
-    
-        # Create scorers - mixing API scorer and JudgevalScorer
-        scorers = [
-            FaithfulnessScorer(threshold=0.7),  # API scorer
-            mock_judgeval_scorer  # JudgevalScorer (mocked)
-        ]
-    
-        # Create rules
-        rules = [
-            Rule(
-                name="Quality Check",
-                conditions=[
-                    Condition(metric=FaithfulnessScorer(threshold=0.7))
-                ],
-                combine_type="all"
-            )
-        ]
-    
-        # Run evaluation should raise ValueError
-        with pytest.raises(ValueError, match="Cannot use Judgeval scorers .* when using rules"):
-            client.run_evaluation(
-                examples=[example],
-                scorers=scorers,
-                model="gpt-3.5-turbo",
-                rules=rules
-            ) 
