@@ -15,5 +15,5 @@ __all__ = [
     "generate_scoring_result",
     "Trace",
     "TraceSpan",
-    "TraceUsage"
+    "TraceUsage",
 ]

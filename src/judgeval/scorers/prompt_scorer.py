@@ -9,7 +9,7 @@ To implement a subclass of PromptScorer, you need to implement the following met
 - success_check(): determines whether the evaluation was successful
 
 The core idea of PromptScorer is to provide a flexible way to create custom scoring metrics
-by leveraging LLM judges to evaluate examples. The scorer constructs a prompt, sends it to 
+by leveraging LLM judges to evaluate examples. The scorer constructs a prompt, sends it to
 the judge, and parses the structured response to determine a score.
 
 For example, the SentimentScorer subclass uses PromptScorer to detect negative sentiment in responses
@@ -26,17 +26,17 @@ NOTE: When implementing build_measure_prompt and build_schema:
 """
 
 from abc import abstractmethod
-from typing import List, Optional, Tuple, Any, Mapping
-from pydantic import BaseModel, model_serializer, Field
+from typing import List, Optional, Tuple, Any
+from pydantic import BaseModel, Field
 
 from judgeval.data import Example
 from judgeval.data.example import ExampleParams
 from judgeval.scorers import JudgevalScorer
 from judgeval.scorers.utils import (
-    scorer_progress_meter, 
+    scorer_progress_meter,
     parse_response_json,
     get_or_create_event_loop,
-    create_verbose_logs
+    create_verbose_logs,
 )
 from judgeval.judges import JudgevalJudge
 
@@ -56,10 +56,10 @@ class PromptScorer(JudgevalScorer, BaseModel):
     # DO NOT SET THESE FIELDS MANUALLY, THEY ARE SET BY THE SCORE_EXAMPLE METHOD
     _response: Optional[dict] = None
     _result: Optional[float] = None
-    
+
     def __init__(
         self,
-        name: str, 
+        name: str,
         threshold: float = 0.5,
         include_reason: bool = True,
         async_mode: bool = True,
@@ -91,10 +91,8 @@ class PromptScorer(JudgevalScorer, BaseModel):
         )
 
     def score_example(
-            self, 
-            example: Example, 
-            _show_indicator: bool = True
-            ) -> float:
+        self, example: Example, _show_indicator: bool = True
+    ) -> float | None:
         """
         Synchronous method for scoring an example using the prompt criteria.
         """
@@ -104,6 +102,7 @@ class PromptScorer(JudgevalScorer, BaseModel):
                 loop.run_until_complete(
                     self.a_score_example(example, _show_indicator=False)
                 )
+                return self._result
             else:
                 result, reason = self.evaluate(example)
                 self.reason = reason
@@ -117,10 +116,10 @@ class PromptScorer(JudgevalScorer, BaseModel):
                 return result
 
     async def a_score_example(
-            self,
-            example: Example,
-            _show_indicator: bool = True,
-            ) -> float: 
+        self,
+        example: Example,
+        _show_indicator: bool = True,
+    ) -> float:
         """
         Async method for scoring an example using the prompt criteria.
         """
@@ -135,30 +134,32 @@ class PromptScorer(JudgevalScorer, BaseModel):
                 ],
             )
             return result
-    
+
     def evaluate(self, example: Example) -> Tuple[Any, str]:
         """
         Synchronous helper method for evaluating an example using the prompt criteria.
 
-        Builds a custom prompt using `build_measure_prompt` and sends it to the judge model 
+        Builds a custom prompt using `build_measure_prompt` and sends it to the judge model
         for evaluation. The result is then parsed as JSON and returned.
 
         NOTE: It is assumed that the model response will be JSON and contain a "score" and "reason" field.
         """
         prompt = self._build_measure_prompt(example)
-        if self.using_native_model:
+        if self.using_native_model and self.model:
             res = self.model.generate(prompt)
             response = parse_response_json(res, self)
             result, reason = self._process_response(response)
             return result, reason
         else:
-            raise NotImplementedError("Non-native judge models are not supported in synchronous mode yet.")
+            raise NotImplementedError(
+                "Non-native judge models are not supported in synchronous mode yet."
+            )
 
     async def a_evaluate(self, example: Example) -> Tuple[Any, str]:
         """
         Asynchronous helper method for evaluating an example using the prompt criteria.
 
-        Builds a custom prompt using `build_measure_prompt` and sends it to the judge model 
+        Builds a custom prompt using `build_measure_prompt` and sends it to the judge model
         for evaluation. The result is then parsed as JSON and returned.
 
         NOTE: It is assumed that the model response will be JSON and contain a "score" and "reason" field.
@@ -166,7 +167,7 @@ class PromptScorer(JudgevalScorer, BaseModel):
         judge_prompt = self._build_measure_prompt(example)
         schema = self._build_schema()
         prompt = self._enforce_prompt_format(judge_prompt=judge_prompt, schema=schema)
-        if self.using_native_model:
+        if self.using_native_model and self.model:
             res = await self.model.a_generate(prompt)
             response = parse_response_json(res, self)
             self._response = response
@@ -177,7 +178,9 @@ class PromptScorer(JudgevalScorer, BaseModel):
             self._response = response
             return result, reason
         else:
-            raise NotImplementedError("Non-native judge models are not supported in async mode yet.")
+            raise NotImplementedError(
+                "Non-native judge models are not supported in async mode yet."
+            )
 
     # TODO: can we make this take *args and **kwargs? How does that work with a_evaluate() since we'd have to pass the same args
     @abstractmethod
@@ -190,7 +193,7 @@ class PromptScorer(JudgevalScorer, BaseModel):
 
         The prompt is typically a set of instructions that the judge model uses to evaluate the example.
 
-        This function returns a conversation prompt of the form 
+        This function returns a conversation prompt of the form
         [{"role": "system", "content": "..."}, {"role": "user", "content": "..."}]
 
         A basic version of implementing this function could be as follows:
@@ -201,7 +204,7 @@ class PromptScorer(JudgevalScorer, BaseModel):
         ]
         """
         pass
-    
+
     # TODO: does this need to take *args and **kwargs? How does that work with a_evaluate() since we'd have to pass the same args
     @abstractmethod
     def _build_schema(self) -> dict:
@@ -214,23 +217,23 @@ class PromptScorer(JudgevalScorer, BaseModel):
         return {"score": int, "reason": str}
         """
         pass
-    
+
     def _enforce_prompt_format(self, judge_prompt: List[dict], schema: dict):
         """
         Formats the final prompt to the judge model.
 
-        This function takes a list of dictionaries (`judge_prompt`) and a schema dictionary (`schema`), 
-        and appends a schema enforcement prompt to the content of the first dictionary in the list, which is assumed to be the system prompt. 
+        This function takes a list of dictionaries (`judge_prompt`) and a schema dictionary (`schema`),
+        and appends a schema enforcement prompt to the content of the first dictionary in the list, which is assumed to be the system prompt.
         The schema enforcement prompt instructs the judge model to provide its response in a specific JSON format.
 
         Args:
-            judge_prompt (List[dict]): A list of dictionaries representing the judge prompt. 
+            judge_prompt (List[dict]): A list of dictionaries representing the judge prompt.
                                        Each dictionary should contain a "content" key.
-            schema (dict): A dictionary representing the schema. The keys are the expected keys in the response, 
+            schema (dict): A dictionary representing the schema. The keys are the expected keys in the response,
                            and the values are the types of the corresponding values.
 
         Returns:
-            List[dict]: The modified judge prompt with the schema enforcement prompt appended to the content 
+            List[dict]: The modified judge prompt with the schema enforcement prompt appended to the content
                         of the first dictionary.
 
         Raises:
@@ -242,19 +245,27 @@ class PromptScorer(JudgevalScorer, BaseModel):
             formatted_prompt = format_measure_prompt(judge_prompt, schema)
             # formatted_prompt[0]["content"] will include the schema enforcement prompt
         """
-        SCHEMA_ENFORCEMENT_PROMPT = "\n\nPlease provide your response in the following JSON format: {"
-        if isinstance(judge_prompt, list) and all(isinstance(item, dict) for item in judge_prompt):
+        SCHEMA_ENFORCEMENT_PROMPT = (
+            "\n\nPlease provide your response in the following JSON format: {"
+        )
+        if isinstance(judge_prompt, list) and all(
+            isinstance(item, dict) for item in judge_prompt
+        ):
             # create formatting string for schema enforcement
-            # schema is a map between key and type of the value 
+            # schema is a map between key and type of the value
             for key, key_type in schema.items():
                 SCHEMA_ENFORCEMENT_PROMPT += f'"{key}": <{key}> ({key_type.__name__}), '
-            SCHEMA_ENFORCEMENT_PROMPT = SCHEMA_ENFORCEMENT_PROMPT[:-2] + "}"  # remove trailing comma and space
+            SCHEMA_ENFORCEMENT_PROMPT = (
+                SCHEMA_ENFORCEMENT_PROMPT[:-2] + "}"
+            )  # remove trailing comma and space
             judge_prompt[0]["content"] += SCHEMA_ENFORCEMENT_PROMPT
             return judge_prompt
         else:
-            raise TypeError(f"Prompt must be a list of dictionaries. Got {type(judge_prompt)} instead.")
+            raise TypeError(
+                f"Prompt must be a list of dictionaries. Got {type(judge_prompt)} instead."
+            )
 
-    @abstractmethod 
+    @abstractmethod
     def _process_response(self, response: dict):
         """
         Customizable method for processing the response from the judge model.
@@ -276,7 +287,7 @@ class PromptScorer(JudgevalScorer, BaseModel):
         Determines whether or not the PromptScorer should consider the evaluation of a single example successful.
         """
         pass
-    
+
     @property
     def __name__(self):
         return self.name

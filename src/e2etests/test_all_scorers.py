@@ -1,14 +1,14 @@
 """
 base e2e tests for all default judgeval scorers
 """
-import uuid
+
 from typing import List
 
 from judgeval.judgment_client import JudgmentClient
 from pydantic import BaseModel
 from judgeval.scorers import (
     AnswerCorrectnessScorer,
-    AnswerRelevancyScorer, 
+    AnswerRelevancyScorer,
     ContextualPrecisionScorer,
     ContextualRecallScorer,
     ContextualRelevancyScorer,
@@ -19,7 +19,6 @@ from judgeval.scorers import (
     Text2SQLScorer,
     InstructionAdherenceScorer,
     ExecutionOrderScorer,
-    DerailmentScorer,
     JSONCorrectnessScorer,
     ClassifierScorer,
     PromptScorer,
@@ -28,8 +27,8 @@ from judgeval.scorers import (
 from judgeval.data import Example
 from judgeval.data.example import ExampleParams
 
+
 def test_ac_scorer(client: JudgmentClient):
-    
     example = Example(
         input="What's the capital of France?",
         actual_output="The capital of France is Paris.",
@@ -51,16 +50,16 @@ def test_ac_scorer(client: JudgmentClient):
     )
     print_debug_on_failure(res[0])
 
-def test_ar_scorer(client: JudgmentClient):
 
+def test_ar_scorer(client: JudgmentClient):
     example_1 = Example(  # should pass
         input="What's the capital of France?",
-        actual_output="The capital of France is Paris."
+        actual_output="The capital of France is Paris.",
     )
 
     example_2 = Example(  # should fail
         input="What's the capital of France?",
-        actual_output="There's alot to do in Marseille. Lots of bars, restaurants, and museums."
+        actual_output="There's alot to do in Marseille. Lots of bars, restaurants, and museums.",
     )
 
     scorer = AnswerRelevancyScorer(threshold=0.5)
@@ -80,25 +79,29 @@ def test_ar_scorer(client: JudgmentClient):
 
     print_debug_on_failure(res[0])
     print_debug_on_failure(res[1])
-    
-    assert res[0].success == True
-    assert res[1].success == False
+
+    assert res[0].success
+    assert not res[1].success
 
 
 def test_comparison_scorer(client: JudgmentClient):
     example_1 = Example(
         input="Generate a poem about a field",
         expected_output="A sunlit meadow, alive with whispers of wind, where daisies dance and hope begins again. Each petal holds a promise—bright, unbruised— a symphony of light that cannot be refused.",
-        actual_output="A field, kinda windy, with some flowers, stuff growing, and maybe a nice vibe. Petals do things, I guess? Like, they're there… and light exists, but whatever, it's fine."
-    )   
+        actual_output="A field, kinda windy, with some flowers, stuff growing, and maybe a nice vibe. Petals do things, I guess? Like, they're there… and light exists, but whatever, it's fine.",
+    )
 
     example_2 = Example(
         input="Generate a poem about a field",
         expected_output="A field, kinda windy, with some flowers, stuff growing, and maybe a nice vibe. Petals do things, I guess? Like, they're there… and light exists, but whatever, it's fine.",
-        actual_output="A field, kinda windy, with some flowers, stuff growing, and maybe a nice vibe. Petals do things, I guess? Like, they're there… and light exists, but whatever, it's fine."
+        actual_output="A field, kinda windy, with some flowers, stuff growing, and maybe a nice vibe. Petals do things, I guess? Like, they're there… and light exists, but whatever, it's fine.",
     )
 
-    scorer = ComparisonScorer(threshold=1, criteria="Tone and Style", description="The tone and style of the poem should be consistent and cohesive.")
+    scorer = ComparisonScorer(
+        threshold=1,
+        criteria="Tone and Style",
+        description="The tone and style of the poem should be consistent and cohesive.",
+    )
 
     PROJECT_NAME = "test-project"
     EVAL_RUN_NAME = "test-run-comparison"
@@ -110,15 +113,15 @@ def test_comparison_scorer(client: JudgmentClient):
         log_results=True,
         project_name=PROJECT_NAME,
         eval_run_name=EVAL_RUN_NAME,
-        override=True,  
+        override=True,
     )
 
     print_debug_on_failure(res[1])
-    assert res[0].success == False
-    assert res[1].success == True
+    assert not res[0].success
+    assert res[1].success
+
 
 def test_cp_scorer(client: JudgmentClient):
-
     example_1 = Example(  # should pass
         input="What's the capital of France?",
         actual_output="The capital of France is Paris.",
@@ -126,8 +129,8 @@ def test_cp_scorer(client: JudgmentClient):
         retrieval_context=[
             "Paris is a city in central France. It is the capital of France.",
             "Paris is well known for its museums, architecture, and cuisine.",
-            "Flights to Paris are available from San Francisco starting at $1000."
-        ]
+            "Flights to Paris are available from San Francisco starting at $1000.",
+        ],
     )
 
     example_2 = Example(
@@ -137,8 +140,8 @@ def test_cp_scorer(client: JudgmentClient):
         retrieval_context=[
             "Marseille is a city in southern France. It is the second largest city in France.",
             "Marseille is known for its beaches, historic port, and vibrant nightlife.",
-            "Flights to Marseille are available from San Francisco starting at $500."
-        ]
+            "Flights to Marseille are available from San Francisco starting at $500.",
+        ],
     )
 
     scorer = ContextualPrecisionScorer(threshold=0.5)
@@ -159,11 +162,11 @@ def test_cp_scorer(client: JudgmentClient):
     print_debug_on_failure(res[0])
     print_debug_on_failure(res[1])
 
-    assert res[0].success == True  # example_1 should pass
-    assert res[1].success == False  # example_2 should fail
+    assert res[0].success  # example_1 should pass
+    assert not res[1].success  # example_2 should fail
+
 
 def test_cr_scorer(client: JudgmentClient):
-
     example_1 = Example(  # should pass
         input="What's the capital of France?",
         actual_output="The capital of France is Paris.",
@@ -171,8 +174,8 @@ def test_cr_scorer(client: JudgmentClient):
         retrieval_context=[
             "Paris is a city in central France. It is the capital of France.",
             "Paris is well known for its museums, architecture, and cuisine.",
-            "Flights to Paris are available from San Francisco starting at $1000."
-        ]
+            "Flights to Paris are available from San Francisco starting at $1000.",
+        ],
     )
 
     scorer = ContextualRecallScorer(threshold=0.5)
@@ -192,10 +195,10 @@ def test_cr_scorer(client: JudgmentClient):
 
     print_debug_on_failure(res[0])
 
-    assert res[0].success == True  # example_1 should pass
+    assert res[0].success  # example_1 should pass
+
 
 def test_crelevancy_scorer(client: JudgmentClient):
-
     example_1 = Example(  # should pass
         input="What's the capital of France?",
         actual_output="The capital of France is Paris.",
@@ -203,8 +206,8 @@ def test_crelevancy_scorer(client: JudgmentClient):
         retrieval_context=[
             "Paris is a city in central France. It is the capital of France.",
             "Paris is well known for its museums, architecture, and cuisine.",
-            "Flights to Paris are available from San Francisco starting at $1000."
-        ]
+            "Flights to Paris are available from San Francisco starting at $1000.",
+        ],
     )
 
     scorer = ContextualRelevancyScorer(threshold=0.5)
@@ -226,10 +229,10 @@ def test_crelevancy_scorer(client: JudgmentClient):
 
     print_debug_on_failure(res[0])
 
-    assert res[0].success == True  # example_1 should pass
+    assert res[0].success  # example_1 should pass
+
 
 def test_faithfulness_scorer(client: JudgmentClient):
-
     faithful_example = Example(  # should pass
         input="What's the capital of France?",
         actual_output="The capital of France is Paris.",
@@ -237,8 +240,8 @@ def test_faithfulness_scorer(client: JudgmentClient):
         retrieval_context=[
             "Paris is a city in central France. It is the capital of France.",
             "Paris is well known for its museums, architecture, and cuisine.",
-            "Flights to Paris are available from San Francisco starting at $1000."
-        ]
+            "Flights to Paris are available from San Francisco starting at $1000.",
+        ],
     )
 
     contradictory_example = Example(  # should fail
@@ -248,8 +251,8 @@ def test_faithfulness_scorer(client: JudgmentClient):
         retrieval_context=[
             "Paris is a city in central France. It is the capital of France.",
             "Paris is well known for its museums, architecture, and cuisine.",
-            "Flights to Paris are available from San Francisco starting at $1000."
-        ]
+            "Flights to Paris are available from San Francisco starting at $1000.",
+        ],
     )
 
     scorer = FaithfulnessScorer(threshold=1.0)
@@ -270,12 +273,11 @@ def test_faithfulness_scorer(client: JudgmentClient):
     print_debug_on_failure(res[0])
     print_debug_on_failure(res[1])
 
-    assert res[0].success == True  # faithful_example should pass
-    assert res[1].success == False, res[1]  # contradictory_example should fail
+    assert res[0].success  # faithful_example should pass
+    assert not res[1].success, res[1]  # contradictory_example should fail
 
 
 def test_hallucination_scorer(client: JudgmentClient):
-
     example_1 = Example(  # should pass
         input="What's the capital of France?",
         actual_output="The capital of France is Paris.",
@@ -283,13 +285,13 @@ def test_hallucination_scorer(client: JudgmentClient):
         context=[
             "Paris is a city in central France. It is the capital of France.",
             "Paris is well known for its museums, architecture, and cuisine.",
-            "Flights to Paris are available from San Francisco starting at $1000."
+            "Flights to Paris are available from San Francisco starting at $1000.",
         ],
         retrieval_context=[
             "Paris is a city in central France. It is the capital of France.",
             "Paris is well known for its museums, architecture, and cuisine.",
-            "Flights to Paris are available from San Francisco starting at $1000."
-        ]
+            "Flights to Paris are available from San Francisco starting at $1000.",
+        ],
     )
 
     scorer = HallucinationScorer(threshold=0.5)
@@ -310,7 +312,10 @@ def test_hallucination_scorer(client: JudgmentClient):
     print_debug_on_failure(res[0])
 
     # Add more detailed assertion error message
-    assert res[0].success == True, f"Hallucination test failed: score={res[0].scorers_data[0].score}, threshold={res[0].scorers_data[0].threshold}, reason={res[0].scorers_data[0].reason}"
+    assert res[0].success, (
+        f"Hallucination test failed: score={res[0].scorers_data[0].score}, threshold={res[0].scorers_data[0].threshold}, reason={res[0].scorers_data[0].reason}"
+    )
+
 
 def test_instruction_adherence_scorer(client: JudgmentClient):
     example_1 = Example(
@@ -335,7 +340,8 @@ def test_instruction_adherence_scorer(client: JudgmentClient):
 
     print_debug_on_failure(res[0])
 
-    assert res[0].success == True
+    assert res[0].success
+
 
 def test_summarization_scorer(client: JudgmentClient):
     example_1 = Example(  # should pass
@@ -359,12 +365,14 @@ def test_summarization_scorer(client: JudgmentClient):
     )
 
     print_debug_on_failure(res[0])
-    
+
     # Add detailed assertion error message
-    assert res[0].success == True, f"Summarization test failed: score={res[0].scorers_data[0].score}, threshold={res[0].scorers_data[0].threshold}, reason={res[0].scorers_data[0].reason}"
+    assert res[0].success, (
+        f"Summarization test failed: score={res[0].scorers_data[0].score}, threshold={res[0].scorers_data[0].threshold}, reason={res[0].scorers_data[0].reason}"
+    )
+
 
 def test_text2sql_scorer(client: JudgmentClient):
-
     table_schema = """CREATE TABLE Artists (
     artist_id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -442,7 +450,7 @@ JOIN Artists a ON t.artist_id = a.artist_id
 WHERE a.name = 'Drake'
 ORDER BY t.popularity DESC;
 """,
-        retrieval_context=[table_schema]
+        retrieval_context=[table_schema],
     )
 
     most_listened_to_one_user_correct = Example(
@@ -455,7 +463,7 @@ GROUP BY t.track_id, t.title
 ORDER BY play_count DESC
 LIMIT 1;
 """,
-        retrieval_context=[table_schema]
+        retrieval_context=[table_schema],
     )
 
     highest_num_playlists_correct = Example(
@@ -467,7 +475,7 @@ GROUP BY u.user_id, u.username
 ORDER BY total_playlists DESC
 LIMIT 5;
 """,
-        retrieval_context=[table_schema]
+        retrieval_context=[table_schema],
     )
 
     most_popular_tracks_all_users_correct = Example(
@@ -479,7 +487,7 @@ GROUP BY t.track_id, t.title
 ORDER BY total_listens DESC
 LIMIT 10;
 """,
-        retrieval_context=[table_schema]
+        retrieval_context=[table_schema],
     )
 
     most_popular_tracks_all_users_incorrect = Example(
@@ -491,23 +499,22 @@ GROUP BY t.track_user, t.title
 ORDER BY total_listens DESC
 LIMIT 10;
 """,
-        retrieval_context=[table_schema]
+        retrieval_context=[table_schema],
     )
-
 
     res = client.run_evaluation(
         examples=[
-            all_tracks_one_artist_correct, 
-            most_listened_to_one_user_correct, 
-            highest_num_playlists_correct, 
-            most_popular_tracks_all_users_correct, 
-            most_popular_tracks_all_users_incorrect
+            all_tracks_one_artist_correct,
+            most_listened_to_one_user_correct,
+            highest_num_playlists_correct,
+            most_popular_tracks_all_users_correct,
+            most_popular_tracks_all_users_incorrect,
         ],
         scorers=[Text2SQLScorer],
         model="gpt-4.1",
         project_name="text2sql",
         eval_run_name="text2sql_test",
-        override=True
+        override=True,
     )
 
     assert print_debug_on_failure(res[0])
@@ -516,14 +523,25 @@ LIMIT 10;
     assert print_debug_on_failure(res[3])
     assert not print_debug_on_failure(res[4])
 
+
 def test_execution_order_scorer(client: JudgmentClient):
     PROJECT_NAME = "test-project"
     EVAL_RUN_NAME = "test-run-execution-order"
 
     example = Example(
         input="What is the weather in New York and the stock price of AAPL?",
-        actual_output=["weather_forecast", "stock_price", "translate_text", "news_headlines"],
-        expected_output=["weather_forecast", "stock_price", "news_headlines", "translate_text"],
+        actual_output=[
+            "weather_forecast",
+            "stock_price",
+            "translate_text",
+            "news_headlines",
+        ],
+        expected_output=[
+            "weather_forecast",
+            "stock_price",
+            "news_headlines",
+            "translate_text",
+        ],
     )
 
     res = client.run_evaluation(
@@ -532,76 +550,86 @@ def test_execution_order_scorer(client: JudgmentClient):
         model="gpt-4.1-mini",
         project_name=PROJECT_NAME,
         eval_run_name=EVAL_RUN_NAME,
-        override=True
+        override=True,
     )
 
+    assert not res[0].success
+
+
 def test_json_scorer(client: JudgmentClient):
-        """Test JSON scorer functionality."""
-        example1 = Example(
-            input="What if these shoes don't fit?",
-            actual_output='{"tool": "authentication"}',
-            retrieval_context=["All customers are eligible for a 30 day full refund at no extra cost."],
-        )
+    """Test JSON scorer functionality."""
+    example1 = Example(
+        input="What if these shoes don't fit?",
+        actual_output='{"tool": "authentication"}',
+        retrieval_context=[
+            "All customers are eligible for a 30 day full refund at no extra cost."
+        ],
+    )
 
-        example2 = Example(
-            input="How do I reset my password?",
-            actual_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
-            expected_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
-            name="Password Reset",
-            context=["User Account"],
-            retrieval_context=["Password reset instructions"],
-            additional_metadata={"difficulty": "medium"}
-        )
+    example2 = Example(
+        input="How do I reset my password?",
+        actual_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
+        expected_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
+        name="Password Reset",
+        context=["User Account"],
+        retrieval_context=["Password reset instructions"],
+        additional_metadata={"difficulty": "medium"},
+    )
 
-        class SampleSchema(BaseModel):
-            tool: str
+    class SampleSchema(BaseModel):
+        tool: str
 
-        scorer = JSONCorrectnessScorer(threshold=0.5, json_schema=SampleSchema)
-        PROJECT_NAME = "test_project"
-        EVAL_RUN_NAME = "test_json_scorer"
-        
-        res = client.run_evaluation(
-            examples=[example1, example2],
-            scorers=[scorer],
-            model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-            metadata={"batch": "test"},
-            project_name=PROJECT_NAME,
-            eval_run_name=EVAL_RUN_NAME,
-            log_results=True,
-            override=True,
-        )
-        assert res, "JSON scorer evaluation failed"
+    scorer = JSONCorrectnessScorer(threshold=0.5, json_schema=SampleSchema)
+    PROJECT_NAME = "test_project"
+    EVAL_RUN_NAME = "test_json_scorer"
+
+    res = client.run_evaluation(
+        examples=[example1, example2],
+        scorers=[scorer],
+        model="Qwen/Qwen2.5-72B-Instruct-Turbo",
+        metadata={"batch": "test"},
+        project_name=PROJECT_NAME,
+        eval_run_name=EVAL_RUN_NAME,
+        log_results=True,
+        override=True,
+    )
+    assert res, "JSON scorer evaluation failed"
+
 
 def test_classifier_scorer(client: JudgmentClient, random_name: str):
     """Test classifier scorer functionality."""
     random_slug = random_name
-    
+
     # Creating a classifier scorer from SDK
-    classifier_scorer= ClassifierScorer(
+    classifier_scorer = ClassifierScorer(
         name="Test Classifier Scorer",
         slug=random_slug,
         threshold=0.5,
         conversation=[],
-        options={}
+        options={},
     )
 
     # Update the conversation with the helpfulness evaluation template
-    classifier_scorer.update_conversation([
-        {
-            "role": "system",
-            "content": "You are a judge that evaluates whether the response is helpful to the user's question. Consider if the response is relevant, accurate, and provides useful information."
-        },
-        {
-            "role": "user",
-            "content": "Question: {{input}}\nResponse: {{actual_output}}\n\nIs this response helpful?"
-        }
-    ])
+    classifier_scorer.update_conversation(
+        [
+            {
+                "role": "system",
+                "content": "You are a judge that evaluates whether the response is helpful to the user's question. Consider if the response is relevant, accurate, and provides useful information.",
+            },
+            {
+                "role": "user",
+                "content": "Question: {{input}}\nResponse: {{actual_output}}\n\nIs this response helpful?",
+            },
+        ]
+    )
 
     # Update the options with helpfulness classification choices
-    classifier_scorer.update_options({
-        "yes": 1.0,  # Helpful response
-        "no": 0.0    # Unhelpful response
-    })
+    classifier_scorer.update_options(
+        {
+            "yes": 1.0,  # Helpful response
+            "no": 0.0,  # Unhelpful response
+        }
+    )
 
     # Create test examples
     helpful_example = Example(
@@ -626,34 +654,33 @@ def test_classifier_scorer(client: JudgmentClient, random_name: str):
     )
 
     # Verify results
-    assert res[0].success == True, "Helpful example should pass classification"
-    assert res[1].success == False, "Unhelpful example should fail classification"
-    
+    assert res[0].success, "Helpful example should pass classification"
+    assert not res[1].success, "Unhelpful example should fail classification"
+
     # Print debug info if any test fails
     print_debug_on_failure(res[0])
     print_debug_on_failure(res[1])
 
+
 def test_local_prompt_scorer(client: JudgmentClient):
     """Test custom prompt scorer functionality."""
+
     class SentimentScorer(PromptScorer):
         def _build_measure_prompt(self, example: Example) -> List[dict]:
             return [
                 {
                     "role": "system",
-                    "content": "You are a judge that evaluates whether the response has a positive or negative sentiment. Rate the sentiment on a scale of 1-5, where 1 is very negative and 5 is very positive."
+                    "content": "You are a judge that evaluates whether the response has a positive or negative sentiment. Rate the sentiment on a scale of 1-5, where 1 is very negative and 5 is very positive.",
                 },
                 {
                     "role": "user",
-                    "content": f"Response: {example.actual_output}\n\nYour judgment: "
-                }
+                    "content": f"Response: {example.actual_output}\n\nYour judgment: ",
+                },
             ]
-        
+
         def _build_schema(self) -> dict:
-            return {
-                "score": int,
-                "reason": str
-            }
-        
+            return {"score": int, "reason": str}
+
         def _process_response(self, response: dict):
             score = response["score"]
             reason = response["reason"]
@@ -661,7 +688,7 @@ def test_local_prompt_scorer(client: JudgmentClient):
             normalized_score = (score - 1) / 4
             self.score = normalized_score
             return normalized_score, reason
-        
+
         def _success_check(self, **kwargs) -> bool:
             return self.score >= self.threshold
 
@@ -683,7 +710,7 @@ def test_local_prompt_scorer(client: JudgmentClient):
         include_reason=True,
         strict_mode=False,
         verbose_mode=True,
-        required_params=[ExampleParams.INPUT, ExampleParams.ACTUAL_OUTPUT]
+        required_params=[ExampleParams.INPUT, ExampleParams.ACTUAL_OUTPUT],
     )
 
     # Run evaluation
@@ -698,17 +725,18 @@ def test_local_prompt_scorer(client: JudgmentClient):
     )
 
     # Verify results
-    assert res[0].success == True, "Positive example should pass sentiment check"
-    assert res[1].success == False, "Negative example should fail sentiment check"
-    
+    assert res[0].success, "Positive example should pass sentiment check"
+    assert not res[1].success, "Negative example should fail sentiment check"
+
     # Print debug info if any test fails
     print_debug_on_failure(res[0])
     print_debug_on_failure(res[1])
 
+
 def print_debug_on_failure(result) -> bool:
     """
     Helper function to print debug info only on test failure
-    
+
     Returns:
         bool: True if the test passed, False if it failed
     """
@@ -717,7 +745,7 @@ def print_debug_on_failure(result) -> bool:
         print(f"Input: {result.data_object.input}")
         print(f"Output: {result.data_object.actual_output}")
         print(f"Success: {result.success}")
-        if hasattr(result.data_object, 'retrieval_context'):
+        if hasattr(result.data_object, "retrieval_context"):
             print(f"Retrieval Context: {result.data_object.retrieval_context}")
         print("\nScorer Details:")
         for scorer_data in result.scorers_data:
@@ -732,4 +760,3 @@ def print_debug_on_failure(result) -> bool:
 
         return False
     return True
-    

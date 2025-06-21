@@ -1,0 +1,37 @@
+name: Lint
+
+on:
+  pull_request:
+    branches: [ main, staging ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install ruff
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: "--version"
+
+      - name: Install mypy and dependencies
+        run: |
+          pip install mypy types-requests types-PyYAML
+
+      - name: Run ruff formatter
+        if: always()
+        run: ruff format --check .
+
+      - name: Run ruff linter
+        if: always()
+        run: ruff check .
+
+      - name: Run mypy
+        if: always()
+        run: mypy --explicit-package-bases --ignore-missing-imports .

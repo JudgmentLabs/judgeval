@@ -6,7 +6,7 @@ Scores `Example`s using ready-made Judgment evaluators.
 
 from pydantic import BaseModel, field_validator
 from typing import List
-from judgeval.common.logger import debug, info, warning, error
+from judgeval.common.logger import debug, info, error
 from judgeval.data import ExampleParams
 from judgeval.constants import APIScorer, UNBOUNDED_SCORERS
 
@@ -19,27 +19,34 @@ class APIJudgmentScorer(BaseModel):
         score_type (APIScorer): The Judgment metric to use for scoring `Example`s
         threshold (float): A value between 0 and 1 that determines the scoring threshold
     """
+
     score_type: APIScorer
     threshold: float
-    required_params: List[ExampleParams] = [] # List of the required parameters on examples for the scorer
+    required_params: List[
+        ExampleParams
+    ] = []  # List of the required parameters on examples for the scorer
 
-    @field_validator('threshold')
+    @field_validator("threshold")
     def validate_threshold(cls, v, info):
         """
         Validates that the threshold is between 0 and 1 inclusive.
         """
-        score_type = info.data.get('score_type')
+        score_type = info.data.get("score_type")
         if score_type in UNBOUNDED_SCORERS:
             if v < 0:
                 error(f"Threshold for {score_type} must be greater than 0, got: {v}")
-                raise ValueError(f"Threshold for {score_type} must be greater than 0, got: {v}")
+                raise ValueError(
+                    f"Threshold for {score_type} must be greater than 0, got: {v}"
+                )
         else:
             if not 0 <= v <= 1:
                 error(f"Threshold for {score_type} must be between 0 and 1, got: {v}")
-                raise ValueError(f"Threshold for {score_type} must be between 0 and 1, got: {v}")
+                raise ValueError(
+                    f"Threshold for {score_type} must be between 0 and 1, got: {v}"
+                )
         return v
 
-    @field_validator('score_type')
+    @field_validator("score_type")
     def convert_to_enum_value(cls, v):
         """
         Validates that the `score_type` is a valid `APIScorer` enum value.
@@ -61,11 +68,13 @@ class APIJudgmentScorer(BaseModel):
     def to_dict(self) -> dict:
         """
         Converts the scorer configuration to a dictionary format.
-        
+
         Returns:
             dict: A dictionary containing the scorer's configuration
         """
         return {
-            "score_type": str(self.score_type.value),  # Convert enum to string for serialization
-            "threshold": self.threshold
+            "score_type": str(
+                self.score_type.value
+            ),  # Convert enum to string for serialization
+            "threshold": self.threshold,
         }

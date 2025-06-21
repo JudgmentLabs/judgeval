@@ -1,0 +1,21 @@
+repos:
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.7.12
+    hooks:
+      - id: uv-lock
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.13
+    hooks:
+      - id: ruff
+        name: ruff (linter)
+        args: [--fix]
+      - id: ruff-format
+        name: ruff (formatter)
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.16.0
+    hooks:
+      - id: mypy
+        args: [--explicit-package-bases, --ignore-missing-imports]
+        additional_dependencies: [types-requests, types-PyYAML]

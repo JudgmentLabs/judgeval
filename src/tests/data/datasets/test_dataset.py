@@ -115,7 +115,7 @@
 #         'example_id': ['12345', '12345']
 #     })
 #     mock_read_csv.return_value = mock_df
-    
+
 #     mock_mapping = {
 #         'input': 'input',
 #         'actual_output': 'actual_output',
@@ -140,7 +140,7 @@
 #     dataset.add_example(sample_example)
 #     save_path = tmp_path / "test_dir"
 #     dataset.save_as("json", str(save_path), "test_save")
-    
+
 #     assert (save_path / "test_save.json").exists()
 #     with open(save_path / "test_save.json") as f:
 #         saved_data = json.load(f)
@@ -150,7 +150,7 @@
 #     dataset.add_example(sample_example)
 #     save_path = tmp_path / "test_dir"
 #     dataset.save_as("csv", str(save_path), "test_save")
-    
+
 #     assert (save_path / "test_save.csv").exists()
 #     df = pd.read_csv(save_path / "test_save.csv")
 #     assert len(df) == 1
@@ -160,7 +160,7 @@
 #     dataset.add_example(sample_example)
 #     save_path = tmp_path / "test_dir"
 #     dataset.save_as("yaml", str(save_path), "test_save")
-    
+
 #     # Check if the YAML file exists
 #     yaml_file_path = save_path / "test_save.yaml"
 #     assert yaml_file_path.exists(), "YAML file was not created."
@@ -172,7 +172,7 @@
 #     # Validate the structure of the YAML data
 #     assert "examples" in yaml_data, "YAML data does not contain 'examples' key."
 #     assert len(yaml_data["examples"]) == 1, "YAML data should contain one example."
-    
+
 
 # def test_save_as_invalid_type(dataset):
 #     with pytest.raises(TypeError):
@@ -240,7 +240,7 @@
 #         trace_id="123",
 #         example_id="12345"
 #     )
-    
+
 #     mock_mapping = {
 #         'input': 'input',
 #         'actual_output': 'actual_output',
@@ -292,15 +292,14 @@
 #         'example': [False, True]
 #     })
 #     mock_read_csv.return_value = mock_df
-    
+
 #     mock_mapping = {
 #         'input': 'input',
 #         'actual_output': 'actual_output',
 #         'example': 'example'
 #     }
-    
+
 #     dataset = EvalDataset()
 #     dataset.add_from_csv("test.csv", header_mapping=mock_mapping)
 #     assert len(dataset.examples) == 1
 #     assert dataset.examples[0].expected_output is None
-    

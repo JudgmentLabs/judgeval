@@ -1,11 +1,11 @@
 from judgeval.scorers.api_scorer import APIJudgmentScorer
 from judgeval.constants import APIScorer
-from typing import List, Mapping, Optional, Dict
-from pydantic import model_serializer
+from typing import List, Mapping, Optional
+
 
 class ClassifierScorer(APIJudgmentScorer):
     """
-    In the Judgment backend, this scorer is implemented as a PromptScorer that takes 
+    In the Judgment backend, this scorer is implemented as a PromptScorer that takes
     1. a system role that may involve the Example object
     2. options for scores on the example
 
@@ -14,7 +14,7 @@ class ClassifierScorer(APIJudgmentScorer):
     ex:
     system_role = "You are a judge that evaluates whether the response is positive or negative. The response is: {example.actual_output}"
     options = {"positive": 1, "negative": 0}
-    
+
     Args:
         name (str): The name of the scorer
         slug (str): A unique identifier for the scorer
@@ -25,14 +25,15 @@ class ClassifierScorer(APIJudgmentScorer):
         strict_mode (bool): Whether to use strict mode (default: False)
         verbose_mode (bool): Whether to include verbose logging (default: False)
     """
+
     name: Optional[str] = None
     slug: Optional[str] = None
     conversation: Optional[List[dict]] = None
     options: Optional[Mapping[str, float]] = None
     verbose_mode: bool = False
     strict_mode: bool = False
-    include_reason: bool = True,
-    async_mode: bool = True,
+    include_reason: bool = True
+    async_mode: bool = True
     threshold: float = 0.5
 
     def __init__(
@@ -65,26 +66,26 @@ class ClassifierScorer(APIJudgmentScorer):
         Updates the name of the scorer.
         """
         self.name = name
-        
+
     def update_threshold(self, threshold: float):
         """
         Updates the threshold of the scorer.
         """
         self.threshold = threshold
-    
+
     def update_conversation(self, conversation: List[dict]):
         """
         Updates the conversation with the new conversation.
-        
+
         Sample conversation:
         [{'role': 'system', 'content': "Did the chatbot answer the user's question in a kind way?: {{actual_output}}."}]
         """
         self.conversation = conversation
-        
+
     def update_options(self, options: Mapping[str, float]):
         """
         Updates the options with the new options.
-        
+
         Sample options:
         {"yes": 1, "no": 0}
         """

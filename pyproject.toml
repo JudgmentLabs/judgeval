@@ -58,6 +58,7 @@ dev = [
     "pytest-mock>=3.14.1",
     "tavily-python>=0.7.5",
     "langgraph>=0.4.3",
+    "pre-commit>=4.2.0",
 ]
 
 [tool.hatch.build]
@@ -70,3 +71,6 @@ exclude = [
     "src/tests/*",
     "src/demo/*"
 ]
+
+[tool.ruff]
+exclude = ["docs"]

@@ -17,7 +17,7 @@ except IOError as e:
 
 try:
     with open("pyproject.toml", "w") as f:
-        for line in lines: # Assumes 'lines' was successfully read earlier
+        for line in lines:  # Assumes 'lines' was successfully read earlier
             if not found and version_placeholder in line:
                 f.write(line.replace(version_placeholder, new_version))
                 found = True

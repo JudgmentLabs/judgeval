@@ -16,12 +16,9 @@ from judgeval.data import Example
 
 class MockJudgevalScorer(JudgevalScorer):
     """Mock implementation of JudgevalScorer for testing"""
+
     def __init__(self, **kwargs):
-        super().__init__(
-            score_type="mock_scorer",
-            threshold=0.7,
-            **kwargs
-        )
+        super().__init__(score_type="mock_scorer", threshold=0.7, **kwargs)
         self.__name__ = "MockScorer"
 
     def score_example(self, example: Example, *args, **kwargs) -> float:
@@ -37,10 +34,7 @@ class MockJudgevalScorer(JudgevalScorer):
 @pytest.fixture
 def mock_scorer():
     return MockJudgevalScorer(
-        evaluation_model="gpt-4",
-        strict_mode=True,
-        async_mode=True,
-        verbose_mode=True
+        evaluation_model="gpt-4", strict_mode=True, async_mode=True, verbose_mode=True
     )
 
 
@@ -48,17 +42,17 @@ def mock_scorer():
 def mock_scorers():
     return [
         MockJudgevalScorer(evaluation_model="gpt-4.1"),
-        MockJudgevalScorer(evaluation_model="gpt-4.1")
+        MockJudgevalScorer(evaluation_model="gpt-4.1"),
     ]
 
 
 def test_clone_scorers(mock_scorers):
     """Test that scorers are properly cloned with all attributes"""
     cloned = clone_scorers(mock_scorers)
-    
+
     assert len(cloned) == len(mock_scorers)
     for original, clone in zip(mock_scorers, cloned):
-        assert type(original) == type(clone)
+        assert type(original) is type(clone)
         assert original.score_type == clone.score_type
         assert original.threshold == clone.threshold
         assert original.evaluation_model == clone.evaluation_model
@@ -83,7 +77,7 @@ async def test_scorer_progress_meter(mock_scorer, capsys):
     # Test with display_meter=True
     with scorer_progress_meter(mock_scorer, display_meter=True):
         pass
-    
+
     # Test with display_meter=False
     with scorer_progress_meter(mock_scorer, display_meter=False):
         pass
@@ -108,8 +102,12 @@ def test_parse_response_json_invalid(mock_scorer):
     invalid_json = '{"score": 0.8, "reason": "test"'  # Missing closing brace
 
     # the parse_response_json function should add the missing brace and parse the JSON
-    assert parse_response_json(invalid_json, scorer=mock_scorer) == {"score": 0.8, "reason": "test"}
+    assert parse_response_json(invalid_json, scorer=mock_scorer) == {
+        "score": 0.8,
+        "reason": "test",
+    }
     assert mock_scorer.error is None
+
 
 def test_parse_response_json_missing_beginning_brace(mock_scorer):
     """
@@ -119,7 +117,7 @@ def test_parse_response_json_missing_beginning_brace(mock_scorer):
 
     with pytest.raises(ValueError) as exc_info:
         parse_response_json(invalid_json, scorer=mock_scorer)
-    
+
     assert "Evaluation LLM outputted an invalid JSON" in str(exc_info.value)
     assert mock_scorer.error is not None
 
@@ -153,7 +151,7 @@ async def test_get_or_create_event_loop():
     # Test with running loop
     async def dummy_task():
         pass
-    
+
     loop.create_task(dummy_task())
     loop2 = get_or_create_event_loop()
     assert loop2 is not None
@@ -166,7 +164,7 @@ def test_print_verbose_logs(capsys):
     metric = "TestMetric"
     logs = "Test logs content"
     print_verbose_logs(metric, logs)
-    
+
     captured = capsys.readouterr()
     assert "TestMetric Verbose Logs" in captured.out
     assert "Test logs content" in captured.out

@@ -83,7 +83,9 @@ def scorer_progress_meter(
         yield
 
 
-def parse_response_json(llm_response: str, scorer: Optional[JudgevalScorer] = None) -> dict:
+def parse_response_json(
+    llm_response: str, scorer: Optional[JudgevalScorer] = None
+) -> dict:
     """
     Extracts JSON output from an LLM response and returns it as a dictionary.
 
@@ -100,8 +102,12 @@ def parse_response_json(llm_response: str, scorer: Optional[JudgevalScorer] = No
         llm_response = llm_response + "}"
         end = len(llm_response)
 
-    json_str = llm_response[start:end] if start != -1 and end != 0 else ""  # extract the JSON string
-    json_str = re.sub(r",\s*([\]}])", r"\1", json_str)  # Remove trailing comma if present
+    json_str = (
+        llm_response[start:end] if start != -1 and end != 0 else ""
+    )  # extract the JSON string
+    json_str = re.sub(
+        r",\s*([\]}])", r"\1", json_str
+    )  # Remove trailing comma if present
 
     try:
         return json.loads(json_str)
@@ -131,7 +137,7 @@ def create_verbose_logs(metric: JudgevalScorer, steps: List[str]) -> str:
     Args:
         metric (JudgevalScorer): The scorer object.
         steps (List[str]): The steps to be included in the verbose logs.
-    
+
     Returns:
         str: The verbose logs (Concatenated steps).
     """
@@ -157,7 +163,7 @@ def get_or_create_event_loop() -> asyncio.AbstractEventLoop:
 
     Returns:
         asyncio.AbstractEventLoop: The current or newly created event loop.
-    
+
     Raises:
         RuntimeError: If the event loop is closed.
     """
@@ -205,5 +211,3 @@ def check_example_params(
         error_str = f"{missing_params_str} fields in example cannot be None for the '{scorer.__name__}' scorer"
         scorer.error = error_str
         raise MissingExampleParamsError(error_str)
-
-

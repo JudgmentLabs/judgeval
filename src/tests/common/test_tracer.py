@@ -3,28 +3,36 @@ from unittest.mock import Mock, patch
 from uuid import uuid4
 import requests
 
-from judgeval.common.tracer import Tracer, wrap, current_span_var, current_trace_var, TraceClient
+from judgeval.common.tracer import (
+    Tracer,
+    wrap,
+    current_span_var,
+    current_trace_var,
+    TraceClient,
+)
 from judgeval.common.exceptions import JudgmentAPIError
 from judgeval.data.trace import TraceSpan
+
 
 @pytest.fixture
 def tracer(mocker):
     """Provide a configured tracer instance"""
-    
+
     # Create the mock response for trace saving (POST)
     mock_post_response = mocker.Mock(spec=requests.Response)
     mock_post_response.status_code = 200
     mock_post_response.json.return_value = {
         "message": "Trace saved successfully",
         "trace_id": "test-trace-id",
-        "ui_results_url": "http://example.com/results"
+        "ui_results_url": "http://example.com/results",
     }
-    
+
     # Create mocks for POST requests
-    mock_post = mocker.patch('requests.post', autospec=True)
+    mock_post = mocker.patch("requests.post", autospec=True)
     mock_post.return_value = mock_post_response
-    
+
     yield Tracer(api_key=str(uuid4()), organization_id="test_org")
+
 
 @pytest.fixture
 def trace_client(tracer):
@@ -32,15 +40,12 @@ def trace_client(tracer):
     # Create a new trace client directly
     trace_id = str(uuid4())
     trace_client = TraceClient(
-        tracer=tracer,
-        trace_id=trace_id,
-        name="test_trace",
-        project_name="test_project"
+        tracer=tracer, trace_id=trace_id, name="test_trace", project_name="test_project"
     )
-    
+
     # Set the trace context
     token = current_trace_var.set(trace_client)
-    
+
     try:
         # Create a root span without recording any data
         with trace_client.span("root_span", span_type="test"):
@@ -49,24 +54,29 @@ def trace_client(tracer):
         # Clean up the trace context
         current_trace_var.reset(token)
 
+
 def test_tracer_singleton(mocker):
     """Test that Tracer maintains singleton pattern"""
     Tracer._instance = None
-    
-    with patch('judgeval.common.tracer.validate_api_key', return_value=(True, "Valid API key")) as mock_validate_api_key:
+
+    with patch(
+        "judgeval.common.tracer.validate_api_key", return_value=(True, "Valid API key")
+    ):
         tracer1 = Tracer(api_key=str(uuid4()), organization_id="test_org")
         tracer2 = Tracer(api_key=str(uuid4()), organization_id="test_org")
         assert tracer1 is tracer2
         assert tracer1.api_key == tracer2.api_key
 
+
 def test_tracer_requires_api_key():
     """Test that Tracer requires an API key"""
     # Clear any existing singleton instance first
     Tracer._instance = None
-    
+
     with pytest.raises(ValueError):
         tracer = Tracer(api_key=None)
         print(tracer.api_key)
+
 
 def test_trace_span_to_dict():
     """Test TraceSpan serialization"""
@@ -82,7 +92,7 @@ def test_trace_span_to_dict():
         function="test_func",
         span_type="test-span",
         evaluation_runs=[],
-        parent_span_id="test-parent-span-id"
+        parent_span_id="test-parent-span-id",
     )
     data = span.model_dump()
     assert data["span_type"] == "test-span"
@@ -96,12 +106,13 @@ def test_trace_span_to_dict():
     assert data["evaluation_runs"] == []
     assert data["span_id"] == "test-span-1"
     assert data["parent_span_id"] == "test-parent-span-id"
-    assert data["has_evaluation"] == False  # Verify default value
-    
+    assert not data["has_evaluation"]  # Verify default value
+
     # Test with has_evaluation set to True
     span.has_evaluation = True
     data = span.model_dump()
-    assert data["has_evaluation"] == True  # Verify updated value
+    assert data["has_evaluation"]  # Verify updated value
+
 
 def test_trace_client_span(trace_client):
     """Test span context manager"""
@@ -111,7 +122,7 @@ def test_trace_client_span(trace_client):
 
     parent_before_span = current_span_var.get()  # Should be the span_id of test_trace
 
-    with trace_client.span("test_span") as span:
+    with trace_client.span("test_span"):
         # Inside the span, the current span var should be updated to the new span_id
         current_span_id = current_span_var.get()
         assert current_span_id is not None
@@ -119,7 +130,9 @@ def test_trace_client_span(trace_client):
         new_span = trace_client.trace_spans[-1]
         assert new_span.function == "test_span"
         assert new_span.span_id == current_span_id
-        assert new_span.parent_span_id == parent_before_span  # Check parent relationship
+        assert (
+            new_span.parent_span_id == parent_before_span
+        )  # Check parent relationship
         assert new_span.depth == 1  # Depth relative to parent
 
     # After the span, the context var should be reset
@@ -127,6 +140,7 @@ def test_trace_client_span(trace_client):
 
     # Check total spans (1 parent span + 1 child span)
     assert len(trace_client.trace_spans) == initial_spans_count + 1
+
 
 def test_trace_client_nested_spans(trace_client):
     """Test nested spans maintain proper depth recorded in trace_spans"""
@@ -152,7 +166,8 @@ def test_trace_client_nested_spans(trace_client):
             assert inner_span.parent_span_id == outer_span_id
             assert inner_span.depth == 2  # Depth is 1(outer) + 1
 
-@patch('requests.post')
+
+@patch("requests.post")
 def test_save_trace(mock_post, trace_client):
     """Test saving trace data"""
     # Configure mock response properly
@@ -161,11 +176,11 @@ def test_save_trace(mock_post, trace_client):
     mock_response.text = '{"message": "success"}'
     mock_response.json.return_value = {
         "ui_results_url": "http://example.com/results",
-        "trace_id": trace_client.trace_id
+        "trace_id": trace_client.trace_id,
     }
     mock_response.raise_for_status.return_value = None
     mock_post.return_value = mock_response
-    
+
     with trace_client.span("test_span"):
         trace_client.record_input({"arg": 1})
         trace_client.record_output("result")
@@ -174,76 +189,90 @@ def test_save_trace(mock_post, trace_client):
     assert mock_post.called
     assert data["trace_id"] == trace_client.trace_id
 
+
 def test_wrap_unsupported_client(tracer):
     """Test wrapping unsupported client type"""
+
     class UnsupportedClient:
         pass
-    
+
     with pytest.raises(ValueError):
         wrap(UnsupportedClient())
+
 
 def test_tracer_invalid_api_key(mocker):
     """Test that Tracer handles invalid API keys"""
     # Clear the singleton instance first
     Tracer._instance = None
-    
+
     # Now when Tracer tries to initialize JudgmentClient, it will receive our mocked result
-    with patch('judgeval.common.tracer.validate_api_key', return_value=(False, "Invalid API key")):
-        with pytest.raises(JudgmentAPIError, match="Issue with passed in Judgment API key: Invalid API key"):
+    with patch(
+        "judgeval.common.tracer.validate_api_key",
+        return_value=(False, "Invalid API key"),
+    ):
+        with pytest.raises(
+            JudgmentAPIError,
+            match="Issue with passed in Judgment API key: Invalid API key",
+        ):
             Tracer(api_key="invalid_key", organization_id="test_org")
+
 
 def test_observe_decorator(tracer):
     """Test the @tracer.observe decorator"""
+
     @tracer.observe
     def test_function(x, y):
         return x + y
-    
+
     result = test_function(1, 2)
     assert result == 3
 
+
 def test_observe_decorator_with_error(tracer):
     """Test decorator error handling"""
+
     @tracer.observe
     def failing_function():
         raise ValueError("Test error")
-    
+
     with tracer.trace("test_trace"):
         with pytest.raises(ValueError):
             failing_function()
+
 
 def test_async_evaluate_sets_has_evaluation_flag(trace_client):
     """Test that async_evaluate sets has_evaluation flag on the span"""
     from judgeval.scorers import AnswerCorrectnessScorer
     from judgeval.data import Example
-    
+
     # Create a span and get its span_id
-    with trace_client.span("test_evaluation_span") as span:
+    with trace_client.span("test_evaluation_span"):
         current_span_id = current_span_var.get()
-        
+
         # Get the actual span object
         test_span = trace_client.span_id_to_span[current_span_id]
-        
+
         # Verify has_evaluation is initially False
-        assert test_span.has_evaluation == False
-        
+        assert not test_span.has_evaluation
+
         # Create a mock example and scorer
         example = Example(
             input="What is the capital of France?",
             actual_output="The capital of France is Paris.",
-            expected_output="Paris"
+            expected_output="Paris",
         )
         scorers = [AnswerCorrectnessScorer(threshold=0.9)]
-        
+
         # Call async_evaluate
         trace_client.async_evaluate(
             scorers=scorers,
             example=example,
             model="gpt-4o-mini",
-            span_id=current_span_id
+            span_id=current_span_id,
         )
-        
+
         # Verify has_evaluation is now True
-        assert test_span.has_evaluation == True
-        
+        assert test_span.has_evaluation
+
         # Verify the span has evaluation runs
         assert len(test_span.evaluation_runs) > 0
