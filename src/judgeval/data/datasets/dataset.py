@@ -9,6 +9,7 @@ from typing import List, Union, Literal, Optional
 
 from judgeval.data import Example, Trace
 from judgeval.common.logger import debug, error, warning, info
+from judgeval.utils.data_utils import add_from_yaml
 
 
 @dataclass
@@ -217,22 +218,10 @@ class EvalDataset:
             timestamp: "20241230_160117"
             trace_id: "123"
         """
-        try:
-            with open(file_path, "r") as file:
-                payload = yaml.safe_load(file)
-                if payload is None:
-                    raise ValueError("The YAML file is empty.")
-                examples = payload.get("examples", [])
-        except FileNotFoundError:
-            error(f"YAML file not found: {file_path}")
-            raise FileNotFoundError(f"The file {file_path} was not found.")
-        except yaml.YAMLError:
-            error(f"Invalid YAML file: {file_path}")
-            raise ValueError(f"The file {file_path} is not a valid YAML file.")
+        examples = add_from_yaml(file_path)
 
         info(f"Added {len(examples)} examples from YAML")
-        new_examples = [Example(**e) for e in examples]
-        for e in new_examples:
+        for e in examples:
             self.add_example(e)
 
     def add_example(self, e: Example) -> None:

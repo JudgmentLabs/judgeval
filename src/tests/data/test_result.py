@@ -10,7 +10,7 @@ def sample_scorer_data():
         threshold=1.0,
         success=True,
         score=0.8,
-        metadata={"key": "value"},
+        additional_metadata={"key": "value"},
     )
 
 
@@ -99,8 +99,6 @@ class TestGenerateScoringResult:
             name="minimal",
             input="test",
             actual_output="output",
-            success=True,
-            scorers_data=[],
         )
 
         result = generate_scoring_result(minimal_example, [], 0.0, True)
