@@ -186,8 +186,9 @@ class JudgmentClient(metaclass=SingletonMeta):
 
     def run_evaluation(
         self,
-        examples: Union[List[Example], List[CustomExample]],
         scorers: List[Union[APIJudgmentScorer, JudgevalScorer]],
+        examples: Optional[Union[List[Example], List[CustomExample]]] = None,
+        test_file: Optional[str] = None,
         model: Optional[Union[str, List[str], JudgevalJudge]] = "gpt-4.1",
         aggregator: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
@@ -204,7 +205,8 @@ class JudgmentClient(metaclass=SingletonMeta):
         Executes an evaluation of `Example`s using one or more `Scorer`s
 
         Args:
-            examples (Union[List[Example], List[CustomExample]]): The examples to evaluate
+            examples (Optional[Union[List[Example], List[CustomExample]]]): The examples to evaluate
+            test_file (Optional[str]): Path to a YAML file containing test examples
             scorers (List[Union[APIJudgmentScorer, JudgevalScorer]]): A list of scorers to use for evaluation
             model (Union[str, List[str], JudgevalJudge]): The model used as a judge when using LLM as a Judge
             aggregator (Optional[str]): The aggregator to use for evaluation if using Mixture of Judges
@@ -223,6 +225,21 @@ class JudgmentClient(metaclass=SingletonMeta):
             raise ValueError(
                 "Cannot set both override and append to True. Please choose one."
             )
+
+        if examples is None and test_file is None:
+            raise ValueError("Must provide either examples or test_file")
+
+        if examples is not None and test_file is not None:
+            raise ValueError("Must provide either examples or test_file, not both")
+
+        try:
+            if test_file:
+                try:
+                    examples = add_from_yaml(test_file)
+                except FileNotFoundError:
+                    raise FileNotFoundError(f"Test file not found: {test_file}")
+        except Exception as e:
+            raise Exception(f"An unexpected error occurred during evaluation: {str(e)}")
 
         try:
             if rules and any(isinstance(scorer, JudgevalScorer) for scorer in scorers):
@@ -626,11 +643,8 @@ class JudgmentClient(metaclass=SingletonMeta):
                 tools=tools,
             )
         else:
-            if examples is None:
-                raise ValueError(
-                    "'examples' cannot be None when 'function' is not provided"
-                )
             results = self.run_evaluation(
+                test_file=test_file,
                 examples=examples,
                 scorers=scorers,
                 model=model,
