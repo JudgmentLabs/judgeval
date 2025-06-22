@@ -1,0 +1,1949 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Judgment Labs: Automated LLM Evaluation",
+    "description": "\n        At Judgment Labs, we're building a platform to automate LLM evaluation pipelines at scale, with a focus on RAG and agent evaluation.\n\n        We aim to make testing sophisticated systems as straightforward as calling an API and running traditional unit tests.\n\n        Key Features:\n        - Automated evaluation pipeline for correctness assessment\n        - LLM-as-Judge architectures with 15+ specialized metrics\n        - RAG system evaluation: Verify LLM outputs against source diagnostics\n        - Robust factual verification and hallucination detection\n        - Agentic system evaluation: Simplified unit testing for LLM behaviors\n\n        Judgment Labs is dedicated to streamlining the evaluation process, allowing developers to focus on building rather than managing evaluation infrastructure.\n\n        We come from Together AI, Datadog, and Juniper Networks, as well as Stanford, Berkeley, and UCLA. Our work spans model evaluation, tool development, and AI agents.\n        ",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/add_to_run_eval_queue/": {
+      "post": {
+        "tags": ["evaluation"],
+        "summary": "Add To Run Eval Queue",
+        "description": "Add an evaluation request to the evaluation queue.",
+        "operationId": "add_to_run_eval_queue_add_to_run_eval_queue__post",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/JudgmentEval" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluate_trace/": {
+      "post": {
+        "tags": ["evaluation"],
+        "summary": "Evaluate Trace",
+        "operationId": "evaluate_trace_evaluate_trace__post",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TraceRun" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluate/": {
+      "post": {
+        "tags": ["evaluation"],
+        "summary": "Evaluate",
+        "description": "Evaluate examples using specified scorers.\nEach scorer run on an example counts as one judgee.\nRate limits based on organization tier and on-demand availability.\n\nWhen stream=True, returns a streaming response with heartbeats to keep the connection alive.",
+        "operationId": "evaluate_evaluate__post",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "stream",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "boolean", "default": false, "title": "Stream" }
+          },
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/JudgmentEval" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/log_eval_results/": {
+      "post": {
+        "tags": ["evaluation"],
+        "summary": "Log Eval Results",
+        "operationId": "log_eval_results_log_eval_results__post",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EvalResults" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fetch_experiment_run/": {
+      "post": {
+        "tags": ["evaluation"],
+        "summary": "Fetch Experiment Run",
+        "description": "Fetch evaluation results for a given project and evaluation name",
+        "operationId": "fetch_experiment_run_fetch_experiment_run__post",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EvalResultsFetch" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/delete_eval_results_by_project_and_run_names/": {
+      "delete": {
+        "tags": ["evaluation"],
+        "summary": "Delete Eval Results By Project And Run Names",
+        "description": "Delete evaluation results for a given project and evaluation names",
+        "operationId": "delete_eval_results_by_project_and_run_names_delete_eval_results_by_project_and_run_names__delete",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EvalResultsDelete" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/delete_eval_results_by_project/": {
+      "delete": {
+        "tags": ["evaluation"],
+        "summary": "Delete Eval Results By Project",
+        "description": "Delete evaluation results for a given project",
+        "operationId": "delete_eval_results_by_project_delete_eval_results_by_project__delete",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvalResultsDeleteByProject"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get_evaluation_status/": {
+      "get": {
+        "tags": ["evaluation"],
+        "summary": "Get Evaluation Status",
+        "description": "Get the status of an asynchronous evaluation.\n\nArgs:\n    eval_name: Name of the evaluation run\n    project_name: Name of the project the evaluation belongs to\n\nReturns:\n    Status information including:\n    - status: 'pending', 'running', 'completed', or 'failed'\n    - results: List of ScoringResult objects if completed\n    - error: Error message if failed",
+        "operationId": "get_evaluation_status_get_evaluation_status__get",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "eval_name",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "title": "Eval Name" }
+          },
+          {
+            "name": "project_name",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "title": "Project Name" }
+          },
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/datasets/insert_examples/": {
+      "post": {
+        "tags": ["datasets"],
+        "summary": "Insert Examples",
+        "description": "Insert new examples to a dataset.\n\nArgs:\n    dataset_insert: Dataset object containing the dataset to insert examples to\n\nReturns:\n    HTTPException with 200 status on success\n\nRaises:\n    HTTPException: If authentication fails or dataset operations fail",
+        "operationId": "insert_examples_datasets_insert_examples__post",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DatasetInsertExamples" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/datasets/pull_for_judgeval/": {
+      "post": {
+        "tags": ["datasets"],
+        "summary": "Fetch Dataset For Judgeval",
+        "description": "Fetch dataset for judgeval\nNote: All data objects returned in this dataset are copies (everything is the same except the IDs) so that if users run evals, the original data is not affected.\n    {\n        \"dataset_alias\": dataset_alias,\n        \"project_name\": project_name\n    }",
+        "operationId": "fetch_dataset_for_judgeval_datasets_pull_for_judgeval__post",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DatasetFetch" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/datasets/fetch_stats_by_project/": {
+      "post": {
+        "tags": ["datasets"],
+        "summary": "Fetch Dataset Stats By Project",
+        "description": "Fetch all datasets' stats for a user.\n\nRequest:\n    {\n        \"project_name\": str\n    }\n    ==>\n    [\n        {\n            \"test_dataset_1\": {\"examples_count\": len(dataset1.examples)},\n            \"test_dataset_2\": {\"examples_count\": len(dataset2.examples)},\n            ...\n        }\n    ]",
+        "operationId": "fetch_dataset_stats_by_project_datasets_fetch_stats_by_project__post",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatasetFetchStatsByProject"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/datasets/push/": {
+      "post": {
+        "tags": ["datasets"],
+        "summary": "Push Dataset",
+        "operationId": "push_dataset_datasets_push__post",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DatasetPush" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/datasets/export_jsonl/": {
+      "post": {
+        "tags": ["datasets"],
+        "summary": "Export Dataset Jsonl",
+        "description": "Export dataset in JSONL format for fine-tuning\n\nRequest:\n    {\n        \"dataset_alias\": \"dataset_name\"\n    }\nResponse:\n    JSONL Stream:\n    {\"input\": \"...\", \"output\": \"...\", \"context\": [...]}\n    {\"input\": \"...\", \"output\": \"...\", \"context\": [...]}",
+        "operationId": "export_dataset_jsonl_datasets_export_jsonl__post",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DatasetFetch" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/datasets/delete/": {
+      "post": {
+        "tags": ["datasets"],
+        "summary": "Delete Dataset",
+        "description": "Delete a dataset by alias.\n\nRequest:\n    {\n        \"dataset_alias\": \"dataset_name\",\n        \"project_name\": \"project_name\"\n    }",
+        "operationId": "delete_dataset_datasets_delete__post",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DatasetDelete" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/traces/upsert/": {
+      "post": {
+        "tags": ["traces"],
+        "summary": "Upsert Trace",
+        "operationId": "upsert_trace_traces_upsert__post",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TraceSave" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/traces/save/": {
+      "post": {
+        "tags": ["traces"],
+        "summary": "Save Trace",
+        "description": "Save a trace for a user given trace data.\nRate limits based on organization tier and on-demand availability.\nIf the project specified in trace_data.project_name does not exist,\nit will be created automatically.",
+        "operationId": "save_trace_traces_save__post",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TraceSave" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/traces/fetch/": {
+      "post": {
+        "tags": ["traces"],
+        "summary": "Fetch Trace",
+        "description": "Fetch a trace for a user given a trace ID",
+        "operationId": "fetch_trace_traces_fetch__post",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TraceFetch" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/traces/delete/": {
+      "delete": {
+        "tags": ["traces"],
+        "summary": "Delete Trace",
+        "description": "Delete a trace for a trace ID",
+        "operationId": "delete_trace_traces_delete__delete",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TraceDeleteBatch" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/traces/usage/check/": {
+      "post": {
+        "tags": ["traces"],
+        "summary": "Check Trace Usage Limits",
+        "description": "Check if organization can use the requested number of traces without exceeding limits.",
+        "operationId": "check_trace_usage_limits_traces_usage_check__post",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TraceUsageUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/traces/usage/update/": {
+      "post": {
+        "tags": ["traces"],
+        "summary": "Update Trace Usage Counters",
+        "description": "Update trace usage counters for an organization. \nThis endpoint should be called after successfully saving traces.",
+        "operationId": "update_trace_usage_counters_traces_usage_update__post",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TraceUsageUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/traces/spans/batch/": {
+      "post": {
+        "tags": ["traces"],
+        "summary": "Process Spans Batch",
+        "description": "Process batched trace spans from the background service.\n\nThis endpoint receives batched span data from the BackgroundSpanService and\nefficiently upserts them to the database via TraceSpanClient.\n\nArgs:\n    request_data: SpansBatchRequest containing spans and organization_id\n    trace_span_client: Injected TraceSpanClient for database operations\n    user_organization: Injected auth validation\n\nReturns:\n    SpansBatchResponse: Success status and processing details",
+        "operationId": "process_spans_batch_traces_spans_batch__post",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SpansBatchRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/traces/evaluation_runs/batch/": {
+      "post": {
+        "tags": ["traces"],
+        "summary": "Process Evaluation Runs Batch",
+        "description": "Process batched evaluation runs from the background service.\n\nThis endpoint receives batched evaluation run data from the BackgroundSpanService,\nfirst upserts the associated span data to avoid race conditions, then queues \nthe evaluation runs for async processing via RabbitMQ.\n\nArgs:\n    request_data: EvaluationRunsBatchRequest containing evaluation entries\n    trace_span_client: Injected TraceSpanClient for span upserts\n    rabbit_client: Injected RabbitMQ client for queueing\n    user_organization: Injected auth validation\n\nReturns:\n    EvaluationRunsBatchResponse: Success status and processing details",
+        "operationId": "process_evaluation_runs_batch_traces_evaluation_runs_batch__post",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluationRunsBatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": { "application/json": { "schema": {} } }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/add/": {
+      "post": {
+        "tags": ["projects"],
+        "summary": "Add Project",
+        "description": "Add a project to the database",
+        "operationId": "add_project_projects_add__post",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ProjectAdd" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ProjectAddResponse" }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/projects/delete/": {
+      "delete": {
+        "tags": ["projects"],
+        "summary": "Delete Project",
+        "description": "Delete a project from the database",
+        "operationId": "delete_project_projects_delete__delete",
+        "security": [{ "HTTPBearer": [] }],
+        "parameters": [
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string", "title": "X-Organization-Id" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ProjectDelete" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDeleteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HTTPValidationError" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "JudgmentEval": {
+        "properties": {
+          "project_name": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Project Name"
+          },
+          "eval_name": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Eval Name"
+          },
+          "examples": {
+            "items": { "$ref": "#/components/schemas/Example" },
+            "type": "array",
+            "title": "Examples"
+          },
+          "scorers": {
+            "items": { "$ref": "#/components/schemas/Scorer" },
+            "type": "array",
+            "title": "Scorers"
+          },
+          "model": {
+            "anyOf": [
+              { "type": "string" },
+              { "items": { "type": "string" }, "type": "array" }
+            ],
+            "title": "Model"
+          },
+          "aggregator": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Aggregator"
+          },
+          "metadata": {
+            "anyOf": [
+              { "additionalProperties": true, "type": "object" },
+              { "type": "null" }
+            ],
+            "title": "Metadata",
+            "default": {}
+          },
+          "judgment_api_key": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Judgment Api Key"
+          },
+          "log_results": { "type": "boolean", "title": "Log Results" },
+          "append": {
+            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+            "title": "Append",
+            "default": false
+          },
+          "override_existing_eval_run_name": {
+            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+            "title": "Override Existing Eval Run Name",
+            "default": false
+          },
+          "rules": {
+            "anyOf": [{ "items": {}, "type": "array" }, { "type": "null" }],
+            "title": "Rules"
+          },
+          "trace_span_id": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Trace Span Id"
+          }
+        },
+        "type": "object",
+        "required": ["examples", "scorers", "model", "log_results"],
+        "title": "JudgmentEval"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": { "$ref": "#/components/schemas/ValidationError" },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "TraceRun": {
+        "properties": {
+          "project_name": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Project Name"
+          },
+          "eval_name": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Eval Name"
+          },
+          "traces": {
+            "items": { "$ref": "#/components/schemas/Trace" },
+            "type": "array",
+            "title": "Traces"
+          },
+          "scorers": {
+            "items": { "$ref": "#/components/schemas/Scorer" },
+            "type": "array",
+            "title": "Scorers"
+          },
+          "model": {
+            "anyOf": [
+              { "type": "string" },
+              { "items": { "type": "string" }, "type": "array" }
+            ],
+            "title": "Model"
+          },
+          "aggregator": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Aggregator"
+          },
+          "metadata": {
+            "anyOf": [
+              { "additionalProperties": true, "type": "object" },
+              { "type": "null" }
+            ],
+            "title": "Metadata",
+            "default": {}
+          },
+          "judgment_api_key": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Judgment Api Key"
+          },
+          "log_results": { "type": "boolean", "title": "Log Results" },
+          "append": {
+            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+            "title": "Append",
+            "default": false
+          },
+          "override_existing_eval_run_name": {
+            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+            "title": "Override Existing Eval Run Name",
+            "default": false
+          },
+          "rules": {
+            "anyOf": [{ "items": {}, "type": "array" }, { "type": "null" }],
+            "title": "Rules"
+          },
+          "trace_span_id": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Trace Span Id"
+          },
+          "tools": {
+            "anyOf": [
+              {
+                "items": { "additionalProperties": true, "type": "object" },
+                "type": "array"
+              },
+              { "type": "null" }
+            ],
+            "title": "Tools"
+          }
+        },
+        "type": "object",
+        "required": ["traces", "scorers", "model", "log_results"],
+        "title": "TraceRun"
+      },
+      "EvalResults": {
+        "properties": {
+          "results": {
+            "items": { "$ref": "#/components/schemas/ScoringResult" },
+            "type": "array",
+            "title": "Results"
+          },
+          "run": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/TraceRun" },
+              { "$ref": "#/components/schemas/JudgmentEval" }
+            ],
+            "title": "Run"
+          }
+        },
+        "type": "object",
+        "required": ["results", "run"],
+        "title": "EvalResults"
+      },
+      "EvalResultsFetch": {
+        "properties": {
+          "eval_name": { "type": "string", "title": "Eval Name" },
+          "project_name": { "type": "string", "title": "Project Name" }
+        },
+        "type": "object",
+        "required": ["eval_name", "project_name"],
+        "title": "EvalResultsFetch"
+      },
+      "EvalResultsDelete": {
+        "properties": {
+          "eval_names": {
+            "items": { "type": "string" },
+            "type": "array",
+            "title": "Eval Names"
+          },
+          "project_name": { "type": "string", "title": "Project Name" }
+        },
+        "type": "object",
+        "required": ["eval_names", "project_name"],
+        "title": "EvalResultsDelete"
+      },
+      "EvalResultsDeleteByProject": {
+        "properties": {
+          "project_name": { "type": "string", "title": "Project Name" }
+        },
+        "type": "object",
+        "required": ["project_name"],
+        "title": "EvalResultsDeleteByProject"
+      },
+      "DatasetInsertExamples": {
+        "properties": {
+          "dataset_alias": { "type": "string", "title": "Dataset Alias" },
+          "examples": {
+            "items": { "$ref": "#/components/schemas/Example" },
+            "type": "array",
+            "title": "Examples"
+          },
+          "project_name": { "type": "string", "title": "Project Name" }
+        },
+        "type": "object",
+        "required": ["dataset_alias", "examples", "project_name"],
+        "title": "DatasetInsertExamples"
+      },
+      "DatasetFetch": {
+        "properties": {
+          "dataset_alias": { "type": "string", "title": "Dataset Alias" },
+          "project_name": { "type": "string", "title": "Project Name" }
+        },
+        "type": "object",
+        "required": ["dataset_alias", "project_name"],
+        "title": "DatasetFetch"
+      },
+      "DatasetFetchStatsByProject": {
+        "properties": {
+          "project_name": { "type": "string", "title": "Project Name" }
+        },
+        "type": "object",
+        "required": ["project_name"],
+        "title": "DatasetFetchStatsByProject"
+      },
+      "DatasetPush": {
+        "properties": {
+          "dataset_alias": { "type": "string", "title": "Dataset Alias" },
+          "comments": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Comments"
+          },
+          "source_file": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Source File"
+          },
+          "examples": {
+            "anyOf": [
+              {
+                "items": { "$ref": "#/components/schemas/Example" },
+                "type": "array"
+              },
+              { "type": "null" }
+            ],
+            "title": "Examples"
+          },
+          "traces": {
+            "anyOf": [
+              {
+                "items": { "$ref": "#/components/schemas/Trace" },
+                "type": "array"
+              },
+              { "type": "null" }
+            ],
+            "title": "Traces"
+          },
+          "is_trace": {
+            "type": "boolean",
+            "title": "Is Trace",
+            "default": false
+          },
+          "project_name": { "type": "string", "title": "Project Name" },
+          "overwrite": {
+            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+            "title": "Overwrite",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": ["dataset_alias", "project_name"],
+        "title": "DatasetPush"
+      },
+      "DatasetDelete": {
+        "properties": {
+          "dataset_alias": { "type": "string", "title": "Dataset Alias" },
+          "project_name": { "type": "string", "title": "Project Name" }
+        },
+        "type": "object",
+        "required": ["dataset_alias", "project_name"],
+        "title": "DatasetDelete"
+      },
+      "TraceSave": {
+        "properties": {
+          "trace_id": { "type": "string", "title": "Trace Id" },
+          "name": { "type": "string", "title": "Name" },
+          "created_at": { "type": "string", "title": "Created At" },
+          "duration": { "type": "number", "title": "Duration" },
+          "trace_spans": {
+            "items": { "$ref": "#/components/schemas/TraceSpan" },
+            "type": "array",
+            "title": "Trace Spans"
+          },
+          "overwrite": {
+            "type": "boolean",
+            "title": "Overwrite",
+            "default": false
+          },
+          "offline_mode": {
+            "type": "boolean",
+            "title": "Offline Mode",
+            "default": false
+          },
+          "rules": {
+            "anyOf": [
+              { "additionalProperties": true, "type": "object" },
+              { "type": "null" }
+            ],
+            "title": "Rules"
+          },
+          "has_notification": {
+            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+            "title": "Has Notification",
+            "default": false
+          },
+          "customer_id": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Customer Id"
+          },
+          "tags": {
+            "anyOf": [
+              { "items": { "type": "string" }, "type": "array" },
+              { "type": "null" }
+            ],
+            "title": "Tags"
+          },
+          "project_name": { "type": "string", "title": "Project Name" },
+          "evaluation_runs": {
+            "items": { "$ref": "#/components/schemas/JudgmentEval" },
+            "type": "array",
+            "title": "Evaluation Runs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "trace_id",
+          "name",
+          "created_at",
+          "duration",
+          "trace_spans",
+          "project_name",
+          "evaluation_runs"
+        ],
+        "title": "TraceSave"
+      },
+      "TraceFetch": {
+        "properties": { "trace_id": { "type": "string", "title": "Trace Id" } },
+        "type": "object",
+        "required": ["trace_id"],
+        "title": "TraceFetch"
+      },
+      "TraceDeleteBatch": {
+        "properties": {
+          "trace_ids": {
+            "items": { "type": "string" },
+            "type": "array",
+            "title": "Trace Ids"
+          }
+        },
+        "type": "object",
+        "required": ["trace_ids"],
+        "title": "TraceDeleteBatch"
+      },
+      "TraceUsageUpdateRequest": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "title": "Count",
+            "description": "Number of traces to count",
+            "default": 1
+          },
+          "trace_ids": {
+            "anyOf": [
+              { "items": { "type": "string" }, "type": "array" },
+              { "type": "null" }
+            ],
+            "title": "Trace Ids",
+            "description": "Optional list of trace IDs for tracking"
+          }
+        },
+        "type": "object",
+        "title": "TraceUsageUpdateRequest",
+        "description": "Request model for updating trace usage"
+      },
+      "SpansBatchRequest": {
+        "properties": {
+          "spans": {
+            "items": { "$ref": "#/components/schemas/SpanBatchItem" },
+            "type": "array",
+            "title": "Spans"
+          },
+          "organization_id": { "type": "string", "title": "Organization Id" }
+        },
+        "type": "object",
+        "required": ["spans", "organization_id"],
+        "title": "SpansBatchRequest",
+        "description": "Request model for batched spans from background service"
+      },
+      "EvaluationRunsBatchRequest": {
+        "properties": {
+          "organization_id": { "type": "string", "title": "Organization Id" },
+          "evaluation_entries": {
+            "items": { "additionalProperties": true, "type": "object" },
+            "type": "array",
+            "title": "Evaluation Entries"
+          }
+        },
+        "type": "object",
+        "required": ["organization_id", "evaluation_entries"],
+        "title": "EvaluationRunsBatchRequest",
+        "description": "Request model for batched evaluation runs from background service"
+      },
+      "ProjectAdd": {
+        "properties": {
+          "project_name": { "type": "string", "title": "Project Name" }
+        },
+        "type": "object",
+        "required": ["project_name"],
+        "title": "ProjectAdd"
+      },
+      "ProjectAddResponse": {
+        "properties": {
+          "project_id": { "type": "string", "title": "Project Id" }
+        },
+        "type": "object",
+        "required": ["project_id"],
+        "title": "ProjectAddResponse"
+      },
+      "ProjectDelete": {
+        "properties": {
+          "project_name": { "type": "string", "title": "Project Name" }
+        },
+        "type": "object",
+        "required": ["project_name"],
+        "title": "ProjectDelete"
+      },
+      "ProjectDeleteResponse": {
+        "properties": { "message": { "type": "string", "title": "Message" } },
+        "type": "object",
+        "required": ["message"],
+        "title": "ProjectDeleteResponse"
+      },
+      "Example": {
+        "properties": {
+          "example_id": { "type": "string", "title": "Example Id" },
+          "input": {
+            "anyOf": [
+              { "type": "string" },
+              { "additionalProperties": true, "type": "object" },
+              { "type": "null" }
+            ],
+            "title": "Input"
+          },
+          "actual_output": {
+            "anyOf": [
+              { "type": "string" },
+              { "items": { "type": "string" }, "type": "array" },
+              { "type": "null" }
+            ],
+            "title": "Actual Output"
+          },
+          "expected_output": {
+            "anyOf": [
+              { "type": "string" },
+              { "items": { "type": "string" }, "type": "array" },
+              { "type": "null" }
+            ],
+            "title": "Expected Output"
+          },
+          "context": {
+            "anyOf": [
+              { "items": { "type": "string" }, "type": "array" },
+              { "type": "null" }
+            ],
+            "title": "Context"
+          },
+          "retrieval_context": {
+            "anyOf": [
+              { "items": { "type": "string" }, "type": "array" },
+              { "type": "null" }
+            ],
+            "title": "Retrieval Context"
+          },
+          "additional_metadata": {
+            "anyOf": [
+              { "additionalProperties": true, "type": "object" },
+              { "type": "null" }
+            ],
+            "title": "Additional Metadata"
+          },
+          "tools_called": {
+            "anyOf": [
+              { "items": { "type": "string" }, "type": "array" },
+              { "type": "null" }
+            ],
+            "title": "Tools Called",
+            "default": []
+          },
+          "expected_tools": {
+            "anyOf": [
+              {
+                "items": { "$ref": "#/components/schemas/Tool" },
+                "type": "array"
+              },
+              { "type": "null" }
+            ],
+            "title": "Expected Tools",
+            "default": []
+          },
+          "name": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Name"
+          },
+          "created_at": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Created At"
+          },
+          "dataset_id": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Dataset Id"
+          },
+          "trace_span_id": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Trace Span Id"
+          }
+        },
+        "type": "object",
+        "required": ["example_id"],
+        "title": "Example",
+        "description": "Based on the examples table in the database"
+      },
+      "Scorer": {
+        "properties": {
+          "threshold": { "type": "number", "title": "Threshold" },
+          "score_type": { "type": "string", "title": "Score Type" },
+          "kwargs": {
+            "anyOf": [
+              { "additionalProperties": true, "type": "object" },
+              { "type": "null" }
+            ],
+            "title": "Kwargs"
+          }
+        },
+        "type": "object",
+        "required": ["threshold", "score_type"],
+        "title": "Scorer",
+        "description": "Data object to describe a Metric used for evaluating Examples"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": { "anyOf": [{ "type": "string" }, { "type": "integer" }] },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": { "type": "string", "title": "Message" },
+          "type": { "type": "string", "title": "Error Type" }
+        },
+        "type": "object",
+        "required": ["loc", "msg", "type"],
+        "title": "ValidationError"
+      },
+      "Trace": {
+        "properties": {
+          "trace_id": { "type": "string", "title": "Trace Id" },
+          "name": { "type": "string", "title": "Name" },
+          "created_at": { "type": "string", "title": "Created At" },
+          "duration": { "type": "number", "title": "Duration" },
+          "trace_spans": {
+            "items": { "$ref": "#/components/schemas/TraceSpan" },
+            "type": "array",
+            "title": "Trace Spans"
+          },
+          "overwrite": {
+            "type": "boolean",
+            "title": "Overwrite",
+            "default": false
+          },
+          "offline_mode": {
+            "type": "boolean",
+            "title": "Offline Mode",
+            "default": false
+          },
+          "rules": {
+            "anyOf": [
+              { "additionalProperties": true, "type": "object" },
+              { "type": "null" }
+            ],
+            "title": "Rules"
+          },
+          "has_notification": {
+            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+            "title": "Has Notification",
+            "default": false
+          },
+          "customer_id": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Customer Id"
+          },
+          "tags": {
+            "anyOf": [
+              { "items": { "type": "string" }, "type": "array" },
+              { "type": "null" }
+            ],
+            "title": "Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "trace_id",
+          "name",
+          "created_at",
+          "duration",
+          "trace_spans"
+        ],
+        "title": "Trace"
+      },
+      "ScoringResult": {
+        "properties": {
+          "success": { "type": "boolean", "title": "Success" },
+          "scorers_data": {
+            "anyOf": [
+              {
+                "items": { "$ref": "#/components/schemas/ScorerData" },
+                "type": "array"
+              },
+              { "type": "null" }
+            ],
+            "title": "Scorers Data"
+          },
+          "name": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Name"
+          },
+          "data_object": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/TraceSpan" },
+              { "$ref": "#/components/schemas/CustomExample" },
+              { "$ref": "#/components/schemas/Example" },
+              { "type": "null" }
+            ],
+            "title": "Data Object"
+          },
+          "trace_id": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Trace Id"
+          },
+          "run_duration": {
+            "anyOf": [{ "type": "number" }, { "type": "null" }],
+            "title": "Run Duration"
+          },
+          "evaluation_cost": {
+            "anyOf": [{ "type": "number" }, { "type": "null" }],
+            "title": "Evaluation Cost"
+          }
+        },
+        "type": "object",
+        "required": ["success", "scorers_data"],
+        "title": "ScoringResult",
+        "description": "A ScoringResult contains the output of one or more scorers applied to a single example.\nIe: One input, one actual_output, one expected_output, etc..., and 1+ scorer (Faithfulness, Hallucination, Summarization, etc...)\n\nArgs:\n    success (bool): Whether the evaluation was successful. \n                    This means that all scorers applied to this example returned a success.\n    scorer_data (List[ScorerData]): The scorers data for the evaluated example\n    data_object (Optional[Example]): The original example object that was used to create the ScoringResult, can be Example, CustomExample (future), WorkflowRun (future)\n    "
+      },
+      "TraceSpan": {
+        "properties": {
+          "span_id": { "type": "string", "title": "Span Id" },
+          "trace_id": { "type": "string", "title": "Trace Id" },
+          "function": { "type": "string", "title": "Function" },
+          "depth": { "type": "integer", "title": "Depth" },
+          "created_at": {
+            "anyOf": [{}, { "type": "null" }],
+            "title": "Created At"
+          },
+          "parent_span_id": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Parent Span Id"
+          },
+          "span_type": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Span Type",
+            "default": "span"
+          },
+          "inputs": {
+            "anyOf": [
+              { "additionalProperties": true, "type": "object" },
+              { "type": "null" }
+            ],
+            "title": "Inputs"
+          },
+          "output": { "anyOf": [{}, { "type": "null" }], "title": "Output" },
+          "error": {
+            "anyOf": [
+              { "additionalProperties": true, "type": "object" },
+              { "type": "null" }
+            ],
+            "title": "Error"
+          },
+          "usage": {
+            "anyOf": [
+              { "$ref": "#/components/schemas/TraceUsage" },
+              { "type": "null" }
+            ]
+          },
+          "duration": {
+            "anyOf": [{ "type": "number" }, { "type": "null" }],
+            "title": "Duration"
+          },
+          "annotation": {
+            "anyOf": [
+              {
+                "items": { "additionalProperties": true, "type": "object" },
+                "type": "array"
+              },
+              { "type": "null" }
+            ],
+            "title": "Annotation"
+          },
+          "expected_tools": {
+            "anyOf": [
+              {
+                "items": { "$ref": "#/components/schemas/Tool" },
+                "type": "array"
+              },
+              { "type": "null" }
+            ],
+            "title": "Expected Tools"
+          },
+          "additional_metadata": {
+            "anyOf": [
+              { "additionalProperties": true, "type": "object" },
+              { "type": "null" }
+            ],
+            "title": "Additional Metadata"
+          },
+          "has_evaluation": {
+            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+            "title": "Has Evaluation",
+            "default": false
+          },
+          "agent_name": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Agent Name"
+          },
+          "state_before": {
+            "anyOf": [
+              { "additionalProperties": true, "type": "object" },
+              { "type": "null" }
+            ],
+            "title": "State Before"
+          },
+          "state_after": {
+            "anyOf": [
+              { "additionalProperties": true, "type": "object" },
+              { "type": "null" }
+            ],
+            "title": "State After"
+          }
+        },
+        "type": "object",
+        "required": ["span_id", "trace_id", "function", "depth"],
+        "title": "TraceSpan"
+      },
+      "SpanBatchItem": {
+        "properties": {
+          "span_id": { "type": "string", "title": "Span Id" },
+          "trace_id": { "type": "string", "title": "Trace Id" },
+          "function": { "type": "string", "title": "Function" },
+          "depth": { "type": "integer", "title": "Depth" },
+          "created_at": {
+            "anyOf": [{}, { "type": "null" }],
+            "title": "Created At"
+          },
+          "parent_span_id": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Parent Span Id"
+          },
+          "span_type": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Span Type",
+            "default": "span"
+          },
+          "inputs": {
+            "anyOf": [
+              { "additionalProperties": true, "type": "object" },
+              { "type": "null" }
+            ],
+            "title": "Inputs"
+          },
+          "output": { "anyOf": [{}, { "type": "null" }], "title": "Output" },
+          "error": {
+            "anyOf": [
+              { "additionalProperties": true, "type": "object" },
+              { "type": "null" }
+            ],
+            "title": "Error"
+          },
+          "usage": {
+            "anyOf": [
+              { "additionalProperties": true, "type": "object" },
+              { "type": "null" }
+            ],
+            "title": "Usage"
+          },
+          "duration": {
+            "anyOf": [{ "type": "number" }, { "type": "null" }],
+            "title": "Duration"
+          },
+          "annotation": {
+            "anyOf": [
+              {
+                "items": { "additionalProperties": true, "type": "object" },
+                "type": "array"
+              },
+              { "type": "null" }
+            ],
+            "title": "Annotation"
+          },
+          "expected_tools": {
+            "anyOf": [
+              {
+                "items": { "additionalProperties": true, "type": "object" },
+                "type": "array"
+              },
+              { "type": "null" }
+            ],
+            "title": "Expected Tools"
+          },
+          "additional_metadata": {
+            "anyOf": [
+              { "additionalProperties": true, "type": "object" },
+              { "type": "null" }
+            ],
+            "title": "Additional Metadata"
+          },
+          "has_evaluation": {
+            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+            "title": "Has Evaluation",
+            "default": false
+          },
+          "agent_name": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Agent Name"
+          },
+          "state_before": {
+            "anyOf": [
+              { "additionalProperties": true, "type": "object" },
+              { "type": "null" }
+            ],
+            "title": "State Before"
+          },
+          "state_after": {
+            "anyOf": [
+              { "additionalProperties": true, "type": "object" },
+              { "type": "null" }
+            ],
+            "title": "State After"
+          },
+          "span_state": { "type": "string", "title": "Span State" },
+          "queued_at": { "type": "number", "title": "Queued At" }
+        },
+        "type": "object",
+        "required": [
+          "span_id",
+          "trace_id",
+          "function",
+          "depth",
+          "span_state",
+          "queued_at"
+        ],
+        "title": "SpanBatchItem",
+        "description": "Individual span item in a batch request from background service"
+      },
+      "Tool": {
+        "properties": {
+          "tool_name": { "type": "string", "title": "Tool Name" },
+          "parameters": {
+            "anyOf": [
+              { "additionalProperties": true, "type": "object" },
+              { "type": "null" }
+            ],
+            "title": "Parameters"
+          },
+          "agent_name": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Agent Name"
+          },
+          "result_dependencies": {
+            "anyOf": [
+              {
+                "items": { "additionalProperties": true, "type": "object" },
+                "type": "array"
+              },
+              { "type": "null" }
+            ],
+            "title": "Result Dependencies"
+          },
+          "action_dependencies": {
+            "anyOf": [
+              {
+                "items": { "additionalProperties": true, "type": "object" },
+                "type": "array"
+              },
+              { "type": "null" }
+            ],
+            "title": "Action Dependencies"
+          },
+          "require_all": {
+            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+            "title": "Require All"
+          }
+        },
+        "type": "object",
+        "required": ["tool_name"],
+        "title": "Tool"
+      },
+      "ScorerData": {
+        "properties": {
+          "name": { "type": "string", "title": "Name" },
+          "threshold": { "type": "number", "title": "Threshold" },
+          "success": { "type": "boolean", "title": "Success" },
+          "score": {
+            "anyOf": [{ "type": "number" }, { "type": "null" }],
+            "title": "Score"
+          },
+          "reason": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Reason"
+          },
+          "strict_mode": {
+            "anyOf": [{ "type": "boolean" }, { "type": "null" }],
+            "title": "Strict Mode"
+          },
+          "evaluation_model": {
+            "anyOf": [
+              { "type": "string" },
+              { "items": { "type": "string" }, "type": "array" }
+            ],
+            "title": "Evaluation Model"
+          },
+          "error": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Error"
+          },
+          "evaluation_cost": {
+            "anyOf": [{ "type": "number" }, { "type": "null" }],
+            "title": "Evaluation Cost"
+          },
+          "verbose_logs": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "title": "Verbose Logs"
+          },
+          "additional_metadata": {
+            "anyOf": [
+              { "additionalProperties": true, "type": "object" },
+              { "type": "null" }
+            ],
+            "title": "Additional Metadata"
+          }
+        },
+        "type": "object",
+        "required": ["name", "threshold", "success"],
+        "title": "ScorerData",
+        "description": "ScorerData holds the information related to a single, completed Scorer evaluation run.\n\nFor example, if running the Judgment Faithfulness scorer on an example, the ScorerData\nobject will contain whether the example passed its threshold expectation, as well as more detailed\ninformation surrounding the evaluation run such as the claims and verdicts generated by the\njudge model(s)."
+      }
+    },
+    "securitySchemes": { "HTTPBearer": { "type": "http", "scheme": "bearer" } }
+  }
+}

@@ -124,3 +124,4 @@ class Trace(BaseModel):
     rules: Optional[Dict[str, Any]] = None
     has_notification: Optional[bool] = False
     
+

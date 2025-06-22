@@ -322,7 +322,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
 
     def on_retriever_end(self, documents: Sequence[Document], *, run_id: UUID, parent_run_id: Optional[UUID] = None, **kwargs: Any) -> Any:
         trace_client = self._ensure_trace_client(run_id, parent_run_id, "RetrieverEnd") # Corrected call
-        if not trace_client: return
+        ifTraceSave not trace_client: return
         doc_summary = [{"index": i, "page_content": doc.page_content[:100] + "..." if len(doc.page_content) > 100 else doc.page_content, "metadata": doc.metadata} for i, doc in enumerate(documents)]
         outputs = {"document_count": len(documents), "documents": doc_summary, "kwargs": kwargs}
         self._end_span_tracking(trace_client, run_id, outputs=outputs)

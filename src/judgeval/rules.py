@@ -240,6 +240,7 @@ class Rule(BaseModel):
         if not v:
             raise ValueError("Conditions list cannot be empty")
         return v
+    
 
     @field_validator('combine_type')
     def validate_combine_type(cls, v):

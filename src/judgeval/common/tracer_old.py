@@ -47,7 +47,6 @@ from google import genai
 
 # Local application/library-specific imports
 from judgeval.constants import (
-    JUDGMENT_TRACES_ADD_ANNOTATION_API_URL,
     JUDGMENT_TRACES_SAVE_API_URL,
     JUDGMENT_TRACES_UPSERT_API_URL,
     JUDGMENT_TRACES_USAGE_CHECK_API_URL,
@@ -341,33 +340,6 @@ class TraceManagerClient:
         
         if response.status_code != HTTPStatus.OK:
             raise ValueError(f"Failed to update usage counters: {response.text}")
-        
-        return response.json()
-
-    ## TODO: Should have a log endpoint, endpoint should also support batched payloads
-    def save_annotation(self, annotation: TraceAnnotation):
-        json_data = {
-            "span_id": annotation.span_id,
-            "annotation": {
-                "text": annotation.text,
-                "label": annotation.label,
-                "score": annotation.score
-            }
-        }       
-
-        response = requests.post(
-            JUDGMENT_TRACES_ADD_ANNOTATION_API_URL,
-            json=json_data,
-            headers={
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {self.judgment_api_key}',
-                'X-Organization-Id': self.organization_id
-            },
-            verify=True
-        )
-        
-        if response.status_code != HTTPStatus.OK:
-            raise ValueError(f"Failed to save annotation: {response.text}")
         
         return response.json()
 
@@ -813,23 +785,18 @@ class TraceClient:
         trace_data = {
             "trace_id": self.trace_id,
             "name": self.name,
-            "project_name": self.project_name,
             "created_at": datetime.fromtimestamp(self.start_time, timezone.utc).isoformat(),
             "duration": total_duration,
             "trace_spans": [span.model_dump() for span in self.trace_spans],
-            "evaluation_runs": [run.model_dump() for run in self.evaluation_runs],
             "overwrite": overwrite,
             "offline_mode": self.tracer.offline_mode,
+            "project_name": self.project_name,
+            "evaluation_runs": [run.model_dump() for run in self.evaluation_runs],
             "parent_trace_id": self.parent_trace_id,
             "parent_name": self.parent_name
         }        
         # --- Log trace data before saving ---
         server_response = self.trace_manager_client.save_trace(trace_data, offline_mode=self.tracer.offline_mode, final_save=True)
-
-        # upload annotations
-        # TODO: batch to the log endpoint
-        for annotation in self.annotations:
-            self.trace_manager_client.save_annotation(annotation)
 
         return self.trace_id, server_response
 
@@ -890,10 +857,7 @@ class TraceClient:
                 # Log warning but don't fail the trace save since the trace was already saved
                 warnings.warn(f"Usage counter update failed (trace was still saved): {e}")
 
-        # Upload annotations
-        # TODO: batch to the log endpoint
-        for annotation in self.annotations:
-            self.trace_manager_client.save_annotation(annotation)
+
         if self.start_time is None:
             self.start_time = time.time()
         return self.trace_id, server_response

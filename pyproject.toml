@@ -58,6 +58,8 @@ dev = [
     "pytest-mock>=3.14.1",
     "tavily-python>=0.7.5",
     "langgraph>=0.4.3",
+    "types-requests>=2.32.4.20250611",
+    "datamodel-code-generator>=0.31.1",
 ]
 
 [tool.hatch.build]
