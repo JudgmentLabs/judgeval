@@ -27,8 +27,6 @@ from judgeval.data.trace_run import TraceRun
 from judgeval.judges import JudgevalJudge
 from judgeval.constants import (
     JUDGMENT_EVAL_FETCH_API_URL,
-    JUDGMENT_EVAL_DELETE_API_URL,
-    JUDGMENT_EVAL_DELETE_PROJECT_API_URL,
     JUDGMENT_PROJECT_DELETE_API_URL,
     JUDGMENT_PROJECT_CREATE_API_URL,
 )
