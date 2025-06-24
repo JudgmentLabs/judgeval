@@ -171,7 +171,6 @@ async def make_upper(input: str) -> str:
         scorers=[FaithfulnessScorer(threshold=0.5)],
         example=example,
         model="gpt-4.1-mini",
-        log_results=True,
     )
 
     return output
@@ -195,7 +194,6 @@ async def make_lower(input):
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
         example=example,
         model="gpt-4.1-mini",
-        log_results=True,
     )
     return output
 
@@ -224,7 +222,6 @@ async def answer_user_question(input):
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
         example=example,
         model="gpt-4.1-mini",
-        log_results=True,
     )
     return output
 
@@ -254,7 +251,6 @@ async def make_poem(input: str) -> str:
             scorers=[AnswerRelevancyScorer(threshold=0.5)],
             example=example,
             model="gpt-4.1-mini",
-            log_results=True,
         )
 
         # Using OpenAI API
@@ -324,7 +320,6 @@ async def make_poem_with_async_clients(input: str) -> str:
             input=input,
             actual_output=anthropic_result,
             model="gpt-4.1-mini",
-            log_results=True,
         )
 
         return await make_lower(f"{openai_result} {anthropic_result}")

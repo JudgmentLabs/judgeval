@@ -1008,9 +1008,7 @@ def run_eval(
             )
 
             pretty_str_to_print = None
-            if (
-                evaluation_run.log_results and results
-            ):  # Ensure results exist before logging
+            if results:  # Ensure results exist before logging
                 send_results = [
                     scoring_result.model_dump(warnings=False)
                     for scoring_result in results

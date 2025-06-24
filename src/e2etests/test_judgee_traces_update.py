@@ -589,10 +589,8 @@ async def test_real_judgee_tracking(client):
             examples=[example],
             scorers=[scorer],
             model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-            log_results=True,
             project_name=PROJECT_NAME,
             eval_run_name=EVAL_RUN_NAME,
-            use_judgment=True,
             override=True,
         )
         print(f"Evaluation response: {res}")
@@ -705,10 +703,8 @@ async def test_real_trace_and_judgee_tracking(client):
                     examples=[example],
                     scorers=[scorer],
                     model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-                    log_results=True,
                     project_name=PROJECT_NAME,
                     eval_run_name=EVAL_RUN_NAME,
-                    use_judgment=True,
                     override=True,
                 )
 

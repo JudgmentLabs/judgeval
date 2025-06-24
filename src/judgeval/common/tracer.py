@@ -96,20 +96,6 @@ ApiClient: TypeAlias = Union[
 SpanType = Literal["span", "tool", "llm", "evaluation", "chain"]
 
 
-# --- Evaluation Config Dataclass (Moved from langgraph.py) ---
-@dataclass
-class EvaluationConfig:
-    """Configuration for triggering an evaluation from the handler."""
-
-    scorers: List[Union[APIJudgmentScorer, JudgevalScorer]]
-    example: Example
-    model: Optional[str] = None
-    log_results: Optional[bool] = True
-
-
-# --- End Evaluation Config Dataclass ---
-
-
 # Temporary as a POC to have log use the existing annotations feature until log endpoints are ready
 @dataclass
 class TraceAnnotation:
@@ -543,7 +529,6 @@ class TraceClient:
         additional_metadata: Optional[Dict[str, Any]] = None,
         model: Optional[str] = None,
         span_id: Optional[str] = None,  # <<< ADDED optional span_id parameter
-        log_results: Optional[bool] = True,
     ):
         if not self.enable_evaluations:
             return
@@ -614,7 +599,6 @@ class TraceClient:
         # Combine the trace-level rules with any evaluation-specific rules)
         eval_run = EvaluationRun(
             organization_id=self.tracer.organization_id,
-            log_results=log_results,
             project_name=self.project_name,
             eval_name=f"{self.name.capitalize()}-"
             f"{span_id_to_use}-"  # Keep original eval name format using context var if available
@@ -622,11 +606,9 @@ class TraceClient:
             examples=[example],
             scorers=scorers,
             model=model,
-            metadata={},
             judgment_api_key=self.tracer.api_key,
             override=self.overwrite,
-            trace_span_id=span_id_to_use,  # Pass the determined ID
-            rules=self.rules,  # Use the combined rules
+            trace_span_id=span_id_to_use,
         )
 
         self.add_eval_run(eval_run, start_time)  # Pass start_time to record_evaluation

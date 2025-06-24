@@ -133,7 +133,6 @@ def main():
         model="Qwen/Qwen2.5-72B-Instruct-Turbo",
         project_name="sentiment_test",
         eval_run_name=f"sentiment_run_{generate_random_slug()}",  # Unique run name
-        log_results=True,
         override=True,
     )
 

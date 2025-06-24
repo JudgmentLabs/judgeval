@@ -4,7 +4,6 @@ from pydantic import BaseModel, field_validator, Field
 from judgeval.data import Example, CustomExample
 from judgeval.scorers import JudgevalScorer, APIJudgmentScorer
 from judgeval.constants import ACCEPTABLE_MODELS
-from judgeval.common.logger import debug, error
 
 
 class EvaluationRun(BaseModel):
@@ -21,7 +20,6 @@ class EvaluationRun(BaseModel):
         judgment_api_key (Optional[str]): The API key for running evaluations on the Judgment API
     """
 
-    # The user will specify whether they want log_results when they call run_eval
     organization_id: Optional[str] = None
     project_name: Optional[str] = Field(default=None, validate_default=True)
     eval_name: Optional[str] = Field(default=None, validate_default=True)
@@ -47,26 +45,6 @@ class EvaluationRun(BaseModel):
         ]
 
         return data
-
-    @field_validator("project_name")
-    def validate_project_name(cls, v, values):
-        if values.data.get("log_results", False) and not v:
-            debug("No project name provided when log_results is True")
-            error("Validation failed: Project name required when logging results")
-            raise ValueError(
-                "Project name is required when log_results is True. Please include the project_name argument."
-            )
-        return v
-
-    @field_validator("eval_name")
-    def validate_eval_name(cls, v, values):
-        if values.data.get("log_results", False) and not v:
-            debug("No eval name provided when log_results is True")
-            error("Validation failed: Eval name required when logging results")
-            raise ValueError(
-                "Eval name is required when log_results is True. Please include the eval_run_name argument."
-            )
-        return v
 
     @field_validator("examples")
     def validate_examples(cls, v):

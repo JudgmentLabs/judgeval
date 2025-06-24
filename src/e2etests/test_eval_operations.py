@@ -67,10 +67,8 @@ class TestEvalOperations:
             examples=[example1, example2],
             scorers=[scorer, scorer2],
             model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-            metadata={"batch": "test"},
             project_name=project_name,
             eval_run_name=eval_run_name,
-            log_results=True,
             override=True,
         )
 
@@ -276,7 +274,6 @@ examples:
                 project_name=PROJECT_NAME_EVAL,
                 eval_run_name=EVAL_RUN_NAME,
                 override=True,
-                log_results=True,
             )
 
             results = client.pull_eval(
@@ -318,24 +315,21 @@ examples:
             examples=[example1],
             scorers=[scorer],
             model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-            metadata={"batch": "test"},
             project_name=PROJECT_NAME,
             eval_run_name=EVAL_RUN_NAME,
-            log_results=True,
             override=False,
         )
 
-        # Second run with log_results=False should succeed
-        client.run_evaluation(
-            examples=[example1],
-            scorers=[scorer],
-            model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-            metadata={"batch": "test"},
-            project_name=PROJECT_NAME,
-            eval_run_name=EVAL_RUN_NAME,
-            log_results=False,
-            override=False,
-        )
+        # This should fail because the eval run name already exists
+        with pytest.raises(ValueError, match="already exists"):
+            client.run_evaluation(
+                examples=[example1],
+                scorers=[scorer],
+                model="Qwen/Qwen2.5-72B-Instruct-Turbo",
+                project_name=PROJECT_NAME,
+                eval_run_name=EVAL_RUN_NAME,
+                override=False,
+            )
 
         # Third run with override=True should succeed
         try:
@@ -344,10 +338,8 @@ examples:
                 examples=[example1],
                 scorers=[scorer],
                 model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-                metadata={"batch": "test"},
                 project_name=PROJECT_NAME,
                 eval_run_name=EVAL_RUN_NAME,
-                log_results=True,
                 override=True,
             )
         except ValueError as e:
@@ -360,9 +352,7 @@ examples:
                 examples=[example1],
                 scorers=[scorer],
                 model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-                metadata={"batch": "test"},
                 project_name=PROJECT_NAME,
                 eval_run_name=EVAL_RUN_NAME,
-                log_results=True,
                 override=False,
             )
