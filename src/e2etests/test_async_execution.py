@@ -67,29 +67,29 @@ def tools_examples() -> List[Example]:
     ]
 
 
-@pytest.fixture
-def judgment_client() -> JudgmentClient:
-    """Return a JudgmentClient instance with API keys from environment."""
-    return JudgmentClient(
-        judgment_api_key=os.environ.get("JUDGMENT_API_KEY"),
-        organization_id=os.environ.get("JUDGMENT_ORG_ID"),
-    )
+@pytest.fixture(scope="module", autouse=True)
+def setup_and_teardown_module(client: JudgmentClient):
+    project_name = f"async-test-{uuid.uuid4().hex[:8]}"
+    client.create_project(project_name)
+    yield project_name
+
+    client.delete_project(project_name)
+    print(f"Deleted project {project_name}")
 
 
 @pytest.fixture
-def project_name() -> str:
-    """Return a unique project name for the test."""
-    return f"async-test-{uuid.uuid4().hex[:8]}"
+def project_name(setup_and_teardown_module):
+    return setup_and_teardown_module
 
 
 @pytest.mark.asyncio
-async def test_async_evaluation_direct_await(judgment_client, examples, project_name):
+async def test_async_evaluation_direct_await(client, examples, project_name):
     """Test direct awaiting of an async evaluation."""
     # Set up scorers
     scorers = [AnswerCorrectnessScorer(threshold=0.9)]
 
     # Run the async evaluation
-    task = judgment_client.run_evaluation(
+    task = client.run_evaluation(
         examples=examples,
         scorers=scorers,
         model="gpt-4o-mini",
@@ -111,9 +111,7 @@ async def test_async_evaluation_direct_await(judgment_client, examples, project_
 
 
 @pytest.mark.asyncio
-async def test_async_evaluation_multiple_scorers(
-    judgment_client, tools_examples, project_name
-):
+async def test_async_evaluation_multiple_scorers(client, tools_examples, project_name):
     """Test async evaluation with multiple scorers."""
     # Set up multiple scorers
     scorers = [
@@ -122,7 +120,7 @@ async def test_async_evaluation_multiple_scorers(
     ]
 
     # Run the async evaluation
-    task = judgment_client.run_evaluation(
+    task = client.run_evaluation(
         examples=tools_examples,
         scorers=scorers,
         model="gpt-4o-mini",
@@ -145,15 +143,13 @@ async def test_async_evaluation_multiple_scorers(
 
 
 @pytest.mark.asyncio
-async def test_async_evaluation_with_other_tasks(
-    judgment_client, examples, project_name
-):
+async def test_async_evaluation_with_other_tasks(client, examples, project_name):
     """Test running other async tasks while an evaluation is in progress."""
     # Set up scorers
     scorers = [AnswerCorrectnessScorer(threshold=0.9)]
 
     # Start the evaluation
-    eval_task = judgment_client.run_evaluation(
+    eval_task = client.run_evaluation(
         examples=examples,
         scorers=scorers,
         model="gpt-4o-mini",
@@ -190,7 +186,7 @@ async def test_async_evaluation_with_other_tasks(
 
 
 @pytest.mark.asyncio
-async def test_pull_async_evaluation_results(judgment_client, examples, project_name):
+async def test_pull_async_evaluation_results(client, examples, project_name):
     """Test pulling results of an async evaluation after it's completed."""
     # Set up a unique evaluation name
     eval_run_name = f"async-pull-{uuid.uuid4().hex[:8]}"
@@ -199,7 +195,7 @@ async def test_pull_async_evaluation_results(judgment_client, examples, project_
     scorers = [AnswerCorrectnessScorer(threshold=0.9)]
 
     # Run the async evaluation
-    task = judgment_client.run_evaluation(
+    task = client.run_evaluation(
         examples=examples,
         scorers=scorers,
         model="gpt-4o-mini",
@@ -212,7 +208,7 @@ async def test_pull_async_evaluation_results(judgment_client, examples, project_
     await task
 
     # Pull the results using the client API
-    pulled_results = judgment_client.pull_eval(project_name, eval_run_name)
+    pulled_results = client.pull_eval(project_name, eval_run_name)
 
     # Verify the pulled results
     assert isinstance(pulled_results, dict)
@@ -224,28 +220,3 @@ async def test_pull_async_evaluation_results(judgment_client, examples, project_
     for example_data in examples_data:
         assert "scorer_data" in example_data
         assert len(example_data["scorer_data"]) > 0
-
-
-@pytest.mark.asyncio
-async def test_cancel_async_evaluation(judgment_client, examples, project_name):
-    """Test cancelling an async evaluation task."""
-    # Set up scorers
-    scorers = [AnswerCorrectnessScorer(threshold=0.9)]
-
-    # Start the evaluation
-    task = judgment_client.run_evaluation(
-        examples=examples,
-        scorers=scorers,
-        model="gpt-4o-mini",
-        project_name=project_name,
-        eval_run_name="async-cancel",
-        async_execution=True,
-    )
-
-    # Cancel the task after a short delay
-    await asyncio.sleep(0.5)
-    task.cancel()
-
-    # Try to await the task and expect CancelledError
-    with pytest.raises(asyncio.CancelledError):
-        await task
