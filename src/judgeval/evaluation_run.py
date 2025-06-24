@@ -1,12 +1,10 @@
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Optional, Union
 from pydantic import BaseModel, field_validator, Field
 
 from judgeval.data import Example, CustomExample
 from judgeval.scorers import JudgevalScorer, APIJudgmentScorer
 from judgeval.constants import ACCEPTABLE_MODELS
 from judgeval.common.logger import debug, error
-from judgeval.judges import JudgevalJudge
-from judgeval.rules import Rule
 
 
 class EvaluationRun(BaseModel):
@@ -19,28 +17,22 @@ class EvaluationRun(BaseModel):
         examples (Union[List[Example], List[CustomExample]]): The examples to evaluate
         scorers (List[Union[JudgmentScorer, JudgevalScorer]]): A list of scorers to use for evaluation
         model (str): The model used as a judge when using LLM as a Judge
-        aggregator (Optional[str]): The aggregator to use for evaluation if using Mixture of Judges
         metadata (Optional[Dict[str, Any]]): Additional metadata to include for this evaluation run, e.g. comments, dataset name, purpose, etc.
         judgment_api_key (Optional[str]): The API key for running evaluations on the Judgment API
-        rules (Optional[List[Rule]]): Rules to evaluate against scoring results
     """
 
     # The user will specify whether they want log_results when they call run_eval
-    log_results: bool = False  # NOTE: log_results has to be set first because it is used to validate project_name and eval_name
     organization_id: Optional[str] = None
     project_name: Optional[str] = Field(default=None, validate_default=True)
     eval_name: Optional[str] = Field(default=None, validate_default=True)
     examples: Union[List[Example], List[CustomExample]]
     scorers: List[Union[APIJudgmentScorer, JudgevalScorer]]
-    model: Optional[Union[str, List[str], JudgevalJudge]] = "gpt-4.1"
-    aggregator: Optional[str] = Field(default=None, validate_default=True)
-    metadata: Optional[Dict[str, Any]] = None
+    model: Optional[str] = "gpt-4.1"
     trace_span_id: Optional[str] = None
     # API Key will be "" until user calls client.run_eval(), then API Key will be set
     judgment_api_key: Optional[str] = ""
     override: Optional[bool] = False
     append: Optional[bool] = False
-    rules: Optional[List[Rule]] = None
 
     def model_dump(self, **kwargs):
         data = super().model_dump(**kwargs)
@@ -54,19 +46,7 @@ class EvaluationRun(BaseModel):
             for scorer in self.scorers
         ]
 
-        if self.rules:
-            # Process rules to ensure proper serialization
-            data["rules"] = [rule.model_dump() for rule in self.rules]
-
         return data
-
-    @field_validator("log_results", mode="before")
-    def validate_log_results(cls, v):
-        if not isinstance(v, bool):
-            raise ValueError(
-                f"log_results must be a boolean. Received {v} of type {type(v)}"
-            )
-        return v
 
     @field_validator("project_name")
     def validate_project_name(cls, v, values):
@@ -114,16 +94,6 @@ class EvaluationRun(BaseModel):
         if not v:
             raise ValueError("Model cannot be empty.")
 
-        # Check if model is a judgevalJudge
-        if isinstance(v, JudgevalJudge):
-            # Verify all scorers are JudgevalScorer when using judgevalJudge
-            scorers = values.data.get("scorers", [])
-            if not all(isinstance(s, JudgevalScorer) for s in scorers):
-                raise ValueError(
-                    "When using a judgevalJudge model, all scorers must be JudgevalScorer type"
-                )
-            return v
-
         # Check if model is string or list of strings
         if isinstance(v, str):
             if v not in ACCEPTABLE_MODELS:
@@ -131,35 +101,6 @@ class EvaluationRun(BaseModel):
                     f"Model name {v} not recognized. Please select a valid model name.)"
                 )
             return v
-
-        if isinstance(v, list):
-            if not all(isinstance(m, str) for m in v):
-                raise ValueError(
-                    "When providing a list of models, all elements must be strings"
-                )
-            for m in v:
-                if m not in ACCEPTABLE_MODELS:
-                    raise ValueError(
-                        f"Model name {m} not recognized. Please select a valid model name."
-                    )
-            return v
-        raise ValueError(
-            f"Model must be one of: string, list of strings, or JudgevalJudge instance. Received type {type(v)}."
-        )
-
-    @field_validator("aggregator", mode="before")
-    def validate_aggregator(cls, v, values):
-        model = values.data.get("model")
-        if isinstance(model, list) and v is None:
-            raise ValueError("Aggregator cannot be empty.")
-
-        if isinstance(model, list) and not isinstance(v, str):
-            raise ValueError("Aggregator must be a string if provided.")
-
-        if v is not None and v not in ACCEPTABLE_MODELS:
-            raise ValueError(f"Model name {v} not recognized.")
-
-        return v
 
     class Config:
         arbitrary_types_allowed = True

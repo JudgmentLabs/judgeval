@@ -1,6 +1,6 @@
 import pytest
 import asyncio
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, MagicMock
 
 from judgeval.run_evaluation import (
     send_to_rabbitmq,
@@ -207,7 +207,14 @@ class TestRunEvaluation:
             check_examples(examples, scorers)
 
     @patch("judgeval.run_evaluation.execute_api_trace_eval")
-    def test_run_trace_eval(self, mock_execute, mock_trace_run):
+    @patch("requests.post")
+    def test_run_trace_eval(self, mock_requests_post, mock_execute, mock_trace_run):
+        # Mock all HTTP requests
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"exists": False}
+        mock_requests_post.return_value = mock_response
+
         mock_execute.return_value = {
             "results": [
                 {
@@ -231,6 +238,7 @@ class TestRunEvaluation:
                 }
             ],
             "status": "completed",
+            "agent_results": [{"success": True}],
         }
 
         results = run_trace_eval(mock_trace_run)
@@ -362,8 +370,15 @@ class TestRunEvaluation:
     def test_run_eval_sync(self, mock_evaluation_run):
         with (
             patch("judgeval.run_evaluation.execute_api_eval") as mock_execute,
+            patch("requests.post") as mock_requests_post,
             patch("builtins.input", return_value="y"),
-        ):  # Mock input to return 'y'
+        ):
+            # Mock all HTTP requests
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"exists": False}
+            mock_requests_post.return_value = mock_response
+
             mock_execute.return_value = {
                 "results": [
                     {
@@ -425,8 +440,15 @@ class TestRunEvaluation:
                 return_value=asyncio.Future(),
             ) as mock_spinner,
             patch("asyncio.create_task", return_value=asyncio.Future()),
+            patch("requests.post") as mock_requests_post,
             patch("builtins.input", return_value="y"),
         ):
+            # Mock all HTTP requests
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"exists": False}
+            mock_requests_post.return_value = mock_response
+
             # Set the result of the future
             mock_spinner.return_value.set_result(mock_results)
 

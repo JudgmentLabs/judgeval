@@ -90,7 +90,7 @@ class TestDatasetOperations:
         client.delete_dataset(alias=random_name1, project_name=project_name)
         client.delete_dataset(alias=random_name2, project_name=project_name)
 
-    def test_insert_dataset(self, client: JudgmentClient, project_name: str):
+    def test_append_dataset(self, client: JudgmentClient, project_name: str):
         """Test dataset editing."""
         dataset = client.create_dataset()
         dataset.add_example(Example(input="input 1", actual_output="output 1"))
@@ -108,7 +108,7 @@ class TestDatasetOperations:
         initial_example_count = len(dataset.examples)
         assert initial_example_count == 2, "Dataset should have 2 examples"
 
-        client.insert_dataset(
+        client.append_dataset(
             alias="test_dataset_6",
             examples=[Example(input="input 3", actual_output="output 3")],
             project_name=project_name,
@@ -146,7 +146,7 @@ class TestDatasetOperations:
         assert dataset, "Failed to pull dataset"
         assert len(dataset.examples) == 2, "Dataset should have 2 examples"
 
-    def test_append_example_dataset(self, client: JudgmentClient, project_name: str):
+    def test_append_dataset2(self, client: JudgmentClient, project_name: str):
         """Test dataset appending."""
         dataset = client.create_dataset()
         dataset.add_example(Example(input="input 1", actual_output="output 1"))
@@ -161,7 +161,7 @@ class TestDatasetOperations:
             Example(input="input 2", actual_output="output 2"),
             Example(input="input 3", actual_output="output 3"),
         ]
-        client.append_example_dataset(
+        client.append_dataset(
             alias="test_dataset_8", examples=examples, project_name=project_name
         )
 

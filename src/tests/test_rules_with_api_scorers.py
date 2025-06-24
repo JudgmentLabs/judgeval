@@ -1,7 +1,5 @@
 """Tests to verify rules work correctly with API scorers."""
 
-from unittest.mock import MagicMock, patch
-
 from judgeval.rules import Rule, Condition, RulesEngine
 from judgeval.utils.alerts import AlertStatus
 from judgeval.scorers.judgeval_scorers.api_scorers.faithfulness import (
@@ -10,8 +8,6 @@ from judgeval.scorers.judgeval_scorers.api_scorers.faithfulness import (
 from judgeval.scorers.judgeval_scorers.api_scorers.answer_relevancy import (
     AnswerRelevancyScorer,
 )
-from judgeval.judgment_client import JudgmentClient
-from judgeval.data import Example
 
 
 class TestRulesWithAPIScorers:
@@ -71,70 +67,3 @@ class TestRulesWithAPIScorers:
         # Check with direct assignment
         condition.metric = faithfulness_scorer
         assert condition.metric_name == "faithfulness"
-
-    @patch("judgeval.judgment_client.run_eval")
-    def test_judgment_client_with_rules(self, mock_run_eval):
-        """Test that JudgmentClient works with API scorers in rules."""
-        # Mock the run_eval function
-        mock_result = MagicMock()
-        mock_result.alert_results = {
-            "rule_0": {
-                "status": "triggered",
-                "rule_name": "Quality Check",
-                "conditions_result": [
-                    {
-                        "metric": "faithfulness",
-                        "value": 0.8,
-                        "threshold": 0.7,
-                        "passed": True,
-                        "skipped": False,
-                    },
-                    {
-                        "metric": "answer_relevancy",
-                        "value": 0.9,
-                        "threshold": 0.8,
-                        "passed": True,
-                        "skipped": False,
-                    },
-                ],
-            }
-        }
-        mock_run_eval.return_value = [mock_result]
-
-        # Create client with patched _validate_api_key method
-        client = JudgmentClient(judgment_api_key="test_key")
-
-        # Create example
-        example = Example(
-            input="Test input",
-            actual_output="Test output",
-            expected_output="Expected output",
-        )
-
-        # Create scorers
-        scorers = [
-            FaithfulnessScorer(threshold=0.7),
-            AnswerRelevancyScorer(threshold=0.8),
-        ]
-
-        # Create rules
-        rules = [
-            Rule(
-                name="Quality Check",
-                conditions=[
-                    Condition(metric=FaithfulnessScorer(threshold=0.7)),
-                    Condition(metric=AnswerRelevancyScorer(threshold=0.8)),
-                ],
-                combine_type="all",
-            )
-        ]
-
-        # Run evaluation
-        client.run_evaluation(
-            examples=[example], scorers=scorers, model="gpt-4.1-mini", rules=rules
-        )
-
-        # Verify run_eval was called with the expected arguments
-        assert mock_run_eval.called
-        call_args = mock_run_eval.call_args[0][0]
-        assert hasattr(call_args, "rules")

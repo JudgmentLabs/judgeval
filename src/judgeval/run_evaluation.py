@@ -426,13 +426,12 @@ def check_examples(
 def run_trace_eval(
     trace_run: TraceRun,
     override: bool = False,
-    ignore_errors: bool = True,
     function: Optional[Callable] = None,
     tracer: Optional[Union[Tracer, BaseCallbackHandler]] = None,
     examples: Optional[List[Example]] = None,
 ) -> List[ScoringResult]:
     # Call endpoint to check to see if eval run name exists (if we DON'T want to override and DO want to log results)
-    if not override and trace_run.log_results and not trace_run.append:
+    if not override and not trace_run.append:
         check_eval_run_name_exists(
             trace_run.eval_name,
             trace_run.project_name,
@@ -509,14 +508,14 @@ def run_trace_eval(
     # Convert the response data to `ScoringResult` objects
     debug("Processing API results")
     # TODO: allow for custom scorer on traces
-    if trace_run.log_results:
-        pretty_str = run_with_spinner(
-            "Logging Results: ",
-            log_evaluation_results,
-            response_data["agent_results"],
-            trace_run,
-        )
-        rprint(pretty_str)
+
+    pretty_str = run_with_spinner(
+        "Logging Results: ",
+        log_evaluation_results,
+        response_data["agent_results"],
+        trace_run,
+    )
+    rprint(pretty_str)
 
     return scoring_results
 
@@ -881,7 +880,6 @@ class SpinnerWrappedTask:
 def run_eval(
     evaluation_run: EvaluationRun,
     override: bool = False,
-    ignore_errors: bool = True,
     async_execution: bool = False,
 ) -> Union[List[ScoringResult], asyncio.Task, SpinnerWrappedTask]:
     """
@@ -890,7 +888,6 @@ def run_eval(
     Args:
         evaluation_run (EvaluationRun): Stores example and evaluation together for running
         override (bool, optional): Whether to override existing evaluation run with same name. Defaults to False.
-        ignore_errors (bool, optional): Whether to ignore scorer errors during evaluation. Defaults to True.
         async_execution (bool, optional): Whether to execute the evaluation asynchronously. Defaults to False.
 
     Returns:
@@ -900,7 +897,7 @@ def run_eval(
     """
 
     # Call endpoint to check to see if eval run name exists (if we DON'T want to override and DO want to log results)
-    if not override and evaluation_run.log_results and not evaluation_run.append:
+    if not override and not evaluation_run.append:
         check_eval_run_name_exists(
             evaluation_run.eval_name,
             evaluation_run.project_name,
@@ -1048,12 +1045,8 @@ def run_eval(
                     examples=evaluation_run.examples,
                     scorers=judgment_scorers,
                     model=evaluation_run.model,
-                    aggregator=evaluation_run.aggregator,
-                    metadata=evaluation_run.metadata,
                     judgment_api_key=evaluation_run.judgment_api_key,
                     organization_id=evaluation_run.organization_id,
-                    log_results=evaluation_run.log_results,
-                    rules=evaluation_run.rules,
                 )
                 debug("Sending request to Judgment API")
                 response_data: Dict = run_with_spinner(
@@ -1090,7 +1083,6 @@ def run_eval(
                     evaluation_run.examples,
                     local_scorers,
                     model=evaluation_run.model,
-                    ignore_errors=ignore_errors,
                     skip_on_missing_params=True,
                     show_indicator=True,
                     _use_bar_indicator=True,
@@ -1116,18 +1108,17 @@ def run_eval(
         #         organization_id=evaluation_run.organization_id
         #     )
         # print(merged_results)
-        if evaluation_run.log_results:
-            send_results = [
-                scoring_result.model_dump(warnings=False)
-                for scoring_result in merged_results
-            ]
-            pretty_str = run_with_spinner(
-                "Logging Results: ",
-                log_evaluation_results,
-                send_results,
-                evaluation_run,
-            )
-            rprint(pretty_str)
+        send_results = [
+            scoring_result.model_dump(warnings=False)
+            for scoring_result in merged_results
+        ]
+        pretty_str = run_with_spinner(
+            "Logging Results: ",
+            log_evaluation_results,
+            send_results,
+            evaluation_run,
+        )
+        rprint(pretty_str)
 
         for i, result in enumerate(merged_results):
             if (

@@ -1,7 +1,6 @@
 """Unit tests for the notification functionality in the rules system."""
 
 import pytest
-from unittest.mock import MagicMock, patch
 import uuid
 
 from judgeval.rules import (
@@ -18,8 +17,6 @@ from judgeval.scorers.judgeval_scorers.api_scorers.faithfulness import (
 from judgeval.scorers.judgeval_scorers.api_scorers.answer_relevancy import (
     AnswerRelevancyScorer,
 )
-from judgeval.judgment_client import JudgmentClient
-from judgeval.data import Example
 
 
 @pytest.fixture
@@ -374,90 +371,3 @@ class TestNotificationInAlertResults:
         # for sending notifications
         assert hasattr(results["test_rule"], "notification")
         assert results["test_rule"].notification is None
-
-
-@patch("judgeval.judgment_client.validate_api_key")
-@patch("judgeval.judgment_client.run_eval")
-class TestNotificationWithJudgmentClient:
-    """Tests for notification with JudgmentClient."""
-
-    def test_judgment_client_with_rules_and_notification(
-        self, mock_run_eval, mock_validate_api_key_direct
-    ):
-        """Test that JudgmentClient works with rules that have notification configs."""
-
-        # Mock the validate_api_key function directly
-        mock_validate_api_key_direct.return_value = (True, "Valid API key")
-
-        # Mock the run_eval function
-        mock_result = MagicMock()
-        mock_result.alert_results = {
-            "rule_0": {
-                "status": "triggered",
-                "rule_name": "Quality Check",
-                "conditions_result": [
-                    {
-                        "metric": "faithfulness",
-                        "value": 0.8,
-                        "threshold": 0.7,
-                        "passed": True,
-                        "skipped": False,
-                    }
-                ],
-                "notification": {
-                    "enabled": True,
-                    "communication_methods": ["slack", "email"],
-                    "email_addresses": ["test@example.com"],
-                    "send_at": None,
-                },
-            }
-        }
-        mock_run_eval.return_value = [mock_result]
-
-        # Create client with patched _validate_api_key method
-        client = JudgmentClient(
-            judgment_api_key="test_key", organization_id="test_org_id"
-        )
-
-        # Create example
-        example = Example(
-            input="Test input",
-            actual_output="Test output",
-            expected_output="Expected output",
-        )
-
-        # Create scorers
-        scorers = [FaithfulnessScorer(threshold=0.7)]
-
-        # Create rules with notification
-        notification = NotificationConfig(
-            enabled=True,
-            communication_methods=["slack", "email"],
-            email_addresses=["test@example.com"],
-        )
-
-        rules = [
-            Rule(
-                name="Quality Check",
-                conditions=[Condition(metric=FaithfulnessScorer(threshold=0.7))],
-                combine_type="all",
-                notification=notification,
-            )
-        ]
-
-        # Run evaluation
-        client.run_evaluation(
-            examples=[example], scorers=scorers, model="gpt-3.5-turbo", rules=rules
-        )
-
-        # Verify run_eval was called with the expected arguments
-        assert mock_run_eval.called
-        call_args = mock_run_eval.call_args[0][0]
-        assert hasattr(call_args, "rules")
-
-        # Check that rules in call_args have notification configs
-        assert len(call_args.rules) == 1
-        rule = call_args.rules[0]
-        assert rule.notification is not None
-        assert rule.notification.enabled is True
-        assert rule.notification.communication_methods == ["slack", "email"]

@@ -25,7 +25,6 @@ from judgeval.scorers import (
 from judgeval.evaluation_run import EvaluationRun
 from judgeval.run_evaluation import run_eval, assert_test, run_trace_eval
 from judgeval.data.trace_run import TraceRun
-from judgeval.judges import JudgevalJudge
 from judgeval.constants import (
     JUDGMENT_EVAL_FETCH_API_URL,
     JUDGMENT_PROJECT_DELETE_API_URL,
@@ -37,7 +36,6 @@ from langchain_core.callbacks import BaseCallbackHandler
 from judgeval.common.tracer import Tracer
 from judgeval.common.utils import validate_api_key
 from pydantic import BaseModel
-from judgeval.rules import Rule
 from judgeval.run_evaluation import SpinnerWrappedTask
 
 
@@ -97,30 +95,21 @@ class JudgmentClient(metaclass=SingletonMeta):
         self,
         examples: List[Example],
         scorers: List[Union[APIJudgmentScorer, JudgevalScorer]],
-        model: Optional[Union[str, List[str], JudgevalJudge]] = "gpt-4.1",
-        aggregator: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        log_results: bool = True,
+        model: Optional[str] = "gpt-4.1",
         project_name: str = "default_project",
         eval_run_name: str = "default_eval_run",
         override: bool = False,
         append: bool = False,
-        ignore_errors: bool = True,
-        rules: Optional[List[Rule]] = None,
     ) -> List[ScoringResult]:
         result = self.run_evaluation(
             examples=examples,
             scorers=scorers,
             model=model,
-            aggregator=aggregator,
-            metadata=metadata,
-            log_results=log_results,
             project_name=project_name,
             eval_run_name=eval_run_name,
             override=override,
             append=append,
-            ignore_errors=ignore_errors,
-            rules=rules,
+            async_execution=True,
         )
         assert not isinstance(result, (asyncio.Task, SpinnerWrappedTask))
         return result
@@ -128,18 +117,14 @@ class JudgmentClient(metaclass=SingletonMeta):
     def run_trace_evaluation(
         self,
         scorers: List[Union[APIJudgmentScorer, JudgevalScorer]],
-        model: Optional[Union[str, List[str], JudgevalJudge]] = "gpt-4.1",
+        model: Optional[str] = "gpt-4.1",
         traces: Optional[List[Trace]] = None,
         examples: Optional[List[Example]] = None,
         test_file: Optional[str] = None,
-        aggregator: Optional[str] = None,
         project_name: str = "default_project",
         eval_run_name: str = "default_eval_trace",
-        log_results: bool = True,
         append: bool = False,
         override: bool = False,
-        ignore_errors: bool = True,
-        rules: Optional[List[Rule]] = None,
         function: Optional[Callable] = None,
         tracer: Optional[Union[Tracer, BaseCallbackHandler]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
@@ -166,16 +151,12 @@ class JudgmentClient(metaclass=SingletonMeta):
                 traces=traces,
                 scorers=scorers,
                 model=model,
-                aggregator=aggregator,
-                log_results=log_results,
                 append=append,
                 judgment_api_key=self.judgment_api_key,
                 organization_id=self.organization_id,
                 tools=tools,
             )
-            return run_trace_eval(
-                trace_run, override, ignore_errors, function, tracer, examples
-            )
+            return run_trace_eval(trace_run, override, function, tracer, examples)
         except ValueError as e:
             raise ValueError(
                 f"Please check your TraceRun object, one or more fields are invalid: \n{str(e)}"
@@ -187,17 +168,12 @@ class JudgmentClient(metaclass=SingletonMeta):
         self,
         examples: Union[List[Example], List[CustomExample]],
         scorers: List[Union[APIJudgmentScorer, JudgevalScorer]],
-        model: Optional[Union[str, List[str], JudgevalJudge]] = "gpt-4.1",
-        aggregator: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        log_results: bool = True,
+        model: Optional[str] = "gpt-4.1",
         project_name: str = "default_project",
         eval_run_name: str = "default_eval_run",
         override: bool = False,
         append: bool = False,
-        ignore_errors: bool = True,
         async_execution: bool = False,
-        rules: Optional[List[Rule]] = None,
     ) -> Union[List[ScoringResult], asyncio.Task | SpinnerWrappedTask]:
         """
         Executes an evaluation of `Example`s using one or more `Scorer`s
@@ -205,15 +181,12 @@ class JudgmentClient(metaclass=SingletonMeta):
         Args:
             examples (Union[List[Example], List[CustomExample]]): The examples to evaluate
             scorers (List[Union[APIJudgmentScorer, JudgevalScorer]]): A list of scorers to use for evaluation
-            model (Union[str, List[str], JudgevalJudge]): The model used as a judge when using LLM as a Judge
-            aggregator (Optional[str]): The aggregator to use for evaluation if using Mixture of Judges
-            metadata (Optional[Dict[str, Any]]): Additional metadata to include for this evaluation run
-            log_results (bool): Whether to log the results to the Judgment API
+            model (str): The model used as a judge when using LLM as a Judge
             project_name (str): The name of the project the evaluation results belong to
             eval_run_name (str): A name for this evaluation run
             override (bool): Whether to override an existing evaluation run with the same name
-            ignore_errors (bool): Whether to ignore errors during evaluation (safely handled)
-            rules (Optional[List[Rule]]): Rules to evaluate against scoring results
+            append (bool): Whether to append to an existing evaluation run with the same name
+            async_execution (bool): Whether to execute the evaluation asynchronously
 
         Returns:
             List[ScoringResult]: The results of the evaluation
@@ -224,29 +197,19 @@ class JudgmentClient(metaclass=SingletonMeta):
             )
 
         try:
-            if rules and any(isinstance(scorer, JudgevalScorer) for scorer in scorers):
-                raise ValueError(
-                    "Cannot use Judgeval scorers (only API scorers) when using rules. Please either remove rules or use only APIJudgmentScorer types."
-                )
-
             eval = EvaluationRun(
-                log_results=log_results,
                 append=append,
                 project_name=project_name,
                 eval_name=eval_run_name,
                 examples=examples,
                 scorers=scorers,
                 model=model,
-                aggregator=aggregator,
-                metadata=metadata,
                 judgment_api_key=self.judgment_api_key,
-                rules=rules,
                 organization_id=self.organization_id,
             )
             return run_eval(
                 eval,
                 override,
-                ignore_errors=ignore_errors,
                 async_execution=async_execution,
             )
         except ValueError as e:
@@ -281,7 +244,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         dataset.judgment_api_key = self.judgment_api_key
         return self.eval_dataset_client.push(dataset, alias, project_name, overwrite)
 
-    def append_example_dataset(
+    def append_dataset(
         self, alias: str, examples: List[Example], project_name: str
     ) -> bool:
         """
@@ -318,14 +281,6 @@ class JudgmentClient(metaclass=SingletonMeta):
             dict: The retrieved dataset stats
         """
         return self.eval_dataset_client.pull_project_dataset_stats(project_name)
-
-    def insert_dataset(
-        self, alias: str, examples: List[Example], project_name: str
-    ) -> bool:
-        """
-        Edits the dataset on Judgment platform by adding new examples
-        """
-        return self.eval_dataset_client.insert_dataset(alias, examples, project_name)
 
     # Maybe add option where you can pass in the EvaluationRun object and it will pull the eval results from the backend
     def pull_eval(
@@ -499,15 +454,10 @@ class JudgmentClient(metaclass=SingletonMeta):
         self,
         scorers: List[Union[APIJudgmentScorer, JudgevalScorer]],
         examples: Optional[List[Example]] = None,
-        model: Optional[Union[str, List[str], JudgevalJudge]] = "gpt-4.1",
+        model: Optional[str] = "gpt-4.1",
         test_file: Optional[str] = None,
-        aggregator: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        log_results: bool = True,
         project_name: str = "default_test",
         eval_run_name: str = str(uuid4()),
-        override: bool = False,
-        rules: Optional[List[Rule]] = None,
         function: Optional[Callable] = None,
         tracer: Optional[Union[Tracer, BaseCallbackHandler]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
@@ -521,13 +471,9 @@ class JudgmentClient(metaclass=SingletonMeta):
             test_file (Optional[str]): Path to a YAML file containing test examples. Must be provided if examples is not.
             scorers (List[Union[APIJudgmentScorer, JudgevalScorer]]): A list of scorers to use for evaluation
             model (Union[str, List[str], JudgevalJudge]): The model used as a judge when using LLM as a Judge
-            aggregator (Optional[str]): The aggregator to use for evaluation if using Mixture of Judges
-            metadata (Optional[Dict[str, Any]]): Additional metadata to include for this evaluation run
-            log_results (bool): Whether to log the results to the Judgment API
             project_name (str): The name of the project the evaluation results belong to
             eval_run_name (str): A name for this evaluation run
             override (bool): Whether to override an existing evaluation run with the same name
-            rules (Optional[List[Rule]]): Rules to evaluate against scoring results
         """
 
         # Check for enable_param_checking and tools
@@ -554,12 +500,8 @@ class JudgmentClient(metaclass=SingletonMeta):
                 examples=examples,
                 scorers=scorers,
                 model=model,
-                aggregator=aggregator,
-                log_results=log_results,
                 project_name=project_name,
                 eval_run_name=eval_run_name,
-                override=override,
-                rules=rules,
                 function=function,
                 tracer=tracer,
                 test_file=test_file,
@@ -574,13 +516,8 @@ class JudgmentClient(metaclass=SingletonMeta):
                 examples=examples,
                 scorers=scorers,
                 model=model,
-                aggregator=aggregator,
-                metadata=metadata,
-                log_results=log_results,
                 project_name=project_name,
                 eval_run_name=eval_run_name,
-                override=override,
-                rules=rules,
                 async_execution=async_execution,
             )
 
