@@ -577,7 +577,6 @@ def test_json_scorer(client: JudgmentClient):
         examples=[example1, example2],
         scorers=[scorer],
         model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-        metadata={"batch": "test"},
         project_name=PROJECT_NAME,
         eval_run_name=EVAL_RUN_NAME,
         override=True,

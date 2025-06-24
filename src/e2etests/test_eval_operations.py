@@ -19,6 +19,7 @@ from judgeval.scorers import (
 )
 from judgeval.data.datasets.dataset import EvalDataset
 from judgeval.tracer import Tracer
+from judgeval.utils.file_utils import get_examples_from_yaml
 
 # Initialize a tracer instance for this test file
 tracer = Tracer()
@@ -113,7 +114,6 @@ class TestEvalOperations:
             examples=[example1],
             scorers=[scorer],
             model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-            metadata={"batch": "test"},
             project_name=PROJECT_NAME,
             eval_run_name=EVAL_RUN_NAME,
             append=True,
@@ -227,7 +227,6 @@ class TestEvalOperations:
             examples=dataset.examples,
             scorers=[FaithfulnessScorer(threshold=0.5)],
             model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-            metadata={"batch": "test"},
             project_name="test_project",
             eval_run_name="test_eval_run",
             override=True,
@@ -267,7 +266,7 @@ examples:
                 temp_yaml_file_path = tmpfile.name
             scorer = ToolOrderScorer(threshold=0.5)
             client.run_trace_evaluation(
-                test_file=temp_yaml_file_path,
+                examples=get_examples_from_yaml(temp_yaml_file_path),
                 function=simple_traced_function_for_yaml_eval,
                 tracer=tracer,
                 scorers=[scorer],
