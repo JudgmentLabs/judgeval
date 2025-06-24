@@ -5,7 +5,7 @@ from judgeval.common.logger import debug, info, error
 from judgeval.data import Example
 
 
-def add_from_yaml(file_path: str) -> List[Example] | None:
+def get_examples_from_yaml(file_path: str) -> List[Example] | None:
     debug(f"Loading dataset from YAML file: {file_path}")
     """
     Adds examples from a YAML file.

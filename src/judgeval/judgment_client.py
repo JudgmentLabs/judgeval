@@ -30,7 +30,6 @@ from judgeval.constants import (
     JUDGMENT_PROJECT_DELETE_API_URL,
     JUDGMENT_PROJECT_CREATE_API_URL,
 )
-from judgeval.utils.data_utils import add_from_yaml
 from judgeval.common.exceptions import JudgmentAPIError
 from langchain_core.callbacks import BaseCallbackHandler
 from judgeval.common.tracer import Tracer
@@ -117,25 +116,18 @@ class JudgmentClient(metaclass=SingletonMeta):
     def run_trace_evaluation(
         self,
         scorers: List[Union[APIJudgmentScorer, JudgevalScorer]],
-        model: Optional[str] = "gpt-4.1",
-        traces: Optional[List[Trace]] = None,
         examples: Optional[List[Example]] = None,
-        test_file: Optional[str] = None,
-        project_name: str = "default_project",
-        eval_run_name: str = "default_eval_trace",
-        append: bool = False,
-        override: bool = False,
         function: Optional[Callable] = None,
         tracer: Optional[Union[Tracer, BaseCallbackHandler]] = None,
+        traces: Optional[List[Trace]] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
+        project_name: str = "default_project",
+        eval_run_name: str = "default_eval_trace",
+        model: Optional[str] = "gpt-4.1",
+        append: bool = False,
+        override: bool = False,
     ) -> List[ScoringResult]:
         try:
-            if test_file:
-                try:
-                    examples = add_from_yaml(test_file)
-                except FileNotFoundError:
-                    raise FileNotFoundError(f"Test file not found: {test_file}")
-
             if examples and not function:
                 raise ValueError("Cannot pass in examples without a function")
 
@@ -452,28 +444,83 @@ class JudgmentClient(metaclass=SingletonMeta):
 
     def assert_test(
         self,
+        examples: List[Example],
         scorers: List[Union[APIJudgmentScorer, JudgevalScorer]],
-        examples: Optional[List[Example]] = None,
         model: Optional[str] = "gpt-4.1",
-        test_file: Optional[str] = None,
         project_name: str = "default_test",
         eval_run_name: str = str(uuid4()),
-        function: Optional[Callable] = None,
-        tracer: Optional[Union[Tracer, BaseCallbackHandler]] = None,
-        tools: Optional[List[Dict[str, Any]]] = None,
+        override: bool = False,
+        append: bool = False,
         async_execution: bool = False,
     ) -> None:
         """
         Asserts a test by running the evaluation and checking the results for success
 
         Args:
-            examples (Optional[List[Example]]): The examples to evaluate. Must be provided if test_file is not.
-            test_file (Optional[str]): Path to a YAML file containing test examples. Must be provided if examples is not.
+            examples (List[Example]): The examples to evaluate.
             scorers (List[Union[APIJudgmentScorer, JudgevalScorer]]): A list of scorers to use for evaluation
-            model (Union[str, List[str], JudgevalJudge]): The model used as a judge when using LLM as a Judge
+            model (str): The model used as a judge when using LLM as a Judge
             project_name (str): The name of the project the evaluation results belong to
             eval_run_name (str): A name for this evaluation run
             override (bool): Whether to override an existing evaluation run with the same name
+            append (bool): Whether to append to an existing evaluation run with the same name
+            async_execution (bool): Whether to run the evaluation asynchronously
+        """
+
+        results: Union[List[ScoringResult], asyncio.Task | SpinnerWrappedTask]
+
+        results = self.run_evaluation(
+            examples=examples,
+            scorers=scorers,
+            model=model,
+            project_name=project_name,
+            eval_run_name=eval_run_name,
+            override=override,
+            append=append,
+            async_execution=async_execution,
+        )
+
+        if async_execution and isinstance(results, (asyncio.Task, SpinnerWrappedTask)):
+
+            async def run_async():  # Using wrapper here to resolve mypy error with passing Task into asyncio.run
+                return await results
+
+            actual_results = asyncio.run(run_async())
+            assert_test(actual_results)  # Call the synchronous imported function
+        else:
+            # 'results' is already List[ScoringResult] here (synchronous path)
+            assert_test(results)  # Call the synchronous imported function
+
+    def assert_trace_test(
+        self,
+        scorers: List[Union[APIJudgmentScorer, JudgevalScorer]],
+        examples: Optional[List[Example]] = None,
+        function: Optional[Callable] = None,
+        tracer: Optional[Union[Tracer, BaseCallbackHandler]] = None,
+        traces: Optional[List[Trace]] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        model: Optional[str] = "gpt-4.1",
+        project_name: str = "default_test",
+        eval_run_name: str = str(uuid4()),
+        override: bool = False,
+        append: bool = False,
+        async_execution: bool = False,
+    ) -> None:
+        """
+        Asserts a test by running the evaluation and checking the results for success
+
+        Args:
+            examples (List[Example]): The examples to evaluate.
+            scorers (List[Union[APIJudgmentScorer, JudgevalScorer]]): A list of scorers to use for evaluation
+            model (str): The model used as a judge when using LLM as a Judge
+            project_name (str): The name of the project the evaluation results belong to
+            eval_run_name (str): A name for this evaluation run
+            override (bool): Whether to override an existing evaluation run with the same name
+            append (bool): Whether to append to an existing evaluation run with the same name
+            function (Optional[Callable]): A function to use for evaluation
+            tracer (Optional[Union[Tracer, BaseCallbackHandler]]): A tracer to use for evaluation
+            tools (Optional[List[Dict[str, Any]]]): A list of tools to use for evaluation
+            async_execution (bool): Whether to run the evaluation asynchronously
         """
 
         # Check for enable_param_checking and tools
@@ -485,41 +532,21 @@ class JudgmentClient(metaclass=SingletonMeta):
                             f"You must provide the 'tools' argument to assert_test when using a scorer with enable_param_checking=True. If you do not want to do param checking, explicitly set enable_param_checking=False for the {scorer.__name__} scorer."
                         )
 
-        # Validate that exactly one of examples or test_file is provided
-        if (examples is None and test_file is None) or (
-            examples is not None and test_file is not None
-        ):
-            raise ValueError(
-                "Exactly one of 'examples' or 'test_file' must be provided, but not both"
-            )
-
         results: Union[List[ScoringResult], asyncio.Task | SpinnerWrappedTask]
 
-        if function:
-            results = self.run_trace_evaluation(
-                examples=examples,
-                scorers=scorers,
-                model=model,
-                project_name=project_name,
-                eval_run_name=eval_run_name,
-                function=function,
-                tracer=tracer,
-                test_file=test_file,
-                tools=tools,
-            )
-        else:
-            if examples is None:
-                raise ValueError(
-                    "'examples' cannot be None when 'function' is not provided"
-                )
-            results = self.run_evaluation(
-                examples=examples,
-                scorers=scorers,
-                model=model,
-                project_name=project_name,
-                eval_run_name=eval_run_name,
-                async_execution=async_execution,
-            )
+        results = self.run_trace_evaluation(
+            examples=examples,
+            traces=traces,
+            scorers=scorers,
+            model=model,
+            project_name=project_name,
+            eval_run_name=eval_run_name,
+            override=override,
+            append=append,
+            function=function,
+            tracer=tracer,
+            tools=tools,
+        )
 
         if async_execution and isinstance(results, (asyncio.Task, SpinnerWrappedTask)):
 

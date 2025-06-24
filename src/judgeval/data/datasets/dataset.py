@@ -9,7 +9,7 @@ from typing import List, Union, Literal, Optional
 
 from judgeval.data import Example, Trace
 from judgeval.common.logger import debug, error, warning, info
-from judgeval.utils.data_utils import add_from_yaml
+from judgeval.utils.file_utils import get_examples_from_yaml
 
 
 @dataclass
@@ -218,7 +218,7 @@ class EvalDataset:
             timestamp: "20241230_160117"
             trace_id: "123"
         """
-        examples = add_from_yaml(file_path)
+        examples = get_examples_from_yaml(file_path)
 
         info(f"Added {len(examples)} examples from YAML")
         for e in examples:
