@@ -143,7 +143,6 @@ class TestEvalOperations:
         for eval_run_name in EVAL_RUN_NAMES:
             self.run_eval_helper(client, PROJECT_NAME, eval_run_name)
 
-        client.delete_eval(project_name=PROJECT_NAME, eval_run_names=EVAL_RUN_NAMES)
         client.delete_project(project_name=PROJECT_NAME)
         for eval_run_name in EVAL_RUN_NAMES:
             with pytest.raises(ValueError, match="Error fetching eval results"):

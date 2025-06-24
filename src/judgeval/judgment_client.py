@@ -27,8 +27,6 @@ from judgeval.data.trace_run import TraceRun
 from judgeval.judges import JudgevalJudge
 from judgeval.constants import (
     JUDGMENT_EVAL_FETCH_API_URL,
-    JUDGMENT_EVAL_DELETE_API_URL,
-    JUDGMENT_EVAL_DELETE_PROJECT_API_URL,
     JUDGMENT_PROJECT_DELETE_API_URL,
     JUDGMENT_PROJECT_CREATE_API_URL,
 )
@@ -362,65 +360,6 @@ class JudgmentClient(metaclass=SingletonMeta):
             raise ValueError(f"Error fetching eval results: {eval_run.json()}")
 
         return eval_run.json()
-
-    def delete_eval(self, project_name: str, eval_run_names: List[str]) -> bool:
-        """
-        Deletes an evaluation from the server by project and run names.
-
-        Args:
-            project_name (str): Name of the project
-            eval_run_names (List[str]): List of names of the evaluation runs
-
-        Returns:
-            bool: Whether the evaluation was successfully deleted
-        """
-        if not eval_run_names:
-            raise ValueError("No evaluation run names provided")
-
-        eval_run_request_body = DeleteEvalRunRequestBody(
-            project_name=project_name,
-            eval_names=eval_run_names,
-            judgment_api_key=self.judgment_api_key,
-        )
-        response = requests.delete(
-            JUDGMENT_EVAL_DELETE_API_URL,
-            json=eval_run_request_body.model_dump(),
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.judgment_api_key}",
-                "X-Organization-Id": self.organization_id,
-            },
-        )
-        if response.status_code == 404:
-            raise ValueError(f"Eval results not found: {response.json()}")
-        elif response.status_code == 500:
-            raise ValueError(f"Error deleting eval results: {response.json()}")
-        return bool(response.json())
-
-    def delete_project_evals(self, project_name: str) -> bool:
-        """
-        Deletes all evaluations from the server for a given project.
-
-        Args:
-            project_name (str): Name of the project
-
-        Returns:
-            bool: Whether the evaluations were successfully deleted
-        """
-        response = requests.delete(
-            JUDGMENT_EVAL_DELETE_PROJECT_API_URL,
-            json={
-                "project_name": project_name,
-            },
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.judgment_api_key}",
-                "X-Organization-Id": self.organization_id,
-            },
-        )
-        if response.status_code != requests.codes.ok:
-            raise ValueError(f"Error deleting eval results: {response.json()}")
-        return response.json()
 
     def create_project(self, project_name: str) -> bool:
         """
