@@ -139,11 +139,9 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
 
                 # NEW: Initial save for live tracking (follows the new practice)
                 try:
-                    trace_id_saved, server_response = (
-                        self._trace_client.save_with_rate_limiting(
-                            overwrite=self._trace_client.overwrite,
-                            final_save=False,  # Initial save for live tracking
-                        )
+                    trace_id_saved, server_response = self._trace_client.save(
+                        overwrite=self._trace_client.overwrite,
+                        final_save=False,  # Initial save for live tracking
                     )
                 except Exception as e:
                     import warnings
@@ -322,9 +320,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                         "parent_trace_id": self._trace_client.parent_trace_id,
                         "parent_name": self._trace_client.parent_name,
                     }
-
-                    # NEW: Use save_with_rate_limiting with final_save=True for final save
-                    trace_id, trace_data = self._trace_client.save_with_rate_limiting(
+                    trace_id, trace_data = self._trace_client.save(
                         overwrite=self._trace_client.overwrite,
                         final_save=True,  # Final save with usage counter updates
                     )
@@ -534,10 +530,9 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                     "parent_trace_id": trace_client.parent_trace_id,
                     "parent_name": trace_client.parent_name,
                 }
-                # NEW: Use save_with_rate_limiting with final_save=True for final save
-                trace_id_saved, trace_data = trace_client.save_with_rate_limiting(
+                trace_id_saved, trace_data = trace_client.save(
                     overwrite=trace_client.overwrite,
-                    final_save=True,  # Final save with usage counter updates
+                    final_save=True,
                 )
 
                 self.tracer.traces.append(complete_trace_data)
