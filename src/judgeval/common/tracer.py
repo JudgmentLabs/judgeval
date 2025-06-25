@@ -244,7 +244,6 @@ class TraceManagerClient:
 
         return server_response
 
-
     def upsert_trace(
         self,
         trace_data: dict,
@@ -314,7 +313,6 @@ class TraceManagerClient:
             rprint(pretty_str)
 
         return server_response
-
 
     ## TODO: Should have a log endpoint, endpoint should also support batched payloads
     def save_annotation(self, annotation: TraceAnnotation):
@@ -869,8 +867,6 @@ class TraceClient:
             "tags": self.tags,
         }
 
-        
-
         # If usage check passes, upsert the trace
         server_response = self.trace_manager_client.upsert_trace(
             trace_data,
@@ -878,8 +874,6 @@ class TraceClient:
             show_link=not final_save,  # Show link only on initial save, not final save
             final_save=final_save,  # Pass final_save to control S3 saving
         )
-
-      
 
         # Upload annotations
         # TODO: batch to the log endpoint
@@ -2134,10 +2128,8 @@ class Tracer:
                             "parent_name": current_trace.parent_name,
                         }
                         # Save the completed trace
-                        trace_id, server_response = (
-                            current_trace.save(
-                                overwrite=overwrite, final_save=True
-                            )
+                        trace_id, server_response = current_trace.save(
+                            overwrite=overwrite, final_save=True
                         )
 
                         # Store the complete trace data instead of just server response
@@ -2261,10 +2253,8 @@ class Tracer:
                         # Flush background spans before saving the trace
 
                         # Save the completed trace
-                        trace_id, server_response = (
-                            current_trace.save(
-                                overwrite=overwrite, final_save=True
-                            )
+                        trace_id, server_response = current_trace.save(
+                            overwrite=overwrite, final_save=True
                         )
 
                         # Store the complete trace data instead of just server response
