@@ -54,8 +54,6 @@ from judgeval.constants import (
     JUDGMENT_TRACES_ADD_ANNOTATION_API_URL,
     JUDGMENT_TRACES_SAVE_API_URL,
     JUDGMENT_TRACES_UPSERT_API_URL,
-    JUDGMENT_TRACES_USAGE_CHECK_API_URL,
-    JUDGMENT_TRACES_USAGE_UPDATE_API_URL,
     JUDGMENT_TRACES_FETCH_API_URL,
     JUDGMENT_TRACES_DELETE_API_URL,
     JUDGMENT_PROJECT_DELETE_API_URL,
@@ -246,40 +244,6 @@ class TraceManagerClient:
 
         return server_response
 
-    def check_usage_limits(self, count: int = 1):
-        """
-        Check if the organization can use the requested number of traces without exceeding limits.
-
-        Args:
-            count: Number of traces to check for (default: 1)
-
-        Returns:
-            dict: Server response with rate limit status and usage info
-
-        Raises:
-            ValueError: If rate limits would be exceeded or other errors occur
-        """
-        response = requests.post(
-            JUDGMENT_TRACES_USAGE_CHECK_API_URL,
-            json={"count": count},
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.judgment_api_key}",
-                "X-Organization-Id": self.organization_id,
-            },
-            verify=True,
-        )
-
-        if response.status_code == HTTPStatus.FORBIDDEN:
-            # Rate limits exceeded
-            error_data = response.json()
-            raise ValueError(
-                f"Rate limit exceeded: {error_data.get('detail', 'Monthly trace limit reached')}"
-            )
-        elif response.status_code != HTTPStatus.OK:
-            raise ValueError(f"Failed to check usage limits: {response.text}")
-
-        return response.json()
 
     def upsert_trace(
         self,
@@ -351,34 +315,6 @@ class TraceManagerClient:
 
         return server_response
 
-    def update_usage_counters(self, count: int = 1):
-        """
-        Update trace usage counters after successfully saving traces.
-
-        Args:
-            count: Number of traces to count (default: 1)
-
-        Returns:
-            dict: Server response with updated usage information
-
-        Raises:
-            ValueError: If the update fails
-        """
-        response = requests.post(
-            JUDGMENT_TRACES_USAGE_UPDATE_API_URL,
-            json={"count": count},
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.judgment_api_key}",
-                "X-Organization-Id": self.organization_id,
-            },
-            verify=True,
-        )
-
-        if response.status_code != HTTPStatus.OK:
-            raise ValueError(f"Failed to update usage counters: {response.text}")
-
-        return response.json()
 
     ## TODO: Should have a log endpoint, endpoint should also support batched payloads
     def save_annotation(self, annotation: TraceAnnotation):
