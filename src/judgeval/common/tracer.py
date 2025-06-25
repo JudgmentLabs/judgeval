@@ -535,7 +535,7 @@ class TraceClient:
         is_first_span = len(self.trace_spans) == 0
         if is_first_span:
             try:
-                trace_id, server_response = self.save_with_rate_limiting(
+                trace_id, server_response = self.save(
                     overwrite=self.overwrite, final_save=False
                 )
                 # Set start_time after first successful save
@@ -858,7 +858,7 @@ class TraceClient:
             return 0.0  # No duration if trace hasn't been saved yet
         return time.time() - self.start_time
 
-    def save(self, overwrite: bool = False) -> Tuple[str, dict]:
+    def save_trace(self, overwrite: bool = False) -> Tuple[str, dict]:
         """
         Save the current trace to the database.
         Returns a tuple of (trace_id, server_response) where server_response contains the UI URL and other metadata.
@@ -899,7 +899,7 @@ class TraceClient:
 
         return self.trace_id, server_response
 
-    def save_with_rate_limiting(
+    def save(
         self, overwrite: bool = False, final_save: bool = False
     ) -> Tuple[str, dict]:
         """
@@ -933,14 +933,7 @@ class TraceClient:
             "tags": self.tags,
         }
 
-        # Check usage limits first
-        try:
-            self.trace_manager_client.check_usage_limits(count=1)
-            # Usage check passed silently - no need to show detailed info
-        except ValueError as e:
-            # Rate limit exceeded
-            warnings.warn(f"Rate limit check failed for live tracing: {e}")
-            raise e
+        
 
         # If usage check passes, upsert the trace
         server_response = self.trace_manager_client.upsert_trace(
@@ -950,16 +943,7 @@ class TraceClient:
             final_save=final_save,  # Pass final_save to control S3 saving
         )
 
-        # Update usage counters only on final save
-        if final_save:
-            try:
-                self.trace_manager_client.update_usage_counters(count=1)
-                # Usage updated silently - no need to show detailed usage info
-            except ValueError as e:
-                # Log warning but don't fail the trace save since the trace was already saved
-                warnings.warn(
-                    f"Usage counter update failed (trace was still saved): {e}"
-                )
+      
 
         # Upload annotations
         # TODO: batch to the log endpoint
@@ -2215,7 +2199,7 @@ class Tracer:
                         }
                         # Save the completed trace
                         trace_id, server_response = (
-                            current_trace.save_with_rate_limiting(
+                            current_trace.save(
                                 overwrite=overwrite, final_save=True
                             )
                         )
@@ -2342,7 +2326,7 @@ class Tracer:
 
                         # Save the completed trace
                         trace_id, server_response = (
-                            current_trace.save_with_rate_limiting(
+                            current_trace.save(
                                 overwrite=overwrite, final_save=True
                             )
                         )
