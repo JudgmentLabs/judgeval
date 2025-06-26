@@ -1,6 +1,5 @@
 import pytest
-import asyncio
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from judgeval.run_evaluation import (
     send_to_rabbitmq,
@@ -12,12 +11,10 @@ from judgeval.run_evaluation import (
     log_evaluation_results,
     run_with_spinner,
     check_examples,
-    run_trace_eval,
     get_evaluation_status,
     _poll_evaluation_until_complete,
     await_with_spinner,
     SpinnerWrappedTask,
-    run_eval,
     assert_test,
 )
 from judgeval.data import Example, ScoringResult, ScorerData, Trace
@@ -206,49 +203,6 @@ class TestRunEvaluation:
         with patch("builtins.input", return_value="y"):
             check_examples(examples, scorers)
 
-    @patch("judgeval.run_evaluation.execute_api_trace_eval")
-    @patch("requests.post")
-    def test_run_trace_eval(self, mock_requests_post, mock_execute, mock_trace_run):
-        # Mock all HTTP requests
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"exists": False}
-        mock_requests_post.return_value = mock_response
-
-        mock_execute.return_value = {
-            "results": [
-                {
-                    "success": True,
-                    "scorers_data": [
-                        {
-                            "name": "test_scorer",
-                            "threshold": 0.5,
-                            "success": True,
-                            "score": 0.8,
-                            "reason": "Test reason",
-                            "strict_mode": True,
-                            "evaluation_model": "gpt-4",
-                            "error": None,
-                            "evaluation_cost": 0.001,
-                            "verbose_logs": "Test logs",
-                            "additional_metadata": {"test": "metadata"},
-                        }
-                    ],
-                    "data_object": {"input": "test", "actual_output": "test"},
-                }
-            ],
-            "status": "completed",
-            "agent_results": [{"success": True}],
-        }
-
-        results = run_trace_eval(mock_trace_run)
-
-        assert len(results) == 1
-        assert isinstance(results[0], ScoringResult)
-        assert results[0].success is True
-        assert len(results[0].scorers_data) == 1
-        mock_execute.assert_called_once()
-
     @pytest.mark.asyncio
     async def test_get_evaluation_status(self):
         with patch("judgeval.run_evaluation.requests.get") as mock_get:
@@ -366,94 +320,3 @@ class TestRunEvaluation:
 
         with pytest.raises(AssertionError):
             assert_test([failing_result])
-
-    def test_run_eval_sync(self, mock_evaluation_run):
-        with (
-            patch("judgeval.run_evaluation.execute_api_eval") as mock_execute,
-            patch("requests.post") as mock_requests_post,
-            patch("builtins.input", return_value="y"),
-        ):
-            # Mock all HTTP requests
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = {"exists": False}
-            mock_requests_post.return_value = mock_response
-
-            mock_execute.return_value = {
-                "results": [
-                    {
-                        "success": True,
-                        "scorers_data": [
-                            {
-                                "name": "test_scorer",
-                                "threshold": 0.5,
-                                "success": True,
-                                "score": 0.8,
-                                "reason": "Test reason",
-                                "strict_mode": True,
-                                "evaluation_model": "gpt-4",
-                                "error": None,
-                                "evaluation_cost": 0.001,
-                                "verbose_logs": "Test logs",
-                                "additional_metadata": {"test": "metadata"},
-                            }
-                        ],
-                        "data_object": {"input": "test", "actual_output": "test"},
-                    }
-                ]
-            }
-
-            results = run_eval(mock_evaluation_run)
-
-            assert len(results) == 1
-            assert isinstance(results[0], ScoringResult)
-            assert results[0].success is True
-            mock_execute.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_run_eval_async(self, mock_evaluation_run):
-        mock_results = [
-            ScoringResult(
-                success=True,
-                scorers_data=[
-                    ScorerData(
-                        name="test_scorer",
-                        threshold=0.5,
-                        success=True,
-                        score=0.8,
-                        reason="Test reason",
-                        strict_mode=True,
-                        evaluation_model="gpt-4",
-                        error=None,
-                        evaluation_cost=0.001,
-                        verbose_logs="Test logs",
-                        additional_metadata={"test": "metadata"},
-                    )
-                ],
-                data_object=Example(input="test", actual_output="test"),
-            )
-        ]
-
-        with (
-            patch(
-                "judgeval.run_evaluation.SpinnerWrappedTask",
-                return_value=asyncio.Future(),
-            ) as mock_spinner,
-            patch("asyncio.create_task", return_value=asyncio.Future()),
-            patch("requests.post") as mock_requests_post,
-            patch("builtins.input", return_value="y"),
-        ):
-            # Mock all HTTP requests
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.json.return_value = {"exists": False}
-            mock_requests_post.return_value = mock_response
-
-            # Set the result of the future
-            mock_spinner.return_value.set_result(mock_results)
-
-            results = await run_eval(mock_evaluation_run, async_execution=True)
-
-            assert len(results) == 1
-            assert isinstance(results[0], ScoringResult)
-            assert results[0].success is True
