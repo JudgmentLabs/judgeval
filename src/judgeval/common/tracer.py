@@ -42,7 +42,8 @@ from rich import print as rprint
 import types
 
 # Third-party imports
-import requests
+from requests import RequestException
+from judgeval.utils.requests import requests
 from litellm import cost_per_token as _original_cost_per_token
 from openai import OpenAI, AsyncOpenAI
 from together import Together, AsyncTogether
@@ -1198,7 +1199,7 @@ class BackgroundSpanService:
                     f"Failed to send spans batch: HTTP {response.status_code} - {response.text}"
                 )
 
-        except requests.RequestException as e:
+        except RequestException as e:
             warnings.warn(f"Network error sending spans batch: {e}")
         except Exception as e:
             warnings.warn(f"Failed to serialize or send spans batch: {e}")
@@ -1260,7 +1261,7 @@ class BackgroundSpanService:
                     f"Failed to send evaluation runs batch: HTTP {response.status_code} - {response.text}"
                 )
 
-        except requests.RequestException as e:
+        except RequestException as e:
             warnings.warn(f"Network error sending evaluation runs batch: {e}")
         except Exception as e:
             warnings.warn(f"Failed to send evaluation runs batch: {e}")

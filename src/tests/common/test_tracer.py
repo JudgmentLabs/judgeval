@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import Mock, patch
 from uuid import uuid4
-import requests
+from requests import Response
 
 from judgeval.common.tracer import (
     Tracer,
@@ -19,7 +19,7 @@ def tracer(mocker):
     """Provide a configured tracer instance"""
 
     # Create the mock response for trace saving (POST)
-    mock_post_response = mocker.Mock(spec=requests.Response)
+    mock_post_response = mocker.Mock(spec=Response)
     mock_post_response.status_code = 200
     mock_post_response.json.return_value = {
         "message": "Trace saved successfully",
@@ -28,10 +28,11 @@ def tracer(mocker):
     }
 
     # Create mocks for POST requests
-    mock_post = mocker.patch("requests.post", autospec=True)
+    mock_post = mocker.patch("judgeval.utils.requests.requests.post", autospec=True)
     mock_post.return_value = mock_post_response
 
-    yield Tracer(api_key=str(uuid4()), organization_id="test_org")
+    with patch("judgeval.common.tracer.BackgroundSpanService"):
+        yield Tracer(api_key=str(uuid4()), organization_id="test_org")
 
 
 @pytest.fixture
@@ -39,10 +40,13 @@ def trace_client(tracer):
     """Provide a trace client instance"""
     # Create a new trace client directly
     trace_id = str(uuid4())
-    trace_client = TraceClient(
-        tracer=tracer, trace_id=trace_id, name="test_trace", project_name="test_project"
-    )
-
+    with patch("judgeval.common.tracer.BackgroundSpanService"):
+        trace_client = TraceClient(
+            tracer=tracer,
+            trace_id=trace_id,
+            name="test_trace",
+            project_name="test_project",
+        )
     # Set the trace context
     token = current_trace_var.set(trace_client)
 
@@ -154,7 +158,7 @@ def test_trace_client_nested_spans(trace_client):
             assert inner_span.depth == 2  # Depth is 1(outer) + 1
 
 
-@patch("requests.post")
+@patch("judgeval.utils.requests.requests.post")
 def test_save_trace(mock_post, trace_client):
     """Test saving trace data"""
     # Configure mock response properly

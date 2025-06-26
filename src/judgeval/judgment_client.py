@@ -5,7 +5,8 @@ Implements the JudgmentClient to interact with the Judgment API.
 import os
 from uuid import uuid4
 from typing import Optional, List, Dict, Any, Union, Callable
-import requests
+from requests import codes
+from judgeval.utils.requests import requests
 import asyncio
 
 from judgeval.constants import ROOT_API
@@ -356,7 +357,7 @@ class JudgmentClient(metaclass=SingletonMeta):
             json=eval_run_request_body.model_dump(),
             verify=True,
         )
-        if eval_run.status_code != requests.codes.ok:
+        if eval_run.status_code != codes.ok:
             raise ValueError(f"Error fetching eval results: {eval_run.json()}")
 
         return eval_run.json()
@@ -376,7 +377,7 @@ class JudgmentClient(metaclass=SingletonMeta):
                 "X-Organization-Id": self.organization_id,
             },
         )
-        if response.status_code != requests.codes.ok:
+        if response.status_code != codes.ok:
             raise ValueError(f"Error creating project: {response.json()}")
         return response.json()
 
@@ -395,7 +396,7 @@ class JudgmentClient(metaclass=SingletonMeta):
                 "X-Organization-Id": self.organization_id,
             },
         )
-        if response.status_code != requests.codes.ok:
+        if response.status_code != codes.ok:
             raise ValueError(f"Error deleting project: {response.json()}")
         return response.json()
 

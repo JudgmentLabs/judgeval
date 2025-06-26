@@ -200,7 +200,7 @@ class TestDirectNotificationIntegration:
         assert results["rule2"].notification.email_addresses == ["email@example.com"]
 
 
-@patch("requests.post")
+@patch("judgeval.judgment_client.requests.post")
 class TestNotificationWithAPICalls:
     """Tests for notifications with API calls to external services."""
 

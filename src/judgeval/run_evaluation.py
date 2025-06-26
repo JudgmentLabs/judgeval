@@ -1,5 +1,6 @@
 import asyncio
-import requests
+from requests import exceptions
+from judgeval.utils.requests import requests
 import time
 import json
 import sys
@@ -257,7 +258,7 @@ def check_experiment_type(
             error(f"Error checking eval run name: {error_message}")
             raise JudgmentAPIError(error_message)
 
-    except requests.exceptions.RequestException as e:
+    except exceptions.RequestException as e:
         error(f"Failed to check if experiment type exists: {str(e)}")
         raise JudgmentAPIError(f"Failed to check if experiment type exists: {str(e)}")
 
@@ -307,7 +308,7 @@ def check_eval_run_name_exists(
             error(f"Error checking eval run name: {error_message}")
             raise JudgmentAPIError(error_message)
 
-    except requests.exceptions.RequestException as e:
+    except exceptions.RequestException as e:
         error(f"Failed to check if eval run name exists: {str(e)}")
         raise JudgmentAPIError(f"Failed to check if eval run name exists: {str(e)}")
 
@@ -351,7 +352,7 @@ def log_evaluation_results(
 
         return None
 
-    except requests.exceptions.RequestException as e:
+    except exceptions.RequestException as e:
         error(f"Request failed while saving evaluation results to DB: {str(e)}")
         raise JudgmentAPIError(
             f"Request failed while saving evaluation results to DB: {str(e)}"
@@ -559,7 +560,7 @@ async def get_evaluation_status(
             raise JudgmentAPIError(error_message)
 
         return response.json()
-    except requests.exceptions.RequestException as e:
+    except exceptions.RequestException as e:
         error(f"Failed to check evaluation status: {str(e)}")
         raise JudgmentAPIError(f"Failed to check evaluation status: {str(e)}")
 

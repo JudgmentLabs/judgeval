@@ -91,7 +91,7 @@ def mock_scoring_results():
 
 
 class TestRunEvaluation:
-    @patch("requests.post")
+    @patch("judgeval.run_evaluation.requests.post")
     def test_send_to_rabbitmq(self, mock_post, mock_evaluation_run):
         mock_post.return_value.json.return_value = {"status": "success"}
         mock_post.return_value.ok = True
@@ -101,7 +101,7 @@ class TestRunEvaluation:
         assert result == {"status": "success"}
         mock_post.assert_called_once()
 
-    @patch("requests.post")
+    @patch("judgeval.run_evaluation.requests.post")
     def test_execute_api_eval_success(self, mock_post, mock_evaluation_run):
         mock_post.return_value.json.return_value = {"results": [{"success": True}]}
         mock_post.return_value.ok = True
@@ -111,7 +111,7 @@ class TestRunEvaluation:
         assert result == {"results": [{"success": True}]}
         mock_post.assert_called_once()
 
-    @patch("requests.post")
+    @patch("judgeval.run_evaluation.requests.post")
     def test_execute_api_eval_failure(self, mock_post, mock_evaluation_run):
         mock_post.return_value.ok = False
         mock_post.return_value.json.return_value = {"detail": "Error message"}
@@ -139,7 +139,7 @@ class TestRunEvaluation:
 
         assert checked_results == results
 
-    @patch("requests.post")
+    @patch("judgeval.run_evaluation.requests.post")
     def test_check_experiment_type_success(self, mock_post):
         mock_post.return_value.ok = True
 
@@ -149,7 +149,7 @@ class TestRunEvaluation:
 
         mock_post.assert_called_once()
 
-    @patch("requests.post")
+    @patch("judgeval.run_evaluation.requests.post")
     def test_check_experiment_type_failure(self, mock_post):
         mock_post.return_value.ok = False
         mock_post.return_value.json.return_value = {"detail": "Error message"}
@@ -159,7 +159,7 @@ class TestRunEvaluation:
                 MOCK_EVAL_NAME, MOCK_PROJECT_NAME, MOCK_API_KEY, MOCK_ORG_ID, False
             )
 
-    @patch("requests.post")
+    @patch("judgeval.run_evaluation.requests.post")
     def test_check_eval_run_name_exists_success(self, mock_post):
         mock_post.return_value.ok = True
 
@@ -169,7 +169,7 @@ class TestRunEvaluation:
 
         mock_post.assert_called_once()
 
-    @patch("requests.post")
+    @patch("judgeval.run_evaluation.requests.post")
     def test_check_eval_run_name_exists_conflict(self, mock_post):
         mock_post.return_value.status_code = 409
 
@@ -178,7 +178,7 @@ class TestRunEvaluation:
                 MOCK_EVAL_NAME, MOCK_PROJECT_NAME, MOCK_API_KEY, MOCK_ORG_ID
             )
 
-    @patch("requests.post")
+    @patch("judgeval.run_evaluation.requests.post")
     def test_log_evaluation_results_success(
         self, mock_post, mock_scoring_results, mock_evaluation_run
     ):
@@ -243,7 +243,7 @@ class TestRunEvaluation:
 
     @pytest.mark.asyncio
     async def test_get_evaluation_status(self):
-        with patch("requests.get") as mock_get:
+        with patch("judgeval.run_evaluation.requests.get") as mock_get:
             mock_get.return_value.ok = True
             mock_get.return_value.json.return_value = {"status": "completed"}
 
@@ -255,7 +255,7 @@ class TestRunEvaluation:
 
     @pytest.mark.asyncio
     async def test_poll_evaluation_until_complete(self):
-        with patch("requests.get") as mock_get:
+        with patch("judgeval.run_evaluation.requests.get") as mock_get:
             mock_get.side_effect = [
                 Mock(ok=True, json=lambda: {"status": "pending"}),
                 Mock(ok=True, json=lambda: {"status": "running"}),
@@ -269,7 +269,10 @@ class TestRunEvaluation:
             ]
 
             # Mock the results fetch endpoint
-            with patch("requests.post") as mock_post, patch("asyncio.sleep"):
+            with (
+                patch("judgeval.run_evaluation.requests.post") as mock_post,
+                patch("asyncio.sleep"),
+            ):
                 mock_post.return_value.ok = True
                 mock_post.return_value.json.return_value = {
                     "examples": [

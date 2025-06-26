@@ -13,7 +13,7 @@ import asyncio
 import concurrent.futures
 import os
 from types import TracebackType
-import requests
+from judgeval.utils.requests import requests
 import pprint
 from typing import Any, Dict, List, Mapping, Optional, TypeAlias, Union, TypeGuard
 
