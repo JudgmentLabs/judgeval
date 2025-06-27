@@ -2072,17 +2072,17 @@ class Tracer:
                                 span, args, is_before=True
                             )
 
-                            if use_deep_tracing:
-                                with _DeepTracer(self):
+                            try:
+                                if use_deep_tracing:
+                                    with _DeepTracer(self):
+                                        result = await func(*args, **kwargs)
+                                else:
                                     result = await func(*args, **kwargs)
-                            else:
-                                try:
-                                    result = await func(*args, **kwargs)
-                                except Exception as e:
-                                    _capture_exception_for_trace(
-                                        current_trace, sys.exc_info()
-                                    )
-                                    raise e
+                            except Exception as e:
+                                _capture_exception_for_trace(
+                                    current_trace, sys.exc_info()
+                                )
+                                raise e
 
                             # Capture state after execution
                             self._conditionally_capture_and_record_state(
@@ -2136,17 +2136,15 @@ class Tracer:
                             span, args, is_before=True
                         )
 
-                        if use_deep_tracing:
-                            with _DeepTracer(self):
+                        try:
+                            if use_deep_tracing:
+                                with _DeepTracer(self):
+                                    result = await func(*args, **kwargs)
+                            else:
                                 result = await func(*args, **kwargs)
-                        else:
-                            try:
-                                result = await func(*args, **kwargs)
-                            except Exception as e:
-                                _capture_exception_for_trace(
-                                    current_trace, sys.exc_info()
-                                )
-                                raise e
+                        except Exception as e:
+                            _capture_exception_for_trace(current_trace, sys.exc_info())
+                            raise e
 
                         # Capture state after execution
                         self._conditionally_capture_and_record_state(
@@ -2212,17 +2210,17 @@ class Tracer:
                                 span, args, is_before=True
                             )
 
-                            if use_deep_tracing:
-                                with _DeepTracer(self):
+                            try:
+                                if use_deep_tracing:
+                                    with _DeepTracer(self):
+                                        result = func(*args, **kwargs)
+                                else:
                                     result = func(*args, **kwargs)
-                            else:
-                                try:
-                                    result = func(*args, **kwargs)
-                                except Exception as e:
-                                    _capture_exception_for_trace(
-                                        current_trace, sys.exc_info()
-                                    )
-                                    raise e
+                            except Exception as e:
+                                _capture_exception_for_trace(
+                                    current_trace, sys.exc_info()
+                                )
+                                raise e
 
                             # Capture state after execution
                             self._conditionally_capture_and_record_state(
@@ -2271,17 +2269,15 @@ class Tracer:
                             span, args, is_before=True
                         )
 
-                        if use_deep_tracing:
-                            with _DeepTracer(self):
+                        try:
+                            if use_deep_tracing:
+                                with _DeepTracer(self):
+                                    result = func(*args, **kwargs)
+                            else:
                                 result = func(*args, **kwargs)
-                        else:
-                            try:
-                                result = func(*args, **kwargs)
-                            except Exception as e:
-                                _capture_exception_for_trace(
-                                    current_trace, sys.exc_info()
-                                )
-                                raise e
+                        except Exception as e:
+                            _capture_exception_for_trace(current_trace, sys.exc_info())
+                            raise e
 
                         # Capture state after execution
                         self._conditionally_capture_and_record_state(
