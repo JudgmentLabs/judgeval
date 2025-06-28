@@ -848,6 +848,8 @@ class TraceClient:
             if k == "customer_id":
                 if v is not None:
                     self.customer_id = str(v)
+                else:
+                    self.customer_id = None
             elif k == "tags":
                 if isinstance(v, list):
                     self.tags = v
