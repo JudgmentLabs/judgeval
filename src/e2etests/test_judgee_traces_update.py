@@ -719,7 +719,7 @@ async def test_real_trace_and_judgee_tracking(client):
 
             # Save the trace
             try:
-                trace_id, trace_data = trace.save_trace()
+                trace_id, trace_data = trace.save()
                 print(f"Trace saved with ID: {trace_id}")
             except Exception as e:
                 print(f"Error saving trace: {str(e)}")

@@ -23,7 +23,7 @@ from contextlib import (
     AbstractContextManager,
 )  # Import context manager bases
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from http import HTTPStatus
 from typing import (
     Any,
@@ -419,7 +419,8 @@ class TraceClient:
         self.parent_trace_id = parent_trace_id
         self.parent_name = parent_name
         self.customer_id: Optional[str] = None  # Added customer_id attribute
-        self.tags: Optional[List[str]] = None  # Added tags attribute
+        self.tags: List[Union[str, dict, set, tuple]] = []  # Added tags attribute
+        self.metadata: Dict[str, Any] = {}
         self.has_notification: Optional[bool] = False  # Initialize has_notification
         self.trace_spans: List[TraceSpan] = []
         self.span_id_to_span: Dict[str, TraceSpan] = {}
@@ -775,47 +776,6 @@ class TraceClient:
             return 0.0  # No duration if trace hasn't been saved yet
         return time.time() - self.start_time
 
-    def save_trace(self, overwrite: bool = False) -> Tuple[str, dict]:
-        """
-        Save the current trace to the database.
-        Returns a tuple of (trace_id, server_response) where server_response contains the UI URL and other metadata.
-        """
-        # Set start_time if this is the first save
-        if self.start_time is None:
-            self.start_time = time.time()
-
-        # Calculate total elapsed time
-        total_duration = self.get_duration()
-        # Create trace document - Always use standard keys for top-level counts
-        trace_data = {
-            "trace_id": self.trace_id,
-            "name": self.name,
-            "project_name": self.project_name,
-            "created_at": datetime.fromtimestamp(
-                self.start_time, timezone.utc
-            ).isoformat(),
-            "duration": total_duration,
-            "trace_spans": [span.model_dump() for span in self.trace_spans],
-            "evaluation_runs": [run.model_dump() for run in self.evaluation_runs],
-            "overwrite": overwrite,
-            "offline_mode": self.tracer.offline_mode,
-            "parent_trace_id": self.parent_trace_id,
-            "parent_name": self.parent_name,
-            "customer_id": self.customer_id,
-            "tags": self.tags,
-        }
-        # --- Log trace data before saving ---
-        server_response = self.trace_manager_client.save_trace(
-            trace_data, offline_mode=self.tracer.offline_mode, final_save=True
-        )
-
-        # upload annotations
-        # TODO: batch to the log endpoint
-        for annotation in self.annotations:
-            self.trace_manager_client.save_annotation(annotation)
-
-        return self.trace_id, server_response
-
     def save(
         self, overwrite: bool = False, final_save: bool = False
     ) -> Tuple[str, dict]:
@@ -848,6 +808,7 @@ class TraceClient:
             "parent_name": self.parent_name,
             "customer_id": self.customer_id,
             "tags": self.tags,
+            "metadata": self.metadata,
         }
 
         # If usage check passes, upsert the trace
@@ -869,14 +830,12 @@ class TraceClient:
     def delete(self):
         return self.trace_manager_client.delete_trace(self.trace_id)
 
-    def set_metadata(self, **kwargs):
+    def update_metadata(self, metadata: dict):
         """
         Set metadata for this trace.
 
         Args:
-            key: The metadata key to set
-            value: The metadata value to set (can be None to unset/clear the value)
-            **kwargs: Additional metadata as keyword arguments
+            metadata: Metadata as a dictionary
 
         Supported keys:
         - customer_id: ID of the customer using this trace
@@ -885,19 +844,25 @@ class TraceClient:
         - overwrite: Whether to overwrite existing traces
         - name: Name of the trace
         """
-        metadata = {}
-        metadata.update(kwargs)
-
         for k, v in metadata.items():
             if k == "customer_id":
-                self.customer_id = str(v) if v is not None else None
+                if v is not None:
+                    self.customer_id = str(v)
             elif k == "tags":
                 if isinstance(v, list):
                     self.tags = v
                 elif isinstance(v, str):
                     self.tags = [v]
+                elif isinstance(v, dict):
+                    self.tags = [v]  # Single dict as one tag
+                elif isinstance(v, set):
+                    self.tags = list(v)  # Convert set to list
+                elif isinstance(v, tuple):
+                    self.tags = [v]  # Single tuple as one tag
                 else:
-                    raise ValueError(f"Tags must be a list or string, got {type(v)}")
+                    raise ValueError(
+                        f"Tags must be a list, string, dict, set, or tuple, got {type(v)}"
+                    )
             elif k == "has_notification":
                 if not isinstance(v, bool):
                     raise ValueError(
@@ -911,19 +876,7 @@ class TraceClient:
             elif k == "name":
                 self.name = v
             else:
-                supported_keys = [
-                    "customer_id",
-                    "tags",
-                    "has_notification",
-                    "overwrite",
-                    "name",
-                ]
-                raise ValueError(
-                    f"Unsupported metadata key: {k}. Supported keys: {supported_keys}"
-                )
-
-        # Metadata changes are stored in memory and will be included
-        # when the trace is saved at completion - no immediate persistence needed
+                self.metadata[k] = v
 
     def set_customer_id(self, customer_id: str):
         """
@@ -932,16 +885,16 @@ class TraceClient:
         Args:
             customer_id: The customer ID to set
         """
-        self.set_metadata(customer_id=customer_id)
+        self.update_metadata({"customer_id": customer_id})
 
-    def set_tags(self, tags: List[str]):
+    def set_tags(self, tags: Union[List[str], str, dict, set, tuple]):
         """
         Set the tags for this trace.
 
         Args:
             tags: List of tags to set
         """
-        self.set_metadata(tags=tags)
+        self.update_metadata({"tags": tags})
 
 
 def _capture_exception_for_trace(
@@ -2376,18 +2329,16 @@ class Tracer:
                 "No trace found (context var or fallback), skipping evaluation"
             )  # Modified warning
 
-    def set_metadata(self, **kwargs):
+    def update_metadata(self, metadata: dict):
         """
-        Set metadata for the current trace.
+        Update metadata for the current trace.
 
         Args:
-            key: The metadata key to set
-            value: The metadata value to set
-            **kwargs: Additional metadata as keyword arguments
+            metadata: Metadata as a dictionary
         """
         current_trace = self.get_current_trace()
         if current_trace:
-            current_trace.set_metadata(**kwargs)
+            current_trace.update_metadata(metadata)
         else:
             warnings.warn("No current trace found, cannot set metadata")
 
@@ -2404,7 +2355,7 @@ class Tracer:
         else:
             warnings.warn("No current trace found, cannot set customer ID")
 
-    def set_tags(self, tags: List[str]):
+    def set_tags(self, tags: Union[List[str], str, dict, set, tuple]):
         """
         Set the tags for the current trace.
 
