@@ -8,7 +8,8 @@ For API calling, we support:
 NOTE: any function beginning with 'a', e.g. 'afetch_together_api_response', is an asynchronous function
 """
 
-# Standard library imports
+from __future__ import annotations
+
 import asyncio
 import concurrent.futures
 import os
@@ -17,12 +18,10 @@ from judgeval.utils.requests import requests
 import pprint
 from typing import Any, Dict, List, Mapping, Optional, TypeAlias, Union, TypeGuard
 
-# Third-party imports
 import litellm
 import pydantic
 from dotenv import load_dotenv
 
-# Local application/library-specific imports
 from judgeval.clients import async_together_client, together_client
 from judgeval.constants import (
     ACCEPTABLE_MODELS,
@@ -122,7 +121,7 @@ def validate_api_key(judgment_api_key: str):
             "Content-Type": "application/json",
             "Authorization": f"Bearer {judgment_api_key}",
         },
-        json={},  # Empty body now
+        json={},
         verify=True,
     )
     if response.status_code == 200:

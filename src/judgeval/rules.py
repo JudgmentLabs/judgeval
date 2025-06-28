@@ -2,7 +2,7 @@
 Rules system for Judgeval that enables alerts based on metric thresholds.
 """
 
-from typing import Dict, List, Optional, Union, Any, Tuple
+from typing import Dict, List, Literal, Optional, Union, Any, Tuple
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
@@ -124,7 +124,7 @@ class NotificationConfig(BaseModel):
     communication_methods: List[str] = []
     email_addresses: Optional[List[str]] = None
     pagerduty_config: Optional[PagerDutyConfig] = None
-    send_at: Optional[int] = None  # Unix timestamp for scheduled notifications
+    send_at: Optional[int] = None
 
     def model_dump(self, **kwargs):
         """Convert the NotificationConfig to a dictionary for JSON serialization."""
@@ -132,9 +132,9 @@ class NotificationConfig(BaseModel):
             "enabled": self.enabled,
             "communication_methods": self.communication_methods,
             "email_addresses": self.email_addresses,
-            "pagerduty_config": self.pagerduty_config.model_dump()
-            if self.pagerduty_config
-            else None,
+            "pagerduty_config": (
+                self.pagerduty_config.model_dump() if self.pagerduty_config else None
+            ),
             "send_at": self.send_at,
         }
 
@@ -161,14 +161,12 @@ class Rule(BaseModel):
         }
     """
 
-    rule_id: str = Field(
-        default_factory=lambda: str(uuid.uuid4())
-    )  # Random UUID string as default value
+    rule_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     description: Optional[str] = None
     conditions: List[Condition]
-    combine_type: str = Field(..., pattern="^(all|any)$")  # all = AND, any = OR
-    notification: Optional[NotificationConfig] = None  # Configuration for notifications
+    combine_type: Literal["all", "any"] = "all"
+    notification: Optional[NotificationConfig] = None
 
     def model_dump(self, **kwargs):
         """
@@ -449,12 +447,12 @@ class RulesEngine:
                 notification=notification_config,
                 metadata=example_metadata or {},
                 combine_type=rule.combine_type,
-                project_id=example_metadata.get("project_id")
-                if example_metadata
-                else None,
-                trace_span_id=example_metadata.get("trace_span_id")
-                if example_metadata
-                else None,
+                project_id=(
+                    example_metadata.get("project_id") if example_metadata else None
+                ),
+                trace_span_id=(
+                    example_metadata.get("trace_span_id") if example_metadata else None
+                ),
             )
 
             results[rule_id] = alert_result

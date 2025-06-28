@@ -27,7 +27,6 @@ class EvaluationRun(BaseModel):
     scorers: List[Union[APIJudgmentScorer, JudgevalScorer]]
     model: Optional[str] = "gpt-4.1"
     trace_span_id: Optional[str] = None
-    # API Key will be "" until user calls client.run_eval(), then API Key will be set
     judgment_api_key: Optional[str] = ""
     override: Optional[bool] = False
     append: Optional[bool] = False
@@ -36,11 +35,18 @@ class EvaluationRun(BaseModel):
         data = super().model_dump(**kwargs)
 
         data["scorers"] = [
-            scorer.to_dict()
-            if hasattr(scorer, "to_dict")
-            else scorer.model_dump()
-            if hasattr(scorer, "model_dump")
-            else {"score_type": scorer.score_type, "threshold": scorer.threshold}
+            (
+                scorer.to_dict()
+                if hasattr(scorer, "to_dict")
+                else (
+                    scorer.model_dump()
+                    if hasattr(scorer, "model_dump")
+                    else {
+                        "score_type": scorer.score_type,
+                        "threshold": scorer.threshold,
+                    }
+                )
+            )
             for scorer in self.scorers
         ]
 
@@ -72,7 +78,6 @@ class EvaluationRun(BaseModel):
         if not v:
             raise ValueError("Model cannot be empty.")
 
-        # Check if model is string or list of strings
         if isinstance(v, str):
             if v not in ACCEPTABLE_MODELS:
                 raise ValueError(

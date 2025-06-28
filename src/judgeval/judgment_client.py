@@ -27,7 +27,6 @@ from judgeval.run_evaluation import run_eval, assert_test, run_trace_eval
 from judgeval.data.trace_run import TraceRun
 from judgeval.constants import (
     JUDGMENT_EVAL_FETCH_API_URL,
-    JUDGMENT_PROJECT_DELETE_API_URL,
     JUDGMENT_PROJECT_CREATE_API_URL,
 )
 from judgeval.common.exceptions import JudgmentAPIError
@@ -66,13 +65,11 @@ class JudgmentClient(metaclass=SingletonMeta):
         judgment_api_key: Optional[str] = os.getenv("JUDGMENT_API_KEY"),
         organization_id: Optional[str] = os.getenv("JUDGMENT_ORG_ID"),
     ):
-        # Check if API key is None
         if judgment_api_key is None:
             raise ValueError(
                 "JUDGMENT_API_KEY cannot be None. Please provide a valid API key or set the JUDGMENT_API_KEY environment variable."
             )
 
-        # Check if organization ID is None
         if organization_id is None:
             raise ValueError(
                 "JUDGMENT_ORG_ID cannot be None. Please provide a valid organization ID or set the JUDGMENT_ORG_ID environment variable."
@@ -82,10 +79,8 @@ class JudgmentClient(metaclass=SingletonMeta):
         self.organization_id = organization_id
         self.eval_dataset_client = EvalDatasetClient(judgment_api_key, organization_id)
 
-        # Verify API key is valid
         result, response = validate_api_key(judgment_api_key)
         if not result:
-            # May be bad to output their invalid API key...
             raise JudgmentAPIError(f"Issue with passed in Judgment API key: {response}")
         else:
             print("Successfully initialized JudgmentClient!")
@@ -232,8 +227,6 @@ class JudgmentClient(metaclass=SingletonMeta):
         Returns:
             bool: Whether the dataset was successfully uploaded
         """
-        # Set judgment_api_key just in case it was not set
-        dataset.judgment_api_key = self.judgment_api_key
         return self.eval_dataset_client.push(dataset, alias, project_name, overwrite)
 
     def append_dataset(
@@ -274,7 +267,6 @@ class JudgmentClient(metaclass=SingletonMeta):
         """
         return self.eval_dataset_client.pull_project_dataset_stats(project_name)
 
-    # Maybe add option where you can pass in the EvaluationRun object and it will pull the eval results from the backend
     def pull_eval(
         self, project_name: str, eval_run_name: str
     ) -> List[Dict[str, Union[str, List[ScoringResult]]]]:
@@ -326,25 +318,6 @@ class JudgmentClient(metaclass=SingletonMeta):
         )
         if response.status_code != codes.ok:
             raise ValueError(f"Error creating project: {response.json()}")
-        return response.json()
-
-    def delete_project(self, project_name: str) -> bool:
-        """
-        Deletes a project from the server. Which also deletes all evaluations and traces associated with the project.
-        """
-        response = requests.delete(
-            JUDGMENT_PROJECT_DELETE_API_URL,
-            json={
-                "project_name": project_name,
-            },
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.judgment_api_key}",
-                "X-Organization-Id": self.organization_id,
-            },
-        )
-        if response.status_code != codes.ok:
-            raise ValueError(f"Error deleting project: {response.json()}")
         return response.json()
 
     def fetch_classifier_scorer(self, slug: str) -> ClassifierScorer:

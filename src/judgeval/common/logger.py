@@ -4,7 +4,6 @@ import sys
 from pathlib import Path
 from contextlib import contextmanager
 
-# Global variables
 logger = None
 
 
@@ -15,7 +14,6 @@ class LoggingState:
 
 LOGGING_STATE = LoggingState()
 
-# Add these as module-level variables
 current_example_id = None
 current_timestamp = None
 
@@ -63,7 +61,7 @@ def _initialize_logger(
     log_dir.mkdir(exist_ok=True, parents=True)
     log_file = log_dir / f"{name}.log"
     if log_file.exists():
-        log_file.unlink()  # Delete existing log file
+        log_file.unlink()
 
     if logger is not None:
         return logger
@@ -109,10 +107,6 @@ def _initialize_logger(
         logger.addHandler(file_handler)
 
     return logger
-
-
-# Initialize the global logger when module is imported
-# logger = _initialize_logger()
 
 
 def log_if_enabled(func):

@@ -35,18 +35,15 @@ class APIScorer(str, Enum):
 
     @classmethod
     def _missing_(cls, value):
-        # Handle case-insensitive lookup
         for member in cls:
             if member.value == value.lower():
                 return member
 
 
-UNBOUNDED_SCORERS = set(
-    [APIScorer.COMPARISON]
-)  # scorers whose scores are not bounded between 0-1
+UNBOUNDED_SCORERS = set([APIScorer.COMPARISON])
 
 ROOT_API = os.getenv("JUDGMENT_API_URL", "https://api.judgmentlabs.ai")
-# API URLs
+
 JUDGMENT_EVAL_API_URL = f"{ROOT_API}/evaluate/"
 JUDGMENT_TRACE_EVAL_API_URL = f"{ROOT_API}/evaluate_trace/"
 JUDGMENT_DATASETS_PUSH_API_URL = f"{ROOT_API}/datasets/push/"
@@ -150,4 +147,4 @@ ACCEPTABLE_MODELS = (
 MAX_WORKER_THREADS = 10
 
 # Maximum number of concurrent operations for evaluation runs
-MAX_CONCURRENT_EVALUATIONS = 50  # Adjust based on system capabilities
+MAX_CONCURRENT_EVALUATIONS = 50

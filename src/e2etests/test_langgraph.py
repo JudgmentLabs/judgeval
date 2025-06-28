@@ -8,7 +8,8 @@ from langgraph.graph import StateGraph
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_openai import ChatOpenAI
 
-from judgeval.common.tracer import Tracer, TraceManagerClient, TraceClient
+from judgeval.common.tracer import Tracer, TraceClient
+from judgeval.common.tracer import TraceManagerClient
 from judgeval.integrations.langgraph import JudgevalCallbackHandler
 
 # --- Test Configuration ---
@@ -80,13 +81,10 @@ def fetch_and_validate_trace(trace_id: str, expected_project: str):
     try:
         trace_data = client.fetch_trace(trace_id=trace_id)
         print("Trace data fetched successfully.")
-        # rprint(trace_data) # Use rich print if available for better readability
 
         assert trace_data, f"Trace data for {trace_id} should not be empty."
         assert trace_data.get("trace_id") == trace_id
-        # assert trace_data.get("project_name") == expected_project # Commenting out: Seems fetch API doesn't return project_name
 
-        # --- MODIFIED CHECK: Look for 'trace_spans' instead of 'entries' ---
         assert "trace_spans" in trace_data, (
             f"Fetched trace {trace_id} should contain 'trace_spans' key."
         )
@@ -94,8 +92,6 @@ def fetch_and_validate_trace(trace_id: str, expected_project: str):
         assert trace_spans is not None, (
             f"Trace {trace_id} field 'trace_spans' should not be None."
         )
-        # assert len(trace_spans) > 0, f"Trace {trace_id} should have at least one span in 'trace_spans'." # Can be 0 if only root span
-        # --- END MODIFIED CHECK ---
 
         # Check for specific nodes/spans if needed
         if trace_spans is None:  # Should not happen due to assert above, but defensive
