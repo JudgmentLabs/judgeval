@@ -2280,7 +2280,7 @@ class Tracer:
                             # Reset trace context (span context resets automatically)
                             self.reset_current_trace(trace_token)
                         except Exception as e:
-                            warnings.warn("Issue with save: ", e)
+                            warnings.warn(f"Issue with save: {e}")
                             return
                 else:
                     with current_trace.span(span_name, span_type=span_type) as span:
