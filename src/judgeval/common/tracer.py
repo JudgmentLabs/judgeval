@@ -1673,7 +1673,13 @@ class Tracer:
         if not api_key:
             raise ValueError("Tracer must be configured with a Judgment API key")
 
-        result, response = validate_api_key(api_key)
+        try:
+            result, response = validate_api_key(api_key)
+        except Exception as e:
+            print(f"Issue with verifying API key, disabling monitoring: {e}")
+            enable_monitoring = False
+            result = True
+
         if not result:
             raise JudgmentAPIError(f"Issue with passed in Judgment API key: {response}")
 
@@ -1704,12 +1710,17 @@ class Tracer:
         if use_s3:
             from judgeval.common.s3_storage import S3Storage
 
-            self.s3_storage = S3Storage(
-                bucket_name=s3_bucket_name,
-                aws_access_key_id=s3_aws_access_key_id,
-                aws_secret_access_key=s3_aws_secret_access_key,
-                region_name=s3_region_name,
-            )
+            try:
+                self.s3_storage = S3Storage(
+                    bucket_name=s3_bucket_name,
+                    aws_access_key_id=s3_aws_access_key_id,
+                    aws_secret_access_key=s3_aws_secret_access_key,
+                    region_name=s3_region_name,
+                )
+            except Exception as e:
+                print(f"Issue with initializing S3 storage, disabling S3: {e}")
+                self.use_s3 = False
+
         self.offline_mode: bool = offline_mode
         self.deep_tracing: bool = deep_tracing  # NEW: Store deep tracing setting
 
@@ -2132,7 +2143,7 @@ class Tracer:
                             # Reset trace context (span context resets automatically)
                             self.reset_current_trace(trace_token)
                         except Exception as e:
-                            warnings.warn("Issue with async_wrapper: ", e)
+                            warnings.warn(f"Issue with async_wrapper: {e}")
                             return
                 else:
                     with current_trace.span(span_name, span_type=span_type) as span:
@@ -2364,7 +2375,7 @@ class Tracer:
 
     def async_evaluate(self, *args, **kwargs):
         try:
-            if not self.enable_evaluations:
+            if not self.enable_monitoring or not self.enable_evaluations:
                 return
 
             # --- Get trace_id passed explicitly (if any) ---
@@ -2387,7 +2398,7 @@ class Tracer:
                     "No trace found (context var or fallback), skipping evaluation"
                 )  # Modified warning
         except Exception as e:
-            warnings.warn("Issue with async_evaluate: ", e)
+            warnings.warn(f"Issue with async_evaluate: {e}")
 
     def set_metadata(self, **kwargs):
         """
