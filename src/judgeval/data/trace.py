@@ -3,6 +3,7 @@ from typing import Optional, Dict, Any, List
 from judgeval.evaluation_run import EvaluationRun
 from judgeval.data.tool import Tool
 import json
+import sys
 from datetime import datetime, timezone
 
 
@@ -100,10 +101,13 @@ class TraceSpan(BaseModel):
         if value is None:
             return None
 
+        recursion_limit = sys.getrecursionlimit()
+        recursion_limit = int(recursion_limit * 0.75)
+
         def serialize_value(value, current_depth=0):
             try:
-                if current_depth > 500:
-                    return f"<max_depth_reached: {type(value).__name__}>"
+                if current_depth > recursion_limit:
+                    return {"error": "max_depth_reached: " + type(value).__name__}
 
                 if isinstance(value, BaseModel):
                     return value.model_dump()
@@ -125,15 +129,15 @@ class TraceSpan(BaseModel):
                         # Fallback to safe stringification
                         return self.safe_stringify(value, self.function)
                     except Exception:
-                        return f"{'error': 'Unable to serialize'}"
+                        return {"error": "Unable to serialize"}
             except Exception:
-                return f"{'error': 'Unable to serialize'}"
+                return {"error": "Unable to serialize"}
 
         # Start serialization with the top-level value
         try:
             return serialize_value(value, current_depth=0)
         except Exception:
-            return f"{'error': 'Unable to serialize'}"
+            return {"error": "Unable to serialize"}
 
 
 class Trace(BaseModel):
