@@ -419,7 +419,7 @@ class TraceClient:
         self.parent_trace_id = parent_trace_id
         self.parent_name = parent_name
         self.customer_id: Optional[str] = None  # Added customer_id attribute
-        self.tags: List[Union[str, dict, set, tuple]] = []  # Added tags attribute
+        self.tags: List[Union[str, set, tuple]] = []  # Added tags attribute
         self.metadata: Dict[str, Any] = {}
         self.has_notification: Optional[bool] = False  # Initialize has_notification
         self.trace_spans: List[TraceSpan] = []
@@ -855,15 +855,13 @@ class TraceClient:
                     self.tags = v
                 elif isinstance(v, str):
                     self.tags = [v]
-                elif isinstance(v, dict):
-                    self.tags = [v]  # Single dict as one tag
                 elif isinstance(v, set):
                     self.tags = list(v)  # Convert set to list
                 elif isinstance(v, tuple):
-                    self.tags = [v]  # Single tuple as one tag
+                    self.tags = list(v)  # Convert tuple to list
                 else:
                     raise ValueError(
-                        f"Tags must be a list, string, dict, set, or tuple, got {type(v)}"
+                        f"Tags must be a list, string, set, or tuple, got {type(v)}"
                     )
             elif k == "has_notification":
                 if not isinstance(v, bool):
