@@ -100,26 +100,40 @@ class TraceSpan(BaseModel):
         if value is None:
             return None
 
-        def serialize_value(value):
-            if isinstance(value, BaseModel):
-                return value.model_dump()
-            elif isinstance(value, dict):
-                # Recursively serialize dictionary values
-                return {k: serialize_value(v) for k, v in value.items()}
-            elif isinstance(value, (list, tuple)):
-                # Recursively serialize list/tuple items
-                return [serialize_value(item) for item in value]
-            else:
-                # Try direct JSON serialization first
-                try:
-                    json.dumps(value)
-                    return value
-                except (TypeError, OverflowError, ValueError):
-                    # Fallback to safe stringification
-                    return self.safe_stringify(value, self.function)
+        def serialize_value(value, current_depth=0):
+            try:
+                if current_depth > 500:
+                    return f"<max_depth_reached: {type(value).__name__}>"
+
+                if isinstance(value, BaseModel):
+                    return value.model_dump()
+                elif isinstance(value, dict):
+                    # Recursively serialize dictionary values
+                    return {
+                        k: serialize_value(v, current_depth + 1)
+                        for k, v in value.items()
+                    }
+                elif isinstance(value, (list, tuple)):
+                    # Recursively serialize list/tuple items
+                    return [serialize_value(item, current_depth + 1) for item in value]
+                else:
+                    # Try direct JSON serialization first
+                    try:
+                        json.dumps(value)
+                        return value
+                    except (TypeError, OverflowError, ValueError):
+                        # Fallback to safe stringification
+                        return self.safe_stringify(value, self.function)
+                    except Exception:
+                        return f"{'error': 'Unable to serialize'}"
+            except Exception:
+                return f"{'error': 'Unable to serialize'}"
 
         # Start serialization with the top-level value
-        return serialize_value(value)
+        try:
+            return serialize_value(value, current_depth=0)
+        except Exception:
+            return f"{'error': 'Unable to serialize'}"
 
 
 class Trace(BaseModel):
