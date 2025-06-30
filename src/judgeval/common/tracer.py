@@ -852,16 +852,16 @@ class TraceClient:
                     self.customer_id = None
             elif k == "tags":
                 if isinstance(v, list):
+                    # Validate that all items in the list are of the expected types
+                    for item in v:
+                        if not isinstance(item, (str, set, tuple)):
+                            raise ValueError(
+                                f"Tags must be a list of strings, sets, or tuples, got item of type {type(item)}"
+                            )
                     self.tags = v
-                elif isinstance(v, str):
-                    self.tags = [v]
-                elif isinstance(v, set):
-                    self.tags = list(v)  # Convert set to list
-                elif isinstance(v, tuple):
-                    self.tags = list(v)  # Convert tuple to list
                 else:
                     raise ValueError(
-                        f"Tags must be a list, string, set, or tuple, got {type(v)}"
+                        f"Tags must be a list of strings, sets, or tuples, got {type(v)}"
                     )
             elif k == "has_notification":
                 if not isinstance(v, bool):
@@ -887,7 +887,7 @@ class TraceClient:
         """
         self.update_metadata({"customer_id": customer_id})
 
-    def set_tags(self, tags: Union[List[str], str, dict, set, tuple]):
+    def set_tags(self, tags: List[Union[str, set, tuple]]):
         """
         Set the tags for this trace.
 
@@ -2355,7 +2355,7 @@ class Tracer:
         else:
             warnings.warn("No current trace found, cannot set customer ID")
 
-    def set_tags(self, tags: Union[List[str], str, dict, set, tuple]):
+    def set_tags(self, tags: List[Union[str, set, tuple]]):
         """
         Set the tags for the current trace.
 
