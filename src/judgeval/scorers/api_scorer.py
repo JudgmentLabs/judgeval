@@ -6,12 +6,12 @@ Scores `Example`s using ready-made Judgment evaluators.
 
 from pydantic import BaseModel, field_validator
 from typing import List
-from judgeval.common.logger import debug, info, error
+from judgeval.common.logger import error
 from judgeval.data import ExampleParams
-from judgeval.constants import APIScorer, UNBOUNDED_SCORERS
+from judgeval.constants import APIScorerType, UNBOUNDED_SCORERS
 
 
-class APIJudgmentScorer(BaseModel):
+class APIScorerConfig(BaseModel):
     """
     Class for ready-made, "out-of-the-box" scorer that uses Judgment evaluators to score `Example`s.
 
@@ -20,11 +20,14 @@ class APIJudgmentScorer(BaseModel):
         threshold (float): A value between 0 and 1 that determines the scoring threshold
     """
 
-    score_type: APIScorer
-    threshold: float
+    score_type: APIScorerType
+    name: str = ""
+    threshold: float = 0.5  # Default threshold for all scorers
+    strict_mode: bool = False  # Default false strict mode for all scorers
     required_params: List[
         ExampleParams
-    ] = []  # List of the required parameters on examples for the scorer
+    ] = []  # List of the required parameters on examples for the scorer, this is used to check if the example has the required parameters before running the scorer
+    kwargs: dict = {}
 
     @field_validator("threshold")
     def validate_threshold(cls, v, info):
@@ -46,35 +49,12 @@ class APIJudgmentScorer(BaseModel):
                 )
         return v
 
-    @field_validator("score_type")
-    def convert_to_enum_value(cls, v):
-        """
-        Validates that the `score_type` is a valid `APIScorer` enum value.
-        Converts string values to `APIScorer` enum values.
-        """
-        debug(f"Attempting to convert score_type value: {v}")
-        if isinstance(v, APIScorer):
-            info(f"Using existing APIScorer: {v}")
-            return v
-        elif isinstance(v, str):
-            debug(f"Converting string value to APIScorer enum: {v}")
-            return APIScorer[v.upper()]
-        error(f"Invalid score_type value: {v}")
-        raise ValueError(f"Invalid value for score_type: {v}")
+    @field_validator("name", mode="after")
+    def set_name_to_score_type_if_none(cls, v, info):
+        """Set name to score_type if not provided"""
+        if v is None:
+            return info.data.get("score_type")
+        return v
 
     def __str__(self):
         return f"JudgmentScorer(score_type={self.score_type.value}, threshold={self.threshold})"
-
-    def to_dict(self) -> dict:
-        """
-        Converts the scorer configuration to a dictionary format.
-
-        Returns:
-            dict: A dictionary containing the scorer's configuration
-        """
-        return {
-            "score_type": str(
-                self.score_type.value
-            ),  # Convert enum to string for serialization
-            "threshold": self.threshold,
-        }

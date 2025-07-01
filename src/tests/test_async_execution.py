@@ -4,8 +4,9 @@ from unittest.mock import patch
 
 from judgeval.data import Example, ScoringResult
 from judgeval.judgment_client import JudgmentClient
-from judgeval.scorers import APIJudgmentScorer
+from judgeval.scorers import APIScorerConfig
 from judgeval.common.exceptions import JudgmentAPIError
+from judgeval.constants import APIScorerType
 
 
 @pytest.fixture
@@ -29,8 +30,10 @@ def examples():
 def scorers():
     """Return a list of API scorers."""
     return [
-        APIJudgmentScorer(
-            name="Test Scorer", score_type="answer_correctness", threshold=0.7
+        APIScorerConfig(
+            name="Test Scorer",
+            score_type=APIScorerType.ANSWER_CORRECTNESS,
+            threshold=0.7,
         )
     ]
 

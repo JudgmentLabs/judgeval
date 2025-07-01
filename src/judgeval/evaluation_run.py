@@ -2,7 +2,7 @@ from typing import List, Optional, Union
 from pydantic import BaseModel, field_validator, Field
 
 from judgeval.data import Example, CustomExample
-from judgeval.scorers import JudgevalScorer, APIJudgmentScorer
+from judgeval.scorers import JudgevalScorer, APIScorerConfig
 from judgeval.constants import ACCEPTABLE_MODELS
 
 
@@ -24,7 +24,7 @@ class EvaluationRun(BaseModel):
     project_name: Optional[str] = Field(default=None, validate_default=True)
     eval_name: Optional[str] = Field(default=None, validate_default=True)
     examples: Union[List[Example], List[CustomExample]]
-    scorers: List[Union[APIJudgmentScorer, JudgevalScorer]]
+    scorers: List[Union[APIScorerConfig, JudgevalScorer]]
     model: Optional[str] = "gpt-4.1"
     trace_span_id: Optional[str] = None
     # API Key will be "" until user calls client.run_eval(), then API Key will be set
@@ -36,13 +36,8 @@ class EvaluationRun(BaseModel):
         data = super().model_dump(**kwargs)
 
         data["scorers"] = [
-            scorer.to_dict()
-            if hasattr(scorer, "to_dict")
-            else scorer.model_dump()
-            if hasattr(scorer, "model_dump")
-            else {"score_type": scorer.score_type, "threshold": scorer.threshold}
-            for scorer in self.scorers
-        ]
+            scorer.model_dump() for scorer in self.scorers
+        ]  # Pydantic has problems with properly calling model_dump() on the scorers, so we need to do it manually
 
         return data
 

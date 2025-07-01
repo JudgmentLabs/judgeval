@@ -8,7 +8,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import uuid
 
-from judgeval.scorers import APIJudgmentScorer, JudgevalScorer
+from judgeval.scorers import APIScorerConfig, JudgevalScorer
 from judgeval.utils.alerts import AlertStatus, AlertResult
 
 
@@ -18,7 +18,7 @@ class Condition(BaseModel):
 
     Example:
         {
-            "metric": FaithfulnessScorer(threshold=0.7)  # Must be a scorer object: APIJudgmentScorer, JudgevalScorer
+            "metric": FaithfulnessScorer(threshold=0.7)  # Must be a scorer object: APIScorerConfig, JudgevalScorer
         }
 
     The Condition class uses the scorer's threshold and success function internally.
@@ -26,13 +26,13 @@ class Condition(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    metric: Union[APIJudgmentScorer, JudgevalScorer]
+    metric: Union[APIScorerConfig, JudgevalScorer]
 
     @property
     def metric_name(self) -> str:
         """Get the name of the metric for lookups in scores dictionary."""
         if hasattr(self.metric, "score_type"):
-            # Handle APIJudgmentScorer and JudgevalScorer which have score_type
+            # Handle APIScorerConfig and JudgevalScorer which have score_type
             return self.metric.score_type
         elif hasattr(self.metric, "__name__"):
             # Handle cases where metric has a __name__ attribute

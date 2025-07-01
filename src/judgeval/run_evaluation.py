@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Union, Optional, Callable
 from rich import print as rprint
 
 from judgeval.data import ScorerData, ScoringResult, Example, Trace
-from judgeval.scorers import JudgevalScorer, APIJudgmentScorer, ClassifierScorer
+from judgeval.scorers import JudgevalScorer, APIScorerConfig
 from judgeval.scorers.score import a_execute_scoring
 from judgeval.constants import (
     ROOT_API,
@@ -86,7 +86,7 @@ def execute_api_eval(evaluation_run: EvaluationRun) -> Dict:
 
     try:
         # submit API request to execute evals
-        payload = evaluation_run.model_dump(warnings=False)
+        payload = evaluation_run.model_dump()
         response = requests.post(
             JUDGMENT_EVAL_API_URL,
             headers={
@@ -422,7 +422,7 @@ def run_with_spinner(message: str, func, *args, **kwargs) -> Any:
 
 
 def check_examples(
-    examples: List[Example], scorers: List[Union[APIJudgmentScorer, JudgevalScorer]]
+    examples: List[Example], scorers: List[Union[APIScorerConfig, JudgevalScorer]]
 ) -> None:
     """
     Checks if the example contains the necessary parameters for the scorer.
@@ -968,12 +968,12 @@ def run_eval(
 
     debug(f"Starting evaluation run with {len(evaluation_run.examples)} examples")
 
-    # Group APIJudgmentScorers and JudgevalScorers, then evaluate them in parallel
+    # Group APIScorerConfigs and JudgevalScorers, then evaluate them in parallel
     debug("Grouping scorers by type")
-    judgment_scorers: List[APIJudgmentScorer] = []
+    judgment_scorers: List[APIScorerConfig] = []
     local_scorers: List[JudgevalScorer] = []
     for scorer in evaluation_run.scorers:
-        if isinstance(scorer, (APIJudgmentScorer, ClassifierScorer)):
+        if isinstance(scorer, APIScorerConfig):
             judgment_scorers.append(scorer)
             debug(f"Added judgment scorer: {type(scorer).__name__}")
         else:

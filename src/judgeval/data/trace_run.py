@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any, Union
 from judgeval.data import Trace
-from judgeval.scorers import APIJudgmentScorer, JudgevalScorer
+from judgeval.scorers import APIScorerConfig, JudgevalScorer
 from judgeval.rules import Rule
 
 
@@ -26,7 +26,7 @@ class TraceRun(BaseModel):
     project_name: Optional[str] = None
     eval_name: Optional[str] = None
     traces: Optional[List[Trace]] = None
-    scorers: List[Union[APIJudgmentScorer, JudgevalScorer]]
+    scorers: List[Union[APIScorerConfig, JudgevalScorer]]
     model: Optional[str] = "gpt-4.1"
     trace_span_id: Optional[str] = None
     append: Optional[bool] = False

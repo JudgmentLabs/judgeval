@@ -3,17 +3,22 @@ from pydantic import ValidationError
 
 from judgeval.evaluation_run import EvaluationRun
 from judgeval.data import Example, CustomExample
-from judgeval.scorers import JudgevalScorer, APIJudgmentScorer
+from judgeval.scorers import JudgevalScorer, APIScorerConfig
 from judgeval.judges import JudgevalJudge
+from judgeval.constants import APIScorerType
 
 
 class MockScorer(JudgevalScorer):
-    def __init__(self, score_type: str = "faithfulness", threshold: float = 0.5):
+    def __init__(
+        self, score_type: str = APIScorerType.FAITHFULNESS, threshold: float = 0.5
+    ):
         super().__init__(score_type=score_type, threshold=threshold)
 
 
-class MockAPIScorer(APIJudgmentScorer):
-    def __init__(self, score_type: str = "faithfulness", threshold: float = 0.5):
+class MockAPIScorer(APIScorerConfig):
+    def __init__(
+        self, score_type: str = APIScorerType.FAITHFULNESS, threshold: float = 0.5
+    ):
         super().__init__(score_type=score_type, threshold=threshold)
 
 

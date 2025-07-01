@@ -10,7 +10,7 @@ from datetime import datetime
 from judgeval.data.tool import Tool
 
 
-class ExampleParams(Enum):
+class ExampleParams(str, Enum):
     INPUT = "input"
     ACTUAL_OUTPUT = "actual_output"
     EXPECTED_OUTPUT = "expected_output"
