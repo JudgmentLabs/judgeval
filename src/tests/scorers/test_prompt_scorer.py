@@ -1,6 +1,6 @@
 import pytest
 from pydantic import Field
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock, AsyncMock, patch
 from typing import List, Any
 
 from judgeval.data import Example
@@ -114,12 +114,20 @@ class TestClassifierScorer:
     def classifier_options(self):
         return {"positive": 1.0, "negative": 0.0}
 
-    def test_classifier_init(self, classifier_conversation, classifier_options):
+    @patch("requests.post")
+    def test_classifier_init(
+        self, mock_post, classifier_conversation, classifier_options
+    ):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"slug": "test-classifier-abcd"}
+        mock_post.return_value = mock_response
+
         scorer = ClassifierScorer(
             name="test_classifier",
-            slug="test_classifier_slug",
             conversation=classifier_conversation,
             options=classifier_options,
         )
         assert scorer.conversation == classifier_conversation
         assert scorer.options == classifier_options
+        assert mock_post.called

@@ -500,7 +500,7 @@ LIMIT 10;
             most_popular_tracks_all_users_correct,
             most_popular_tracks_all_users_incorrect,
         ],
-        scorers=[Text2SQLScorer],
+        scorers=[Text2SQLScorer()],
         model="gpt-4.1",
         project_name="text2sql",
         eval_run_name="text2sql_test",
@@ -584,17 +584,19 @@ def test_json_scorer(client: JudgmentClient):
     assert res, "JSON scorer evaluation failed"
 
 
-def test_classifier_scorer(client: JudgmentClient, random_name: str):
+def test_classifier_scorer(client: JudgmentClient):
     """Test classifier scorer functionality."""
-    random_slug = random_name
-
     # Creating a classifier scorer from SDK
     classifier_scorer = ClassifierScorer(
         name="Test Classifier Scorer",
-        slug=random_slug,
         threshold=0.5,
-        conversation=[],
-        options={},
+        conversation=[
+            {
+                "role": "system",
+                "content": "You are a judge that evaluates whether the response is helpful to the user's question. Consider if the response is relevant, accurate, and provides useful information.",
+            },
+        ],
+        options={"yes": 1.0, "no": 0.0},
     )
 
     # Update the conversation with the helpfulness evaluation template

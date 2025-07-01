@@ -15,11 +15,7 @@ def block_http_requests(monkeypatch):
         return inspect.getframeinfo(caller_frame)
 
     def is_external_url(url):
-        return (
-            isinstance(url, str)
-            and url.startswith(("http://", "https://"))
-            and not url.startswith("http://testserver")
-        )  # FastAPI TestClient base url starts with http://testserver
+        return True
 
     # Store original methods
     original_requests = {

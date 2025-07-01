@@ -27,7 +27,7 @@ NOTE: When implementing build_measure_prompt and build_schema:
 
 from abc import abstractmethod
 from typing import List, Optional, Tuple, Any
-from pydantic import BaseModel, Field
+from pydantic import Field, BaseModel
 
 from judgeval.data import Example
 from judgeval.data.example import ExampleParams
@@ -39,11 +39,6 @@ from judgeval.scorers.utils import (
     create_verbose_logs,
 )
 from judgeval.judges import JudgevalJudge
-
-
-class ReasonScore(BaseModel):
-    reason: str
-    score: float
 
 
 class PromptScorer(JudgevalScorer, BaseModel):
