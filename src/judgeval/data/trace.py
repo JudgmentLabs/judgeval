@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 from judgeval.evaluation_run import EvaluationRun
 from judgeval.data.tool import Tool
@@ -148,7 +148,7 @@ class Trace(BaseModel):
     trace_spans: List[TraceSpan]
     overwrite: bool = False
     offline_mode: bool = False
-    rules: Optional[Dict[str, Any]] = None
+    rules: Dict[str, Any] = Field(default_factory=dict)
     has_notification: Optional[bool] = False
     customer_id: Optional[str] = None
-    tags: Optional[List[str]] = None
+    tags: List[str] = Field(default_factory=list)
