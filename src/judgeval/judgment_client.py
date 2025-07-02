@@ -23,7 +23,12 @@ from judgeval.scorers import (
     ClassifierScorer,
 )
 from judgeval.evaluation_run import EvaluationRun
-from judgeval.run_evaluation import run_eval, assert_test, run_trace_eval
+from judgeval.run_evaluation import (
+    run_eval,
+    assert_test,
+    run_trace_eval,
+    safe_run_async,
+)
 from judgeval.data.trace_run import TraceRun
 from judgeval.constants import (
     JUDGMENT_EVAL_FETCH_API_URL,
@@ -485,7 +490,7 @@ class JudgmentClient(metaclass=SingletonMeta):
             async def run_async():  # Using wrapper here to resolve mypy error with passing Task into asyncio.run
                 return await results
 
-            actual_results = asyncio.run(run_async())
+            actual_results = safe_run_async(run_async())
             assert_test(actual_results)  # Call the synchronous imported function
         else:
             # 'results' is already List[ScoringResult] here (synchronous path)
@@ -553,7 +558,7 @@ class JudgmentClient(metaclass=SingletonMeta):
             async def run_async():  # Using wrapper here to resolve mypy error with passing Task into asyncio.run
                 return await results
 
-            actual_results = asyncio.run(run_async())
+            actual_results = safe_run_async(run_async())
             assert_test(actual_results)  # Call the synchronous imported function
         else:
             # 'results' is already List[ScoringResult] here (synchronous path)

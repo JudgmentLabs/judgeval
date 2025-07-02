@@ -1,4 +1,5 @@
 import asyncio
+import concurrent.futures
 from requests import exceptions
 from judgeval.utils.requests import requests
 import time
@@ -28,6 +29,29 @@ from judgeval.evaluation_run import EvaluationRun
 from judgeval.data.trace_run import TraceRun
 from judgeval.common.tracer import Tracer
 from langchain_core.callbacks import BaseCallbackHandler
+
+
+def safe_run_async(coro):
+    """
+    Safely run an async coroutine whether or not there's already an event loop running.
+
+    Args:
+        coro: The coroutine to run
+
+    Returns:
+        The result of the coroutine
+    """
+    try:
+        # Try to get the running loop
+        asyncio.get_running_loop()
+        # If we get here, there's already a loop running
+        # Run in a separate thread to avoid "asyncio.run() cannot be called from a running event loop"
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(asyncio.run, coro)
+            return future.result()
+    except RuntimeError:
+        # No event loop is running, safe to use asyncio.run()
+        return asyncio.run(coro)
 
 
 def send_to_rabbitmq(evaluation_run: EvaluationRun) -> None:
@@ -377,7 +401,11 @@ def run_with_spinner(message: str, func, *args, **kwargs) -> Any:
     spinner_thread.start()
 
     try:
-        result = func(*args, **kwargs)
+        if asyncio.iscoroutinefunction(func):
+            coro = func(*args, **kwargs)
+            result = safe_run_async(coro)
+        else:
+            result = func(*args, **kwargs)
     except Exception as e:
         error(f"An error occurred: {str(e)}")
         stop_spinner_event.set()
@@ -1076,7 +1104,7 @@ def run_eval(
                 with example_logging_context(example.created_at, example.example_id):
                     debug(f"Processing example {example.example_id}: {example.input}")
 
-            results: List[ScoringResult] = asyncio.run(
+            results: List[ScoringResult] = safe_run_async(
                 a_execute_scoring(
                     evaluation_run.examples,
                     local_scorers,
