@@ -13,20 +13,24 @@ from judgeval.constants import APIScorerType, UNBOUNDED_SCORERS
 
 class APIScorerConfig(BaseModel):
     """
-    Class for ready-made, "out-of-the-box" scorer that uses Judgment evaluators to score `Example`s.
+    Scorer config that is used to send to our Judgment server.
 
     Args:
         score_type (APIScorer): The Judgment metric to use for scoring `Example`s
+        name (str): The name of the scorer, usually this is the same as the score_type
         threshold (float): A value between 0 and 1 that determines the scoring threshold
+        strict_mode (bool): Whether to use strict mode for the scorer
+        required_params (List[ExampleParams]): List of the required parameters on examples for the scorer
+        kwargs (dict): Additional keyword arguments to pass to the scorer
     """
 
     score_type: APIScorerType
     name: str = ""
-    threshold: float = 0.5  # Default threshold for all scorers
-    strict_mode: bool = False  # Default false strict mode for all scorers
+    threshold: float = 0.5
+    strict_mode: bool = False
     required_params: List[
         ExampleParams
-    ] = []  # List of the required parameters on examples for the scorer, this is used to check if the example has the required parameters before running the scorer
+    ] = []  # This is used to check if the example has the required parameters before running the scorer
     kwargs: dict = {}
 
     @field_validator("threshold")
