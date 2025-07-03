@@ -10,12 +10,12 @@ from judgeval.scorers.utils import (
     create_verbose_logs,
     get_or_create_event_loop,
 )
-from judgeval.scorers import JudgevalScorer
+from judgeval.scorers import BaseScorer
 from judgeval.data import Example
 
 
-class MockJudgevalScorer(JudgevalScorer):
-    """Mock implementation of JudgevalScorer for testing"""
+class MockBaseScorer(BaseScorer):
+    """Mock implementation of BaseScorer for testing"""
 
     def __init__(self, **kwargs):
         super().__init__(score_type="mock_scorer", threshold=0.7, **kwargs)
@@ -33,7 +33,7 @@ class MockJudgevalScorer(JudgevalScorer):
 
 @pytest.fixture
 def mock_scorer():
-    return MockJudgevalScorer(
+    return MockBaseScorer(
         evaluation_model="gpt-4", strict_mode=True, async_mode=True, verbose_mode=True
     )
 
@@ -41,8 +41,8 @@ def mock_scorer():
 @pytest.fixture
 def mock_scorers():
     return [
-        MockJudgevalScorer(evaluation_model="gpt-4.1"),
-        MockJudgevalScorer(evaluation_model="gpt-4.1"),
+        MockBaseScorer(evaluation_model="gpt-4.1"),
+        MockBaseScorer(evaluation_model="gpt-4.1"),
     ]
 
 

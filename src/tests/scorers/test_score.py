@@ -10,12 +10,12 @@ from judgeval.scorers.score import (
     a_execute_scoring,
     a_eval_examples_helper,
 )
-from judgeval.scorers import JudgevalScorer
+from judgeval.scorers import BaseScorer
 from judgeval.data import Example, ScoringResult, ScorerData
 from judgeval.common.exceptions import MissingTestCaseParamsError
 
 
-class MockJudgevalScorer(JudgevalScorer):
+class MockBaseScorer(BaseScorer):
     def score_example(self, example, *args, **kwargs):
         pass
 
@@ -35,15 +35,15 @@ def example():
 
 @pytest.fixture
 def basic_scorer():
-    return MockJudgevalScorer(score_type="test_scorer", threshold=0.5)
+    return MockBaseScorer(score_type="test_scorer", threshold=0.5)
 
 
 @pytest.fixture
 def scorers(basic_scorer):
     """Fixture providing a list of test scorers"""
     return [
-        MockJudgevalScorer(score_type="test_scorer", threshold=0.5),
-        MockJudgevalScorer(score_type="test_scorer", threshold=0.5),
+        MockBaseScorer(score_type="test_scorer", threshold=0.5),
+        MockBaseScorer(score_type="test_scorer", threshold=0.5),
     ]
 
 
@@ -556,8 +556,8 @@ async def test_score_with_indicator_concurrent_execution(
         completed_order.append(2)  # Second scorer
 
     # Create two separate scorer instances instead of using the same one twice
-    scorer1 = MockJudgevalScorer(score_type="test_scorer", threshold=0.5)
-    scorer2 = MockJudgevalScorer(score_type="test_scorer", threshold=0.5)
+    scorer1 = MockBaseScorer(score_type="test_scorer", threshold=0.5)
+    scorer2 = MockBaseScorer(score_type="test_scorer", threshold=0.5)
 
     scorer1.a_score_example = AsyncMock(side_effect=mock_delayed_score)
     scorer2.a_score_example = AsyncMock(side_effect=mock_quick_score)
@@ -589,7 +589,7 @@ def mock_examples():
 
 @pytest.fixture
 def mock_scorer():
-    class MockScorer(JudgevalScorer):
+    class MockScorer(BaseScorer):
         def __init__(self):
             self.success = None
             self.error = None
@@ -822,8 +822,8 @@ def mock_example():
 
 @pytest.fixture
 def mock_scorer_2():
-    """Create a mock JudgevalScorer"""
-    scorer = Mock(spec=JudgevalScorer)
+    """Create a mock BaseScorer"""
+    scorer = Mock(spec=BaseScorer)
     scorer.__name__ = "MockScorer"
     scorer.threshold = 0.8
     scorer.strict_mode = True

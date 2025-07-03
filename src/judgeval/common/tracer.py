@@ -62,7 +62,7 @@ from judgeval.constants import (
     JUDGMENT_TRACES_EVALUATION_RUNS_BATCH_API_URL,
 )
 from judgeval.data import Example, Trace, TraceSpan, TraceUsage
-from judgeval.scorers import APIScorerConfig, JudgevalScorer
+from judgeval.scorers import APIScorerConfig, BaseScorer
 from judgeval.rules import Rule
 from judgeval.evaluation_run import EvaluationRun
 from judgeval.common.utils import ExcInfo, validate_api_key
@@ -518,7 +518,7 @@ class TraceClient:
 
     def async_evaluate(
         self,
-        scorers: List[Union[APIScorerConfig, JudgevalScorer]],
+        scorers: List[Union[APIScorerConfig, BaseScorer]],
         example: Optional[Example] = None,
         input: Optional[str] = None,
         actual_output: Optional[Union[str, List[str]]] = None,
@@ -542,10 +542,8 @@ class TraceClient:
                 warnings.warn("No valid scorers available for evaluation")
                 return
 
-            # Prevent using JudgevalScorer with rules - only APIScorerConfig allowed with rules
-            if self.rules and any(
-                isinstance(scorer, JudgevalScorer) for scorer in scorers
-            ):
+            # Prevent using BaseScorer with rules - only APIScorerConfig allowed with rules
+            if self.rules and any(isinstance(scorer, BaseScorer) for scorer in scorers):
                 raise ValueError(
                     "Cannot use Judgeval scorers, you can only use API scorers when using rules. Please either remove rules or use only APIScorerConfig types."
                 )

@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any, Union
 from judgeval.data import Trace
-from judgeval.scorers import APIScorerConfig, JudgevalScorer
+from judgeval.scorers import APIScorerConfig, BaseScorer
 from judgeval.rules import Rule
 
 
@@ -13,7 +13,7 @@ class TraceRun(BaseModel):
         project_name (str): The name of the project the evaluation results belong to
         eval_name (str): A name for this evaluation run
         traces (List[Trace]): The traces to evaluate
-        scorers (List[Union[JudgmentScorer, JudgevalScorer]]): A list of scorers to use for evaluation
+        scorers (List[Union[JudgmentScorer, BaseScorer]]): A list of scorers to use for evaluation
         model (str): The model used as a judge when using LLM as a Judge
         metadata (Optional[Dict[str, Any]]): Additional metadata to include for this evaluation run, e.g. comments, dataset name, purpose, etc.
         judgment_api_key (Optional[str]): The API key for running evaluations on the Judgment API
@@ -26,7 +26,7 @@ class TraceRun(BaseModel):
     project_name: Optional[str] = None
     eval_name: Optional[str] = None
     traces: Optional[List[Trace]] = None
-    scorers: List[Union[APIScorerConfig, JudgevalScorer]]
+    scorers: List[Union[APIScorerConfig, BaseScorer]]
     model: Optional[str] = "gpt-4.1"
     trace_span_id: Optional[str] = None
     append: Optional[bool] = False

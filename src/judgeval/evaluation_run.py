@@ -2,7 +2,7 @@ from typing import List, Optional, Union
 from pydantic import BaseModel, field_validator, Field
 
 from judgeval.data import Example, CustomExample
-from judgeval.scorers import JudgevalScorer, APIScorerConfig
+from judgeval.scorers import BaseScorer, APIScorerConfig
 from judgeval.constants import ACCEPTABLE_MODELS
 
 
@@ -14,7 +14,7 @@ class EvaluationRun(BaseModel):
         project_name (str): The name of the project the evaluation results belong to
         eval_name (str): A name for this evaluation run
         examples (Union[List[Example], List[CustomExample]]): The examples to evaluate
-        scorers (List[Union[JudgmentScorer, JudgevalScorer]]): A list of scorers to use for evaluation
+        scorers (List[Union[JudgmentScorer, BaseScorer]]): A list of scorers to use for evaluation
         model (str): The model used as a judge when using LLM as a Judge
         metadata (Optional[Dict[str, Any]]): Additional metadata to include for this evaluation run, e.g. comments, dataset name, purpose, etc.
         judgment_api_key (Optional[str]): The API key for running evaluations on the Judgment API
@@ -24,7 +24,7 @@ class EvaluationRun(BaseModel):
     project_name: Optional[str] = Field(default=None, validate_default=True)
     eval_name: Optional[str] = Field(default=None, validate_default=True)
     examples: Union[List[Example], List[CustomExample]]
-    scorers: List[Union[APIScorerConfig, JudgevalScorer]]
+    scorers: List[Union[APIScorerConfig, BaseScorer]]
     model: Optional[str] = "gpt-4.1"
     trace_span_id: Optional[str] = None
     # API Key will be "" until user calls client.run_eval(), then API Key will be set

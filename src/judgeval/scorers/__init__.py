@@ -1,6 +1,5 @@
 from judgeval.scorers.api_scorer import APIScorerConfig
-from judgeval.scorers.judgeval_scorer import JudgevalScorer
-from judgeval.scorers.prompt_scorer import PromptScorer
+from judgeval.scorers.base_scorer import BaseScorer
 from judgeval.scorers.judgeval_scorers.api_scorers import (
     ExecutionOrderScorer,
     HallucinationScorer,
@@ -19,8 +18,7 @@ from judgeval.scorers.judgeval_scorers.classifiers import (
 
 __all__ = [
     "APIScorerConfig",
-    "JudgevalScorer",
-    "PromptScorer",
+    "BaseScorer",
     "ClassifierScorer",
     "ExecutionOrderScorer",
     "HallucinationScorer",

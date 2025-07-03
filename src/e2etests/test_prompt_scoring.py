@@ -7,67 +7,12 @@ Toy example in this case to determine the sentiment
 from judgeval.judgment_client import JudgmentClient
 from judgeval.data import Example
 from judgeval.judges import TogetherJudge
-from judgeval.scorers import PromptScorer, ClassifierScorer
+from judgeval.scorers import ClassifierScorer
 import random
 import string
 
 
 qwen = TogetherJudge()
-
-
-class SentimentScorer(PromptScorer):
-    """
-    Detects negative sentiment (angry, sad, upset, etc.) in a response
-    """
-
-    def __init__(
-        self,
-        name="Sentiment Scorer",
-        threshold=0.5,
-        include_reason=True,
-        async_mode=True,
-        strict_mode=False,
-        verbose_mode=False,
-    ):
-        super().__init__(
-            name=name,
-            threshold=threshold,
-            include_reason=include_reason,
-            async_mode=async_mode,
-            strict_mode=strict_mode,
-            verbose_mode=verbose_mode,
-        )
-        self.score = 0.0
-
-    def _build_measure_prompt(self, example: Example):
-        SYSTEM_ROLE = (
-            "You are a great judge of emotional intelligence. You understand the feelings "
-            "and intentions of others. You will be tasked with judging whether the following "
-            "response is negative (sad, angry, upset) or not. After deciding whether the "
-            "response is negative or not, you will be asked to provide a brief, 1 sentence-long reason for your decision."
-            "You should score the response based on a 1 to 5 scale, where 1 is not negative and "
-            "5 is very negative."
-        )
-        conversation = [
-            {"role": "system", "content": SYSTEM_ROLE},
-            {
-                "role": "user",
-                "content": f"Response: {example.actual_output}\n\nYour judgment: ",
-            },
-        ]
-        return conversation
-
-    def _build_schema(self):
-        return {"score": int, "reason": str}
-
-    def _process_response(self, response):
-        return response["score"], response["reason"]
-
-    def _success_check(self):
-        POSITIVITY_THRESHOLD = (
-            3  # we want all model responses to be somewhat positive in tone
-        )
-        return self.score <= POSITIVITY_THRESHOLD
 
 
 def generate_random_slug(length=6):
@@ -86,7 +31,6 @@ def main():
         actual_output="That's not my problem. You should have read the instructions more carefully.",
     )
 
-    # scorer = SentimentScorer()
     scorer = ClassifierScorer(
         slug=generate_random_slug(),  # Generate random 6-letter slug
         name="Sentiment Classifier",

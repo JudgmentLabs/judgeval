@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Union, Optional, Callable
 from rich import print as rprint
 
 from judgeval.data import ScorerData, ScoringResult, Example, Trace
-from judgeval.scorers import JudgevalScorer, APIScorerConfig
+from judgeval.scorers import BaseScorer, APIScorerConfig
 from judgeval.scorers.score import a_execute_scoring
 from judgeval.constants import (
     ROOT_API,
@@ -422,7 +422,7 @@ def run_with_spinner(message: str, func, *args, **kwargs) -> Any:
 
 
 def check_examples(
-    examples: List[Example], scorers: List[Union[APIScorerConfig, JudgevalScorer]]
+    examples: List[Example], scorers: List[Union[APIScorerConfig, BaseScorer]]
 ) -> None:
     """
     Checks if the example contains the necessary parameters for the scorer.
@@ -968,10 +968,10 @@ def run_eval(
 
     debug(f"Starting evaluation run with {len(evaluation_run.examples)} examples")
 
-    # Group APIScorerConfigs and JudgevalScorers, then evaluate them in parallel
+    # Group APIScorerConfigs and BaseScorers, then evaluate them in parallel
     debug("Grouping scorers by type")
     judgment_scorers: List[APIScorerConfig] = []
-    local_scorers: List[JudgevalScorer] = []
+    local_scorers: List[BaseScorer] = []
     for scorer in evaluation_run.scorers:
         if isinstance(scorer, APIScorerConfig):
             judgment_scorers.append(scorer)
@@ -1097,7 +1097,7 @@ def run_eval(
                 ScoringResult(**result) for result in response_data["results"]
             ]
         # Run local evals
-        if local_scorers:  # List[JudgevalScorer]
+        if local_scorers:  # List[BaseScorer]
             # We should be removing local scorers soon
             info("Starting local evaluation")
             for example in evaluation_run.examples:

@@ -13,12 +13,12 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.console import Console
 from typing import List, Optional
 
-from judgeval.scorers import JudgevalScorer
+from judgeval.scorers import BaseScorer
 from judgeval.data import Example, ExampleParams
 from judgeval.scorers.exceptions import MissingExampleParamsError
 
 
-def clone_scorers(scorers: List[JudgevalScorer]) -> List[JudgevalScorer]:
+def clone_scorers(scorers: List[BaseScorer]) -> List[BaseScorer]:
     """
     Creates duplicates of the scorers passed as argument.
     """
@@ -32,7 +32,7 @@ def clone_scorers(scorers: List[JudgevalScorer]) -> List[JudgevalScorer]:
         valid_args = {key: args[key] for key in valid_params if key in args}
 
         cloned_scorer = scorer_class(**valid_args)
-        # kinda hacky, but in case the class inheriting from JudgevalScorer doesn't have `model` in its __init__,
+        # kinda hacky, but in case the class inheriting from BaseScorer doesn't have `model` in its __init__,
         # we need to explicitly include it here so that we can add the judge model to the cloned scorer
         cloned_scorer._add_model(model=args.get("model"))
         cloned_scorers.append(cloned_scorer)
@@ -40,7 +40,7 @@ def clone_scorers(scorers: List[JudgevalScorer]) -> List[JudgevalScorer]:
 
 
 def scorer_console_msg(
-    scorer: JudgevalScorer,
+    scorer: BaseScorer,
     async_mode: Optional[bool] = None,
 ):
     """
@@ -57,7 +57,7 @@ def scorer_console_msg(
 
 @contextmanager
 def scorer_progress_meter(
-    scorer: JudgevalScorer,
+    scorer: BaseScorer,
     async_mode: Optional[bool] = None,
     display_meter: bool = True,
     total: int = 100,
@@ -83,9 +83,7 @@ def scorer_progress_meter(
         yield
 
 
-def parse_response_json(
-    llm_response: str, scorer: Optional[JudgevalScorer] = None
-) -> dict:
+def parse_response_json(llm_response: str, scorer: Optional[BaseScorer] = None) -> dict:
     """
     Extracts JSON output from an LLM response and returns it as a dictionary.
 
@@ -93,7 +91,7 @@ def parse_response_json(
 
     Args:
         llm_response (str): The response from an LLM.
-        scorer (JudgevalScorer, optional): The scorer object to forward errors to (if any).
+        scorer (BaseScorer, optional): The scorer object to forward errors to (if any).
     """
     start = llm_response.find("{")  # opening bracket
     end = llm_response.rfind("}") + 1  # closing bracket
@@ -130,12 +128,12 @@ def print_verbose_logs(metric: str, logs: str):
     print("=" * 70)
 
 
-def create_verbose_logs(metric: JudgevalScorer, steps: List[str]) -> str:
+def create_verbose_logs(metric: BaseScorer, steps: List[str]) -> str:
     """
     Creates verbose logs for a scorer object.
 
     Args:
-        metric (JudgevalScorer): The scorer object.
+        metric (BaseScorer): The scorer object.
         steps (List[str]): The steps to be included in the verbose logs.
 
     Returns:
@@ -186,7 +184,7 @@ def get_or_create_event_loop() -> asyncio.AbstractEventLoop:
 def check_example_params(
     example: Example,
     example_params: List[ExampleParams],
-    scorer: JudgevalScorer,
+    scorer: BaseScorer,
 ):
     if isinstance(example, Example) is False:
         error_str = f"in check_example_params(): Expected example to be of type 'Example', but got {type(example)}"

@@ -2,7 +2,7 @@ import asyncio
 import pytest
 from unittest.mock import Mock, patch
 
-from judgeval.scorers.judgeval_scorer import JudgevalScorer
+from judgeval.scorers.base_scorer import BaseScorer
 from judgeval.judges import JudgevalJudge
 from judgeval.common.exceptions import InvalidJudgeModelError
 
@@ -23,8 +23,8 @@ class MockJudge(JudgevalJudge):
         return "mock-model"
 
 
-class SampleScorer(JudgevalScorer):
-    """Concrete implementation of JudgevalScorer for testing"""
+class SampleScorer(BaseScorer):
+    """Concrete implementation of BaseScorer for testing"""
 
     def score_example(self, example, *args, **kwargs) -> float:
         return 0.8
@@ -46,7 +46,7 @@ def mock_judge():
     return MockJudge(model_name="mock-model")
 
 
-class TestJudgevalScorer:
+class TestBaseScorer:
     def test_initialization(self):
         """Test basic initialization with minimal parameters"""
         scorer = SampleScorer(score_type="test", threshold=0.5)
@@ -134,14 +134,14 @@ class TestJudgevalScorer:
     def test_str_representation(self, basic_scorer):
         """Test string representation of scorer"""
         str_rep = str(basic_scorer)
-        assert "JudgevalScorer" in str_rep
+        assert "BaseScorer" in str_rep
         assert "test_scorer" in str_rep
         assert "0.7" in str_rep  # threshold value
 
     def test_abstract_methods_base_class(self):
         """Test that abstract methods raise NotImplementedError when not implemented"""
 
-        class IncompleteScorer(JudgevalScorer):
+        class IncompleteScorer(BaseScorer):
             pass
 
         scorer = IncompleteScorer(score_type="test", threshold=0.5)

@@ -1,5 +1,5 @@
 """
-Infrastructure for executing evaluations of `Example`s using one or more `JudgevalScorer`s.
+Infrastructure for executing evaluations of `Example`s using one or more `BaseScorer`s.
 """
 
 import asyncio
@@ -15,7 +15,7 @@ from judgeval.data import (
     generate_scoring_result,
     create_scorer_data,
 )
-from judgeval.scorers import JudgevalScorer
+from judgeval.scorers import BaseScorer
 from judgeval.scorers.utils import clone_scorers, scorer_console_msg
 from judgeval.common.exceptions import MissingTestCaseParamsError
 from judgeval.common.logger import example_logging_context, debug, error, warning, info
@@ -23,22 +23,22 @@ from judgeval.judges import JudgevalJudge
 
 
 async def safe_a_score_example(
-    scorer: JudgevalScorer,
+    scorer: BaseScorer,
     example: Example,
     ignore_errors: bool,
     skip_on_missing_params: bool,
 ):
     """
     Scoring task function when not using a progress indicator!
-    "Safely" scores an `Example` using a `JudgevalScorer` by gracefully handling any exceptions that may occur.
+    "Safely" scores an `Example` using a `BaseScorer` by gracefully handling any exceptions that may occur.
 
     Args:
-        scorer (JudgevalScorer): The `JudgevalScorer` to use for scoring the example.
+        scorer (BaseScorer): The `BaseScorer` to use for scoring the example.
         example (Example): The `Example` to be scored.
 
         ignore_errors (bool): Whether to ignore errors during the evaluation.
         If set to false, any error will be raised and stop the evaluation.
-        If set to true, the error will be stored in the `error` attribute of the `JudgevalScorer` and the `success` attribute will be set to False.
+        If set to true, the error will be stored in the `error` attribute of the `BaseScorer` and the `success` attribute will be set to False.
 
         skip_on_missing_params (bool): Whether to skip the test case if required parameters are missing.
     """
@@ -116,18 +116,18 @@ async def safe_a_score_example(
 async def score_task(
     task_id: int,
     progress: Progress,
-    scorer: JudgevalScorer,
+    scorer: BaseScorer,
     example: Example,
     ignore_errors: bool = True,
     skip_on_missing_params: bool = True,
 ):
     """
-    Task function for asynchronously measuring a given example using a JudgevalScorer.
+    Task function for asynchronously measuring a given example using a BaseScorer.
 
     Args:
         task_id (int): The ID of the task being measured.
         progress (Progress): An instance of the Progress class to track task progress.
-        scorer (JudgevalScorer): An instance of the JudgevalScorer class used to score the example.
+        scorer (BaseScorer): An instance of the BaseScorer class used to score the example.
         example (Example): The example to be scored.
         ignore_errors (bool, optional): Whether to ignore errors during scoring. Defaults to True.
         skip_on_missing_params (bool, optional): Whether to skip scoring if there are missing parameters. Defaults to True.
@@ -218,17 +218,17 @@ async def score_task(
 
 
 async def score_with_indicator(
-    scorers: List[JudgevalScorer],
+    scorers: List[BaseScorer],
     example: Example,
     ignore_errors: bool,
     skip_on_missing_params: bool,
     show_indicator: bool,
 ):
     """
-    Scores an example using a list of JudgevalScorers, optionally displaying a progress indicator.
+    Scores an example using a list of BaseScorers, optionally displaying a progress indicator.
 
     Args:
-        scorers (List[JudgevalScorer]): A list of JudgevalScorer objects to evaluate the example.
+        scorers (List[BaseScorer]): A list of BaseScorer objects to evaluate the example.
         example (Example): The example to be scored.
         ignore_errors (bool): If True, errors during scoring will be ignored.
         skip_on_missing_params (bool): If True, scoring will be skipped if required parameters are missing.
@@ -274,7 +274,7 @@ async def score_with_indicator(
 
 async def a_execute_scoring(
     examples: Union[List[Example], List[CustomExample]],
-    scorers: List[JudgevalScorer],
+    scorers: List[BaseScorer],
     model: Optional[Union[str, List[str], JudgevalJudge]] = "gpt-4.1",
     ignore_errors: bool = True,
     skip_on_missing_params: bool = True,
@@ -285,12 +285,12 @@ async def a_execute_scoring(
     _use_bar_indicator: bool = True,
 ) -> List[ScoringResult]:
     """
-    Executes evaluations of `Example`s asynchronously using one or more `JudgevalScorer`s.
-    Each `Example` will be evaluated by all of the `JudgevalScorer`s in the `scorers` list.
+    Executes evaluations of `Example`s asynchronously using one or more `BaseScorer`s.
+    Each `Example` will be evaluated by all of the `BaseScorer`s in the `scorers` list.
 
     Args:
         examples (Union[List[Example], List[CustomExample]]): A list of `Example` objects to be evaluated.
-        scorers (List[JudgevalScorer]): A list of `JudgevalScorer` objects to evaluate the examples.
+        scorers (List[BaseScorer]): A list of `BaseScorer` objects to evaluate the examples.
         model (Union[str, List[str], JudgevalJudge]): The model to use for evaluation.
         ignore_errors (bool): Whether to ignore errors during evaluation.
         skip_on_missing_params (bool): Whether to skip evaluation if parameters are missing.
@@ -328,7 +328,7 @@ async def a_execute_scoring(
 
     scoring_results: List[ScoringResult] = [None for _ in examples]
     tasks = []
-    cloned_scorers: List[JudgevalScorer]
+    cloned_scorers: List[BaseScorer]
 
     if show_indicator and _use_bar_indicator:
         with tqdm_asyncio(
@@ -396,7 +396,7 @@ async def a_execute_scoring(
 
 
 async def a_eval_examples_helper(
-    scorers: List[JudgevalScorer],
+    scorers: List[BaseScorer],
     example: Union[Example, CustomExample],
     scoring_results: List[ScoringResult],
     score_index: int,
@@ -410,7 +410,7 @@ async def a_eval_examples_helper(
     Evaluate a single example asynchronously using a list of scorers.
 
     Args:
-        scorers (List[JudgevalScorer]): List of JudgevalScorer objects to evaluate the example.
+        scorers (List[BaseScorer]): List of BaseScorer objects to evaluate the example.
         example (Example): The example to be evaluated.
         scoring_results (List[ScoringResult]): List to store the scoring results.
         score_index (int): Index at which the result should be stored in scoring_results.
