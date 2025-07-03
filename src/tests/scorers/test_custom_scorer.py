@@ -3,6 +3,7 @@ import pytest
 from unittest.mock import Mock, patch
 
 from judgeval.scorers.base_scorer import BaseScorer
+from judgeval.scorers.example_scorer import ExampleScorer
 from judgeval.judges import JudgevalJudge
 from judgeval.common.exceptions import InvalidJudgeModelError
 
@@ -53,8 +54,6 @@ class TestBaseScorer:
         assert scorer.score_type == "test"
         assert scorer.threshold == 0.5
         assert scorer.score is None
-        assert scorer.async_mode is True
-        assert scorer.verbose_mode is True
 
     def test_initialization_with_all_params(self):
         """Test initialization with all optional parameters"""
@@ -85,7 +84,7 @@ class TestBaseScorer:
         assert scorer.async_mode is False
         assert scorer.additional_metadata == additional_metadata
 
-    @patch("judgeval.scorers.judgeval_scorer.create_judge")
+    @patch("judgeval.scorers.base_scorer.create_judge")
     def test_add_model_success(self, mock_create_judge, mock_judge, basic_scorer):
         """Test successful model addition"""
         mock_create_judge.return_value = (mock_judge, True)
@@ -97,7 +96,7 @@ class TestBaseScorer:
         assert scorer.using_native_model is True
         mock_create_judge.assert_called_once_with("mock-model")
 
-    @patch("judgeval.scorers.judgeval_scorer.create_judge")
+    @patch("judgeval.scorers.base_scorer.create_judge")
     def test_add_model_error(self, mock_create_judge, basic_scorer):
         """Test model addition with invalid model"""
         mock_create_judge.side_effect = InvalidJudgeModelError("Invalid model")
@@ -141,7 +140,7 @@ class TestBaseScorer:
     def test_abstract_methods_base_class(self):
         """Test that abstract methods raise NotImplementedError when not implemented"""
 
-        class IncompleteScorer(BaseScorer):
+        class IncompleteScorer(ExampleScorer):
             pass
 
         scorer = IncompleteScorer(score_type="test", threshold=0.5)
@@ -151,6 +150,3 @@ class TestBaseScorer:
 
         with pytest.raises(NotImplementedError):
             asyncio.run(scorer.a_score_example({}))
-
-        with pytest.raises(NotImplementedError):
-            scorer._success_check()

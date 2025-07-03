@@ -89,7 +89,9 @@ def test_validate_scorers():
     class InvalidScorer:
         pass
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(
+        ValueError, match="All scorers must be of type BaseScorer or APIScorerConfig."
+    ):
         EvaluationRun(
             examples=[Example(input="test", actual_output="test")],
             scorers=[InvalidScorer()],

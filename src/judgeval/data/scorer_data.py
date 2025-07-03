@@ -61,7 +61,7 @@ def create_scorer_data(scorer: BaseScorer) -> ScorerData:
     """
     if scorer.error is not None:  # error occurred during eval run
         return ScorerData(
-            name=scorer.__name__,
+            name=scorer.name,
             threshold=scorer.threshold,
             score=None,
             reason=None,
@@ -74,7 +74,7 @@ def create_scorer_data(scorer: BaseScorer) -> ScorerData:
         )
     else:  # standard execution, no error
         return ScorerData(
-            name=scorer.__name__,
+            name=scorer.name,
             score=scorer.score,
             threshold=scorer.threshold,
             reason=scorer.reason,

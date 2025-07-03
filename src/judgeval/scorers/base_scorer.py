@@ -2,16 +2,15 @@
 Base class for all scorers.
 """
 
-from abc import abstractmethod
 from typing import Dict, Optional
 
 from pydantic import BaseModel
 
-from judgeval.common.logger import debug, info, warning, error
+from judgeval.common.logger import debug, info, warning
 
 from judgeval.judges.utils import create_judge
 from typing import Any
-from pydantic import model_validator, field_validator
+from pydantic import model_validator
 
 
 class BaseScorer(BaseModel):
@@ -53,13 +52,12 @@ class BaseScorer(BaseModel):
             data["threshold"] = 1.0
         return data
 
-    @field_validator("name", mode="after")
+    @model_validator(mode="after")
     @classmethod
-    def set_name_to_score_type_if_none(cls, v, info):
-        """Set name to score_type if not provided"""
-        if v is None or v == "":
-            return info.data.get("score_type")
-        return v
+    def default_name(cls, m: "BaseScorer") -> "BaseScorer":
+        if not m.name:
+            m.name = m.score_type
+        return m
 
     def _add_model(self, model: str):
         """
@@ -70,16 +68,15 @@ class BaseScorer(BaseModel):
         self.model, self.using_native_model = create_judge(model)
         self.evaluation_model = self.model.get_model_name()
 
-    @abstractmethod
     def success_check(self) -> bool:
         """
         For unit testing, determines whether the test case passes or fails
         """
-        warning("Attempting to call unimplemented success_check method")
-        error("success_check method not implemented")
-        raise NotImplementedError(
-            "You must implement the `success_check` method in your custom scorer"
-        )
+        if self.error:
+            return False
+        if self.score is None:
+            return False
+        return self.score >= self.threshold
 
     def __str__(self):
         debug("Converting BaseScorer instance to string representation")

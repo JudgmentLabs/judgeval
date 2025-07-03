@@ -56,10 +56,17 @@ class EvaluationRun(BaseModel):
 
         return v
 
-    @field_validator("scorers")
+    @field_validator("scorers", mode="before")
     def validate_scorers(cls, v):
         if not v:
             raise ValueError("Scorers cannot be empty.")
+        if not all(
+            isinstance(scorer, BaseScorer) or isinstance(scorer, APIScorerConfig)
+            for scorer in v
+        ):
+            raise ValueError(
+                "All scorers must be of type BaseScorer or APIScorerConfig."
+            )
         return v
 
     @field_validator("model")

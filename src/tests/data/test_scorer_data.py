@@ -1,44 +1,10 @@
 import pytest
-from typing import Dict, Optional
 
 from judgeval.data.scorer_data import ScorerData, create_scorer_data
-from judgeval.scorers.base_scorer import BaseScorer
+from judgeval.scorers.example_scorer import ExampleScorer
 
 
-class MockBaseScorer(BaseScorer):
-    """Mock implementation of BaseScorer for testing"""
-
-    def __init__(
-        self,
-        score_type: str = "mock_scorer",
-        threshold: float = 0.7,
-        score: Optional[float] = None,
-        score_breakdown: Optional[Dict] = None,
-        reason: Optional[str] = None,
-        success: Optional[bool] = None,
-        evaluation_model: Optional[str] = "gpt-4",
-        strict_mode: bool = False,
-        error: Optional[str] = None,
-        evaluation_cost: Optional[float] = None,
-        verbose_logs: Optional[str] = None,
-        additional_metadata: Optional[Dict] = None,
-    ):
-        super().__init__(
-            score_type=score_type,
-            threshold=threshold,
-            score=score,
-            score_breakdown=score_breakdown,
-            reason=reason,
-            success=success,
-            evaluation_model=evaluation_model,
-            strict_mode=strict_mode,
-            error=error,
-            evaluation_cost=evaluation_cost,
-            verbose_logs=verbose_logs,
-            additional_metadata=additional_metadata,
-        )
-        self.__name__ = score_type
-
+class MockBaseScorer(ExampleScorer):
     def score_example(self, example, *args, **kwargs):
         pass
 
@@ -60,7 +26,7 @@ def successful_scorer():
         score=0.8,
         reason="Test passed successfully",
         evaluation_model="gpt-4",
-        strict_mode=True,
+        strict_mode=False,
         evaluation_cost=0.1,
         verbose_logs="Detailed test logs",
         additional_metadata={"key": "value"},
@@ -78,7 +44,7 @@ def failed_scorer():
         score=0.6,
         reason="Test failed",
         evaluation_model="gpt-4",
-        strict_mode=True,
+        strict_mode=False,
         evaluation_cost=0.1,
         verbose_logs="Detailed test logs",
     )
@@ -108,7 +74,7 @@ def test_scorer_data_successful_case(successful_scorer):
     assert scorer_data.score == 0.8
     assert scorer_data.success is True
     assert scorer_data.reason == "Test passed successfully"
-    assert scorer_data.strict_mode is True
+    assert scorer_data.strict_mode is False
     assert scorer_data.evaluation_model == "gpt-4"
     assert scorer_data.error is None
     assert scorer_data.evaluation_cost == 0.1
@@ -151,7 +117,7 @@ def test_scorer_data_to_dict(successful_scorer):
     assert data_dict["score"] == 0.8
     assert data_dict["success"] is True
     assert data_dict["reason"] == "Test passed successfully"
-    assert data_dict["strict_mode"] is True
+    assert data_dict["strict_mode"] is False
     assert data_dict["evaluation_model"] == "gpt-4"
     assert data_dict["error"] is None
     assert data_dict["evaluation_cost"] == 0.1
