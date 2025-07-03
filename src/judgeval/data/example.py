@@ -10,7 +10,13 @@ from datetime import datetime
 from judgeval.data.tool import Tool
 
 
-class ExampleParams(Enum):
+class ExampleParams(str, Enum):
+    """
+    Enum for example parameters that supports JSON serialization.
+
+    Inherits from str to enable JSON serialization without custom encoders.
+    """
+
     INPUT = "input"
     ACTUAL_OUTPUT = "actual_output"
     EXPECTED_OUTPUT = "expected_output"

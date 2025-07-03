@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 from uuid import uuid4
 from requests import Response
 
@@ -156,29 +156,6 @@ def test_trace_client_nested_spans(trace_client):
             assert inner_span.span_id == inner_span_id
             assert inner_span.parent_span_id == outer_span_id
             assert inner_span.depth == 2  # Depth is 1(outer) + 1
-
-
-@patch("judgeval.utils.requests.requests.post")
-def test_save_trace(mock_post, trace_client):
-    """Test saving trace data"""
-    # Configure mock response properly
-    mock_response = Mock()
-    mock_response.status_code = 200
-    mock_response.text = '{"message": "success"}'
-    mock_response.json.return_value = {
-        "ui_results_url": "http://example.com/results",
-        "trace_id": trace_client.trace_id,
-    }
-    mock_response.raise_for_status.return_value = None
-    mock_post.return_value = mock_response
-
-    with trace_client.span("test_span"):
-        trace_client.record_input({"arg": 1})
-        trace_client.record_output("result")
-
-    trace_id, data = trace_client.save()
-    assert mock_post.called
-    assert data["trace_id"] == trace_client.trace_id
 
 
 def test_wrap_unsupported_client(tracer):

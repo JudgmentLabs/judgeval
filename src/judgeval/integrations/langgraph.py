@@ -312,6 +312,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                             self._trace_client.start_time
                         ).isoformat(),
                         "duration": self._trace_client.get_duration(),
+                        "update_id": self._trace_client.update_id,
                         "trace_spans": [
                             span.model_dump() for span in self._trace_client.trace_spans
                         ],
@@ -320,12 +321,14 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                         "parent_trace_id": self._trace_client.parent_trace_id,
                         "parent_name": self._trace_client.parent_name,
                     }
-                    trace_id, trace_data = self._trace_client.save(
+                    self._trace_client.save(
                         overwrite=self._trace_client.overwrite,
                         final_save=True,  # Final save with usage counter updates
                     )
-                    token = self.trace_id_to_token.pop(trace_id, None)
-                    self.tracer.reset_current_trace(token, trace_id)
+                    token = self.trace_id_to_token.pop(
+                        self._trace_client.trace_id, None
+                    )
+                    self.tracer.reset_current_trace(token, self._trace_client.trace_id)
 
                     # Store complete trace data instead of server response
                     self.tracer.traces.append(complete_trace_data)
@@ -522,6 +525,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                         trace_client.start_time
                     ).isoformat(),
                     "duration": trace_client.get_duration(),
+                    "update_id": trace_client.update_id,
                     "trace_spans": [
                         span.model_dump() for span in trace_client.trace_spans
                     ],

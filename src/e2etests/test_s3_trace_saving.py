@@ -2,10 +2,15 @@ import pytest
 import boto3
 import uuid
 import asyncio
+import logging
 from botocore.exceptions import ClientError
 from judgeval.tracer import Tracer
 from unittest.mock import patch
 import time
+
+# Configure logging to prevent closed file errors during test shutdown
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpx._client").setLevel(logging.WARNING)
 
 # Test constants
 TEST_BUCKET_PREFIX = "judgeval-test-"
@@ -51,24 +56,34 @@ def test_bucket(s3_client, test_bucket_name):
 def judgment(test_bucket):
     """Create a Tracer instance for testing."""
     Tracer._instance = None
-    yield Tracer(
+    tracer = Tracer(
         project_name="test_s3_trace_saving",
         s3_bucket_name=test_bucket,
         s3_region_name=TEST_REGION,
         use_s3=True,
     )
+    yield tracer
+    # Flush and shutdown the background service before test cleanup
+    if tracer.background_span_service:
+        tracer.background_span_service.flush()
+        tracer.background_span_service.shutdown()
     Tracer._instance = None
 
 
 @pytest.fixture
 def judgment_no_bucket_yet(test_bucket_name, s3_client):
     Tracer._instance = None
-    yield Tracer(
+    tracer = Tracer(
         project_name="test_s3_trace_saving",
         s3_bucket_name=test_bucket_name,
         s3_region_name=TEST_REGION,
         use_s3=True,
     )
+    yield tracer
+    # Flush and shutdown the background service before test cleanup
+    if tracer.background_span_service:
+        tracer.background_span_service.flush()
+        tracer.background_span_service.shutdown()
     Tracer._instance = None
     try:
         objects = s3_client.list_objects_v2(Bucket=test_bucket_name)
@@ -80,6 +95,20 @@ def judgment_no_bucket_yet(test_bucket_name, s3_client):
         s3_client.delete_bucket(Bucket=test_bucket_name)
     except ClientError as e:
         print(f"Error cleaning up bucket {test_bucket_name}: {e}")
+
+
+async def wait_for_s3_objects(s3_client, bucket_name, timeout=10):
+    """Wait for objects to appear in S3 bucket with timeout."""
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        try:
+            response = s3_client.list_objects_v2(Bucket=bucket_name)
+            if "Contents" in response:
+                return response
+            await asyncio.sleep(0.5)  # Wait 500ms before retrying
+        except ClientError:
+            await asyncio.sleep(0.5)
+    return s3_client.list_objects_v2(Bucket=bucket_name)
 
 
 @pytest.mark.asyncio
@@ -94,33 +123,33 @@ async def test_save_trace_to_s3(judgment, s3_client):
 
     # Call the decorated function
     test_function(input="test input")
-    # Verify trace was saved to S3
-    try:
-        # List objects in the bucket
-        response = s3_client.list_objects_v2(Bucket=judgment.s3_storage.bucket_name)
-        assert "Contents" in response, "No objects found in bucket"
 
-        # Find our trace file
-        trace_files = [
-            obj for obj in response["Contents"] if "test_s3_trace_saving" in obj["Key"]
-        ]
-        assert len(trace_files) > 0, (
-            "Trace file with ID test_s3_trace_saving not found in bucket"
-        )
+    # Flush background spans to ensure S3 save completes
+    if judgment.background_span_service:
+        judgment.background_span_service.flush()
 
-        # Get the trace file content
-        trace_file = trace_files[0]
-        response = s3_client.get_object(
-            Bucket=judgment.s3_storage.bucket_name, Key=trace_file["Key"]
-        )
-        trace_content = response["Body"].read().decode("utf-8")
+    # Wait for S3 objects to appear
+    response = await wait_for_s3_objects(s3_client, judgment.s3_storage.bucket_name)
+    assert "Contents" in response, "No objects found in bucket"
 
-        # Verify trace content
-        assert test_output in trace_content
-        assert "test input" in trace_content
+    # Find our trace file
+    trace_files = [
+        obj for obj in response["Contents"] if "test_s3_trace_saving" in obj["Key"]
+    ]
+    assert len(trace_files) > 0, (
+        "Trace file with ID test_s3_trace_saving not found in bucket"
+    )
 
-    except ClientError as e:
-        pytest.fail(f"Failed to verify trace in S3: {e}")
+    # Get the trace file content
+    trace_file = trace_files[0]
+    response = s3_client.get_object(
+        Bucket=judgment.s3_storage.bucket_name, Key=trace_file["Key"]
+    )
+    trace_content = response["Body"].read().decode("utf-8")
+
+    # Verify trace content
+    assert test_output in trace_content
+    assert "test input" in trace_content
 
 
 @pytest.mark.asyncio
@@ -155,35 +184,34 @@ async def test_auto_bucket_creation(judgment_no_bucket_yet, s3_client):
                 )
             await asyncio.sleep(1)  # Wait 1 second before retrying
 
-    # Verify trace was saved to S3
-    try:
-        # List objects in the bucket
-        response = s3_client.list_objects_v2(
-            Bucket=judgment_no_bucket_yet.s3_storage.bucket_name
-        )
-        assert "Contents" in response, "No objects found in bucket"
+    # Flush background spans to ensure S3 save completes
+    if judgment_no_bucket_yet.background_span_service:
+        judgment_no_bucket_yet.background_span_service.flush()
 
-        # Find our trace file
-        trace_files = [
-            obj for obj in response["Contents"] if "test_s3_trace_saving" in obj["Key"]
-        ]
-        assert len(trace_files) > 0, (
-            "Trace file with ID test_s3_trace_saving not found in bucket"
-        )
+    # Wait for S3 objects to appear
+    response = await wait_for_s3_objects(
+        s3_client, judgment_no_bucket_yet.s3_storage.bucket_name
+    )
+    assert "Contents" in response, "No objects found in bucket"
 
-        # Get the trace file content
-        trace_file = trace_files[0]
-        response = s3_client.get_object(
-            Bucket=judgment_no_bucket_yet.s3_storage.bucket_name, Key=trace_file["Key"]
-        )
-        trace_content = response["Body"].read().decode("utf-8")
+    # Find our trace file
+    trace_files = [
+        obj for obj in response["Contents"] if "test_s3_trace_saving" in obj["Key"]
+    ]
+    assert len(trace_files) > 0, (
+        "Trace file with ID test_s3_trace_saving not found in bucket"
+    )
 
-        # Verify trace content
-        assert test_output in trace_content
-        assert "test input" in trace_content
+    # Get the trace file content
+    trace_file = trace_files[0]
+    response = s3_client.get_object(
+        Bucket=judgment_no_bucket_yet.s3_storage.bucket_name, Key=trace_file["Key"]
+    )
+    trace_content = response["Body"].read().decode("utf-8")
 
-    except ClientError as e:
-        pytest.fail(f"Failed to verify trace in S3: {e}")
+    # Verify trace content
+    assert test_output in trace_content
+    assert "test input" in trace_content
 
 
 @pytest.mark.asyncio

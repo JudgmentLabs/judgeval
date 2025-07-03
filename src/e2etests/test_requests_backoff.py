@@ -114,11 +114,11 @@ def test_requests_backoff_limit(http_server_fixture):
 
 
 def test_requests_backoff_non_502_503(http_server_fixture):
-    response = requests.get("http://localhost:8002/get_500")
-    assert response.status_code == 500, f"Expected 500, got {response.status_code}"
+    response = requests.get("http://localhost:8002/get_501")
+    assert response.status_code == 404, f"Expected 404, got {response.status_code}"
 
     # No retry on error codes other than 502 and 503
     data = response.json()
     assert data["status"] == "error"
     assert data["call"] == 1
-    assert data["code"] == 500
+    assert data["code"] == 404

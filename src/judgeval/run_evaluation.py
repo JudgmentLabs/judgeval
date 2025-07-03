@@ -134,9 +134,9 @@ def execute_api_trace_eval(trace_run: TraceRun) -> Dict:
         response_data = response.json()
     except Exception as e:
         error(f"Error: {e}")
-        details = response.json().get("detail", "No details provided")
+        # details = response.json().get("detail", "No details provided")
         raise JudgmentAPIError(
-            "An error occurred while executing the Judgment API request: " + details
+            "An error occurred while executing the Judgment API request:"
         )
     # Check if the response status code is not 2XX
     # Add check for the duplicate eval run name
