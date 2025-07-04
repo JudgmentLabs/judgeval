@@ -629,7 +629,6 @@ class TraceClient:
 
         if current_span_id:
             span = self.span_id_to_span[current_span_id]
-            span.evaluation_runs.append(eval_run)
             span.has_evaluation = True  # Set the has_evaluation flag
         self.evaluation_runs.append(eval_run)
 

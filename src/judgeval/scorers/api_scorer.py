@@ -34,6 +34,7 @@ class APIScorerConfig(BaseModel):
     kwargs: dict = {}
 
     @field_validator("threshold")
+    @classmethod
     def validate_threshold(cls, v, info):
         """
         Validates that the threshold is between 0 and 1 inclusive.
@@ -54,6 +55,7 @@ class APIScorerConfig(BaseModel):
         return v
 
     @field_validator("name", mode="after")
+    @classmethod
     def set_name_to_score_type_if_none(cls, v, info):
         """Set name to score_type if not provided"""
         if v is None:

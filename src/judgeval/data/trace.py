@@ -1,44 +1,20 @@
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, List
-from judgeval.evaluation_run import EvaluationRun
-from judgeval.data.tool import Tool
+from typing import Any
 import json
 import sys
 from datetime import datetime, timezone
+from judgeval.data.judgment_types import (
+    TraceUsageJudgmentType,
+    TraceSpanJudgmentType,
+    TraceJudgmentType,
+)
+from pydantic import BaseModel
 
 
-class TraceUsage(BaseModel):
-    prompt_tokens: Optional[int] = None
-    completion_tokens: Optional[int] = None
-    total_tokens: Optional[int] = None
-    prompt_tokens_cost_usd: Optional[float] = None
-    completion_tokens_cost_usd: Optional[float] = None
-    total_cost_usd: Optional[float] = None
-    model_name: Optional[str] = None
+class TraceUsage(TraceUsageJudgmentType):
+    pass
 
 
-class TraceSpan(BaseModel):
-    span_id: str
-    trace_id: str
-    function: str
-    depth: int
-    created_at: Optional[Any] = None
-    parent_span_id: Optional[str] = None
-    span_type: Optional[str] = "span"
-    inputs: Optional[Dict[str, Any]] = None
-    error: Optional[Dict[str, Any]] = None
-    output: Optional[Any] = None
-    usage: Optional[TraceUsage] = None
-    duration: Optional[float] = None
-    annotation: Optional[List[Dict[str, Any]]] = None
-    evaluation_runs: Optional[List[EvaluationRun]] = []
-    expected_tools: Optional[List[Tool]] = None
-    additional_metadata: Optional[Dict[str, Any]] = None
-    has_evaluation: Optional[bool] = False
-    agent_name: Optional[str] = None
-    state_before: Optional[Dict[str, Any]] = None
-    state_after: Optional[Dict[str, Any]] = None
-
+class TraceSpan(TraceSpanJudgmentType):
     def model_dump(self, **kwargs):
         return {
             "span_id": self.span_id,
@@ -50,9 +26,6 @@ class TraceSpan(BaseModel):
             "inputs": self._serialize_value(self.inputs),
             "output": self._serialize_value(self.output),
             "error": self._serialize_value(self.error),
-            "evaluation_runs": [run.model_dump() for run in self.evaluation_runs]
-            if self.evaluation_runs
-            else [],
             "parent_span_id": self.parent_span_id,
             "function": self.function,
             "duration": self.duration,
@@ -94,6 +67,7 @@ class TraceSpan(BaseModel):
             return repr(output)
         except (TypeError, OverflowError, ValueError):
             pass
+
         return None
 
     def _serialize_value(self, value: Any) -> Any:
@@ -140,15 +114,5 @@ class TraceSpan(BaseModel):
             return {"error": "Unable to serialize"}
 
 
-class Trace(BaseModel):
-    trace_id: str
-    name: str
-    created_at: str
-    duration: float
-    trace_spans: List[TraceSpan]
-    overwrite: bool = False
-    offline_mode: bool = False
-    rules: Dict[str, Any] = Field(default_factory=dict)
-    has_notification: Optional[bool] = False
-    customer_id: Optional[str] = None
-    tags: List[str] = Field(default_factory=list)
+class Trace(TraceJudgmentType):
+    pass

@@ -1,11 +1,11 @@
-from typing import List, Optional, Union
+from typing import List, Union
 from judgeval.common.logger import debug
-from pydantic import BaseModel
-from judgeval.data import ScorerData, Example, CustomExample
+from judgeval.data import ScorerData, Example
 from judgeval.data.trace import TraceSpan
+from judgeval.data.judgment_types import ScoringResultJudgmentType
 
 
-class ScoringResult(BaseModel):
+class ScoringResult(ScoringResultJudgmentType):
     """
     A ScoringResult contains the output of one or more scorers applied to a single example.
     Ie: One input, one actual_output, one expected_output, etc..., and 1+ scorer (Faithfulness, Hallucination, Summarization, etc...)
@@ -17,19 +17,6 @@ class ScoringResult(BaseModel):
         data_object (Optional[Example]): The original example object that was used to create the ScoringResult, can be Example, CustomExample (future), WorkflowRun (future)
 
     """
-
-    # Fields for scoring outputs
-    success: bool  # used for unit testing
-    scorers_data: Union[List[ScorerData], None]
-    name: Optional[str] = None
-
-    # The original example object that was used to create the ScoringResult
-    data_object: Optional[Union[TraceSpan, CustomExample, Example]] = None
-    trace_id: Optional[str] = None
-
-    # Additional fields for internal use
-    run_duration: Optional[float] = None
-    evaluation_cost: Optional[float] = None
 
     def to_dict(self) -> dict:
         """Convert the ScoringResult instance to a dictionary, properly serializing scorer_data."""
@@ -62,7 +49,7 @@ def generate_scoring_result(
     When an LLMTestCase is executed, it turns into an LLMApiTestCase and the progress of the evaluation run is tracked.
     At the end of the evaluation run, we create a TestResult object out of the completed LLMApiTestCase.
     """
-    if data_object.name is not None:
+    if hasattr(data_object, "name") and data_object.name is not None:
         name = data_object.name
     else:
         name = "Test Case Placeholder"

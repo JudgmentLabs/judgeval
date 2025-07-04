@@ -82,7 +82,6 @@ def test_trace_span_to_dict():
         output="result",
         function="test_func",
         span_type="test-span",
-        evaluation_runs=[],
         parent_span_id="test-parent-span-id",
     )
     data = span.model_dump()
@@ -94,7 +93,6 @@ def test_trace_span_to_dict():
     assert data["inputs"] == {"arg": 1}
     assert data["output"] == "result"
     assert data["function"] == "test_func"
-    assert data["evaluation_runs"] == []
     assert data["span_id"] == "test-span-1"
     assert data["parent_span_id"] == "test-parent-span-id"
     assert not data["has_evaluation"]  # Verify default value
@@ -264,6 +262,3 @@ def test_async_evaluate_sets_has_evaluation_flag(trace_client):
 
         # Verify has_evaluation is now True
         assert test_span.has_evaluation
-
-        # Verify the span has evaluation runs
-        assert len(test_span.evaluation_runs) > 0

@@ -40,18 +40,21 @@ class CustomModelParameters(pydantic.BaseModel):
     litellm_base_url: str
 
     @pydantic.field_validator("model_name")
+    @classmethod
     def validate_model_name(cls, v):
         if not v:
             raise ValueError("Model name cannot be empty")
         return v
 
     @pydantic.field_validator("secret_key")
+    @classmethod
     def validate_secret_key(cls, v):
         if not v:
             raise ValueError("Secret key cannot be empty")
         return v
 
     @pydantic.field_validator("litellm_base_url")
+    @classmethod
     def validate_litellm_base_url(cls, v):
         if not v:
             raise ValueError("Litellm base URL cannot be empty")
@@ -64,6 +67,7 @@ class ChatCompletionRequest(pydantic.BaseModel):
     response_format: Optional[Union[pydantic.BaseModel, Dict[str, Any]]] = None
 
     @pydantic.field_validator("messages")
+    @classmethod
     def validate_messages(cls, messages):
         if not messages:
             raise ValueError("Messages cannot be empty")
@@ -83,6 +87,7 @@ class ChatCompletionRequest(pydantic.BaseModel):
         return messages
 
     @pydantic.field_validator("model")
+    @classmethod
     def validate_model(cls, model):
         if not model:
             raise ValueError("Model cannot be empty")
@@ -91,6 +96,7 @@ class ChatCompletionRequest(pydantic.BaseModel):
         return model
 
     @pydantic.field_validator("response_format", mode="before")
+    @classmethod
     def validate_response_format(cls, response_format):
         if response_format is not None:
             if not isinstance(response_format, (dict, pydantic.BaseModel)):

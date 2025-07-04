@@ -3,7 +3,7 @@ Rules system for Judgeval that enables alerts based on metric thresholds.
 """
 
 from typing import Dict, List, Optional, Union, Any, Tuple
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import uuid
@@ -58,8 +58,8 @@ class Condition(BaseModel):
         # Use the scorer's success check function if available
         if hasattr(self.metric, "success_check"):
             return self.metric.success_check()
-        elif hasattr(self.metric, "_success_check"):
-            return self.metric._success_check()
+        elif hasattr(self.metric, "success_check"):
+            return self.metric.success_check()
         else:
             # Fallback to default comparison (greater than or equal)
             return value >= self.threshold if self.threshold is not None else False
@@ -240,18 +240,6 @@ class Rule(BaseModel):
                     condition["metric"] = metric_data
 
         return data
-
-    @field_validator("conditions")
-    def validate_conditions_not_empty(cls, v):
-        if not v:
-            raise ValueError("Conditions list cannot be empty")
-        return v
-
-    @field_validator("combine_type")
-    def validate_combine_type(cls, v):
-        if v not in ["all", "any"]:
-            raise ValueError(f"combine_type must be 'all' or 'any', got: {v}")
-        return v
 
 
 class RulesEngine:
