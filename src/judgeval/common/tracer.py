@@ -63,7 +63,6 @@ from judgeval.constants import (
 )
 from judgeval.data import Example, Trace, TraceSpan, TraceUsage
 from judgeval.scorers import APIScorerConfig, BaseScorer
-from judgeval.rules import Rule
 from judgeval.evaluation_run import EvaluationRun
 from judgeval.common.utils import ExcInfo, validate_api_key
 from judgeval.common.exceptions import JudgmentAPIError
@@ -402,7 +401,6 @@ class TraceClient:
         name: str = "default",
         project_name: str | None = None,
         overwrite: bool = False,
-        rules: Optional[List[Rule]] = None,
         enable_monitoring: bool = True,
         enable_evaluations: bool = True,
         parent_trace_id: Optional[str] = None,
@@ -410,10 +408,9 @@ class TraceClient:
     ):
         self.name = name
         self.trace_id = trace_id or str(uuid.uuid4())
-        self.project_name = project_name or str(uuid.uuid4())
+        self.project_name = project_name or "default_project"
         self.overwrite = overwrite
         self.tracer = tracer
-        self.rules = rules or []
         self.enable_monitoring = enable_monitoring
         self.enable_evaluations = enable_evaluations
         self.parent_trace_id = parent_trace_id
@@ -540,12 +537,6 @@ class TraceClient:
                 warnings.warn("No valid scorers available for evaluation")
                 return
 
-            # Prevent using BaseScorer with rules - only APIScorerConfig allowed with rules
-            if self.rules and any(isinstance(scorer, BaseScorer) for scorer in scorers):
-                raise ValueError(
-                    "Cannot use Judgeval scorers, you can only use API scorers when using rules. Please either remove rules or use only APIScorerConfig types."
-                )
-
         except Exception as e:
             warnings.warn(f"Failed to load scorers: {str(e)}")
             return
@@ -593,7 +584,6 @@ class TraceClient:
         # print(f"[TraceClient.async_evaluate] Using span_id: {span_id_to_use}")
         # --- End Modification ---
 
-        # Combine the trace-level rules with any evaluation-specific rules)
         eval_run = EvaluationRun(
             organization_id=self.tracer.organization_id,
             project_name=self.project_name,
@@ -1600,9 +1590,9 @@ class Tracer:
     def __init__(
         self,
         api_key: str | None = os.getenv("JUDGMENT_API_KEY"),
-        project_name: str | None = None,
-        rules: Optional[List[Rule]] = None,  # Added rules parameter
         organization_id: str | None = os.getenv("JUDGMENT_ORG_ID"),
+        project_name: str | None = None,
+        deep_tracing: bool = False,  # Deep tracing is disabled by default
         enable_monitoring: bool = os.getenv("JUDGMENT_MONITORING", "true").lower()
         == "true",
         enable_evaluations: bool = os.getenv("JUDGMENT_EVALUATIONS", "true").lower()
@@ -1613,11 +1603,8 @@ class Tracer:
         s3_aws_access_key_id: Optional[str] = None,
         s3_aws_secret_access_key: Optional[str] = None,
         s3_region_name: Optional[str] = None,
-        offline_mode: bool = False,
-        deep_tracing: bool = False,  # Deep tracing is disabled by default
         trace_across_async_contexts: bool = False,  # BY default, we don't trace across async contexts
         # Background span service configuration
-        enable_background_spans: bool = True,  # Enable background span service by default
         span_batch_size: int = 50,  # Number of spans to batch before sending
         span_flush_interval: float = 1.0,  # Time in seconds between automatic flushes
         span_num_workers: int = 10,  # Number of worker threads for span processing
@@ -1641,9 +1628,8 @@ class Tracer:
             raise ValueError("S3 bucket name must be provided when use_s3 is True")
 
         self.api_key: str = api_key
-        self.project_name: str = project_name or str(uuid.uuid4())
+        self.project_name: str = project_name or "default_project"
         self.organization_id: str = organization_id
-        self.rules: List[Rule] = rules or []  # Store rules at tracer level
         self.traces: List[Trace] = []
         self.enable_monitoring: bool = enable_monitoring
         self.enable_evaluations: bool = enable_evaluations
@@ -1673,20 +1659,18 @@ class Tracer:
                 print(f"Issue with initializing S3 storage, disabling S3: {e}")
                 self.use_s3 = False
 
-        self.offline_mode: bool = offline_mode
+        self.offline_mode = False  # This is used to differentiate traces between online and offline (IE experiments vs monitoring page)
         self.deep_tracing: bool = deep_tracing  # NEW: Store deep tracing setting
 
         # Initialize background span service
-        self.enable_background_spans: bool = enable_background_spans
         self.background_span_service: Optional[BackgroundSpanService] = None
-        if enable_background_spans and not offline_mode:
-            self.background_span_service = BackgroundSpanService(
-                judgment_api_key=api_key,
-                organization_id=organization_id,
-                batch_size=span_batch_size,
-                flush_interval=span_flush_interval,
-                num_workers=span_num_workers,
-            )
+        self.background_span_service = BackgroundSpanService(
+            judgment_api_key=api_key,
+            organization_id=organization_id,
+            batch_size=span_batch_size,
+            flush_interval=span_flush_interval,
+            num_workers=span_num_workers,
+        )
 
     def set_current_span(self, span_id: str) -> Optional[contextvars.Token[str | None]]:
         self.span_id_to_previous_span_id[span_id] = self.current_span_id
@@ -1776,11 +1760,7 @@ class Tracer:
 
     @contextmanager
     def trace(
-        self,
-        name: str,
-        project_name: str | None = None,
-        overwrite: bool = False,
-        rules: Optional[List[Rule]] = None,  # Added rules parameter
+        self, name: str, project_name: str | None = None, overwrite: bool = False
     ) -> Generator[TraceClient, None, None]:
         """Start a new trace context using a context manager"""
         trace_id = str(uuid.uuid4())
@@ -1801,7 +1781,6 @@ class Tracer:
             name,
             project_name=project,
             overwrite=overwrite,
-            rules=self.rules,  # Pass combined rules to the trace client
             enable_monitoring=self.enable_monitoring,
             enable_evaluations=self.enable_evaluations,
             parent_trace_id=parent_trace_id,
@@ -2015,7 +1994,6 @@ class Tracer:
                         span_name,  # MODIFIED: Use span_name directly
                         project_name=project,
                         overwrite=overwrite,
-                        rules=self.rules,
                         enable_monitoring=self.enable_monitoring,
                         enable_evaluations=self.enable_evaluations,
                     )
@@ -2159,7 +2137,6 @@ class Tracer:
                         span_name,  # MODIFIED: Use span_name directly
                         project_name=project,
                         overwrite=overwrite,
-                        rules=self.rules,
                         enable_monitoring=self.enable_monitoring,
                         enable_evaluations=self.enable_evaluations,
                     )

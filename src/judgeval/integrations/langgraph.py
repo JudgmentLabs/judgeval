@@ -121,7 +121,6 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                 event_name,
                 project_name=project,
                 overwrite=False,
-                rules=self.tracer.rules,
                 enable_monitoring=self.tracer.enable_monitoring,
                 enable_evaluations=self.tracer.enable_evaluations,
             )
