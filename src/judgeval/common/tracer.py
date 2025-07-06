@@ -23,7 +23,7 @@ from contextlib import (
     AbstractContextManager,
 )  # Import context manager bases
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from http import HTTPStatus
 from typing import (
     Any,
@@ -458,8 +458,6 @@ class TraceClient:
                     overwrite=self.overwrite, final_save=False
                 )
                 # Set start_time after first successful save
-                if self.start_time is None:
-                    self.start_time = time.time()
                 # Link will be shown by upsert_trace method
             except Exception as e:
                 warnings.warn(f"Failed to save initial trace for live tracking: {e}")
@@ -789,7 +787,9 @@ class TraceClient:
             "trace_id": self.trace_id,
             "name": self.name,
             "project_name": self.project_name,
-            "created_at": datetime.utcfromtimestamp(time.time()).isoformat(),
+            "created_at": datetime.fromtimestamp(
+                self.start_time or time.time(), timezone.utc
+            ).isoformat(),
             "duration": total_duration,
             "trace_spans": [span.model_dump() for span in self.trace_spans],
             "evaluation_runs": [run.model_dump() for run in self.evaluation_runs],
@@ -810,12 +810,13 @@ class TraceClient:
             final_save=final_save,  # Pass final_save to control S3 saving
         )
 
+        if self.start_time is None:
+            self.start_time = time.time()
+
         # Upload annotations
         # TODO: batch to the log endpoint
         for annotation in self.annotations:
             self.trace_manager_client.save_annotation(annotation)
-        if self.start_time is None:
-            self.start_time = time.time()
         return self.trace_id, server_response
 
     def delete(self):
@@ -2044,8 +2045,9 @@ class Tracer:
                             complete_trace_data = {
                                 "trace_id": current_trace.trace_id,
                                 "name": current_trace.name,
-                                "created_at": datetime.utcfromtimestamp(
-                                    current_trace.start_time
+                                "created_at": datetime.fromtimestamp(
+                                    current_trace.start_time or time.time(),
+                                    timezone.utc,
                                 ).isoformat(),
                                 "duration": current_trace.get_duration(),
                                 "trace_spans": [
@@ -2191,8 +2193,9 @@ class Tracer:
                             complete_trace_data = {
                                 "trace_id": current_trace.trace_id,
                                 "name": current_trace.name,
-                                "created_at": datetime.utcfromtimestamp(
-                                    current_trace.start_time
+                                "created_at": datetime.fromtimestamp(
+                                    current_trace.start_time or time.time(),
+                                    timezone.utc,
                                 ).isoformat(),
                                 "duration": current_trace.get_duration(),
                                 "trace_spans": [

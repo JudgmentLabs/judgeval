@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Optional, Sequence
 from uuid import UUID
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from judgeval.common.tracer import (
     TraceClient,
@@ -307,8 +307,8 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                     complete_trace_data = {
                         "trace_id": self._trace_client.trace_id,
                         "name": self._trace_client.name,
-                        "created_at": datetime.utcfromtimestamp(
-                            self._trace_client.start_time
+                        "created_at": datetime.fromtimestamp(
+                            self._trace_client.start_time, timezone.utc
                         ).isoformat(),
                         "duration": self._trace_client.get_duration(),
                         "trace_spans": [
@@ -517,8 +517,8 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                 complete_trace_data = {
                     "trace_id": trace_client.trace_id,
                     "name": trace_client.name,
-                    "created_at": datetime.utcfromtimestamp(
-                        trace_client.start_time
+                    "created_at": datetime.fromtimestamp(
+                        trace_client.start_time, timezone.utc
                     ).isoformat(),
                     "duration": trace_client.get_duration(),
                     "trace_spans": [
