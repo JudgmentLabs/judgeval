@@ -168,6 +168,7 @@ async def test_trace_save_increment(client, cleanup_traces):
             "token_counts": {"total": 10},
             "empty_save": False,
             "overwrite": False,
+            "update_id": 1,
             "evaluation_runs": [],
         }
         logger.debug(f"Created trace data: {trace_data}")
@@ -256,6 +257,7 @@ async def test_concurrent_trace_saves(client, cleanup_traces):
                     "token_counts": {"total": 10},
                     "empty_save": False,
                     "overwrite": False,
+                    "update_id": 1,
                     "evaluation_runs": [],
                 }
 
@@ -446,6 +448,7 @@ async def test_burst_request_handling(client):
         "token_counts": {"total": 10},
         "empty_save": False,
         "overwrite": False,
+        "update_id": 1,
         "evaluation_runs": [],
     }
 
