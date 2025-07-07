@@ -209,7 +209,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
             # Set both fields on the span
             new_span.inputs = clean_inputs
             new_span.additional_metadata = metadata
-            new_span.update_id += 1  # Increment update_id for span modification
+            new_span.increment_update_id()  # Thread-safe increment for span modification
         else:
             new_span.inputs = {}
             new_span.additional_metadata = {}
@@ -249,14 +249,12 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
             trace_span = trace_client.span_id_to_span.get(span_id)
             if trace_span:
                 trace_span.duration = duration
-                trace_span.update_id += 1  # Increment update_id for span modification
+                trace_span.increment_update_id()  # Thread-safe increment for span modification
 
                 # Handle outputs and error
                 if error:
                     trace_span.output = error
-                    trace_span.update_id += (
-                        1  # Increment update_id for span modification
-                    )
+                    trace_span.increment_update_id()  # Thread-safe increment for span modification
                 elif outputs:
                     # Separate metadata from outputs
                     metadata = {}
@@ -276,9 +274,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
 
                     # Set both fields on the span
                     trace_span.output = clean_outputs
-                    trace_span.update_id += (
-                        1  # Increment update_id for span modification
-                    )
+                    trace_span.increment_update_id()  # Thread-safe increment for span modification
                     if metadata:
                         # Merge with existing metadata
                         existing_metadata = trace_span.additional_metadata or {}
@@ -286,9 +282,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                             **existing_metadata,
                             **metadata,
                         }
-                        trace_span.update_id += (
-                            1  # Increment update_id for span modification
-                        )
+                        trace_span.increment_update_id()  # Thread-safe increment for span modification
 
                 # Queue span with completed state through background service
                 if trace_client.background_span_service:
@@ -825,9 +819,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                 if span_id and span_id in trace_client.span_id_to_span:
                     trace_span = trace_client.span_id_to_span[span_id]
                     trace_span.usage = usage
-                    trace_span.update_id += (
-                        1  # Increment update_id for span modification
-                    )
+                    trace_span.increment_update_id()  # Thread-safe increment for span modification
 
         self._end_span_tracking(trace_client, run_id, outputs=outputs)
         # --- End Token Usage ---

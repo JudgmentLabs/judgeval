@@ -4,6 +4,7 @@ from judgeval.evaluation_run import EvaluationRun
 from judgeval.data.tool import Tool
 import json
 import sys
+import threading
 from datetime import datetime, timezone
 
 
@@ -39,6 +40,22 @@ class TraceSpan(BaseModel):
     state_before: Optional[Dict[str, Any]] = None
     state_after: Optional[Dict[str, Any]] = None
     update_id: int = Field(default=1)
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        # Initialize thread lock for thread-safe update_id increment
+        self._update_id_lock = threading.Lock()
+
+    def increment_update_id(self) -> int:
+        """
+        Thread-safe method to increment the update_id counter.
+
+        Returns:
+            int: The new update_id value after incrementing
+        """
+        with self._update_id_lock:
+            self.update_id += 1
+            return self.update_id
 
     def model_dump(self, **kwargs):
         return {
