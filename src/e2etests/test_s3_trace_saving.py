@@ -48,11 +48,11 @@ def test_bucket(s3_client, test_bucket_name):
 
 
 @pytest.fixture
-def judgment(test_bucket):
+def judgment(test_bucket, project_name: str):
     """Create a Tracer instance for testing."""
     Tracer._instance = None
     yield Tracer(
-        project_name="test_s3_trace_saving",
+        project_name=project_name,
         s3_bucket_name=test_bucket,
         s3_region_name=TEST_REGION,
         use_s3=True,
@@ -61,10 +61,10 @@ def judgment(test_bucket):
 
 
 @pytest.fixture
-def judgment_no_bucket_yet(test_bucket_name, s3_client):
+def judgment_no_bucket_yet(test_bucket_name, s3_client, project_name: str):
     Tracer._instance = None
     yield Tracer(
-        project_name="test_s3_trace_saving",
+        project_name=project_name,
         s3_bucket_name=test_bucket_name,
         s3_region_name=TEST_REGION,
         use_s3=True,
@@ -83,7 +83,7 @@ def judgment_no_bucket_yet(test_bucket_name, s3_client):
 
 
 @pytest.mark.asyncio
-async def test_save_trace_to_s3(judgment, s3_client):
+async def test_save_trace_to_s3(judgment, s3_client, project_name: str):
     """Test saving a trace to S3 using judgment.observe decorator."""
 
     test_output = "test output"
@@ -102,10 +102,10 @@ async def test_save_trace_to_s3(judgment, s3_client):
 
         # Find our trace file
         trace_files = [
-            obj for obj in response["Contents"] if "test_s3_trace_saving" in obj["Key"]
+            obj for obj in response["Contents"] if project_name in obj["Key"]
         ]
         assert len(trace_files) > 0, (
-            "Trace file with ID test_s3_trace_saving not found in bucket"
+            "Trace file with ID project_name not found in bucket"
         )
 
         # Get the trace file content
@@ -124,7 +124,9 @@ async def test_save_trace_to_s3(judgment, s3_client):
 
 
 @pytest.mark.asyncio
-async def test_auto_bucket_creation(judgment_no_bucket_yet, s3_client):
+async def test_auto_bucket_creation(
+    judgment_no_bucket_yet, s3_client, project_name: str
+):
     """Test that observe() automatically creates the S3 bucket if it doesn't exist."""
 
     # Verify bucket doesn't exist initially
@@ -134,7 +136,7 @@ async def test_auto_bucket_creation(judgment_no_bucket_yet, s3_client):
 
     test_output = "test output"
 
-    @judgment_no_bucket_yet.observe(name="test_trace")
+    @judgment_no_bucket_yet.observe(name=project_name)
     def test_function(input):
         return test_output
 
@@ -165,10 +167,10 @@ async def test_auto_bucket_creation(judgment_no_bucket_yet, s3_client):
 
         # Find our trace file
         trace_files = [
-            obj for obj in response["Contents"] if "test_s3_trace_saving" in obj["Key"]
+            obj for obj in response["Contents"] if project_name in obj["Key"]
         ]
         assert len(trace_files) > 0, (
-            "Trace file with ID test_s3_trace_saving not found in bucket"
+            "Trace file with ID project_name not found in bucket"
         )
 
         # Get the trace file content
