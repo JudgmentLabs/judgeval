@@ -38,6 +38,7 @@ class TraceSpan(BaseModel):
     agent_name: Optional[str] = None
     state_before: Optional[Dict[str, Any]] = None
     state_after: Optional[Dict[str, Any]] = None
+    update_id: int = Field(default=1)
 
     def model_dump(self, **kwargs):
         return {
@@ -63,6 +64,7 @@ class TraceSpan(BaseModel):
             "state_before": self.state_before,
             "state_after": self.state_after,
             "additional_metadata": self._serialize_value(self.additional_metadata),
+            "update_id": self.update_id,
         }
 
     def print_span(self):

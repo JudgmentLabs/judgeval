@@ -619,6 +619,7 @@ class TraceClient:
             span = self.span_id_to_span[current_span_id]
             span.evaluation_runs.append(eval_run)
             span.has_evaluation = True  # Set the has_evaluation flag
+            span.update_id += 1  # Increment update_id for span modification
         self.evaluation_runs.append(eval_run)
 
     def add_annotation(self, annotation: TraceAnnotation):
@@ -634,6 +635,7 @@ class TraceClient:
             if "self" in inputs:
                 del inputs["self"]
             span.inputs = inputs
+            span.update_id += 1  # Increment update_id for span modification
 
             # Queue span with input data
             try:
@@ -647,6 +649,7 @@ class TraceClient:
         if current_span_id:
             span = self.span_id_to_span[current_span_id]
             span.agent_name = agent_name
+            span.update_id += 1  # Increment update_id for span modification
 
             # Queue span with agent_name data
             if self.background_span_service:
@@ -662,6 +665,7 @@ class TraceClient:
         if current_span_id:
             span = self.span_id_to_span[current_span_id]
             span.state_before = state
+            span.update_id += 1  # Increment update_id for span modification
 
             # Queue span with state_before data
             if self.background_span_service:
@@ -677,6 +681,7 @@ class TraceClient:
         if current_span_id:
             span = self.span_id_to_span[current_span_id]
             span.state_after = state
+            span.update_id += 1  # Increment update_id for span modification
 
             # Queue span with state_after data
             if self.background_span_service:
@@ -687,6 +692,7 @@ class TraceClient:
         try:
             result = await coroutine
             setattr(span, field, result)
+            span.update_id += 1  # Increment update_id for span modification
 
             # Queue span with output data now that coroutine is complete
             if self.background_span_service and field == "output":
@@ -695,6 +701,7 @@ class TraceClient:
             return result
         except Exception as e:
             setattr(span, field, f"Error: {str(e)}")
+            span.update_id += 1  # Increment update_id for span modification
 
             # Queue span even if there was an error
             if self.background_span_service and field == "output":
@@ -707,6 +714,7 @@ class TraceClient:
         if current_span_id:
             span = self.span_id_to_span[current_span_id]
             span.output = "<pending>" if inspect.iscoroutine(output) else output
+            span.update_id += 1  # Increment update_id for span modification
 
             if inspect.iscoroutine(output):
                 asyncio.create_task(self._update_coroutine(span, output, "output"))
@@ -724,6 +732,7 @@ class TraceClient:
         if current_span_id:
             span = self.span_id_to_span[current_span_id]
             span.usage = usage
+            span.update_id += 1  # Increment update_id for span modification
 
             # Queue span with usage data
             if self.background_span_service:
@@ -738,6 +747,7 @@ class TraceClient:
         if current_span_id:
             span = self.span_id_to_span[current_span_id]
             span.error = error
+            span.update_id += 1  # Increment update_id for span modification
 
             # Queue span with error data
             if self.background_span_service:
@@ -3018,6 +3028,7 @@ def _sync_stream_wrapper(
         # Update the trace entry with the accumulated content and usage
         span.output = "".join(content_parts)
         span.usage = final_usage
+        span.update_id += 1  # Increment update_id for span modification
 
         # Queue the completed LLM span now that streaming is done and all data is available
 
@@ -3127,6 +3138,7 @@ async def _async_stream_wrapper(
             span.usage = usage_info
             start_ts = getattr(span, "created_at", time.time())
             span.duration = time.time() - start_ts
+            span.update_id += 1  # Increment update_id for span modification
 
             # Queue the completed LLM span now that async streaming is done and all data is available
             current_trace = _get_current_trace(trace_across_async_contexts)
@@ -3194,6 +3206,7 @@ class _BaseStreamManagerWrapper:
         span = self._trace_client.span_id_to_span.get(span_id)
         if span:
             span.duration = time.time() - span.created_at
+            span.update_id += 1  # Increment update_id for span modification
         if span_id in self._trace_client._span_depths:
             del self._trace_client._span_depths[span_id]
 
@@ -3209,10 +3222,12 @@ class _TracedAsyncStreamManagerWrapper(
         span_id, span = self._create_span()
         self._span_context_token = self._trace_client.set_current_span(span_id)
         span.inputs = _format_input_data(self._client, **self._input_kwargs)
+        span.update_id += 1  # Increment update_id for span modification
 
         # Call the original __aenter__ and expect it to be an async generator
         raw_iterator = await self._original_manager.__aenter__()
         span.output = "<pending stream>"
+        span.update_id += 1  # Increment update_id for span modification
         return self._stream_wrapper_func(
             raw_iterator, self._client, span, self._trace_across_async_contexts
         )
@@ -3237,9 +3252,11 @@ class _TracedSyncStreamManagerWrapper(
         span_id, span = self._create_span()
         self._span_context_token = self._trace_client.set_current_span(span_id)
         span.inputs = _format_input_data(self._client, **self._input_kwargs)
+        span.update_id += 1  # Increment update_id for span modification
 
         raw_iterator = self._original_manager.__enter__()
         span.output = "<pending stream>"
+        span.update_id += 1  # Increment update_id for span modification
         return self._stream_wrapper_func(
             raw_iterator, self._client, span, self._trace_across_async_contexts
         )
