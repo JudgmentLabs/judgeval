@@ -44,7 +44,7 @@ def judgment_client():
     with patch(
         "judgeval.judgment_client.validate_api_key", return_value=(True, "valid")
     ):
-        client = JudgmentClient(judgment_api_key="fake_key", organization_id="fake_org")
+        client = JudgmentClient(api_key="fake_key", organization_id="fake_org")
         return client
 
 
