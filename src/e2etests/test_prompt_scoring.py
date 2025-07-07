@@ -20,7 +20,7 @@ def generate_random_slug(length=6):
     return "".join(random.choices(string.ascii_lowercase, k=length))
 
 
-def main():
+def test_prompt_scoring(project_name: str):
     pos_example = Example(
         input="What's the store return policy?",
         actual_output="Our return policy is wonderful! You may return any item within 30 days of purchase for a full refund.",
@@ -46,28 +46,10 @@ def main():
     )
 
     # Test direct API call first
-    import requests
     from dotenv import load_dotenv
 
     load_dotenv()
     import os
-
-    response = requests.post(
-        "http://127.0.0.1:8000/classifier_eval/",
-        json={
-            "conversation": [
-                {
-                    "role": "system",
-                    "content": "Is the response positive (Y/N)? The response is: {{actual_output}}.",
-                }
-            ],
-            "options": {"Y": 1, "N": 0},
-            "example": pos_example.model_dump(),
-            "model": "Qwen/Qwen2.5-72B-Instruct-Turbo",
-            "judgment_api_key": os.getenv("JUDGMENT_API_KEY"),
-        },
-    )
-    print("Direct API Response:", response.json())
 
     # Then test using client.run_evaluation()
     client = JudgmentClient(judgment_api_key=os.getenv("JUDGMENT_API_KEY"))
@@ -75,10 +57,12 @@ def main():
         examples=[pos_example, neg_example],
         scorers=[scorer],
         model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-        project_name="sentiment_test",
+        project_name=project_name,
         eval_run_name=f"sentiment_run_{generate_random_slug()}",  # Unique run name
         override=True,
     )
+    assert results[0].success
+    assert not results[1].success
 
     print("\nClient Evaluation Results:")
     for i, result in enumerate(results):
@@ -92,7 +76,3 @@ def main():
             print(f"Reason: {result.reason}")
         if hasattr(result, "metadata") and result.metadata:
             print(f"Metadata: {result.metadata}")
-
-
-if __name__ == "__main__":
-    main()

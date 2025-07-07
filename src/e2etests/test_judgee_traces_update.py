@@ -131,7 +131,7 @@ async def test_judgee_count_endpoint(client):
 
 
 @pytest.mark.asyncio
-async def test_trace_save_increment(client, cleanup_traces):
+async def test_trace_save_increment(client, project_name: str):
     """Test that saving a trace increments the trace count."""
     try:
         logger.debug("Starting trace save increment test")
@@ -147,7 +147,7 @@ async def test_trace_save_increment(client, cleanup_traces):
         trace_id = str(uuid4())
         trace_data = {
             "name": f"test_trace_{int(timestamp)}",
-            "project_name": "test_project",
+            "project_name": project_name,
             "trace_id": trace_id,
             "created_at": datetime.fromtimestamp(timestamp).isoformat(),
             "trace_spans": [
@@ -218,7 +218,7 @@ async def test_trace_count_endpoint(client):
 
 
 @pytest.mark.asyncio
-async def test_concurrent_trace_saves(client, cleanup_traces):
+async def test_concurrent_trace_saves(client, project_name: str):
     """Test concurrent trace saves to verify atomic operations."""
     try:
         # Get initial count
@@ -236,7 +236,7 @@ async def test_concurrent_trace_saves(client, cleanup_traces):
                 trace_id = str(uuid4())
                 trace_data = {
                     "name": f"concurrent_trace_{index}_{int(timestamp)}",
-                    "project_name": "test_project",
+                    "project_name": project_name,
                     "trace_id": trace_id,
                     "created_at": datetime.fromtimestamp(timestamp).isoformat(),
                     "trace_spans": [
@@ -307,7 +307,7 @@ async def test_concurrent_trace_saves(client, cleanup_traces):
 
 
 @pytest.mark.asyncio
-async def test_failed_trace_counting(client):
+async def test_failed_trace_counting(client, project_name: str):
     """Test that failed traces are still counted."""
     # Get initial count
     response = await client.get(f"{SERVER_URL}/traces/count/", headers=get_headers())
@@ -317,7 +317,7 @@ async def test_failed_trace_counting(client):
     timestamp = time.time()
     trace_data = {
         "name": f"test_failed_trace_{int(timestamp)}",
-        "project_name": "test_project",
+        "project_name": project_name,
         "trace_id": str(uuid4()),
         "created_at": str(timestamp),  # Convert to string
         # Missing trace_spans, which should cause a validation error
@@ -341,7 +341,7 @@ async def test_failed_trace_counting(client):
 
 
 @pytest.mark.asyncio
-async def test_real_trace_tracking(client):
+async def test_real_trace_tracking(client, project_name: str):
     """Test real trace tracking with actual trace saves"""
     from judgeval.common.tracer import Tracer
 
@@ -353,7 +353,7 @@ async def test_real_trace_tracking(client):
         Tracer._instance = None
         tracer = Tracer(
             api_key=os.getenv("JUDGMENT_API_KEY"),
-            project_name="test_project",
+            project_name=project_name,
             organization_id=os.getenv("JUDGMENT_ORG_ID"),
         )
         print("Tracer initialized successfully")
@@ -417,7 +417,7 @@ async def test_rate_limiting_detection(client):
 
 
 @pytest.mark.asyncio
-async def test_burst_request_handling(client):
+async def test_burst_request_handling(client, project_name: str):
     """Test how the API handles a burst of requests without exceeding limits."""
     # Number of requests to send in a burst (keep this low to avoid triggering actual limits)
     num_requests = 5
@@ -427,7 +427,7 @@ async def test_burst_request_handling(client):
     trace_id = str(uuid4())
     trace_data = {
         "name": f"burst_test_trace_{int(timestamp)}",
-        "project_name": "test_project",
+        "project_name": project_name,
         "trace_id": trace_id,
         "created_at": datetime.fromtimestamp(timestamp).isoformat(),
         "trace_spans": [
@@ -562,7 +562,7 @@ async def test_on_demand_resource_detection(client):
 
 
 @pytest.mark.asyncio
-async def test_real_judgee_tracking(client):
+async def test_real_judgee_tracking(client, project_name: str):
     """Test real judgee tracking with actual evaluation."""
     # Get initial judgee count
     print(f"Getting initial judgee count from {SERVER_URL}/judgees/count/")
@@ -582,7 +582,6 @@ async def test_real_judgee_tracking(client):
     scorer = AnswerCorrectnessScorer(threshold=0.1)
 
     judgment_client = JudgmentClient()
-    PROJECT_NAME = "test-project"
     EVAL_RUN_NAME = "test-run-ac"
 
     print("Running evaluation with use_judgment=True...")
@@ -592,7 +591,7 @@ async def test_real_judgee_tracking(client):
             examples=[example],
             scorers=[scorer],
             model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-            project_name=PROJECT_NAME,
+            project_name=project_name,
             eval_run_name=EVAL_RUN_NAME,
             override=True,
         )
@@ -636,7 +635,7 @@ async def test_real_judgee_tracking(client):
 
 
 @pytest.mark.asyncio
-async def test_real_trace_and_judgee_tracking(client):
+async def test_real_trace_and_judgee_tracking(client, project_name: str):
     """Test both trace and judgee tracking in a single E2E test.
 
     This test:
@@ -686,13 +685,12 @@ async def test_real_trace_and_judgee_tracking(client):
 
         # Initialize judgment client
         judgment_client = JudgmentClient()
-        PROJECT_NAME = "test-trace-judgee-project"
         EVAL_RUN_NAME = "test-trace-judgee-run"
 
         # Create a tracer
         tracer = Tracer(
             api_key=os.getenv("JUDGMENT_API_KEY"),
-            project_name=PROJECT_NAME,
+            project_name=project_name,
             organization_id=os.getenv("JUDGMENT_ORG_ID"),
         )
 
@@ -706,7 +704,7 @@ async def test_real_trace_and_judgee_tracking(client):
                     examples=[example],
                     scorers=[scorer],
                     model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-                    project_name=PROJECT_NAME,
+                    project_name=project_name,
                     eval_run_name=EVAL_RUN_NAME,
                     override=True,
                 )
