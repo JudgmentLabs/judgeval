@@ -21,16 +21,6 @@ from judgeval.data.datasets.dataset import EvalDataset
 from judgeval.tracer import Tracer
 from judgeval.utils.file_utils import get_examples_from_yaml
 
-# Initialize a tracer instance for this test file
-tracer = Tracer()
-
-
-@tracer.observe(span_type="tool", project_name="TraceEvalProjectFromYAMLTest")
-def simple_traced_function_for_yaml_eval(text: str):
-    """A simple function to be traced and evaluated from YAML."""
-    time.sleep(0.01)  # Simulate minimal sync work
-    return f"Processed: {text.upper()}"
-
 
 @pytest.mark.basic
 class TestEvalOperations:
@@ -233,6 +223,13 @@ examples:
         agent_name: "Agent 1"
     retrieval_context: ["Context for another yaml test"]
 """
+        tracer = Tracer(project_name=project_name)
+
+        @tracer.observe(span_type="tool")
+        def simple_traced_function_for_yaml_eval(text: str):
+            """A simple function to be traced and evaluated from YAML."""
+            time.sleep(0.01)  # Simulate minimal sync work
+            return f"Processed: {text.upper()}"
 
         temp_yaml_file_path = None
         try:

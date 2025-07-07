@@ -120,7 +120,6 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                 trace_id,
                 event_name,
                 project_name=project,
-                overwrite=False,
                 enable_monitoring=self.tracer.enable_monitoring,
                 enable_evaluations=self.tracer.enable_evaluations,
             )
@@ -139,7 +138,6 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                 # NEW: Initial save for live tracking (follows the new practice)
                 try:
                     trace_id_saved, server_response = self._trace_client.save(
-                        overwrite=self._trace_client.overwrite,
                         final_save=False,  # Initial save for live tracking
                     )
                 except Exception as e:
@@ -314,13 +312,11 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                         "trace_spans": [
                             span.model_dump() for span in self._trace_client.trace_spans
                         ],
-                        "overwrite": self._trace_client.overwrite,
                         "offline_mode": self.tracer.offline_mode,
                         "parent_trace_id": self._trace_client.parent_trace_id,
                         "parent_name": self._trace_client.parent_name,
                     }
                     trace_id, trace_data = self._trace_client.save(
-                        overwrite=self._trace_client.overwrite,
                         final_save=True,  # Final save with usage counter updates
                     )
                     token = self.trace_id_to_token.pop(trace_id, None)
@@ -524,13 +520,11 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                     "trace_spans": [
                         span.model_dump() for span in trace_client.trace_spans
                     ],
-                    "overwrite": trace_client.overwrite,
                     "offline_mode": self.tracer.offline_mode,
                     "parent_trace_id": trace_client.parent_trace_id,
                     "parent_name": trace_client.parent_name,
                 }
                 trace_id_saved, trace_data = trace_client.save(
-                    overwrite=trace_client.overwrite,
                     final_save=True,
                 )
 
