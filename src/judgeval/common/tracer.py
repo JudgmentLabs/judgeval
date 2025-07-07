@@ -342,6 +342,7 @@ class TraceClient:
         self.tags: List[Union[str, set, tuple]] = []  # Added tags attribute
         self.metadata: Dict[str, Any] = {}
         self.has_notification: Optional[bool] = False  # Initialize has_notification
+        self.update_id: int = 1  # Initialize update_id to 1, increments with each save
         self.trace_spans: List[TraceSpan] = []
         self.span_id_to_span: Dict[str, TraceSpan] = {}
         self.evaluation_runs: List[EvaluationRun] = []
@@ -716,6 +717,7 @@ class TraceClient:
             "customer_id": self.customer_id,
             "tags": self.tags,
             "metadata": self.metadata,
+            "update_id": self.update_id,
         }
 
         # If usage check passes, upsert the trace
@@ -728,6 +730,8 @@ class TraceClient:
 
         if self.start_time is None:
             self.start_time = time.time()
+
+        self.update_id += 1
 
         # Upload annotations
         # TODO: batch to the log endpoint
