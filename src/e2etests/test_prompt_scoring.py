@@ -46,28 +46,10 @@ def test_prompt_scoring(project_name: str):
     )
 
     # Test direct API call first
-    import requests
     from dotenv import load_dotenv
 
     load_dotenv()
     import os
-
-    response = requests.post(
-        "http://127.0.0.1:8000/classifier_eval/",
-        json={
-            "conversation": [
-                {
-                    "role": "system",
-                    "content": "Is the response positive (Y/N)? The response is: {{actual_output}}.",
-                }
-            ],
-            "options": {"Y": 1, "N": 0},
-            "example": pos_example.model_dump(),
-            "model": "Qwen/Qwen2.5-72B-Instruct-Turbo",
-            "judgment_api_key": os.getenv("JUDGMENT_API_KEY"),
-        },
-    )
-    print("Direct API Response:", response.json())
 
     # Then test using client.run_evaluation()
     client = JudgmentClient(judgment_api_key=os.getenv("JUDGMENT_API_KEY"))
@@ -79,6 +61,8 @@ def test_prompt_scoring(project_name: str):
         eval_run_name=f"sentiment_run_{generate_random_slug()}",  # Unique run name
         override=True,
     )
+    assert results[0].success
+    assert not results[1].success
 
     print("\nClient Evaluation Results:")
     for i, result in enumerate(results):
