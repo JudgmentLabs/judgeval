@@ -1610,7 +1610,14 @@ class Tracer:
         span_num_workers: int = 10,  # Number of worker threads for span processing
     ):
         if not api_key:
-            raise ValueError("Tracer must be configured with a Judgment API key")
+            raise ValueError(
+                "api_key parameter must be provided. Please provide a valid API key value or set the JUDGMENT_API_KEY environment variable."
+            )
+
+        if not organization_id:
+            raise ValueError(
+                "organization_id parameter must be provided. Please provide a valid organization ID value or set the JUDGMENT_ORG_ID environment variable."
+            )
 
         try:
             result, response = validate_api_key(api_key)
@@ -1622,8 +1629,6 @@ class Tracer:
         if not result:
             raise JudgmentAPIError(f"Issue with passed in Judgment API key: {response}")
 
-        if not organization_id:
-            raise ValueError("Tracer must be configured with an Organization ID")
         if use_s3 and not s3_bucket_name:
             raise ValueError("S3 bucket name must be provided when use_s3 is True")
 

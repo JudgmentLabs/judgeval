@@ -31,7 +31,7 @@ if not API_KEY:
 def client() -> JudgmentClient:
     """Create a single JudgmentClient instance for all tests."""
     # Setup
-    client = JudgmentClient(judgment_api_key=API_KEY, organization_id=ORGANIZATION_ID)
+    client = JudgmentClient(api_key=API_KEY, organization_id=ORGANIZATION_ID)
     yield client
     # Teardown
     # Add more projects to delete as needed
