@@ -48,11 +48,11 @@ def test_bucket(s3_client, test_bucket_name):
 
 
 @pytest.fixture
-def judgment(test_bucket):
+def judgment(test_bucket, project_name: str):
     """Create a Tracer instance for testing."""
     Tracer._instance = None
     yield Tracer(
-        project_name="test_s3_trace_saving",
+        project_name=project_name,
         s3_bucket_name=test_bucket,
         s3_region_name=TEST_REGION,
         use_s3=True,
@@ -61,10 +61,10 @@ def judgment(test_bucket):
 
 
 @pytest.fixture
-def judgment_no_bucket_yet(test_bucket_name, s3_client):
+def judgment_no_bucket_yet(test_bucket_name, s3_client, project_name: str):
     Tracer._instance = None
     yield Tracer(
-        project_name="test_s3_trace_saving",
+        project_name=project_name,
         s3_bucket_name=test_bucket_name,
         s3_region_name=TEST_REGION,
         use_s3=True,

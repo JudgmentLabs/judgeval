@@ -28,6 +28,13 @@ if not API_KEY:
 
 
 @pytest.fixture(scope="session")
+def project_name():
+    return "e2e-tests-" + "".join(
+        random.choices(string.ascii_letters + string.digits, k=12)
+    )
+
+
+@pytest.fixture(scope="session")
 def client() -> JudgmentClient:
     """Create a single JudgmentClient instance for all tests."""
     # Setup

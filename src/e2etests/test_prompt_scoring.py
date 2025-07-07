@@ -20,7 +20,7 @@ def generate_random_slug(length=6):
     return "".join(random.choices(string.ascii_lowercase, k=length))
 
 
-def main():
+def test_prompt_scoring(project_name: str):
     pos_example = Example(
         input="What's the store return policy?",
         actual_output="Our return policy is wonderful! You may return any item within 30 days of purchase for a full refund.",
@@ -75,7 +75,7 @@ def main():
         examples=[pos_example, neg_example],
         scorers=[scorer],
         model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-        project_name="sentiment_test",
+        project_name=project_name,
         eval_run_name=f"sentiment_run_{generate_random_slug()}",  # Unique run name
         override=True,
     )
@@ -92,7 +92,3 @@ def main():
             print(f"Reason: {result.reason}")
         if hasattr(result, "metadata") and result.metadata:
             print(f"Metadata: {result.metadata}")
-
-
-if __name__ == "__main__":
-    main()

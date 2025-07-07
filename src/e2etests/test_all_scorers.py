@@ -15,7 +15,7 @@ from judgeval.scorers import (
 from judgeval.data import Example
 
 
-def test_ac_scorer(client: JudgmentClient):
+def test_ac_scorer(client: JudgmentClient, project_name: str):
     example = Example(
         input="What's the capital of France?",
         actual_output="The capital of France is Paris.",
@@ -23,21 +23,20 @@ def test_ac_scorer(client: JudgmentClient):
     )
 
     scorer = AnswerCorrectnessScorer(threshold=0.5)
-    PROJECT_NAME = "test-project"
     EVAL_RUN_NAME = "test-run-ac"
 
     res = client.run_evaluation(
         examples=[example],
         scorers=[scorer],
         model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-        project_name=PROJECT_NAME,
+        project_name=project_name,
         eval_run_name=EVAL_RUN_NAME,
         override=True,
     )
     print_debug_on_failure(res[0])
 
 
-def test_ar_scorer(client: JudgmentClient):
+def test_ar_scorer(client: JudgmentClient, project_name: str):
     example_1 = Example(  # should pass
         input="What's the capital of France?",
         actual_output="The capital of France is Paris.",
@@ -50,14 +49,13 @@ def test_ar_scorer(client: JudgmentClient):
 
     scorer = AnswerRelevancyScorer(threshold=0.5)
 
-    PROJECT_NAME = "test-project"
     EVAL_RUN_NAME = "test-run-ar"
 
     res = client.run_evaluation(
         examples=[example_1, example_2],
         scorers=[scorer],
         model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-        project_name=PROJECT_NAME,
+        project_name=project_name,
         eval_run_name=EVAL_RUN_NAME,
         override=True,
     )
@@ -69,7 +67,7 @@ def test_ar_scorer(client: JudgmentClient):
     assert not res[1].success
 
 
-def test_faithfulness_scorer(client: JudgmentClient):
+def test_faithfulness_scorer(client: JudgmentClient, project_name: str):
     faithful_example = Example(  # should pass
         input="What's the capital of France?",
         actual_output="The capital of France is Paris.",
@@ -94,14 +92,13 @@ def test_faithfulness_scorer(client: JudgmentClient):
 
     scorer = FaithfulnessScorer(threshold=1.0)
 
-    PROJECT_NAME = "test-project"
     EVAL_RUN_NAME = "test-run-faithfulness"
 
     res = client.run_evaluation(
         examples=[faithful_example, contradictory_example],
         scorers=[scorer],
         model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-        project_name=PROJECT_NAME,
+        project_name=project_name,
         eval_run_name=EVAL_RUN_NAME,
         override=True,
     )
@@ -113,7 +110,7 @@ def test_faithfulness_scorer(client: JudgmentClient):
     assert not res[1].success, res[1]  # contradictory_example should fail
 
 
-def test_instruction_adherence_scorer(client: JudgmentClient):
+def test_instruction_adherence_scorer(client: JudgmentClient, project_name: str):
     example_1 = Example(
         input="write me a poem about cars and then turn it into a joke, but also what is 5 +5?",
         actual_output="Cars on the road, they zoom and they fly, Under the sun or a stormy sky. Engines roar, tires spin, A symphony of motion, let the race begin. Now for the joke: Why did the car break up with the bicycle. Because it was tired of being two-tired! And 5 + 5 is 10.",
@@ -121,14 +118,13 @@ def test_instruction_adherence_scorer(client: JudgmentClient):
 
     scorer = InstructionAdherenceScorer(threshold=0.5)
 
-    PROJECT_NAME = "test-project"
     EVAL_RUN_NAME = "test-run-instruction-adherence"
 
     res = client.run_evaluation(
         examples=[example_1],
         scorers=[scorer],
         model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-        project_name=PROJECT_NAME,
+        project_name=project_name,
         eval_run_name=EVAL_RUN_NAME,
         override=True,
     )
@@ -138,8 +134,7 @@ def test_instruction_adherence_scorer(client: JudgmentClient):
     assert res[0].success
 
 
-def test_execution_order_scorer(client: JudgmentClient):
-    PROJECT_NAME = "test-project"
+def test_execution_order_scorer(client: JudgmentClient, project_name: str):
     EVAL_RUN_NAME = "test-run-execution-order"
 
     example = Example(
@@ -162,7 +157,7 @@ def test_execution_order_scorer(client: JudgmentClient):
         examples=[example],
         scorers=[ExecutionOrderScorer(threshold=1, should_consider_ordering=True)],
         model="gpt-4.1-mini",
-        project_name=PROJECT_NAME,
+        project_name=project_name,
         eval_run_name=EVAL_RUN_NAME,
         override=True,
     )
@@ -170,7 +165,7 @@ def test_execution_order_scorer(client: JudgmentClient):
     assert not res[0].success
 
 
-def test_classifier_scorer(client: JudgmentClient, random_name: str):
+def test_classifier_scorer(client: JudgmentClient, project_name: str, random_name: str):
     """Test classifier scorer functionality."""
     random_slug = random_name
 
@@ -221,7 +216,7 @@ def test_classifier_scorer(client: JudgmentClient, random_name: str):
         examples=[helpful_example, unhelpful_example],
         scorers=[classifier_scorer],
         model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-        project_name="test-project",
+        project_name=project_name,
         eval_run_name="test-run-helpfulness",
         override=True,
     )

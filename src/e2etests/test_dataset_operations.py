@@ -11,22 +11,6 @@ from judgeval.judgment_client import JudgmentClient
 from judgeval.data import Example
 
 
-@pytest.fixture(scope="module", autouse=True)
-def setup_and_teardown_module(client: JudgmentClient):
-    # Code to run before all tests in the module
-    project_name = "".join(random.choices(string.ascii_letters + string.digits, k=20))
-    client.create_project(project_name)
-    yield project_name  # This is where the tests will run
-
-    # Code to run after all tests in the module
-    client.delete_project(project_name)
-
-
-@pytest.fixture
-def project_name(setup_and_teardown_module):
-    return setup_and_teardown_module
-
-
 @pytest.mark.basic
 class TestDatasetOperations:
     def test_dataset(self, client: JudgmentClient, project_name: str):

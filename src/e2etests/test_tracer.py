@@ -347,11 +347,11 @@ def test_input():
 @pytest.mark.asyncio
 @judgment.observe(
     name="test_evaluation_mixed_trace",
-    project_name="TestingPoemBot",
+    project_name="project_name",
     overwrite=True,
     deep_tracing=False,
 )
-async def test_evaluation_mixed(test_input):
+async def test_evaluation_mixed(test_input, project_name: str):
     print(f"Using test input: {test_input}")
 
     upper = await make_upper(test_input)

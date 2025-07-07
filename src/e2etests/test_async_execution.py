@@ -5,7 +5,6 @@ import uuid
 from typing import List
 
 from judgeval.data import Example, ScoringResult
-from judgeval.judgment_client import JudgmentClient
 from judgeval.scorers import AnswerCorrectnessScorer, AnswerRelevancyScorer
 
 
@@ -65,21 +64,6 @@ def tools_examples() -> List[Example]:
             ],
         ),
     ]
-
-
-@pytest.fixture(scope="module", autouse=True)
-def setup_and_teardown_module(client: JudgmentClient):
-    project_name = f"async-test-{uuid.uuid4().hex[:8]}"
-    client.create_project(project_name)
-    yield project_name
-
-    client.delete_project(project_name)
-    print(f"Deleted project {project_name}")
-
-
-@pytest.fixture
-def project_name(setup_and_teardown_module):
-    return setup_and_teardown_module
 
 
 @pytest.mark.asyncio
