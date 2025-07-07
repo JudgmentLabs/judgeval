@@ -31,7 +31,7 @@ class TraceSpan(BaseModel):
     usage: Optional[TraceUsage] = None
     duration: Optional[float] = None
     annotation: Optional[List[Dict[str, Any]]] = None
-    evaluation_runs: Optional[List[EvaluationRun]] = []
+    evaluation_runs: List[EvaluationRun] = Field(default_factory=list)
     expected_tools: Optional[List[Tool]] = None
     additional_metadata: Optional[Dict[str, Any]] = None
     has_evaluation: Optional[bool] = False
@@ -50,9 +50,11 @@ class TraceSpan(BaseModel):
             "inputs": self._serialize_value(self.inputs),
             "output": self._serialize_value(self.output),
             "error": self._serialize_value(self.error),
-            "evaluation_runs": [run.model_dump() for run in self.evaluation_runs]
-            if self.evaluation_runs
-            else [],
+            "evaluation_runs": (
+                [run.model_dump() for run in self.evaluation_runs]
+                if self.evaluation_runs
+                else []
+            ),
             "parent_span_id": self.parent_span_id,
             "function": self.function,
             "duration": self.duration,

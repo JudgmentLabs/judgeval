@@ -7,9 +7,8 @@ from judgeval.tracer import Tracer
 from unittest.mock import patch
 import time
 
-# Test constants
 TEST_BUCKET_PREFIX = "judgeval-test-"
-TEST_REGION = "us-west-1"  # Change this to your desired region
+TEST_REGION = "us-west-1"
 
 
 @pytest.fixture

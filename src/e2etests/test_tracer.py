@@ -12,7 +12,8 @@ from together import AsyncTogether
 from google import genai
 
 # Local imports
-from judgeval.tracer import Tracer, wrap, TraceManagerClient
+from judgeval.common.tracer import TraceManagerClient
+from judgeval.tracer import Tracer, wrap
 from judgeval.scorers import FaithfulnessScorer, AnswerRelevancyScorer
 from judgeval.data import Example
 
@@ -298,7 +299,6 @@ async def make_poem_with_async_clients(input: str) -> str:
             openai_task, anthropic_task
         )
 
-        # --- Important: Access results correctly ---
         # Check if the response object has the expected structure
         if hasattr(openai_response, "choices") and openai_response.choices:
             openai_result = openai_response.choices[0].message.content
@@ -313,7 +313,6 @@ async def make_poem_with_async_clients(input: str) -> str:
                 f"Warning: Unexpected Anthropic response structure: {anthropic_response}"
             )
             anthropic_result = "<Anthropic Error>"
-        # --- End Important ---
 
         judgment.async_evaluate(
             scorers=[AnswerRelevancyScorer(threshold=0.5)],
@@ -361,7 +360,6 @@ async def test_evaluation_mixed(test_input):
     # Add delay before validating trace tokens to allow spans to be properly populated
     await asyncio.sleep(1.5)
 
-    # --- Attempt to assert based on current trace state ---
     trace = judgment.get_current_trace()
     validate_trace_tokens(trace)
 
@@ -386,7 +384,6 @@ async def test_evaluation_mixed_async(test_input):
     # Add delay before validating trace tokens to allow spans to be properly populated
     await asyncio.sleep(1.5)
 
-    # --- Attempt to assert based on current trace state ---
     trace = judgment.get_current_trace()
     validate_trace_tokens(trace)
 
@@ -640,9 +637,6 @@ async def test_deep_tracing_with_custom_spans():
     return result
 
 
-# --- NEW TESTS FOR STREAMING USAGE ---
-
-
 @pytest.mark.asyncio
 @judgment.observe(
     name="test_openai_sync_streaming_usage_trace",
@@ -688,7 +682,6 @@ async def test_openai_sync_streaming_usage(test_input):
     # Add delay before validating trace tokens to allow spans to be properly populated
     await asyncio.sleep(1.5)
 
-    # --- Attempt to assert based on current trace state ---
     trace = judgment.get_current_trace()
     validate_trace_tokens(trace)
 
@@ -741,17 +734,11 @@ async def test_openai_async_streaming_usage(test_input):
     # Add delay before validating trace tokens to allow spans to be properly populated
     await asyncio.sleep(1.5)
 
-    # --- Attempt to assert based on current trace state ---
     trace = judgment.get_current_trace()
     validate_trace_tokens(trace)
 
     # Let the decorator handle the actual saving when the function returns
     return result
-
-
-# --- END NEW TESTS ---
-
-# --- NEW COMPREHENSIVE TOKEN COUNTING TEST ---
 
 
 @pytest.mark.asyncio
@@ -840,17 +827,11 @@ async def test_token_counting():
     # This test mixes streaming and non-streaming calls, so we need a longer delay
     await asyncio.sleep(2.0)
 
-    # --- Attempt to assert based on current trace state ---
     trace = judgment.get_current_trace()
     validate_trace_tokens(trace)
 
     # Let the decorator handle the actual saving when the function returns
     print("Token Aggregation Test Passed!")
-
-
-# --- END NEW COMPREHENSIVE TOKEN COUNTING TEST ---
-
-# --- NEW PROVIDER-SPECIFIC STREAMING TESTS ---
 
 
 @pytest.mark.asyncio
@@ -897,7 +878,6 @@ async def test_anthropic_async_streaming_usage(test_input):
     # Add delay before validating trace tokens to allow spans to be properly populated
     await asyncio.sleep(1.5)
 
-    # --- Attempt to assert based on current trace state ---
     trace = judgment.get_current_trace()
     validate_trace_tokens(trace)
 
@@ -945,7 +925,6 @@ async def test_together_async_streaming_usage(test_input):
     # Add delay before validating trace tokens to allow spans to be properly populated
     await asyncio.sleep(1.5)
 
-    # --- Attempt to assert based on current trace state ---
     trace = judgment.get_current_trace()
     validate_trace_tokens(trace)
 

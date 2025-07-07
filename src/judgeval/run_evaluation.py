@@ -105,7 +105,6 @@ def execute_api_eval(evaluation_run: EvaluationRun) -> Dict:
             "An error occurred while executing the Judgment API request: " + details
         )
     # Check if the response status code is not 2XX
-    # Add check for the duplicate eval run name
     if not response.ok:
         error_message = response_data.get("detail", "An unknown error occurred.")
         error(f"Error: {error_message=}")
@@ -1125,15 +1124,6 @@ def run_eval(
 
         info(f"Successfully merged {len(merged_results)} results")
 
-        # Evaluate rules against local scoring results if rules exist (this cant be done just yet)
-        # if evaluation_run.rules and merged_results:
-        #     run_rules(
-        #         local_results=merged_results,
-        #         rules=evaluation_run.rules,
-        #         judgment_api_key=evaluation_run.judgment_api_key,
-        #         organization_id=evaluation_run.organization_id
-        #     )
-        # print(merged_results)
         send_results = [
             scoring_result.model_dump(warnings=False)
             for scoring_result in merged_results
@@ -1186,15 +1176,6 @@ def assert_test(scoring_results: List[ScoringResult]) -> None:
     if failed_cases:
         error_msg = "The following test cases failed: \n"
         for fail_case in failed_cases:
-            # error_msg += f"\nInput: {fail_case['input']}\n"
-            # error_msg += f"Actual Output: {fail_case['actual_output']}\n"
-            # error_msg += f"Expected Output: {fail_case['expected_output']}\n"
-            # error_msg += f"Context: {fail_case['context']}\n"
-            # error_msg += f"Retrieval Context: {fail_case['retrieval_context']}\n"
-            # error_msg += f"Additional Metadata: {fail_case['additional_metadata']}\n"
-            # error_msg += f"Tools Called: {fail_case['tools_called']}\n"
-            # error_msg += f"Expected Tools: {fail_case['expected_tools']}\n"
-
             for fail_scorer in fail_case["failed_scorers"]:
                 error_msg += (
                     f"\nScorer Name: {fail_scorer.name}\n"
