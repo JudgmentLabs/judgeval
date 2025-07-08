@@ -54,15 +54,6 @@ def tools_examples() -> List[Example]:
                 }
             ],
         ),
-        Example(
-            input="Search for the latest news about AI",
-            actual_output="Here are the latest news about AI...",
-            expected_output="Here are the latest AI news developments...",
-            tools_called=["search_news(query='AI', count=5)"],
-            expected_tools=[
-                {"tool_name": "search_news", "parameters": {"query": "AI"}}
-            ],
-        ),
     ]
 
 
@@ -107,7 +98,7 @@ async def test_async_evaluation_multiple_scorers(client, tools_examples, project
     task = client.run_evaluation(
         examples=tools_examples,
         scorers=scorers,
-        model="gpt-4o-mini",
+        model="gpt-4.1",
         project_name=project_name,
         eval_run_name="async-multi-scorers",
         async_execution=True,

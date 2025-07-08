@@ -33,7 +33,7 @@ class SampleScorer(BaseScorer):
     async def a_score_example(self, example, *args, **kwargs) -> float:
         return 0.9
 
-    def _success_check(self) -> bool:
+    def success_check(self) -> bool:
         return self.score >= self.threshold if self.score is not None else False
 
 
@@ -120,15 +120,15 @@ class TestBaseScorer:
         """Test success_check with various scores"""
         # Test with score above threshold
         basic_scorer.score = 0.8
-        assert basic_scorer._success_check() is True
+        assert basic_scorer.success_check() is True
 
         # Test with score below threshold
         basic_scorer.score = 0.6
-        assert basic_scorer._success_check() is False
+        assert basic_scorer.success_check() is False
 
         # Test with no score
         basic_scorer.score = None
-        assert basic_scorer._success_check() is False
+        assert basic_scorer.success_check() is False
 
     def test_str_representation(self, basic_scorer):
         """Test string representation of scorer"""

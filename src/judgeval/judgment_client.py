@@ -68,27 +68,25 @@ class SingletonMeta(type):
 class JudgmentClient(metaclass=SingletonMeta):
     def __init__(
         self,
-        judgment_api_key: Optional[str] = os.getenv("JUDGMENT_API_KEY"),
+        api_key: Optional[str] = os.getenv("JUDGMENT_API_KEY"),
         organization_id: Optional[str] = os.getenv("JUDGMENT_ORG_ID"),
     ):
-        # Check if API key is None
-        if judgment_api_key is None:
+        if not api_key:
             raise ValueError(
-                "JUDGMENT_API_KEY cannot be None. Please provide a valid API key or set the JUDGMENT_API_KEY environment variable."
+                "api_key parameter must be provided. Please provide a valid API key value or set the JUDGMENT_API_KEY environment variable."
             )
 
-        # Check if organization ID is None
-        if organization_id is None:
+        if not organization_id:
             raise ValueError(
-                "JUDGMENT_ORG_ID cannot be None. Please provide a valid organization ID or set the JUDGMENT_ORG_ID environment variable."
+                "organization_id parameter must be provided. Please provide a valid organization ID value or set the JUDGMENT_ORG_ID environment variable."
             )
 
-        self.judgment_api_key = judgment_api_key
+        self.judgment_api_key = api_key
         self.organization_id = organization_id
-        self.eval_dataset_client = EvalDatasetClient(judgment_api_key, organization_id)
+        self.eval_dataset_client = EvalDatasetClient(api_key, organization_id)
 
         # Verify API key is valid
-        result, response = validate_api_key(judgment_api_key)
+        result, response = validate_api_key(api_key)
         if not result:
             # May be bad to output their invalid API key...
             raise JudgmentAPIError(f"Issue with passed in Judgment API key: {response}")
