@@ -64,7 +64,7 @@ from judgeval.data import Example, Trace, TraceSpan, TraceUsage
 from judgeval.scorers import APIScorerConfig, BaseScorer
 from judgeval.evaluation_run import EvaluationRun
 from judgeval.common.utils import ExcInfo, validate_api_key
-from judgeval.common.exceptions import JudgmentAPIError
+from judgeval.common.logger import judgeval_logger
 
 # Standard library imports needed for the new class
 import concurrent.futures
@@ -215,7 +215,7 @@ class TraceManagerClient:
                     trace_id=trace_data["trace_id"],
                     project_name=trace_data["project_name"],
                 )
-                print(f"Trace also saved to S3 at key: {s3_key}")
+                judgeval_logger.info(f"Trace also saved to S3 at key: {s3_key}")
             except Exception as e:
                 warnings.warn(f"Failed to save trace to S3: {str(e)}")
 
@@ -498,13 +498,7 @@ class TraceClient:
 
         # check_examples([example], scorers)
 
-        # --- Modification: Capture span_id immediately ---
-        # span_id_at_eval_call = current_span_var.get()
-        # print(f"[TraceClient.async_evaluate] Captured span ID at eval call: {span_id_at_eval_call}")
-        # Prioritize explicitly passed span_id, fallback to context var
         span_id_to_use = span_id if span_id is not None else self.get_current_span()
-        # print(f"[TraceClient.async_evaluate] Using span_id: {span_id_to_use}")
-        # --- End Modification ---
 
         eval_run = EvaluationRun(
             organization_id=self.tracer.organization_id,
@@ -1525,73 +1519,84 @@ class Tracer:
         span_flush_interval: float = 1.0,  # Time in seconds between automatic flushes
         span_num_workers: int = 10,  # Number of worker threads for span processing
     ):
-        if not api_key:
-            raise ValueError(
-                "api_key parameter must be provided. Please provide a valid API key value or set the JUDGMENT_API_KEY environment variable."
-            )
-
-        if not organization_id:
-            raise ValueError(
-                "organization_id parameter must be provided. Please provide a valid organization ID value or set the JUDGMENT_ORG_ID environment variable."
-            )
-
         try:
-            result, response = validate_api_key(api_key)
-        except Exception as e:
-            print(f"Issue with verifying API key, disabling monitoring: {e}")
-            enable_monitoring = False
-            result = True
+            if not api_key:
+                raise ValueError(
+                    "api_key parameter must be provided. Please provide a valid API key value or set the JUDGMENT_API_KEY environment variable"
+                )
 
-        if not result:
-            raise JudgmentAPIError(f"Issue with passed in Judgment API key: {response}")
-
-        if use_s3 and not s3_bucket_name:
-            raise ValueError("S3 bucket name must be provided when use_s3 is True")
-
-        self.api_key: str = api_key
-        self.project_name: str = project_name or "default_project"
-        self.organization_id: str = organization_id
-        self.traces: List[Trace] = []
-        self.enable_monitoring: bool = enable_monitoring
-        self.enable_evaluations: bool = enable_evaluations
-        self.class_identifiers: Dict[
-            str, str
-        ] = {}  # Dictionary to store class identifiers
-        self.span_id_to_previous_span_id: Dict[str, str | None] = {}
-        self.trace_id_to_previous_trace: Dict[str, TraceClient | None] = {}
-        self.current_span_id: Optional[str] = None
-        self.current_trace: Optional[TraceClient] = None
-        self.trace_across_async_contexts: bool = trace_across_async_contexts
-        Tracer.trace_across_async_contexts = trace_across_async_contexts
-
-        # Initialize S3 storage if enabled
-        self.use_s3 = use_s3
-        if use_s3:
-            from judgeval.common.s3_storage import S3Storage
+            if not organization_id:
+                raise ValueError(
+                    "organization_id parameter must be provided. Please provide a valid organization ID value or set the JUDGMENT_ORG_ID environment variable"
+                )
 
             try:
-                self.s3_storage = S3Storage(
-                    bucket_name=s3_bucket_name,
-                    aws_access_key_id=s3_aws_access_key_id,
-                    aws_secret_access_key=s3_aws_secret_access_key,
-                    region_name=s3_region_name,
-                )
+                result, response = validate_api_key(api_key)
             except Exception as e:
-                print(f"Issue with initializing S3 storage, disabling S3: {e}")
-                self.use_s3 = False
+                judgeval_logger.error(
+                    f"Issue with verifying API key, disabling monitoring: {e}"
+                )
+                enable_monitoring = False
+                result = True
 
-        self.offline_mode = False  # This is used to differentiate traces between online and offline (IE experiments vs monitoring page)
-        self.deep_tracing: bool = deep_tracing  # NEW: Store deep tracing setting
+            if not result:
+                raise ValueError(f"Issue with passed in Judgment API key: {response}")
 
-        # Initialize background span service
-        self.background_span_service: Optional[BackgroundSpanService] = None
-        self.background_span_service = BackgroundSpanService(
-            judgment_api_key=api_key,
-            organization_id=organization_id,
-            batch_size=span_batch_size,
-            flush_interval=span_flush_interval,
-            num_workers=span_num_workers,
-        )
+            if use_s3 and not s3_bucket_name:
+                raise ValueError("S3 bucket name must be provided when use_s3 is True")
+
+            self.api_key: str = api_key
+            self.project_name: str = project_name or "default_project"
+            self.organization_id: str = organization_id
+            self.traces: List[Trace] = []
+            self.enable_monitoring: bool = enable_monitoring
+            self.enable_evaluations: bool = enable_evaluations
+            self.class_identifiers: Dict[
+                str, str
+            ] = {}  # Dictionary to store class identifiers
+            self.span_id_to_previous_span_id: Dict[str, str | None] = {}
+            self.trace_id_to_previous_trace: Dict[str, TraceClient | None] = {}
+            self.current_span_id: Optional[str] = None
+            self.current_trace: Optional[TraceClient] = None
+            self.trace_across_async_contexts: bool = trace_across_async_contexts
+            Tracer.trace_across_async_contexts = trace_across_async_contexts
+
+            # Initialize S3 storage if enabled
+            self.use_s3 = use_s3
+            if use_s3:
+                from judgeval.common.s3_storage import S3Storage
+
+                try:
+                    self.s3_storage = S3Storage(
+                        bucket_name=s3_bucket_name,
+                        aws_access_key_id=s3_aws_access_key_id,
+                        aws_secret_access_key=s3_aws_secret_access_key,
+                        region_name=s3_region_name,
+                    )
+                except Exception as e:
+                    judgeval_logger.error(
+                        f"Issue with initializing S3 storage, disabling S3: {e}"
+                    )
+                    self.use_s3 = False
+
+            self.offline_mode = False  # This is used to differentiate traces between online and offline (IE experiments vs monitoring page)
+            self.deep_tracing: bool = deep_tracing  # NEW: Store deep tracing setting
+
+            # Initialize background span service
+            self.background_span_service: Optional[BackgroundSpanService] = None
+            self.background_span_service = BackgroundSpanService(
+                judgment_api_key=api_key,
+                organization_id=organization_id,
+                batch_size=span_batch_size,
+                flush_interval=span_flush_interval,
+                num_workers=span_num_workers,
+            )
+        except Exception as e:
+            judgeval_logger.error(
+                f"Issue with initializing Tracer: {e}. Disabling monitoring and evaluations."
+            )
+            self.enable_monitoring = False
+            self.enable_evaluations = False
 
     def set_current_span(self, span_id: str) -> Optional[contextvars.Token[str | None]]:
         self.span_id_to_previous_span_id[span_id] = self.current_span_id
@@ -2181,8 +2186,8 @@ class Tracer:
                 if hasattr(method, "_judgment_span_name"):
                     skipped.append(name)
                     if warn_on_double_decoration:
-                        print(
-                            f"Warning: {cls.__name__}.{name} already decorated, skipping"
+                        judgeval_logger.info(
+                            f"{cls.__name__}.{name} already decorated, skipping"
                         )
                     continue
 
@@ -2192,7 +2197,9 @@ class Tracer:
                     decorated.append(name)
                 except Exception as e:
                     if warn_on_double_decoration:
-                        print(f"Warning: Failed to decorate {cls.__name__}.{name}: {e}")
+                        judgeval_logger.warning(
+                            f"Failed to decorate {cls.__name__}.{name}: {e}"
+                        )
 
             return cls
 

@@ -6,11 +6,11 @@ from typing import Dict, Optional
 
 from pydantic import BaseModel
 
-from judgeval.common.logger import debug, info, warning
 
 from judgeval.judges.utils import create_judge
 from typing import Any
 from pydantic import model_validator
+from judgeval.common.logger import judgeval_logger
 
 
 class BaseScorer(BaseModel):
@@ -79,10 +79,8 @@ class BaseScorer(BaseModel):
         return self.score >= self.threshold
 
     def __str__(self):
-        debug("Converting BaseScorer instance to string representation")
         if self.error:
-            warning(f"BaseScorer contains error: {self.error}")
-        info(f"BaseScorer status - success: {self.success}, score: {self.score}")
+            judgeval_logger.warning(f"BaseScorer contains error: {self.error}")
         attributes = {
             "score_type": self.score_type,
             "threshold": self.threshold,

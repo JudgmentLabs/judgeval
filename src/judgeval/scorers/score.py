@@ -18,7 +18,7 @@ from judgeval.data import (
 from judgeval.scorers import BaseScorer
 from judgeval.scorers.utils import clone_scorers, scorer_console_msg
 from judgeval.common.exceptions import MissingTestCaseParamsError
-from judgeval.common.logger import example_logging_context, debug, error, warning, info
+from judgeval.common.logger import judgeval_logger
 from judgeval.judges import JudgevalJudge
 
 
@@ -42,75 +42,13 @@ async def safe_a_score_example(
 
         skip_on_missing_params (bool): Whether to skip the test case if required parameters are missing.
     """
-    debug(f"Starting safe_a_score_example for example {example.example_id}")
     try:
         await scorer.a_score_example(example, _show_indicator=False)
-        info(f"Successfully scored example {example.example_id}")
-    except MissingTestCaseParamsError as e:
-        if (
-            skip_on_missing_params
-        ):  # Skip the example if the scorer requires parameters that are missing
-            with example_logging_context(example.created_at, example.example_id):
-                warning(
-                    f"Skipping example {example.example_id} due to missing parameters"
-                )
-            scorer.skipped = True
-            return
-        else:
-            if (
-                ignore_errors
-            ):  # Gracefully handle the error, does not stop the evaluation
-                scorer.error = str(e)
-                scorer.success = False
-                with example_logging_context(example.created_at, example.example_id):
-                    warning(
-                        f"Ignoring errors for example {example.example_id}: {str(e)} due to missing parameters"
-                    )
-            else:  # Raise the error and stop the evaluation
-                with example_logging_context(example.created_at, example.example_id):
-                    error(
-                        f"Stopping example {example.example_id}: {str(e)} due to missing parameters"
-                    )
-                raise
-    except TypeError:  # in case a_score_example does not accept _show_indicator
-        try:
-            await scorer.a_score_example(example)
-        except MissingTestCaseParamsError as e:
-            if skip_on_missing_params:
-                scorer.skipped = True
-                with example_logging_context(example.created_at, example.example_id):
-                    warning(
-                        f"Skipping example {example.example_id} due to missing parameters"
-                    )
-                return
-            else:
-                if ignore_errors:
-                    scorer.error = str(e)
-                    scorer.success = False
-                    with example_logging_context(
-                        example.created_at, example.example_id
-                    ):
-                        warning(
-                            f"Ignoring errors for example {example.example_id}: {str(e)} due to missing parameters"
-                        )
-                else:
-                    with example_logging_context(
-                        example.created_at, example.example_id
-                    ):
-                        error(
-                            f"Stopping example {example.example_id}: {str(e)} due to missing parameters"
-                        )
-                    raise
     except Exception as e:
-        if ignore_errors:
-            scorer.error = str(e)
-            scorer.success = False  # Assuming you want to set success to False
-            with example_logging_context(example.created_at, example.example_id):
-                warning(f"Ignoring errors for example {example.example_id}: {str(e)}")
-        else:
-            with example_logging_context(example.created_at, example.example_id):
-                error(f"Stopping example {example.example_id}: {str(e)}")
-            raise
+        judgeval_logger.error(f"Error during scoring: {str(e)}")
+        scorer.error = str(e)
+        scorer.success = False
+        return
 
 
 async def score_task(
@@ -147,11 +85,6 @@ async def score_task(
             finish_text = "Completed"
         except MissingTestCaseParamsError as e:
             if skip_on_missing_params:
-                scorer.skipped = True
-                with example_logging_context(example.created_at, example.example_id):
-                    debug(
-                        f"Skipping example {example.example_id} due to missing parameters"
-                    )
                 return
             else:
                 if ignore_errors:
@@ -159,12 +92,6 @@ async def score_task(
                     scorer.success = False  # Override success
                     finish_text = "Failed"
                 else:
-                    with example_logging_context(
-                        example.created_at, example.example_id
-                    ):
-                        error(
-                            f"Stopping example {example.example_id}: {str(e)} due to missing parameters"
-                        )
                     raise
         except TypeError:
             try:
@@ -172,13 +99,6 @@ async def score_task(
                 finish_text = "Completed"
             except MissingTestCaseParamsError as e:
                 if skip_on_missing_params:
-                    scorer.skipped = True
-                    with example_logging_context(
-                        example.created_at, example.example_id
-                    ):
-                        debug(
-                            f"Skipping example {example.example_id} due to missing parameters"
-                        )
                     return
                 else:
                     if ignore_errors:
@@ -186,25 +106,13 @@ async def score_task(
                         scorer.success = False  # Override success
                         finish_text = "Failed"
                     else:
-                        with example_logging_context(
-                            example.created_at, example.example_id
-                        ):
-                            error(
-                                f"Stopping example {example.example_id}: {str(e)} due to missing parameters"
-                            )
                         raise
         except Exception as e:
             if ignore_errors:
                 scorer.error = str(e)
                 scorer.success = False  # Override success
                 finish_text = "Failed"
-                with example_logging_context(example.created_at, example.example_id):
-                    warning(
-                        f"Ignoring errors for example {example.example_id}: {str(e)}"
-                    )
             else:
-                with example_logging_context(example.created_at, example.example_id):
-                    error(f"Stopping example {example.example_id}: {str(e)}")
                 raise
 
         end_time = time.perf_counter()
@@ -338,16 +246,6 @@ async def a_execute_scoring(
             bar_format="{desc}: |{bar}|{percentage:3.0f}% ({n_fmt}/{total_fmt}) [Time Taken: {elapsed}, {rate_fmt}{postfix}]",
         ) as pbar:
             for i, ex in enumerate(examples):
-                with example_logging_context(ex.created_at, ex.example_id):
-                    debug(f"Starting scoring for example {ex.example_id}")
-                    debug(f"Input: {ex.input}")
-                    debug(f"Using {len(scorers)} scorers")
-                    for scorer in scorers:
-                        debug(f"Using scorer: {type(scorer).__name__}")
-                        if hasattr(scorer, "threshold"):
-                            debug(f"Scorer threshold: {scorer.threshold}")
-                        if hasattr(scorer, "model"):
-                            debug(f"Scorer model: {type(scorer.model).__name__}")
                 if isinstance(ex, Example) or isinstance(ex, CustomExample):
                     if len(scorers) == 0:
                         pbar.update(1)
@@ -426,7 +324,6 @@ async def a_eval_examples_helper(
     show_metrics_indicator = show_indicator and not _use_bar_indicator
 
     for scorer in scorers:
-        scorer.skipped = False
         scorer.error = None  # Reset scorer error
 
     # scoring the Example

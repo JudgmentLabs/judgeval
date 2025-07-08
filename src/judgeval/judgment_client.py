@@ -41,6 +41,7 @@ from judgeval.common.tracer import Tracer
 from judgeval.common.utils import validate_api_key
 from pydantic import BaseModel
 from judgeval.run_evaluation import SpinnerWrappedTask
+from judgeval.common.logger import judgeval_logger
 
 
 class EvalRunRequestBody(BaseModel):
@@ -91,7 +92,7 @@ class JudgmentClient(metaclass=SingletonMeta):
             # May be bad to output their invalid API key...
             raise JudgmentAPIError(f"Issue with passed in Judgment API key: {response}")
         else:
-            print("Successfully initialized JudgmentClient!")
+            judgeval_logger.info("Successfully initialized JudgmentClient!")
 
     def a_run_evaluation(
         self,

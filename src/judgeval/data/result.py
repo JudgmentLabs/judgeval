@@ -1,5 +1,4 @@
 from typing import List, Union
-from judgeval.common.logger import debug
 from judgeval.data import ScorerData, Example
 from judgeval.data.trace import TraceSpan
 from judgeval.data.judgment_types import ScoringResultJudgmentType
@@ -53,8 +52,6 @@ def generate_scoring_result(
         name = data_object.name
     else:
         name = "Test Case Placeholder"
-        debug(f"No name provided for example, using default name: {name}")
-    debug(f"Creating ScoringResult for: {name}")
     scoring_result = ScoringResult(
         name=name,
         data_object=data_object,

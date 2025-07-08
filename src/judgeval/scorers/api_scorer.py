@@ -6,9 +6,9 @@ Scores `Example`s using ready-made Judgment evaluators.
 
 from pydantic import BaseModel, field_validator
 from typing import List
-from judgeval.common.logger import error
 from judgeval.data import ExampleParams
 from judgeval.constants import APIScorerType, UNBOUNDED_SCORERS
+from judgeval.common.logger import judgeval_logger
 
 
 class APIScorerConfig(BaseModel):
@@ -42,13 +42,17 @@ class APIScorerConfig(BaseModel):
         score_type = info.data.get("score_type")
         if score_type in UNBOUNDED_SCORERS:
             if v < 0:
-                error(f"Threshold for {score_type} must be greater than 0, got: {v}")
+                judgeval_logger.error(
+                    f"Threshold for {score_type} must be greater than 0, got: {v}"
+                )
                 raise ValueError(
                     f"Threshold for {score_type} must be greater than 0, got: {v}"
                 )
         else:
             if not 0 <= v <= 1:
-                error(f"Threshold for {score_type} must be between 0 and 1, got: {v}")
+                judgeval_logger.error(
+                    f"Threshold for {score_type} must be between 0 and 1, got: {v}"
+                )
                 raise ValueError(
                     f"Threshold for {score_type} must be between 0 and 1, got: {v}"
                 )
