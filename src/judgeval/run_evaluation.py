@@ -1046,14 +1046,12 @@ def run_eval(
                     evaluation_run.examples,
                     local_scorers,
                     model=evaluation_run.model,
-                    skip_on_missing_params=True,
-                    show_indicator=True,
-                    _use_bar_indicator=True,
                     throttle_value=0,
                     max_concurrent=MAX_CONCURRENT_EVALUATIONS,
                 )
             )
             local_results = results
+        print(local_results)
         # Aggregate the ScorerData from the API and local evaluations
         merged_results: List[ScoringResult] = merge_results(api_results, local_results)
         merged_results = check_missing_scorer_data(merged_results)

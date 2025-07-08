@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from judgeval.judges.utils import create_judge
 from typing import Any
-from pydantic import model_validator
+from pydantic import model_validator, Field
 from judgeval.common.logger import judgeval_logger
 
 
@@ -32,7 +32,9 @@ class BaseScorer(BaseModel):
     reason: Optional[str] = ""
     using_native_model: Optional[bool] = None  # Whether the model is a native model
     success: Optional[bool] = None  # Whether the test case passed or failed
-    model: Optional[Any] = None  # The model used to evaluate the test case
+    model: Optional[Any] = Field(
+        default=None, exclude=True
+    )  # The model used to evaluate the test case
     evaluation_model: Optional[str] = None  # The model used to evaluate the test case
     strict_mode: bool = False  # Whether to run the scorer in strict mode
     async_mode: bool = True  # Whether to run the scorer in async mode
@@ -56,7 +58,12 @@ class BaseScorer(BaseModel):
     @classmethod
     def default_name(cls, m: "BaseScorer") -> "BaseScorer":
         if not m.name:
-            m.name = m.score_type
+            # Try to use the class name if it exists and is not empty
+            class_name = getattr(m, "__class__", None)
+            if class_name and getattr(m.__class__, "__name__", None):
+                m.name = m.__class__.__name__
+            else:
+                m.name = m.score_type
         return m
 
     def _add_model(self, model: str):

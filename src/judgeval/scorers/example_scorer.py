@@ -2,7 +2,7 @@ from judgeval.scorers.base_scorer import BaseScorer
 from judgeval.data import Example
 from typing import List
 from pydantic import Field
-from judgeval.common.logger import warning, error
+from judgeval.common.logger import judgeval_logger
 
 
 class ExampleScorer(BaseScorer):
@@ -13,8 +13,7 @@ class ExampleScorer(BaseScorer):
         """
         Measures the score on a single example
         """
-        warning("Attempting to call unimplemented score_example method")
-        error("score_example method not implemented")
+        judgeval_logger.error("score_example method not implemented")
         raise NotImplementedError(
             "You must implement the `score_example` method in your custom scorer"
         )
@@ -23,8 +22,7 @@ class ExampleScorer(BaseScorer):
         """
         Asynchronously measures the score on a single example
         """
-        warning("Attempting to call unimplemented a_score_example method")
-        error("a_score_example method not implemented")
+        judgeval_logger.error("a_score_example method not implemented")
         raise NotImplementedError(
             "You must implement the `a_score_example` method in your custom scorer"
         )
