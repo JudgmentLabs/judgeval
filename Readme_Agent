@@ -4,7 +4,7 @@ This project demonstrates how to evaluate a simple AI agent using the open-sourc
 
 ---
 
-## Project Structure
+## **Project Structure**
 
 **my_agents/agents/echo_agent.py**  
 A minimal agent that echoes the input prompt with a prefix: "You said: <prompt>".
@@ -24,7 +24,7 @@ Implements the `AnswerRelevancyScorer`, a basic scorer that checks if the genera
 
 ---
 
-## How to Run
+## **How to Run**
 
 1. Set the Python path:
 
@@ -40,7 +40,7 @@ Implements the `AnswerRelevancyScorer`, a basic scorer that checks if the genera
 
 ---
 
-## Example Output
+## **Example Output**
 
 ```
 Prompt: What is Python?
@@ -58,6 +58,9 @@ Agent Accuracy: 0/2 passed (0.00%)
 
 ---
 
-## Notes
+## **Notes**
 
-This evaluation uses a very basic agent (`EchoAgent`) and scoring strategy for demonstration purposes. More advanced agents and scorers can be integrated easily by modifying the agent runner and scoring logic.
+This evaluation uses a basic agent (`EchoAgent`) and a simple scoring strategy for demonstration. You can extend it by:
+- Creating more intelligent agents
+- Improving the scoring logic
+- Adding more prompts and test cases
