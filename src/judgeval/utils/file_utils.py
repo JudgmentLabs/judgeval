@@ -74,7 +74,7 @@ def get_examples_from_yaml(file_path: str) -> List[Example] | None:
     return new_examples
 
 
-def get_examples_from_json(file_path: str) -> List[Example] | None:
+def get_examples_from_json(file_path: str) -> List[Example]:
     debug(f"Loading dataset from JSON file: {file_path}")
     """
     Adds examples from a JSON file.
