@@ -1,48 +1,46 @@
-# 🤖 Judgment Labs – EchoAgent Evaluation Project
+# Judgment Labs - EchoAgent Evaluation Project
 
-This project demonstrates how to evaluate a simple AI agent using the open-source `judgeval` framework by Judgment Labs. It showcases the end-to-end pipeline from agent creation to scoring and accuracy measurement.
-
----
-
-## 🔧 Project Structure
-
-- **`my_agents/agents/echo_agent.py`**  
-  A minimal agent that echoes the input prompt with a prefix: _"You said: <prompt>"_.
-
-- **`my_agents/agent_battle.py`**  
-  Main evaluation script that:
-  - Loads prompt-response examples from JSON
-  - Calls the agent on each prompt
-  - Scores outputs using a custom scorer (`AnswerRelevancyScorer`)
-  - Prints results with pass/fail metrics
-
-- **`my_agents/examples/prompts.json`**  
-  Contains a list of test cases with expected inputs and outputs.
-
-- **`src/judgeval/scorers/answer_relevancy_scorer.py`**  
-  Custom scorer that compares agent responses with expected output using partial string matching logic.
+This project demonstrates how to evaluate a simple AI agent using the open-source `judgeval` framework by Judgment Labs. It showcases how to define an agent, run evaluations, and score outputs using a custom-defined scorer.
 
 ---
 
-## 🚀 How to Run the Evaluation
+## Project Structure
 
-1. Set the Python path environment variable:
+**my_agents/agents/echo_agent.py**  
+A minimal agent that echoes the input prompt with a prefix: "You said: <prompt>".
 
-   ```
+**my_agents/agent_battle.py**  
+Main evaluation script that:
+- Loads prompt-response examples from JSON
+- Calls the agent on each prompt
+- Scores outputs using a custom scorer (`AnswerRelevancyScorer`)
+- Prints results with pass/fail metrics
+
+**my_agents/examples/prompts.json**  
+Contains a list of test cases with expected inputs and outputs.
+
+**src/judgeval/scorers/answer_relevancy_scorer.py**  
+Implements the `AnswerRelevancyScorer`, a basic scorer that checks if the generated output is relevant to the expected output.
+
+---
+
+## How to Run
+
+1. Set the Python path:
+
+   ```bash
    export PYTHONPATH=src
    ```
 
 2. Run the evaluation script:
 
-   ```
+   ```bash
    python my_agents/agent_battle.py
    ```
 
-You’ll see the prompt, generated output, expected output, individual scores, and total accuracy.
-
 ---
 
-## ✅ Example Output
+## Example Output
 
 ```
 Prompt: What is Python?
@@ -55,22 +53,11 @@ Generated: You said: Define variable.
 Expected: A variable stores a value in programming.
 Score: 0.33 | Passed: False
 ---
-
-✅ Agent Accuracy: 0/2 passed (0.00%)
+Agent Accuracy: 0/2 passed (0.00%)
 ```
 
 ---
 
-## 🧠 Why This Project
+## Notes
 
-This mini-project was created as part of the **Judgment Labs AI Agent Battle**. It helps demonstrate:
-
-- Agent evaluation using custom or built-in scorers
-- Integration with the `judgeval` scoring system
-- Ability to test and benchmark agents programmatically
-
----
-
-## 🙌 Credits
-
-Built by Sai Santoshi Praneetha Mukkamala forked from [Judgment Labs](https://github.com/JudgmentLabs/judgeval).
+This evaluation uses a very basic agent (`EchoAgent`) and scoring strategy for demonstration purposes. More advanced agents and scorers can be integrated easily by modifying the agent runner and scoring logic.
