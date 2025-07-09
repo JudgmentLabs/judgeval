@@ -252,8 +252,6 @@ def print_debug_on_failure(result) -> bool:
             print(f"- Success: {scorer_data.success}")
             print(f"- Reason: {scorer_data.reason}")
             print(f"- Error: {scorer_data.error}")
-            if scorer_data.verbose_logs:
-                print(f"- Verbose Logs: {scorer_data.verbose_logs}")
 
         return False
     return True
