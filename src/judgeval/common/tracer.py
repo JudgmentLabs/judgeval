@@ -13,7 +13,6 @@ import threading
 import time
 import traceback
 import uuid
-import warnings
 import contextvars
 import sys
 import json
@@ -217,7 +216,7 @@ class TraceManagerClient:
                 )
                 judgeval_logger.info(f"Trace also saved to S3 at key: {s3_key}")
             except Exception as e:
-                warnings.warn(f"Failed to save trace to S3: {str(e)}")
+                judgeval_logger.warning(f"Failed to save trace to S3: {str(e)}")
 
         if not offline_mode and show_link and "ui_results_url" in server_response:
             pretty_str = f"\n🔍 You can view your trace data here: [rgb(106,0,255)][link={server_response['ui_results_url']}]View Trace[/link]\n"
@@ -382,7 +381,9 @@ class TraceClient:
                 # Set start_time after first successful save
                 # Link will be shown by upsert_trace method
             except Exception as e:
-                warnings.warn(f"Failed to save initial trace for live tracking: {e}")
+                judgeval_logger.warning(
+                    f"Failed to save initial trace for live tracking: {e}"
+                )
         start_time = time.time()
 
         # Generate a unique ID for *this specific span invocation*
@@ -456,11 +457,11 @@ class TraceClient:
         try:
             # Load appropriate implementations for all scorers
             if not scorers:
-                warnings.warn("No valid scorers available for evaluation")
+                judgeval_logger.warning("No valid scorers available for evaluation")
                 return
 
         except Exception as e:
-            warnings.warn(f"Failed to load scorers: {str(e)}")
+            judgeval_logger.warning(f"Failed to load scorers: {str(e)}")
             return
 
         # If example is not provided, create one from the individual parameters
@@ -554,7 +555,7 @@ class TraceClient:
                 if self.background_span_service:
                     self.background_span_service.queue_span(span, span_state="input")
             except Exception as e:
-                warnings.warn(f"Failed to queue span with input data: {e}")
+                judgeval_logger.warning(f"Failed to queue span with input data: {e}")
 
     def record_agent_name(self, agent_name: str):
         current_span_id = self.get_current_span()
@@ -953,7 +954,7 @@ class BackgroundSpanService:
                     last_flush_time = current_time
 
             except Exception as e:
-                warnings.warn(f"Error in span service worker loop: {e}")
+                judgeval_logger.warning(f"Error in span service worker loop: {e}")
                 # On error, still need to mark tasks as done to prevent hanging
                 for _ in range(pending_task_count):
                     self._span_queue.task_done()
@@ -997,7 +998,7 @@ class BackgroundSpanService:
                 self._send_evaluation_runs_batch(evaluation_runs_to_send)
 
         except Exception as e:
-            warnings.warn(f"Failed to send batch: {e}")
+            judgeval_logger.warning(f"Failed to send batch: {e}")
 
     def _send_spans_batch(self, spans: List[Dict[str, Any]]):
         """Send a batch of spans to the spans endpoint."""
@@ -1030,14 +1031,14 @@ class BackgroundSpanService:
             )
 
             if response.status_code != HTTPStatus.OK:
-                warnings.warn(
+                judgeval_logger.warning(
                     f"Failed to send spans batch: HTTP {response.status_code} - {response.text}"
                 )
 
         except RequestException as e:
-            warnings.warn(f"Network error sending spans batch: {e}")
+            judgeval_logger.warning(f"Network error sending spans batch: {e}")
         except Exception as e:
-            warnings.warn(f"Failed to serialize or send spans batch: {e}")
+            judgeval_logger.warning(f"Failed to serialize or send spans batch: {e}")
 
     def _send_evaluation_runs_batch(self, evaluation_runs: List[Dict[str, Any]]):
         """Send a batch of evaluation runs with their associated span data to the endpoint."""
@@ -1092,14 +1093,14 @@ class BackgroundSpanService:
             )
 
             if response.status_code != HTTPStatus.OK:
-                warnings.warn(
+                judgeval_logger.warning(
                     f"Failed to send evaluation runs batch: HTTP {response.status_code} - {response.text}"
                 )
 
         except RequestException as e:
-            warnings.warn(f"Network error sending evaluation runs batch: {e}")
+            judgeval_logger.warning(f"Network error sending evaluation runs batch: {e}")
         except Exception as e:
-            warnings.warn(f"Failed to send evaluation runs batch: {e}")
+            judgeval_logger.warning(f"Failed to send evaluation runs batch: {e}")
 
     def queue_span(self, span: TraceSpan, span_state: str = "input"):
         """
@@ -1151,7 +1152,7 @@ class BackgroundSpanService:
             # Wait for the queue to be processed
             self._span_queue.join()
         except Exception as e:
-            warnings.warn(f"Error during flush: {e}")
+            judgeval_logger.warning(f"Error during flush: {e}")
 
     def shutdown(self):
         """Shutdown the background service and flush remaining spans."""
@@ -1166,9 +1167,9 @@ class BackgroundSpanService:
             try:
                 self.flush()
             except Exception as e:
-                warnings.warn(f"Error during final flush: {e}")
+                judgeval_logger.warning(f"Error during final flush: {e}")
         except Exception as e:
-            warnings.warn(f"Error during BackgroundSpanService shutdown: {e}")
+            judgeval_logger.warning(f"Error during BackgroundSpanService shutdown: {e}")
         finally:
             # Clear the worker threads list (daemon threads will be killed automatically)
             self._worker_threads.clear()
@@ -1979,7 +1980,7 @@ class Tracer:
                             # Reset trace context (span context resets automatically)
                             self.reset_current_trace(trace_token)
                         except Exception as e:
-                            warnings.warn(f"Issue with async_wrapper: {e}")
+                            judgeval_logger.warning(f"Issue with async_wrapper: {e}")
                             return
                 else:
                     with current_trace.span(span_name, span_type=span_type) as span:
@@ -2110,7 +2111,7 @@ class Tracer:
                             # Reset trace context (span context resets automatically)
                             self.reset_current_trace(trace_token)
                         except Exception as e:
-                            warnings.warn(f"Issue with save: {e}")
+                            judgeval_logger.warning(f"Issue with save: {e}")
                             return
                 else:
                     with current_trace.span(span_name, span_type=span_type) as span:
@@ -2226,11 +2227,11 @@ class Tracer:
                     )
                 current_trace.async_evaluate(*args, **kwargs)
             else:
-                warnings.warn(
+                judgeval_logger.warning(
                     "No trace found (context var or fallback), skipping evaluation"
                 )  # Modified warning
         except Exception as e:
-            warnings.warn(f"Issue with async_evaluate: {e}")
+            judgeval_logger.warning(f"Issue with async_evaluate: {e}")
 
     def update_metadata(self, metadata: dict):
         """
@@ -2243,7 +2244,7 @@ class Tracer:
         if current_trace:
             current_trace.update_metadata(metadata)
         else:
-            warnings.warn("No current trace found, cannot set metadata")
+            judgeval_logger.warning("No current trace found, cannot set metadata")
 
     def set_customer_id(self, customer_id: str):
         """
@@ -2256,7 +2257,7 @@ class Tracer:
         if current_trace:
             current_trace.set_customer_id(customer_id)
         else:
-            warnings.warn("No current trace found, cannot set customer ID")
+            judgeval_logger.warning("No current trace found, cannot set customer ID")
 
     def set_tags(self, tags: List[Union[str, set, tuple]]):
         """
@@ -2269,7 +2270,7 @@ class Tracer:
         if current_trace:
             current_trace.set_tags(tags)
         else:
-            warnings.warn("No current trace found, cannot set tags")
+            judgeval_logger.warning("No current trace found, cannot set tags")
 
     def get_background_span_service(self) -> Optional[BackgroundSpanService]:
         """Get the background span service instance."""
@@ -2326,7 +2327,7 @@ def wrap(
         # Warn about token counting limitations with streaming
         if isinstance(client, (AsyncOpenAI, OpenAI)) and is_streaming:
             if not kwargs.get("stream_options", {}).get("include_usage"):
-                warnings.warn(
+                judgeval_logger.warning(
                     "OpenAI streaming calls don't include token counts by default. "
                     "To enable token counting with streams, set stream_options={'include_usage': True} "
                     "in your API call arguments.",
@@ -2631,7 +2632,7 @@ def _format_response_output_data(client: ApiClient, response: Any) -> tuple:
         completion_tokens = response.usage.output_tokens
         message_content = response.output
     else:
-        warnings.warn(f"Unsupported client type: {type(client)}")
+        judgeval_logger.warning(f"Unsupported client type: {type(client)}")
         return None, None
 
     prompt_cost, completion_cost = cost_per_token(
@@ -2694,7 +2695,7 @@ def _format_output_data(
         completion_tokens = response.usage.output_tokens
         message_content = response.content[0].text
     else:
-        warnings.warn(f"Unsupported client type: {type(client)}")
+        judgeval_logger.warning(f"Unsupported client type: {type(client)}")
         return None, None
 
     prompt_cost, completion_cost = cost_per_token(
@@ -3042,7 +3043,7 @@ def cost_per_token(*args, **kwargs):
     try:
         return _original_cost_per_token(*args, **kwargs)
     except Exception as e:
-        warnings.warn(f"Error calculating cost per token: {e}")
+        judgeval_logger.warning(f"Error calculating cost per token: {e}")
         return None, None
 
 
