@@ -1,33 +1,76 @@
-# 🔎 Judgeval: Custom Agent Scoring with AnswerRelevancyScorer
+# 🤖 Judgment Labs – EchoAgent Evaluation Project
 
-This fork of [JudgmentLabs/judgeval](https://github.com/JudgmentLabs/judgeval) contains my custom implementation to experiment with agent evaluation using a custom scorer and a simple echo-style agent.
+This project demonstrates how to evaluate a simple AI agent using the open-source `judgeval` framework by Judgment Labs. It showcases the end-to-end pipeline from agent creation to scoring and accuracy measurement.
 
-## ✅ What I Added
+---
 
-### 🧠 Custom Scorer: `AnswerRelevancyScorer`
-- Extended `JudgevalScorer` to create a new scorer called `AnswerRelevancyScorer`
-- Performs string overlap scoring between the agent's output and the expected output
-- Tracks score, threshold, and pass/fail status for each example
+## 🔧 Project Structure
 
-### 🤖 Custom Agent: `EchoAgent`
-- A basic agent that simply echoes the prompt input (used for testing and benchmarking)
-- Located in `my_agents/agents/echo_agent.py`
+- **`my_agents/agents/echo_agent.py`**  
+  A minimal agent that echoes the input prompt with a prefix: _"You said: <prompt>"_.
 
-### 🧪 Evaluation Script: `agent_battle.py`
-- Loads a list of prompt/expected_output pairs from JSON
-- Runs the agent on each prompt
-- Evaluates outputs using the custom scorer
-- Prints score and whether the output passed the defined threshold
+- **`my_agents/agent_battle.py`**  
+  Main evaluation script that:
+  - Loads prompt-response examples from JSON
+  - Calls the agent on each prompt
+  - Scores outputs using a custom scorer (`AnswerRelevancyScorer`)
+  - Prints results with pass/fail metrics
 
-### 📂 Prompts Example:
-```json
-[
-  {
-    "input": "What is Python?",
-    "expected_output": "Python is a high-level programming language."
-  },
-  {
-    "input": "Define variable.",
-    "expected_output": "A variable stores a value in programming."
-  }
-]
+- **`my_agents/examples/prompts.json`**  
+  Contains a list of test cases with expected inputs and outputs.
+
+- **`src/judgeval/scorers/answer_relevancy_scorer.py`**  
+  Custom scorer that compares agent responses with expected output using partial string matching logic.
+
+---
+
+## 🚀 How to Run the Evaluation
+
+1. Set the Python path environment variable:
+
+   ```
+   export PYTHONPATH=src
+   ```
+
+2. Run the evaluation script:
+
+   ```
+   python my_agents/agent_battle.py
+   ```
+
+You’ll see the prompt, generated output, expected output, individual scores, and total accuracy.
+
+---
+
+## ✅ Example Output
+
+```
+Prompt: What is Python?
+Generated: You said: What is Python?
+Expected: Python is a high-level programming language.
+Score: 0.17 | Passed: False
+---
+Prompt: Define variable.
+Generated: You said: Define variable.
+Expected: A variable stores a value in programming.
+Score: 0.33 | Passed: False
+---
+
+✅ Agent Accuracy: 0/2 passed (0.00%)
+```
+
+---
+
+## 🧠 Why This Project
+
+This mini-project was created as part of the **Judgment Labs AI Agent Battle**. It helps demonstrate:
+
+- Agent evaluation using custom or built-in scorers
+- Integration with the `judgeval` scoring system
+- Ability to test and benchmark agents programmatically
+
+---
+
+## 🙌 Credits
+
+Built by Sai Santoshi Praneetha Mukkamala forked from [Judgment Labs](https://github.com/JudgmentLabs/judgeval).
