@@ -188,10 +188,6 @@ def test_wrap_unsupported_client(tracer):
 def test_invalid_api_key_logs_warning(caplog):
     with caplog.at_level("ERROR"):
         Tracer(api_key="invalid_key", organization_id="test_org")
-
-    print("ALA", caplog.records)
-    for record in caplog.records:
-        print(record.levelname, record.name, record.message)
     # Now assert the warning message is in the logs
     assert any(
         "Issue with passed in Judgment API key" in message
