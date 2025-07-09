@@ -929,13 +929,6 @@ def run_eval(
         else:
             local_scorers.append(scorer)
 
-    custom_example_check = [scorer.custom_example for scorer in local_scorers]
-    if any(custom_example_check) and not all(custom_example_check):
-        judgeval_logger.error(
-            "All scorers must be custom scorers if using custom examples"
-        )
-        raise ValueError("All scorers must be custom scorers if using custom examples")
-
     api_results: List[ScoringResult] = []
     local_results: List[ScoringResult] = []
 
@@ -1051,7 +1044,6 @@ def run_eval(
                 )
             )
             local_results = results
-        print(local_results)
         # Aggregate the ScorerData from the API and local evaluations
         merged_results: List[ScoringResult] = merge_results(api_results, local_results)
         merged_results = check_missing_scorer_data(merged_results)
@@ -1129,8 +1121,6 @@ def assert_test(scoring_results: List[ScoringResult]) -> None:
                     f"Strict Mode: {fail_scorer.strict_mode}\n"
                     f"Evaluation Model: {fail_scorer.evaluation_model}\n"
                     f"Error: {fail_scorer.error}\n"
-                    f"Evaluation Cost: {fail_scorer.evaluation_cost}\n"
-                    f"Verbose Logs: {fail_scorer.verbose_logs}\n"
                     f"Additional Metadata: {fail_scorer.additional_metadata}\n"
                 )
             error_msg += "-" * 100

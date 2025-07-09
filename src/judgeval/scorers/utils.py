@@ -6,11 +6,7 @@ import asyncio
 import nest_asyncio
 import inspect
 import json
-import sys
 import re
-from contextlib import contextmanager
-from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.console import Console
 from typing import List, Optional
 
 from judgeval.scorers import BaseScorer
@@ -37,50 +33,6 @@ def clone_scorers(scorers: List[BaseScorer]) -> List[BaseScorer]:
         cloned_scorer._add_model(model=args.get("model"))
         cloned_scorers.append(cloned_scorer)
     return cloned_scorers
-
-
-def scorer_console_msg(
-    scorer: BaseScorer,
-    async_mode: Optional[bool] = None,
-):
-    """
-    Renders a message to be displayed to console when a scorer is being executed.
-    """
-    if async_mode is None:
-        run_async = scorer.async_mode
-    else:
-        run_async = async_mode
-
-    return f"🔨 Executing Judgment's [rgb(106,0,255)]{scorer.__name__} Scorer[/rgb(106,0,255)]! \
-        [rgb(55,65,81)](using {scorer.evaluation_model}, async_mode={run_async})...[/rgb(55,65,81)]"
-
-
-@contextmanager
-def scorer_progress_meter(
-    scorer: BaseScorer,
-    async_mode: Optional[bool] = None,
-    display_meter: bool = True,
-    total: int = 100,
-    transient: bool = True,
-):
-    """
-    Context manager to display a progress indicator (spinner) while a scorer is being run.
-    """
-    console = Console(file=sys.stderr)
-    if display_meter:
-        with Progress(
-            SpinnerColumn(style="rgb(106,0,255)"),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-            transient=transient,
-        ) as progress:
-            progress.add_task(
-                description=scorer_console_msg(scorer, async_mode),
-                total=total,
-            )
-            yield
-    else:
-        yield
 
 
 def parse_response_json(llm_response: str, scorer: Optional[BaseScorer] = None) -> dict:
@@ -116,38 +68,6 @@ def parse_response_json(llm_response: str, scorer: Optional[BaseScorer] = None) 
         raise ValueError(error_str)
     except Exception as e:
         raise Exception(f"An unexpected error occurred: {str(e)}")
-
-
-def print_verbose_logs(metric: str, logs: str):
-    print("*" * 50)
-    print(f"{metric} Verbose Logs")
-    print("*" * 50)
-    print("")
-    print(logs)
-    print("")
-    print("=" * 70)
-
-
-def create_verbose_logs(metric: BaseScorer, steps: List[str]) -> str:
-    """
-    Creates verbose logs for a scorer object.
-
-    Args:
-        metric (BaseScorer): The scorer object.
-        steps (List[str]): The steps to be included in the verbose logs.
-
-    Returns:
-        str: The verbose logs (Concatenated steps).
-    """
-
-    verbose_logs = ""
-    for i in range(len(steps) - 1):
-        verbose_logs += steps[i]
-        if i < len(steps) - 2:  # don't add new line for penultimate step
-            verbose_logs += " \n \n"
-    if metric.verbose_mode:
-        print_verbose_logs(metric.__name__, verbose_logs + f"\n \n{steps[-1]}")
-    return verbose_logs
 
 
 def get_or_create_event_loop() -> asyncio.AbstractEventLoop:

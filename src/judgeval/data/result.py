@@ -13,7 +13,7 @@ class ScoringResult(ScoringResultJudgmentType):
         success (bool): Whether the evaluation was successful.
                         This means that all scorers applied to this example returned a success.
         scorer_data (List[ScorerData]): The scorers data for the evaluated example
-        data_object (Optional[Example]): The original example object that was used to create the ScoringResult, can be Example, CustomExample (future), WorkflowRun (future)
+        data_object (Optional[Example]): The original example object that was used to create the ScoringResult, can be Example, WorkflowRun (future)
 
     """
 
@@ -32,8 +32,7 @@ class ScoringResult(ScoringResultJudgmentType):
             success={self.success}, \
             scorer_data={self.scorers_data}, \
             data_object={self.data_object}, \
-            run_duration={self.run_duration}, \
-            evaluation_cost={self.evaluation_cost})"
+            run_duration={self.run_duration})"
 
 
 def generate_scoring_result(
@@ -58,6 +57,5 @@ def generate_scoring_result(
         success=success,
         scorers_data=scorers_data,
         run_duration=run_duration,
-        evaluation_cost=None,
     )
     return scoring_result

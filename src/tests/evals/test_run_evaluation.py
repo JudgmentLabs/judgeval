@@ -77,8 +77,6 @@ def mock_scoring_results():
                     strict_mode=True,
                     evaluation_model="gpt-4",
                     error=None,
-                    evaluation_cost=0.001,
-                    verbose_logs="Test logs",
                     additional_metadata={"test": "metadata"},
                 )
             ],
@@ -250,8 +248,6 @@ class TestRunEvaluation:
                                     "strict_mode": True,
                                     "evaluation_model": "gpt-4",
                                     "error": None,
-                                    "evaluation_cost": 0.001,
-                                    "verbose_logs": "Test logs",
                                     "additional_metadata": {"test": "metadata"},
                                 }
                             ],
@@ -310,8 +306,6 @@ class TestRunEvaluation:
                     strict_mode=True,
                     evaluation_model="gpt-4",
                     error=None,
-                    evaluation_cost=0.001,
-                    verbose_logs="Test logs",
                     additional_metadata={"test": "metadata"},
                 )
             ],

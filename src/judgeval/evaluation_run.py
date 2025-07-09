@@ -1,7 +1,7 @@
 from typing import List, Optional, Union
 from pydantic import BaseModel, field_validator, Field
 
-from judgeval.data import Example, CustomExample
+from judgeval.data import Example
 from judgeval.scorers import BaseScorer, APIScorerConfig
 from judgeval.constants import ACCEPTABLE_MODELS
 
@@ -13,7 +13,7 @@ class EvaluationRun(BaseModel):
     Args:
         project_name (str): The name of the project the evaluation results belong to
         eval_name (str): A name for this evaluation run
-        examples (Union[List[Example], List[CustomExample]]): The examples to evaluate
+        examples (List[Example]): The examples to evaluate
         scorers (List[Union[JudgmentScorer, BaseScorer]]): A list of scorers to use for evaluation
         model (str): The model used as a judge when using LLM as a Judge
         metadata (Optional[Dict[str, Any]]): Additional metadata to include for this evaluation run, e.g. comments, dataset name, purpose, etc.
@@ -23,7 +23,7 @@ class EvaluationRun(BaseModel):
     organization_id: Optional[str] = None
     project_name: Optional[str] = Field(default=None, validate_default=True)
     eval_name: Optional[str] = Field(default=None, validate_default=True)
-    examples: Union[List[Example], List[CustomExample]]
+    examples: List[Example]
     scorers: List[Union[APIScorerConfig, BaseScorer]]
     model: Optional[str] = "gpt-4.1"
     trace_span_id: Optional[str] = None
@@ -45,15 +45,6 @@ class EvaluationRun(BaseModel):
     def validate_examples(cls, v):
         if not v:
             raise ValueError("Examples cannot be empty.")
-
-        first_type = type(v[0])
-        if first_type not in (Example, CustomExample):
-            raise ValueError(f"Invalid type for Example/CustomExample: {first_type}")
-        if not all(isinstance(ex, first_type) for ex in v):
-            raise ValueError(
-                "All examples must be of the same type, either all Example or all CustomExample."
-            )
-
         return v
 
     @field_validator("scorers", mode="before")

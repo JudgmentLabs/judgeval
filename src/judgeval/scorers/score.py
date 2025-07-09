@@ -9,7 +9,6 @@ from typing import List, Union, Optional, Callable
 
 from judgeval.data import (
     Example,
-    CustomExample,
     ScoringResult,
     generate_scoring_result,
     create_scorer_data,
@@ -39,7 +38,6 @@ async def safe_a_score_example(
         skip_on_missing_params (bool): Whether to skip the test case if required parameters are missing.
     """
     try:
-        print(f"Scoring example: {example}")
         await scorer.a_score_example(example)
     except Exception as e:
         judgeval_logger.error(f"Error during scoring: {str(e)}")
@@ -49,7 +47,7 @@ async def safe_a_score_example(
 
 
 async def a_execute_scoring(
-    examples: Union[List[Example], List[CustomExample]],
+    examples: List[Example],
     scorers: List[BaseScorer],
     model: Optional[Union[str, List[str], JudgevalJudge]] = "gpt-4.1",
     ignore_errors: bool = False,
@@ -61,7 +59,7 @@ async def a_execute_scoring(
     Each `Example` will be evaluated by all of the `BaseScorer`s in the `scorers` list.
 
     Args:
-        examples (Union[List[Example], List[CustomExample]]): A list of `Example` objects to be evaluated.
+        examples (List[Example]): A list of `Example` objects to be evaluated.
         scorers (List[BaseScorer]): A list of `BaseScorer` objects to evaluate the examples.
         model (Union[str, List[str], JudgevalJudge]): The model to use for evaluation.
         ignore_errors (bool): Whether to ignore errors during evaluation.
@@ -81,7 +79,7 @@ async def a_execute_scoring(
             try:
                 return await func(*args, **kwargs)
             except Exception as e:
-                print(f"Error executing function: {e}")
+                judgeval_logger.error(f"Error executing function: {e}")
                 if kwargs.get("ignore_errors", False):
                     # Simply return None when ignoring errors, as expected by the test
                     return None
@@ -103,7 +101,7 @@ async def a_execute_scoring(
         bar_format="{desc}: |{bar}|{percentage:3.0f}% ({n_fmt}/{total_fmt}) [Time Taken: {elapsed}, {rate_fmt}{postfix}]",
     ) as pbar:
         for i, ex in enumerate(examples):
-            if isinstance(ex, Example) or isinstance(ex, CustomExample):
+            if isinstance(ex, Example):
                 if len(scorers) == 0:
                     pbar.update(1)
                     continue
@@ -127,7 +125,7 @@ async def a_execute_scoring(
 
 async def a_eval_examples_helper(
     scorers: List[BaseScorer],
-    example: Union[Example, CustomExample],
+    example: Example,
     scoring_results: List[ScoringResult],
     score_index: int,
     ignore_errors: bool,

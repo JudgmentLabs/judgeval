@@ -65,12 +65,7 @@ class TestBaseScorer:
             success=True,
             evaluation_model="gpt-4",
             strict_mode=True,
-            async_mode=False,
-            verbose_mode=False,
-            include_reason=True,
             error=None,
-            evaluation_cost=0.01,
-            verbose_logs="test logs",
             additional_metadata=additional_metadata,
         )
 
@@ -79,7 +74,6 @@ class TestBaseScorer:
         assert scorer.reason == "test reason"
         assert scorer.success is True
         assert scorer.strict_mode is True
-        assert scorer.async_mode is False
         assert scorer.additional_metadata == additional_metadata
 
     @patch("judgeval.scorers.base_scorer.create_judge")

@@ -26,8 +26,6 @@ def test_assert_test_all_passing(sample_example):
         strict_mode=True,
         evaluation_model="gpt-4",
         error=None,
-        evaluation_cost=0.1,
-        verbose_logs="test logs",
         additional_metadata={},
     )
 
@@ -50,8 +48,6 @@ def test_assert_test_failed_scorer(sample_example):
         strict_mode=True,
         evaluation_model="gpt-4",
         error=None,
-        evaluation_cost=0.1,
-        verbose_logs="test logs",
         additional_metadata={},
     )
 
@@ -79,8 +75,6 @@ def test_assert_test_multiple_failed_scorers(sample_example):
         strict_mode=True,
         evaluation_model="gpt-4",
         error=None,
-        evaluation_cost=0.1,
-        verbose_logs="test logs",
         additional_metadata={},
     )
 
@@ -93,8 +87,6 @@ def test_assert_test_multiple_failed_scorers(sample_example):
         strict_mode=True,
         evaluation_model="gpt-4",
         error=None,
-        evaluation_cost=0.1,
-        verbose_logs="test logs",
         additional_metadata={},
     )
 

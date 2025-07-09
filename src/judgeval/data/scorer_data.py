@@ -30,8 +30,6 @@ class ScorerData(ScorerDataJudgmentType):
             "strict_mode": self.strict_mode,
             "evaluation_model": self.evaluation_model,
             "error": self.error,
-            "evaluation_cost": self.evaluation_cost,
-            "verbose_logs": self.verbose_logs,
             "additional_metadata": self.additional_metadata,
         }
 
@@ -58,8 +56,6 @@ def create_scorer_data(scorer: BaseScorer) -> List[ScorerData]:
                 strict_mode=scorer.strict_mode,
                 evaluation_model=scorer.evaluation_model,
                 error=scorer.error,
-                evaluation_cost=scorer.evaluation_cost,
-                verbose_logs=scorer.verbose_logs,
             )
         )
     else:  # standard execution, no error
@@ -73,8 +69,6 @@ def create_scorer_data(scorer: BaseScorer) -> List[ScorerData]:
                 strict_mode=scorer.strict_mode,
                 evaluation_model=scorer.evaluation_model,
                 error=None,
-                evaluation_cost=scorer.evaluation_cost,
-                verbose_logs=scorer.verbose_logs,
                 additional_metadata=scorer.additional_metadata,
             )
         )
@@ -90,8 +84,6 @@ def create_scorer_data(scorer: BaseScorer) -> List[ScorerData]:
                     strict_mode=scorer.internal_scorer.strict_mode,
                     evaluation_model=scorer.internal_scorer.evaluation_model,
                     error=scorer.internal_scorer.error,
-                    evaluation_cost=scorer.internal_scorer.evaluation_cost,
-                    verbose_logs=scorer.internal_scorer.verbose_logs,
                 )
             )
         else:
@@ -105,8 +97,6 @@ def create_scorer_data(scorer: BaseScorer) -> List[ScorerData]:
                     strict_mode=scorer.internal_scorer.strict_mode,
                     evaluation_model=scorer.internal_scorer.evaluation_model,
                     error=None,
-                    evaluation_cost=scorer.internal_scorer.evaluation_cost,
-                    verbose_logs=scorer.internal_scorer.verbose_logs,
                     additional_metadata=scorer.internal_scorer.additional_metadata,
                 )
             )

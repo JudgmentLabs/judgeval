@@ -83,7 +83,6 @@ async def test_async_execution_result_awaitable(judgment_client, examples, score
             name=None,
             trace_id=None,
             run_duration=None,
-            evaluation_cost=None,
         )
     ]
 
