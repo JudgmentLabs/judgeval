@@ -2,7 +2,7 @@ from typing import Optional, List
 from requests import Response, exceptions
 from judgeval.utils.requests import requests
 from rich.progress import Progress, SpinnerColumn, TextColumn
-
+from uuid import uuid4
 from judgeval.common.logger import debug, error, warning, info
 from judgeval.constants import (
     JUDGMENT_DATASETS_PUSH_API_URL,
@@ -203,8 +203,13 @@ class EvalDatasetClient:
 
             info(f"Successfully pulled dataset with alias '{alias}'")
             payload = response.json()
-            dataset.examples = [Example(**e) for e in payload.get("examples", [])]
-            dataset.traces = [Trace(**t) for t in payload.get("traces", [])]
+            for example in payload.get("examples", []):
+                example_dict = dict(example)
+                example_dict.pop("example_id", None)
+                dataset.examples.append(Example(**example_dict))
+            dataset.traces = [
+                remap_trace_and_spans(Trace(**t)) for t in payload.get("traces", [])
+            ]
             dataset._alias = payload.get("alias")
             dataset._id = payload.get("id")
             progress.update(
@@ -341,3 +346,27 @@ class EvalDatasetClient:
             )
 
             return response
+
+
+def remap_trace_and_spans(trace: Trace) -> Trace:
+    new_trace = trace.model_copy()
+    new_trace_id = str(uuid4())
+    id_map = {}
+
+    # Assign new span IDs and update trace_id
+    for span in new_trace.trace_spans:
+        old_id = span.span_id
+        new_id = str(uuid4())
+        id_map[old_id] = new_id
+        span.span_id = new_id
+        span.trace_id = new_trace_id
+
+    # Update the trace itself
+    new_trace.trace_id = new_trace_id
+
+    # Remap parent relations
+    for span in new_trace.trace_spans:
+        if span.parent_span_id:
+            span.parent_span_id = id_map.get(span.parent_span_id)
+
+    return new_trace
