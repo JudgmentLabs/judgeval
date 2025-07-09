@@ -13,8 +13,9 @@ class AnswerRelevancyScorer(JudgevalScorer):
         self.score = score
         return score
 
-    async def a_score_example(self, example: Example, *args, **kwargs) -> float:
-        return self.score_example(example, *args, **kwargs)
+    # async def a_score_example(self, example: Example, *args, **kwargs) -> float:
+    #     return self.score_example(example, *args, **kwargs)
+    pass
 
     def _success_check(self) -> bool:
         return self.score is not None and self.score >= self.threshold
