@@ -37,7 +37,8 @@ async def main():
 
     for example in examples:
         generated = agent_fn(example.input)
-        example.actual_output = generated  # dynamic attribute used by scorer
+# example.actual_output = generated  # dynamic attribute used by scorer
+        example.additional_metadata['actual_output'] = generated # Use additional_metadata instead
         score = scorer.score_example(example)
         success = score >= threshold
         if success:
