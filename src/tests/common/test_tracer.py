@@ -10,7 +10,6 @@ from judgeval.common.tracer import (
     current_trace_var,
     TraceClient,
 )
-from judgeval.common.exceptions import JudgmentAPIError
 from judgeval.data.trace import TraceSpan
 
 
@@ -59,14 +58,11 @@ def trace_client(tracer):
         current_trace_var.reset(token)
 
 
-def test_tracer_requires_api_key():
-    """Test that Tracer requires an API key"""
-    # Clear any existing singleton instance first
+def test_tracer_requires_api_key(caplog):
     Tracer._instance = None
-
-    with pytest.raises(ValueError):
-        tracer = Tracer(api_key=None)
-        print(tracer.api_key)
+    with caplog.at_level("ERROR"):
+        Tracer(api_key=None)
+    assert "api_key parameter must be provided" in caplog.text
 
 
 def test_trace_span_to_dict():
@@ -189,21 +185,18 @@ def test_wrap_unsupported_client(tracer):
         wrap(UnsupportedClient())
 
 
-def test_tracer_invalid_api_key(mocker):
-    """Test that Tracer handles invalid API keys"""
-    # Clear the singleton instance first
-    Tracer._instance = None
+def test_invalid_api_key_logs_warning(caplog):
+    with caplog.at_level("ERROR"):
+        Tracer(api_key="invalid_key", organization_id="test_org")
 
-    # Now when Tracer tries to initialize JudgmentClient, it will receive our mocked result
-    with patch(
-        "judgeval.common.tracer.validate_api_key",
-        return_value=(False, "Invalid API key"),
-    ):
-        with pytest.raises(
-            JudgmentAPIError,
-            match="Issue with passed in Judgment API key: Invalid API key",
-        ):
-            Tracer(api_key="invalid_key", organization_id="test_org")
+    print("ALA", caplog.records)
+    for record in caplog.records:
+        print(record.levelname, record.name, record.message)
+    # Now assert the warning message is in the logs
+    assert any(
+        "Issue with passed in Judgment API key" in message
+        for message in caplog.messages
+    )
 
 
 def test_observe_decorator(tracer):

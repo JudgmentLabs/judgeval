@@ -52,7 +52,6 @@ def _setup_judgeval_logger():
 
     logger = logging.getLogger("judgeval")
     logger.setLevel(logging.DEBUG)
-    logger.propagate = False
     logger.addHandler(handler)
     return logger
 
