@@ -140,7 +140,4 @@ class TestBaseScorer:
         scorer = IncompleteScorer(score_type="test", threshold=0.5)
 
         with pytest.raises(NotImplementedError):
-            scorer.score_example({})
-
-        with pytest.raises(NotImplementedError):
             asyncio.run(scorer.a_score_example({}))

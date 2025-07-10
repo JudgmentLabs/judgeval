@@ -9,15 +9,6 @@ class ExampleScorer(BaseScorer):
     score_type: str = "Custom"  # default to custom score type
     required_params: List[str] = Field(default_factory=list)
 
-    def score_example(self, example: Example, *args, **kwargs) -> float:
-        """
-        Measures the score on a single example
-        """
-        judgeval_logger.error("score_example method not implemented")
-        raise NotImplementedError(
-            "You must implement the `score_example` method in your custom scorer"
-        )
-
     async def a_score_example(self, example: Example, *args, **kwargs) -> float:
         """
         Asynchronously measures the score on a single example
