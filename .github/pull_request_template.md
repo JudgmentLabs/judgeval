@@ -19,3 +19,5 @@
 - [ ] Tagged Linear ticket in PR title. Ie. PR Title (JUD-XXXX)
 - [ ] Video demo of changes
 - [ ] Reviewers assigned
+- [ ] Docs updated (if necessary)
+- [ ] Cookbooks updated (if necessary)
