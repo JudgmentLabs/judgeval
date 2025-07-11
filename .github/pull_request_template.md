@@ -19,5 +19,5 @@
 - [ ] Tagged Linear ticket in PR title. Ie. PR Title (JUD-XXXX)
 - [ ] Video demo of changes
 - [ ] Reviewers assigned
-- [ ] Docs updated (if necessary)
-- [ ] Cookbooks updated (if necessary)
+- [ ] Docs updated ([if necessary](https://github.com/JudgmentLabs/docs))
+- [ ] Cookbooks updated ([if necessary](https://github.com/JudgmentLabs/judgment-cookbook))
