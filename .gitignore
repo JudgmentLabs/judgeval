@@ -114,3 +114,5 @@ demo
 
 # OpenAPI json file
 src/judgeval/data/openapi_new.json
+
+CLAUDE.md
