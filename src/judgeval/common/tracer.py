@@ -797,6 +797,15 @@ class TraceClient:
         """
         self.update_metadata({"tags": tags})
 
+    def set_reward_score(self, reward_score: Union[float, Dict[str, float]]):
+        """
+        Set the reward score for this trace to be used for RL or SFT.
+
+        Args:
+            reward_score: The reward score to set
+        """
+        self.update_metadata({"reward_score": reward_score})
+
 
 def _capture_exception_for_trace(
     current_trace: Optional["TraceClient"], exc_info: ExcInfo
@@ -2271,6 +2280,19 @@ class Tracer:
             current_trace.set_tags(tags)
         else:
             judgeval_logger.warning("No current trace found, cannot set tags")
+
+    def set_reward_score(self, reward_score: Union[float, Dict[str, float]]):
+        """
+        Set the reward score for this trace to be used for RL or SFT.
+
+        Args:
+            reward_score: The reward score to set
+        """
+        current_trace = self.get_current_trace()
+        if current_trace:
+            current_trace.set_reward_score(reward_score)
+        else:
+            judgeval_logger.warning("No current trace found, cannot set reward score")
 
     def get_background_span_service(self) -> Optional[BackgroundSpanService]:
         """Get the background span service instance."""
