@@ -9,7 +9,6 @@ from requests import codes
 from judgeval.utils.requests import requests
 import asyncio
 
-from judgeval.constants import ROOT_API
 from judgeval.data.datasets import EvalDataset, EvalDatasetClient
 from judgeval.data import (
     ScoringResult,
@@ -19,7 +18,6 @@ from judgeval.data import (
 from judgeval.scorers import (
     APIScorerConfig,
     BaseScorer,
-    ClassifierScorer,
 )
 from judgeval.evaluation_run import EvaluationRun
 from judgeval.run_evaluation import (
@@ -349,101 +347,6 @@ class JudgmentClient(metaclass=SingletonMeta):
         if response.status_code != codes.ok:
             raise ValueError(f"Error deleting project: {response.json()}")
         return response.json()
-
-    def fetch_classifier_scorer(self, slug: str) -> ClassifierScorer:
-        """
-        Fetches a classifier scorer configuration from the Judgment API.
-
-        Args:
-            slug (str): Slug identifier of the custom scorer to fetch
-
-        Returns:
-            ClassifierScorer: The configured classifier scorer object
-
-        Raises:
-            JudgmentAPIError: If the scorer cannot be fetched or doesn't exist
-        """
-        request_body = {
-            "slug": slug,
-        }
-
-        response = requests.post(
-            f"{ROOT_API}/fetch_scorer/",
-            json=request_body,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.judgment_api_key}",
-                "X-Organization-Id": self.organization_id,
-            },
-            verify=True,
-        )
-
-        if response.status_code == 500:
-            raise JudgmentAPIError(
-                f"The server is temporarily unavailable. Please try your request again in a few moments. Error details: {response.json().get('detail', '')}"
-            )
-        elif response.status_code != 200:
-            raise JudgmentAPIError(
-                f"Failed to fetch classifier scorer '{slug}': {response.json().get('detail', '')}"
-            )
-
-        scorer_config = response.json()
-        scorer_config.pop("created_at")
-        scorer_config.pop("updated_at")
-
-        try:
-            return ClassifierScorer(**scorer_config)
-        except Exception as e:
-            raise JudgmentAPIError(
-                f"Failed to create classifier scorer '{slug}' with config {scorer_config}: {str(e)}"
-            )
-
-    def push_classifier_scorer(
-        self, scorer: ClassifierScorer, slug: str | None = None
-    ) -> str:
-        """
-        Pushes a classifier scorer configuration to the Judgment API.
-
-        Args:
-            slug (str): Slug identifier for the scorer. If it exists, the scorer will be updated.
-            scorer (ClassifierScorer): The classifier scorer to save
-
-        Returns:
-            str: The slug identifier of the saved scorer
-
-        Raises:
-            JudgmentAPIError: If there's an error saving the scorer
-        """
-        request_body = {
-            "name": scorer.name,
-            "conversation": scorer.conversation,
-            "options": scorer.options,
-            "slug": slug,
-        }
-
-        response = requests.post(
-            f"{ROOT_API}/save_scorer/",
-            json=request_body,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.judgment_api_key}",
-                "X-Organization-Id": self.organization_id,
-            },
-            verify=True,
-        )
-
-        if response.status_code == 500:
-            raise JudgmentAPIError(
-                f"The server is temporarily unavailable. \
-                                   Please try your request again in a few moments. \
-                                   Error details: {response.json().get('detail', '')}"
-            )
-        elif response.status_code != 200:
-            raise JudgmentAPIError(
-                f"Failed to save classifier scorer: {response.json().get('detail', '')}"
-            )
-
-        return response.json()["slug"]
 
     def assert_test(
         self,

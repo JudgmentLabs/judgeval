@@ -9,23 +9,19 @@ from judgeval.scorers.judgeval_scorers.api_scorers import (
     InstructionAdherenceScorer,
     DerailmentScorer,
     ToolOrderScorer,
-    ClassifierScorer,
+    PromptScorer,
     ToolDependencyScorer,
-)
-from judgeval.scorers.judgeval_scorers.classifiers import (
-    Text2SQLScorer,
 )
 
 __all__ = [
     "APIScorerConfig",
     "BaseScorer",
-    "ClassifierScorer",
+    "PromptScorer",
     "ExecutionOrderScorer",
     "HallucinationScorer",
     "FaithfulnessScorer",
     "AnswerRelevancyScorer",
     "AnswerCorrectnessScorer",
-    "Text2SQLScorer",
     "InstructionAdherenceScorer",
     "DerailmentScorer",
     "ToolOrderScorer",

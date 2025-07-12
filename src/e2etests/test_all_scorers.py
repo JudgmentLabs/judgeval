@@ -9,9 +9,9 @@ from judgeval.scorers import (
     FaithfulnessScorer,
     InstructionAdherenceScorer,
     ExecutionOrderScorer,
-    ClassifierScorer,
+    PromptScorer,
 )
-
+from uuid import uuid4
 from judgeval.data import Example
 
 
@@ -165,35 +165,17 @@ def test_execution_order_scorer(client: JudgmentClient, project_name: str):
     assert not res[0].success
 
 
-def test_classifier_scorer(client: JudgmentClient, project_name: str, random_name: str):
-    """Test classifier scorer functionality."""
-    random_slug = random_name
-
-    # Creating a classifier scorer from SDK
-    classifier_scorer = ClassifierScorer(
-        name="Test Classifier Scorer",
-        slug=random_slug,
-        threshold=0.5,
-        conversation=[],
-        options={},
-    )
-
-    # Update the conversation with the helpfulness evaluation template
-    classifier_scorer.update_conversation(
-        [
-            {
-                "role": "system",
-                "content": "You are a judge that evaluates whether the response is helpful to the user's question. Consider if the response is relevant, accurate, and provides useful information.",
-            },
-            {
-                "role": "user",
-                "content": "Question: {{input}}\nResponse: {{actual_output}}\n\nIs this response helpful?",
-            },
-        ]
+def test_prompt_scorer(client: JudgmentClient, project_name: str):
+    """Test prompt scorer functionality."""
+    # Creating a prompt scorer from SDK
+    prompt_scorer = PromptScorer.create(
+        name=f"Test Prompt Scorer {uuid4()}",
+        prompt="Question: {{input}}\nResponse: {{actual_output}}\n\nIs this response helpful?",
+        options={"yes": 1.0, "no": 0.0},
     )
 
     # Update the options with helpfulness classification choices
-    classifier_scorer.update_options(
+    prompt_scorer.set_options(
         {
             "yes": 1.0,  # Helpful response
             "no": 0.0,  # Unhelpful response
@@ -214,7 +196,7 @@ def test_classifier_scorer(client: JudgmentClient, project_name: str, random_nam
     # Run evaluation
     res = client.run_evaluation(
         examples=[helpful_example, unhelpful_example],
-        scorers=[classifier_scorer],
+        scorers=[prompt_scorer],
         model="Qwen/Qwen2.5-72B-Instruct-Turbo",
         project_name=project_name,
         eval_run_name="test-run-helpfulness",
