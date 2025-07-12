@@ -8,6 +8,7 @@ from judgeval.data.judgment_types import (
     TraceSpanJudgmentType,
     TraceJudgmentType,
 )
+from judgeval.constants import SPAN_LIFECYCLE_END_UPDATE_ID
 from pydantic import BaseModel
 
 
@@ -53,6 +54,22 @@ class TraceSpan(TraceSpanJudgmentType):
         """
         with self._update_id_lock:
             self.update_id += 1
+            return self.update_id
+
+    def set_update_id_to_ending_number(
+        self, ending_number: int = SPAN_LIFECYCLE_END_UPDATE_ID
+    ) -> int:
+        """
+        Thread-safe method to set the update_id to a predetermined ending number.
+
+        Args:
+            ending_number (int): The number to set update_id to. Defaults to SPAN_LIFECYCLE_END_UPDATE_ID.
+
+        Returns:
+            int: The new update_id value after setting
+        """
+        with self._update_id_lock:
+            self.update_id = ending_number
             return self.update_id
 
     def print_span(self):

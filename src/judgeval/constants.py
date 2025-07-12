@@ -145,3 +145,6 @@ MAX_WORKER_THREADS = 10
 
 # Maximum number of concurrent operations for evaluation runs
 MAX_CONCURRENT_EVALUATIONS = 50  # Adjust based on system capabilities
+
+# Span lifecycle management
+SPAN_LIFECYCLE_END_UPDATE_ID = 20  # Default ending number for completed spans
