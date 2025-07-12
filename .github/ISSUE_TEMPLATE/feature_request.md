@@ -3,7 +3,6 @@ name: Feature Request
 about: Suggest an idea for Judgeval
 title: "[FEATURE]"
 labels: feature-request
-assignees: Unassigned
 
 ---
 
