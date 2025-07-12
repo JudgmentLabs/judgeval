@@ -49,6 +49,7 @@ from openai import OpenAI, AsyncOpenAI
 from together import Together, AsyncTogether
 from anthropic import Anthropic, AsyncAnthropic
 from google import genai
+from groq import Groq, AsyncGroq
 
 # Local application/library-specific imports
 from judgeval.constants import (
@@ -90,6 +91,8 @@ ApiClient: TypeAlias = Union[
     AsyncOpenAI,
     AsyncAnthropic,
     AsyncTogether,
+    Groq,
+    AsyncGroq,
     genai.Client,
     genai.client.AsyncClient,
 ]  # Supported API clients
@@ -2422,7 +2425,7 @@ def wrap(
 ) -> Any:
     """
     Wraps an API client to add tracing capabilities.
-    Supports OpenAI, Together, Anthropic, and Google GenAI clients.
+    Supports OpenAI, Together, Anthropic, Groq, and Google GenAI clients.
     Patches both '.create' and Anthropic's '.stream' methods using a wrapper class.
     """
     (
@@ -2629,7 +2632,7 @@ def wrap(
         )
 
     # --- Assign Traced Methods to Client Instance ---
-    if isinstance(client, (AsyncOpenAI, AsyncTogether)):
+    if isinstance(client, (AsyncOpenAI, AsyncTogether, AsyncGroq)):
         client.chat.completions.create = traced_create_async
         if hasattr(client, "responses") and hasattr(client.responses, "create"):
             client.responses.create = traced_response_create_async
@@ -2646,7 +2649,7 @@ def wrap(
             client.messages.stream = traced_stream_async
     elif isinstance(client, genai.client.AsyncClient):
         client.models.generate_content = traced_create_async
-    elif isinstance(client, (OpenAI, Together)):
+    elif isinstance(client, (OpenAI, Together, Groq)):
         client.chat.completions.create = traced_create_sync
         if hasattr(client, "responses") and hasattr(client.responses, "create"):
             client.responses.create = traced_response_create_sync
@@ -2676,7 +2679,7 @@ def _get_client_config(
     """Returns configuration tuple for the given API client.
 
     Args:
-        client: An instance of OpenAI, Together, or Anthropic client
+        client: An instance of OpenAI, Together, Groq, or Anthropic client
 
     Returns:
         tuple: (span_name, create_method, responses_method, stream_method, beta_parse_method)
@@ -2699,6 +2702,14 @@ def _get_client_config(
         )
     elif isinstance(client, (Together, AsyncTogether)):
         return "TOGETHER_API_CALL", client.chat.completions.create, None, None, None
+    elif isinstance(client,(Groq,AsyncGroq)):
+        return (
+            "GROQ_API_CALL",
+            client.chat.completions.create,
+            None, # Groq clients do not have client.responses.create
+            None,
+            None,
+        )
     elif isinstance(client, (Anthropic, AsyncAnthropic)):
         return (
             "ANTHROPIC_API_CALL",
@@ -2718,7 +2729,7 @@ def _format_input_data(client: ApiClient, **kwargs) -> dict:
     Extracts relevant parameters from kwargs based on the client type
     to ensure consistent tracing across different APIs.
     """
-    if isinstance(client, (OpenAI, Together, AsyncOpenAI, AsyncTogether)):
+    if isinstance(client, (OpenAI, Together, Groq, AsyncOpenAI, AsyncTogether, AsyncGroq)):
         input_data = {
             "model": kwargs.get("model"),
             "messages": kwargs.get("messages"),
@@ -2748,6 +2759,11 @@ def _format_response_output_data(client: ApiClient, response: Any) -> tuple:
     model_name = None
     if isinstance(client, (OpenAI, Together, AsyncOpenAI, AsyncTogether)):
         model_name = response.model
+        prompt_tokens = response.usage.input_tokens
+        completion_tokens = response.usage.output_tokens
+        message_content = response.output
+    elif isinstance(client, (Groq, AsyncGroq)):
+        model_name = f"groq/{response.model}"
         prompt_tokens = response.usage.input_tokens
         completion_tokens = response.usage.output_tokens
         message_content = response.output
@@ -2814,6 +2830,11 @@ def _format_output_data(
         prompt_tokens = response.usage.input_tokens
         completion_tokens = response.usage.output_tokens
         message_content = response.content[0].text
+    elif isinstance(client, (Groq, AsyncGroq)):
+        model_name = f"groq/{response.model}" 
+        prompt_tokens = response.usage.prompt_tokens
+        completion_tokens = response.usage.completion_tokens
+        message_content = response.choices[0].message.content
     else:
         warnings.warn(f"Unsupported client type: {type(client)}")
         return None, None
@@ -2928,7 +2949,7 @@ class TraceThreadPoolExecutor(concurrent.futures.ThreadPoolExecutor):
 def _extract_content_from_chunk(client: ApiClient, chunk: Any) -> Optional[str]:
     """Extracts the text content from a stream chunk based on the client type."""
     try:
-        if isinstance(client, (OpenAI, Together, AsyncOpenAI, AsyncTogether)):
+        if isinstance(client, (OpenAI, Together, Groq, AsyncOpenAI, AsyncTogether, AsyncGroq)):
             return chunk.choices[0].delta.content
         elif isinstance(client, (Anthropic, AsyncAnthropic)):
             # Anthropic streams various event types, we only care for content blocks
@@ -2955,7 +2976,7 @@ def _extract_usage_from_final_chunk(
     try:
         # OpenAI/Together include usage in the *last* chunk's `usage` attribute if available
         # This typically requires specific API versions or settings. Often usage is *not* streamed.
-        if isinstance(client, (OpenAI, Together, AsyncOpenAI, AsyncTogether)):
+        if isinstance(client, (OpenAI, Together, Groq, AsyncOpenAI, AsyncTogether, AsyncGroq)):
             # Check if usage is directly on the chunk (some models might do this)
             if hasattr(chunk, "usage") and chunk.usage:
                 prompt_tokens = chunk.usage.prompt_tokens

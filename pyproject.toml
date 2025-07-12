@@ -28,7 +28,9 @@ dependencies = [
     "langchain-openai",
     "langchain-anthropic",
     "langchain-core",
+    "langchain-groq",
     "google-genai",
+    "groq",
     "boto3",
     "matplotlib>=3.10.3",
 ]
