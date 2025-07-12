@@ -8,8 +8,7 @@ import sys
 import itertools
 import threading
 from typing import List, Dict, Any, Union, Optional, Callable
-from rich import print as rprint
-
+from rich.console import Console
 from judgeval.data import ScorerData, ScoringResult, Example, Trace
 from judgeval.scorers import BaseScorer, APIScorerConfig
 from judgeval.scorers.score import a_execute_scoring
@@ -29,6 +28,8 @@ from judgeval.evaluation_run import EvaluationRun
 from judgeval.data.trace_run import TraceRun
 from judgeval.common.tracer import Tracer
 from langchain_core.callbacks import BaseCallbackHandler
+
+console = Console()
 
 
 def safe_run_async(coro):
@@ -369,12 +370,15 @@ def log_evaluation_results(
             judgeval_logger.error(f"Error {res.status_code}: {error_message}")
             raise JudgmentAPIError(error_message)
 
+        print_str = ""
         if "ui_results_url" in res.json():
             url = res.json()["ui_results_url"]
-            pretty_str = f"\n🔍 You can view your evaluation results here: [rgb(106,0,255)][link={url}]View Results[/link]\n"
-            return pretty_str
-
-        return None
+            if console.is_terminal:
+                print_str = f"You can view your evaluation results here: [rgb(106,0,255)][link={url}]View Results[/link]"
+            else:
+                print_str = f"You can view your evaluation results here: {url}"
+            judgeval_logger.info(print_str)
+        return print_str
 
     except exceptions.RequestException as e:
         judgeval_logger.error(
@@ -437,20 +441,18 @@ def check_examples(
                 if getattr(example, param.value) is None:
                     missing_params.append(f"{param.value}")
             if missing_params:
-                rprint(
-                    f"[yellow]⚠️  WARNING:[/yellow] Example is missing required parameters for scorer [bold]{scorer.score_type.value}[/bold]"
+                msg = (
+                    f"Example is missing required parameters for scorer [bold]{scorer.score_type.value}[/bold]\n"
+                    f"Missing parameters: {', '.join(missing_params)}\n"
+                    f"Example: {json.dumps(example.model_dump(), indent=2)}\n"
                 )
-                rprint(f"Missing parameters: {', '.join(missing_params)}")
-                rprint(f"Example: {json.dumps(example.model_dump(), indent=2)}")
-                rprint("-" * 40)
+                judgeval_logger.warning(msg)
                 prompt_user = True
 
     if prompt_user:
         user_input = input("Do you want to continue? (y/n)")
         if user_input.lower() != "y":
             sys.exit(0)
-        else:
-            rprint("[green]Continuing...[/green]")
 
 
 def run_trace_eval(
@@ -492,19 +494,18 @@ def run_trace_eval(
         for example in examples:
             if example.input:
                 if isinstance(example.input, str):
-                    run_with_spinner(
-                        "Running agent function: ", function, example.input
-                    )
+                    judgeval_logger.info("Running agent function ...")
+                    function(example.input)
                 elif isinstance(example.input, dict):
-                    run_with_spinner(
-                        "Running agent function: ", function, **example.input
-                    )
+                    judgeval_logger.info("Running agent function ...")
+                    function(**example.input)
                 else:
                     raise ValueError(
                         f"Input must be string or dict, got {type(example.input)}"
                     )
             else:
-                run_with_spinner("Running agent function: ", function)
+                judgeval_logger.info("Running agent function ...")
+                function()
 
         for i, trace in enumerate(actual_tracer.traces):
             # We set the root-level trace span with the expected tools of the Trace
@@ -516,9 +517,8 @@ def run_trace_eval(
 
     # Execute evaluation using Judgment API
     try:  # execute an EvaluationRun with just JudgmentScorers
-        response_data: Dict = run_with_spinner(
-            "Running Trace Evaluation: ", execute_api_trace_eval, trace_run
-        )
+        judgeval_logger.info("Running Trace Evaluation ...")
+        response_data: Dict = execute_api_trace_eval(trace_run)
         scoring_results = [
             ScoringResult(**result) for result in response_data["results"]
         ]
@@ -534,13 +534,10 @@ def run_trace_eval(
     # Convert the response data to `ScoringResult` objects
     # TODO: allow for custom scorer on traces
 
-    pretty_str = run_with_spinner(
-        "Logging Results: ",
-        log_evaluation_results,
+    log_evaluation_results(
         response_data["agent_results"],
         trace_run,
     )
-    rprint(pretty_str)
 
     return scoring_results
 
@@ -730,82 +727,11 @@ async def _poll_evaluation_until_complete(
             await asyncio.sleep(poll_interval_seconds)
 
 
-async def await_with_spinner(task, message: str = "Awaiting async task: "):
-    """
-    Display a spinner while awaiting an async task.
-
-    Args:
-        task: The asyncio task to await
-        message (str): Message to display with the spinner
-
-    Returns:
-        Any: The result of the awaited task
-    """
-    spinner = itertools.cycle(["|", "/", "-", "\\"])
-
-    # Create an event to signal when to stop the spinner
-    stop_spinner_event = asyncio.Event()
-
-    async def display_spinner():
-        while not stop_spinner_event.is_set():
-            sys.stdout.write(f"\r{message}{next(spinner)}")
-            sys.stdout.flush()
-            await asyncio.sleep(0.1)
-
-    # Start the spinner in a separate task
-    spinner_task = asyncio.create_task(display_spinner())
-
-    try:
-        # Await the actual task
-        result = await task
-    finally:
-        # Signal the spinner to stop and wait for it to finish
-        stop_spinner_event.set()
-        await spinner_task
-
-        # Clear the spinner line
-        sys.stdout.write("\r" + " " * (len(message) + 1) + "\r")
-        sys.stdout.flush()
-
-    return result
-
-
-class SpinnerWrappedTask:
-    """
-    A wrapper for an asyncio task that displays a spinner when awaited.
-    """
-
-    def __init__(self, task, message: str):
-        self.task = task
-        self.message = message
-
-    def __await__(self):
-        async def _spin_and_await():
-            # self.task resolves to (scoring_results, pretty_str_to_print)
-            task_result_tuple = await await_with_spinner(self.task, self.message)
-
-            # Unpack the tuple
-            scoring_results, pretty_str_to_print = task_result_tuple
-
-            # Print the pretty string if it exists, after spinner is cleared
-            if pretty_str_to_print:
-                rprint(pretty_str_to_print)
-
-            # Return only the scoring_results to the original awaiter
-            return scoring_results
-
-        return _spin_and_await().__await__()
-
-    # Proxy all Task attributes and methods to the underlying task
-    def __getattr__(self, name):
-        return getattr(self.task, name)
-
-
 def run_eval(
     evaluation_run: EvaluationRun,
     override: bool = False,
     async_execution: bool = False,
-) -> Union[List[ScoringResult], asyncio.Task, SpinnerWrappedTask]:
+) -> Union[List[ScoringResult], asyncio.Task]:
     """
     Executes an evaluation of `Example`s using one or more `Scorer`s
 
@@ -815,7 +741,7 @@ def run_eval(
         async_execution (bool, optional): Whether to execute the evaluation asynchronously. Defaults to False.
 
     Returns:
-        Union[List[ScoringResult], Union[asyncio.Task, SpinnerWrappedTask]]:
+        Union[List[ScoringResult], asyncio.Task]:
             - If async_execution is False, returns a list of ScoringResult objects
             - If async_execution is True, returns a Task that will resolve to a list of ScoringResult objects when awaited
     """
@@ -919,9 +845,8 @@ def run_eval(
         task = asyncio.create_task(_async_evaluation_workflow())
 
         # Wrap it in our custom awaitable that will show a spinner only when awaited
-        return SpinnerWrappedTask(
-            task, f"Processing evaluation '{evaluation_run.eval_name}': "
-        )
+        judgeval_logger.info("Running Evaluation ...")
+        return task
     else:
         check_examples(evaluation_run.examples, evaluation_run.scorers)
         if judgment_scorers:
@@ -936,9 +861,8 @@ def run_eval(
                     judgment_api_key=evaluation_run.judgment_api_key,
                     organization_id=evaluation_run.organization_id,
                 )
-                response_data: Dict = run_with_spinner(
-                    "Running Evaluation: ", execute_api_eval, api_evaluation_run
-                )
+                judgeval_logger.info("Running Evaluation ...")
+                response_data = execute_api_eval(api_evaluation_run)
             except JudgmentAPIError as e:
                 judgeval_logger.error(
                     f"An error occurred while executing the Judgment API request: {str(e)}"
@@ -971,26 +895,11 @@ def run_eval(
         merged_results: List[ScoringResult] = merge_results(api_results, local_results)
         merged_results = check_missing_scorer_data(merged_results)
 
-        # Evaluate rules against local scoring results if rules exist (this cant be done just yet)
-        # if evaluation_run.rules and merged_results:
-        #     run_rules(
-        #         local_results=merged_results,
-        #         rules=evaluation_run.rules,
-        #         judgment_api_key=evaluation_run.judgment_api_key,
-        #         organization_id=evaluation_run.organization_id
-        #     )
-        # print(merged_results)
         send_results = [
             scoring_result.model_dump(warnings=False)
             for scoring_result in merged_results
         ]
-        pretty_str = run_with_spinner(
-            "Logging Results: ",
-            log_evaluation_results,
-            send_results,
-            evaluation_run,
-        )
-        rprint(pretty_str)
+        log_evaluation_results(send_results, evaluation_run)
 
         return merged_results
 
@@ -1053,34 +962,42 @@ def assert_test(scoring_results: List[ScoringResult]) -> None:
         passed_tests = total_tests - failed_tests
 
         # Print summary with colors
-        rprint("\n" + "=" * 80)
+        judgeval_logger.info("\n" + "=" * 80)
         if failed_tests == 0:
-            rprint(
+            judgeval_logger.info(
                 f"[bold green]🎉 ALL TESTS PASSED! {passed_tests}/{total_tests} tests successful[/bold green]"
             )
         else:
-            rprint(
+            judgeval_logger.info(
                 f"[bold red]⚠️  TEST RESULTS: {passed_tests}/{total_tests} passed ({failed_tests} failed)[/bold red]"
             )
-        rprint("=" * 80 + "\n")
+        judgeval_logger.info("=" * 80 + "\n")
 
         # Print individual test cases
         for i, result in enumerate(scoring_results):
             test_num = i + 1
             if result.success:
-                rprint(f"[green]✓ Test {test_num}: PASSED[/green]")
+                judgeval_logger.info(f"[green]✓ Test {test_num}: PASSED[/green]")
             else:
-                rprint(f"[red]✗ Test {test_num}: FAILED[/red]")
+                judgeval_logger.info(f"[red]✗ Test {test_num}: FAILED[/red]")
                 if result.scorers_data:
                     for scorer_data in result.scorers_data:
                         if not scorer_data.success:
-                            rprint(f"  [yellow]Scorer: {scorer_data.name}[/yellow]")
-                            rprint(f"  [red]  Score: {scorer_data.score}[/red]")
-                            rprint(f"  [red]  Reason: {scorer_data.reason}[/red]")
+                            judgeval_logger.info(
+                                f"  [yellow]Scorer: {scorer_data.name}[/yellow]"
+                            )
+                            judgeval_logger.info(
+                                f"  [red]  Score: {scorer_data.score}[/red]"
+                            )
+                            judgeval_logger.info(
+                                f"  [red]  Reason: {scorer_data.reason}[/red]"
+                            )
                             if scorer_data.error:
-                                rprint(f"  [red]  Error: {scorer_data.error}[/red]")
-                rprint("  " + "-" * 40)
+                                judgeval_logger.info(
+                                    f"  [red]  Error: {scorer_data.error}[/red]"
+                                )
+                judgeval_logger.info("  " + "-" * 40)
 
-        rprint("\n" + "=" * 80)
+        judgeval_logger.info("\n" + "=" * 80)
         if failed_tests > 0:
             raise AssertionError(failed_cases)

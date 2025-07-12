@@ -38,6 +38,8 @@ from typing import (
     TypeAlias,
 )
 from rich import print as rprint
+from rich.console import Console
+
 import types
 
 # Third-party imports
@@ -71,6 +73,7 @@ from collections.abc import Iterator, AsyncIterator  # Add Iterator and AsyncIte
 import queue
 import atexit
 
+console = Console()
 # Define context variables for tracking the current trace and the current span within a trace
 current_trace_var = contextvars.ContextVar[Optional["TraceClient"]](
     "current_trace", default=None
@@ -219,8 +222,12 @@ class TraceManagerClient:
                 judgeval_logger.warning(f"Failed to save trace to S3: {str(e)}")
 
         if not offline_mode and show_link and "ui_results_url" in server_response:
-            pretty_str = f"\n🔍 You can view your trace data here: [rgb(106,0,255)][link={server_response['ui_results_url']}]View Trace[/link]\n"
-            rprint(pretty_str)
+            print_str = ""
+            if console.is_terminal:
+                print_str = f"\n🔍 You can view your trace data here: [rgb(106,0,255)][link={server_response['ui_results_url']}]View Trace[/link]\n"
+            else:
+                print_str = f"\n🔍 You can view your trace data here: {server_response['ui_results_url']}\n"
+            judgeval_logger.info(print_str)
 
         return server_response
 
@@ -528,7 +535,6 @@ class TraceClient:
     def add_eval_run(self, eval_run: EvaluationRun, start_time: float):
         # --- Modification: Use span_id from eval_run ---
         current_span_id = eval_run.trace_span_id  # Get ID from the eval_run object
-        # print(f"[TraceClient.add_eval_run] Using span_id from eval_run: {current_span_id}")
         # --- End Modification ---
 
         if current_span_id:
