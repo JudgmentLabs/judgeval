@@ -1,5 +1,5 @@
 from typing import Any
-import json
+import orjson as json
 import sys
 import threading
 from datetime import datetime, timezone

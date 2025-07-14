@@ -15,7 +15,7 @@ import traceback
 import uuid
 import contextvars
 import sys
-import json
+import orjson as json
 from contextlib import (
     contextmanager,
     AbstractAsyncContextManager,

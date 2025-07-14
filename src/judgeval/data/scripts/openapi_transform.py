@@ -1,4 +1,4 @@
-import json
+import orjson as json
 import sys
 from typing import Any, Dict, Generator, List
 import requests
@@ -11,7 +11,7 @@ if spec_file.startswith("http"):
     SPEC = r.json()
 else:
     with open(spec_file, "r") as f:
-        SPEC = json.load(f)
+        SPEC = json.loads(f.read())
 
 JUDGEVAL_PATHS: List[str] = [
     "/log_eval_results/",
@@ -120,4 +120,4 @@ spec = {
     },
 }
 
-print(json.dumps(spec, indent=4))
+print(json.dumps(spec, option=orjson.OPT_INDENT_2).decode())

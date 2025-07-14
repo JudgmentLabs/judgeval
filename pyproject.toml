@@ -31,7 +31,7 @@ dependencies = [
     "google-genai",
     "boto3",
     "matplotlib>=3.10.3",
-    "datamodel-code-generator>=0.31.1",
+    "orjson",
 ]
 
 [project.urls]

@@ -1,7 +1,7 @@
 import ast
 import csv
 import datetime
-import json
+import orjson as json
 import os
 import yaml
 from dataclasses import dataclass, field
@@ -78,7 +78,7 @@ class EvalDataset:
         """
         try:
             with open(file_path, "r") as file:
-                payload = json.load(file)
+                payload = json.loads(file.read())
                 examples = payload.get("examples", [])
         except FileNotFoundError:
             judgeval_logger.error(f"JSON file not found: {file_path}")
@@ -251,13 +251,12 @@ class EvalDataset:
         complete_path = os.path.join(dir_path, f"{file_name}.{file_type}")
         if file_type == "json":
             with open(complete_path, "w") as file:
-                json.dump(
+                file.write(json.dumps(
                     {
                         "examples": [e.to_dict() for e in self.examples],
                     },
-                    file,
-                    indent=4,
-                )
+                    option=orjson.OPT_INDENT_2,
+                ).decode())
         elif file_type == "csv":
             with open(complete_path, "w", newline="") as file:
                 writer = csv.writer(file)

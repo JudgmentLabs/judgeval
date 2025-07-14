@@ -1,7 +1,7 @@
 from requests import exceptions
 from judgeval.utils.requests import requests, requests_original
 from http.server import BaseHTTPRequestHandler, HTTPServer
-import json
+import orjson as json
 import pytest
 import threading
 import time
@@ -25,7 +25,7 @@ def http_server_fixture():
                         "call": CustomHandler.call_count,
                         "code": 502,
                     }
-                    self.wfile.write(json.dumps(response).encode())
+                    self.wfile.write(json.dumps(response))
                 if CustomHandler.call_count == 3:
                     self.send_response(200)
                     self.send_header("Content-type", "application/json")
@@ -35,7 +35,7 @@ def http_server_fixture():
                         "call": CustomHandler.call_count,
                         "code": 200,
                     }
-                    self.wfile.write(json.dumps(response).encode())
+                    self.wfile.write(json.dumps(response))
                 else:
                     self.send_response(503)
                     self.send_header("Content-type", "application/json")
@@ -45,7 +45,7 @@ def http_server_fixture():
                         "call": CustomHandler.call_count,
                         "code": 503,
                     }
-                    self.wfile.write(json.dumps(response).encode())
+                    self.wfile.write(json.dumps(response))
             elif self.path == "/get_error":
                 CustomHandler.call_count += 1
                 print(f"Call count: {CustomHandler.call_count}")

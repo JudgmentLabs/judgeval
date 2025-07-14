@@ -1,5 +1,5 @@
 import os
-import json
+import orjson as json
 import boto3
 from typing import Optional
 from datetime import datetime, UTC

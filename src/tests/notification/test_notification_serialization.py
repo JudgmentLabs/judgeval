@@ -1,6 +1,6 @@
 """Tests for serialization and deserialization of notification configurations."""
 
-import json
+import orjson as json
 
 from judgeval.rules import Rule, Condition, NotificationConfig
 from judgeval.utils.alerts import AlertStatus, AlertResult

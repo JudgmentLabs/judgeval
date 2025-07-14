@@ -5,7 +5,7 @@ Util functions for Scorer objects
 import asyncio
 import nest_asyncio
 import inspect
-import json
+import orjson as json
 import re
 from typing import List, Optional
 

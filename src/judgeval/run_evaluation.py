@@ -3,7 +3,7 @@ import concurrent.futures
 from requests import exceptions
 from judgeval.utils.requests import requests
 import time
-import json
+import orjson as json
 import sys
 import itertools
 import threading

@@ -3,7 +3,7 @@ Tests for dataset operations in the JudgmentClient.
 """
 
 import pytest
-import json
+import orjson as json
 import random
 import string
 
