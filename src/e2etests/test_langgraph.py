@@ -12,8 +12,6 @@ from judgeval.common.tracer import Tracer, TraceManagerClient, TraceClient
 from judgeval.integrations.langgraph import JudgevalCallbackHandler
 
 # --- Test Configuration ---
-PROJECT_NAME_SYNC = "test-sync-langgraph-project"
-PROJECT_NAME_ASYNC = "test-async-langgraph-project"
 API_KEY = os.getenv("JUDGMENT_API_KEY")
 ORG_ID = os.getenv("JUDGMENT_ORG_ID")
 
@@ -114,16 +112,16 @@ def fetch_and_validate_trace(trace_id: str, expected_project: str):
 
 
 # --- Synchronous Test ---
-def test_sync_graph_execution():
+def test_sync_graph_execution(project_name: str):
     """Tests synchronous graph execution with JudgevalCallbackHandler."""
     print("\n--- Running Sync Test ---")
     Tracer._instance = None
     tracer_sync = Tracer(
-        api_key=API_KEY, organization_id=ORG_ID, project_name=PROJECT_NAME_SYNC
+        api_key=API_KEY, organization_id=ORG_ID, project_name=project_name
     )
     handler_sync = JudgevalCallbackHandler(tracer_sync)
     trace_client_sync: TraceClient = None  # Keep this for type hinting
-    trace_id_sync: str = None
+    trace_id_sync: str = ""
 
     initial_state = {"messages": [HumanMessage(content="What is 5 + 5?")]}
     config = {"callbacks": [handler_sync]}
@@ -174,7 +172,7 @@ def test_sync_graph_execution():
         # Add a small delay before fetching
         print("Waiting 5 seconds before fetching sync trace...")
         time.sleep(5)
-        fetched_trace = fetch_and_validate_trace(trace_id_sync, PROJECT_NAME_SYNC)
+        fetched_trace = fetch_and_validate_trace(trace_id_sync, project_name)
         # Add more specific trace content assertions
         assert fetched_trace.get("trace_spans") is not None, (
             f"Trace {trace_id_sync} should have trace_spans."
@@ -191,16 +189,16 @@ def test_sync_graph_execution():
 
 # --- Asynchronous Test ---
 @pytest.mark.asyncio
-async def test_async_graph_execution():
+async def test_async_graph_execution(project_name: str):
     """Tests asynchronous graph execution with JudgevalCallbackHandler."""
     print("\n--- Running Async Test ---")
     Tracer._instance = None
     tracer_async = Tracer(
-        api_key=API_KEY, organization_id=ORG_ID, project_name=PROJECT_NAME_ASYNC
+        api_key=API_KEY, organization_id=ORG_ID, project_name=project_name
     )
     handler_async = JudgevalCallbackHandler(tracer_async)
     trace_client_async: TraceClient = None
-    trace_id_async: str = None
+    trace_id_async: str = ""
 
     initial_state = {"messages": [HumanMessage(content="What is 10 + 10?")]}
     config = {"callbacks": [handler_async]}
@@ -258,7 +256,7 @@ async def test_async_graph_execution():
         # Add a small delay before fetching
         print("Waiting 5 seconds before fetching async trace...")
         time.sleep(5)
-        fetched_trace = fetch_and_validate_trace(trace_id_async, PROJECT_NAME_ASYNC)
+        fetched_trace = fetch_and_validate_trace(trace_id_async, project_name)
         # Add more specific trace content assertions
         assert fetched_trace.get("trace_spans") is not None, (
             f"Trace {trace_id_async} should have trace_spans."

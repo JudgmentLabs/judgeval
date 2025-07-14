@@ -21,16 +21,6 @@ from judgeval.data.datasets.dataset import EvalDataset
 from judgeval.tracer import Tracer
 from judgeval.utils.file_utils import get_examples_from_yaml
 
-# Initialize a tracer instance for this test file
-tracer = Tracer()
-
-
-@tracer.observe(span_type="tool", project_name="TraceEvalProjectFromYAMLTest")
-def simple_traced_function_for_yaml_eval(text: str):
-    """A simple function to be traced and evaluated from YAML."""
-    time.sleep(0.01)  # Simulate minimal sync work
-    return f"Processed: {text.upper()}"
-
 
 @pytest.mark.basic
 class TestEvalOperations:
@@ -128,7 +118,37 @@ class TestEvalOperations:
         assert results[0]["scorer_data"][0]["score"] == 1.0
         client.delete_project(project_name=PROJECT_NAME)
 
-    def test_delete_eval_by_project_and_run_names(self, client: JudgmentClient):
+    def test_run_append_without_existing(
+        self, client: JudgmentClient, project_name: str
+    ):
+        """Test evaluation append behavior when the eval run does not exist."""
+        EVAL_RUN_NAME = "ColdEmailGenerator-Improve-BasePrompt"
+
+        example1 = Example(
+            input="Generate a cold outreach email for TechCorp. Facts: They recently launched an AI-powered analytics platform. Their CEO Sarah Chen previously worked at Google. They have 50+ enterprise clients.",
+            actual_output="Dear Ms. Chen,\n\nI noticed TechCorp's recent launch of your AI analytics platform and was impressed by its enterprise-focused approach. Your experience from Google clearly shines through in building scalable solutions, as evidenced by your impressive 50+ enterprise client base.\n\nWould you be open to a brief call to discuss how we could potentially collaborate?\n\nBest regards,\nAlex",
+            retrieval_context=[
+                "TechCorp launched AI analytics platform in 2024",
+                "Sarah Chen is CEO, ex-Google executive",
+                "Current client base: 50+ enterprise customers",
+            ],
+        )
+        scorer = AnswerRelevancyScorer(threshold=0.5)
+
+        results = client.run_evaluation(
+            examples=[example1],
+            scorers=[scorer],
+            model="gpt-4o-mini",
+            project_name=project_name,
+            eval_run_name=EVAL_RUN_NAME,
+            append=True,
+        )
+        assert results, f"No evaluation results found for {EVAL_RUN_NAME}"
+        assert len(results) == 1
+        print(results)
+        assert results[0].success
+
+    def test_delete_eval_by_project(self, client: JudgmentClient):
         """Test delete evaluation by project and run name workflow."""
         PROJECT_NAME = "".join(
             random.choices(string.ascii_letters + string.digits, k=20)
@@ -146,30 +166,8 @@ class TestEvalOperations:
             with pytest.raises(ValueError, match="Error fetching eval results"):
                 client.pull_eval(project_name=PROJECT_NAME, eval_run_name=eval_run_name)
 
-    def test_delete_eval_by_project(self, client: JudgmentClient):
-        """Test delete evaluation by project workflow."""
-        PROJECT_NAME = "".join(
-            random.choices(string.ascii_letters + string.digits, k=20)
-        )
-        EVAL_RUN_NAME = "".join(
-            random.choices(string.ascii_letters + string.digits, k=20)
-        )
-        EVAL_RUN_NAME2 = "".join(
-            random.choices(string.ascii_letters + string.digits, k=20)
-        )
-
-        self.run_eval_helper(client, PROJECT_NAME, EVAL_RUN_NAME)
-        self.run_eval_helper(client, PROJECT_NAME, EVAL_RUN_NAME2)
-
-        client.delete_project(project_name=PROJECT_NAME)
-        with pytest.raises(ValueError, match="Error fetching eval results"):
-            client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
-
-        with pytest.raises(ValueError, match="Error fetching eval results"):
-            client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME2)
-
     @pytest.mark.asyncio
-    async def test_assert_test(self, client: JudgmentClient):
+    async def test_assert_test(self, client: JudgmentClient, project_name: str):
         """Test assertion functionality."""
         # Create examples and scorers as before
         example = Example(
@@ -195,14 +193,14 @@ class TestEvalOperations:
         with pytest.raises(AssertionError):
             await client.assert_test(
                 eval_run_name="test_eval",
-                project_name="test_project",
+                project_name=project_name,
                 examples=[example, example1, example2],
                 scorers=[scorer],
                 model="Qwen/Qwen2.5-72B-Instruct-Turbo",
                 override=True,
             )
 
-    def test_evaluate_dataset(self, client: JudgmentClient):
+    def test_evaluate_dataset(self, client: JudgmentClient, project_name: str):
         """Test dataset evaluation."""
         example1 = Example(
             input="What if these shoes don't fit?",
@@ -227,7 +225,7 @@ class TestEvalOperations:
             examples=dataset.examples,
             scorers=[FaithfulnessScorer(threshold=0.5)],
             model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-            project_name="test_project",
+            project_name=project_name,
             eval_run_name="test_eval_run",
             override=True,
         )
@@ -235,10 +233,9 @@ class TestEvalOperations:
 
     @pytest.mark.asyncio
     async def test_run_trace_eval_from_yaml(
-        self, client: JudgmentClient, random_name: str
+        self, client: JudgmentClient, project_name: str, random_name: str
     ):
         """Test run_trace_evaluation with a YAML configuration file."""
-        PROJECT_NAME_EVAL = "TraceEvalProjectFromYAMLTest"
         EVAL_RUN_NAME = random_name
 
         yaml_content = """
@@ -256,6 +253,13 @@ examples:
         agent_name: "Agent 1"
     retrieval_context: ["Context for another yaml test"]
 """
+        tracer = Tracer(project_name=project_name)
+
+        @tracer.observe(span_type="tool")
+        def simple_traced_function_for_yaml_eval(text: str):
+            """A simple function to be traced and evaluated from YAML."""
+            time.sleep(0.01)  # Simulate minimal sync work
+            return f"Processed: {text.upper()}"
 
         temp_yaml_file_path = None
         try:
@@ -270,16 +274,16 @@ examples:
                 function=simple_traced_function_for_yaml_eval,
                 tracer=tracer,
                 scorers=[scorer],
-                project_name=PROJECT_NAME_EVAL,
+                project_name=project_name,
                 eval_run_name=EVAL_RUN_NAME,
                 override=True,
             )
 
             results = client.pull_eval(
-                project_name=PROJECT_NAME_EVAL, eval_run_name=EVAL_RUN_NAME
+                project_name=project_name, eval_run_name=EVAL_RUN_NAME
             )
             assert results, (
-                f"No evaluation results found for {EVAL_RUN_NAME} in project {PROJECT_NAME_EVAL}"
+                f"No evaluation results found for {EVAL_RUN_NAME} in project {project_name}"
             )
             assert isinstance(results, list), (
                 "Expected results to be a list of experiment/trace data"
@@ -289,12 +293,10 @@ examples:
         finally:
             if temp_yaml_file_path and os.path.exists(temp_yaml_file_path):
                 os.remove(temp_yaml_file_path)
-            try:
-                client.delete_project(project_name=PROJECT_NAME_EVAL)
-            except Exception as e:
-                print(f"Failed to delete project {PROJECT_NAME_EVAL}: {e}")
 
-    def test_override_eval(self, client: JudgmentClient, random_name: str):
+    def test_override_eval(
+        self, client: JudgmentClient, project_name: str, random_name: str
+    ):
         """Test evaluation override behavior."""
         example1 = Example(
             input="What if these shoes don't fit?",
@@ -306,7 +308,6 @@ examples:
 
         scorer = FaithfulnessScorer(threshold=0.5)
 
-        PROJECT_NAME = "test_eval_run_naming_collisions"
         EVAL_RUN_NAME = random_name
 
         # First run should succeed
@@ -314,7 +315,7 @@ examples:
             examples=[example1],
             scorers=[scorer],
             model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-            project_name=PROJECT_NAME,
+            project_name=project_name,
             eval_run_name=EVAL_RUN_NAME,
             override=False,
         )
@@ -325,7 +326,7 @@ examples:
                 examples=[example1],
                 scorers=[scorer],
                 model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-                project_name=PROJECT_NAME,
+                project_name=project_name,
                 eval_run_name=EVAL_RUN_NAME,
                 override=False,
             )
@@ -337,7 +338,7 @@ examples:
                 examples=[example1],
                 scorers=[scorer],
                 model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-                project_name=PROJECT_NAME,
+                project_name=project_name,
                 eval_run_name=EVAL_RUN_NAME,
                 override=True,
             )
@@ -351,7 +352,7 @@ examples:
                 examples=[example1],
                 scorers=[scorer],
                 model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-                project_name=PROJECT_NAME,
+                project_name=project_name,
                 eval_run_name=EVAL_RUN_NAME,
                 override=False,
             )

@@ -31,7 +31,7 @@ from judgeval.constants import (
     TOGETHER_SUPPORTED_MODELS,
     LITELLM_SUPPORTED_MODELS,
 )
-from judgeval.common.logger import debug, error
+from judgeval.common.logger import judgeval_logger
 
 
 class CustomModelParameters(pydantic.BaseModel):
@@ -40,18 +40,21 @@ class CustomModelParameters(pydantic.BaseModel):
     litellm_base_url: str
 
     @pydantic.field_validator("model_name")
+    @classmethod
     def validate_model_name(cls, v):
         if not v:
             raise ValueError("Model name cannot be empty")
         return v
 
     @pydantic.field_validator("secret_key")
+    @classmethod
     def validate_secret_key(cls, v):
         if not v:
             raise ValueError("Secret key cannot be empty")
         return v
 
     @pydantic.field_validator("litellm_base_url")
+    @classmethod
     def validate_litellm_base_url(cls, v):
         if not v:
             raise ValueError("Litellm base URL cannot be empty")
@@ -64,6 +67,7 @@ class ChatCompletionRequest(pydantic.BaseModel):
     response_format: Optional[Union[pydantic.BaseModel, Dict[str, Any]]] = None
 
     @pydantic.field_validator("messages")
+    @classmethod
     def validate_messages(cls, messages):
         if not messages:
             raise ValueError("Messages cannot be empty")
@@ -83,6 +87,7 @@ class ChatCompletionRequest(pydantic.BaseModel):
         return messages
 
     @pydantic.field_validator("model")
+    @classmethod
     def validate_model(cls, model):
         if not model:
             raise ValueError("Model cannot be empty")
@@ -91,6 +96,7 @@ class ChatCompletionRequest(pydantic.BaseModel):
         return model
 
     @pydantic.field_validator("response_format", mode="before")
+    @classmethod
     def validate_response_format(cls, response_format):
         if response_format is not None:
             if not isinstance(response_format, (dict, pydantic.BaseModel)):
@@ -145,11 +151,7 @@ def fetch_together_api_response(
         model=model, messages=messages, response_format=response_format
     )
 
-    debug(f"Calling Together API with model: {request.model}")
-    debug(f"Messages: {request.messages}")
-
     if request.response_format is not None:
-        debug(f"Using response format: {request.response_format}")
         response = together_client.chat.completions.create(
             model=request.model,
             messages=request.messages,
@@ -161,7 +163,6 @@ def fetch_together_api_response(
             messages=request.messages,
         )
 
-    debug(f"Received response: {response.choices[0].message.content[:100]}...")
     return response.choices[0].message.content
 
 
@@ -175,11 +176,7 @@ async def afetch_together_api_response(
         model=model, messages=messages, response_format=response_format
     )
 
-    debug(f"Calling Together API with model: {request.model}")
-    debug(f"Messages: {request.messages}")
-
     if request.response_format is not None:
-        debug(f"Using response format: {request.response_format}")
         response = await async_together_client.chat.completions.create(
             model=request.model,
             messages=request.messages,
@@ -251,7 +248,7 @@ def query_together_api_multiple_calls(
             try:
                 out[idx] = future.result()
             except Exception as e:
-                error(f"Error in parallel call {idx}: {str(e)}")
+                judgeval_logger.error(f"Error in parallel call {idx}: {str(e)}")
                 out[idx] = None
     return out
 
@@ -294,17 +291,15 @@ async def aquery_together_api_multiple_calls(
     # Validate message format
     validate_batched_chat_messages(messages)
 
-    debug(f"Starting parallel Together API calls for {len(messages)} messages")
     out: List[Union[str, None]] = [None] * len(messages)
 
     async def fetch_and_store(idx, model, message, response_format):
         try:
-            debug(f"Processing call {idx} with model {model}")
             out[idx] = await afetch_together_api_response(
                 model, message, response_format
             )
         except Exception as e:
-            error(f"Error in parallel call {idx}: {str(e)}")
+            judgeval_logger.error(f"Error in parallel call {idx}: {str(e)}")
             out[idx] = None
 
     tasks = [
@@ -315,7 +310,6 @@ async def aquery_together_api_multiple_calls(
     ]
 
     await asyncio.gather(*tasks)
-    debug(f"Completed {len(messages)} parallel calls")
     return out
 
 
@@ -329,11 +323,7 @@ def fetch_litellm_api_response(
         model=model, messages=messages, response_format=response_format
     )
 
-    debug(f"Calling LiteLLM API with model: {request.model}")
-    debug(f"Messages: {request.messages}")
-
     if request.response_format is not None:
-        debug(f"Using response format: {request.response_format}")
         response = litellm.completion(
             model=request.model,
             messages=request.messages,
@@ -483,7 +473,7 @@ def query_litellm_api_multiple_calls(
             try:
                 out[idx] = future.result()
             except Exception as e:
-                error(f"Error in parallel call {idx}: {str(e)}")
+                judgeval_logger.error(f"Error in parallel call {idx}: {str(e)}")
                 out[idx] = None
     return out
 
@@ -513,7 +503,7 @@ async def aquery_litellm_api_multiple_calls(
                 model, message, response_format
             )
         except Exception as e:
-            error(f"Error in parallel call {idx}: {str(e)}")
+            judgeval_logger.error(f"Error in parallel call {idx}: {str(e)}")
             out[idx] = None
 
     tasks = [
@@ -681,7 +671,6 @@ async def aget_chat_completion(
     Raises:
         - ValueError: If requested model is not supported by Litellm or TogetherAI.
     """
-    debug(f"Starting chat completion for model {model_type}, batched={batched}")
 
     if batched:
         validate_batched_chat_messages(messages)
@@ -693,7 +682,6 @@ async def aget_chat_completion(
         and is_batched_messages(messages)
         and model_type in TOGETHER_SUPPORTED_MODELS
     ):
-        debug("Using batched Together API call")
         return await aquery_together_api_multiple_calls(
             models=[model_type] * len(messages),
             messages=messages,
@@ -704,7 +692,6 @@ async def aget_chat_completion(
         and is_batched_messages(messages)
         and model_type in LITELLM_SUPPORTED_MODELS
     ):
-        debug("Using batched LiteLLM API call")
         return await aquery_litellm_api_multiple_calls(
             models=[model_type] * len(messages),
             messages=messages,
@@ -715,7 +702,6 @@ async def aget_chat_completion(
         and is_simple_messages(messages)
         and model_type in TOGETHER_SUPPORTED_MODELS
     ):
-        debug("Using single Together API call")
         return await afetch_together_api_response(
             model=model_type, messages=messages, response_format=response_format
         )
@@ -724,12 +710,11 @@ async def aget_chat_completion(
         and is_simple_messages(messages)
         and model_type in LITELLM_SUPPORTED_MODELS
     ):
-        debug("Using single LiteLLM API call")
         return await afetch_litellm_api_response(
             model=model_type, messages=messages, response_format=response_format
         )
 
-    error(f"Model {model_type} not supported by either API")
+    judgeval_logger.error(f"Model {model_type} not supported by either API")
     raise ValueError(
         f"Model {model_type} is not supported by Litellm or TogetherAI for chat completions. Please check the model name and try again."
     )
@@ -753,7 +738,6 @@ def get_completion_multiple_models(
     Raises:
         ValueError: If a model is not supported by Litellm or Together
     """
-    debug(f"Starting multiple model completion for {len(models)} models")
 
     if models is None or models == []:
         raise ValueError("Models list cannot be empty")
@@ -761,7 +745,9 @@ def get_completion_multiple_models(
     validate_batched_chat_messages(messages)
 
     if len(models) != len(messages):
-        error(f"Model/message count mismatch: {len(models)} vs {len(messages)}")
+        judgeval_logger.error(
+            f"Model/message count mismatch: {len(models)} vs {len(messages)}"
+        )
         raise ValueError(
             f"Number of models and messages must be the same: {len(models)} != {len(messages)}"
         )
@@ -774,13 +760,11 @@ def get_completion_multiple_models(
         zip(models, messages, response_formats)
     ):
         if model in TOGETHER_SUPPORTED_MODELS:
-            debug(f"Model {model} routed to Together API")
             together_calls[idx] = (model, message, r_format)
         elif model in LITELLM_SUPPORTED_MODELS:
-            debug(f"Model {model} routed to LiteLLM API")
             litellm_calls[idx] = (model, message, r_format)
         else:
-            error(f"Model {model} not supported by either API")
+            judgeval_logger.error(f"Model {model} not supported by either API")
             raise ValueError(
                 f"Model {model} is not supported by Litellm or TogetherAI for chat completions. Please check the model name and try again."
             )
@@ -792,7 +776,6 @@ def get_completion_multiple_models(
     # Get the responses from the TogetherAI models
     # List of responses from the TogetherAI models in order of the together_calls dict
     if together_calls:
-        debug(f"Executing {len(together_calls)} Together API calls")
         together_responses = query_together_api_multiple_calls(
             models=[model for model, _, _ in together_calls.values()],
             messages=[message for _, message, _ in together_calls.values()],
@@ -801,7 +784,6 @@ def get_completion_multiple_models(
 
     # Get the responses from the Litellm models
     if litellm_calls:
-        debug(f"Executing {len(litellm_calls)} LiteLLM API calls")
         litellm_responses = query_litellm_api_multiple_calls(
             models=[model for model, _, _ in litellm_calls.values()],
             messages=[message for _, message, _ in litellm_calls.values()],
@@ -809,13 +791,11 @@ def get_completion_multiple_models(
         )
 
     # Merge the responses in the order of the original models
-    debug("Merging responses")
     out: List[Union[str, None]] = [None] * len(models)
     for idx, (model, message, r_format) in together_calls.items():
         out[idx] = together_responses.pop(0)
     for idx, (model, message, r_format) in litellm_calls.items():
         out[idx] = litellm_responses.pop(0)
-    debug("Multiple model completion finished")
     return out
 
 

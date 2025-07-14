@@ -33,7 +33,7 @@ class SampleScorer(BaseScorer):
     async def a_score_example(self, example, *args, **kwargs) -> float:
         return 0.9
 
-    def _success_check(self) -> bool:
+    def success_check(self) -> bool:
         return self.score >= self.threshold if self.score is not None else False
 
 
@@ -67,12 +67,7 @@ class TestBaseScorer:
             success=True,
             evaluation_model="gpt-4",
             strict_mode=True,
-            async_mode=False,
-            verbose_mode=False,
-            include_reason=True,
             error=None,
-            evaluation_cost=0.01,
-            verbose_logs="test logs",
             additional_metadata=additional_metadata,
         )
 
@@ -81,7 +76,6 @@ class TestBaseScorer:
         assert scorer.reason == "test reason"
         assert scorer.success is True
         assert scorer.strict_mode is True
-        assert scorer.async_mode is False
         assert scorer.additional_metadata == additional_metadata
 
     @patch("judgeval.scorers.base_scorer.create_judge")
@@ -92,7 +86,7 @@ class TestBaseScorer:
         scorer = basic_scorer
         scorer._add_model("mock-model")
 
-        assert scorer.evaluation_model == "mock-model"
+        assert scorer.model == "mock-model"
         assert scorer.using_native_model is True
         mock_create_judge.assert_called_once_with("mock-model")
 
@@ -120,22 +114,15 @@ class TestBaseScorer:
         """Test success_check with various scores"""
         # Test with score above threshold
         basic_scorer.score = 0.8
-        assert basic_scorer._success_check() is True
+        assert basic_scorer.success_check() is True
 
         # Test with score below threshold
         basic_scorer.score = 0.6
-        assert basic_scorer._success_check() is False
+        assert basic_scorer.success_check() is False
 
         # Test with no score
         basic_scorer.score = None
-        assert basic_scorer._success_check() is False
-
-    def test_str_representation(self, basic_scorer):
-        """Test string representation of scorer"""
-        str_rep = str(basic_scorer)
-        assert "BaseScorer" in str_rep
-        assert "test_scorer" in str_rep
-        assert "0.7" in str_rep  # threshold value
+        assert basic_scorer.success_check() is False
 
     def test_abstract_methods_base_class(self):
         """Test that abstract methods raise NotImplementedError when not implemented"""
@@ -144,9 +131,6 @@ class TestBaseScorer:
             pass
 
         scorer = IncompleteScorer(score_type="test", threshold=0.5)
-
-        with pytest.raises(NotImplementedError):
-            scorer.score_example({})
 
         with pytest.raises(NotImplementedError):
             asyncio.run(scorer.a_score_example({}))

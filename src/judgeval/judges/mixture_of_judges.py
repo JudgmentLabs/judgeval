@@ -13,7 +13,7 @@ from judgeval.common.utils import (
     aget_completion_multiple_models,
     aget_chat_completion,
 )
-from judgeval.common.logger import debug, error
+from judgeval.common.logger import judgeval_logger
 
 
 def build_dynamic_mixture_prompt(
@@ -85,14 +85,13 @@ def build_dynamic_mixture_prompt(
     # If a custom system prompt is provided, validate and use it
     if custom_system_prompt is not None:
         if not isinstance(custom_system_prompt, str):
-            error(
+            judgeval_logger.error(
                 f"TypeError: Custom system prompt must be a string. Received: {type(custom_system_prompt)}."
             )
             raise TypeError(
                 f"Custom system prompt must be a string. Received: {type(custom_system_prompt)}."
             )
         if not custom_system_prompt:
-            error("ValueError: Custom system prompt cannot be empty")
             raise ValueError("Custom system prompt cannot be empty")
         # Override the default system prompt, but also add special instructions for handling JSON
         default_conversation[0]["content"] = (
@@ -105,31 +104,21 @@ def build_dynamic_mixture_prompt(
         # Validate custom conversation history format
         for message in custom_conversation_history:
             if not isinstance(message, dict):
-                error(
-                    f"TypeError: Custom conversation history must be a list of dictionaries. Received: {message}."
-                )
                 raise TypeError(
                     f"Custom conversation history must be a list of dictionaries. Received: {message}."
                 )
 
             if "role" not in message or "content" not in message:
-                error("ValueError: Each message must have 'role' and 'content' keys")
                 raise ValueError("Each message must have 'role' and 'content' keys")
 
             if not isinstance(message["role"], str) or not isinstance(
                 message["content"], str
             ):
-                error(
-                    f"TypeError: Message role and content must be strings. Received: {type(message['role'])}, {type(message['content'])}."
-                )
                 raise TypeError(
                     f"Message role and content must be strings. Received: {type(message['role'])}, {type(message['content'])}."
                 )
 
             if message["role"] not in ["system", "user", "assistant"]:
-                error(
-                    f"ValueError: Message role must be one of: 'system', 'user', 'assistant'. Received: {message['role']}."
-                )
                 raise ValueError(
                     f"Message role must be one of: 'system', 'user', 'assistant'. Received: {message['role']}."
                 )
@@ -200,7 +189,6 @@ class MixtureOfJudges(JudgevalJudge):
             aggregation_schema (pydantic.BaseModel): Response schema for the aggregator model.
             kwargs: Additional keyword arguments.
         """
-        debug(f"Generating response for input type: {type(input)}")
 
         # Convert input to conversation format if needed
         if isinstance(input, str):
@@ -208,7 +196,7 @@ class MixtureOfJudges(JudgevalJudge):
         elif isinstance(input, list):
             convo = input
         else:
-            error(f"Invalid input type received: {type(input)}")
+            judgeval_logger.error(f"Invalid input type received: {type(input)}")
             raise TypeError(
                 f"Input must be a string or a list of dictionaries. Input type of: {type(input)}"
             )
@@ -219,8 +207,7 @@ class MixtureOfJudges(JudgevalJudge):
                 messages=[convo] * len(self.models),
                 response_formats=[response_schema] * len(self.models),
             )
-        except Exception as e:
-            error(f"Error getting completions from multiple models: {str(e)}")
+        except Exception:
             raise
 
         compiled_mixture_prompt = build_dynamic_mixture_prompt(
@@ -235,8 +222,7 @@ class MixtureOfJudges(JudgevalJudge):
                 messages=compiled_mixture_prompt,
                 response_format=aggregation_schema,
             )
-        except Exception as e:
-            error(f"Error getting chat completion from aggregator: {str(e)}")
+        except Exception:
             raise
 
         return mixed_response
@@ -255,7 +241,6 @@ class MixtureOfJudges(JudgevalJudge):
             aggregation_schema (pydantic.BaseModel): Response schema for the aggregator model.
             kwargs: Additional keyword arguments.
         """
-        debug(f"Generating response for input type: {type(input)}")
 
         # Convert input to conversation format if needed
         if isinstance(input, str):
@@ -263,7 +248,7 @@ class MixtureOfJudges(JudgevalJudge):
         elif isinstance(input, list):
             convo = input
         else:
-            error(f"Invalid input type received: {type(input)}")
+            judgeval_logger.error(f"Invalid input type received: {type(input)}")
             raise TypeError(
                 f"Input must be a string or a list of dictionaries. Input type of: {type(input)}"
             )
@@ -274,8 +259,7 @@ class MixtureOfJudges(JudgevalJudge):
                 messages=[convo] * len(self.models),
                 response_formats=[response_schema] * len(self.models),
             )
-        except Exception as e:
-            error(f"Error getting async completions from multiple models: {str(e)}")
+        except Exception:
             raise
 
         compiled_mixture_prompt = build_dynamic_mixture_prompt(
@@ -290,8 +274,7 @@ class MixtureOfJudges(JudgevalJudge):
                 messages=compiled_mixture_prompt,
                 response_format=aggregation_schema,
             )
-        except Exception as e:
-            error(f"Error getting async chat completion from aggregator: {str(e)}")
+        except Exception:
             raise
 
         return mixed_response

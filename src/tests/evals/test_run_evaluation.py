@@ -77,8 +77,6 @@ def mock_scoring_results():
                     strict_mode=True,
                     evaluation_model="gpt-4",
                     error=None,
-                    evaluation_cost=0.001,
-                    verbose_logs="Test logs",
                     additional_metadata={"test": "metadata"},
                 )
             ],
@@ -250,8 +248,6 @@ class TestRunEvaluation:
                                     "strict_mode": True,
                                     "evaluation_model": "gpt-4",
                                     "error": None,
-                                    "evaluation_cost": 0.001,
-                                    "verbose_logs": "Test logs",
                                     "additional_metadata": {"test": "metadata"},
                                 }
                             ],
@@ -260,7 +256,12 @@ class TestRunEvaluation:
                 }
 
                 results = await _poll_evaluation_until_complete(
-                    MOCK_EVAL_NAME, MOCK_PROJECT_NAME, MOCK_API_KEY, MOCK_ORG_ID
+                    MOCK_EVAL_NAME,
+                    MOCK_PROJECT_NAME,
+                    MOCK_API_KEY,
+                    MOCK_ORG_ID,
+                    expected_scorer_count=1,
+                    original_examples=[Example(input="test", actual_output="test")],
                 )
 
                 # Verify that we got the expected results
@@ -310,8 +311,6 @@ class TestRunEvaluation:
                     strict_mode=True,
                     evaluation_model="gpt-4",
                     error=None,
-                    evaluation_cost=0.001,
-                    verbose_logs="Test logs",
                     additional_metadata={"test": "metadata"},
                 )
             ],

@@ -62,7 +62,6 @@ JUDGMENT_TRACES_FETCH_API_URL = f"{ROOT_API}/traces/fetch/"
 JUDGMENT_TRACES_SAVE_API_URL = f"{ROOT_API}/traces/save/"
 JUDGMENT_TRACES_UPSERT_API_URL = f"{ROOT_API}/traces/upsert/"
 JUDGMENT_TRACES_DELETE_API_URL = f"{ROOT_API}/traces/delete/"
-JUDGMENT_TRACES_ADD_ANNOTATION_API_URL = f"{ROOT_API}/traces/add_annotation/"
 JUDGMENT_TRACES_SPANS_BATCH_API_URL = f"{ROOT_API}/traces/spans/batch/"
 JUDGMENT_TRACES_EVALUATION_RUNS_BATCH_API_URL = (
     f"{ROOT_API}/traces/evaluation_runs/batch/"
@@ -145,3 +144,6 @@ MAX_WORKER_THREADS = 10
 
 # Maximum number of concurrent operations for evaluation runs
 MAX_CONCURRENT_EVALUATIONS = 50  # Adjust based on system capabilities
+
+# Span lifecycle management
+SPAN_LIFECYCLE_END_UPDATE_ID = 20  # Default ending number for completed spans

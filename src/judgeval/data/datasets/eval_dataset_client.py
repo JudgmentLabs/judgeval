@@ -2,8 +2,7 @@ from typing import Optional, List
 from requests import Response, exceptions
 from judgeval.utils.requests import requests
 from rich.progress import Progress, SpinnerColumn, TextColumn
-
-from judgeval.common.logger import debug, error, warning, info
+from judgeval.common.logger import judgeval_logger
 from judgeval.constants import (
     JUDGMENT_DATASETS_PUSH_API_URL,
     JUDGMENT_DATASETS_APPEND_EXAMPLES_API_URL,
@@ -31,9 +30,8 @@ class EvalDatasetClient:
         project_name: str,
         overwrite: Optional[bool] = False,
     ) -> bool:
-        debug(f"Pushing dataset with alias '{alias}' (overwrite={overwrite})")
         if overwrite:
-            warning(f"Overwrite enabled for alias '{alias}'")
+            judgeval_logger.warning(f"Overwrite enabled for alias '{alias}'")
         """
         Pushes the dataset to Judgment platform
 
@@ -76,16 +74,19 @@ class EvalDatasetClient:
                     verify=True,
                 )
                 if response.status_code != 200:
-                    error(f"Server error during push: {response.json()}")
+                    judgeval_logger.error(
+                        f"Server error during push: {response.json()}"
+                    )
                     raise Exception(f"Server error during push: {response.json()}")
                 response.raise_for_status()
             except exceptions.HTTPError as err:
                 if response.status_code == 422:
-                    error(f"Validation error during push: {err.response.json()}")
+                    judgeval_logger.error(
+                        f"Validation error during push: {err.response.json()}"
+                    )
                 else:
-                    error(f"HTTP error during push: {err}")
+                    judgeval_logger.error(f"HTTP error during push: {err}")
 
-            info(f"Successfully pushed dataset with alias '{alias}'")
             payload = response.json()
             dataset._alias = payload.get("_alias")
             dataset._id = payload.get("_id")
@@ -98,7 +99,6 @@ class EvalDatasetClient:
     def append_examples(
         self, alias: str, examples: List[Example], project_name: str
     ) -> bool:
-        debug(f"Appending dataset with alias '{alias}'")
         """
         Appends the dataset to Judgment platform
 
@@ -139,14 +139,18 @@ class EvalDatasetClient:
                     verify=True,
                 )
                 if response.status_code != 200:
-                    error(f"Server error during append: {response.json()}")
+                    judgeval_logger.error(
+                        f"Server error during append: {response.json()}"
+                    )
                     raise Exception(f"Server error during append: {response.json()}")
                 response.raise_for_status()
             except exceptions.HTTPError as err:
                 if response.status_code == 422:
-                    error(f"Validation error during append: {err.response.json()}")
+                    judgeval_logger.error(
+                        f"Validation error during append: {err.response.json()}"
+                    )
                 else:
-                    error(f"HTTP error during append: {err}")
+                    judgeval_logger.error(f"HTTP error during append: {err}")
 
             progress.update(
                 task_id,
@@ -155,7 +159,6 @@ class EvalDatasetClient:
             return True
 
     def pull(self, alias: str, project_name: str) -> EvalDataset:
-        debug(f"Pulling dataset with alias '{alias}'")
         """
         Pulls the dataset from Judgment platform
 
@@ -163,7 +166,7 @@ class EvalDatasetClient:
         {
             "alias": alias,
             "project_name": project_name
-        } 
+        }
         ==>
         {
             "examples": [...],
@@ -198,10 +201,9 @@ class EvalDatasetClient:
                 )
                 response.raise_for_status()
             except exceptions.RequestException as e:
-                error(f"Error pulling dataset: {str(e)}")
+                judgeval_logger.error(f"Error pulling dataset: {str(e)}")
                 raise
 
-            info(f"Successfully pulled dataset with alias '{alias}'")
             payload = response.json()
             dataset.examples = [Example(**e) for e in payload.get("examples", [])]
             dataset.traces = [Trace(**t) for t in payload.get("traces", [])]
@@ -239,20 +241,19 @@ class EvalDatasetClient:
                 )
                 response.raise_for_status()
             except exceptions.RequestException as e:
-                error(f"Error deleting dataset: {str(e)}")
+                judgeval_logger.error(f"Error deleting dataset: {str(e)}")
                 raise
 
             return True
 
     def pull_project_dataset_stats(self, project_name: str) -> dict:
-        debug(f"Pulling project datasets stats for project_name: {project_name}'")
         """
-        Pulls the project datasets stats from Judgment platform    
+        Pulls the project datasets stats from Judgment platform
 
         Mock request:
         {
             "project_name": project_name
-        } 
+        }
         ==>
         {
             "test_dataset_1": {"examples_count": len(dataset1.examples)},
@@ -286,10 +287,9 @@ class EvalDatasetClient:
                 )
                 response.raise_for_status()
             except exceptions.RequestException as e:
-                error(f"Error pulling dataset: {str(e)}")
+                judgeval_logger.error(f"Error pulling dataset: {str(e)}")
                 raise
 
-            info(f"Successfully pulled datasets for userid: {self.judgment_api_key}'")
             payload = response.json()
 
             progress.update(
@@ -301,7 +301,6 @@ class EvalDatasetClient:
 
     def export_jsonl(self, alias: str, project_name: str) -> Response:
         """Export dataset in JSONL format from Judgment platform"""
-        debug(f"Exporting dataset with alias '{alias}' as JSONL")
         with Progress(
             SpinnerColumn(style="rgb(106,0,255)"),
             TextColumn("[progress.description]{task.description}"),
@@ -326,15 +325,14 @@ class EvalDatasetClient:
                 response.raise_for_status()
             except exceptions.HTTPError as err:
                 if err.response.status_code == 404:
-                    error(f"Dataset not found: {alias}")
+                    judgeval_logger.error(f"Dataset not found: {alias}")
                 else:
-                    error(f"HTTP error during export: {err}")
+                    judgeval_logger.error(f"HTTP error during export: {err}")
                 raise
             except Exception as e:
-                error(f"Error during export: {str(e)}")
+                judgeval_logger.error(f"Error during export: {str(e)}")
                 raise
 
-            info(f"Successfully exported dataset with alias '{alias}'")
             progress.update(
                 task_id,
                 description=f"{progress.tasks[task_id].description} [rgb(25,227,160)]Done!)",

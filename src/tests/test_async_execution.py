@@ -44,7 +44,7 @@ def judgment_client():
     with patch(
         "judgeval.judgment_client.validate_api_key", return_value=(True, "valid")
     ):
-        client = JudgmentClient(judgment_api_key="fake_key", organization_id="fake_org")
+        client = JudgmentClient(api_key="fake_key", organization_id="fake_org")
         return client
 
 
@@ -83,7 +83,6 @@ async def test_async_execution_result_awaitable(judgment_client, examples, score
             name=None,
             trace_id=None,
             run_duration=None,
-            evaluation_cost=None,
         )
     ]
 

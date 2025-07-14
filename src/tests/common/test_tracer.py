@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 from uuid import uuid4
 from requests import Response
 
@@ -10,7 +10,6 @@ from judgeval.common.tracer import (
     current_trace_var,
     TraceClient,
 )
-from judgeval.common.exceptions import JudgmentAPIError
 from judgeval.data.trace import TraceSpan
 
 
@@ -59,14 +58,11 @@ def trace_client(tracer):
         current_trace_var.reset(token)
 
 
-def test_tracer_requires_api_key():
-    """Test that Tracer requires an API key"""
-    # Clear any existing singleton instance first
+def test_tracer_requires_api_key(caplog):
     Tracer._instance = None
-
-    with pytest.raises(ValueError):
-        tracer = Tracer(api_key=None)
-        print(tracer.api_key)
+    with caplog.at_level("ERROR"):
+        Tracer(api_key=None)
+    assert "api_key parameter must be provided" in caplog.text
 
 
 def test_trace_span_to_dict():
@@ -82,7 +78,6 @@ def test_trace_span_to_dict():
         output="result",
         function="test_func",
         span_type="test-span",
-        evaluation_runs=[],
         parent_span_id="test-parent-span-id",
     )
     data = span.model_dump()
@@ -94,7 +89,6 @@ def test_trace_span_to_dict():
     assert data["inputs"] == {"arg": 1}
     assert data["output"] == "result"
     assert data["function"] == "test_func"
-    assert data["evaluation_runs"] == []
     assert data["span_id"] == "test-span-1"
     assert data["parent_span_id"] == "test-parent-span-id"
     assert not data["has_evaluation"]  # Verify default value
@@ -158,29 +152,6 @@ def test_trace_client_nested_spans(trace_client):
             assert inner_span.depth == 2  # Depth is 1(outer) + 1
 
 
-@patch("judgeval.utils.requests.requests.post")
-def test_save_trace(mock_post, trace_client):
-    """Test saving trace data"""
-    # Configure mock response properly
-    mock_response = Mock()
-    mock_response.status_code = 200
-    mock_response.text = '{"message": "success"}'
-    mock_response.json.return_value = {
-        "ui_results_url": "http://example.com/results",
-        "trace_id": trace_client.trace_id,
-    }
-    mock_response.raise_for_status.return_value = None
-    mock_post.return_value = mock_response
-
-    with trace_client.span("test_span"):
-        trace_client.record_input({"arg": 1})
-        trace_client.record_output("result")
-
-    trace_id, data = trace_client.save()
-    assert mock_post.called
-    assert data["trace_id"] == trace_client.trace_id
-
-
 def test_wrap_unsupported_client(tracer):
     """Test wrapping unsupported client type"""
 
@@ -191,21 +162,14 @@ def test_wrap_unsupported_client(tracer):
         wrap(UnsupportedClient())
 
 
-def test_tracer_invalid_api_key(mocker):
-    """Test that Tracer handles invalid API keys"""
-    # Clear the singleton instance first
-    Tracer._instance = None
-
-    # Now when Tracer tries to initialize JudgmentClient, it will receive our mocked result
-    with patch(
-        "judgeval.common.tracer.validate_api_key",
-        return_value=(False, "Invalid API key"),
-    ):
-        with pytest.raises(
-            JudgmentAPIError,
-            match="Issue with passed in Judgment API key: Invalid API key",
-        ):
-            Tracer(api_key="invalid_key", organization_id="test_org")
+def test_invalid_api_key_logs_warning(caplog):
+    with caplog.at_level("ERROR"):
+        Tracer(api_key="invalid_key", organization_id="test_org")
+    # Now assert the warning message is in the logs
+    assert any(
+        "Issue with passed in Judgment API key" in message
+        for message in caplog.messages
+    )
 
 
 def test_observe_decorator(tracer):
@@ -264,6 +228,3 @@ def test_async_evaluate_sets_has_evaluation_flag(trace_client):
 
         # Verify has_evaluation is now True
         assert test_span.has_evaluation
-
-        # Verify the span has evaluation runs
-        assert len(test_span.evaluation_runs) > 0

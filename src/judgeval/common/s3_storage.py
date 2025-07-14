@@ -4,7 +4,7 @@ import boto3
 from typing import Optional
 from datetime import datetime, UTC
 from botocore.exceptions import ClientError
-from judgeval.common.logger import warning, info
+from judgeval.common.logger import judgeval_logger
 
 
 class S3Storage:
@@ -42,7 +42,6 @@ class S3Storage:
             error_code = e.response["Error"]["Code"]
             if error_code == "404":
                 # Bucket doesn't exist, create it
-                info(f"Bucket {self.bucket_name} doesn't exist, creating it ...")
                 try:
                     self.s3_client.create_bucket(
                         Bucket=self.bucket_name,
@@ -52,14 +51,13 @@ class S3Storage:
                     ) if self.s3_client.meta.region_name != "us-east-1" else self.s3_client.create_bucket(
                         Bucket=self.bucket_name
                     )
-                    info(f"Created S3 bucket: {self.bucket_name}")
                 except ClientError as create_error:
                     if (
                         create_error.response["Error"]["Code"]
                         == "BucketAlreadyOwnedByYou"
                     ):
                         # Bucket was just created by another process
-                        warning(
+                        judgeval_logger.warning(
                             f"Bucket {self.bucket_name} was just created by another process"
                         )
                         pass
@@ -90,8 +88,6 @@ class S3Storage:
         # Convert trace data to JSON string
         trace_json = json.dumps(trace_data)
 
-        # Upload to S3
-        info(f"Uploading trace to S3 at key {s3_key}, in bucket {self.bucket_name} ...")
         self.s3_client.put_object(
             Bucket=self.bucket_name,
             Key=s3_key,

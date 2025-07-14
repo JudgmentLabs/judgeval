@@ -9,18 +9,15 @@ from requests import codes
 from judgeval.utils.requests import requests
 import asyncio
 
-from judgeval.constants import ROOT_API
 from judgeval.data.datasets import EvalDataset, EvalDatasetClient
 from judgeval.data import (
     ScoringResult,
     Example,
-    CustomExample,
     Trace,
 )
 from judgeval.scorers import (
     APIScorerConfig,
     BaseScorer,
-    ClassifierScorer,
 )
 from judgeval.evaluation_run import EvaluationRun
 from judgeval.run_evaluation import (
@@ -41,6 +38,7 @@ from judgeval.common.tracer import Tracer
 from judgeval.common.utils import validate_api_key
 from pydantic import BaseModel
 from judgeval.run_evaluation import SpinnerWrappedTask
+from judgeval.common.logger import judgeval_logger
 
 
 class EvalRunRequestBody(BaseModel):
@@ -68,32 +66,30 @@ class SingletonMeta(type):
 class JudgmentClient(metaclass=SingletonMeta):
     def __init__(
         self,
-        judgment_api_key: Optional[str] = os.getenv("JUDGMENT_API_KEY"),
+        api_key: Optional[str] = os.getenv("JUDGMENT_API_KEY"),
         organization_id: Optional[str] = os.getenv("JUDGMENT_ORG_ID"),
     ):
-        # Check if API key is None
-        if judgment_api_key is None:
+        if not api_key:
             raise ValueError(
-                "JUDGMENT_API_KEY cannot be None. Please provide a valid API key or set the JUDGMENT_API_KEY environment variable."
+                "api_key parameter must be provided. Please provide a valid API key value or set the JUDGMENT_API_KEY environment variable."
             )
 
-        # Check if organization ID is None
-        if organization_id is None:
+        if not organization_id:
             raise ValueError(
-                "JUDGMENT_ORG_ID cannot be None. Please provide a valid organization ID or set the JUDGMENT_ORG_ID environment variable."
+                "organization_id parameter must be provided. Please provide a valid organization ID value or set the JUDGMENT_ORG_ID environment variable."
             )
 
-        self.judgment_api_key = judgment_api_key
+        self.judgment_api_key = api_key
         self.organization_id = organization_id
-        self.eval_dataset_client = EvalDatasetClient(judgment_api_key, organization_id)
+        self.eval_dataset_client = EvalDatasetClient(api_key, organization_id)
 
         # Verify API key is valid
-        result, response = validate_api_key(judgment_api_key)
+        result, response = validate_api_key(api_key)
         if not result:
             # May be bad to output their invalid API key...
             raise JudgmentAPIError(f"Issue with passed in Judgment API key: {response}")
         else:
-            print("Successfully initialized JudgmentClient!")
+            judgeval_logger.info("Successfully initialized JudgmentClient!")
 
     def a_run_evaluation(
         self,
@@ -163,7 +159,7 @@ class JudgmentClient(metaclass=SingletonMeta):
 
     def run_evaluation(
         self,
-        examples: Union[List[Example], List[CustomExample]],
+        examples: List[Example],
         scorers: List[Union[APIScorerConfig, BaseScorer]],
         model: Optional[str] = "gpt-4.1",
         project_name: str = "default_project",
@@ -176,7 +172,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         Executes an evaluation of `Example`s using one or more `Scorer`s
 
         Args:
-            examples (Union[List[Example], List[CustomExample]]): The examples to evaluate
+            examples (List[Example]): The examples to evaluate
             scorers (List[Union[APIScorerConfig, BaseScorer]]): A list of scorers to use for evaluation
             model (str): The model used as a judge when using LLM as a Judge
             project_name (str): The name of the project the evaluation results belong to
@@ -351,101 +347,6 @@ class JudgmentClient(metaclass=SingletonMeta):
         if response.status_code != codes.ok:
             raise ValueError(f"Error deleting project: {response.json()}")
         return response.json()
-
-    def fetch_classifier_scorer(self, slug: str) -> ClassifierScorer:
-        """
-        Fetches a classifier scorer configuration from the Judgment API.
-
-        Args:
-            slug (str): Slug identifier of the custom scorer to fetch
-
-        Returns:
-            ClassifierScorer: The configured classifier scorer object
-
-        Raises:
-            JudgmentAPIError: If the scorer cannot be fetched or doesn't exist
-        """
-        request_body = {
-            "slug": slug,
-        }
-
-        response = requests.post(
-            f"{ROOT_API}/fetch_scorer/",
-            json=request_body,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.judgment_api_key}",
-                "X-Organization-Id": self.organization_id,
-            },
-            verify=True,
-        )
-
-        if response.status_code == 500:
-            raise JudgmentAPIError(
-                f"The server is temporarily unavailable. Please try your request again in a few moments. Error details: {response.json().get('detail', '')}"
-            )
-        elif response.status_code != 200:
-            raise JudgmentAPIError(
-                f"Failed to fetch classifier scorer '{slug}': {response.json().get('detail', '')}"
-            )
-
-        scorer_config = response.json()
-        scorer_config.pop("created_at")
-        scorer_config.pop("updated_at")
-
-        try:
-            return ClassifierScorer(**scorer_config)
-        except Exception as e:
-            raise JudgmentAPIError(
-                f"Failed to create classifier scorer '{slug}' with config {scorer_config}: {str(e)}"
-            )
-
-    def push_classifier_scorer(
-        self, scorer: ClassifierScorer, slug: str | None = None
-    ) -> str:
-        """
-        Pushes a classifier scorer configuration to the Judgment API.
-
-        Args:
-            slug (str): Slug identifier for the scorer. If it exists, the scorer will be updated.
-            scorer (ClassifierScorer): The classifier scorer to save
-
-        Returns:
-            str: The slug identifier of the saved scorer
-
-        Raises:
-            JudgmentAPIError: If there's an error saving the scorer
-        """
-        request_body = {
-            "name": scorer.name,
-            "conversation": scorer.conversation,
-            "options": scorer.options,
-            "slug": slug,
-        }
-
-        response = requests.post(
-            f"{ROOT_API}/save_scorer/",
-            json=request_body,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.judgment_api_key}",
-                "X-Organization-Id": self.organization_id,
-            },
-            verify=True,
-        )
-
-        if response.status_code == 500:
-            raise JudgmentAPIError(
-                f"The server is temporarily unavailable. \
-                                   Please try your request again in a few moments. \
-                                   Error details: {response.json().get('detail', '')}"
-            )
-        elif response.status_code != 200:
-            raise JudgmentAPIError(
-                f"Failed to save classifier scorer: {response.json().get('detail', '')}"
-            )
-
-        return response.json()["slug"]
 
     def assert_test(
         self,

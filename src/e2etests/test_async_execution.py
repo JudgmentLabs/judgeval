@@ -5,7 +5,6 @@ import uuid
 from typing import List
 
 from judgeval.data import Example, ScoringResult
-from judgeval.judgment_client import JudgmentClient
 from judgeval.scorers import AnswerCorrectnessScorer, AnswerRelevancyScorer
 
 
@@ -55,31 +54,7 @@ def tools_examples() -> List[Example]:
                 }
             ],
         ),
-        Example(
-            input="Search for the latest news about AI",
-            actual_output="Here are the latest news about AI...",
-            expected_output="Here are the latest AI news developments...",
-            tools_called=["search_news(query='AI', count=5)"],
-            expected_tools=[
-                {"tool_name": "search_news", "parameters": {"query": "AI"}}
-            ],
-        ),
     ]
-
-
-@pytest.fixture(scope="module", autouse=True)
-def setup_and_teardown_module(client: JudgmentClient):
-    project_name = f"async-test-{uuid.uuid4().hex[:8]}"
-    client.create_project(project_name)
-    yield project_name
-
-    client.delete_project(project_name)
-    print(f"Deleted project {project_name}")
-
-
-@pytest.fixture
-def project_name(setup_and_teardown_module):
-    return setup_and_teardown_module
 
 
 @pytest.mark.asyncio
@@ -123,7 +98,7 @@ async def test_async_evaluation_multiple_scorers(client, tools_examples, project
     task = client.run_evaluation(
         examples=tools_examples,
         scorers=scorers,
-        model="gpt-4o-mini",
+        model="gpt-4.1",
         project_name=project_name,
         eval_run_name="async-multi-scorers",
         async_execution=True,

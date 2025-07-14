@@ -2,7 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from judgeval.evaluation_run import EvaluationRun
-from judgeval.data import Example, CustomExample
+from judgeval.data import Example
 from judgeval.scorers import BaseScorer, APIScorerConfig
 from judgeval.judges import JudgevalJudge
 from judgeval.constants import APIScorerType
@@ -63,9 +63,7 @@ def test_validate_examples():
         EvaluationRun(
             examples=[
                 Example(input="test1", actual_output="test1"),
-                CustomExample(
-                    input={"question": "test2"}, actual_output={"answer": "test2"}
-                ),
+                Example(input={"question": "test2"}, actual_output={"answer": "test2"}),
             ],
             scorers=[MockScorer()],
         )

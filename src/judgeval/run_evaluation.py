@@ -24,7 +24,7 @@ from judgeval.constants import (
     JUDGMENT_EVAL_FETCH_API_URL,
 )
 from judgeval.common.exceptions import JudgmentAPIError
-from judgeval.common.logger import debug, info, error, warning, example_logging_context
+from judgeval.common.logger import judgeval_logger
 from judgeval.evaluation_run import EvaluationRun
 from judgeval.data.trace_run import TraceRun
 from judgeval.common.tracer import Tracer
@@ -99,7 +99,7 @@ def execute_api_eval(evaluation_run: EvaluationRun) -> Dict:
         )
         response_data = response.json()
     except Exception as e:
-        error(f"Error: {e}")
+        judgeval_logger.error(f"Error: {e}")
         details = response.json().get("detail", "No details provided")
         raise JudgmentAPIError(
             "An error occurred while executing the Judgment API request: " + details
@@ -108,7 +108,7 @@ def execute_api_eval(evaluation_run: EvaluationRun) -> Dict:
     # Add check for the duplicate eval run name
     if not response.ok:
         error_message = response_data.get("detail", "An unknown error occurred.")
-        error(f"Error: {error_message=}")
+        judgeval_logger.error(f"Error: {error_message=}")
         raise JudgmentAPIError(error_message)
     return response_data
 
@@ -133,7 +133,7 @@ def execute_api_trace_eval(trace_run: TraceRun) -> Dict:
         )
         response_data = response.json()
     except Exception as e:
-        error(f"Error: {e}")
+        judgeval_logger.error(f"Error: {e}")
         details = response.json().get("detail", "No details provided")
         raise JudgmentAPIError(
             "An error occurred while executing the Judgment API request: " + details
@@ -142,7 +142,7 @@ def execute_api_trace_eval(trace_run: TraceRun) -> Dict:
     # Add check for the duplicate eval run name
     if not response.ok:
         error_message = response_data.get("detail", "An unknown error occurred.")
-        error(f"Error: {error_message=}")
+        judgeval_logger.error(f"Error: {error_message=}")
         raise JudgmentAPIError(error_message)
     return response_data
 
@@ -235,7 +235,7 @@ def check_missing_scorer_data(results: List[ScoringResult]) -> List[ScoringResul
     """
     for i, result in enumerate(results):
         if not result.scorers_data:
-            error(
+            judgeval_logger.error(
                 f"Scorer data is missing for example {i}. "
                 "This is usually caused when the example does not contain "
                 "the fields required by the scorer. "
@@ -273,17 +273,17 @@ def check_experiment_type(
         )
 
         if response.status_code == 422:
-            error(f"{response.json()}")
+            judgeval_logger.error(f"{response.json()}")
             raise ValueError(f"{response.json()}")
 
         if not response.ok:
             response_data = response.json()
             error_message = response_data.get("detail", "An unknown error occurred.")
-            error(f"Error checking eval run name: {error_message}")
+            judgeval_logger.error(f"Error checking eval run name: {error_message}")
             raise JudgmentAPIError(error_message)
 
     except exceptions.RequestException as e:
-        error(f"Failed to check if experiment type exists: {str(e)}")
+        judgeval_logger.error(f"Failed to check if experiment type exists: {str(e)}")
         raise JudgmentAPIError(f"Failed to check if experiment type exists: {str(e)}")
 
 
@@ -319,7 +319,7 @@ def check_eval_run_name_exists(
         )
 
         if response.status_code == 409:
-            error(
+            judgeval_logger.error(
                 f"Eval run name '{eval_name}' already exists for this project. Please choose a different name, set the `override` flag to true, or set the `append` flag to true."
             )
             raise ValueError(
@@ -329,11 +329,11 @@ def check_eval_run_name_exists(
         if not response.ok:
             response_data = response.json()
             error_message = response_data.get("detail", "An unknown error occurred.")
-            error(f"Error checking eval run name: {error_message}")
+            judgeval_logger.error(f"Error checking eval run name: {error_message}")
             raise JudgmentAPIError(error_message)
 
     except exceptions.RequestException as e:
-        error(f"Failed to check if eval run name exists: {str(e)}")
+        judgeval_logger.error(f"Failed to check if eval run name exists: {str(e)}")
         raise JudgmentAPIError(f"Failed to check if eval run name exists: {str(e)}")
 
 
@@ -366,7 +366,7 @@ def log_evaluation_results(
         if not res.ok:
             response_data = res.json()
             error_message = response_data.get("detail", "An unknown error occurred.")
-            error(f"Error {res.status_code}: {error_message}")
+            judgeval_logger.error(f"Error {res.status_code}: {error_message}")
             raise JudgmentAPIError(error_message)
 
         if "ui_results_url" in res.json():
@@ -377,12 +377,14 @@ def log_evaluation_results(
         return None
 
     except exceptions.RequestException as e:
-        error(f"Request failed while saving evaluation results to DB: {str(e)}")
+        judgeval_logger.error(
+            f"Request failed while saving evaluation results to DB: {str(e)}"
+        )
         raise JudgmentAPIError(
             f"Request failed while saving evaluation results to DB: {str(e)}"
         )
     except Exception as e:
-        error(f"Failed to save evaluation results to DB: {str(e)}")
+        judgeval_logger.error(f"Failed to save evaluation results to DB: {str(e)}")
         raise ValueError(f"Failed to save evaluation results to DB: {str(e)}")
 
 
@@ -407,7 +409,7 @@ def run_with_spinner(message: str, func, *args, **kwargs) -> Any:
         else:
             result = func(*args, **kwargs)
     except Exception as e:
-        error(f"An error occurred: {str(e)}")
+        judgeval_logger.error(f"An error occurred: {str(e)}")
         stop_spinner_event.set()
         spinner_thread.join()
         raise e
@@ -513,18 +515,14 @@ def run_trace_eval(
         actual_tracer.traces = []
 
     # Execute evaluation using Judgment API
-    info("Starting API evaluation")
     try:  # execute an EvaluationRun with just JudgmentScorers
-        debug("Sending request to Judgment API")
         response_data: Dict = run_with_spinner(
             "Running Trace Evaluation: ", execute_api_trace_eval, trace_run
         )
         scoring_results = [
             ScoringResult(**result) for result in response_data["results"]
         ]
-        info(f"Received {len(scoring_results)} results from API")
     except JudgmentAPIError as e:
-        error(f"An error occurred while executing the Judgment API request: {str(e)}")
         raise JudgmentAPIError(
             f"An error occurred while executing the Judgment API request: {str(e)}"
         )
@@ -534,7 +532,6 @@ def run_trace_eval(
         )
 
     # Convert the response data to `ScoringResult` objects
-    debug("Processing API results")
     # TODO: allow for custom scorer on traces
 
     pretty_str = run_with_spinner(
@@ -583,12 +580,12 @@ async def get_evaluation_status(
 
         if not response.ok:
             error_message = response.json().get("detail", "An unknown error occurred.")
-            error(f"Error checking evaluation status: {error_message}")
+            judgeval_logger.error(f"Error checking evaluation status: {error_message}")
             raise JudgmentAPIError(error_message)
 
         return response.json()
     except exceptions.RequestException as e:
-        error(f"Failed to check evaluation status: {str(e)}")
+        judgeval_logger.error(f"Failed to check evaluation status: {str(e)}")
         raise JudgmentAPIError(f"Failed to check evaluation status: {str(e)}")
 
 
@@ -597,8 +594,9 @@ async def _poll_evaluation_until_complete(
     project_name: str,
     judgment_api_key: str,
     organization_id: str,
+    expected_scorer_count: int,
+    original_examples: List[Example],
     poll_interval_seconds: int = 5,
-    original_examples: Optional[List[Example]] = None,
 ) -> List[ScoringResult]:
     """
     Polls until the evaluation is complete and returns the results.
@@ -616,23 +614,10 @@ async def _poll_evaluation_until_complete(
         List[ScoringResult]: The evaluation results
     """
     poll_count = 0
-    # Create example_id to Example mapping if original examples are provided
-    original_example_map = {}
-    if original_examples:
-        for example in original_examples:
-            original_example_map[example.example_id] = example
 
-    # Remove the expected scorer names extraction and checking
-    # We'll instead verify all examples have consistent scorer data
     while True:
         poll_count += 1
         try:
-            # Log polling attempt
-            if poll_count % 4 == 0:  # Log every 4th poll to avoid excess logging
-                info(
-                    f"Polling for evaluation '{eval_name}' in project '{project_name}' (attempt {poll_count})"
-                )
-
             # Check status
             response = await asyncio.to_thread(
                 requests.get,
@@ -650,7 +635,9 @@ async def _poll_evaluation_until_complete(
                 error_message = response.json().get(
                     "detail", "An unknown error occurred."
                 )
-                error(f"Error checking evaluation status: {error_message}")
+                judgeval_logger.error(
+                    f"Error checking evaluation status: {error_message}"
+                )
                 # Don't raise exception immediately, just log and continue polling
                 await asyncio.sleep(poll_interval_seconds)
                 continue
@@ -660,9 +647,6 @@ async def _poll_evaluation_until_complete(
 
             # If complete, get results and return
             if status == "completed" or status == "complete":
-                info(
-                    f"Evaluation '{eval_name}' reported as completed, fetching and verifying results..."
-                )
                 results_response = await asyncio.to_thread(
                     requests.post,
                     JUDGMENT_EVAL_FETCH_API_URL,
@@ -679,142 +663,54 @@ async def _poll_evaluation_until_complete(
                     error_message = results_response.json().get(
                         "detail", "An unknown error occurred."
                     )
-                    error(f"Error fetching evaluation results: {error_message}")
+                    judgeval_logger.error(
+                        f"Error fetching evaluation results: {error_message}"
+                    )
                     raise JudgmentAPIError(error_message)
 
                 result_data = results_response.json()
 
-                if "examples" in result_data:
-                    examples_data = result_data.get("examples", [])
+                if result_data.get("examples") is None:
+                    continue
 
-                    info(
-                        f"Successfully fetched {len(examples_data)} results for evaluation '{eval_name}'"
+                examples_data = result_data.get("examples", [])
+                scoring_results = []
+
+                for example_data in examples_data:
+                    # Create ScorerData objects
+                    scorer_data_list = []
+                    for raw_scorer_data in example_data.get("scorer_data", []):
+                        scorer_data_list.append(ScorerData(**raw_scorer_data))
+
+                    if len(scorer_data_list) != expected_scorer_count:
+                        # This means that not all scorers were loading for a specific example
+                        continue
+
+                    example = Example(**example_data)
+
+                    # Calculate success based on whether all scorer_data entries were successful
+                    success = all(
+                        scorer_data.success for scorer_data in scorer_data_list
                     )
-
-                    # Check for result validity if original examples are provided
-                    if original_example_map:
-                        # Verify all returned examples have matching original examples
-                        has_invalid_results = False
-                        for example_data in examples_data:
-                            example_id = example_data.get("example_id")
-
-                            if example_id not in original_example_map:
-                                warning(
-                                    f"Server returned example with ID {example_id} not found in original examples. "
-                                    + "This indicates stale or incorrect data. Continuing to poll..."
-                                )
-                                has_invalid_results = True
-                                break
-
-                        # If any invalid examples found, continue polling
-                        if has_invalid_results:
-                            info("Detected stale data. Waiting before polling again...")
-                            await asyncio.sleep(poll_interval_seconds)
-                            continue
-
-                        # Check if we received the expected number of results
-                        if original_examples and len(original_examples) != len(
-                            examples_data
-                        ):
-                            warning(
-                                f"Expected {len(original_examples)} results but got {len(examples_data)} results. "
-                                + "This indicates incomplete data. Continuing to poll..."
-                            )
-                            await asyncio.sleep(poll_interval_seconds)
-                            continue
-
-                        # Collect all example IDs from scorer data
-                        scorer_example_ids = set()
-                        for example_data in examples_data:
-                            scorer_data_list = example_data.get("scorer_data", [])
-                            for scorer_data in scorer_data_list:
-                                if "example_id" in scorer_data:
-                                    scorer_example_ids.add(scorer_data["example_id"])
-
-                        # Get the set of original example IDs
-                        original_example_ids = set(original_example_map.keys())
-
-                        # Check if the sets are equal
-                        missing_in_scorer = original_example_ids - scorer_example_ids
-                        extra_in_scorer = scorer_example_ids - original_example_ids
-
-                        if missing_in_scorer or extra_in_scorer:
-                            if missing_in_scorer:
-                                warning(
-                                    f"Examples missing in scorer data: {missing_in_scorer}"
-                                )
-                            if extra_in_scorer:
-                                warning(
-                                    f"Extra examples in scorer data: {extra_in_scorer}"
-                                )
-                            info(
-                                "Detected mismatched example IDs in scorer data. Waiting before polling again..."
-                            )
-                            await asyncio.sleep(poll_interval_seconds)
-                            continue
-
-                    # Create ScoringResult objects from the raw data
-                    scoring_results = []
-
-                    for example_data in examples_data:
-                        # Extract example_id from the server response
-                        example_id = example_data.get("example_id")
-
-                        # Create ScorerData objects
-                        scorer_data_list = []
-                        for raw_scorer_data in example_data.get("scorer_data", []):
-                            scorer_data_list.append(ScorerData(**raw_scorer_data))
-
-                        # Use the original Example object if we have it and the ID matches
-                        if original_example_map:
-                            example = original_example_map[example_id]
-                            debug(f"Matched result with original example {example_id}")
-                        else:
-                            # Create Example from example data (excluding scorer_data) if no original examples provided
-                            example_dict = {
-                                k: v
-                                for k, v in example_data.items()
-                                if k != "scorer_data"
-                            }
-                            example = Example(**example_dict)
-
-                        # Calculate success based on whether all scorer_data entries were successful
-                        success = (
-                            all(scorer_data.success for scorer_data in scorer_data_list)
-                            if scorer_data_list
-                            else False
-                        )
-
-                        # Create ScoringResult
-                        scoring_result = ScoringResult(
-                            success=success,  # Set based on all scorer data success values
-                            scorers_data=scorer_data_list,
-                            data_object=example,
-                        )
-                        scoring_results.append(scoring_result)
-
-                    # If we got here, all validation checks passed
-                    info(
-                        f"Verified complete results for all {len(scoring_results)} examples with all expected scorer data"
+                    scoring_result = ScoringResult(
+                        success=success,  # Set based on all scorer data success values
+                        scorers_data=scorer_data_list,
+                        data_object=example,
                     )
-                    return scoring_results
-                else:
-                    # No examples found
-                    info(
-                        f"No example results found for completed evaluation '{eval_name}'"
-                    )
-                    return []
+                    scoring_results.append(scoring_result)
 
+                    if len(scoring_results) != len(original_examples):
+                        # This means that not all examples were evaluated
+                        continue
+
+                return scoring_results
             elif status == "failed":
                 # Evaluation failed
                 error_message = status_data.get("error", "Unknown error")
-                error(f"Evaluation '{eval_name}' failed: {error_message}")
+                judgeval_logger.error(
+                    f"Evaluation '{eval_name}' failed: {error_message}"
+                )
                 raise JudgmentAPIError(f"Evaluation failed: {error_message}")
-
-            elif status == "pending" or status == "running":
-                # Only log occasionally for pending/running to avoid flooding logs
-                if poll_count % 4 == 0:
-                    info(f"Evaluation '{eval_name}' status: {status}")
 
             # Wait before checking again
             await asyncio.sleep(poll_interval_seconds)
@@ -824,7 +720,7 @@ async def _poll_evaluation_until_complete(
                 raise
 
             # For other exceptions, log and continue polling
-            error(f"Error checking evaluation status: {str(e)}")
+            judgeval_logger.error(f"Error checking evaluation status: {str(e)}")
             if poll_count > 20:  # Only raise exception after many failed attempts
                 raise JudgmentAPIError(
                     f"Error checking evaluation status after {poll_count} attempts: {str(e)}"
@@ -944,61 +840,26 @@ def run_eval(
         )
 
     # Set example IDs if not already set
-    debug("Initializing examples with IDs and timestamps")
     for idx, example in enumerate(evaluation_run.examples):
         example.example_index = idx  # Set numeric index
-        with example_logging_context(example.created_at, example.example_id):
-            debug(
-                f"Initialized example {example.example_id} (index: {example.example_index})"
-            )
-            debug(f"Input: {example.input}")
-            debug(f"Actual output: {example.actual_output}")
-            if example.expected_output:
-                debug(f"Expected output: {example.expected_output}")
-            if example.context:
-                debug(f"Context: {example.context}")
-            if example.retrieval_context:
-                debug(f"Retrieval context: {example.retrieval_context}")
-            if example.additional_metadata:
-                debug(f"Additional metadata: {example.additional_metadata}")
-            if example.tools_called:
-                debug(f"Tools called: {example.tools_called}")
-            if example.expected_tools:
-                debug(f"Expected tools: {example.expected_tools}")
 
-    debug(f"Starting evaluation run with {len(evaluation_run.examples)} examples")
-
-    # Group APIScorerConfigs and BaseScorers, then evaluate them in parallel
-    debug("Grouping scorers by type")
     judgment_scorers: List[APIScorerConfig] = []
     local_scorers: List[BaseScorer] = []
     for scorer in evaluation_run.scorers:
         if isinstance(scorer, APIScorerConfig):
             judgment_scorers.append(scorer)
-            debug(f"Added judgment scorer: {type(scorer).__name__}")
         else:
             local_scorers.append(scorer)
-            debug(f"Added local scorer: {type(scorer).__name__}")
-
-    custom_example_check = [scorer.custom_example for scorer in local_scorers]
-    if any(custom_example_check) and not all(custom_example_check):
-        error("All scorers must be custom scorers if using custom examples")
-        raise ValueError("All scorers must be custom scorers if using custom examples")
-
-    debug(
-        f"Found {len(judgment_scorers)} judgment scorers and {len(local_scorers)} local scorers"
-    )
 
     api_results: List[ScoringResult] = []
     local_results: List[ScoringResult] = []
 
     if async_execution:
         if len(local_scorers) > 0:
-            error("Local scorers are not supported in async execution")
+            judgeval_logger.error("Local scorers are not supported in async execution")
             raise ValueError("Local scorers are not supported in async execution")
 
         check_examples(evaluation_run.examples, evaluation_run.scorers)
-        info("Starting async evaluation")
 
         async def _async_evaluation_workflow():
             # Create a payload
@@ -1021,10 +882,10 @@ def run_eval(
                 error_message = response.json().get(
                     "detail", "An unknown error occurred."
                 )
-                error(f"Error adding evaluation to queue: {error_message}")
+                judgeval_logger.error(
+                    f"Error adding evaluation to queue: {error_message}"
+                )
                 raise JudgmentAPIError(error_message)
-
-            info(f"Successfully added evaluation '{evaluation_run.eval_name}' to queue")
 
             # Poll until the evaluation is complete
             results = await _poll_evaluation_until_complete(
@@ -1033,6 +894,7 @@ def run_eval(
                 judgment_api_key=evaluation_run.judgment_api_key,
                 organization_id=evaluation_run.organization_id,
                 original_examples=evaluation_run.examples,  # Pass the original examples
+                expected_scorer_count=len(evaluation_run.scorers),
             )
 
             pretty_str_to_print = None
@@ -1047,7 +909,9 @@ def run_eval(
                         log_evaluation_results, send_results, evaluation_run
                     )
                 except Exception as e:
-                    error(f"Error logging results after async evaluation: {str(e)}")
+                    judgeval_logger.error(
+                        f"Error logging results after async evaluation: {str(e)}"
+                    )
 
             return results, pretty_str_to_print
 
@@ -1062,8 +926,6 @@ def run_eval(
         check_examples(evaluation_run.examples, evaluation_run.scorers)
         if judgment_scorers:
             # Execute evaluation using Judgment API
-            info("Starting API evaluation")
-            debug(f"Creating API evaluation run with {len(judgment_scorers)} scorers")
             try:  # execute an EvaluationRun with just JudgmentScorers
                 api_evaluation_run: EvaluationRun = EvaluationRun(
                     eval_name=evaluation_run.eval_name,
@@ -1074,13 +936,11 @@ def run_eval(
                     judgment_api_key=evaluation_run.judgment_api_key,
                     organization_id=evaluation_run.organization_id,
                 )
-                debug("Sending request to Judgment API")
                 response_data: Dict = run_with_spinner(
                     "Running Evaluation: ", execute_api_eval, api_evaluation_run
                 )
-                info(f"Received {len(response_data['results'])} results from API")
             except JudgmentAPIError as e:
-                error(
+                judgeval_logger.error(
                     f"An error occurred while executing the Judgment API request: {str(e)}"
                 )
                 raise JudgmentAPIError(
@@ -1092,38 +952,24 @@ def run_eval(
                 )
 
             # Convert the response data to `ScoringResult` objects
-            debug("Processing API results")
             api_results = [
                 ScoringResult(**result) for result in response_data["results"]
             ]
         # Run local evals
         if local_scorers:  # List[BaseScorer]
-            # We should be removing local scorers soon
-            info("Starting local evaluation")
-            for example in evaluation_run.examples:
-                with example_logging_context(example.created_at, example.example_id):
-                    debug(f"Processing example {example.example_id}: {example.input}")
-
             results: List[ScoringResult] = safe_run_async(
                 a_execute_scoring(
                     evaluation_run.examples,
                     local_scorers,
                     model=evaluation_run.model,
-                    skip_on_missing_params=True,
-                    show_indicator=True,
-                    _use_bar_indicator=True,
                     throttle_value=0,
                     max_concurrent=MAX_CONCURRENT_EVALUATIONS,
                 )
             )
             local_results = results
-            info(f"Local evaluation complete with {len(local_results)} results")
         # Aggregate the ScorerData from the API and local evaluations
-        debug("Merging API and local results")
         merged_results: List[ScoringResult] = merge_results(api_results, local_results)
         merged_results = check_missing_scorer_data(merged_results)
-
-        info(f"Successfully merged {len(merged_results)} results")
 
         # Evaluate rules against local scoring results if rules exist (this cant be done just yet)
         # if evaluation_run.rules and merged_results:
@@ -1146,13 +992,6 @@ def run_eval(
         )
         rprint(pretty_str)
 
-        for i, result in enumerate(merged_results):
-            if (
-                not result.scorers_data
-            ):  # none of the scorers could be executed on this example
-                info(
-                    f"None of the scorers could be executed on example {i}. This is usually because the Example is missing the fields needed by the scorers. Try checking that the Example has the necessary fields for your scorers."
-                )
         return merged_results
 
 
@@ -1205,8 +1044,6 @@ def assert_test(scoring_results: List[ScoringResult]) -> None:
                     f"Strict Mode: {fail_scorer.strict_mode}\n"
                     f"Evaluation Model: {fail_scorer.evaluation_model}\n"
                     f"Error: {fail_scorer.error}\n"
-                    f"Evaluation Cost: {fail_scorer.evaluation_cost}\n"
-                    f"Verbose Logs: {fail_scorer.verbose_logs}\n"
                     f"Additional Metadata: {fail_scorer.additional_metadata}\n"
                 )
             error_msg += "-" * 100

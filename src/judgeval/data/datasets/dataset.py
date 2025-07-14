@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from typing import List, Union, Literal, Optional
 
 from judgeval.data import Example, Trace
-from judgeval.common.logger import debug, error, warning, info
+from judgeval.common.logger import judgeval_logger
 from judgeval.utils.file_utils import get_examples_from_yaml
 
 
@@ -29,7 +29,7 @@ class EvalDataset:
         traces: Optional[List[Trace]] = None,
     ):
         if not judgment_api_key:
-            warning("No judgment_api_key provided")
+            judgeval_logger.error("No judgment_api_key provided")
         self.examples = examples or []
         self.traces = traces or []
         self._alias = None
@@ -38,11 +38,10 @@ class EvalDataset:
         self.organization_id = organization_id
 
     def add_from_json(self, file_path: str) -> None:
-        debug(f"Loading dataset from JSON file: {file_path}")
         """
         Adds examples from a JSON file.
 
-        The format of the JSON file is expected to be a dictionary with one key: "examples". 
+        The format of the JSON file is expected to be a dictionary with one key: "examples".
         The value of the key is a list of dictionaries, where each dictionary represents an example.
 
         The JSON file is expected to have the following format:
@@ -82,13 +81,12 @@ class EvalDataset:
                 payload = json.load(file)
                 examples = payload.get("examples", [])
         except FileNotFoundError:
-            error(f"JSON file not found: {file_path}")
+            judgeval_logger.error(f"JSON file not found: {file_path}")
             raise FileNotFoundError(f"The file {file_path} was not found.")
         except json.JSONDecodeError:
-            error(f"Invalid JSON file: {file_path}")
+            judgeval_logger.error(f"Invalid JSON file: {file_path}")
             raise ValueError(f"The file {file_path} is not a valid JSON file.")
 
-        info(f"Added {len(examples)} examples from JSON")
         new_examples = [Example(**e) for e in examples]
         for e in new_examples:
             self.add_example(e)
@@ -189,11 +187,10 @@ class EvalDataset:
             self.add_example(e)
 
     def add_from_yaml(self, file_path: str) -> None:
-        debug(f"Loading dataset from YAML file: {file_path}")
         """
         Adds examples from a YAML file.
 
-        The format of the YAML file is expected to be a dictionary with one key: "examples". 
+        The format of the YAML file is expected to be a dictionary with one key: "examples".
         The value of the key is a list of dictionaries, where each dictionary represents an example.
 
         The YAML file is expected to have the following format:
@@ -220,7 +217,6 @@ class EvalDataset:
         """
         examples = get_examples_from_yaml(file_path)
 
-        info(f"Added {len(examples)} examples from YAML")
         for e in examples:
             self.add_example(e)
 
