@@ -13,8 +13,6 @@ from judgeval.run_evaluation import (
     check_examples,
     get_evaluation_status,
     _poll_evaluation_until_complete,
-    await_with_spinner,
-    SpinnerWrappedTask,
     assert_test,
 )
 from judgeval.data import Example, ScoringResult, ScorerData, Trace
@@ -274,24 +272,6 @@ class TestRunEvaluation:
 
                 # Verify that we made one call to fetch results
                 mock_post.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_await_with_spinner(self):
-        async def test_task():
-            return "test_result"
-
-        result = await await_with_spinner(test_task(), "Testing: ")
-
-        assert result == "test_result"
-
-    def test_spinner_wrapped_task(self):
-        async def test_task():
-            return "test_result", "pretty_str"
-
-        task = SpinnerWrappedTask(test_task(), "Testing: ")
-
-        # Test that the task is awaitable
-        assert hasattr(task, "__await__")
 
     def test_assert_test_success(self, mock_scoring_results):
         # All tests pass

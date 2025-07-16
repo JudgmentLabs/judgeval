@@ -368,12 +368,12 @@ def log_evaluation_results(
             judgeval_logger.error(f"Error {res.status_code}: {error_message}")
             raise JudgmentAPIError(error_message)
 
+        print_str = ""
         if "ui_results_url" in res.json():
             url = res.json()["ui_results_url"]
-            pretty_str = f"\n🔍 You can view your evaluation results here: [rgb(106,0,255)][link={url}]View Results[/link]\n"
-            return pretty_str
-
-        return None
+            print_str = f"You can view your evaluation results here: [rgb(106,0,255)][link={url}]View Results[/link]"
+            judgeval_logger.info(print_str)
+        return print_str
 
     except exceptions.RequestException as e:
         judgeval_logger.error(
@@ -436,20 +436,18 @@ def check_examples(
                 if getattr(example, param.value) is None:
                     missing_params.append(f"{param.value}")
             if missing_params:
-                rprint(
-                    f"[yellow]⚠️  WARNING:[/yellow] Example is missing required parameters for scorer [bold]{scorer.score_type.value}[/bold]"
+                msg = (
+                    f"Example is missing required parameters for scorer [bold]{scorer.score_type.value}[/bold]\n"
+                    f"Missing parameters: {', '.join(missing_params)}\n"
+                    f"Example: {json.dumps(example.model_dump(), indent=2)}\n"
                 )
-                rprint(f"Missing parameters: {', '.join(missing_params)}")
-                rprint(f"Example: {json.dumps(example.model_dump(), indent=2)}")
-                rprint("-" * 40)
+                judgeval_logger.warning(msg)
                 prompt_user = True
 
     if prompt_user:
         user_input = input("Do you want to continue? (y/n)")
         if user_input.lower() != "y":
             sys.exit(0)
-        else:
-            rprint("[green]Continuing...[/green]")
 
 
 def run_trace_eval(
@@ -489,21 +487,18 @@ def run_trace_eval(
         actual_tracer.offline_mode = True
         actual_tracer.traces = []
         for example in examples:
+            judgeval_logger.info("Running agent function ...")
             if example.input:
                 if isinstance(example.input, str):
-                    run_with_spinner(
-                        "Running agent function: ", function, example.input
-                    )
+                    function(example.input)
                 elif isinstance(example.input, dict):
-                    run_with_spinner(
-                        "Running agent function: ", function, **example.input
-                    )
+                    function(**example.input)
                 else:
                     raise ValueError(
                         f"Input must be string or dict, got {type(example.input)}"
                     )
             else:
-                run_with_spinner("Running agent function: ", function)
+                function()
 
         for i, trace in enumerate(actual_tracer.traces):
             # We set the root-level trace span with the expected tools of the Trace
@@ -515,9 +510,8 @@ def run_trace_eval(
 
     # Execute evaluation using Judgment API
     try:  # execute an EvaluationRun with just JudgmentScorers
-        response_data: Dict = run_with_spinner(
-            "Running Trace Evaluation: ", execute_api_trace_eval, trace_run
-        )
+        judgeval_logger.info("Running Trace Evaluation ...")
+        response_data: Dict = execute_api_trace_eval(trace_run)
         scoring_results = [
             ScoringResult(**result) for result in response_data["results"]
         ]
@@ -533,13 +527,10 @@ def run_trace_eval(
     # Convert the response data to `ScoringResult` objects
     # TODO: allow for custom scorer on traces
 
-    pretty_str = run_with_spinner(
-        "Logging Results: ",
-        log_evaluation_results,
+    log_evaluation_results(
         response_data["agent_results"],
         trace_run,
     )
-    rprint(pretty_str)
 
     return scoring_results
 
@@ -729,82 +720,38 @@ async def _poll_evaluation_until_complete(
             await asyncio.sleep(poll_interval_seconds)
 
 
-async def await_with_spinner(task, message: str = "Awaiting async task: "):
-    """
-    Display a spinner while awaiting an async task.
-
-    Args:
-        task: The asyncio task to await
-        message (str): Message to display with the spinner
-
-    Returns:
-        Any: The result of the awaited task
-    """
-    spinner = itertools.cycle(["|", "/", "-", "\\"])
-
-    # Create an event to signal when to stop the spinner
-    stop_spinner_event = asyncio.Event()
-
-    async def display_spinner():
-        while not stop_spinner_event.is_set():
-            sys.stdout.write(f"\r{message}{next(spinner)}")
-            sys.stdout.flush()
-            await asyncio.sleep(0.1)
-
-    # Start the spinner in a separate task
-    spinner_task = asyncio.create_task(display_spinner())
-
-    try:
-        # Await the actual task
-        result = await task
-    finally:
-        # Signal the spinner to stop and wait for it to finish
-        stop_spinner_event.set()
-        await spinner_task
-
-        # Clear the spinner line
-        sys.stdout.write("\r" + " " * (len(message) + 1) + "\r")
-        sys.stdout.flush()
-
-    return result
-
-
-class SpinnerWrappedTask:
-    """
-    A wrapper for an asyncio task that displays a spinner when awaited.
-    """
-
-    def __init__(self, task, message: str):
-        self.task = task
+class ProgressLogger:
+    def __init__(self, message="Working...", interval=10, local_scorers: bool = False):
         self.message = message
+        self.interval = interval
+        self.logger = judgeval_logger
+        self.local_scorers = local_scorers
+        self._stop_event = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
 
-    def __await__(self):
-        async def _spin_and_await():
-            # self.task resolves to (scoring_results, pretty_str_to_print)
-            task_result_tuple = await await_with_spinner(self.task, self.message)
+    def _run(self):
+        start = time.time()
+        while not self._stop_event.is_set() and not self.local_scorers:
+            elapsed = int(time.time() - start)
+            self.logger.info(f"{self.message} ({elapsed} secs)")
+            self._stop_event.wait(self.interval)
 
-            # Unpack the tuple
-            scoring_results, pretty_str_to_print = task_result_tuple
+    def __enter__(self):
+        if self.local_scorers:
+            self._thread.start()
+        return self
 
-            # Print the pretty string if it exists, after spinner is cleared
-            if pretty_str_to_print:
-                rprint(pretty_str_to_print)
-
-            # Return only the scoring_results to the original awaiter
-            return scoring_results
-
-        return _spin_and_await().__await__()
-
-    # Proxy all Task attributes and methods to the underlying task
-    def __getattr__(self, name):
-        return getattr(self.task, name)
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self.local_scorers:
+            self._stop_event.set()
+            self._thread.join()
 
 
 def run_eval(
     evaluation_run: EvaluationRun,
     override: bool = False,
     async_execution: bool = False,
-) -> Union[List[ScoringResult], asyncio.Task, SpinnerWrappedTask]:
+) -> Union[List[ScoringResult], asyncio.Task]:
     """
     Executes an evaluation of `Example`s using one or more `Scorer`s
 
@@ -814,7 +761,7 @@ def run_eval(
         async_execution (bool, optional): Whether to execute the evaluation asynchronously. Defaults to False.
 
     Returns:
-        Union[List[ScoringResult], Union[asyncio.Task, SpinnerWrappedTask]]:
+        Union[List[ScoringResult], asyncio.Task]:
             - If async_execution is False, returns a list of ScoringResult objects
             - If async_execution is True, returns a Task that will resolve to a list of ScoringResult objects when awaited
     """
@@ -853,142 +800,137 @@ def run_eval(
     api_results: List[ScoringResult] = []
     local_results: List[ScoringResult] = []
 
-    if async_execution:
-        if len(local_scorers) > 0:
-            judgeval_logger.error("Local scorers are not supported in async execution")
-            raise ValueError("Local scorers are not supported in async execution")
-
-        check_examples(evaluation_run.examples, evaluation_run.scorers)
-
-        async def _async_evaluation_workflow():
-            payload = evaluation_run.model_dump(warnings=False)
-
-            response = await asyncio.to_thread(
-                requests.post,
-                JUDGMENT_ADD_TO_RUN_EVAL_QUEUE_API_URL,
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {evaluation_run.judgment_api_key}",
-                    "X-Organization-Id": evaluation_run.organization_id,
-                },
-                json=payload,
-                verify=True,
-            )
-
-            if not response.ok:
-                error_message = response.json().get(
-                    "detail", "An unknown error occurred."
-                )
+    with ProgressLogger(
+        message="Running Evaluation...",
+        interval=5,
+        local_scorers=len(local_scorers) > 0,
+    ):
+        if async_execution:
+            if len(local_scorers) > 0:
                 judgeval_logger.error(
-                    f"Error adding evaluation to queue: {error_message}"
+                    "Local scorers are not supported in async execution"
                 )
-                raise JudgmentAPIError(error_message)
+                raise ValueError("Local scorers are not supported in async execution")
 
-            results = await _poll_evaluation_until_complete(
-                eval_name=evaluation_run.eval_name,
-                project_name=evaluation_run.project_name,
-                judgment_api_key=evaluation_run.judgment_api_key,
-                organization_id=evaluation_run.organization_id,
-                original_examples=evaluation_run.examples,
-                expected_scorer_count=len(evaluation_run.scorers),
-            )
+            check_examples(evaluation_run.examples, evaluation_run.scorers)
 
-            pretty_str_to_print = None
-            if results:
-                send_results = [
-                    scoring_result.model_dump(warnings=False)
-                    for scoring_result in results
-                ]
-                try:
-                    # Run the blocking log_evaluation_results in a separate thread
-                    pretty_str_to_print = await asyncio.to_thread(
-                        log_evaluation_results, send_results, evaluation_run
+            async def _async_evaluation_workflow():
+                # Create a payload
+                payload = evaluation_run.model_dump(warnings=False)
+
+                # Send the evaluation to the queue
+                response = await asyncio.to_thread(
+                    requests.post,
+                    JUDGMENT_ADD_TO_RUN_EVAL_QUEUE_API_URL,
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {evaluation_run.judgment_api_key}",
+                        "X-Organization-Id": evaluation_run.organization_id,
+                    },
+                    json=payload,
+                    verify=True,
+                )
+
+                if not response.ok:
+                    error_message = response.json().get(
+                        "detail", "An unknown error occurred."
                     )
-                except Exception as e:
                     judgeval_logger.error(
-                        f"Error logging results after async evaluation: {str(e)}"
+                        f"Error adding evaluation to queue: {error_message}"
                     )
+                    raise JudgmentAPIError(error_message)
 
-            return results, pretty_str_to_print
-
-        # Create a regular task
-        task = asyncio.create_task(_async_evaluation_workflow())
-
-        # Wrap it in our custom awaitable that will show a spinner only when awaited
-        return SpinnerWrappedTask(
-            task, f"Processing evaluation '{evaluation_run.eval_name}': "
-        )
-    else:
-        check_examples(evaluation_run.examples, evaluation_run.scorers)
-        if judgment_scorers:
-            # Execute evaluation using Judgment API
-            try:  # execute an EvaluationRun with just JudgmentScorers
-                api_evaluation_run: EvaluationRun = EvaluationRun(
+                # Poll until the evaluation is complete
+                results = await _poll_evaluation_until_complete(
                     eval_name=evaluation_run.eval_name,
                     project_name=evaluation_run.project_name,
-                    examples=evaluation_run.examples,
-                    scorers=judgment_scorers,
-                    model=evaluation_run.model,
                     judgment_api_key=evaluation_run.judgment_api_key,
                     organization_id=evaluation_run.organization_id,
-                )
-                response_data: Dict = run_with_spinner(
-                    "Running Evaluation: ", execute_api_eval, api_evaluation_run
-                )
-            except JudgmentAPIError as e:
-                judgeval_logger.error(
-                    f"An error occurred while executing the Judgment API request: {str(e)}"
-                )
-                raise JudgmentAPIError(
-                    f"An error occurred while executing the Judgment API request: {str(e)}"
-                )
-            except ValueError as e:
-                raise ValueError(
-                    f"Please check your EvaluationRun object, one or more fields are invalid: {str(e)}"
+                    original_examples=evaluation_run.examples,  # Pass the original examples
+                    expected_scorer_count=len(evaluation_run.scorers),
                 )
 
-            # Convert the response data to `ScoringResult` objects
-            api_results = [
-                ScoringResult(**result) for result in response_data["results"]
-            ]
-        # Run local evals
-        if local_scorers:  # List[BaseScorer]
-            results: List[ScoringResult] = safe_run_async(
-                a_execute_scoring(
-                    evaluation_run.examples,
-                    local_scorers,
-                    model=evaluation_run.model,
-                    throttle_value=0,
-                    max_concurrent=MAX_CONCURRENT_EVALUATIONS,
+                pretty_str_to_print = None
+                if results:  # Ensure results exist before logging
+                    send_results = [
+                        scoring_result.model_dump(warnings=False)
+                        for scoring_result in results
+                    ]
+                    try:
+                        # Run the blocking log_evaluation_results in a separate thread
+                        pretty_str_to_print = await asyncio.to_thread(
+                            log_evaluation_results, send_results, evaluation_run
+                        )
+                    except Exception as e:
+                        judgeval_logger.error(
+                            f"Error logging results after async evaluation: {str(e)}"
+                        )
+
+                return results, pretty_str_to_print
+
+            # Create a regular task
+            task = asyncio.create_task(_async_evaluation_workflow())
+
+            # Wrap it in our custom awaitable that will show a spinner only when awaited
+            judgeval_logger.info("Running Evaluation ...")
+            return task
+        else:
+            check_examples(evaluation_run.examples, evaluation_run.scorers)
+            if judgment_scorers:
+                # Execute evaluation using Judgment API
+                try:  # execute an EvaluationRun with just JudgmentScorers
+                    api_evaluation_run: EvaluationRun = EvaluationRun(
+                        eval_name=evaluation_run.eval_name,
+                        project_name=evaluation_run.project_name,
+                        examples=evaluation_run.examples,
+                        scorers=judgment_scorers,
+                        model=evaluation_run.model,
+                        judgment_api_key=evaluation_run.judgment_api_key,
+                        organization_id=evaluation_run.organization_id,
+                    )
+                    judgeval_logger.info("Running Evaluation ...")
+                    response_data = execute_api_eval(api_evaluation_run)
+                except JudgmentAPIError as e:
+                    judgeval_logger.error(
+                        f"An error occurred while executing the Judgment API request: {str(e)}"
+                    )
+                    raise JudgmentAPIError(
+                        f"An error occurred while executing the Judgment API request: {str(e)}"
+                    )
+                except ValueError as e:
+                    raise ValueError(
+                        f"Please check your EvaluationRun object, one or more fields are invalid: {str(e)}"
+                    )
+
+                # Convert the response data to `ScoringResult` objects
+                api_results = [
+                    ScoringResult(**result) for result in response_data["results"]
+                ]
+            # Run local evals
+            if local_scorers:  # List[BaseScorer]
+                results: List[ScoringResult] = safe_run_async(
+                    a_execute_scoring(
+                        evaluation_run.examples,
+                        local_scorers,
+                        model=evaluation_run.model,
+                        throttle_value=0,
+                        max_concurrent=MAX_CONCURRENT_EVALUATIONS,
+                    )
                 )
+                local_results = results
+            # Aggregate the ScorerData from the API and local evaluations
+            merged_results: List[ScoringResult] = merge_results(
+                api_results, local_results
             )
-            local_results = results
-        # Aggregate the ScorerData from the API and local evaluations
-        merged_results: List[ScoringResult] = merge_results(api_results, local_results)
-        merged_results = check_missing_scorer_data(merged_results)
+            merged_results = check_missing_scorer_data(merged_results)
 
-        # Evaluate rules against local scoring results if rules exist (this cant be done just yet)
-        # if evaluation_run.rules and merged_results:
-        #     run_rules(
-        #         local_results=merged_results,
-        #         rules=evaluation_run.rules,
-        #         judgment_api_key=evaluation_run.judgment_api_key,
-        #         organization_id=evaluation_run.organization_id
-        #     )
-        # print(merged_results)
-        send_results = [
-            scoring_result.model_dump(warnings=False)
-            for scoring_result in merged_results
-        ]
-        pretty_str = run_with_spinner(
-            "Logging Results: ",
-            log_evaluation_results,
-            send_results,
-            evaluation_run,
-        )
-        rprint(pretty_str)
+            send_results = [
+                scoring_result.model_dump(warnings=False)
+                for scoring_result in merged_results
+            ]
+            log_evaluation_results(send_results, evaluation_run)
 
-        return merged_results
+            return merged_results
 
 
 def assert_test(scoring_results: List[ScoringResult]) -> None:
@@ -1002,7 +944,6 @@ def assert_test(scoring_results: List[ScoringResult]) -> None:
         None. Raises exceptions for any failed test cases.
     """
     failed_cases: List[ScorerData] = []
-
     for result in scoring_results:
         if not result.success:
             # Create a test case context with all relevant fields
@@ -1080,3 +1021,5 @@ def assert_test(scoring_results: List[ScoringResult]) -> None:
         rprint("\n" + "=" * 80)
         if failed_tests > 0:
             raise AssertionError(failed_cases)
+    else:
+        print("All tests passed!")

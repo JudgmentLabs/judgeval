@@ -37,7 +37,6 @@ from langchain_core.callbacks import BaseCallbackHandler
 from judgeval.common.tracer import Tracer
 from judgeval.common.utils import validate_api_key
 from pydantic import BaseModel
-from judgeval.run_evaluation import SpinnerWrappedTask
 from judgeval.common.logger import judgeval_logger
 
 
@@ -111,7 +110,7 @@ class JudgmentClient(metaclass=SingletonMeta):
             append=append,
             async_execution=True,
         )
-        assert not isinstance(result, (asyncio.Task, SpinnerWrappedTask))
+        assert not isinstance(result, asyncio.Task)
         return result
 
     def run_trace_evaluation(
@@ -167,7 +166,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         override: bool = False,
         append: bool = False,
         async_execution: bool = False,
-    ) -> Union[List[ScoringResult], asyncio.Task | SpinnerWrappedTask]:
+    ) -> Union[List[ScoringResult], asyncio.Task]:
         """
         Executes an evaluation of `Example`s using one or more `Scorer`s
 
@@ -373,7 +372,7 @@ class JudgmentClient(metaclass=SingletonMeta):
             async_execution (bool): Whether to run the evaluation asynchronously
         """
 
-        results: Union[List[ScoringResult], asyncio.Task | SpinnerWrappedTask]
+        results: Union[List[ScoringResult], asyncio.Task]
 
         results = self.run_evaluation(
             examples=examples,
@@ -386,7 +385,7 @@ class JudgmentClient(metaclass=SingletonMeta):
             async_execution=async_execution,
         )
 
-        if async_execution and isinstance(results, (asyncio.Task, SpinnerWrappedTask)):
+        if async_execution and isinstance(results, asyncio.Task):
 
             async def run_async():  # Using wrapper here to resolve mypy error with passing Task into asyncio.run
                 return await results
@@ -438,7 +437,7 @@ class JudgmentClient(metaclass=SingletonMeta):
                             f"You must provide the 'tools' argument to assert_test when using a scorer with enable_param_checking=True. If you do not want to do param checking, explicitly set enable_param_checking=False for the {scorer.__name__} scorer."
                         )
 
-        results: Union[List[ScoringResult], asyncio.Task | SpinnerWrappedTask]
+        results: Union[List[ScoringResult], asyncio.Task]
 
         results = self.run_trace_evaluation(
             examples=examples,
@@ -454,7 +453,7 @@ class JudgmentClient(metaclass=SingletonMeta):
             tools=tools,
         )
 
-        if async_execution and isinstance(results, (asyncio.Task, SpinnerWrappedTask)):
+        if async_execution and isinstance(results, asyncio.Task):
 
             async def run_async():  # Using wrapper here to resolve mypy error with passing Task into asyncio.run
                 return await results
