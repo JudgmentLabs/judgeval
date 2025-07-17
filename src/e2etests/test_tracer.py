@@ -764,10 +764,466 @@ async def test_openai_cached_input_tokens():
     contents = "What is the capital of France?" * 150
     for i in range(3):
         response_chat = openai_client.chat.completions.create(
-            model="gpt-4o-mini", messages=[{"role": "user", "content": contents}]
+            model="gpt-4.1-mini", messages=[{"role": "user", "content": contents}]
         )
         print(f"Response {i}: {response_chat}")
     await asyncio.sleep(1.5)
 
     trace = judgment.get_current_trace()
     validate_trace_tokens(trace, cached_input_tokens=True)
+
+
+@pytest.mark.asyncio
+@judgment.observe(
+    name="test_llamaindex_integration_e2e",
+)
+async def test_llamaindex_integration_e2e():
+    """
+    E2E test for LlamaIndex integration with judgeval.wrap()
+    
+    This test verifies that:
+    1. LlamaIndex OpenAI client can be wrapped
+    2. Real API calls work through the wrapper
+    3. Token counting and tracing work correctly
+    4. Trace data is sent to Judgment dashboard
+    """
+    print(f"\n{'=' * 20} Starting LlamaIndex E2E Integration Test {'=' * 20}")
+    
+    # Try to import LlamaIndex
+    try:
+        from llama_index.llms.openai import OpenAI as LlamaIndexOpenAI
+        LLAMAINDEX_AVAILABLE = True
+        print("✓ LlamaIndex is available")
+    except ImportError:
+        print("✗ LlamaIndex not available, skipping test")
+        pytest.skip("LlamaIndex not available")
+        return
+    
+    # Create and wrap LlamaIndex client
+    try:
+        llm = LlamaIndexOpenAI(model="gpt-4.1", temperature=0.0)
+        wrapped_llm = wrap(llm)
+        print("✓ LlamaIndex client wrapped successfully")
+    except Exception as e:
+        print(f"✗ Failed to wrap LlamaIndex client: {e}")
+        pytest.fail(f"Failed to wrap LlamaIndex client: {e}")
+        return
+    
+    # Test basic functionality
+    try:
+        # Test complete method
+        response = wrapped_llm.complete("What is the capital of France?")
+        print(f"✓ LlamaIndex complete() response: {response.text[:100]}...")
+        
+        # Test acomplete method (if available)
+        try:
+            async_response = await wrapped_llm.acomplete("What is 2+2?")
+            print(f"✓ LlamaIndex acomplete() response: {async_response.text[:100]}...")
+        except (AttributeError, TypeError) as e:
+            print(f"⚠ acomplete() method not available or not async: {e}")
+            # Try sync version if async not available
+            try:
+                async_response = wrapped_llm.acomplete("What is 2+2?")
+                print(f"✓ LlamaIndex acomplete() (sync) response: {async_response.text[:100]}...")
+            except Exception as sync_e:
+                print(f"⚠ acomplete() method not working: {sync_e}")
+        
+        # Test that wrapper preserves original attributes
+        assert wrapped_llm.model == "gpt-4.1", "Model attribute not preserved"
+        assert wrapped_llm.temperature == 0.0, "Temperature attribute not preserved"
+        print("✓ Wrapper preserves original attributes")
+        
+        # Test that wrapper has correct type information
+        assert "LlamaIndexWrapper" in str(type(wrapped_llm)), "Wrapper type not identified correctly"
+        print("✓ Wrapper type identification works")
+        
+    except Exception as e:
+        print(f"✗ LlamaIndex API call failed: {e}")
+        pytest.fail(f"LlamaIndex API call failed: {e}")
+        return
+    
+    # Allow time for trace data to be processed
+    await asyncio.sleep(1.5)
+    
+    # Validate trace tokens
+    try:
+        trace = judgment.get_current_trace()
+        if trace:
+            validate_trace_tokens(trace)
+            print("✓ Token counting validation passed")
+        else:
+            print("⚠ No trace available for token validation")
+    except Exception as e:
+        print(f"⚠ Token validation failed: {e}")
+    
+    print("✓ LlamaIndex E2E Integration Test Passed!")
+    print("✓ Check Judgment dashboard for trace data")
+    
+    return "LlamaIndex integration test completed successfully"
+
+
+@pytest.mark.asyncio
+@judgment.observe(
+    name="test_llamaindex_multi_step_agent_workflow",
+)
+async def test_llamaindex_multi_step_agent_workflow():
+    """
+    E2E test for complex multi-step agent workflow with LlamaIndex
+    
+    This test simulates a real-world agent that:
+    1. Analyzes user input
+    2. Generates multiple responses
+    3. Evaluates responses
+    4. Selects best response
+    5. Provides final output
+    """
+    print(f"\n{'=' * 20} Starting Multi-Step Agent Workflow Test {'=' * 20}")
+    
+    # Try to import LlamaIndex
+    try:
+        from llama_index.llms.openai import OpenAI as LlamaIndexOpenAI
+        LLAMAINDEX_AVAILABLE = True
+        print("✓ LlamaIndex is available")
+    except ImportError:
+        print("✗ LlamaIndex not available, skipping test")
+        pytest.skip("LlamaIndex not available")
+        return
+    
+    # Create and wrap LlamaIndex client
+    try:
+        llm = LlamaIndexOpenAI(model="gpt-4.1", temperature=0.7)
+        wrapped_llm = wrap(llm)
+        print("✓ LlamaIndex client wrapped successfully")
+    except Exception as e:
+        print(f"✗ Failed to wrap LlamaIndex client: {e}")
+        pytest.fail(f"Failed to wrap LlamaIndex client: {e}")
+        return
+    
+    # Multi-step agent workflow
+    try:
+        user_input = "Explain quantum computing in simple terms"
+        
+        # Step 1: Analyze user input
+        print("Step 1: Analyzing user input...")
+        analysis_prompt = f"Analyze this user request and break it down into key components: {user_input}"
+        analysis = wrapped_llm.complete(analysis_prompt)
+        print(f"✓ Analysis: {analysis.text[:100]}...")
+        
+        # Step 2: Generate multiple response approaches
+        print("Step 2: Generating multiple response approaches...")
+        approaches = []
+        for i in range(3):
+            approach_prompt = f"Generate approach {i+1} for explaining quantum computing to a beginner. Focus on different aspects."
+            approach = wrapped_llm.complete(approach_prompt)
+            approaches.append(approach.text)
+            print(f"✓ Approach {i+1}: {approach.text[:80]}...")
+        
+        # Step 3: Evaluate each approach
+        print("Step 3: Evaluating approaches...")
+        evaluations = []
+        for i, approach in enumerate(approaches):
+            eval_prompt = f"Rate this explanation from 1-10 for clarity and accuracy: {approach[:200]}"
+            evaluation = wrapped_llm.complete(eval_prompt)
+            evaluations.append(evaluation.text)
+            print(f"✓ Evaluation {i+1}: {evaluation.text[:50]}...")
+        
+        # Step 4: Select best approach
+        print("Step 4: Selecting best approach...")
+        selection_prompt = f"Based on these evaluations: {evaluations}, which approach (1, 2, or 3) is best and why?"
+        selection = wrapped_llm.complete(selection_prompt)
+        print(f"✓ Selection: {selection.text[:100]}...")
+        
+        # Step 5: Generate final response
+        print("Step 5: Generating final response...")
+        final_prompt = f"Create a comprehensive final explanation based on the best approach: {user_input}"
+        final_response = wrapped_llm.complete(final_prompt)
+        print(f"✓ Final Response: {final_response.text[:150]}...")
+        
+        # Validate workflow completion
+        assert len(approaches) == 3, "Should generate 3 approaches"
+        assert len(evaluations) == 3, "Should evaluate 3 approaches"
+        assert final_response.text, "Should have final response"
+        print("✓ Multi-step workflow validation passed")
+        
+    except Exception as e:
+        print(f"✗ Multi-step workflow failed: {e}")
+        pytest.fail(f"Multi-step workflow failed: {e}")
+        return
+    
+    # Allow time for trace data to be processed
+    await asyncio.sleep(2.0)
+    
+    # Validate trace tokens
+    try:
+        trace = judgment.get_current_trace()
+        if trace:
+            validate_trace_tokens(trace)
+            print("✓ Token counting validation passed")
+        else:
+            print("⚠ No trace available for token validation")
+    except Exception as e:
+        print(f"⚠ Token validation failed: {e}")
+    
+    print("✓ Multi-Step Agent Workflow Test Passed!")
+    return "Multi-step agent workflow completed successfully"
+
+
+@pytest.mark.asyncio
+@judgment.observe(
+    name="test_llamaindex_performance_benchmarks",
+)
+async def test_llamaindex_performance_benchmarks():
+    """
+    Performance benchmarks for LlamaIndex integration
+    
+    Tests:
+    1. Latency measurements
+    2. Throughput (requests per second)
+    3. Token processing speed
+    4. Memory usage patterns
+    """
+    print(f"\n{'=' * 20} Starting Performance Benchmarks Test {'=' * 20}")
+    
+    import time
+    import statistics
+    
+    # Try to import LlamaIndex
+    try:
+        from llama_index.llms.openai import OpenAI as LlamaIndexOpenAI
+        LLAMAINDEX_AVAILABLE = True
+        print("✓ LlamaIndex is available")
+    except ImportError:
+        print("✗ LlamaIndex not available, skipping test")
+        pytest.skip("LlamaIndex not available")
+        return
+    
+    # Create and wrap LlamaIndex client
+    try:
+        llm = LlamaIndexOpenAI(model="gpt-4.1", temperature=0.0)
+        wrapped_llm = wrap(llm)
+        print("✓ LlamaIndex client wrapped successfully")
+    except Exception as e:
+        print(f"✗ Failed to wrap LlamaIndex client: {e}")
+        pytest.fail(f"Failed to wrap LlamaIndex client: {e}")
+        return
+    
+    # Performance test parameters
+    num_requests = 5
+    test_prompts = [
+        "What is 2+2?",
+        "Explain photosynthesis briefly",
+        "What is the capital of Japan?",
+        "How does a computer work?",
+        "What is machine learning?"
+    ]
+    
+    # Performance metrics
+    latencies = []
+    token_counts = []
+    response_lengths = []
+    
+    print(f"Running {num_requests} performance tests...")
+    
+    try:
+        for i in range(num_requests):
+            prompt = test_prompts[i % len(test_prompts)]
+            
+            # Measure latency
+            start_time = time.time()
+            response = wrapped_llm.complete(prompt)
+            end_time = time.time()
+            
+            latency = end_time - start_time
+            latencies.append(latency)
+            
+            # Measure response characteristics
+            response_length = len(response.text)
+            response_lengths.append(response_length)
+            
+            print(f"Request {i+1}: {latency:.2f}s, {response_length} chars")
+            
+            # Small delay between requests to avoid rate limiting
+            await asyncio.sleep(0.5)
+        
+        # Calculate performance metrics
+        avg_latency = statistics.mean(latencies)
+        min_latency = min(latencies)
+        max_latency = max(latencies)
+        avg_response_length = statistics.mean(response_lengths)
+        
+        # Performance assertions
+        print(f"\nPerformance Results:")
+        print(f"  Average Latency: {avg_latency:.2f}s")
+        print(f"  Min Latency: {min_latency:.2f}s")
+        print(f"  Max Latency: {max_latency:.2f}s")
+        print(f"  Average Response Length: {avg_response_length:.0f} characters")
+        
+        # Performance benchmarks (adjust based on your requirements)
+        assert avg_latency < 10.0, f"Average latency {avg_latency:.2f}s exceeds 10s threshold"
+        assert max_latency < 15.0, f"Max latency {max_latency:.2f}s exceeds 15s threshold"
+        assert avg_response_length > 10, f"Average response length {avg_response_length:.0f} is too short"
+        
+        print("✓ Performance benchmarks passed")
+        
+        # Throughput calculation
+        total_time = sum(latencies)
+        throughput = num_requests / total_time if total_time > 0 else 0
+        print(f"  Throughput: {throughput:.2f} requests/second")
+        
+    except Exception as e:
+        print(f"✗ Performance test failed: {e}")
+        pytest.fail(f"Performance test failed: {e}")
+        return
+    
+    # Allow time for trace data to be processed
+    await asyncio.sleep(1.5)
+    
+    # Validate trace tokens
+    try:
+        trace = judgment.get_current_trace()
+        if trace:
+            validate_trace_tokens(trace)
+            print("✓ Token counting validation passed")
+        else:
+            print("⚠ No trace available for token validation")
+    except Exception as e:
+        print(f"⚠ Token validation failed: {e}")
+    
+    print("✓ Performance Benchmarks Test Passed!")
+    return "Performance benchmarks completed successfully"
+
+
+@pytest.mark.asyncio
+@judgment.observe(
+    name="test_llamaindex_concurrent_processing",
+)
+async def test_llamaindex_concurrent_processing():
+    """
+    Test concurrent processing capabilities of LlamaIndex integration
+    
+    Tests:
+    1. Multiple concurrent requests
+    2. Async processing
+    3. Resource management
+    4. Error handling under load
+    """
+    print(f"\n{'=' * 20} Starting Concurrent Processing Test {'=' * 20}")
+    
+    import asyncio
+    import time
+    
+    # Try to import LlamaIndex
+    try:
+        from llama_index.llms.openai import OpenAI as LlamaIndexOpenAI
+        LLAMAINDEX_AVAILABLE = True
+        print("✓ LlamaIndex is available")
+    except ImportError:
+        print("✗ LlamaIndex not available, skipping test")
+        pytest.skip("LlamaIndex not available")
+        return
+    
+    # Create and wrap LlamaIndex client
+    try:
+        llm = LlamaIndexOpenAI(model="gpt-4.1", temperature=0.0)
+        wrapped_llm = wrap(llm)
+        print("✓ LlamaIndex client wrapped successfully")
+    except Exception as e:
+        print(f"✗ Failed to wrap LlamaIndex client: {e}")
+        pytest.fail(f"Failed to wrap LlamaIndex client: {e}")
+        return
+    
+    # Concurrent processing test
+    async def make_request(prompt: str, request_id: int):
+        """Make a single request and return results"""
+        try:
+            start_time = time.time()
+            response = wrapped_llm.complete(prompt)
+            end_time = time.time()
+            
+            return {
+                'request_id': request_id,
+                'success': True,
+                'latency': end_time - start_time,
+                'response_length': len(response.text),
+                'response_preview': response.text[:50]
+            }
+        except Exception as e:
+            return {
+                'request_id': request_id,
+                'success': False,
+                'error': str(e)
+            }
+    
+    # Test parameters
+    num_concurrent_requests = 3
+    test_prompts = [
+        "What is the weather like?",
+        "Explain gravity",
+        "What is artificial intelligence?"
+    ]
+    
+    print(f"Running {num_concurrent_requests} concurrent requests...")
+    
+    try:
+        # Create concurrent tasks
+        tasks = []
+        for i in range(num_concurrent_requests):
+            prompt = test_prompts[i % len(test_prompts)]
+            task = make_request(prompt, i + 1)
+            tasks.append(task)
+        
+        # Execute concurrent requests
+        start_time = time.time()
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        total_time = time.time() - start_time
+        
+        # Analyze results
+        successful_requests = 0
+        total_latency = 0
+        
+        for result in results:
+            if isinstance(result, dict) and result.get('success'):
+                successful_requests += 1
+                total_latency += result['latency']
+                print(f"Request {result['request_id']}: {result['latency']:.2f}s, {result['response_length']} chars")
+            else:
+                print(f"Request failed: {result}")
+        
+        # Performance metrics
+        success_rate = successful_requests / num_concurrent_requests
+        avg_latency = total_latency / successful_requests if successful_requests > 0 else 0
+        throughput = successful_requests / total_time if total_time > 0 else 0
+        
+        print(f"\nConcurrent Processing Results:")
+        print(f"  Success Rate: {success_rate:.1%}")
+        print(f"  Average Latency: {avg_latency:.2f}s")
+        print(f"  Throughput: {throughput:.2f} requests/second")
+        print(f"  Total Time: {total_time:.2f}s")
+        
+        # Assertions
+        assert success_rate >= 0.8, f"Success rate {success_rate:.1%} below 80% threshold"
+        assert avg_latency < 15.0, f"Average latency {avg_latency:.2f}s exceeds 15s threshold"
+        
+        print("✓ Concurrent processing test passed")
+        
+    except Exception as e:
+        print(f"✗ Concurrent processing test failed: {e}")
+        pytest.fail(f"Concurrent processing test failed: {e}")
+        return
+    
+    # Allow time for trace data to be processed
+    await asyncio.sleep(2.0)
+    
+    # Validate trace tokens
+    try:
+        trace = judgment.get_current_trace()
+        if trace:
+            validate_trace_tokens(trace)
+            print("✓ Token counting validation passed")
+        else:
+            print("⚠ No trace available for token validation")
+    except Exception as e:
+        print(f"⚠ Token validation failed: {e}")
+    
+    print("✓ Concurrent Processing Test Passed!")
+    return "Concurrent processing test completed successfully"

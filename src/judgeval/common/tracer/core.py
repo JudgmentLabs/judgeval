@@ -44,6 +44,14 @@ from together import Together, AsyncTogether
 from anthropic import Anthropic, AsyncAnthropic
 from google import genai
 
+# LlamaIndex imports (optional, for enhanced integrations)
+try:
+    from llama_index.llms.openai.base import OpenAI as LlamaIndexOpenAI
+    LLAMAINDEX_AVAILABLE = True
+except ImportError:
+    LlamaIndexOpenAI = None
+    LLAMAINDEX_AVAILABLE = False
+
 from judgeval.data import Example, Trace, TraceSpan, TraceUsage
 from judgeval.scorers import APIScorerConfig, BaseScorer
 from judgeval.evaluation_run import EvaluationRun
@@ -65,6 +73,7 @@ ApiClient: TypeAlias = Union[
     AsyncTogether,
     genai.Client,
     genai.client.AsyncClient,
+    LlamaIndexOpenAI,
 ]
 SpanType: TypeAlias = str
 
@@ -1726,11 +1735,62 @@ def wrap(
         client.models.generate_content = wrapped(original_create)
     elif isinstance(client, (genai.client.AsyncClient)):
         client.models.generate_content = wrapped_async(original_create)
+    elif LLAMAINDEX_AVAILABLE and isinstance(client, LlamaIndexOpenAI):
+        # LlamaIndex uses Pydantic models which prevent direct attribute assignment
+        # We need to create a wrapper class that preserves the original interface
+        return _create_llamaindex_wrapper(
+            client, 
+            wrapped(original_create), 
+            wrapped_async(original_create),
+            trace_across_async_contexts
+        )
 
     return client
 
 
 # Helper functions for client-specific operations
+
+
+def _create_llamaindex_wrapper(
+    original_client,
+    wrapped_sync,
+    wrapped_async, 
+    trace_across_async_contexts: bool = True
+):
+    """
+    Creates a wrapper for LlamaIndex OpenAI clients that preserves the original interface
+    while adding tracing capabilities. LlamaIndex uses Pydantic models which prevent
+    direct attribute assignment, so we use a proxy approach.
+    """
+    class LlamaIndexWrapper:
+        def __init__(self, client):
+            # Store the original client
+            object.__setattr__(self, '_original_client', client)
+            object.__setattr__(self, '_wrapped_sync', wrapped_sync)
+            object.__setattr__(self, '_wrapped_async', wrapped_async)
+        
+        def __getattr__(self, name):
+            # For traced methods, return the traced version
+            if name == "complete":
+                return self._wrapped_sync
+            elif name == "acomplete":
+                return self._wrapped_async
+            elif name == "chat":
+                return self._wrapped_sync
+            elif name == "achat":
+                return self._wrapped_async
+            else:
+                # For all other attributes, delegate to the original client
+                return getattr(self._original_client, name)
+        
+        def __setattr__(self, name, value):
+            # Delegate attribute setting to the original client
+            return setattr(self._original_client, name, value)
+        
+        def __repr__(self):
+            return f"LlamaIndexWrapper({repr(self._original_client)})"
+    
+    return LlamaIndexWrapper(original_client)
 
 
 def _get_client_config(
@@ -1772,6 +1832,15 @@ def _get_client_config(
         )
     elif isinstance(client, (genai.Client, genai.client.AsyncClient)):
         return "GOOGLE_API_CALL", client.models.generate_content, None, None, None
+    # LlamaIndex OpenAI client support
+    elif LLAMAINDEX_AVAILABLE and isinstance(client, LlamaIndexOpenAI):
+        return (
+            "LLAMAINDEX_OPENAI_API_CALL",
+            client.complete,  # LlamaIndex uses direct complete method
+            None,  # No responses method
+            None,  # No stream method (handled differently)
+            None,  # No beta parse method
+        )
     raise ValueError(f"Unsupported client type: {type(client)}")
 
 
@@ -1836,6 +1905,21 @@ def _format_output_data(
         cache_read_input_tokens = response.usage.cache_read_input_tokens
         cache_creation_input_tokens = response.usage.cache_creation_input_tokens
         message_content = response.content[0].text
+    elif LLAMAINDEX_AVAILABLE and isinstance(client, LlamaIndexOpenAI):
+        # LlamaIndex response handling
+        model_name = getattr(client, "model", "unknown")
+        message_content = str(response.text) if hasattr(response, "text") else str(response)
+        
+        # LlamaIndex might not have detailed usage info like OpenAI
+        # Try to extract if available, otherwise use defaults
+        if hasattr(response, "raw") and hasattr(response.raw, "usage"):
+            usage = response.raw.usage
+            prompt_tokens = getattr(usage, "prompt_tokens", 0)
+            completion_tokens = getattr(usage, "completion_tokens", 0)
+        else:
+            # Estimate token counts if not available
+            prompt_tokens = 0
+            completion_tokens = len(message_content.split()) if message_content else 0
     else:
         judgeval_logger.warning(f"Unsupported client type: {type(client)}")
         return None, None
