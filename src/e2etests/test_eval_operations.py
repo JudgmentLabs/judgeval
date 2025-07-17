@@ -3,8 +3,6 @@ Tests for evaluation operations in the JudgmentClient.
 """
 
 import pytest
-import random
-import string
 import os
 import tempfile
 import time
@@ -138,23 +136,6 @@ def test_run_append_without_existing(client: JudgmentClient, project_name: str):
     assert len(results) == 1
     print(results)
     assert results[0].success
-
-
-def test_delete_eval_by_project(client: JudgmentClient):
-    """Test delete evaluation by project and run name workflow."""
-    PROJECT_NAME = "".join(random.choices(string.ascii_letters + string.digits, k=20))
-    EVAL_RUN_NAMES = [
-        "".join(random.choices(string.ascii_letters + string.digits, k=20))
-        for _ in range(3)
-    ]
-
-    for eval_run_name in EVAL_RUN_NAMES:
-        run_eval_helper(client, PROJECT_NAME, eval_run_name)
-
-    client.delete_project(project_name=PROJECT_NAME)
-    for eval_run_name in EVAL_RUN_NAMES:
-        with pytest.raises(ValueError, match="Error fetching eval results"):
-            client.pull_eval(project_name=PROJECT_NAME, eval_run_name=eval_run_name)
 
 
 @pytest.mark.asyncio

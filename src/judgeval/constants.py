@@ -39,35 +39,6 @@ UNBOUNDED_SCORERS: set[APIScorerType] = (
     set()
 )  # scorers whose scores are not bounded between 0-1
 
-ROOT_API = os.getenv("JUDGMENT_API_URL", "https://api.judgmentlabs.ai")
-# API URLs
-JUDGMENT_EVAL_API_URL = f"{ROOT_API}/evaluate/"
-JUDGMENT_TRACE_EVAL_API_URL = f"{ROOT_API}/evaluate_trace/"
-JUDGMENT_DATASETS_PUSH_API_URL = f"{ROOT_API}/datasets/push/"
-JUDGMENT_DATASETS_APPEND_EXAMPLES_API_URL = f"{ROOT_API}/datasets/insert_examples/"
-JUDGMENT_DATASETS_PULL_API_URL = f"{ROOT_API}/datasets/pull_for_judgeval/"
-JUDGMENT_DATASETS_DELETE_API_URL = f"{ROOT_API}/datasets/delete/"
-JUDGMENT_DATASETS_EXPORT_JSONL_API_URL = f"{ROOT_API}/datasets/export_jsonl/"
-JUDGMENT_DATASETS_PROJECT_STATS_API_URL = f"{ROOT_API}/datasets/fetch_stats_by_project/"
-JUDGMENT_DATASETS_INSERT_API_URL = f"{ROOT_API}/datasets/insert_examples/"
-JUDGMENT_EVAL_LOG_API_URL = f"{ROOT_API}/log_eval_results/"
-JUDGMENT_EVAL_FETCH_API_URL = f"{ROOT_API}/fetch_experiment_run/"
-JUDGMENT_EVAL_DELETE_API_URL = (
-    f"{ROOT_API}/delete_eval_results_by_project_and_run_names/"
-)
-JUDGMENT_EVAL_DELETE_PROJECT_API_URL = f"{ROOT_API}/delete_eval_results_by_project/"
-JUDGMENT_PROJECT_DELETE_API_URL = f"{ROOT_API}/projects/delete/"
-JUDGMENT_PROJECT_CREATE_API_URL = f"{ROOT_API}/projects/add/"
-JUDGMENT_TRACES_FETCH_API_URL = f"{ROOT_API}/traces/fetch/"
-JUDGMENT_TRACES_SAVE_API_URL = f"{ROOT_API}/traces/save/"
-JUDGMENT_TRACES_UPSERT_API_URL = f"{ROOT_API}/traces/upsert/"
-JUDGMENT_TRACES_DELETE_API_URL = f"{ROOT_API}/traces/delete/"
-JUDGMENT_TRACES_SPANS_BATCH_API_URL = f"{ROOT_API}/traces/spans/batch/"
-JUDGMENT_TRACES_EVALUATION_RUNS_BATCH_API_URL = (
-    f"{ROOT_API}/traces/evaluation_runs/batch/"
-)
-JUDGMENT_ADD_TO_RUN_EVAL_QUEUE_API_URL = f"{ROOT_API}/add_to_run_eval_queue/"
-JUDGMENT_GET_EVAL_STATUS_API_URL = f"{ROOT_API}/get_evaluation_status/"
 # RabbitMQ
 RABBITMQ_HOST = os.getenv(
     "RABBITMQ_HOST", "rabbitmq-networklb-faa155df16ec9085.elb.us-west-1.amazonaws.com"

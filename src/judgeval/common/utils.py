@@ -13,6 +13,7 @@ import asyncio
 import concurrent.futures
 import os
 from types import TracebackType
+from judgeval.common.api.constants import ROOT_API
 from judgeval.utils.requests import requests
 import pprint
 from typing import Any, Dict, List, Mapping, Optional, TypeAlias, Union, TypeGuard
@@ -27,7 +28,6 @@ from judgeval.clients import async_together_client, together_client
 from judgeval.constants import (
     ACCEPTABLE_MODELS,
     MAX_WORKER_THREADS,
-    ROOT_API,
     TOGETHER_SUPPORTED_MODELS,
     LITELLM_SUPPORTED_MODELS,
 )
@@ -128,7 +128,7 @@ def validate_api_key(judgment_api_key: str):
             "Content-Type": "application/json",
             "Authorization": f"Bearer {judgment_api_key}",
         },
-        json={},  # Empty body now
+        json={},
         verify=True,
     )
     if response.status_code == 200:

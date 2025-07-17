@@ -5,20 +5,8 @@ if TYPE_CHECKING:
     from judgeval.common.tracer import Tracer
 
 from judgeval.common.logger import judgeval_logger
-from judgeval.constants import (
-    JUDGMENT_PROJECT_DELETE_API_URL,
-    JUDGMENT_TRACES_DELETE_API_URL,
-    JUDGMENT_TRACES_FETCH_API_URL,
-    JUDGMENT_TRACES_UPSERT_API_URL,
-)
-from judgeval.utils.requests import requests
-
-
+from judgeval.common.api import JudgmentApiClient
 from rich import print as rprint
-
-
-import json
-from http import HTTPStatus
 
 
 class TraceManagerClient:
@@ -38,31 +26,14 @@ class TraceManagerClient:
         organization_id: str,
         tracer: Optional[Tracer] = None,
     ):
-        self.judgment_api_key = judgment_api_key
-        self.organization_id = organization_id
+        self.api_client = JudgmentApiClient(judgment_api_key, organization_id)
         self.tracer = tracer
 
     def fetch_trace(self, trace_id: str):
         """
         Fetch a trace by its id
         """
-        response = requests.post(
-            JUDGMENT_TRACES_FETCH_API_URL,
-            json={
-                "trace_id": trace_id,
-            },
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.judgment_api_key}",
-                "X-Organization-Id": self.organization_id,
-            },
-            verify=True,
-        )
-
-        if response.status_code != HTTPStatus.OK:
-            raise ValueError(f"Failed to fetch traces: {response.text}")
-
-        return response.json()
+        return self.api_client.fetch_trace(trace_id)
 
     def upsert_trace(
         self,
@@ -83,37 +54,7 @@ class TraceManagerClient:
         Returns:
             dict: Server response containing UI URL and other metadata
         """
-
-        def fallback_encoder(obj):
-            """
-            Custom JSON encoder fallback.
-            Tries to use obj.__repr__(), then str(obj) if that fails or for a simpler string.
-            """
-            try:
-                return repr(obj)
-            except Exception:
-                try:
-                    return str(obj)
-                except Exception as e:
-                    return f"<Unserializable object of type {type(obj).__name__}: {e}>"
-
-        serialized_trace_data = json.dumps(trace_data, default=fallback_encoder)
-
-        response = requests.post(
-            JUDGMENT_TRACES_UPSERT_API_URL,
-            data=serialized_trace_data,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.judgment_api_key}",
-                "X-Organization-Id": self.organization_id,
-            },
-            verify=True,
-        )
-
-        if response.status_code != HTTPStatus.OK:
-            raise ValueError(f"Failed to upsert trace data: {response.text}")
-
-        server_response = response.json()
+        server_response = self.api_client.upsert_trace(trace_data)
 
         if self.tracer and self.tracer.use_s3 and final_save:
             try:
@@ -136,61 +77,16 @@ class TraceManagerClient:
         """
         Delete a trace from the database.
         """
-        response = requests.delete(
-            JUDGMENT_TRACES_DELETE_API_URL,
-            json={
-                "trace_ids": [trace_id],
-            },
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.judgment_api_key}",
-                "X-Organization-Id": self.organization_id,
-            },
-        )
-
-        if response.status_code != HTTPStatus.OK:
-            raise ValueError(f"Failed to delete trace: {response.text}")
-
-        return response.json()
+        return self.api_client.delete_trace(trace_id)
 
     def delete_traces(self, trace_ids: List[str]):
         """
         Delete a batch of traces from the database.
         """
-        response = requests.delete(
-            JUDGMENT_TRACES_DELETE_API_URL,
-            json={
-                "trace_ids": trace_ids,
-            },
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.judgment_api_key}",
-                "X-Organization-Id": self.organization_id,
-            },
-        )
-
-        if response.status_code != HTTPStatus.OK:
-            raise ValueError(f"Failed to delete trace: {response.text}")
-
-        return response.json()
+        return self.api_client.delete_traces(trace_ids)
 
     def delete_project(self, project_name: str):
         """
         Deletes a project from the server. Which also deletes all evaluations and traces associated with the project.
         """
-        response = requests.delete(
-            JUDGMENT_PROJECT_DELETE_API_URL,
-            json={
-                "project_name": project_name,
-            },
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.judgment_api_key}",
-                "X-Organization-Id": self.organization_id,
-            },
-        )
-
-        if response.status_code != HTTPStatus.OK:
-            raise ValueError(f"Failed to delete traces: {response.text}")
-
-        return response.json()
+        return self.api_client.delete_project(project_name)

@@ -28,6 +28,18 @@ jobs:
           version=$(curl -s https://pypi.org/pypi/judgeval/json | jq -r .info.version)
           echo "latest_version=$version" >> $GITHUB_OUTPUT
 
+      - name: Determine bump type (minor if commit message starts with [Bump Minor Version], else patch)
+        id: bump_type
+        run: |
+          # Get the latest commit message
+          commit_message=$(git log -1 --pretty=%B)
+          # Default bump type
+          bump_type=patch
+          if [[ "$commit_message" == "[Bump Minor Version]"* ]]; then
+            bump_type=minor
+          fi
+          echo "bump_type=$bump_type" >> $GITHUB_OUTPUT
+
       - name: Bump version and create new tag
         id: bump_tag
         run: |
@@ -37,9 +49,29 @@ jobs:
           # Extract version numbers
           IFS='.' read -r major minor patch <<< "$latest_version"
 
-          # Bump patch version
-          patch=$((patch + 1))
-          new_version="$major.$minor.$patch"
+          # Set major version (manually modify this if you want to change the major version)
+          new_major_version=0
+
+          # Validate that new major version is greater than current major version
+          if [ "$new_major_version" -lt "$major" ]; then
+            echo "Error: New major version ($new_major_version) must be greater than or equal to current major version ($major)"
+            exit 1
+          fi
+
+          if [ "$new_major_version" -ne "$major" ]; then  # If major version changed, set minor and patch to 0
+            echo "Major version bumped, setting minor and patch to 0"
+            minor=0
+            patch=0
+          elif [ "${{ steps.bump_type.outputs.bump_type }}" = "minor" ]; then
+            echo "Minor version bumped, setting patch to 0"
+            minor=$((minor + 1))
+            patch=0
+          else
+            echo "Patch version bumped"
+            patch=$((patch + 1))
+          fi
+
+          new_version="$new_major_version.$minor.$patch"
 
           echo "New version: $new_version"
           echo "new_version=$new_version" >> $GITHUB_OUTPUT

@@ -181,10 +181,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
 
         trace_client.add_span(new_span)
 
-        if trace_client.background_span_service:
-            trace_client.background_span_service.queue_span(
-                new_span, span_state="input"
-            )
+        trace_client.otel_span_processor.queue_span_update(new_span, span_state="input")
 
         token = self.tracer.set_current_span(span_id)
         if token:
@@ -244,11 +241,10 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                             **metadata,
                         }
 
-                if trace_client.background_span_service:
-                    span_state = "error" if error else "completed"
-                    trace_client.background_span_service.queue_span(
-                        trace_span, span_state=span_state
-                    )
+                span_state = "error" if error else "completed"
+                trace_client.otel_span_processor.queue_span_update(
+                    trace_span, span_state=span_state
+                )
 
             # Clean up dictionaries for this specific span
             if span_id in self._span_id_to_start_time:
@@ -263,7 +259,6 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                 if (
                     self._trace_client and not self._trace_saved
                 ):  # Check if not already saved
-                    # Flush background spans before saving the final trace
                     complete_trace_data = {
                         "trace_id": self._trace_client.trace_id,
                         "name": self._trace_client.name,
@@ -278,6 +273,9 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                         "parent_trace_id": self._trace_client.parent_trace_id,
                         "parent_name": self._trace_client.parent_name,
                     }
+
+                    self.tracer.flush_background_spans()
+
                     trace_id, trace_data = self._trace_client.save(
                         final_save=True,  # Final save with usage counter updates
                     )
@@ -465,6 +463,8 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                     "parent_trace_id": trace_client.parent_trace_id,
                     "parent_name": trace_client.parent_name,
                 }
+
+                self.tracer.flush_background_spans()
 
                 trace_client.save(
                     final_save=True,

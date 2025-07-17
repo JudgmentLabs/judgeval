@@ -5,11 +5,10 @@ Tracing system for judgeval that allows for function tracing using decorators.
 from __future__ import annotations
 
 import asyncio
+import atexit
 import functools
 import inspect
 import os
-import site
-import sysconfig
 import threading
 import time
 import traceback
@@ -33,7 +32,10 @@ from typing import (
 )
 import types
 
-from judgeval.common.tracer.background_span import BackgroundSpanService
+from judgeval.common.tracer.constants import _TRACE_FILEPATH_BLOCKLIST
+
+from judgeval.common.tracer.otel_span_processor import JudgmentSpanProcessor
+from judgeval.common.tracer.span_processor import SpanProcessorBase
 from judgeval.common.tracer.trace_manager import TraceManagerClient
 from litellm import cost_per_token as _original_cost_per_token
 from openai import OpenAI, AsyncOpenAI
@@ -114,8 +116,10 @@ class TraceClient:
         )
         self._span_depths: Dict[str, int] = {}
 
-        self.background_span_service = (
-            tracer.get_background_span_service() if tracer else None
+        self.otel_span_processor = tracer.otel_span_processor
+
+        judgeval_logger.info(
+            f"🎯 TraceClient using span processor for trace {self.trace_id}"
         )
 
     def get_current_span(self):
@@ -166,8 +170,7 @@ class TraceClient:
         )
         self.add_span(span)
 
-        if self.background_span_service:
-            self.background_span_service.queue_span(span, span_state="input")
+        self.otel_span_processor.queue_span_update(span, span_state="input")
 
         try:
             yield self
@@ -175,8 +178,7 @@ class TraceClient:
             duration = time.time() - start_time
             span.duration = duration
 
-            if self.background_span_service:
-                self.background_span_service.queue_span(span, span_state="completed")
+            self.otel_span_processor.queue_span_update(span, span_state="completed")
 
             if span_id in self._span_depths:
                 del self._span_depths[span_id]
@@ -257,10 +259,10 @@ class TraceClient:
 
         self.add_eval_run(eval_run, start_time)
 
-        if self.background_span_service and span_id_to_use:
+        if span_id_to_use:
             current_span = self.span_id_to_span.get(span_id_to_use)
             if current_span:
-                self.background_span_service.queue_evaluation_run(
+                self.otel_span_processor.queue_evaluation_run(
                     eval_run, span_id=span_id_to_use, span_data=current_span
                 )
 
@@ -281,8 +283,7 @@ class TraceClient:
             span.inputs = inputs
 
             try:
-                if self.background_span_service:
-                    self.background_span_service.queue_span(span, span_state="input")
+                self.otel_span_processor.queue_span_update(span, span_state="input")
             except Exception as e:
                 judgeval_logger.warning(f"Failed to queue span with input data: {e}")
 
@@ -292,8 +293,7 @@ class TraceClient:
             span = self.span_id_to_span[current_span_id]
             span.agent_name = agent_name
 
-            if self.background_span_service:
-                self.background_span_service.queue_span(span, span_state="agent_name")
+            self.otel_span_processor.queue_span_update(span, span_state="agent_name")
 
     def record_state_before(self, state: dict):
         """Records the agent's state before a tool execution on the current span.
@@ -306,8 +306,7 @@ class TraceClient:
             span = self.span_id_to_span[current_span_id]
             span.state_before = state
 
-            if self.background_span_service:
-                self.background_span_service.queue_span(span, span_state="state_before")
+            self.otel_span_processor.queue_span_update(span, span_state="state_before")
 
     def record_state_after(self, state: dict):
         """Records the agent's state after a tool execution on the current span.
@@ -320,8 +319,7 @@ class TraceClient:
             span = self.span_id_to_span[current_span_id]
             span.state_after = state
 
-            if self.background_span_service:
-                self.background_span_service.queue_span(span, span_state="state_after")
+            self.otel_span_processor.queue_span_update(span, span_state="state_after")
 
     async def _update_coroutine(self, span: TraceSpan, coroutine: Any, field: str):
         """Helper method to update the output of a trace entry once the coroutine completes"""
@@ -329,15 +327,15 @@ class TraceClient:
             result = await coroutine
             setattr(span, field, result)
 
-            if self.background_span_service and field == "output":
-                self.background_span_service.queue_span(span, span_state="output")
+            if field == "output":
+                self.otel_span_processor.queue_span_update(span, span_state="output")
 
             return result
         except Exception as e:
             setattr(span, field, f"Error: {str(e)}")
 
-            if self.background_span_service and field == "output":
-                self.background_span_service.queue_span(span, span_state="output")
+            if field == "output":
+                self.otel_span_processor.queue_span_update(span, span_state="output")
 
             raise
 
@@ -350,8 +348,8 @@ class TraceClient:
             if inspect.iscoroutine(output):
                 asyncio.create_task(self._update_coroutine(span, output, "output"))
 
-            if self.background_span_service and not inspect.iscoroutine(output):
-                self.background_span_service.queue_span(span, span_state="output")
+            if not inspect.iscoroutine(output):
+                self.otel_span_processor.queue_span_update(span, span_state="output")
 
             return span
         return None
@@ -362,8 +360,7 @@ class TraceClient:
             span = self.span_id_to_span[current_span_id]
             span.usage = usage
 
-            if self.background_span_service:
-                self.background_span_service.queue_span(span, span_state="usage")
+            self.otel_span_processor.queue_span_update(span, span_state="usage")
 
             return span
         return None
@@ -374,8 +371,7 @@ class TraceClient:
             span = self.span_id_to_span[current_span_id]
             span.error = error
 
-            if self.background_span_service:
-                self.background_span_service.queue_span(span, span_state="error")
+            self.otel_span_processor.queue_span_update(span, span_state="error")
 
             return span
         return None
@@ -409,6 +405,13 @@ class TraceClient:
 
         Returns a tuple of (trace_id, server_response) where server_response contains the UI URL and other metadata.
         """
+        if final_save:
+            try:
+                self.otel_span_processor.flush_pending_spans()
+            except Exception as e:
+                judgeval_logger.warning(
+                    f"Error flushing spans for trace {self.trace_id}: {e}"
+                )
 
         total_duration = self.get_duration()
 
@@ -555,14 +558,6 @@ def _capture_exception_for_trace(
 
     current_trace.record_error(formatted_exception)
 
-    if current_trace.background_span_service:
-        current_span_id = current_trace.get_current_span()
-        if current_span_id and current_span_id in current_trace.span_id_to_span:
-            error_span = current_trace.span_id_to_span[current_span_id]
-            current_trace.background_span_service.queue_span(
-                error_span, span_state="error"
-            )
-
 
 class _DeepTracer:
     _instance: Optional["_DeepTracer"] = None
@@ -642,14 +637,10 @@ class _DeepTracer:
             try:
                 original_result = self._original_sys_trace(frame, event, arg)
             except Exception:
-                # If the original tracer fails, continue with our tracing
                 pass
 
-        # Then do our own tracing
         our_result = self._trace(frame, event, arg, self._cooperative_sys_trace)
 
-        # Return our tracer to continue tracing, but respect the original's decision
-        # If the original tracer returned None (stop tracing), we should respect that
         if original_result is None and self._original_sys_trace:
             return None
 
@@ -659,20 +650,15 @@ class _DeepTracer:
         self, frame: types.FrameType, event: str, arg: Any
     ):
         """Cooperative trace function for threading.settrace that chains with existing tracers."""
-        # First, call the original threading trace function if it exists
         original_result = None
         if self._original_threading_trace:
             try:
                 original_result = self._original_threading_trace(frame, event, arg)
             except Exception:
-                # If the original tracer fails, continue with our tracing
                 pass
 
-        # Then do our own tracing
         our_result = self._trace(frame, event, arg, self._cooperative_threading_trace)
 
-        # Return our tracer to continue tracing, but respect the original's decision
-        # If the original tracer returned None (stop tracing), we should respect that
         if original_result is None and self._original_threading_trace:
             return None
 
@@ -888,10 +874,10 @@ class Tracer:
         s3_aws_secret_access_key: Optional[str] = None,
         s3_region_name: Optional[str] = None,
         trace_across_async_contexts: bool = False,  # BY default, we don't trace across async contexts
-        # Background span service configuration
-        span_batch_size: int = 50,  # Number of spans to batch before sending
-        span_flush_interval: float = 1.0,  # Time in seconds between automatic flushes
-        span_num_workers: int = 10,  # Number of worker threads for span processing
+        span_batch_size: int = 50,
+        span_flush_interval: float = 1.0,
+        span_max_queue_size: int = 2048,
+        span_export_timeout: int = 30000,
     ):
         try:
             if not api_key:
@@ -956,15 +942,24 @@ class Tracer:
             self.offline_mode = False  # This is used to differentiate traces between online and offline (IE experiments vs monitoring page)
             self.deep_tracing: bool = deep_tracing
 
-            # Initialize background span service
-            self.background_span_service: Optional[BackgroundSpanService] = None
-            self.background_span_service = BackgroundSpanService(
-                judgment_api_key=api_key,
-                organization_id=organization_id,
-                batch_size=span_batch_size,
-                flush_interval=span_flush_interval,
-                num_workers=span_num_workers,
-            )
+            self.span_batch_size = span_batch_size
+            self.span_flush_interval = span_flush_interval
+            self.span_max_queue_size = span_max_queue_size
+            self.span_export_timeout = span_export_timeout
+            self.otel_span_processor: SpanProcessorBase
+            if enable_monitoring:
+                self.otel_span_processor = JudgmentSpanProcessor(
+                    judgment_api_key=api_key,
+                    organization_id=organization_id,
+                    batch_size=span_batch_size,
+                    flush_interval=span_flush_interval,
+                    max_queue_size=span_max_queue_size,
+                    export_timeout=span_export_timeout,
+                )
+            else:
+                self.otel_span_processor = SpanProcessorBase()
+
+            atexit.register(self._cleanup_on_exit)
         except Exception as e:
             judgeval_logger.error(
                 f"Issue with initializing Tracer: {e}. Disabling monitoring and evaluations."
@@ -1089,7 +1084,6 @@ class Tracer:
         # Set the current trace in context variables
         token = self.set_current_trace(trace)
 
-        # Automatically create top-level span
         with trace.span(name or "unnamed_trace"):
             try:
                 # Save the trace to the database to handle Evaluations' trace_id referential integrity
@@ -1268,8 +1262,6 @@ class Tracer:
                     trace_token = self.set_current_trace(current_trace)
 
                     try:
-                        # Use span for the function execution within the root trace
-                        # This sets the current_span_var
                         with current_trace.span(span_name, span_type=span_type) as span:
                             inputs = combine_args_kwargs(func, args, kwargs)
                             span.record_input(inputs)
@@ -1326,7 +1318,7 @@ class Tracer:
                             self.reset_current_trace(trace_token)
                         except Exception as e:
                             judgeval_logger.warning(f"Issue with async_wrapper: {e}")
-                            return
+                            pass
                 else:
                     with current_trace.span(span_name, span_type=span_type) as span:
                         inputs = combine_args_kwargs(func, args, kwargs)
@@ -1383,7 +1375,7 @@ class Tracer:
                     current_trace = TraceClient(
                         self,
                         trace_id,
-                        span_name,  # MODIFIED: Use span_name directly
+                        span_name,
                         project_name=project,
                         enable_monitoring=self.enable_monitoring,
                         enable_evaluations=self.enable_evaluations,
@@ -1392,11 +1384,7 @@ class Tracer:
                     trace_token = self.set_current_trace(current_trace)
 
                     try:
-                        # Use span for the function execution within the root trace
-                        # This sets the current_span_var
-                        with current_trace.span(
-                            span_name, span_type=span_type
-                        ) as span:  # MODIFIED: Use span_name directly
+                        with current_trace.span(span_name, span_type=span_type) as span:
                             # Record inputs
                             inputs = combine_args_kwargs(func, args, kwargs)
                             span.record_input(inputs)
@@ -1428,14 +1416,11 @@ class Tracer:
                             span.record_output(result)
                         return result
                     finally:
-                        # Flush background spans before saving the trace
                         try:
-                            # Save the completed trace
                             trace_id, server_response = current_trace.save(
                                 final_save=True
                             )
 
-                            # Store the complete trace data instead of just server response
                             complete_trace_data = {
                                 "trace_id": current_trace.trace_id,
                                 "name": current_trace.name,
@@ -1453,11 +1438,10 @@ class Tracer:
                                 "parent_name": current_trace.parent_name,
                             }
                             self.traces.append(complete_trace_data)
-                            # Reset trace context (span context resets automatically)
                             self.reset_current_trace(trace_token)
                         except Exception as e:
                             judgeval_logger.warning(f"Issue with save: {e}")
-                            return
+                            pass
                 else:
                     with current_trace.span(span_name, span_type=span_type) as span:
                         inputs = combine_args_kwargs(func, args, kwargs)
@@ -1619,20 +1603,32 @@ class Tracer:
         else:
             judgeval_logger.warning("No current trace found, cannot set reward score")
 
-    def get_background_span_service(self) -> Optional[BackgroundSpanService]:
-        """Get the background span service instance."""
-        return self.background_span_service
+    def get_otel_span_processor(self) -> SpanProcessorBase:
+        """Get the OpenTelemetry span processor instance."""
+        return self.otel_span_processor
 
-    def flush_background_spans(self):
+    def flush_background_spans(self, timeout_millis: int = 30000):
         """Flush all pending spans in the background service."""
-        if self.background_span_service:
-            self.background_span_service.flush()
+        self.otel_span_processor.force_flush(timeout_millis)
 
     def shutdown_background_service(self):
         """Shutdown the background span service."""
-        if self.background_span_service:
-            self.background_span_service.shutdown()
-            self.background_span_service = None
+        self.otel_span_processor.shutdown()
+        self.otel_span_processor = SpanProcessorBase()
+
+    def _cleanup_on_exit(self):
+        """Cleanup handler called on application exit to ensure spans are flushed."""
+        try:
+            self.flush_background_spans()
+        except Exception as e:
+            judgeval_logger.warning(f"Error during tracer cleanup: {e}")
+        finally:
+            try:
+                self.shutdown_background_service()
+            except Exception as e:
+                judgeval_logger.warning(
+                    f"Error during background service shutdown: {e}"
+                )
 
 
 def _get_current_trace(
@@ -1665,17 +1661,6 @@ def wrap(
         output, usage = _format_output_data(client, response)
         span.record_output(output)
         span.record_usage(usage)
-
-        # Queue the completed LLM span now that it has all data (input, output, usage)
-        current_trace = _get_current_trace(trace_across_async_contexts)
-        if current_trace and current_trace.background_span_service:
-            # Get the current span from the trace client
-            current_span_id = current_trace.get_current_span()
-            if current_span_id and current_span_id in current_trace.span_id_to_span:
-                completed_span = current_trace.span_id_to_span[current_span_id]
-                current_trace.background_span_service.queue_span(
-                    completed_span, span_state="completed"
-                )
 
         return response
 
@@ -1977,25 +1962,6 @@ def combine_args_kwargs(func, args, kwargs):
     except Exception:
         # Fallback if signature inspection fails
         return {**{f"arg{i}": arg for i, arg in enumerate(args)}, **kwargs}
-
-
-# NOTE: This builds once, can be tweaked if we are missing / capturing other unncessary modules
-# @link https://docs.python.org/3.13/library/sysconfig.html
-_TRACE_FILEPATH_BLOCKLIST = tuple(
-    os.path.realpath(p) + os.sep
-    for p in {
-        sysconfig.get_paths()["stdlib"],
-        sysconfig.get_paths().get("platstdlib", ""),
-        *site.getsitepackages(),
-        site.getusersitepackages(),
-        *(
-            [os.path.join(os.path.dirname(__file__), "../../judgeval/")]
-            if os.environ.get("JUDGMENT_DEV")
-            else []
-        ),
-    }
-    if p
-)
 
 
 def cost_per_token(*args, **kwargs):

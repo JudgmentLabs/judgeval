@@ -90,8 +90,56 @@ class TraceSpan(TraceSpanJudgmentType):
 
     def safe_stringify(self, output, function_name):
         """
-        Safely converts an object to a string or repr, handling serialization issues gracefully.
+        Safely converts an object to a JSON-serializable structure, handling common object types intelligently.
         """
+        # Handle Pydantic models
+        if hasattr(output, "model_dump"):
+            try:
+                return output.model_dump()
+            except Exception:
+                pass
+
+        # Handle LangChain messages and similar objects with content/type
+        if hasattr(output, "content") and hasattr(output, "type"):
+            try:
+                result = {"type": output.type, "content": output.content}
+                # Add additional fields if they exist
+                if hasattr(output, "additional_kwargs"):
+                    result["additional_kwargs"] = output.additional_kwargs
+                if hasattr(output, "response_metadata"):
+                    result["response_metadata"] = output.response_metadata
+                if hasattr(output, "name"):
+                    result["name"] = output.name
+                return result
+            except Exception:
+                pass
+
+        if hasattr(output, "dict"):
+            try:
+                return output.dict()
+            except Exception:
+                pass
+
+        if hasattr(output, "to_dict"):
+            try:
+                return output.to_dict()
+            except Exception:
+                pass
+
+        if hasattr(output, "__dataclass_fields__"):
+            try:
+                import dataclasses
+
+                return dataclasses.asdict(output)
+            except Exception:
+                pass
+
+        if hasattr(output, "__dict__"):
+            try:
+                return output.__dict__
+            except Exception:
+                pass
+
         try:
             return str(output)
         except (TypeError, OverflowError, ValueError):

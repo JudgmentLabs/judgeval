@@ -1,138 +1,65 @@
 from judgeval.scorers.api_scorer import APIScorerConfig
 from judgeval.constants import APIScorerType
-from typing import Mapping, Optional, Dict, Any
-import requests
-from judgeval.constants import ROOT_API
-from judgeval.common.exceptions import JudgmentAPIError
+from typing import Mapping, Dict, Any
+from judgeval.common.api import JudgmentApiClient, JudgmentAPIException
 import os
+from judgeval.common.exceptions import JudgmentAPIError
 
 
 def push_prompt_scorer(
     name: str,
     prompt: str,
     options: Mapping[str, float],
-    judgment_api_key: Optional[str] = os.getenv("JUDGMENT_API_KEY"),
-    organization_id: Optional[str] = os.getenv("JUDGMENT_ORG_ID"),
+    judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
+    organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
 ) -> str:
-    """
-    Pushes a classifier scorer configuration to the Judgment API.
-
-    Returns:
-        str: The slug identifier of the saved scorer
-
-    Raises:
-        JudgmentAPIError: If there's an error saving the scorer
-    """
-    request_body = {
-        "name": name,
-        "prompt": prompt,
-        "options": options,
-    }
-
-    response = requests.post(
-        f"{ROOT_API}/save_scorer/",
-        json=request_body,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {judgment_api_key}",
-            "X-Organization-Id": organization_id,
-        },
-        verify=True,
-    )
-
-    if response.status_code == 500:
-        raise JudgmentAPIError(
-            f"The server is temporarily unavailable. \
-                                Please try your request again in a few moments. \
-                                Error details: {response.json().get('detail', '')}"
-        )
-    elif response.status_code != 200:
-        raise JudgmentAPIError(
-            f"Failed to save classifier scorer: {response.json().get('detail', '')}"
-        )
-    return response.json()["name"]
+    client = JudgmentApiClient(judgment_api_key, organization_id)
+    try:
+        r = client.save_scorer(name, prompt, dict(options))
+    except JudgmentAPIException as e:
+        if e.status_code == 500:
+            raise JudgmentAPIError(
+                f"The server is temporarily unavailable. Please try your request again in a few moments. Error details: {e.error_detail}"
+            )
+        raise JudgmentAPIError(f"Failed to save classifier scorer: {e.error_detail}")
+    return r["name"]
 
 
 def fetch_prompt_scorer(
     name: str,
-    judgment_api_key: Optional[str] = os.getenv("JUDGMENT_API_KEY"),
-    organization_id: Optional[str] = os.getenv("JUDGMENT_ORG_ID"),
+    judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
+    organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
 ):
-    """
-    Fetches a classifier scorer configuration from the Judgment API.
-
-    Args:
-        slug (str): Slug identifier of the custom scorer to fetch
-
-    Returns:
-        dict: The configured classifier scorer object as a dictionary
-
-    Raises:
-        JudgmentAPIError: If the scorer cannot be fetched or doesn't exist
-    """
-    request_body = {
-        "name": name,
-    }
-
-    response = requests.post(
-        f"{ROOT_API}/fetch_scorer/",
-        json=request_body,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {judgment_api_key}",
-            "X-Organization-Id": organization_id,
-        },
-        verify=True,
-    )
-
-    if response.status_code == 500:
+    client = JudgmentApiClient(judgment_api_key, organization_id)
+    try:
+        scorer_config = client.fetch_scorer(name)
+        scorer_config.pop("created_at")
+        scorer_config.pop("updated_at")
+        return scorer_config
+    except JudgmentAPIException as e:
+        if e.status_code == 500:
+            raise JudgmentAPIError(
+                f"The server is temporarily unavailable. Please try your request again in a few moments. Error details: {e.error_detail}"
+            )
         raise JudgmentAPIError(
-            f"The server is temporarily unavailable. Please try your request again in a few moments. Error details: {response.json().get('detail', '')}"
+            f"Failed to fetch classifier scorer '{name}': {e.error_detail}"
         )
-    elif response.status_code != 200:
-        raise JudgmentAPIError(
-            f"Failed to fetch classifier scorer '{name}': {response.json().get('detail', '')}"
-        )
-
-    scorer_config = response.json()
-    scorer_config.pop("created_at")
-    scorer_config.pop("updated_at")
-
-    return scorer_config
 
 
 def scorer_exists(
     name: str,
-    judgment_api_key: Optional[str] = os.getenv("JUDGMENT_API_KEY"),
-    organization_id: Optional[str] = os.getenv("JUDGMENT_ORG_ID"),
+    judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
+    organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
 ):
-    """
-    Checks if a scorer exists in the DB.
-    """
-    request_body = {
-        "name": name,
-    }
-
-    response = requests.post(
-        f"{ROOT_API}/scorer_exists/",
-        json=request_body,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {judgment_api_key}",
-            "X-Organization-Id": organization_id,
-        },
-        verify=True,
-    )
-
-    if response.status_code == 500:
-        raise JudgmentAPIError(
-            f"The server is temporarily unavailable. Please try your request again in a few moments. Error details: {response.json().get('detail', '')}"
-        )
-    elif response.status_code != 200:
-        raise JudgmentAPIError(
-            f"Failed to check if scorer exists: {response.json().get('detail', '')}"
-        )
-    return response.json()["exists"]
+    client = JudgmentApiClient(judgment_api_key, organization_id)
+    try:
+        return client.scorer_exists(name)["exists"]
+    except JudgmentAPIException as e:
+        if e.status_code == 500:
+            raise JudgmentAPIError(
+                f"The server is temporarily unavailable. Please try your request again in a few moments. Error details: {e.error_detail}"
+            )
+        raise JudgmentAPIError(f"Failed to check if scorer exists: {e.error_detail}")
 
 
 class PromptScorer(APIScorerConfig):
@@ -147,15 +74,15 @@ class PromptScorer(APIScorerConfig):
     prompt: str
     options: Mapping[str, float]
     score_type: APIScorerType = APIScorerType.PROMPT_SCORER
-    judgment_api_key: Optional[str] = os.getenv("JUDGMENT_API_KEY")
-    organization_id: Optional[str] = os.getenv("JUDGMENT_ORG_ID")
+    judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or ""
+    organization_id: str = os.getenv("JUDGMENT_ORG_ID") or ""
 
     @classmethod
     def get(
         cls,
         name: str,
-        judgment_api_key: Optional[str] = os.getenv("JUDGMENT_API_KEY"),
-        organization_id: Optional[str] = os.getenv("JUDGMENT_ORG_ID"),
+        judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
+        organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
     ):
         scorer_config = fetch_prompt_scorer(name, judgment_api_key, organization_id)
         return cls(
@@ -172,8 +99,8 @@ class PromptScorer(APIScorerConfig):
         name: str,
         prompt: str,
         options: Mapping[str, float],
-        judgment_api_key: Optional[str] = os.getenv("JUDGMENT_API_KEY"),
-        organization_id: Optional[str] = os.getenv("JUDGMENT_ORG_ID"),
+        judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
+        organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
     ):
         if not scorer_exists(name, judgment_api_key, organization_id):
             push_prompt_scorer(name, prompt, options, judgment_api_key, organization_id)

@@ -5,8 +5,6 @@ Implements the JudgmentClient to interact with the Judgment API.
 import os
 from uuid import uuid4
 from typing import Optional, List, Dict, Any, Union, Callable
-from requests import codes
-from judgeval.utils.requests import requests
 import asyncio
 
 from judgeval.data.datasets import EvalDataset, EvalDatasetClient
@@ -27,11 +25,7 @@ from judgeval.run_evaluation import (
     safe_run_async,
 )
 from judgeval.data.trace_run import TraceRun
-from judgeval.constants import (
-    JUDGMENT_EVAL_FETCH_API_URL,
-    JUDGMENT_PROJECT_DELETE_API_URL,
-    JUDGMENT_PROJECT_CREATE_API_URL,
-)
+from judgeval.common.api import JudgmentApiClient
 from judgeval.common.exceptions import JudgmentAPIError
 from langchain_core.callbacks import BaseCallbackHandler
 from judgeval.common.tracer import Tracer
@@ -81,6 +75,7 @@ class JudgmentClient(metaclass=SingletonMeta):
 
         self.judgment_api_key = api_key
         self.organization_id = organization_id
+        self.api_client = JudgmentApiClient(api_key, organization_id)
         self.eval_dataset_client = EvalDatasetClient(api_key, organization_id)
 
         # Verify API key is valid
@@ -290,63 +285,21 @@ class JudgmentClient(metaclass=SingletonMeta):
                 - id (str): The evaluation run ID
                 - results (List[ScoringResult]): List of scoring results
         """
-        eval_run_request_body = EvalRunRequestBody(
-            project_name=project_name,
-            eval_name=eval_run_name,
-            judgment_api_key=self.judgment_api_key,
-        )
-        eval_run = requests.post(
-            JUDGMENT_EVAL_FETCH_API_URL,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.judgment_api_key}",
-                "X-Organization-Id": self.organization_id,
-            },
-            json=eval_run_request_body.model_dump(),
-            verify=True,
-        )
-        if eval_run.status_code != codes.ok:
-            raise ValueError(f"Error fetching eval results: {eval_run.json()}")
-
-        return eval_run.json()
+        return self.api_client.fetch_evaluation_results(project_name, eval_run_name)
 
     def create_project(self, project_name: str) -> bool:
         """
         Creates a project on the server.
         """
-        response = requests.post(
-            JUDGMENT_PROJECT_CREATE_API_URL,
-            json={
-                "project_name": project_name,
-            },
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.judgment_api_key}",
-                "X-Organization-Id": self.organization_id,
-            },
-        )
-        if response.status_code != codes.ok:
-            raise ValueError(f"Error creating project: {response.json()}")
-        return response.json()
+        self.api_client.create_project(project_name)
+        return True
 
     def delete_project(self, project_name: str) -> bool:
         """
         Deletes a project from the server. Which also deletes all evaluations and traces associated with the project.
         """
-        response = requests.delete(
-            JUDGMENT_PROJECT_DELETE_API_URL,
-            json={
-                "project_name": project_name,
-            },
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.judgment_api_key}",
-                "X-Organization-Id": self.organization_id,
-            },
-        )
-        if response.status_code != codes.ok:
-            raise ValueError(f"Error deleting project: {response.json()}")
-        return response.json()
+        self.api_client.delete_project(project_name)
+        return True
 
     def assert_test(
         self,
@@ -388,14 +341,13 @@ class JudgmentClient(metaclass=SingletonMeta):
 
         if async_execution and isinstance(results, (asyncio.Task, SpinnerWrappedTask)):
 
-            async def run_async():  # Using wrapper here to resolve mypy error with passing Task into asyncio.run
+            async def run_async():
                 return await results
 
             actual_results = safe_run_async(run_async())
-            assert_test(actual_results)  # Call the synchronous imported function
+            assert_test(actual_results)
         else:
-            # 'results' is already List[ScoringResult] here (synchronous path)
-            assert_test(results)  # Call the synchronous imported function
+            assert_test(results)
 
     def assert_trace_test(
         self,
@@ -456,11 +408,10 @@ class JudgmentClient(metaclass=SingletonMeta):
 
         if async_execution and isinstance(results, (asyncio.Task, SpinnerWrappedTask)):
 
-            async def run_async():  # Using wrapper here to resolve mypy error with passing Task into asyncio.run
+            async def run_async():
                 return await results
 
             actual_results = safe_run_async(run_async())
-            assert_test(actual_results)  # Call the synchronous imported function
+            assert_test(actual_results)
         else:
-            # 'results' is already List[ScoringResult] here (synchronous path)
-            assert_test(results)  # Call the synchronous imported function
+            assert_test(results)
