@@ -62,6 +62,7 @@ dev = [
     "langgraph>=0.4.3",
     "pre-commit>=4.2.0",
     "types-requests>=2.32.4.20250611",
+    "llama-index>=0.12.49",
 ]
 
 [tool.hatch.build]
