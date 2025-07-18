@@ -17,15 +17,10 @@ class ScoringResult(ScoringResultJudgmentType):
 
     """
 
-    def to_dict(self) -> dict:
-        """Convert the ScoringResult instance to a dictionary, properly serializing scorer_data."""
-        return {
-            "success": self.success,
-            "scorers_data": [scorer_data.to_dict() for scorer_data in self.scorers_data]
-            if self.scorers_data
-            else None,
-            "data_object": self.data_object.to_dict() if self.data_object else None,
-        }
+    def model_dump(self, **kwargs):
+        data = super().model_dump(**kwargs)
+        data["data_object"] = self.data_object.model_dump()
+        return data
 
     def __str__(self) -> str:
         return f"ScoringResult(\
@@ -47,12 +42,8 @@ def generate_scoring_result(
     When an LLMTestCase is executed, it turns into an LLMApiTestCase and the progress of the evaluation run is tracked.
     At the end of the evaluation run, we create a TestResult object out of the completed LLMApiTestCase.
     """
-    if hasattr(data_object, "name") and data_object.name is not None:
-        name = data_object.name
-    else:
-        name = "Test Case Placeholder"
+    print(type(data_object))
     scoring_result = ScoringResult(
-        name=name,
         data_object=data_object,
         success=success,
         scorers_data=scorers_data,

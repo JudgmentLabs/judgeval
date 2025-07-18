@@ -172,6 +172,7 @@ class JudgmentApiClient:
     def log_evaluation_results(
         self, results: List[Dict[str, Any]], run: Dict[str, Any]
     ):
+        print(results)
         payload: EvalLogPayload = {"results": results, "run": run}
         return self._do_request("POST", JUDGMENT_EVAL_LOG_API_URL, payload)
 

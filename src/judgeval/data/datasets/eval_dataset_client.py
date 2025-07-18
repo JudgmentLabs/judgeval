@@ -49,7 +49,7 @@ class EvalDatasetClient:
                 payload = self.api_client.push_dataset(
                     dataset_alias=alias,
                     project_name=project_name,
-                    examples=[e.to_dict() for e in dataset.examples],
+                    examples=[e.model_dump() for e in dataset.examples],
                     traces=[t.model_dump() for t in dataset.traces],
                     overwrite=overwrite or False,
                 )
@@ -94,7 +94,7 @@ class EvalDatasetClient:
                 self.api_client.append_examples(
                     dataset_alias=alias,
                     project_name=project_name,
-                    examples=[e.to_dict() for e in examples],
+                    examples=[e.model_dump() for e in examples],
                 )
             except Exception as e:
                 judgeval_logger.error(f"Error during append: {e}")

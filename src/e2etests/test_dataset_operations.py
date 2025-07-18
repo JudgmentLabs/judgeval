@@ -7,7 +7,7 @@ import random
 import string
 
 from judgeval.judgment_client import JudgmentClient
-from judgeval.data import Example
+from judgeval.data import JudgevalExample
 
 
 @pytest.mark.basic
@@ -15,7 +15,7 @@ class TestDatasetOperations:
     def test_dataset(self, client: JudgmentClient, project_name: str):
         """Test dataset creation and manipulation."""
         dataset = client.create_dataset()
-        dataset.add_example(Example(input="input 1", actual_output="output 1"))
+        dataset.add_example(JudgevalExample(input="input 1", actual_output="output 1"))
 
         client.push_dataset(
             alias="test_dataset_5",
@@ -34,9 +34,9 @@ class TestDatasetOperations:
     ):
         """Test pulling statistics for all project datasets."""
         dataset = client.create_dataset()
-        dataset.add_example(Example(input="input 1", actual_output="output 1"))
-        dataset.add_example(Example(input="input 2", actual_output="output 2"))
-        dataset.add_example(Example(input="input 3", actual_output="output 3"))
+        dataset.add_example(JudgevalExample(input="input 1", actual_output="output 1"))
+        dataset.add_example(JudgevalExample(input="input 2", actual_output="output 2"))
+        dataset.add_example(JudgevalExample(input="input 3", actual_output="output 3"))
         random_name1 = "".join(
             random.choices(string.ascii_letters + string.digits, k=20)
         )
@@ -48,8 +48,8 @@ class TestDatasetOperations:
         )
 
         dataset = client.create_dataset()
-        dataset.add_example(Example(input="input 1", actual_output="output 1"))
-        dataset.add_example(Example(input="input 2", actual_output="output 2"))
+        dataset.add_example(JudgevalExample(input="input 1", actual_output="output 1"))
+        dataset.add_example(JudgevalExample(input="input 2", actual_output="output 2"))
         random_name2 = "".join(
             random.choices(string.ascii_letters + string.digits, k=20)
         )
@@ -76,8 +76,8 @@ class TestDatasetOperations:
     def test_append_dataset(self, client: JudgmentClient, project_name: str):
         """Test dataset editing."""
         dataset = client.create_dataset()
-        dataset.add_example(Example(input="input 1", actual_output="output 1"))
-        dataset.add_example(Example(input="input 2", actual_output="output 2"))
+        dataset.add_example(JudgevalExample(input="input 1", actual_output="output 1"))
+        dataset.add_example(JudgevalExample(input="input 2", actual_output="output 2"))
         client.push_dataset(
             alias="test_dataset_6",
             dataset=dataset,
@@ -93,7 +93,7 @@ class TestDatasetOperations:
 
         client.append_dataset(
             alias="test_dataset_6",
-            examples=[Example(input="input 3", actual_output="output 3")],
+            examples=[JudgevalExample(input="input 3", actual_output="output 3")],
             project_name=project_name,
         )
         dataset = client.pull_dataset(alias="test_dataset_6", project_name=project_name)
@@ -107,7 +107,7 @@ class TestDatasetOperations:
     def test_overwrite_dataset(self, client: JudgmentClient, project_name: str):
         """Test dataset overwriting."""
         dataset = client.create_dataset()
-        dataset.add_example(Example(input="input 1", actual_output="output 1"))
+        dataset.add_example(JudgevalExample(input="input 1", actual_output="output 1"))
         client.push_dataset(
             alias="test_dataset_7",
             dataset=dataset,
@@ -116,8 +116,8 @@ class TestDatasetOperations:
         )
 
         dataset = client.create_dataset()
-        dataset.add_example(Example(input="input 2", actual_output="output 2"))
-        dataset.add_example(Example(input="input 3", actual_output="output 3"))
+        dataset.add_example(JudgevalExample(input="input 2", actual_output="output 2"))
+        dataset.add_example(JudgevalExample(input="input 3", actual_output="output 3"))
         client.push_dataset(
             alias="test_dataset_7",
             dataset=dataset,
@@ -132,7 +132,7 @@ class TestDatasetOperations:
     def test_append_dataset2(self, client: JudgmentClient, project_name: str):
         """Test dataset appending."""
         dataset = client.create_dataset()
-        dataset.add_example(Example(input="input 1", actual_output="output 1"))
+        dataset.add_example(JudgevalExample(input="input 1", actual_output="output 1"))
         client.push_dataset(
             alias="test_dataset_8",
             dataset=dataset,
@@ -141,8 +141,8 @@ class TestDatasetOperations:
         )
 
         examples = [
-            Example(input="input 2", actual_output="output 2"),
-            Example(input="input 3", actual_output="output 3"),
+            JudgevalExample(input="input 2", actual_output="output 2"),
+            JudgevalExample(input="input 3", actual_output="output 3"),
         ]
         client.append_dataset(
             alias="test_dataset_8", examples=examples, project_name=project_name

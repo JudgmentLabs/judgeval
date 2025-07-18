@@ -2,10 +2,10 @@ import yaml
 from typing import List
 from judgeval.common.logger import judgeval_logger
 
-from judgeval.data import Example
+from judgeval.data import JudgevalExample
 
 
-def get_examples_from_yaml(file_path: str) -> List[Example] | None:
+def get_examples_from_yaml(file_path: str) -> List[JudgevalExample] | None:
     """
     Adds examples from a YAML file.
 
@@ -47,5 +47,6 @@ def get_examples_from_yaml(file_path: str) -> List[Example] | None:
         judgeval_logger.error(f"Invalid YAML file: {file_path}")
         raise ValueError(f"The file {file_path} is not a valid YAML file.")
 
-    new_examples = [Example(**e) for e in examples]
+    new_examples = [JudgevalExample(**e) for e in examples]
+    print(new_examples)
     return new_examples

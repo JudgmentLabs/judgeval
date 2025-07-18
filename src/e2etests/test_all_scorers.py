@@ -12,11 +12,11 @@ from judgeval.scorers import (
     PromptScorer,
 )
 from uuid import uuid4
-from judgeval.data import Example
+from judgeval.data import JudgevalExample
 
 
 def test_ac_scorer(client: JudgmentClient, project_name: str):
-    example = Example(
+    example = JudgevalExample(
         input="What's the capital of France?",
         actual_output="The capital of France is Paris.",
         expected_output="France's capital is Paris. It used to be called the city of lights until 1968.",
@@ -37,12 +37,12 @@ def test_ac_scorer(client: JudgmentClient, project_name: str):
 
 
 def test_ar_scorer(client: JudgmentClient, project_name: str):
-    example_1 = Example(  # should pass
+    example_1 = JudgevalExample(  # should pass
         input="What's the capital of France?",
         actual_output="The capital of France is Paris.",
     )
 
-    example_2 = Example(  # should fail
+    example_2 = JudgevalExample(  # should fail
         input="What's the capital of France?",
         actual_output="There's alot to do in Marseille. Lots of bars, restaurants, and museums.",
     )
@@ -68,7 +68,7 @@ def test_ar_scorer(client: JudgmentClient, project_name: str):
 
 
 def test_faithfulness_scorer(client: JudgmentClient, project_name: str):
-    faithful_example = Example(  # should pass
+    faithful_example = JudgevalExample(  # should pass
         input="What's the capital of France?",
         actual_output="The capital of France is Paris.",
         expected_output="France's capital is Paris. It used to be called the city of lights until 1968.",
@@ -79,7 +79,7 @@ def test_faithfulness_scorer(client: JudgmentClient, project_name: str):
         ],
     )
 
-    contradictory_example = Example(  # should fail
+    contradictory_example = JudgevalExample(  # should fail
         input="What's the capital of France?",
         actual_output="The capital of France is Lyon. It's located in southern France near the Mediterranean coast.",
         expected_output="France's capital is Paris. It used to be called the city of lights until 1968.",
@@ -111,7 +111,7 @@ def test_faithfulness_scorer(client: JudgmentClient, project_name: str):
 
 
 def test_instruction_adherence_scorer(client: JudgmentClient, project_name: str):
-    example_1 = Example(
+    example_1 = JudgevalExample(
         input="write me a poem about cars and then turn it into a joke, but also what is 5 +5?",
         actual_output="Cars on the road, they zoom and they fly, Under the sun or a stormy sky. Engines roar, tires spin, A symphony of motion, let the race begin. Now for the joke: Why did the car break up with the bicycle. Because it was tired of being two-tired! And 5 + 5 is 10.",
     )
@@ -137,7 +137,7 @@ def test_instruction_adherence_scorer(client: JudgmentClient, project_name: str)
 def test_execution_order_scorer(client: JudgmentClient, project_name: str):
     EVAL_RUN_NAME = "test-run-execution-order"
 
-    example = Example(
+    example = JudgevalExample(
         input="What is the weather in New York and the stock price of AAPL?",
         actual_output=[
             "weather_forecast",
@@ -183,12 +183,12 @@ def test_prompt_scorer(client: JudgmentClient, project_name: str):
     )
 
     # Create test examples
-    helpful_example = Example(
+    helpful_example = JudgevalExample(
         input="What's the capital of France?",
         actual_output="The capital of France is Paris. It's one of the most populous cities in Europe and is known for landmarks like the Eiffel Tower and the Louvre Museum.",
     )
 
-    unhelpful_example = Example(
+    unhelpful_example = JudgevalExample(
         input="What's the capital of France?",
         actual_output="I don't know much about geography, but I think it might be somewhere in Europe.",
     )
@@ -220,12 +220,7 @@ def print_debug_on_failure(result) -> bool:
         bool: True if the test passed, False if it failed
     """
     if not result.success:
-        print("\n=== Test Failure Details ===")
-        print(f"Input: {result.data_object.input}")
-        print(f"Output: {result.data_object.actual_output}")
-        print(f"Success: {result.success}")
-        if hasattr(result.data_object, "retrieval_context"):
-            print(f"Retrieval Context: {result.data_object.retrieval_context}")
+        print(result.data_object.model_dump())
         print("\nScorer Details:")
         for scorer_data in result.scorers_data:
             print(f"- Name: {scorer_data.name}")

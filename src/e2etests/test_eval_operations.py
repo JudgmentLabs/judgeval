@@ -8,7 +8,7 @@ import tempfile
 import time
 
 from judgeval.judgment_client import JudgmentClient
-from judgeval.data import Example
+from judgeval.data import JudgevalExample
 from judgeval.scorers import (
     FaithfulnessScorer,
     AnswerRelevancyScorer,
@@ -22,7 +22,7 @@ from judgeval.utils.file_utils import get_examples_from_yaml
 def run_eval_helper(client: JudgmentClient, project_name: str, eval_run_name: str):
     """Helper function to run evaluation."""
     # Single step in our workflow, an outreach Sales Agent
-    example1 = Example(
+    example1 = JudgevalExample(
         input="Generate a cold outreach email for TechCorp. Facts: They recently launched an AI-powered analytics platform. Their CEO Sarah Chen previously worked at Google. They have 50+ enterprise clients.",
         actual_output="Dear Ms. Chen,\n\nI noticed TechCorp's recent launch of your AI analytics platform and was impressed by its enterprise-focused approach. Your experience from Google clearly shines through in building scalable solutions, as evidenced by your impressive 50+ enterprise client base.\n\nWould you be open to a brief call to discuss how we could potentially collaborate?\n\nBest regards,\nAlex",
         retrieval_context=[
@@ -32,7 +32,7 @@ def run_eval_helper(client: JudgmentClient, project_name: str, eval_run_name: st
         ],
     )
 
-    example2 = Example(
+    example2 = JudgevalExample(
         input="Generate a cold outreach email for GreenEnergy Solutions. Facts: They're developing solar panel technology that's 30% more efficient. They're looking to expand into the European market. They won a sustainability award in 2023.",
         actual_output="Dear GreenEnergy Solutions team,\n\nCongratulations on your 2023 sustainability award! Your innovative solar panel technology with 30% higher efficiency is exactly what the European market needs right now.\n\nI'd love to discuss how we could support your European expansion plans.\n\nBest regards,\nAlex",
         expected_output="A professional cold email mentioning the sustainability award, solar technology innovation, and European expansion plans",
@@ -57,30 +57,28 @@ def run_eval_helper(client: JudgmentClient, project_name: str, eval_run_name: st
     )
 
 
-def test_run_eval(client: JudgmentClient):
+def test_run_eval(client: JudgmentClient, project_name: str):
     """Test basic evaluation workflow."""
-    PROJECT_NAME = "OutreachWorkflow"
     EVAL_RUN_NAME = "ColdEmailGenerator-Improve-BasePrompt"
 
-    run_eval_helper(client, PROJECT_NAME, EVAL_RUN_NAME)
-    results = client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
+    run_eval_helper(client, project_name, EVAL_RUN_NAME)
+    results = client.pull_eval(project_name=project_name, eval_run_name=EVAL_RUN_NAME)
     assert results, f"No evaluation results found for {EVAL_RUN_NAME}"
 
-    client.delete_project(project_name=PROJECT_NAME)
+    client.delete_project(project_name=project_name)
 
 
-def test_run_eval_append(client: JudgmentClient):
+def test_run_eval_append(client: JudgmentClient, project_name: str):
     """Test evaluation append behavior."""
-    PROJECT_NAME = "OutreachWorkflow"
     EVAL_RUN_NAME = "ColdEmailGenerator-Improve-BasePrompt"
 
-    run_eval_helper(client, PROJECT_NAME, EVAL_RUN_NAME)
-    results = client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
+    run_eval_helper(client, project_name, EVAL_RUN_NAME)
+    results = client.pull_eval(project_name=project_name, eval_run_name=EVAL_RUN_NAME)
     results = results["examples"]
     assert results, f"No evaluation results found for {EVAL_RUN_NAME}"
     assert len(results) == 2
 
-    example1 = Example(
+    example1 = JudgevalExample(
         input="Generate a cold outreach email for TechCorp. Facts: They recently launched an AI-powered analytics platform. Their CEO Sarah Chen previously worked at Google. They have 50+ enterprise clients.",
         actual_output="Dear Ms. Chen,\n\nI noticed TechCorp's recent launch of your AI analytics platform and was impressed by its enterprise-focused approach. Your experience from Google clearly shines through in building scalable solutions, as evidenced by your impressive 50+ enterprise client base.\n\nWould you be open to a brief call to discuss how we could potentially collaborate?\n\nBest regards,\nAlex",
         retrieval_context=[
@@ -95,24 +93,24 @@ def test_run_eval_append(client: JudgmentClient):
         examples=[example1],
         scorers=[scorer],
         model="Qwen/Qwen2.5-72B-Instruct-Turbo",
-        project_name=PROJECT_NAME,
+        project_name=project_name,
         eval_run_name=EVAL_RUN_NAME,
         append=True,
     )
 
-    results = client.pull_eval(project_name=PROJECT_NAME, eval_run_name=EVAL_RUN_NAME)
+    results = client.pull_eval(project_name=project_name, eval_run_name=EVAL_RUN_NAME)
     assert results, f"No evaluation results found for {EVAL_RUN_NAME}"
     results = results["examples"]
     assert len(results) == 3
     assert results[0]["scorer_data"][0]["score"] == 1.0
-    client.delete_project(project_name=PROJECT_NAME)
+    client.delete_project(project_name=project_name)
 
 
 def test_run_append_without_existing(client: JudgmentClient, project_name: str):
     """Test evaluation append behavior when the eval run does not exist."""
     EVAL_RUN_NAME = "ColdEmailGenerator-Improve-BasePrompt"
 
-    example1 = Example(
+    example1 = JudgevalExample(
         input="Generate a cold outreach email for TechCorp. Facts: They recently launched an AI-powered analytics platform. Their CEO Sarah Chen previously worked at Google. They have 50+ enterprise clients.",
         actual_output="Dear Ms. Chen,\n\nI noticed TechCorp's recent launch of your AI analytics platform and was impressed by its enterprise-focused approach. Your experience from Google clearly shines through in building scalable solutions, as evidenced by your impressive 50+ enterprise client base.\n\nWould you be open to a brief call to discuss how we could potentially collaborate?\n\nBest regards,\nAlex",
         retrieval_context=[
@@ -141,7 +139,7 @@ def test_run_append_without_existing(client: JudgmentClient, project_name: str):
 async def test_assert_test(client: JudgmentClient, project_name: str):
     """Test assertion functionality."""
     # Create examples and scorers as before
-    example = Example(
+    example = JudgevalExample(
         input="What if these shoes don't fit?",
         actual_output="We offer a 30-day full refund at no extra cost.",
         retrieval_context=[
@@ -149,12 +147,12 @@ async def test_assert_test(client: JudgmentClient, project_name: str):
         ],
     )
 
-    example1 = Example(
+    example1 = JudgevalExample(
         input="How much are your croissants?",
         actual_output="Sorry, we don't accept electronic returns.",
     )
 
-    example2 = Example(
+    example2 = JudgevalExample(
         input="Who is the best basketball player in the world?",
         actual_output="No, the room is too small.",
     )
@@ -174,7 +172,7 @@ async def test_assert_test(client: JudgmentClient, project_name: str):
 
 def test_evaluate_dataset(client: JudgmentClient, project_name: str):
     """Test dataset evaluation."""
-    example1 = Example(
+    example1 = JudgevalExample(
         input="What if these shoes don't fit?",
         actual_output="We offer a 30-day full refund at no extra cost.",
         retrieval_context=[
@@ -182,7 +180,7 @@ def test_evaluate_dataset(client: JudgmentClient, project_name: str):
         ],
     )
 
-    example2 = Example(
+    example2 = JudgevalExample(
         input="How do I reset my password?",
         actual_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
         expected_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
@@ -272,7 +270,7 @@ examples:
 
 def test_override_eval(client: JudgmentClient, project_name: str, random_name: str):
     """Test evaluation override behavior."""
-    example1 = Example(
+    example1 = JudgevalExample(
         input="What if these shoes don't fit?",
         actual_output="We offer a 30-day full refund at no extra cost.",
         retrieval_context=[

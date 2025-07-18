@@ -36,6 +36,7 @@ class EvaluationRun(BaseModel):
         data["scorers"] = [
             scorer.model_dump() for scorer in self.scorers
         ]  # Pydantic has problems with properly calling model_dump() on the scorers, so we need to do it manually
+        data["examples"] = [example.model_dump() for example in self.examples]
 
         return data
 

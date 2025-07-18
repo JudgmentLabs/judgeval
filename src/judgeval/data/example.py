@@ -4,7 +4,8 @@ Classes for representing examples in a dataset.
 
 from enum import Enum
 from datetime import datetime
-from judgeval.data.judgment_types import ExampleJudgmentType
+from typing import Dict, Any, List, Optional
+from pydantic import BaseModel, Field
 
 
 class ExampleParams(str, Enum):
@@ -19,43 +20,37 @@ class ExampleParams(str, Enum):
     ADDITIONAL_METADATA = "additional_metadata"
 
 
-class Example(ExampleJudgmentType):
+class Example(BaseModel):
     example_id: str = ""
+    created_at: str = datetime.now().isoformat()
+    name: Optional[str] = None
+    data: Dict[str, Any] = Field(None, exclude=True)
 
-    def __init__(self, **data):
-        if "created_at" not in data:
-            data["created_at"] = datetime.now().isoformat()
-        super().__init__(**data)
-        self.example_id = None
+    def model_dump(self, **kwargs) -> Dict[str, Any]:
+        data = super().model_dump(**kwargs)
 
-    def to_dict(self):
+        data.pop("example_id")
+        created_at = data.pop("created_at")
+        name = data.pop("name")
+
         return {
-            "input": self.input,
-            "actual_output": self.actual_output,
-            "expected_output": self.expected_output,
-            "context": self.context,
-            "retrieval_context": self.retrieval_context,
-            "additional_metadata": self.additional_metadata,
-            "tools_called": self.tools_called,
-            "expected_tools": self.expected_tools,
-            "name": self.name,
-            "example_id": self.example_id,
-            "example_index": self.example_index,
-            "created_at": self.created_at,
+            "example_id": "",
+            "created_at": created_at,
+            "name": name,
+            "data": data,
         }
 
-    def __str__(self):
-        return (
-            f"Example(input={self.input}, "
-            f"actual_output={self.actual_output}, "
-            f"expected_output={self.expected_output}, "
-            f"context={self.context}, "
-            f"retrieval_context={self.retrieval_context}, "
-            f"additional_metadata={self.additional_metadata}, "
-            f"tools_called={self.tools_called}, "
-            f"expected_tools={self.expected_tools}, "
-            f"name={self.name}, "
-            f"example_id={self.example_id}, "
-            f"example_index={self.example_index}, "
-            f"created_at={self.created_at}, "
-        )
+    def to_dict(self) -> Dict[str, Any]:
+        data = super().model_dump(warnings=False)
+        return data
+
+
+class JudgevalExample(Example):
+    input: Optional[str] = None
+    actual_output: Optional[str | List[str]] = None
+    expected_output: Optional[str | List[str]] = None
+    retrieval_context: Optional[List[str]] = None
+    reasoning: Optional[str] = None
+    context: Optional[List[str]] = None
+    additional_metadata: Optional[Dict[str, Any]] = None
+    expected_tools: Optional[List[Dict[str, Any]]] = None
