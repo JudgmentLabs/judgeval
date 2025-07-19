@@ -16,7 +16,7 @@ classifiers = [
 license = "Apache-2.0"
 license-files = ["LICENSE.md"]
 dependencies = [
-    "litellm==1.61.15",
+    "litellm>=1.61.15",
     "python-dotenv==1.0.1",
     "requests",
     "pandas",
@@ -31,6 +31,8 @@ dependencies = [
     "google-genai",
     "boto3",
     "matplotlib>=3.10.3",
+    "python-slugify>=8.0.4",
+    "datamodel-code-generator>=0.31.1",
 ]
 
 [project.urls]
@@ -59,6 +61,7 @@ dev = [
     "tavily-python>=0.7.5",
     "langgraph>=0.4.3",
     "pre-commit>=4.2.0",
+    "types-requests>=2.32.4.20250611",
 ]
 
 [tool.hatch.build]

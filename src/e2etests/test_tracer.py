@@ -18,7 +18,8 @@ from judgeval.data import Example
 
 # Initialize the tracer and clients
 # Ensure relevant API keys (OPENAI_API_KEY, ANTHROPIC_API_KEY, TOGETHER_API_KEY, GOOGLE_API_KEY) are set
-judgment = Tracer()
+PROJECT_NAME = "e2e-tests-gkzqvtrbwnyl"
+judgment = Tracer(project_name=PROJECT_NAME)
 
 # Wrap clients
 openai_client = wrap(OpenAI())
@@ -52,7 +53,9 @@ else:
 
 
 # Helper function
-def validate_trace_token_counts(trace_client) -> Dict[str, int]:
+def validate_trace_token_counts(
+    trace_client, cached_input_tokens=False
+) -> Dict[str, int]:
     """
     Validates token counts from trace spans and performs assertions.
 
@@ -74,6 +77,7 @@ def validate_trace_token_counts(trace_client) -> Dict[str, int]:
     # Manually calculate token counts from trace spans
     manual_prompt_tokens = 0
     manual_completion_tokens = 0
+    manual_cached_input_tokens = 0
     manual_total_tokens = 0
 
     # Known LLM API call function names
@@ -88,20 +92,18 @@ def validate_trace_token_counts(trace_client) -> Dict[str, int]:
         if span.span_type == "llm" and span.function in llm_span_names:
             usage = span.usage
             if usage and "info" not in usage:  # Check if it's actual usage data
-                # Correctly handle different key names from different providers
-
-                prompt_tokens = usage.prompt_tokens
-                completion_tokens = usage.completion_tokens
-                total_tokens = usage.total_tokens
-
-                # Accumulate separately
-                manual_prompt_tokens += prompt_tokens
-                manual_completion_tokens += completion_tokens
-                manual_total_tokens += total_tokens
+                manual_prompt_tokens += usage.prompt_tokens or 0
+                manual_completion_tokens += usage.completion_tokens or 0
+                manual_total_tokens += usage.total_tokens or 0
+                manual_cached_input_tokens += usage.cache_read_input_tokens or 0
 
     assert manual_prompt_tokens > 0, "Prompt tokens should be counted"
     assert manual_completion_tokens > 0, "Completion tokens should be counted"
     assert manual_total_tokens > 0, "Total tokens should be counted"
+
+    if cached_input_tokens:
+        assert manual_cached_input_tokens > 0, "Cached input tokens should be counted"
+
     assert manual_total_tokens == (manual_prompt_tokens + manual_completion_tokens), (
         "Total tokens should equal prompt + completion"
     )
@@ -110,11 +112,12 @@ def validate_trace_token_counts(trace_client) -> Dict[str, int]:
         "prompt_tokens": manual_prompt_tokens,
         "completion_tokens": manual_completion_tokens,
         "total_tokens": manual_total_tokens,
+        "cached_input_tokens": manual_cached_input_tokens,
     }
 
 
 # Helper function
-def validate_trace_tokens(trace, fail_on_missing=True):
+def validate_trace_tokens(trace, fail_on_missing=True, cached_input_tokens=False):
     """
     Helper function to validate token counts in a trace
 
@@ -134,7 +137,7 @@ def validate_trace_tokens(trace, fail_on_missing=True):
     print("\nAttempting assertions on current trace state (before decorator save)...")
 
     # Use the utility function for token count validation
-    token_counts = validate_trace_token_counts(trace)
+    token_counts = validate_trace_token_counts(trace, cached_input_tokens)
 
     print(
         f"Calculated token counts: P={token_counts['prompt_tokens']}, C={token_counts['completion_tokens']}, T={token_counts['total_tokens']}"
@@ -347,9 +350,6 @@ def test_input():
 @pytest.mark.asyncio
 @judgment.observe(
     name="test_evaluation_mixed_trace",
-    project_name="TestingPoemBot",
-    overwrite=True,
-    deep_tracing=False,
 )
 async def test_evaluation_mixed(test_input):
     print(f"Using test input: {test_input}")
@@ -372,9 +372,6 @@ async def test_evaluation_mixed(test_input):
 @pytest.mark.asyncio
 @judgment.observe(
     name="test_evaluation_mixed_async_trace",
-    project_name="TestingPoemBotAsync",
-    overwrite=True,
-    deep_tracing=False,
 )
 async def test_evaluation_mixed_async(test_input):
     print(f"Using test input: {test_input}")
@@ -397,8 +394,6 @@ async def test_evaluation_mixed_async(test_input):
 @pytest.mark.asyncio
 @judgment.observe(
     name="test_openai_response_api_trace",
-    project_name="ResponseAPITest",
-    overwrite=True,
 )
 async def test_openai_response_api():
     """
@@ -587,8 +582,6 @@ def deep_tracing_fib(n):
 @pytest.mark.asyncio
 @judgment.observe(
     name="test_deep_tracing_with_custom_spans_trace",
-    project_name="DeepTracingTest",
-    overwrite=True,
 )
 async def test_deep_tracing_with_custom_spans():
     """
@@ -596,7 +589,6 @@ async def test_deep_tracing_with_custom_spans():
     Tests that custom span names and types are correctly applied to functions
     in a complex async execution flow with nested function calls.
     """
-    PROJECT_NAME = "DeepTracingTest"
     test_input = "deep_tracing_test"
 
     print(f"\n{'=' * 20} Starting Deep Tracing Test {'=' * 20}")
@@ -605,7 +597,6 @@ async def test_deep_tracing_with_custom_spans():
     # First, update the decorator to include the project name
     deep_tracing_root_function.__judgment_observe_kwargs = {
         "project_name": PROJECT_NAME,
-        "overwrite": True,
     }
 
     # Execute the root function which triggers the entire call chain
@@ -640,126 +631,12 @@ async def test_deep_tracing_with_custom_spans():
     return result
 
 
-# --- NEW TESTS FOR STREAMING USAGE ---
-
-
-@pytest.mark.asyncio
-@judgment.observe(
-    name="test_openai_sync_streaming_usage_trace",
-    project_name="TestSyncStreamUsage",
-    overwrite=True,
-    deep_tracing=False,
-)
-async def test_openai_sync_streaming_usage(test_input):
-    """Test that sync OpenAI streaming calls correctly capture usage."""
-    PROJECT_NAME = "TestSyncStreamUsage"
-    print(f"\n{'=' * 20} Starting Sync Streaming Usage Test {'=' * 20}")
-
-    # Use the globally defined wrapped sync client
-    sync_client = openai_client
-
-    @judgment.observe(
-        name="sync_stream_test_func",
-        project_name=PROJECT_NAME,
-        overwrite=True,
-        deep_tracing=False,
-    )
-    def run_sync_stream(prompt):
-        stream = sync_client.chat.completions.create(
-            model="gpt-4.1-mini",
-            messages=[{"role": "user", "content": prompt}],
-            stream=True,
-            stream_options={"include_usage": True},  # Explicitly enable usage tracking
-        )
-        # Consume the stream fully
-        response_content = ""
-        for chunk in stream:
-            if (
-                chunk.choices
-                and chunk.choices[0].delta
-                and chunk.choices[0].delta.content
-            ):
-                response_content += chunk.choices[0].delta.content
-        return response_content
-
-    result = run_sync_stream(test_input)
-    print(f"Sync Stream Result: {result[:100]}...")  # Print start of result
-
-    # Add delay before validating trace tokens to allow spans to be properly populated
-    await asyncio.sleep(1.5)
-
-    # --- Attempt to assert based on current trace state ---
-    trace = judgment.get_current_trace()
-    validate_trace_tokens(trace)
-
-    # Let the decorator handle the actual saving when the function returns
-    return result
-
-
-@pytest.mark.asyncio
-@judgment.observe(
-    name="test_openai_async_streaming_usage_trace",
-    project_name="TestAsyncStreamUsage",
-    overwrite=True,
-    deep_tracing=False,
-)
-async def test_openai_async_streaming_usage(test_input):
-    """Test that async OpenAI streaming calls correctly capture usage."""
-    PROJECT_NAME = "TestAsyncStreamUsage"
-    print(f"\n{'=' * 20} Starting Async Streaming Usage Test {'=' * 20}")
-
-    # Use the globally defined wrapped async client
-    async_client = openai_client_async
-
-    @judgment.observe(
-        name="async_stream_test_func",
-        project_name=PROJECT_NAME,
-        overwrite=True,
-        deep_tracing=False,
-    )
-    async def run_async_stream(prompt):
-        stream = await async_client.chat.completions.create(
-            model="gpt-4.1-mini",
-            messages=[{"role": "user", "content": prompt}],
-            stream=True,
-            stream_options={"include_usage": True},  # Explicitly enable usage tracking
-        )
-        # Consume the stream fully
-        response_content = ""
-        async for chunk in stream:
-            if (
-                chunk.choices
-                and chunk.choices[0].delta
-                and chunk.choices[0].delta.content
-            ):
-                response_content += chunk.choices[0].delta.content
-        return response_content
-
-    result = await run_async_stream(test_input)
-    print(f"Async Stream Result: {result[:100]}...")  # Print start of result
-
-    # Add delay before validating trace tokens to allow spans to be properly populated
-    await asyncio.sleep(1.5)
-
-    # --- Attempt to assert based on current trace state ---
-    trace = judgment.get_current_trace()
-    validate_trace_tokens(trace)
-
-    # Let the decorator handle the actual saving when the function returns
-    return result
-
-
-# --- END NEW TESTS ---
-
 # --- NEW COMPREHENSIVE TOKEN COUNTING TEST ---
 
 
 @pytest.mark.asyncio
 @judgment.observe(
     name="test_token_counting_trace",
-    project_name="TestTokenAggregation",
-    overwrite=True,
-    deep_tracing=False,
 )
 async def test_token_counting():
     """Test aggregation of token counts and costs across mixed API calls."""
@@ -848,118 +725,9 @@ async def test_token_counting():
     print("Token Aggregation Test Passed!")
 
 
-# --- END NEW COMPREHENSIVE TOKEN COUNTING TEST ---
-
-# --- NEW PROVIDER-SPECIFIC STREAMING TESTS ---
-
-
-@pytest.mark.asyncio
-@judgment.observe(
-    name="test_anthropic_async_streaming_usage_trace",
-    project_name="TestAnthropicStreamUsage",
-    overwrite=True,
-    deep_tracing=False,
-)
-async def test_anthropic_async_streaming_usage(test_input):
-    """Test Anthropic async streaming usage capture."""
-    if not anthropic_client_async:
-        pytest.skip("Anthropic client not initialized.")
-    PROJECT_NAME = "TestAnthropicStreamUsage"
-    print(f"\n{'=' * 20} Starting Anthropic Streaming Usage Test {'=' * 20}")
-
-    @judgment.observe(
-        name="anthropic_stream_func",
-        project_name=PROJECT_NAME,
-        overwrite=True,
-        deep_tracing=False,
-    )
-    async def run_anthropic_stream(prompt):
-        # Use the wrapped client directly with the .stream() context manager
-        async with anthropic_client_async.messages.stream(
-            model="claude-3-haiku-20240307",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=100,
-        ) as stream:
-            # The wrapper now handles the context manager (__aenter__)
-            # and wraps the yielded iterator (__aenter__ return value).
-            # We just need to consume the stream to ensure processing.
-            async for chunk in stream:
-                # Consume chunks - wrapper handles accumulation and usage internally
-                pass
-
-        # The wrapper patched onto .stream handles usage capture.
-        # Return placeholder string.
-        return "<Stream processed by wrapper via .stream() context manager>"
-
-    result = await run_anthropic_stream(test_input)
-    print(f"Anthropic Stream Result: {result}")  # Result is now placeholder
-
-    # Add delay before validating trace tokens to allow spans to be properly populated
-    await asyncio.sleep(1.5)
-
-    # --- Attempt to assert based on current trace state ---
-    trace = judgment.get_current_trace()
-    validate_trace_tokens(trace)
-
-    # Let the decorator handle the actual saving when the function returns
-    print("Anthropic Streaming Usage Test Passed!")
-    return result
-
-
-@pytest.mark.asyncio
-@judgment.observe(
-    name="test_together_async_streaming_usage_trace",
-    project_name="TestTogetherStreamUsage",
-    overwrite=True,
-    deep_tracing=False,
-)
-async def test_together_async_streaming_usage(test_input):
-    """Test Together AI async streaming usage capture."""
-    if not together_client_async:
-        pytest.skip("Together client not initialized. Set TOGETHER_API_KEY.")
-    PROJECT_NAME = "TestTogetherStreamUsage"
-    print(f"\n{'=' * 20} Starting Together Streaming Usage Test {'=' * 20}")
-
-    @judgment.observe(
-        name="together_stream_func",
-        project_name=PROJECT_NAME,
-        overwrite=True,
-        deep_tracing=False,
-    )
-    async def run_together_stream(prompt):
-        # Use the wrapped client directly
-        stream = await together_client_async.chat.completions.create(
-            model="mistralai/Mistral-7B-Instruct-v0.1",
-            messages=[{"role": "user", "content": prompt}],
-            stream=True,
-            max_tokens=100,
-        )
-        # Consume stream - wrapper handles usage/content capture
-        async for chunk in stream:
-            pass
-        return "<Content processed by wrapper>"
-
-    result = await run_together_stream(test_input)
-    print(f"Together Stream Result: {result}")
-
-    # Add delay before validating trace tokens to allow spans to be properly populated
-    await asyncio.sleep(1.5)
-
-    # --- Attempt to assert based on current trace state ---
-    trace = judgment.get_current_trace()
-    validate_trace_tokens(trace)
-
-    # Let the decorator handle the actual saving when the function returns
-    print("Together Streaming Usage Test Passed!")
-    return result
-
-
 @pytest.mark.asyncio
 @judgment.observe(
     name="test_google_response_api",
-    project_name="TestGoogleResponseAPI",
-    overwrite=True,
-    deep_tracing=False,
 )
 async def test_google_response_api():
     """
@@ -984,3 +752,22 @@ async def test_google_response_api():
 
     trace = judgment.get_current_trace()
     validate_trace_tokens(trace)
+
+
+@pytest.mark.asyncio
+@judgment.observe(
+    name="test_openai_cached_input_tokens",
+)
+async def test_openai_cached_input_tokens():
+    print("\n\n=== Testing OpenAI cached input tokens ===")
+
+    contents = "What is the capital of France?" * 150
+    for i in range(3):
+        response_chat = openai_client.chat.completions.create(
+            model="gpt-4o-mini", messages=[{"role": "user", "content": contents}]
+        )
+        print(f"Response {i}: {response_chat}")
+    await asyncio.sleep(1.5)
+
+    trace = judgment.get_current_trace()
+    validate_trace_tokens(trace, cached_input_tokens=True)

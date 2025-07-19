@@ -6,27 +6,35 @@ Scores `Example`s using ready-made Judgment evaluators.
 
 from pydantic import BaseModel, field_validator
 from typing import List
-from judgeval.common.logger import debug, info, error
 from judgeval.data import ExampleParams
-from judgeval.constants import APIScorer, UNBOUNDED_SCORERS
+from judgeval.constants import APIScorerType, UNBOUNDED_SCORERS
+from judgeval.common.logger import judgeval_logger
 
 
-class APIJudgmentScorer(BaseModel):
+class APIScorerConfig(BaseModel):
     """
-    Class for ready-made, "out-of-the-box" scorer that uses Judgment evaluators to score `Example`s.
+    Scorer config that is used to send to our Judgment server.
 
     Args:
         score_type (APIScorer): The Judgment metric to use for scoring `Example`s
+        name (str): The name of the scorer, usually this is the same as the score_type
         threshold (float): A value between 0 and 1 that determines the scoring threshold
+        strict_mode (bool): Whether to use strict mode for the scorer
+        required_params (List[ExampleParams]): List of the required parameters on examples for the scorer
+        kwargs (dict): Additional keyword arguments to pass to the scorer
     """
 
-    score_type: APIScorer
-    threshold: float
+    score_type: APIScorerType
+    name: str = ""
+    threshold: float = 0.5
+    strict_mode: bool = False
     required_params: List[
         ExampleParams
-    ] = []  # List of the required parameters on examples for the scorer
+    ] = []  # This is used to check if the example has the required parameters before running the scorer
+    kwargs: dict = {}
 
     @field_validator("threshold")
+    @classmethod
     def validate_threshold(cls, v, info):
         """
         Validates that the threshold is between 0 and 1 inclusive.
@@ -34,47 +42,29 @@ class APIJudgmentScorer(BaseModel):
         score_type = info.data.get("score_type")
         if score_type in UNBOUNDED_SCORERS:
             if v < 0:
-                error(f"Threshold for {score_type} must be greater than 0, got: {v}")
+                judgeval_logger.error(
+                    f"Threshold for {score_type} must be greater than 0, got: {v}"
+                )
                 raise ValueError(
                     f"Threshold for {score_type} must be greater than 0, got: {v}"
                 )
         else:
             if not 0 <= v <= 1:
-                error(f"Threshold for {score_type} must be between 0 and 1, got: {v}")
+                judgeval_logger.error(
+                    f"Threshold for {score_type} must be between 0 and 1, got: {v}"
+                )
                 raise ValueError(
                     f"Threshold for {score_type} must be between 0 and 1, got: {v}"
                 )
         return v
 
-    @field_validator("score_type")
-    def convert_to_enum_value(cls, v):
-        """
-        Validates that the `score_type` is a valid `APIScorer` enum value.
-        Converts string values to `APIScorer` enum values.
-        """
-        debug(f"Attempting to convert score_type value: {v}")
-        if isinstance(v, APIScorer):
-            info(f"Using existing APIScorer: {v}")
-            return v
-        elif isinstance(v, str):
-            debug(f"Converting string value to APIScorer enum: {v}")
-            return APIScorer[v.upper()]
-        error(f"Invalid score_type value: {v}")
-        raise ValueError(f"Invalid value for score_type: {v}")
+    @field_validator("name", mode="after")
+    @classmethod
+    def set_name_to_score_type_if_none(cls, v, info):
+        """Set name to score_type if not provided"""
+        if v is None:
+            return info.data.get("score_type")
+        return v
 
     def __str__(self):
         return f"JudgmentScorer(score_type={self.score_type.value}, threshold={self.threshold})"
-
-    def to_dict(self) -> dict:
-        """
-        Converts the scorer configuration to a dictionary format.
-
-        Returns:
-            dict: A dictionary containing the scorer's configuration
-        """
-        return {
-            "score_type": str(
-                self.score_type.value
-            ),  # Convert enum to string for serialization
-            "threshold": self.threshold,
-        }

@@ -6,7 +6,7 @@ from judgeval.common.utils import (
     afetch_litellm_api_response,
     fetch_litellm_api_response,
 )
-from judgeval.common.logger import debug, error
+from judgeval.common.logger import judgeval_logger
 
 BASE_CONVERSATION = [
     {"role": "system", "content": "You are a helpful assistant."},
@@ -15,7 +15,6 @@ BASE_CONVERSATION = [
 
 class LiteLLMJudge(JudgevalJudge):
     def __init__(self, model: str = "gpt-4.1-mini", **kwargs):
-        debug(f"Initializing LiteLLMJudge with model={model}")
         self.model = model
         self.kwargs = kwargs
         super().__init__(model_name=model)
@@ -25,7 +24,6 @@ class LiteLLMJudge(JudgevalJudge):
         input: Union[str, List[Mapping[str, str]]],
         schema: pydantic.BaseModel = None,
     ) -> str:
-        debug(f"Generating response for input type: {type(input)}")
         if isinstance(input, str):
             convo = BASE_CONVERSATION + [{"role": "user", "content": input}]
             return fetch_litellm_api_response(
@@ -36,7 +34,7 @@ class LiteLLMJudge(JudgevalJudge):
                 model=self.model, messages=input, response_format=schema
             )
         else:
-            error(f"Invalid input type received: {type(input)}")
+            judgeval_logger.error(f"Invalid input type received: {type(input)}")
             raise TypeError(
                 f"Input must be a string or a list of dictionaries. Input type of: {type(input)}"
             )
@@ -46,7 +44,6 @@ class LiteLLMJudge(JudgevalJudge):
         input: Union[str, List[Mapping[str, str]]],
         schema: pydantic.BaseModel = None,
     ) -> str:
-        debug(f"Async generating response for input type: {type(input)}")
         if isinstance(input, str):
             convo = BASE_CONVERSATION + [{"role": "user", "content": input}]
             response = await afetch_litellm_api_response(
@@ -59,7 +56,7 @@ class LiteLLMJudge(JudgevalJudge):
             )
             return response
         else:
-            error(f"Invalid input type received: {type(input)}")
+            judgeval_logger.error(f"Invalid input type received: {type(input)}")
             raise TypeError(
                 f"Input must be a string or a list of dictionaries. Input type of: {type(input)}"
             )

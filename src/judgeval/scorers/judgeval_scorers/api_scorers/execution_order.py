@@ -6,13 +6,13 @@ TODO add link to docs page for this scorer
 """
 
 # Internal imports
-from judgeval.scorers.api_scorer import APIJudgmentScorer
-from judgeval.constants import APIScorer
+from judgeval.scorers.api_scorer import APIScorerConfig
+from judgeval.constants import APIScorerType
 from typing import Optional, Dict
 from judgeval.data import ExampleParams
 
 
-class ExecutionOrderScorer(APIJudgmentScorer):
+class ExecutionOrderScorer(APIScorerConfig):
     kwargs: Optional[Dict] = None
 
     def __init__(
@@ -23,7 +23,7 @@ class ExecutionOrderScorer(APIJudgmentScorer):
     ):
         super().__init__(
             threshold=threshold,
-            score_type=APIScorer.EXECUTION_ORDER,
+            score_type=APIScorerType.EXECUTION_ORDER,
             required_params=[
                 ExampleParams.ACTUAL_OUTPUT,
                 ExampleParams.EXPECTED_OUTPUT,

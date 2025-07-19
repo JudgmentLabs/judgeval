@@ -1,44 +1,22 @@
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, List
-from judgeval.evaluation_run import EvaluationRun
-from judgeval.data.tool import Tool
+from typing import Any
 import json
 import sys
+import threading
 from datetime import datetime, timezone
+from judgeval.data.judgment_types import (
+    TraceUsageJudgmentType,
+    TraceSpanJudgmentType,
+    TraceJudgmentType,
+)
+from judgeval.constants import SPAN_LIFECYCLE_END_UPDATE_ID
+from pydantic import BaseModel
 
 
-class TraceUsage(BaseModel):
-    prompt_tokens: Optional[int] = None
-    completion_tokens: Optional[int] = None
-    total_tokens: Optional[int] = None
-    prompt_tokens_cost_usd: Optional[float] = None
-    completion_tokens_cost_usd: Optional[float] = None
-    total_cost_usd: Optional[float] = None
-    model_name: Optional[str] = None
+class TraceUsage(TraceUsageJudgmentType):
+    pass
 
 
-class TraceSpan(BaseModel):
-    span_id: str
-    trace_id: str
-    function: str
-    depth: int
-    created_at: Optional[Any] = None
-    parent_span_id: Optional[str] = None
-    span_type: Optional[str] = "span"
-    inputs: Optional[Dict[str, Any]] = None
-    error: Optional[Dict[str, Any]] = None
-    output: Optional[Any] = None
-    usage: Optional[TraceUsage] = None
-    duration: Optional[float] = None
-    annotation: Optional[List[Dict[str, Any]]] = None
-    evaluation_runs: Optional[List[EvaluationRun]] = []
-    expected_tools: Optional[List[Tool]] = None
-    additional_metadata: Optional[Dict[str, Any]] = None
-    has_evaluation: Optional[bool] = False
-    agent_name: Optional[str] = None
-    state_before: Optional[Dict[str, Any]] = None
-    state_after: Optional[Dict[str, Any]] = None
-
+class TraceSpan(TraceSpanJudgmentType):
     def model_dump(self, **kwargs):
         return {
             "span_id": self.span_id,
@@ -50,9 +28,6 @@ class TraceSpan(BaseModel):
             "inputs": self._serialize_value(self.inputs),
             "output": self._serialize_value(self.output),
             "error": self._serialize_value(self.error),
-            "evaluation_runs": [run.model_dump() for run in self.evaluation_runs]
-            if self.evaluation_runs
-            else [],
             "parent_span_id": self.parent_span_id,
             "function": self.function,
             "duration": self.duration,
@@ -63,7 +38,39 @@ class TraceSpan(BaseModel):
             "state_before": self.state_before,
             "state_after": self.state_after,
             "additional_metadata": self._serialize_value(self.additional_metadata),
+            "update_id": self.update_id,
         }
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        # Initialize thread lock for thread-safe update_id increment
+        self._update_id_lock = threading.Lock()
+
+    def increment_update_id(self) -> int:
+        """
+        Thread-safe method to increment the update_id counter.
+        Returns:
+            int: The new update_id value after incrementing
+        """
+        with self._update_id_lock:
+            self.update_id += 1
+            return self.update_id
+
+    def set_update_id_to_ending_number(
+        self, ending_number: int = SPAN_LIFECYCLE_END_UPDATE_ID
+    ) -> int:
+        """
+        Thread-safe method to set the update_id to a predetermined ending number.
+
+        Args:
+            ending_number (int): The number to set update_id to. Defaults to SPAN_LIFECYCLE_END_UPDATE_ID.
+
+        Returns:
+            int: The new update_id value after setting
+        """
+        with self._update_id_lock:
+            self.update_id = ending_number
+            return self.update_id
 
     def print_span(self):
         """Print the span with proper formatting and parent relationship information."""
@@ -83,8 +90,56 @@ class TraceSpan(BaseModel):
 
     def safe_stringify(self, output, function_name):
         """
-        Safely converts an object to a string or repr, handling serialization issues gracefully.
+        Safely converts an object to a JSON-serializable structure, handling common object types intelligently.
         """
+        # Handle Pydantic models
+        if hasattr(output, "model_dump"):
+            try:
+                return output.model_dump()
+            except Exception:
+                pass
+
+        # Handle LangChain messages and similar objects with content/type
+        if hasattr(output, "content") and hasattr(output, "type"):
+            try:
+                result = {"type": output.type, "content": output.content}
+                # Add additional fields if they exist
+                if hasattr(output, "additional_kwargs"):
+                    result["additional_kwargs"] = output.additional_kwargs
+                if hasattr(output, "response_metadata"):
+                    result["response_metadata"] = output.response_metadata
+                if hasattr(output, "name"):
+                    result["name"] = output.name
+                return result
+            except Exception:
+                pass
+
+        if hasattr(output, "dict"):
+            try:
+                return output.dict()
+            except Exception:
+                pass
+
+        if hasattr(output, "to_dict"):
+            try:
+                return output.to_dict()
+            except Exception:
+                pass
+
+        if hasattr(output, "__dataclass_fields__"):
+            try:
+                import dataclasses
+
+                return dataclasses.asdict(output)
+            except Exception:
+                pass
+
+        if hasattr(output, "__dict__"):
+            try:
+                return output.__dict__
+            except Exception:
+                pass
+
         try:
             return str(output)
         except (TypeError, OverflowError, ValueError):
@@ -94,6 +149,7 @@ class TraceSpan(BaseModel):
             return repr(output)
         except (TypeError, OverflowError, ValueError):
             pass
+
         return None
 
     def _serialize_value(self, value: Any) -> Any:
@@ -140,15 +196,5 @@ class TraceSpan(BaseModel):
             return {"error": "Unable to serialize"}
 
 
-class Trace(BaseModel):
-    trace_id: str
-    name: str
-    created_at: str
-    duration: float
-    trace_spans: List[TraceSpan]
-    overwrite: bool = False
-    offline_mode: bool = False
-    rules: Dict[str, Any] = Field(default_factory=dict)
-    has_notification: Optional[bool] = False
-    customer_id: Optional[str] = None
-    tags: List[str] = Field(default_factory=list)
+class Trace(TraceJudgmentType):
+    pass

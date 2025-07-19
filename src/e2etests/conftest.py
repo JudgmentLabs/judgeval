@@ -28,41 +28,24 @@ if not API_KEY:
 
 
 @pytest.fixture(scope="session")
-def client() -> JudgmentClient:
+def project_name():
+    return "e2e-tests-" + "".join(
+        random.choices(string.ascii_letters + string.digits, k=12)
+    )
+
+
+@pytest.fixture(scope="session")
+def client(project_name: str) -> JudgmentClient:
     """Create a single JudgmentClient instance for all tests."""
     # Setup
-    client = JudgmentClient(judgment_api_key=API_KEY, organization_id=ORGANIZATION_ID)
+    client = JudgmentClient(api_key=API_KEY, organization_id=ORGANIZATION_ID)
     yield client
     # Teardown
     # Add more projects to delete as needed
-    client.delete_project(project_name="test-project")
-    client.delete_project(project_name="custom_judge_test")
-    client.delete_project(project_name="test_project")
-    client.delete_project(project_name="test_eval_run_naming_collisions")
-    client.delete_project(project_name="ToneScorerTest")
-    client.delete_project(project_name="sentiment_test")
-    client.delete_project(project_name="rules_test")
-    client.delete_project(project_name="rules-test-project")
-    client.delete_project(project_name="TestingPoemBot")
-    client.delete_project(project_name="TEST")
-    client.delete_project(project_name="TEST2")
-    client.delete_project(project_name="text2sql")
-    client.delete_project(project_name="OutreachWorkflow")
-    client.delete_project(project_name="test-langgraph-project")
-    client.delete_project(project_name="test-trace-judgee-project")
-    client.delete_project(project_name="TestTogetherStreamUsage")
-    client.delete_project(project_name="TestAnthropicStreamUsage")
-    client.delete_project(project_name="TestTokenAggregation")
-    client.delete_project(project_name="TestAsyncStreamUsage")
-    client.delete_project(project_name="TestSyncStreamUsage")
-    client.delete_project(project_name="DeepTracingTest")
-    client.delete_project(project_name="ResponseAPITest")
-    client.delete_project(project_name="TestingPoemBotAsync")
-    client.delete_project(project_name="TestGoogleResponseAPI")
-    client.delete_project(project_name="TraceEvalProjectFromYAMLTest")
-    client.delete_project(project_name="test_s3_trace_saving")
-    client.delete_project(project_name="test-sync-langgraph-project")
-    client.delete_project(project_name="test-async-langgraph-project")
+    client.delete_project(project_name=project_name)
+    client.delete_project(
+        project_name="e2e-tests-gkzqvtrbwnyl"
+    )  # this is hard coded in test_tracer.py since we can't export fixture
 
 
 @pytest.fixture

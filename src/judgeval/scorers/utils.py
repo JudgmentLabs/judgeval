@@ -4,88 +4,26 @@ Util functions for Scorer objects
 
 import asyncio
 import nest_asyncio
-import inspect
 import json
-import sys
 import re
-from contextlib import contextmanager
-from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.console import Console
 from typing import List, Optional
 
-from judgeval.scorers import JudgevalScorer
+from judgeval.scorers import BaseScorer
 from judgeval.data import Example, ExampleParams
 from judgeval.scorers.exceptions import MissingExampleParamsError
 
 
-def clone_scorers(scorers: List[JudgevalScorer]) -> List[JudgevalScorer]:
+def clone_scorers(scorers: List[BaseScorer]) -> List[BaseScorer]:
     """
     Creates duplicates of the scorers passed as argument.
     """
     cloned_scorers = []
     for s in scorers:
-        scorer_class = type(s)
-        args = vars(s)
-
-        signature = inspect.signature(scorer_class.__init__)
-        valid_params = signature.parameters.keys()
-        valid_args = {key: args[key] for key in valid_params if key in args}
-
-        cloned_scorer = scorer_class(**valid_args)
-        # kinda hacky, but in case the class inheriting from JudgevalScorer doesn't have `model` in its __init__,
-        # we need to explicitly include it here so that we can add the judge model to the cloned scorer
-        cloned_scorer._add_model(model=args.get("model"))
-        cloned_scorers.append(cloned_scorer)
+        cloned_scorers.append(s.model_copy(deep=True))
     return cloned_scorers
 
 
-def scorer_console_msg(
-    scorer: JudgevalScorer,
-    async_mode: Optional[bool] = None,
-):
-    """
-    Renders a message to be displayed to console when a scorer is being executed.
-    """
-    if async_mode is None:
-        run_async = scorer.async_mode
-    else:
-        run_async = async_mode
-
-    return f"🔨 Executing Judgment's [rgb(106,0,255)]{scorer.__name__} Scorer[/rgb(106,0,255)]! \
-        [rgb(55,65,81)](using {scorer.evaluation_model}, async_mode={run_async})...[/rgb(55,65,81)]"
-
-
-@contextmanager
-def scorer_progress_meter(
-    scorer: JudgevalScorer,
-    async_mode: Optional[bool] = None,
-    display_meter: bool = True,
-    total: int = 100,
-    transient: bool = True,
-):
-    """
-    Context manager to display a progress indicator (spinner) while a scorer is being run.
-    """
-    console = Console(file=sys.stderr)
-    if display_meter:
-        with Progress(
-            SpinnerColumn(style="rgb(106,0,255)"),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-            transient=transient,
-        ) as progress:
-            progress.add_task(
-                description=scorer_console_msg(scorer, async_mode),
-                total=total,
-            )
-            yield
-    else:
-        yield
-
-
-def parse_response_json(
-    llm_response: str, scorer: Optional[JudgevalScorer] = None
-) -> dict:
+def parse_response_json(llm_response: str, scorer: Optional[BaseScorer] = None) -> dict:
     """
     Extracts JSON output from an LLM response and returns it as a dictionary.
 
@@ -93,7 +31,7 @@ def parse_response_json(
 
     Args:
         llm_response (str): The response from an LLM.
-        scorer (JudgevalScorer, optional): The scorer object to forward errors to (if any).
+        scorer (BaseScorer, optional): The scorer object to forward errors to (if any).
     """
     start = llm_response.find("{")  # opening bracket
     end = llm_response.rfind("}") + 1  # closing bracket
@@ -118,38 +56,6 @@ def parse_response_json(
         raise ValueError(error_str)
     except Exception as e:
         raise Exception(f"An unexpected error occurred: {str(e)}")
-
-
-def print_verbose_logs(metric: str, logs: str):
-    print("*" * 50)
-    print(f"{metric} Verbose Logs")
-    print("*" * 50)
-    print("")
-    print(logs)
-    print("")
-    print("=" * 70)
-
-
-def create_verbose_logs(metric: JudgevalScorer, steps: List[str]) -> str:
-    """
-    Creates verbose logs for a scorer object.
-
-    Args:
-        metric (JudgevalScorer): The scorer object.
-        steps (List[str]): The steps to be included in the verbose logs.
-
-    Returns:
-        str: The verbose logs (Concatenated steps).
-    """
-
-    verbose_logs = ""
-    for i in range(len(steps) - 1):
-        verbose_logs += steps[i]
-        if i < len(steps) - 2:  # don't add new line for penultimate step
-            verbose_logs += " \n \n"
-    if metric.verbose_mode:
-        print_verbose_logs(metric.__name__, verbose_logs + f"\n \n{steps[-1]}")
-    return verbose_logs
 
 
 def get_or_create_event_loop() -> asyncio.AbstractEventLoop:
@@ -186,7 +92,7 @@ def get_or_create_event_loop() -> asyncio.AbstractEventLoop:
 def check_example_params(
     example: Example,
     example_params: List[ExampleParams],
-    scorer: JudgevalScorer,
+    scorer: BaseScorer,
 ):
     if isinstance(example, Example) is False:
         error_str = f"in check_example_params(): Expected example to be of type 'Example', but got {type(example)}"

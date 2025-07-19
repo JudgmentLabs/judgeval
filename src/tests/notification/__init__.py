@@ -1,1 +1,0 @@
-"""Notification tests package."""

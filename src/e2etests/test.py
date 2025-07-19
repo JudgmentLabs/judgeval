@@ -1,4 +1,4 @@
-import requests
+from judgeval.utils.requests import requests
 from dotenv import load_dotenv
 import os
 

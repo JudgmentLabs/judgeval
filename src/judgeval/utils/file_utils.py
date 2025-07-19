@@ -1,16 +1,15 @@
 import yaml
 from typing import List
-from judgeval.common.logger import debug, info, error
+from judgeval.common.logger import judgeval_logger
 
 from judgeval.data import Example
 
 
 def get_examples_from_yaml(file_path: str) -> List[Example] | None:
-    debug(f"Loading dataset from YAML file: {file_path}")
     """
     Adds examples from a YAML file.
 
-    The format of the YAML file is expected to be a dictionary with one key: "examples". 
+    The format of the YAML file is expected to be a dictionary with one key: "examples".
     The value of the key is a list of dictionaries, where each dictionary represents an example.
 
     The YAML file is expected to have the following format:
@@ -42,12 +41,11 @@ def get_examples_from_yaml(file_path: str) -> List[Example] | None:
                 raise ValueError("The YAML file is empty.")
             examples = payload.get("examples", [])
     except FileNotFoundError:
-        error(f"YAML file not found: {file_path}")
+        judgeval_logger.error(f"YAML file not found: {file_path}")
         raise FileNotFoundError(f"The file {file_path} was not found.")
     except yaml.YAMLError:
-        error(f"Invalid YAML file: {file_path}")
+        judgeval_logger.error(f"Invalid YAML file: {file_path}")
         raise ValueError(f"The file {file_path} is not a valid YAML file.")
 
-    info(f"Added {len(examples)} examples from YAML")
     new_examples = [Example(**e) for e in examples]
     return new_examples
