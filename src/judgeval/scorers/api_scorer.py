@@ -4,7 +4,7 @@ Judgment Scorer class.
 Scores `Example`s using ready-made Judgment evaluators.
 """
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, ConfigDict
 from typing import List
 from judgeval.data import ExampleParams
 from judgeval.constants import APIScorerType, UNBOUNDED_SCORERS
@@ -12,6 +12,7 @@ from judgeval.common.logger import judgeval_logger
 
 
 class APIScorerConfig(BaseModel):
+    model_config = ConfigDict(extra='forbid')
     """
     Scorer config that is used to send to our Judgment server.
 

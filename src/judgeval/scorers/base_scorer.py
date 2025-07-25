@@ -4,7 +4,7 @@ Base class for all scorers.
 
 from typing import Dict, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 from judgeval.judges.utils import create_judge
@@ -13,6 +13,7 @@ from pydantic import model_validator, Field
 
 
 class BaseScorer(BaseModel):
+    model_config = ConfigDict(extra='forbid')
     """
     If you want to create a scorer that does not fall under any of the ready-made Judgment scorers,
     you can create a custom scorer by extending this class. This is best used for special use cases

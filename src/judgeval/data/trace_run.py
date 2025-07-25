@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Dict, Any, Union
 from judgeval.data import Trace
 from judgeval.scorers import APIScorerConfig, BaseScorer
@@ -6,6 +6,7 @@ from judgeval.rules import Rule
 
 
 class TraceRun(BaseModel):
+    model_config = ConfigDict(extra='forbid', arbitrary_types_allowed=True)
     """
     Stores example and evaluation scorers together for running an eval task
 
@@ -32,6 +33,3 @@ class TraceRun(BaseModel):
     override: Optional[bool] = False
     rules: Optional[List[Rule]] = None
     tools: Optional[List[Dict[str, Any]]] = None
-
-    class Config:
-        arbitrary_types_allowed = True

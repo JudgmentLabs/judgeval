@@ -4,7 +4,7 @@ Handling alerts in Judgeval.
 
 from enum import Enum
 from typing import Dict, Any, List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class AlertStatus(str, Enum):
@@ -15,6 +15,7 @@ class AlertStatus(str, Enum):
 
 
 class AlertResult(BaseModel):
+    model_config = ConfigDict(extra='forbid')
     """
     Result of a rule evaluation.
 

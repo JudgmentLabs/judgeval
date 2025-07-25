@@ -4,6 +4,7 @@ Classes for representing examples in a dataset.
 
 from enum import Enum
 from datetime import datetime
+from pydantic import ConfigDict
 from judgeval.data.judgment_types import ExampleJudgmentType
 
 
@@ -20,6 +21,7 @@ class ExampleParams(str, Enum):
 
 
 class Example(ExampleJudgmentType):
+    model_config = ConfigDict(extra='forbid')
     example_id: str = ""
 
     def __init__(self, **data):

@@ -114,6 +114,6 @@ def check_example_params(
                 ", ".join(missing_params[:-1]) + ", and " + missing_params[-1]
             )
 
-        error_str = f"{missing_params_str} fields in example cannot be None for the '{scorer.__name__}' scorer"
+        error_str = f"{missing_params_str} fields in example cannot be None for the '{scorer.name or scorer.__class__.__name__}' scorer"
         scorer.error = error_str
         raise MissingExampleParamsError(error_str)

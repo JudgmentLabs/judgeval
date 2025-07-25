@@ -28,16 +28,18 @@ from judgeval.common.exceptions import JudgmentAPIError
 from langchain_core.callbacks import BaseCallbackHandler
 from judgeval.common.tracer import Tracer
 from judgeval.common.utils import validate_api_key
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from judgeval.common.logger import judgeval_logger
 
 
 class EvalRunRequestBody(BaseModel):
+    model_config = ConfigDict(extra='forbid')
     eval_name: str
     project_name: str
 
 
 class DeleteEvalRunRequestBody(BaseModel):
+    model_config = ConfigDict(extra='forbid')
     eval_names: List[str]
     project_name: str
 

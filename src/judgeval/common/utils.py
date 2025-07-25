@@ -35,6 +35,7 @@ from judgeval.common.logger import judgeval_logger
 
 
 class CustomModelParameters(pydantic.BaseModel):
+    model_config = pydantic.ConfigDict(extra='forbid')
     model_name: str
     secret_key: str
     litellm_base_url: str
@@ -62,6 +63,7 @@ class CustomModelParameters(pydantic.BaseModel):
 
 
 class ChatCompletionRequest(pydantic.BaseModel):
+    model_config = pydantic.ConfigDict(extra='forbid')
     model: str
     messages: List[Dict[str, str]]
     response_format: Optional[Union[pydantic.BaseModel, Dict[str, Any]]] = None

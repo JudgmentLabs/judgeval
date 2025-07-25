@@ -1,5 +1,5 @@
 from typing import List, Optional, Union
-from pydantic import BaseModel, field_validator, Field
+from pydantic import BaseModel, field_validator, Field, ConfigDict
 
 from judgeval.data import Example
 from judgeval.scorers import BaseScorer, APIScorerConfig
@@ -7,6 +7,7 @@ from judgeval.constants import ACCEPTABLE_MODELS
 
 
 class EvaluationRun(BaseModel):
+    model_config = ConfigDict(extra='forbid', arbitrary_types_allowed=True)
     """
     Stores example and evaluation scorers together for running an eval task
 
@@ -59,7 +60,7 @@ class EvaluationRun(BaseModel):
         return v
 
     @field_validator("model")
-    def validate_model(cls, v, values):
+    def validate_model(cls, v):
         if not v:
             raise ValueError("Model cannot be empty.")
 
@@ -70,6 +71,3 @@ class EvaluationRun(BaseModel):
                     f"Model name {v} not recognized. Please select a valid model name.)"
                 )
             return v
-
-    class Config:
-        arbitrary_types_allowed = True
