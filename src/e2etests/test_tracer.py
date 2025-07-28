@@ -1059,17 +1059,14 @@ async def test_llamaindex_error_handling():
         return
     
     # Test with invalid model
-    try:
-        llm = LlamaIndexOpenAI(model="invalid-model-xyz", temperature=0.0)
-        wrapped_llm = wrap(llm)
-        
-        # This should raise an error
-        with pytest.raises(Exception) as exc_info:
-            response = wrapped_llm.complete("Hello")
-        
-        print(f"✓ Invalid model error caught: {type(exc_info.value).__name__}")
-    except Exception as e:
-        print(f"✓ Setup error handled: {e}")
+    llm = LlamaIndexOpenAI(model="invalid-model-xyz", temperature=0.0)
+    wrapped_llm = wrap(llm)
+    
+    # This should raise an error
+    with pytest.raises(Exception) as exc_info:
+        response = wrapped_llm.complete("Hello")
+    
+    print(f"✓ Invalid model error caught: {type(exc_info.value).__name__}")
     
     # Test with empty input
     llm = LlamaIndexOpenAI(model="gpt-4o-mini", temperature=0.0)

@@ -1663,6 +1663,32 @@ class Tracer:
                 )
 
 
+def _is_llamaindex_openai_client(client: Any) -> bool:
+    """Checks if a client is a LlamaIndex OpenAI client."""
+    if not LLAMAINDEX_AVAILABLE:
+        return False
+    if isinstance(client, LlamaIndexOpenAI):
+        return True
+    return (
+        hasattr(client, '__class__') and
+        client.__class__.__module__ == 'llama_index.llms.openai.base' and
+        client.__class__.__name__ == 'OpenAI'
+    )
+
+
+def _is_llamaindex_anthropic_client(client: Any) -> bool:
+    """Checks if a client is a LlamaIndex Anthropic client."""
+    if not LLAMAINDEX_AVAILABLE:
+        return False
+    if isinstance(client, LlamaIndexAnthropic):
+        return True
+    return (
+        hasattr(client, '__class__') and
+        client.__class__.__module__ == 'llama_index.llms.anthropic' and
+        client.__class__.__name__ == 'Anthropic'
+    )
+
+
 def _get_current_trace(
     trace_across_async_contexts: bool = Tracer.trace_across_async_contexts,
 ):
@@ -1752,10 +1778,7 @@ def wrap(
         client.models.generate_content = wrapped(original_create)
     elif isinstance(client, (genai.client.AsyncClient)):
         client.models.generate_content = wrapped_async(original_create)
-    elif LLAMAINDEX_AVAILABLE and (isinstance(client, (LlamaIndexOpenAI, LlamaIndexAnthropic)) or
-                                     (hasattr(client, '__class__') and 
-                                      client.__class__.__module__ in ['llama_index.llms.openai.base', 'llama_index.llms.anthropic'] and
-                                      client.__class__.__name__ in ['OpenAI', 'Anthropic'])):
+    elif _is_llamaindex_openai_client(client) or _is_llamaindex_anthropic_client(client):
         # For LlamaIndex clients which are Pydantic models, we can't modify attributes directly
         # Instead, we'll use __setattr__ bypass
         # Store original methods before wrapping
@@ -1825,10 +1848,7 @@ def _get_client_config(
         )
     elif isinstance(client, (genai.Client, genai.client.AsyncClient)):
         return "GOOGLE_API_CALL", client.models.generate_content, None, None, None
-    elif LLAMAINDEX_AVAILABLE and (isinstance(client, LlamaIndexOpenAI) or 
-                                    (hasattr(client, '__class__') and 
-                                     client.__class__.__module__ == 'llama_index.llms.openai.base' and
-                                     client.__class__.__name__ == 'OpenAI')):
+    elif _is_llamaindex_openai_client(client):
         return (
             "LLAMAINDEX_OPENAI_API_CALL", 
             client.complete,  # Primary method for completions
@@ -1836,10 +1856,7 @@ def _get_client_config(
             client.stream_complete,  # Stream method for completions
             client.stream_chat,      # Beta parse slot used for stream chat
         )
-    elif LLAMAINDEX_AVAILABLE and (isinstance(client, LlamaIndexAnthropic) or
-                                    (hasattr(client, '__class__') and 
-                                     client.__class__.__module__ == 'llama_index.llms.anthropic' and
-                                     client.__class__.__name__ == 'Anthropic')):
+    elif _is_llamaindex_anthropic_client(client):
         return (
             "LLAMAINDEX_ANTHROPIC_API_CALL",
             client.complete,
@@ -1911,10 +1928,7 @@ def _format_output_data(
         cache_read_input_tokens = response.usage.cache_read_input_tokens
         cache_creation_input_tokens = response.usage.cache_creation_input_tokens
         message_content = response.content[0].text
-    elif LLAMAINDEX_AVAILABLE and (isinstance(client, (LlamaIndexOpenAI, LlamaIndexAnthropic)) or
-                                     (hasattr(client, '__class__') and 
-                                      client.__class__.__module__ in ['llama_index.llms.openai.base', 'llama_index.llms.anthropic'] and
-                                      client.__class__.__name__ in ['OpenAI', 'Anthropic'])):
+    elif _is_llamaindex_openai_client(client) or _is_llamaindex_anthropic_client(client):
         # Handle LlamaIndex response types
         if hasattr(response, 'text'):
             # CompletionResponse

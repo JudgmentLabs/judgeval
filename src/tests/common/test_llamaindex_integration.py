@@ -21,7 +21,7 @@ except ImportError:
     LlamaIndexOpenAI = None
     LlamaIndexAnthropic = None
 
-from judgeval.common.tracer.core import wrap, _get_client_config, _format_output_data
+from judgeval.common.tracer.core import wrap, _get_client_config, _format_output_data, _is_llamaindex_openai_client, _is_llamaindex_anthropic_client
 
 
 class TestLlamaIndexIntegration:
@@ -159,6 +159,8 @@ class TestLlamaIndexIntegration:
         assert config[0] == "LLAMAINDEX_ANTHROPIC_API_CALL"
         assert config[1] == llm_anthropic.complete
         assert config[2] == llm_anthropic.chat
+        assert config[3] == llm_anthropic.stream_complete
+        assert config[4] == llm_anthropic.stream_chat
 
     @pytest.mark.skipif(not LLAMAINDEX_AVAILABLE, reason="LlamaIndex not available")
     def test_format_output_data_llamaindex(self):
@@ -218,7 +220,7 @@ class TestLlamaIndexIntegration:
         llm = LlamaIndexOpenAI(model="gpt-4")
         
         # Direct assignment would fail with Pydantic
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError, match='"OpenAI" object has no field'):
             llm.some_new_method = lambda: "test"
         
         # But object.__setattr__ bypasses validation
