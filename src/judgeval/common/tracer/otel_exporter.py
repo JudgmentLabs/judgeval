@@ -64,6 +64,9 @@ class JudgmentAPISpanExporter(SpanExporter):
 
         except Exception as e:
             judgeval_logger.error(f"Error in JudgmentAPISpanExporter.export: {e}")
+            # Log the spans data for debugging
+            if spans_data:
+                judgeval_logger.debug(f"Failed to export spans. First span: {spans_data[0] if spans_data else 'No spans'}")
             return SpanExportResult.FAILURE
 
     def _convert_span_to_judgment_format(self, span: ReadableSpan) -> Dict[str, Any]:

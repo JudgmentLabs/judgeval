@@ -86,6 +86,8 @@ def validate_trace_token_counts(
         "ANTHROPIC_API_CALL",
         "TOGETHER_API_CALL",
         "GOOGLE_API_CALL",
+        "LLAMAINDEX_OPENAI_API_CALL",
+        "LLAMAINDEX_ANTHROPIC_API_CALL",
     }
 
     for span in trace_spans:
@@ -771,3 +773,321 @@ async def test_openai_cached_input_tokens():
 
     trace = judgment.get_current_trace()
     validate_trace_tokens(trace, cached_input_tokens=True)
+
+
+# ================== LlamaIndex Integration E2E Tests ==================
+# These tests comprehensively verify that LlamaIndex integration works
+# correctly with ReActAgent, which was the original issue reported.
+
+
+@pytest.mark.asyncio
+@judgment.observe(
+    name="test_llamaindex_basic_integration",
+)
+async def test_llamaindex_basic_integration():
+    """
+    Basic test for LlamaIndex integration with judgeval.wrap()
+    Tests complete, chat, and async methods.
+    """
+    print(f"\n{'=' * 20} Testing LlamaIndex Basic Integration {'=' * 20}")
+    
+    # Try to import LlamaIndex
+    try:
+        from llama_index.llms.openai import OpenAI as LlamaIndexOpenAI
+        from llama_index.core.llms import ChatMessage
+    except ImportError:
+        pytest.skip("LlamaIndex not available")
+        return
+    
+    # Create and wrap LlamaIndex client
+    llm = LlamaIndexOpenAI(model="gpt-4o-mini", temperature=0.0)
+    wrapped_llm = wrap(llm)
+    print("✓ LlamaIndex client wrapped successfully")
+    
+    # Test complete method
+    response = wrapped_llm.complete("What is 2+2?")
+    print(f"✓ complete() response: {response.text}")
+    assert "4" in response.text
+    
+    # Test chat method
+    messages = [
+        ChatMessage(role="system", content="You are a helpful assistant."),
+        ChatMessage(role="user", content="What is the capital of France?")
+    ]
+    chat_response = wrapped_llm.chat(messages)
+    print(f"✓ chat() response: {chat_response.message.content}")
+    assert "Paris" in chat_response.message.content
+    
+    # Test async methods
+    async_response = await wrapped_llm.acomplete("What is 10 divided by 2?")
+    print(f"✓ acomplete() response: {async_response.text}")
+    assert "5" in async_response.text
+    
+    # Allow time for trace processing
+    await asyncio.sleep(1.5)
+    
+    # Validate trace
+    trace = judgment.get_current_trace()
+    validate_trace_tokens(trace)
+    
+    print("✓ LlamaIndex Basic Integration Test Passed!")
+    return "Basic integration test completed"
+
+
+@pytest.mark.asyncio
+@judgment.observe(
+    name="test_llamaindex_react_agent",
+)
+async def test_llamaindex_react_agent():
+    """
+    Critical test: Verify wrapped LLM works with ReActAgent.
+    This is the actual use case from the GitHub issue.
+    """
+    print(f"\n{'=' * 20} Testing LlamaIndex ReActAgent Integration {'=' * 20}")
+    
+    try:
+        from llama_index.llms.openai import OpenAI as LlamaIndexOpenAI
+        from llama_index.core.agent import ReActAgent
+        from llama_index.core.tools import FunctionTool
+    except ImportError:
+        pytest.skip("LlamaIndex or ReActAgent not available")
+        return
+    
+    # Define test tools
+    def multiply(a: int, b: int) -> int:
+        """Multiply two numbers."""
+        return a * b
+    
+    def add(a: int, b: int) -> int:
+        """Add two numbers."""
+        return a + b
+    
+    # Create tools
+    multiply_tool = FunctionTool.from_defaults(fn=multiply)
+    add_tool = FunctionTool.from_defaults(fn=add)
+    
+    # Create and wrap LLM
+    llm = LlamaIndexOpenAI(model="gpt-4o-mini", temperature=0.0)
+    wrapped_llm = wrap(llm)
+    print("✓ LlamaIndex client wrapped")
+    
+    # This is the critical test - create ReActAgent with wrapped LLM
+    try:
+        agent = ReActAgent.from_tools(
+            tools=[multiply_tool, add_tool],
+            llm=wrapped_llm,
+            verbose=True
+        )
+        print("✓ ReActAgent created with wrapped LLM (validation passed!)")
+    except Exception as e:
+        pytest.fail(f"ReActAgent rejected wrapped LLM: {e}")
+    
+    # Test agent functionality
+    response = agent.chat("What is (5 * 3) + (2 * 4)?")
+    print(f"✓ Agent response: {response}")
+    
+    # Verify the calculation
+    expected_result = (5 * 3) + (2 * 4)  # 23
+    assert str(expected_result) in str(response)
+    
+    # Test multi-step reasoning
+    complex_response = agent.chat(
+        "First multiply 12 by 3, then add 6 to the result. What do you get?"
+    )
+    print(f"✓ Complex query response: {complex_response}")
+    assert "42" in str(complex_response)
+    
+    await asyncio.sleep(1.5)
+    
+    trace = judgment.get_current_trace()
+    validate_trace_tokens(trace)
+    
+    print("✓ ReActAgent Integration Test Passed!")
+    return "ReActAgent test completed successfully"
+
+
+@pytest.mark.asyncio
+@judgment.observe(
+    name="test_llamaindex_streaming",
+)
+async def test_llamaindex_streaming():
+    """
+    Test streaming functionality with LlamaIndex.
+    """
+    print(f"\n{'=' * 20} Testing LlamaIndex Streaming {'=' * 20}")
+    
+    try:
+        from llama_index.llms.openai import OpenAI as LlamaIndexOpenAI
+    except ImportError:
+        pytest.skip("LlamaIndex not available")
+        return
+    
+    # Create and wrap LLM
+    llm = LlamaIndexOpenAI(model="gpt-4o-mini", temperature=0.0)
+    wrapped_llm = wrap(llm)
+    
+    # Test stream_complete
+    print("Testing stream_complete...")
+    stream = wrapped_llm.stream_complete("Count from 1 to 5")
+    
+    full_response = ""
+    chunk_count = 0
+    for chunk in stream:
+        full_response += chunk.delta
+        chunk_count += 1
+    
+    print(f"✓ Received {chunk_count} chunks")
+    print(f"✓ Full response: {full_response}")
+    assert chunk_count > 0
+    assert any(str(i) in full_response for i in range(1, 6))
+    
+    # Test async streaming
+    print("\nTesting async stream_complete...")
+    astream = await wrapped_llm.astream_complete("List three colors")
+    
+    async_response = ""
+    async_chunks = 0
+    async for chunk in astream:
+        async_response += chunk.delta
+        async_chunks += 1
+    
+    print(f"✓ Received {async_chunks} async chunks")
+    print(f"✓ Async response: {async_response}")
+    assert async_chunks > 0
+    
+    await asyncio.sleep(1.5)
+    
+    trace = judgment.get_current_trace()
+    # Note: LlamaIndex streaming responses do not include token counts in the API response
+    # The OpenAI API's usage field is None for all chunks in a stream
+    # This is a known limitation, not a bug in our implementation
+    if trace and trace.trace_spans:
+        print(f"✓ Trace contains {len(trace.trace_spans)} spans")
+        # We cannot validate token counts for streaming responses
+        # as the API doesn't provide them
+    
+    print("✓ Streaming Test Passed!")
+    return "Streaming test completed"
+
+
+@pytest.mark.asyncio
+@judgment.observe(
+    name="test_llamaindex_rag_agent",
+)
+async def test_llamaindex_rag_agent():
+    """
+    Test complex RAG agent with vector store and multiple tools.
+    This demonstrates real-world usage patterns.
+    """
+    print(f"\n{'=' * 20} Testing LlamaIndex RAG Agent {'=' * 20}")
+    
+    try:
+        from llama_index.llms.openai import OpenAI as LlamaIndexOpenAI
+        from llama_index.core import VectorStoreIndex, Document
+        from llama_index.core.agent import ReActAgent
+        from llama_index.core.tools import QueryEngineTool, ToolMetadata
+    except ImportError:
+        pytest.skip("LlamaIndex with vector store not available")
+        return
+    
+    # Create sample documents
+    docs = [
+        Document(text="The capital of France is Paris. Paris is known for the Eiffel Tower."),
+        Document(text="Python is a programming language. It was created by Guido van Rossum."),
+        Document(text="Machine learning is a subset of artificial intelligence.")
+    ]
+    
+    # Create and wrap LLM
+    llm = LlamaIndexOpenAI(model="gpt-4o-mini", temperature=0.0)
+    wrapped_llm = wrap(llm)
+    
+    # Create index with wrapped LLM
+    index = VectorStoreIndex.from_documents(docs)
+    query_engine = index.as_query_engine(llm=wrapped_llm)
+    
+    # Create query tool
+    query_tool = QueryEngineTool(
+        query_engine=query_engine,
+        metadata=ToolMetadata(
+            name="knowledge_base",
+            description="Provides information about various topics"
+        )
+    )
+    
+    # Create RAG agent
+    agent = ReActAgent.from_tools(
+        tools=[query_tool],
+        llm=wrapped_llm,
+        verbose=True
+    )
+    print("✓ RAG Agent created with wrapped LLM")
+    
+    # Test RAG functionality
+    response = agent.chat("What is the capital of France and what is it known for?")
+    print(f"✓ RAG response: {response}")
+    assert "Paris" in str(response)
+    assert "Eiffel" in str(response) or "Tower" in str(response)
+    
+    # Test knowledge not in documents
+    response2 = agent.chat("Who created Python programming language?")
+    print(f"✓ Python creator response: {response2}")
+    assert "Guido" in str(response2)
+    
+    await asyncio.sleep(1.5)
+    
+    trace = judgment.get_current_trace()
+    validate_trace_tokens(trace)
+    
+    print("✓ RAG Agent Test Passed!")
+    return "RAG agent test completed"
+
+
+@pytest.mark.asyncio
+@judgment.observe(
+    name="test_llamaindex_error_handling",
+)
+async def test_llamaindex_error_handling():
+    """
+    Test error handling and edge cases with LlamaIndex integration.
+    """
+    print(f"\n{'=' * 20} Testing LlamaIndex Error Handling {'=' * 20}")
+    
+    try:
+        from llama_index.llms.openai import OpenAI as LlamaIndexOpenAI
+    except ImportError:
+        pytest.skip("LlamaIndex not available")
+        return
+    
+    # Test with invalid model
+    try:
+        llm = LlamaIndexOpenAI(model="invalid-model-xyz", temperature=0.0)
+        wrapped_llm = wrap(llm)
+        
+        # This should raise an error
+        with pytest.raises(Exception) as exc_info:
+            response = wrapped_llm.complete("Hello")
+        
+        print(f"✓ Invalid model error caught: {type(exc_info.value).__name__}")
+    except Exception as e:
+        print(f"✓ Setup error handled: {e}")
+    
+    # Test with empty input
+    llm = LlamaIndexOpenAI(model="gpt-4o-mini", temperature=0.0)
+    wrapped_llm = wrap(llm)
+    
+    response = wrapped_llm.complete("")
+    print(f"✓ Empty input handled: {response.text[:50]}...")
+    
+    # Test with very long input
+    long_input = "Test " * 1000
+    response = wrapped_llm.complete(long_input[:4000])  # Limit to avoid token limits
+    print(f"✓ Long input handled: {response.text[:50]}...")
+    
+    await asyncio.sleep(1.5)
+    
+    trace = judgment.get_current_trace()
+    if trace and trace.trace_spans:
+        print(f"✓ Trace contains {len(trace.trace_spans)} spans")
+    
+    print("✓ Error Handling Test Passed!")
+    return "Error handling test completed"

@@ -52,6 +52,39 @@ from judgeval.evaluation_run import EvaluationRun
 from judgeval.common.utils import ExcInfo, validate_api_key
 from judgeval.common.logger import judgeval_logger
 
+# Optional LlamaIndex imports - we check if it's installed
+LLAMAINDEX_AVAILABLE = False
+LlamaIndexOpenAI = None
+LlamaIndexAnthropic = None
+CompletionResponse = None
+ChatResponse = None
+
+# Try to import LlamaIndex OpenAI
+try:
+    from llama_index.llms.openai.base import OpenAI as LlamaIndexOpenAI
+    LLAMAINDEX_AVAILABLE = True
+except ImportError:
+    try:
+        from llama_index.llms.openai import OpenAI as LlamaIndexOpenAI
+        LLAMAINDEX_AVAILABLE = True
+    except ImportError:
+        pass
+
+# Try to import LlamaIndex Anthropic (optional)
+try:
+    from llama_index.llms.anthropic import Anthropic as LlamaIndexAnthropic
+except ImportError:
+    pass
+
+# Try to import response types
+try:
+    from llama_index.core.base.llms.types import CompletionResponse, ChatResponse
+except ImportError:
+    try:
+        from llama_index.core.llms.types import CompletionResponse, ChatResponse
+    except ImportError:
+        pass
+
 
 current_trace_var = contextvars.ContextVar[Optional["TraceClient"]](
     "current_trace", default=None
@@ -68,6 +101,14 @@ ApiClient: TypeAlias = Union[
     genai.Client,
     genai.client.AsyncClient,
 ]
+
+# Extend ApiClient if LlamaIndex is available
+if LLAMAINDEX_AVAILABLE:
+    ApiClient = Union[
+        ApiClient,
+        LlamaIndexOpenAI,
+        LlamaIndexAnthropic,
+    ]
 SpanType: TypeAlias = str
 
 
@@ -1711,6 +1752,33 @@ def wrap(
         client.models.generate_content = wrapped(original_create)
     elif isinstance(client, (genai.client.AsyncClient)):
         client.models.generate_content = wrapped_async(original_create)
+    elif LLAMAINDEX_AVAILABLE and (isinstance(client, (LlamaIndexOpenAI, LlamaIndexAnthropic)) or
+                                     (hasattr(client, '__class__') and 
+                                      client.__class__.__module__ in ['llama_index.llms.openai.base', 'llama_index.llms.anthropic'] and
+                                      client.__class__.__name__ in ['OpenAI', 'Anthropic'])):
+        # For LlamaIndex clients which are Pydantic models, we can't modify attributes directly
+        # Instead, we'll use __setattr__ bypass
+        # Store original methods before wrapping
+        original_complete = client.complete
+        original_chat = client.chat
+        original_stream_complete = client.stream_complete
+        original_stream_chat = client.stream_chat
+        original_acomplete = client.acomplete
+        original_achat = client.achat
+        original_astream_complete = client.astream_complete
+        original_astream_chat = client.astream_chat
+        
+        # Wrap sync methods
+        object.__setattr__(client, 'complete', wrapped(original_complete))
+        object.__setattr__(client, 'chat', wrapped(original_chat))
+        object.__setattr__(client, 'stream_complete', wrapped(original_stream_complete))
+        object.__setattr__(client, 'stream_chat', wrapped(original_stream_chat))
+        
+        # Wrap async methods
+        object.__setattr__(client, 'acomplete', wrapped_async(original_acomplete))
+        object.__setattr__(client, 'achat', wrapped_async(original_achat))
+        object.__setattr__(client, 'astream_complete', wrapped_async(original_astream_complete))
+        object.__setattr__(client, 'astream_chat', wrapped_async(original_astream_chat))
 
     return client
 
@@ -1757,6 +1825,28 @@ def _get_client_config(
         )
     elif isinstance(client, (genai.Client, genai.client.AsyncClient)):
         return "GOOGLE_API_CALL", client.models.generate_content, None, None, None
+    elif LLAMAINDEX_AVAILABLE and (isinstance(client, LlamaIndexOpenAI) or 
+                                    (hasattr(client, '__class__') and 
+                                     client.__class__.__module__ == 'llama_index.llms.openai.base' and
+                                     client.__class__.__name__ == 'OpenAI')):
+        return (
+            "LLAMAINDEX_OPENAI_API_CALL", 
+            client.complete,  # Primary method for completions
+            client.chat,      # Chat method (using responses_method slot)
+            client.stream_complete,  # Stream method for completions
+            client.stream_chat,      # Beta parse slot used for stream chat
+        )
+    elif LLAMAINDEX_AVAILABLE and (isinstance(client, LlamaIndexAnthropic) or
+                                    (hasattr(client, '__class__') and 
+                                     client.__class__.__module__ == 'llama_index.llms.anthropic' and
+                                     client.__class__.__name__ == 'Anthropic')):
+        return (
+            "LLAMAINDEX_ANTHROPIC_API_CALL",
+            client.complete,
+            client.chat,
+            client.stream_complete,
+            client.stream_chat,
+        )
     raise ValueError(f"Unsupported client type: {type(client)}")
 
 
@@ -1821,6 +1911,47 @@ def _format_output_data(
         cache_read_input_tokens = response.usage.cache_read_input_tokens
         cache_creation_input_tokens = response.usage.cache_creation_input_tokens
         message_content = response.content[0].text
+    elif LLAMAINDEX_AVAILABLE and (isinstance(client, (LlamaIndexOpenAI, LlamaIndexAnthropic)) or
+                                     (hasattr(client, '__class__') and 
+                                      client.__class__.__module__ in ['llama_index.llms.openai.base', 'llama_index.llms.anthropic'] and
+                                      client.__class__.__name__ in ['OpenAI', 'Anthropic'])):
+        # Handle LlamaIndex response types
+        if hasattr(response, 'text'):
+            # CompletionResponse
+            message_content = response.text
+        elif hasattr(response, 'message') and hasattr(response.message, 'content'):
+            # ChatResponse
+            message_content = response.message.content
+        else:
+            message_content = str(response)
+        
+        # Extract usage data if available (typically from raw response)
+        if hasattr(response, 'raw') and hasattr(response.raw, 'usage'):
+            usage_data = response.raw.usage
+            prompt_tokens = getattr(usage_data, 'prompt_tokens', 0)
+            completion_tokens = getattr(usage_data, 'completion_tokens', 0)
+            # For OpenAI backend, check for cached tokens
+            if hasattr(usage_data, 'prompt_tokens_details') and hasattr(usage_data.prompt_tokens_details, 'cached_tokens'):
+                cache_read_input_tokens = usage_data.prompt_tokens_details.cached_tokens
+        elif hasattr(response, 'additional_kwargs') and 'usage' in response.additional_kwargs:
+            # Alternative location for usage data
+            usage_data = response.additional_kwargs['usage']
+            prompt_tokens = usage_data.get('prompt_tokens', 0)
+            completion_tokens = usage_data.get('completion_tokens', 0)
+        
+        # Extract model name
+        if hasattr(response, 'raw') and hasattr(response.raw, 'model'):
+            model_name = response.raw.model
+        elif hasattr(response, 'model_name'):
+            model_name = response.model_name
+        elif isinstance(client, LlamaIndexOpenAI) or (hasattr(client, '__class__') and 
+                                                       client.__class__.__module__ == 'llama_index.llms.openai.base'):
+            model_name = getattr(client, 'model', 'unknown')
+        elif isinstance(client, LlamaIndexAnthropic) or (hasattr(client, '__class__') and 
+                                                          client.__class__.__module__ == 'llama_index.llms.anthropic'):
+            model_name = getattr(client, 'model', 'unknown')
+        else:
+            model_name = 'unknown'
     else:
         judgeval_logger.warning(f"Unsupported client type: {type(client)}")
         return None, None
