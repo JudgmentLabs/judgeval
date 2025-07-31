@@ -4,6 +4,7 @@ from typing import Mapping, Dict, Any
 from judgeval.common.api import JudgmentApiClient, JudgmentAPIException
 import os
 from judgeval.common.exceptions import JudgmentAPIError
+from copy import copy
 
 
 def push_prompt_scorer(
@@ -172,7 +173,7 @@ class PromptScorer(APIScorerConfig):
         """
         Returns the options of the scorer.
         """
-        return self.options
+        return copy(self.options)
 
     def get_name(self) -> str | None:
         """
