@@ -239,17 +239,11 @@ class JudgmentApiClient:
         return self._do_request("POST", JUDGMENT_CHECK_EXAMPLE_KEYS_API_URL, payload)
 
     def save_scorer(self, name: str, prompt: str, options: Optional[dict] = None):
-        if options is not None:
-            payload: ScorerSavePayload = {
-                "name": name,
-                "prompt": prompt,
-                "options": options,
-            }
-        else:
-            payload: ScorerSavePayload = {
-                "name": name,
-                "prompt": prompt,
-            }
+        payload: ScorerSavePayload = {
+            "name": name,
+            "prompt": prompt,
+            "options": options,
+        }
         try:
             return self._do_request("POST", JUDGMENT_SCORER_SAVE_API_URL, payload)
         except JudgmentAPIException as e:
