@@ -162,7 +162,7 @@ JUDGMENT_SCORER_EXISTS_API_URL = f"{ROOT_API}/scorer_exists/"
 class ScorerSavePayload(TypedDict):
     name: str
     prompt: str
-    options: dict
+    options: Optional[dict]
 
 
 class ScorerFetchPayload(TypedDict):

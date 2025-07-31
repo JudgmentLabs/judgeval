@@ -1,6 +1,6 @@
 from judgeval.scorers.api_scorer import APIScorerConfig
 from judgeval.constants import APIScorerType
-from typing import Mapping, Dict, Any
+from typing import Mapping, Dict, Any, Optional
 from judgeval.common.api import JudgmentApiClient, JudgmentAPIException
 import os
 from judgeval.common.exceptions import JudgmentAPIError
@@ -10,13 +10,16 @@ from copy import copy
 def push_prompt_scorer(
     name: str,
     prompt: str,
-    options: Mapping[str, float],
+    options: Optional[Mapping[str, float]] = None,
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
 ) -> str:
     client = JudgmentApiClient(judgment_api_key, organization_id)
     try:
-        r = client.save_scorer(name, prompt, dict(options))
+        if options is not None:
+            r = client.save_scorer(name, prompt, dict(options))
+        else:
+            r = client.save_scorer(name, prompt)
     except JudgmentAPIException as e:
         if e.status_code == 500:
             raise JudgmentAPIError(
@@ -73,7 +76,7 @@ class PromptScorer(APIScorerConfig):
     """
 
     prompt: str
-    options: Mapping[str, float]
+    options: Optional[Mapping[str, float]] = None
     score_type: APIScorerType = APIScorerType.PROMPT_SCORER
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or ""
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or ""
@@ -89,7 +92,7 @@ class PromptScorer(APIScorerConfig):
         return cls(
             name=name,
             prompt=scorer_config["prompt"],
-            options=scorer_config["options"],
+            options=scorer_config.get("options"),
             judgment_api_key=judgment_api_key,
             organization_id=organization_id,
         )
@@ -99,7 +102,7 @@ class PromptScorer(APIScorerConfig):
         cls,
         name: str,
         prompt: str,
-        options: Mapping[str, float],
+        options: Optional[Mapping[str, float]] = None,
         judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
         organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
     ):
@@ -173,7 +176,7 @@ class PromptScorer(APIScorerConfig):
         """
         Returns the options of the scorer.
         """
-        return copy(self.options)
+        return copy(self.options) if self.options is not None else None
 
     def get_name(self) -> str | None:
         """
@@ -185,11 +188,17 @@ class PromptScorer(APIScorerConfig):
         """
         Returns a dictionary with all the fields in the scorer.
         """
-        return {
-            "name": self.name,
-            "prompt": self.prompt,
-            "options": self.options,
-        }
+        if self.options is not None:
+            return {
+                "name": self.name,
+                "prompt": self.prompt,
+                "options": self.options,
+            }
+        else:
+            return {
+                "name": self.name,
+                "prompt": self.prompt,
+            }
 
     def push_prompt_scorer(self):
         """
