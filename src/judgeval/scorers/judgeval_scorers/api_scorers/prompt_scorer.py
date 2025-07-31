@@ -32,7 +32,7 @@ def fetch_prompt_scorer(
 ):
     client = JudgmentApiClient(judgment_api_key, organization_id)
     try:
-        scorer_config = client.fetch_scorer(name)
+        scorer_config = client.fetch_scorer(name)["scorer"]
         scorer_config.pop("created_at")
         scorer_config.pop("updated_at")
         return scorer_config
@@ -121,8 +121,11 @@ class PromptScorer(APIScorerConfig):
         """
         Updates the name of the scorer.
         """
-        self.name = name
-        self.push_prompt_scorer()
+        if not scorer_exists(name, self.judgment_api_key, self.organization_id):
+            self.name = name
+            self.push_prompt_scorer()
+        else:
+            raise JudgmentAPIError(f"Scorer with name {name} already exists.")
 
     def set_threshold(self, threshold: float):
         """
