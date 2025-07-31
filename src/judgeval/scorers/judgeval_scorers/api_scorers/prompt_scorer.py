@@ -118,16 +118,6 @@ class PromptScorer(APIScorerConfig):
             )
 
     # Setter functions. Each setter function pushes the scorer to the DB.
-    def set_name(self, name: str):
-        """
-        Updates the name of the scorer.
-        """
-        if not scorer_exists(name, self.judgment_api_key, self.organization_id):
-            self.name = name
-            self.push_prompt_scorer()
-        else:
-            raise JudgmentAPIError(f"Scorer with name {name} already exists.")
-
     def set_threshold(self, threshold: float):
         """
         Updates the threshold of the scorer.
@@ -185,17 +175,11 @@ class PromptScorer(APIScorerConfig):
         """
         Returns a dictionary with all the fields in the scorer.
         """
-        if self.options is not None:
-            return {
-                "name": self.name,
-                "prompt": self.prompt,
-                "options": self.options,
-            }
-        else:
-            return {
-                "name": self.name,
-                "prompt": self.prompt,
-            }
+        return {
+            "name": self.name,
+            "prompt": self.prompt,
+            "options": self.options,
+        }
 
     def push_prompt_scorer(self):
         """
