@@ -8,7 +8,8 @@ of TraceSpan objects converted to OpenTelemetry format.
 from __future__ import annotations
 
 import threading
-from typing import Any, Dict, Optional
+import queue
+from typing import Any, Dict, Optional, Callable
 
 from opentelemetry.context import Context
 from opentelemetry.sdk.trace import ReadableSpan, Span
@@ -105,6 +106,12 @@ class JudgmentSpanProcessor(SpanProcessor, SpanProcessorBase):
         self._span_states: Dict[str, str] = {}
         self._cache_lock = threading.RLock()
 
+        # Background trace upsert processing
+        self._trace_queue: queue.Queue = queue.Queue(maxsize=max_queue_size)
+        self._trace_worker_thread: Optional[threading.Thread] = None
+        self._shutdown_flag = threading.Event()
+        self._start_trace_worker()
+
         self.batch_processor = BatchSpanProcessor(
             JudgmentAPISpanExporter(
                 judgment_api_key=judgment_api_key,
@@ -115,6 +122,43 @@ class JudgmentSpanProcessor(SpanProcessor, SpanProcessorBase):
             max_export_batch_size=batch_size,
             export_timeout_millis=export_timeout,
         )
+
+    def _start_trace_worker(self):
+        """Start the background worker thread for processing trace upserts."""
+        if (
+            self._trace_worker_thread is None
+            or not self._trace_worker_thread.is_alive()
+        ):
+            self._trace_worker_thread = threading.Thread(
+                target=self._trace_worker, daemon=True, name="JudgmentTraceWorker"
+            )
+            self._trace_worker_thread.start()
+
+    def _trace_worker(self):
+        """Background worker that processes trace upserts."""
+        while not self._shutdown_flag.is_set():
+            try:
+                # Wait for items with a timeout to allow checking shutdown flag
+                trace_item = self._trace_queue.get(timeout=1.0)
+
+                try:
+                    trace_data, upsert_callback, final_save = trace_item
+                    upsert_callback(trace_data)
+                    judgeval_logger.debug(
+                        f"Background trace upsert completed for trace {trace_data.get('trace_id', 'unknown')}"
+                    )
+                except Exception as e:
+                    judgeval_logger.warning(
+                        f"Error processing background trace upsert: {e}"
+                    )
+                finally:
+                    self._trace_queue.task_done()
+
+            except queue.Empty:
+                # Timeout occurred, continue loop to check shutdown flag
+                continue
+            except Exception as e:
+                judgeval_logger.warning(f"Error in trace worker: {e}")
 
     def on_start(self, span: Span, parent_context: Optional[Context] = None) -> None:
         self.batch_processor.on_start(span, parent_context)
@@ -165,6 +209,46 @@ class JudgmentSpanProcessor(SpanProcessor, SpanProcessorBase):
 
         self.batch_processor.on_end(readable_span)
 
+    def queue_trace_upsert(
+        self,
+        trace_data: Dict[str, Any],
+        upsert_callback: Callable[[Dict[str, Any]], Dict[str, Any]],
+        final_save: bool = False,
+    ) -> None:
+        """
+        Queue a trace upsert to be processed in the background.
+
+        Args:
+            trace_data: The trace data to upsert
+            upsert_callback: Callback function that performs the actual upsert
+            final_save: Whether this is the final save
+        """
+        try:
+            self._trace_queue.put_nowait((trace_data, upsert_callback, final_save))
+            judgeval_logger.debug(
+                f"Queued trace upsert for trace {trace_data.get('trace_id', 'unknown')}"
+            )
+        except queue.Full:
+            judgeval_logger.warning(
+                "Trace upsert queue is full, performing synchronous upsert"
+            )
+            # Fallback to synchronous processing if queue is full
+            try:
+                upsert_callback(trace_data)
+            except Exception as e:
+                judgeval_logger.error(
+                    f"Error in fallback synchronous trace upsert: {e}"
+                )
+
+    def flush_pending_traces(self) -> None:
+        """Flush all pending trace upserts by waiting for the queue to empty."""
+        try:
+            # Wait for all queued trace upserts to complete
+            self._trace_queue.join()
+            judgeval_logger.debug("All pending trace upserts have been processed")
+        except Exception as e:
+            judgeval_logger.warning(f"Error flushing pending traces: {e}")
+
     def shutdown(self) -> None:
         try:
             self.flush_pending_spans()
@@ -172,6 +256,17 @@ class JudgmentSpanProcessor(SpanProcessor, SpanProcessorBase):
             judgeval_logger.warning(
                 f"Error flushing pending spans during shutdown: {e}"
             )
+
+        # Shutdown trace processing
+        try:
+            self.flush_pending_traces()
+            self._shutdown_flag.set()
+
+            if self._trace_worker_thread and self._trace_worker_thread.is_alive():
+                self._trace_worker_thread.join(timeout=5.0)
+
+        except Exception as e:
+            judgeval_logger.warning(f"Error shutting down trace worker: {e}")
 
         self.batch_processor.shutdown()
 
@@ -182,7 +277,8 @@ class JudgmentSpanProcessor(SpanProcessor, SpanProcessorBase):
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         try:
             self.flush_pending_spans()
+            self.flush_pending_traces()
         except Exception as e:
-            judgeval_logger.warning(f"Error flushing pending spans: {e}")
+            judgeval_logger.warning(f"Error flushing pending spans and traces: {e}")
 
         return self.batch_processor.force_flush(timeout_millis)
