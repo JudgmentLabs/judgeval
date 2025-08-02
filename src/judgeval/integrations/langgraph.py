@@ -13,11 +13,17 @@ from judgeval.common.tracer import (
 )
 from judgeval.data.trace import TraceUsage
 
-from langchain_core.callbacks import BaseCallbackHandler
-from langchain_core.agents import AgentAction, AgentFinish
-from langchain_core.outputs import LLMResult
-from langchain_core.messages.base import BaseMessage
-from langchain_core.documents import Document
+
+try:
+    from langchain_core.callbacks import BaseCallbackHandler
+    from langchain_core.agents import AgentAction, AgentFinish
+    from langchain_core.outputs import LLMResult
+    from langchain_core.messages.base import BaseMessage
+    from langchain_core.documents import Document
+except ImportError as e:
+    raise ImportError(
+        "LangChain is not installed. Please install it to use this callback handler."
+    ) from e
 
 # TODO: Figure out how to handle context variables. Current solution is to keep track of current span id in Tracer class
 

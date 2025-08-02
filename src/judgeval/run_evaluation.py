@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import asyncio
 import concurrent.futures
 import time
 import orjson
 import sys
 import threading
-from typing import List, Dict, Union, Optional, Callable, Tuple, Any
+from typing import List, Dict, Union, Optional, Callable, Tuple, Any, TYPE_CHECKING
 from rich import print as rprint
 
 from judgeval.data import ScorerData, ScoringResult, Example, Trace
@@ -17,10 +19,13 @@ from judgeval.constants import (
 from judgeval.common.exceptions import JudgmentAPIError
 from judgeval.common.api.api import JudgmentAPIException
 from judgeval.common.logger import judgeval_logger
-from judgeval.evaluation_run import EvaluationRun
-from judgeval.data.trace_run import TraceRun
-from judgeval.common.tracer import Tracer
-from judgeval.integrations.langgraph import JudgevalCallbackHandler
+
+
+if TYPE_CHECKING:
+    from judgeval.common.tracer import Tracer
+    from judgeval.data.trace_run import TraceRun
+    from judgeval.evaluation_run import EvaluationRun
+    from judgeval.integrations.langgraph import JudgevalCallbackHandler
 
 
 def safe_run_async(coro):
@@ -282,7 +287,7 @@ def run_trace_eval(
     judgment_api_key: str,
     override: bool = False,
     function: Optional[Callable] = None,
-    tracer: Optional[Union[Tracer, JudgevalCallbackHandler]] = None,
+    tracer: Optional[Union[Tracer, "JudgevalCallbackHandler"]] = None,
     examples: Optional[List[Example]] = None,
 ) -> List[ScoringResult]:
     # Call endpoint to check to see if eval run name exists (if we DON'T want to override and DO want to log results)

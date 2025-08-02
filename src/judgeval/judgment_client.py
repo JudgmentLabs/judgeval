@@ -2,9 +2,10 @@
 Implements the JudgmentClient to interact with the Judgment API.
 """
 
+from __future__ import annotations
 import os
 from uuid import uuid4
-from typing import Optional, List, Dict, Any, Union, Callable
+from typing import Optional, List, Dict, Any, Union, Callable, TYPE_CHECKING
 
 from judgeval.data import (
     ScoringResult,
@@ -28,7 +29,10 @@ from judgeval.common.tracer import Tracer
 from judgeval.common.utils import validate_api_key
 from pydantic import BaseModel
 from judgeval.common.logger import judgeval_logger
-from judgeval.integrations.langgraph import JudgevalCallbackHandler
+
+
+if TYPE_CHECKING:
+    from judgeval.integrations.langgraph import JudgevalCallbackHandler
 from judgeval.constants import DEFAULT_GPT_MODEL
 
 
