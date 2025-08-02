@@ -26,6 +26,7 @@ class EvaluationRun(BaseModel):
     scorers: List[Union[APIScorerConfig, BaseScorer]]
     model: Optional[str] = DEFAULT_GPT_MODEL
     trace_span_id: Optional[str] = None
+    trace_id: Optional[str] = None
     # API Key will be "" until user calls client.run_eval(), then API Key will be set
     override: Optional[bool] = False
     append: Optional[bool] = False
