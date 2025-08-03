@@ -32,6 +32,7 @@ class TraceSpan(TraceSpanJudgmentType):
             "usage": self.usage.model_dump() if self.usage else None,
             "has_evaluation": self.has_evaluation,
             "agent_name": self.agent_name,
+            "class_name": self.class_name,
             "state_before": self.state_before,
             "state_after": self.state_after,
             "additional_metadata": json_encoder(self.additional_metadata),
