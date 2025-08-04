@@ -11,13 +11,14 @@ from judgeval.common.logger import judgeval_logger
 def push_prompt_scorer(
     name: str,
     prompt: str,
+    threshold: float,
     options: Optional[Dict[str, float]] = None,
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
 ) -> str:
     client = JudgmentApiClient(judgment_api_key, organization_id)
     try:
-        r = client.save_scorer(name, prompt, options)
+        r = client.save_scorer(name, prompt, threshold, options)
     except JudgmentAPIException as e:
         if e.status_code == 500:
             raise JudgmentAPIError(
@@ -90,6 +91,7 @@ class PromptScorer(APIScorerConfig):
         return cls(
             name=name,
             prompt=scorer_config["prompt"],
+            threshold=scorer_config["threshold"],
             options=scorer_config.get("options"),
             judgment_api_key=judgment_api_key,
             organization_id=organization_id,
@@ -100,16 +102,20 @@ class PromptScorer(APIScorerConfig):
         cls,
         name: str,
         prompt: str,
+        threshold: Optional[float] = 0.5,
         options: Optional[Dict[str, float]] = None,
         judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
         organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
     ):
         if not scorer_exists(name, judgment_api_key, organization_id):
-            push_prompt_scorer(name, prompt, options, judgment_api_key, organization_id)
+            push_prompt_scorer(
+                name, prompt, threshold, options, judgment_api_key, organization_id
+            )
             judgeval_logger.info(f"Successfully created PromptScorer: {name}")
             return cls(
                 name=name,
                 prompt=prompt,
+                threshold=threshold,
                 options=options,
                 judgment_api_key=judgment_api_key,
                 organization_id=organization_id,
@@ -183,6 +189,7 @@ class PromptScorer(APIScorerConfig):
         return {
             "name": self.name,
             "prompt": self.prompt,
+            "threshold": self.threshold,
             "options": self.options,
         }
 
@@ -193,13 +200,14 @@ class PromptScorer(APIScorerConfig):
         push_prompt_scorer(
             self.name,
             self.prompt,
+            self.threshold,
             self.options,
             self.judgment_api_key,
             self.organization_id,
         )
 
     def __str__(self):
-        return f"PromptScorer(name={self.name}, prompt={self.prompt}, options={self.options})"
+        return f"PromptScorer(name={self.name}, prompt={self.prompt}, threshold={self.threshold}, options={self.options})"
 
     def model_dump(self, *args, **kwargs) -> Dict[str, Any]:
         base = super().model_dump(*args, **kwargs)

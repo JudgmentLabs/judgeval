@@ -237,10 +237,13 @@ class JudgmentApiClient:
         }
         return self._do_request("POST", JUDGMENT_CHECK_EXAMPLE_KEYS_API_URL, payload)
 
-    def save_scorer(self, name: str, prompt: str, options: Optional[dict] = None):
+    def save_scorer(
+        self, name: str, prompt: str, threshold: float, options: Optional[dict] = None
+    ):
         payload: ScorerSavePayload = {
             "name": name,
             "prompt": prompt,
+            "threshold": threshold,
             "options": options,
         }
         try:
