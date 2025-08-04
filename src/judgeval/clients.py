@@ -2,7 +2,6 @@ import os
 from dotenv import load_dotenv
 from openai import OpenAI
 from typing import Optional
-from together import Together, AsyncTogether
 
 PATH_TO_DOTENV = os.path.join(os.path.dirname(__file__), ".env")
 load_dotenv(dotenv_path=PATH_TO_DOTENV)
@@ -28,6 +27,8 @@ async_together_client: Optional["AsyncTogether"] = None
 together_api_key = os.getenv("TOGETHERAI_API_KEY") or os.getenv("TOGETHER_API_KEY")
 if together_api_key:
     try:
+        from together import Together, AsyncTogether
+
         together_client = Together(api_key=together_api_key)
         async_together_client = AsyncTogether(api_key=together_api_key)
     except Exception:

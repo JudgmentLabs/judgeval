@@ -1,8 +1,12 @@
+from __future__ import annotations
+
+import asyncio
+import concurrent.futures
 import time
 import orjson
 import sys
 import threading
-from typing import List, Dict, Union, Optional, Callable, Tuple, Any
+from typing import List, Dict, Union, Optional, Callable, Tuple, Any, TYPE_CHECKING
 from rich import print as rprint
 
 from judgeval.data import ScorerData, ScoringResult, Example, Trace
@@ -15,11 +19,36 @@ from judgeval.constants import (
 from judgeval.common.exceptions import JudgmentAPIError
 from judgeval.common.api.api import JudgmentAPIException
 from judgeval.common.logger import judgeval_logger
-from judgeval.evaluation_run import EvaluationRun
-from judgeval.data.trace_run import TraceRun
-from judgeval.common.tracer import Tracer
-from judgeval.integrations.langgraph import JudgevalCallbackHandler
-from judgeval.utils.async_utils import safe_run_async
+
+
+if TYPE_CHECKING:
+    from judgeval.common.tracer import Tracer
+    from judgeval.data.trace_run import TraceRun
+    from judgeval.evaluation_run import EvaluationRun
+    from judgeval.integrations.langgraph import JudgevalCallbackHandler
+
+
+def safe_run_async(coro):
+    """
+    Safely run an async coroutine whether or not there's already an event loop running.
+
+    Args:
+        coro: The coroutine to run
+
+    Returns:
+        The result of the coroutine
+    """
+    try:
+        # Try to get the running loop
+        asyncio.get_running_loop()
+        # If we get here, there's already a loop running
+        # Run in a separate thread to avoid "asyncio.run() cannot be called from a running event loop"
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(asyncio.run, coro)
+            return future.result()
+    except RuntimeError:
+        # No event loop is running, safe to use asyncio.run()
+        return asyncio.run(coro)
 
 
 def send_to_rabbitmq(evaluation_run: EvaluationRun) -> Dict[str, Any]:
@@ -258,7 +287,7 @@ def run_trace_eval(
     judgment_api_key: str,
     override: bool = False,
     function: Optional[Callable] = None,
-    tracer: Optional[Union[Tracer, JudgevalCallbackHandler]] = None,
+    tracer: Optional[Union[Tracer, "JudgevalCallbackHandler"]] = None,
     examples: Optional[List[Example]] = None,
 ) -> List[ScoringResult]:
     # Call endpoint to check to see if eval run name exists (if we DON'T want to override and DO want to log results)

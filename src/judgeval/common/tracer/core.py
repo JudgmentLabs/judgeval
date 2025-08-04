@@ -26,9 +26,12 @@ from typing import (
     Generator,
     List,
     Optional,
+    ParamSpec,
     Tuple,
+    TypeVar,
     Union,
     TypeAlias,
+    overload,
 )
 import types
 import random
@@ -39,23 +42,24 @@ from judgeval.common.tracer.constants import _TRACE_FILEPATH_BLOCKLIST
 from judgeval.common.tracer.otel_span_processor import JudgmentSpanProcessor
 from judgeval.common.tracer.span_processor import SpanProcessorBase
 from judgeval.common.tracer.trace_manager import TraceManagerClient
-from litellm import cost_per_token as _original_cost_per_token
-from openai import OpenAI, AsyncOpenAI
-from openai.types.chat.chat_completion import ChatCompletion
-from openai.types.responses.response import Response
-from openai.types.chat import ParsedChatCompletion
-from together import Together, AsyncTogether
-from anthropic import Anthropic, AsyncAnthropic
-from google import genai
-from groq import Groq, AsyncGroq
 
 from judgeval.data import Example, Trace, TraceSpan, TraceUsage
 from judgeval.scorers import APIScorerConfig, BaseScorer
 from judgeval.evaluation_run import EvaluationRun
 from judgeval.local_eval_queue import LocalEvaluationQueue
 from judgeval.common.api import JudgmentApiClient
-from judgeval.common.utils import ExcInfo, validate_api_key
+from judgeval.common.utils import OptExcInfo, validate_api_key
 from judgeval.common.logger import judgeval_logger
+
+from litellm import cost_per_token as _original_cost_per_token  # type: ignore
+from judgeval.common.tracer.providers import (
+    HAS_OPENAI,
+    HAS_TOGETHER,
+    HAS_ANTHROPIC,
+    HAS_GOOGLE_GENAI,
+    HAS_GROQ,
+    ApiClient,
+)
 from judgeval.constants import DEFAULT_GPT_MODEL
 
 
@@ -64,18 +68,7 @@ current_trace_var = contextvars.ContextVar[Optional["TraceClient"]](
 )
 current_span_var = contextvars.ContextVar[Optional[str]]("current_span", default=None)
 
-ApiClient: TypeAlias = Union[
-    OpenAI,
-    Together,
-    Anthropic,
-    AsyncOpenAI,
-    AsyncAnthropic,
-    AsyncTogether,
-    genai.Client,
-    genai.client.AsyncClient,
-    Groq,
-    AsyncGroq,
-]
+
 SpanType: TypeAlias = str
 
 
@@ -199,7 +192,6 @@ class TraceClient:
                 examples=[example],
                 scorers=[scorer],
                 model=model,
-                judgment_api_key=self.tracer.api_key,
                 trace_span_id=span_id,
             )
 
@@ -494,7 +486,7 @@ class TraceClient:
 
 
 def _capture_exception_for_trace(
-    current_trace: Optional[TraceClient], exc_info: ExcInfo
+    current_trace: Optional[TraceClient], exc_info: OptExcInfo
 ):
     if not current_trace:
         return
@@ -817,6 +809,10 @@ class _DeepTracer:
                 # Clean up the references
                 self._original_sys_trace = None
                 self._original_threading_trace = None
+
+
+T = TypeVar("T", bound=Callable[..., Any])
+P = ParamSpec("P")
 
 
 class Tracer:
@@ -1180,11 +1176,24 @@ class Tracer:
             else:
                 trace_client_instance.record_state_after(state)
 
+    @overload
+    def observe(
+        self, func: T, *, name: Optional[str] = None, span_type: SpanType = "span"
+    ) -> T: ...
+
+    @overload
     def observe(
         self,
-        func=None,
         *,
-        name=None,
+        name: Optional[str] = None,
+        span_type: SpanType = "span",
+    ) -> Callable[[T], T]: ...
+
+    def observe(
+        self,
+        func: Optional[T] = None,
+        *,
+        name: Optional[str] = None,
         span_type: SpanType = "span",
     ):
         """
@@ -1201,8 +1210,8 @@ class Tracer:
                 return func if func else lambda f: f
 
             if func is None:
-                return lambda f: self.observe(
-                    f,
+                return lambda func: self.observe(
+                    func,
                     name=name,
                     span_type=span_type,
                 )
@@ -1211,8 +1220,8 @@ class Tracer:
             original_span_name = name or func.__name__
 
             # Store custom attributes on the function object
-            func._judgment_span_name = original_span_name
-            func._judgment_span_type = span_type
+            func._judgment_span_name = original_span_name  # type: ignore
+            func._judgment_span_type = span_type  # type: ignore
 
         except Exception:
             return func
@@ -1791,33 +1800,76 @@ def wrap(
 
         return wrapper
 
-    if isinstance(client, (OpenAI)):
-        setattr(client.chat.completions, "create", wrapped(original_create))
-        setattr(client.responses, "create", wrapped(original_responses_create))
-        setattr(client.beta.chat.completions, "parse", wrapped(original_beta_parse))
-    elif isinstance(client, (AsyncOpenAI)):
-        setattr(client.chat.completions, "create", wrapped_async(original_create))
-        setattr(client.responses, "create", wrapped_async(original_responses_create))
-        setattr(
-            client.beta.chat.completions, "parse", wrapped_async(original_beta_parse)
-        )
-    elif isinstance(client, (Together)):
-        setattr(client.chat.completions, "create", wrapped(original_create))
-    elif isinstance(client, (AsyncTogether)):
-        setattr(client.chat.completions, "create", wrapped_async(original_create))
-    elif isinstance(client, (Anthropic)):
-        setattr(client.messages, "create", wrapped(original_create))
-    elif isinstance(client, (AsyncAnthropic)):
-        setattr(client.messages, "create", wrapped_async(original_create))
-    elif isinstance(client, (genai.Client)):
-        setattr(client.models, "generate_content", wrapped(original_create))
-    elif isinstance(client, (genai.client.AsyncClient)):
-        setattr(client.models, "generate_content", wrapped_async(original_create))
-    elif isinstance(client, (Groq)):
-        setattr(client.chat.completions, "create", wrapped(original_create))
-    elif isinstance(client, (AsyncGroq)):
-        setattr(client.chat.completions, "create", wrapped_async(original_create))
+    if HAS_OPENAI:
+        from judgeval.common.tracer.providers import openai_OpenAI, openai_AsyncOpenAI
 
+        assert openai_OpenAI is not None, "OpenAI client not found"
+        assert openai_AsyncOpenAI is not None, "OpenAI async client not found"
+        if isinstance(client, (openai_OpenAI)):
+            setattr(client.chat.completions, "create", wrapped(original_create))
+            setattr(client.responses, "create", wrapped(original_responses_create))
+            setattr(client.beta.chat.completions, "parse", wrapped(original_beta_parse))
+        elif isinstance(client, (openai_AsyncOpenAI)):
+            setattr(client.chat.completions, "create", wrapped_async(original_create))
+            setattr(
+                client.responses, "create", wrapped_async(original_responses_create)
+            )
+            setattr(
+                client.beta.chat.completions,
+                "parse",
+                wrapped_async(original_beta_parse),
+            )
+
+    if HAS_TOGETHER:
+        from judgeval.common.tracer.providers import (
+            together_Together,
+            together_AsyncTogether,
+        )
+
+        assert together_Together is not None, "Together client not found"
+        assert together_AsyncTogether is not None, "Together async client not found"
+        if isinstance(client, (together_Together)):
+            setattr(client.chat.completions, "create", wrapped(original_create))
+        elif isinstance(client, (together_AsyncTogether)):
+            setattr(client.chat.completions, "create", wrapped_async(original_create))
+
+    if HAS_ANTHROPIC:
+        from judgeval.common.tracer.providers import (
+            anthropic_Anthropic,
+            anthropic_AsyncAnthropic,
+        )
+
+        assert anthropic_Anthropic is not None, "Anthropic client not found"
+        assert anthropic_AsyncAnthropic is not None, "Anthropic async client not found"
+        if isinstance(client, (anthropic_Anthropic)):
+            setattr(client.messages, "create", wrapped(original_create))
+        elif isinstance(client, (anthropic_AsyncAnthropic)):
+            setattr(client.messages, "create", wrapped_async(original_create))
+
+    if HAS_GOOGLE_GENAI:
+        from judgeval.common.tracer.providers import (
+            google_genai_Client,
+            google_genai_AsyncClient,
+        )
+
+        assert google_genai_Client is not None, "Google GenAI client not found"
+        assert google_genai_AsyncClient is not None, (
+            "Google GenAI async client not found"
+        )
+        if isinstance(client, (google_genai_Client)):
+            setattr(client.models, "generate_content", wrapped(original_create))
+        elif isinstance(client, (google_genai_AsyncClient)):
+            setattr(client.models, "generate_content", wrapped_async(original_create))
+
+    if HAS_GROQ:
+        from judgeval.common.tracer.providers import groq_Groq, groq_AsyncGroq
+
+        assert groq_Groq is not None, "Groq client not found"
+        assert groq_AsyncGroq is not None, "Groq async client not found"
+        if isinstance(client, (groq_Groq)):
+            setattr(client.chat.completions, "create", wrapped(original_create))
+        elif isinstance(client, (groq_AsyncGroq)):
+            setattr(client.chat.completions, "create", wrapped_async(original_create))
     return client
 
 
@@ -1843,28 +1895,87 @@ def _get_client_config(
     Raises:
         ValueError: If client type is not supported
     """
-    if isinstance(client, (OpenAI, AsyncOpenAI)):
-        return (
-            "OPENAI_API_CALL",
-            client.chat.completions.create,
-            client.responses.create,
-            None,
-            client.beta.chat.completions.parse,
+
+    if HAS_OPENAI:
+        from judgeval.common.tracer.providers import openai_OpenAI, openai_AsyncOpenAI
+
+        assert openai_OpenAI is not None, "OpenAI client not found"
+        assert openai_AsyncOpenAI is not None, "OpenAI async client not found"
+        if isinstance(client, (openai_OpenAI)):
+            return (
+                "OPENAI_API_CALL",
+                client.chat.completions.create,
+                client.responses.create,
+                None,
+                client.beta.chat.completions.parse,
+            )
+        elif isinstance(client, (openai_AsyncOpenAI)):
+            return (
+                "OPENAI_API_CALL",
+                client.chat.completions.create,
+                client.responses.create,
+                None,
+                client.beta.chat.completions.parse,
+            )
+    if HAS_TOGETHER:
+        from judgeval.common.tracer.providers import (
+            together_Together,
+            together_AsyncTogether,
         )
-    elif isinstance(client, (Groq, AsyncGroq)):
-        return "GROQ_API_CALL", client.chat.completions.create, None, None, None
-    elif isinstance(client, (Together, AsyncTogether)):
-        return "TOGETHER_API_CALL", client.chat.completions.create, None, None, None
-    elif isinstance(client, (Anthropic, AsyncAnthropic)):
-        return (
-            "ANTHROPIC_API_CALL",
-            client.messages.create,
-            None,
-            client.messages.stream,
-            None,
+
+        assert together_Together is not None, "Together client not found"
+        assert together_AsyncTogether is not None, "Together async client not found"
+        if isinstance(client, (together_Together)):
+            return "TOGETHER_API_CALL", client.chat.completions.create, None, None, None
+        elif isinstance(client, (together_AsyncTogether)):
+            return "TOGETHER_API_CALL", client.chat.completions.create, None, None, None
+    if HAS_ANTHROPIC:
+        from judgeval.common.tracer.providers import (
+            anthropic_Anthropic,
+            anthropic_AsyncAnthropic,
         )
-    elif isinstance(client, (genai.Client, genai.client.AsyncClient)):
-        return "GOOGLE_API_CALL", client.models.generate_content, None, None, None
+
+        assert anthropic_Anthropic is not None, "Anthropic client not found"
+        assert anthropic_AsyncAnthropic is not None, "Anthropic async client not found"
+        if isinstance(client, (anthropic_Anthropic)):
+            return (
+                "ANTHROPIC_API_CALL",
+                client.messages.create,
+                None,
+                client.messages.stream,
+                None,
+            )
+        elif isinstance(client, (anthropic_AsyncAnthropic)):
+            return (
+                "ANTHROPIC_API_CALL",
+                client.messages.create,
+                None,
+                client.messages.stream,
+                None,
+            )
+    if HAS_GOOGLE_GENAI:
+        from judgeval.common.tracer.providers import (
+            google_genai_Client,
+            google_genai_AsyncClient,
+        )
+
+        assert google_genai_Client is not None, "Google GenAI client not found"
+        assert google_genai_AsyncClient is not None, (
+            "Google GenAI async client not found"
+        )
+        if isinstance(client, (google_genai_Client)):
+            return "GOOGLE_API_CALL", client.models.generate_content, None, None, None
+        elif isinstance(client, (google_genai_AsyncClient)):
+            return "GOOGLE_API_CALL", client.models.generate_content, None, None, None
+    if HAS_GROQ:
+        from judgeval.common.tracer.providers import groq_Groq, groq_AsyncGroq
+
+        assert groq_Groq is not None, "Groq client not found"
+        assert groq_AsyncGroq is not None, "Groq async client not found"
+        if isinstance(client, (groq_Groq)):
+            return "GROQ_API_CALL", client.chat.completions.create, None, None, None
+        elif isinstance(client, (groq_AsyncGroq)):
+            return "GROQ_API_CALL", client.chat.completions.create, None, None, None
     raise ValueError(f"Unsupported client type: {type(client)}")
 
 
@@ -1888,73 +1999,173 @@ def _format_output_data(
     model_name = None
     message_content = None
 
-    if isinstance(client, (OpenAI, AsyncOpenAI)):
-        if isinstance(response, ChatCompletion):
-            model_name = response.model
-            prompt_tokens = response.usage.prompt_tokens if response.usage else 0
-            completion_tokens = (
-                response.usage.completion_tokens if response.usage else 0
-            )
-            cache_read_input_tokens = (
-                response.usage.prompt_tokens_details.cached_tokens
-                if response.usage
-                and response.usage.prompt_tokens_details
-                and response.usage.prompt_tokens_details.cached_tokens
-                else 0
-            )
+    if HAS_OPENAI:
+        from judgeval.common.tracer.providers import (
+            openai_OpenAI,
+            openai_AsyncOpenAI,
+            openai_ChatCompletion,
+            openai_Response,
+            openai_ParsedChatCompletion,
+        )
 
-            if isinstance(response, ParsedChatCompletion):
-                message_content = response.choices[0].message.parsed
-            else:
-                message_content = response.choices[0].message.content
-        elif isinstance(response, Response):
-            model_name = response.model
-            prompt_tokens = response.usage.input_tokens if response.usage else 0
-            completion_tokens = response.usage.output_tokens if response.usage else 0
-            cache_read_input_tokens = (
-                response.usage.input_tokens_details.cached_tokens
-                if response.usage and response.usage.input_tokens_details
-                else 0
-            )
-            if hasattr(response.output[0], "content"):
-                message_content = "".join(
-                    seg.text
-                    for seg in response.output[0].content
-                    if hasattr(seg, "text")
+        assert openai_OpenAI is not None, "OpenAI client not found"
+        assert openai_AsyncOpenAI is not None, "OpenAI async client not found"
+        assert openai_ChatCompletion is not None, "OpenAI chat completion not found"
+        assert openai_Response is not None, "OpenAI response not found"
+        assert openai_ParsedChatCompletion is not None, (
+            "OpenAI parsed chat completion not found"
+        )
+
+        if isinstance(client, (openai_OpenAI, openai_AsyncOpenAI)):
+            if isinstance(response, openai_ChatCompletion):
+                model_name = response.model
+                prompt_tokens = response.usage.prompt_tokens if response.usage else 0
+                completion_tokens = (
+                    response.usage.completion_tokens if response.usage else 0
+                )
+                cache_read_input_tokens = (
+                    response.usage.prompt_tokens_details.cached_tokens
+                    if response.usage
+                    and response.usage.prompt_tokens_details
+                    and response.usage.prompt_tokens_details.cached_tokens
+                    else 0
                 )
 
-        # Note: LiteLLM seems to use cache_read_input_tokens to calculate the cost for OpenAI
-    elif isinstance(client, (Together, AsyncTogether)):
-        model_name = "together_ai/" + response.model
-        prompt_tokens = response.usage.prompt_tokens
-        completion_tokens = response.usage.completion_tokens
-        message_content = response.choices[0].message.content
+                if isinstance(response, openai_ParsedChatCompletion):
+                    message_content = response.choices[0].message.parsed
+                else:
+                    message_content = response.choices[0].message.content
+            elif isinstance(response, openai_Response):
+                model_name = response.model
+                prompt_tokens = response.usage.input_tokens if response.usage else 0
+                completion_tokens = (
+                    response.usage.output_tokens if response.usage else 0
+                )
+                cache_read_input_tokens = (
+                    response.usage.input_tokens_details.cached_tokens
+                    if response.usage and response.usage.input_tokens_details
+                    else 0
+                )
+                if hasattr(response.output[0], "content"):
+                    message_content = "".join(
+                        seg.text
+                        for seg in response.output[0].content
+                        if hasattr(seg, "text")
+                    )
+            # Note: LiteLLM seems to use cache_read_input_tokens to calculate the cost for OpenAI
+            return message_content, _create_usage(
+                model_name,
+                prompt_tokens,
+                completion_tokens,
+                cache_read_input_tokens,
+                cache_creation_input_tokens,
+            )
 
-        # As of 2025-07-14, Together does not do any input cache token tracking
-    elif isinstance(client, (genai.Client, genai.client.AsyncClient)):
-        model_name = response.model_version
-        prompt_tokens = response.usage_metadata.prompt_token_count
-        completion_tokens = response.usage_metadata.candidates_token_count
-        message_content = response.candidates[0].content.parts[0].text
+    if HAS_TOGETHER:
+        from judgeval.common.tracer.providers import (
+            together_Together,
+            together_AsyncTogether,
+        )
 
-        if hasattr(response.usage_metadata, "cached_content_token_count"):
-            cache_read_input_tokens = response.usage_metadata.cached_content_token_count
-    elif isinstance(client, (Anthropic, AsyncAnthropic)):
-        model_name = response.model
-        prompt_tokens = response.usage.input_tokens
-        completion_tokens = response.usage.output_tokens
-        cache_read_input_tokens = response.usage.cache_read_input_tokens
-        cache_creation_input_tokens = response.usage.cache_creation_input_tokens
-        message_content = response.content[0].text
-    elif isinstance(client, (Groq, AsyncGroq)):
-        model_name = "groq/" + response.model
-        prompt_tokens = response.usage.prompt_tokens
-        completion_tokens = response.usage.completion_tokens
-        message_content = response.choices[0].message.content
-    else:
-        judgeval_logger.warning(f"Unsupported client type: {type(client)}")
-        return None, None
+        assert together_Together is not None, "Together client not found"
+        assert together_AsyncTogether is not None, "Together async client not found"
 
+        if isinstance(client, (together_Together, together_AsyncTogether)):
+            model_name = "together_ai/" + response.model
+            prompt_tokens = response.usage.prompt_tokens
+            completion_tokens = response.usage.completion_tokens
+            message_content = response.choices[0].message.content
+
+            # As of 2025-07-14, Together does not do any input cache token tracking
+            return message_content, _create_usage(
+                model_name,
+                prompt_tokens,
+                completion_tokens,
+                cache_read_input_tokens,
+                cache_creation_input_tokens,
+            )
+
+    if HAS_GOOGLE_GENAI:
+        from judgeval.common.tracer.providers import (
+            google_genai_Client,
+            google_genai_AsyncClient,
+        )
+
+        assert google_genai_Client is not None, "Google GenAI client not found"
+        assert google_genai_AsyncClient is not None, (
+            "Google GenAI async client not found"
+        )
+        if isinstance(client, (google_genai_Client, google_genai_AsyncClient)):
+            model_name = response.model_version
+            prompt_tokens = response.usage_metadata.prompt_token_count
+            completion_tokens = response.usage_metadata.candidates_token_count
+            message_content = response.candidates[0].content.parts[0].text
+
+            if hasattr(response.usage_metadata, "cached_content_token_count"):
+                cache_read_input_tokens = (
+                    response.usage_metadata.cached_content_token_count
+                )
+            return message_content, _create_usage(
+                model_name,
+                prompt_tokens,
+                completion_tokens,
+                cache_read_input_tokens,
+                cache_creation_input_tokens,
+            )
+
+    if HAS_ANTHROPIC:
+        from judgeval.common.tracer.providers import (
+            anthropic_Anthropic,
+            anthropic_AsyncAnthropic,
+        )
+
+        assert anthropic_Anthropic is not None, "Anthropic client not found"
+        assert anthropic_AsyncAnthropic is not None, "Anthropic async client not found"
+        if isinstance(client, (anthropic_Anthropic, anthropic_AsyncAnthropic)):
+            model_name = response.model
+            prompt_tokens = response.usage.input_tokens
+            completion_tokens = response.usage.output_tokens
+            cache_read_input_tokens = response.usage.cache_read_input_tokens
+            cache_creation_input_tokens = response.usage.cache_creation_input_tokens
+            message_content = response.content[0].text
+            return message_content, _create_usage(
+                model_name,
+                prompt_tokens,
+                completion_tokens,
+                cache_read_input_tokens,
+                cache_creation_input_tokens,
+            )
+
+    if HAS_GROQ:
+        from judgeval.common.tracer.providers import groq_Groq, groq_AsyncGroq
+
+        assert groq_Groq is not None, "Groq client not found"
+        assert groq_AsyncGroq is not None, "Groq async client not found"
+        if isinstance(client, (groq_Groq, groq_AsyncGroq)):
+            model_name = "groq/" + response.model
+            prompt_tokens = response.usage.prompt_tokens
+            completion_tokens = response.usage.completion_tokens
+            message_content = response.choices[0].message.content
+            return message_content, _create_usage(
+                model_name,
+                prompt_tokens,
+                completion_tokens,
+                cache_read_input_tokens,
+                cache_creation_input_tokens,
+            )
+
+    judgeval_logger.warning(f"Unsupported client type: {type(client)}")
+    return None, None
+
+
+def _create_usage(
+    model_name: str,
+    prompt_tokens: int,
+    completion_tokens: int,
+    cache_read_input_tokens: int = 0,
+    cache_creation_input_tokens: int = 0,
+) -> TraceUsage:
+    """Helper function to create TraceUsage object with cost calculation."""
     prompt_cost, completion_cost = cost_per_token(
         model=model_name,
         prompt_tokens=prompt_tokens,
@@ -1965,7 +2176,7 @@ def _format_output_data(
     total_cost_usd = (
         (prompt_cost + completion_cost) if prompt_cost and completion_cost else None
     )
-    usage = TraceUsage(
+    return TraceUsage(
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
         total_tokens=prompt_tokens + completion_tokens,
@@ -1976,7 +2187,6 @@ def _format_output_data(
         total_cost_usd=total_cost_usd,
         model_name=model_name,
     )
-    return message_content, usage
 
 
 def combine_args_kwargs(func, args, kwargs):
