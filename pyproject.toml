@@ -2,9 +2,9 @@
 name = "judgeval"
 version = "0.0.0"
 authors = [
-    { name="Andrew Li", email="andrew@judgmentlabs.ai" },
-    { name="Alex Shan", email="alex@judgmentlabs.ai" },
-    { name="Joseph Camyre", email="joseph@judgmentlabs.ai" },
+    { name = "Andrew Li", email = "andrew@judgmentlabs.ai" },
+    { name = "Alex Shan", email = "alex@judgmentlabs.ai" },
+    { name = "Joseph Camyre", email = "joseph@judgmentlabs.ai" },
 ]
 description = "Judgeval Package"
 readme = "README.md"
@@ -16,27 +16,19 @@ classifiers = [
 license = "Apache-2.0"
 license-files = ["LICENSE.md"]
 dependencies = [
+    "rich",
     "litellm>=1.61.15",
-    "python-dotenv==1.0.1",
+    "python-dotenv",
     "requests",
-    "pandas",
-    "openai",
-    "together",
-    "anthropic",
-    "nest-asyncio",
+    "boto3",
+    "opentelemetry-api>=1.34.1",
+    "opentelemetry-sdk>=1.34.1",
+    "orjson>=3.9.0",
+    "nest-asyncio>=1.6.0",
     "langchain-huggingface",
     "langchain-openai",
     "langchain-anthropic",
     "langchain-core",
-    "google-genai",
-    "boto3",
-    "matplotlib>=3.10.3",
-    "python-slugify>=8.0.4",
-    "datamodel-code-generator>=0.31.1",
-    "groq>=0.30.0",
-    "opentelemetry-api>=1.34.1",
-    "opentelemetry-sdk>=1.34.1",
-    "orjson>=3.9.0",
 ]
 
 [project.urls]
@@ -49,21 +41,24 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/judgeval"]
-include = [
-    "/src/judgeval",
-    "/src/judgeval/**/*.py",
+include = ["/src/judgeval", "/src/judgeval/**/*.py"]
+
+[project.optional-dependencies]
+langchain = [
+    "langchain-huggingface",
+    "langchain-openai",
+    "langchain-anthropic",
+    "langchain-core",
 ]
 
 [dependency-groups]
 dev = [
     "chromadb>=1.0.12",
-    "langchain-community>=0.3.24",
     "pytest>=8.4.0",
     "pytest-asyncio>=1.0.0",
     "pytest-cov>=6.1.1",
     "pytest-mock>=3.14.1",
     "tavily-python>=0.7.5",
-    "langgraph>=0.4.3",
     "pre-commit>=4.2.0",
     "types-requests>=2.32.4.20250611",
     "mypy>=1.17.0",
@@ -90,18 +85,19 @@ dev = [
     "types-tqdm>=4.67.0.20250516",
     "types-tree-sitter-languages>=1.10.0.20250530",
     "types-xmltodict>=0.14.0.20241009",
+    "datamodel-code-generator>=0.31.2",
+    "openai",
+    "together",
+    "anthropic",
+    "google-genai",
+    "groq",
+    "langgraph>=0.4.3",
 ]
 
 [tool.hatch.build]
 directory = "dist"
-artifacts = [
-    "src/judgeval/**/*.py",
-]
-exclude = [
-    "src/e2etests/*",
-    "src/tests/*",
-    "src/demo/*"
-]
+artifacts = ["src/judgeval/**/*.py"]
+exclude = ["src/e2etests/*", "src/tests/*", "src/demo/*"]
 
 [tool.ruff]
 exclude = ["docs"]
