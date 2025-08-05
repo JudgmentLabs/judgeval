@@ -650,6 +650,7 @@ class _DeepTracer:
 
         qual_name = self._get_qual_name(frame)
         instance_name = None
+        class_name = None
         if "self" in frame.f_locals:
             instance = frame.f_locals["self"]
             class_name = instance.__class__.__name__
@@ -1120,6 +1121,9 @@ class Tracer:
         return decorator
 
     def identify(self, *args, **kwargs):
+        judgeval_logger.warning(
+            "identify() is deprecated and may not be supported in future versions of judgeval. Use the agent() decorator instead."
+        )
         return self.agent(*args, **kwargs)
 
     def _capture_instance_state(
@@ -1264,7 +1268,7 @@ class Tracer:
                             span.record_input(inputs)
                             if agent_name:
                                 span.record_agent_name(agent_name)
-                            if class_name:
+                            if class_name and class_name in self.class_identifiers:
                                 span.record_class_name(class_name)
 
                             self._conditionally_capture_and_record_state(
@@ -1324,7 +1328,7 @@ class Tracer:
                         span.record_input(inputs)
                         if agent_name:
                             span.record_agent_name(agent_name)
-                        if class_name:
+                        if class_name and class_name in self.class_identifiers:
                             span.record_class_name(class_name)
 
                         # Capture state before execution
@@ -1391,7 +1395,7 @@ class Tracer:
                             span.record_input(inputs)
                             if agent_name:
                                 span.record_agent_name(agent_name)
-                            if class_name:
+                            if class_name and class_name in self.class_identifiers:
                                 span.record_class_name(class_name)
                             # Capture state before execution
                             self._conditionally_capture_and_record_state(
@@ -1451,7 +1455,7 @@ class Tracer:
                         span.record_input(inputs)
                         if agent_name:
                             span.record_agent_name(agent_name)
-                        if class_name:
+                        if class_name and class_name in self.class_identifiers:
                             span.record_class_name(class_name)
 
                         # Capture state before execution
@@ -2251,6 +2255,6 @@ def get_instance_prefixed_name(instance, class_name, class_identifiers):
                 return instance_name
             else:
                 raise Exception(
-                    f"Attribute {attr} does not exist for {class_name}. Check your identify() decorator."
+                    f"Attribute {attr} does not exist for {class_name}. Check your agent() decorator."
                 )
         return None
