@@ -2250,7 +2250,7 @@ def get_instance_prefixed_name(instance, class_name, class_identifiers):
         class_config = class_identifiers[class_name]
         attr = class_config.get("identifier")
         if attr:
-            if hasattr(instance, attr):
+            if hasattr(instance, attr) and not callable(getattr(instance, attr)):
                 instance_name = getattr(instance, attr)
                 return instance_name
             else:
