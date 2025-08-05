@@ -1,0 +1,10 @@
+[
+  {
+    "input": "What is Python?",
+    "expected_output": "Python is a high-level programming language."
+  },
+  {
+    "input": "Define variable.",
+    "expected_output": "A variable stores a value in programming."
+  }
+]
