@@ -1,52 +1,11 @@
-"""
-Constant variables used throughout source code
-"""
+from __future__ import annotations
 
 from enum import Enum
+from typing import Set
 import litellm
-import os
 
+LITELLM_SUPPORTED_MODELS: Set[str] = set(litellm.model_list)
 
-class APIScorerType(str, Enum):
-    """
-    Collection of proprietary scorers implemented by Judgment.
-
-    These are ready-made evaluation scorers that can be used to evaluate
-    Examples via the Judgment API.
-    """
-
-    PROMPT_SCORER = "Prompt Scorer"
-    FAITHFULNESS = "Faithfulness"
-    ANSWER_RELEVANCY = "Answer Relevancy"
-    ANSWER_CORRECTNESS = "Answer Correctness"
-    INSTRUCTION_ADHERENCE = "Instruction Adherence"
-    EXECUTION_ORDER = "Execution Order"
-    DERAILMENT = "Derailment"
-    TOOL_ORDER = "Tool Order"
-    CLASSIFIER = "Classifier"
-    TOOL_DEPENDENCY = "Tool Dependency"
-    CUSTOM = "Custom"
-
-    @classmethod
-    def _missing_(cls, value):
-        # Handle case-insensitive lookup
-        for member in cls:
-            if member.value == value.lower():
-                return member
-
-
-UNBOUNDED_SCORERS: set[APIScorerType] = (
-    set()
-)  # scorers whose scores are not bounded between 0-1
-
-# RabbitMQ
-RABBITMQ_HOST = os.getenv(
-    "RABBITMQ_HOST", "rabbitmq-networklb-faa155df16ec9085.elb.us-west-1.amazonaws.com"
-)
-RABBITMQ_PORT = os.getenv("RABBITMQ_PORT", 5672)
-RABBITMQ_QUEUE = os.getenv("RABBITMQ_QUEUE", "task_queue")
-# Models
-LITELLM_SUPPORTED_MODELS = set(litellm.model_list)
 
 TOGETHER_SUPPORTED_MODELS = [
     "meta-llama/Meta-Llama-3-70B-Instruct-Turbo",
@@ -104,20 +63,43 @@ TOGETHER_SUPPORTED_MODELS = [
     "mistralai/Mistral-7B-Instruct-v0.1",
 ]
 
-DEFAULT_TOGETHER_MODEL = "meta-llama/Meta-Llama-3-8B-Instruct-Lite"
-DEFAULT_GPT_MODEL = "gpt-4.1"
-
 JUDGMENT_SUPPORTED_MODELS = {"osiris-large", "osiris-mini", "osiris"}
 
 ACCEPTABLE_MODELS = (
     set(litellm.model_list) | set(TOGETHER_SUPPORTED_MODELS) | JUDGMENT_SUPPORTED_MODELS
 )
 
-## System settings
-MAX_WORKER_THREADS = 10
 
-# Maximum number of concurrent operations for evaluation runs
-MAX_CONCURRENT_EVALUATIONS = 50  # Adjust based on system capabilities
+class APIScorerType(str, Enum):
+    """
+    Collection of proprietary scorers implemented by Judgment.
 
-# Span lifecycle management
-SPAN_LIFECYCLE_END_UPDATE_ID = 20  # Default ending number for completed spans
+    These are ready-made evaluation scorers that can be used to evaluate
+    Examples via the Judgment API.
+    """
+
+    PROMPT_SCORER = "Prompt Scorer"
+    FAITHFULNESS = "Faithfulness"
+    ANSWER_RELEVANCY = "Answer Relevancy"
+    ANSWER_CORRECTNESS = "Answer Correctness"
+    INSTRUCTION_ADHERENCE = "Instruction Adherence"
+    EXECUTION_ORDER = "Execution Order"
+    DERAILMENT = "Derailment"
+    TOOL_ORDER = "Tool Order"
+    CLASSIFIER = "Classifier"
+    TOOL_DEPENDENCY = "Tool Dependency"
+    CUSTOM = "Custom"
+
+    @classmethod
+    def __missing__(cls, value: str) -> APIScorerType:
+        # Handle case-insensitive lookup
+        for member in cls:
+            if member.value == value.lower():
+                return member
+
+        raise ValueError(f"Invalid scorer type: {value}")
+
+
+UNBOUNDED_SCORERS: Set[APIScorerType] = (
+    set()
+)  # scorers whose scores are not bounded between 0-1

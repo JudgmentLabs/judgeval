@@ -15,9 +15,9 @@ from judgeval.data import (
 )
 from judgeval.scorers import BaseScorer
 from judgeval.scorers.utils import clone_scorers
-from judgeval.common.logger import judgeval_logger
+from judgeval.logger import judgeval_logger
 from judgeval.judges import JudgevalJudge
-from judgeval.constants import DEFAULT_GPT_MODEL
+from judgeval.env import JUDGMENT_DEFAULT_GPT_MODEL
 
 
 async def safe_a_score_example(
@@ -56,7 +56,7 @@ async def safe_a_score_example(
 async def a_execute_scoring(
     examples: List[Example],
     scorers: List[BaseScorer],
-    model: Optional[Union[str, List[str], JudgevalJudge]] = DEFAULT_GPT_MODEL,
+    model: Optional[Union[str, List[str], JudgevalJudge]] = JUDGMENT_DEFAULT_GPT_MODEL,
     ignore_errors: bool = False,
     throttle_value: int = 0,
     max_concurrent: int = 100,
@@ -88,12 +88,10 @@ async def a_execute_scoring(
             except Exception as e:
                 judgeval_logger.error(f"Error executing function: {e}")
                 if kwargs.get("ignore_errors", False):
-                    # Simply return None when ignoring errors, as expected by the test
                     return None
-                # If we're not ignoring errors, propagate the exception
+
                 raise
 
-    # Add model to scorers
     for scorer in scorers:
         if not scorer.model:
             scorer._add_model(model)
@@ -174,24 +172,19 @@ async def a_eval_examples_helper(
         None
     """
 
-    # scoring the Example
     scoring_start_time = time.perf_counter()
 
     tasks = [safe_a_score_example(scorer, example) for scorer in scorers]
 
     await asyncio.gather(*tasks)
 
-    # Now that all the scoring functions of each scorer have executed, we collect
-    # the results and update the ScoringResult with the scorer data
     success = True
     scorer_data_list = []
     for scorer in scorers:
-        # At this point, the scorer has been executed and already contains data.
+
         if getattr(scorer, "skipped", False):
             continue
-        scorer_data = create_scorer_data(
-            scorer
-        )  # Fetch scorer data from completed scorer evaluation
+        scorer_data = create_scorer_data(scorer)
         for s in scorer_data:
             success = success and s.success
         scorer_data_list.extend(scorer_data)

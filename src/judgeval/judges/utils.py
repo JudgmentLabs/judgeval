@@ -5,9 +5,9 @@ This module contains utility functions for judge models.
 import litellm
 from typing import Optional, Union, Tuple, List
 
-from judgeval.common.exceptions import InvalidJudgeModelError
+from judgeval.exceptions import InvalidJudgeModelError
 from judgeval.judges import JudgevalJudge, LiteLLMJudge, TogetherJudge, MixtureOfJudges
-from judgeval.constants import DEFAULT_GPT_MODEL
+from judgeval.env import JUDGMENT_DEFAULT_GPT_MODEL
 from judgeval.constants import (
     TOGETHER_SUPPORTED_MODELS,
     JUDGMENT_SUPPORTED_MODELS,
@@ -31,7 +31,7 @@ def create_judge(
     If no model is provided, uses GPT4o as the default judge.
     """
     if model is None:  # default option
-        return LiteLLMJudge(model=DEFAULT_GPT_MODEL), True
+        return LiteLLMJudge(model=JUDGMENT_DEFAULT_GPT_MODEL), True
     if not isinstance(model, (str, list, JudgevalJudge)):
         raise InvalidJudgeModelError(
             f"Model must be a string, list of strings, or a judgeval judge object. Got: {type(model)} instead."
@@ -52,7 +52,6 @@ def create_judge(
             if m not in ACCEPTABLE_MODELS:
                 raise InvalidJudgeModelError(f"Invalid judge model chosen: {m}")
         return MixtureOfJudges(models=model), True
-    # If model is a string, check that it corresponds to a valid model
     if model in LITELLM_SUPPORTED_MODELS:
         return LiteLLMJudge(model=model), True
     if model in TOGETHER_SUPPORTED_MODELS:

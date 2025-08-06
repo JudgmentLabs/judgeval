@@ -17,9 +17,8 @@ class ScoringResult(ScoringResultJudgmentType):
 
     """
 
-    data_object: (
-        Example  # Need to override this so that it uses this repo's Example class
-    )
+    # Need to override this so that it uses this repo's Example class
+    data_object: Example
 
     def model_dump(self, **kwargs):
         data = super().model_dump(**kwargs)

@@ -1,11 +1,11 @@
 from judgeval.scorers.api_scorer import APIScorerConfig
 from judgeval.constants import APIScorerType
 from typing import Dict, Any, Optional
-from judgeval.common.api import JudgmentApiClient, JudgmentAPIException
+from judgeval.api import JudgmentSyncClient
+from judgeval.exceptions import JudgmentAPIError
 import os
-from judgeval.common.exceptions import JudgmentAPIError
 from copy import copy
-from judgeval.common.logger import judgeval_logger
+from judgeval.logger import judgeval_logger
 
 
 def push_prompt_scorer(
@@ -15,15 +15,21 @@ def push_prompt_scorer(
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
 ) -> str:
-    client = JudgmentApiClient(judgment_api_key, organization_id)
+    client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
         r = client.save_scorer(name, prompt, options)
-    except JudgmentAPIException as e:
+    except JudgmentAPIError as e:
         if e.status_code == 500:
             raise JudgmentAPIError(
-                f"The server is temporarily unavailable. Please try your request again in a few moments. Error details: {e.error_detail}"
+                status_code=e.status_code,
+                detail=f"The server is temporarily unavailable. Please try your request again in a few moments. Error details: {e.detail}",
+                response=e.response,
             )
-        raise JudgmentAPIError(f"Failed to save prompt scorer: {e.error_detail}")
+        raise JudgmentAPIError(
+            status_code=e.status_code,
+            detail=f"Failed to save prompt scorer: {e.detail}",
+            response=e.response,
+        )
     return r["name"]
 
 
@@ -32,19 +38,23 @@ def fetch_prompt_scorer(
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
 ):
-    client = JudgmentApiClient(judgment_api_key, organization_id)
+    client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
         scorer_config = client.fetch_scorer(name)["scorer"]
         scorer_config.pop("created_at")
         scorer_config.pop("updated_at")
         return scorer_config
-    except JudgmentAPIException as e:
+    except JudgmentAPIError as e:
         if e.status_code == 500:
             raise JudgmentAPIError(
-                f"The server is temporarily unavailable. Please try your request again in a few moments. Error details: {e.error_detail}"
+                status_code=e.status_code,
+                detail=f"The server is temporarily unavailable. Please try your request again in a few moments. Error details: {e.detail}",
+                response=e.response,
             )
         raise JudgmentAPIError(
-            f"Failed to fetch prompt scorer '{name}': {e.error_detail}"
+            status_code=e.status_code,
+            detail=f"Failed to fetch prompt scorer '{name}': {e.detail}",
+            response=e.response,
         )
 
 
@@ -53,15 +63,21 @@ def scorer_exists(
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
 ):
-    client = JudgmentApiClient(judgment_api_key, organization_id)
+    client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
         return client.scorer_exists(name)["exists"]
-    except JudgmentAPIException as e:
+    except JudgmentAPIError as e:
         if e.status_code == 500:
             raise JudgmentAPIError(
-                f"The server is temporarily unavailable. Please try your request again in a few moments. Error details: {e.error_detail}"
+                status_code=e.status_code,
+                detail=f"The server is temporarily unavailable. Please try your request again in a few moments. Error details: {e.detail}",
+                response=e.response,
             )
-        raise JudgmentAPIError(f"Failed to check if scorer exists: {e.error_detail}")
+        raise JudgmentAPIError(
+            status_code=e.status_code,
+            detail=f"Failed to check if scorer exists: {e.detail}",
+            response=e.response,
+        )
 
 
 class PromptScorer(APIScorerConfig):
@@ -116,7 +132,9 @@ class PromptScorer(APIScorerConfig):
             )
         else:
             raise JudgmentAPIError(
-                f"Scorer with name {name} already exists. Either use the existing scorer with the get() method or use a new name."
+                status_code=400,
+                detail=f"Scorer with name {name} already exists. Either use the existing scorer with the get() method or use a new name.",
+                response=None,  # type: ignore
             )
 
     # Setter functions. Each setter function pushes the scorer to the DB.

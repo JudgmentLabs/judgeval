@@ -6,8 +6,7 @@ TODO add link to docs page for this scorer
 """
 
 # Internal imports
-from judgeval.scorers.api_scorer import APIScorerConfig
-from judgeval.constants import APIScorerType
+from judgeval.scorers.api_scorer import APIScorerConfig, APIScorerType
 from judgeval.data import ExampleParams
 
 
