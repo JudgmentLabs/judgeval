@@ -2,20 +2,19 @@ import pydantic
 from typing import List, Union, Mapping
 
 from judgeval.judges import JudgevalJudge
-from judgeval.common.utils import (
-    afetch_litellm_api_response,
+from judgeval.env import JUDGMENT_DEFAULT_GPT_MODEL
+from judgeval.judges.todo import (
     fetch_litellm_api_response,
+    afetch_litellm_api_response,
 )
-from judgeval.common.logger import judgeval_logger
-from judgeval.constants import DEFAULT_GPT_MODEL
 
 BASE_CONVERSATION = [
     {"role": "system", "content": "You are a helpful assistant."},
-]  # for string inputs, we need to add the user query to a base conversation, since LiteLLM only accepts a list of dictionaries as a chat history
+]
 
 
 class LiteLLMJudge(JudgevalJudge):
-    def __init__(self, model: str = DEFAULT_GPT_MODEL, **kwargs):
+    def __init__(self, model: str = JUDGMENT_DEFAULT_GPT_MODEL, **kwargs):
         self.model = model
         self.kwargs = kwargs
         super().__init__(model_name=model)
@@ -35,7 +34,6 @@ class LiteLLMJudge(JudgevalJudge):
                 model=self.model, messages=input, response_format=schema
             )
         else:
-            judgeval_logger.error(f"Invalid input type received: {type(input)}")
             raise TypeError(
                 f"Input must be a string or a list of dictionaries. Input type of: {type(input)}"
             )
@@ -57,10 +55,7 @@ class LiteLLMJudge(JudgevalJudge):
             )
             return response
         else:
-            judgeval_logger.error(f"Invalid input type received: {type(input)}")
-            raise TypeError(
-                f"Input must be a string or a list of dictionaries. Input type of: {type(input)}"
-            )
+            raise TypeError(f"Input must be a string or a list of dictionaries. Input type of: {type(input)}")  # type: ignore[unreachable]
 
     def load_model(self):
         return self.model

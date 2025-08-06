@@ -2,6 +2,7 @@
 Base class for all scorers.
 """
 
+from __future__ import annotations
 from typing import Dict, Optional
 
 from pydantic import BaseModel
@@ -19,28 +20,47 @@ class BaseScorer(BaseModel):
     where none of Judgment's scorers are suitable.
     """
 
-    score_type: str  # type of your scorer (Faithfulness, PromptScorer)
-    threshold: float = (
-        0.5  # The threshold to pass a test while using this scorer as a scorer
-    )
-    name: Optional[str] = (
-        None  # name of your scorer (Faithfulness, PromptScorer-randomslug)
-    )
-    class_name: Optional[str] = None  # The name of the class of the scorer
-    score: Optional[float] = None  # The float score of the scorer run on the test case
+    # type of your scorer (Faithfulness, PromptScorer)
+    score_type: str
+
+    # The threshold to pass a test while using this scorer as a scorer
+    threshold: float = 0.5
+
+    # name of your scorer (Faithfulness, PromptScorer-randomslug)
+    name: Optional[str] = None
+
+    # The float score of the scorer run on the test case
+    score: Optional[float] = None
+
     score_breakdown: Optional[Dict] = None
     reason: Optional[str] = ""
-    using_native_model: Optional[bool] = None  # Whether the model is a native model
-    success: Optional[bool] = None  # Whether the test case passed or failed
-    model: Optional[str] = None  # The name of the model used to evaluate the test case
-    model_client: Optional[Any] = Field(
-        default=None, exclude=True
-    )  # The model used to evaluate the test case
-    strict_mode: bool = False  # Whether to run the scorer in strict mode
-    error: Optional[str] = None  # The error message if the scorer failed
-    additional_metadata: Optional[Dict] = None  # Additional metadata for the scorer
-    user: Optional[str] = None  # The user ID of the scorer
-    server_hosted: bool = False  # Whether the scorer is enabled for e2b
+
+    # Whether the model is a native model
+    using_native_model: Optional[bool] = None
+
+    # Whether the test case passed or failed
+    success: Optional[bool] = None
+
+    # The name of the model used to evaluate the test case
+    model: Optional[str] = None
+
+    # The model used to evaluate the test case
+    model_client: Optional[Any] = Field(default=None, exclude=True)
+
+    # Whether to run the scorer in strict mode
+    strict_mode: bool = False
+
+    # The error message if the scorer failed
+    error: Optional[str] = None
+
+    # Additional metadata for the scorer
+    additional_metadata: Optional[Dict] = None
+
+    # The user ID of the scorer
+    user: Optional[str] = None
+
+    # Whether the scorer is hosted on the server
+    server_hosted: bool = False
 
     @model_validator(mode="after")
     @classmethod

@@ -6,12 +6,12 @@ from pydantic import BaseModel
 from typing import List, Union
 
 from judgeval.judges import JudgevalJudge
-from judgeval.common.utils import (
+from judgeval.judges.todo import (
     fetch_together_api_response,
     afetch_together_api_response,
 )
-from judgeval.common.logger import judgeval_logger
-from judgeval.constants import DEFAULT_TOGETHER_MODEL
+from judgeval.logger import judgeval_logger
+from judgeval.env import JUDGMENT_DEFAULT_TOGETHER_MODEL
 
 BASE_CONVERSATION = [
     {"role": "system", "content": "You are a helpful assistant."},
@@ -19,7 +19,7 @@ BASE_CONVERSATION = [
 
 
 class TogetherJudge(JudgevalJudge):
-    def __init__(self, model: str = DEFAULT_TOGETHER_MODEL, **kwargs):
+    def __init__(self, model: str = JUDGMENT_DEFAULT_TOGETHER_MODEL, **kwargs):
         self.model = model
         self.kwargs = kwargs
         super().__init__(model_name=model)
@@ -58,7 +58,6 @@ class TogetherJudge(JudgevalJudge):
             )
             return res
         else:
-            judgeval_logger.error(f"Invalid input type received: {type(input)}")
             raise TypeError("Input must be a string or a list of dictionaries.")
 
     def load_model(self) -> str:

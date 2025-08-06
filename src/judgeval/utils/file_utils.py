@@ -1,12 +1,12 @@
 import yaml
 import orjson
 from typing import List
-from judgeval.common.logger import judgeval_logger
+from judgeval.logger import judgeval_logger
 
-from judgeval.data import Example
+from judgeval.data.example import Example
 
 
-def get_examples_from_yaml(file_path: str) -> List[Example] | None:
+def get_examples_from_yaml(file_path: str) -> List[Example]:
     """
     Adds examples from a YAML file.
 
@@ -34,7 +34,7 @@ def get_examples_from_yaml(file_path: str) -> List[Example] | None:
     return new_examples
 
 
-def get_examples_from_json(file_path: str) -> List[Example] | None:
+def get_examples_from_json(file_path: str) -> List[Example]:
     """
     Adds examples from a JSON file.
 
