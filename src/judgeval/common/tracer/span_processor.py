@@ -7,7 +7,7 @@ When monitoring is enabled, we use JudgmentSpanProcessor which overrides the met
 """
 
 from judgeval.data import TraceSpan
-from judgeval.evaluation_run import EvaluationRun
+from judgeval.data.evaluation_run import EvaluationRun
 
 
 class SpanProcessorBase:

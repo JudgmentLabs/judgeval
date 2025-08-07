@@ -21,7 +21,7 @@ from judgeval.common.tracer.otel_exporter import JudgmentAPISpanExporter
 from judgeval.common.tracer.span_processor import SpanProcessorBase
 from judgeval.common.tracer.span_transformer import SpanTransformer
 from judgeval.data import TraceSpan
-from judgeval.evaluation_run import EvaluationRun
+from judgeval.data.evaluation_run import EvaluationRun
 
 
 class SimpleReadableSpan(ReadableSpan):

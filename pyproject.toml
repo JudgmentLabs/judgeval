@@ -29,11 +29,16 @@ dependencies = [
     "langchain-openai",
     "langchain-anthropic",
     "langchain-core",
+    "httpcore==1.0.3",
+    "typer",
 ]
 
 [project.urls]
 Homepage = "https://github.com/JudgmentLabs/judgeval"
 Issues = "https://github.com/JudgmentLabs/judgeval/issues"
+
+[project.scripts]
+judgeval = "judgeval.cli:app"
 
 [build-system]
 requires = ["hatchling"]

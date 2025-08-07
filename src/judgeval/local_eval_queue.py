@@ -13,9 +13,8 @@ import time
 from judgeval.common.logger import judgeval_logger
 from judgeval.constants import MAX_CONCURRENT_EVALUATIONS
 from judgeval.data import ScoringResult
-from judgeval.evaluation_run import EvaluationRun
+from judgeval.data.evaluation_run import EvaluationRun
 from judgeval.utils.async_utils import safe_run_async
-from judgeval.scorers import BaseScorer
 from judgeval.scorers.score import a_execute_scoring
 
 
@@ -43,9 +42,8 @@ class LocalEvaluationQueue:
 
     def _process_run(self, evaluation_run: EvaluationRun) -> List[ScoringResult]:
         """Execute evaluation run locally and return results."""
-        local_scorers = [s for s in evaluation_run.scorers if isinstance(s, BaseScorer)]
 
-        if not local_scorers:
+        if not evaluation_run.custom_scorers:
             raise ValueError(
                 "LocalEvaluationQueue only supports runs with local scorers (BaseScorer). "
                 "Found only APIScorerConfig instances."
@@ -54,7 +52,7 @@ class LocalEvaluationQueue:
         return safe_run_async(
             a_execute_scoring(
                 evaluation_run.examples,
-                local_scorers,
+                evaluation_run.custom_scorers,
                 model=evaluation_run.model,
                 throttle_value=0,
                 max_concurrent=self._max_concurrent // self._num_workers,
