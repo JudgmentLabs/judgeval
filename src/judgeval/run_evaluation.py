@@ -417,11 +417,16 @@ def run_eval(
         judgeval_logger.error(error_msg)
         raise ValueError(error_msg)
 
-    e2b_scorers = any(cs.e2b_enabled for cs in evaluation_run.custom_scorers)
+    e2b_scorers = [cs for cs in evaluation_run.custom_scorers if cs.e2b_enabled]
 
     if evaluation_run.judgment_scorers or e2b_scorers:
         if evaluation_run.judgment_scorers and e2b_scorers:
             error_msg = "We currently do not support running both hosted custom scorers and Judgment API scorers at the same time. Please run your evaluation with one or the other, but not both."
+            judgeval_logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        if len(e2b_scorers) > 1:
+            error_msg = "We currently do not support running multiple hosted custom scorers at the same time."
             judgeval_logger.error(error_msg)
             raise ValueError(error_msg)
 
