@@ -45,7 +45,7 @@ from judgeval.common.tracer.trace_manager import TraceManagerClient
 
 from judgeval.data import Example, Trace, TraceSpan, TraceUsage
 from judgeval.scorers import APIScorerConfig, BaseScorer
-from judgeval.evaluation_run import EvaluationRun
+from judgeval.data.evaluation_run import EvaluationRun
 from judgeval.local_eval_queue import LocalEvaluationQueue
 from judgeval.common.api import JudgmentApiClient
 from judgeval.common.utils import OptExcInfo, validate_api_key
@@ -183,8 +183,10 @@ class TraceClient:
         eval_run_name = (
             f"{self.name.capitalize()}-{span_id}-{scorer.score_type.capitalize()}"
         )
-
-        if isinstance(scorer, APIScorerConfig):
+        hosted_scoring = isinstance(scorer, APIScorerConfig) or (
+            isinstance(scorer, BaseScorer) and scorer.e2b_enabled
+        )
+        if hosted_scoring:
             eval_run = EvaluationRun(
                 organization_id=self.tracer.organization_id,
                 project_name=self.project_name,
@@ -203,7 +205,7 @@ class TraceClient:
                     self.otel_span_processor.queue_evaluation_run(
                         eval_run, span_id=span_id, span_data=current_span
                     )
-        elif isinstance(scorer, BaseScorer):
+        else:
             # Handle custom scorers using local evaluation queue
             eval_run = EvaluationRun(
                 organization_id=self.tracer.organization_id,
@@ -212,9 +214,7 @@ class TraceClient:
                 examples=[example],
                 scorers=[scorer],
                 model=model,
-                judgment_api_key=self.tracer.api_key,
                 trace_span_id=span_id,
-                trace_id=self.trace_id,
             )
 
             self.add_eval_run(eval_run, start_time)

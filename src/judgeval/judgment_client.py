@@ -16,7 +16,7 @@ from judgeval.scorers import (
     APIScorerConfig,
     BaseScorer,
 )
-from judgeval.evaluation_run import EvaluationRun
+from judgeval.data.evaluation_run import EvaluationRun
 from judgeval.run_evaluation import (
     run_eval,
     assert_test,
@@ -265,3 +265,64 @@ class JudgmentClient(metaclass=SingletonMeta):
         )
 
         assert_test(results)
+
+    def save_custom_scorer(
+        self,
+        unique_name: str,
+        scorer_file_path: str,
+        requirements_file_path: Optional[str] = None,
+    ) -> bool:
+        """
+        Upload custom ExampleScorer from files to backend.
+
+        Args:
+            unique_name: Unique identifier for the custom scorer
+            scorer_file_path: Path to Python file containing CustomScorer class
+            requirements_file_path: Optional path to requirements.txt
+            description: Optional description of the scorer
+
+        Returns:
+            bool: True if upload successful
+
+        Raises:
+            ValueError: If scorer file is invalid
+            FileNotFoundError: If scorer file doesn't exist
+        """
+        import os
+
+        if not os.path.exists(scorer_file_path):
+            raise FileNotFoundError(f"Scorer file not found: {scorer_file_path}")
+
+        # Read scorer code
+        with open(scorer_file_path, "r") as f:
+            scorer_code = f.read()
+
+        # Read requirements (optional)
+        requirements_text = ""
+        if requirements_file_path and os.path.exists(requirements_file_path):
+            with open(requirements_file_path, "r") as f:
+                requirements_text = f.read()
+
+        # Upload to backend
+        judgeval_logger.info(
+            f"Uploading custom scorer: {unique_name}, this can take a couple of minutes..."
+        )
+        try:
+            success = self.api_client.upload_custom_scorer(
+                scorer_name=unique_name,
+                scorer_code=scorer_code,
+                requirements_text=requirements_text,
+            )
+
+            if success:
+                judgeval_logger.info(
+                    f"Successfully uploaded custom scorer: {unique_name}"
+                )
+                return True
+            else:
+                judgeval_logger.error(f"Failed to upload custom scorer: {unique_name}")
+                return False
+
+        except Exception as e:
+            judgeval_logger.error(f"Error uploading custom scorer: {e}")
+            raise

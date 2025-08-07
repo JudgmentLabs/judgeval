@@ -50,6 +50,10 @@ JUDGMENT_EVAL_DELETE_PROJECT_API_URL = f"{ROOT_API}/delete_eval_results_by_proje
 JUDGMENT_ADD_TO_RUN_EVAL_QUEUE_API_URL = f"{ROOT_API}/add_to_run_eval_queue/"
 JUDGMENT_GET_EVAL_STATUS_API_URL = f"{ROOT_API}/get_evaluation_status/"
 
+# Custom Scorers API
+JUDGMENT_CUSTOM_SCORER_UPLOAD_API_URL = f"{ROOT_API}/build_sandbox_template/"
+JUDGMENT_CUSTOM_SCORER_FETCH_API_URL = f"{ROOT_API}/custom-scorers/fetch/"
+
 
 # Evaluation API Payloads
 class EvalRunRequestBody(TypedDict):
@@ -169,3 +173,16 @@ class ScorerFetchPayload(TypedDict):
 
 class ScorerExistsPayload(TypedDict):
     name: str
+
+
+class CustomScorerUploadPayload(TypedDict):
+    scorer_name: str
+    scorer_code: str
+    requirements_text: str
+    user_id: str
+    organization_id: str
+
+
+class CustomScorerFetchPayload(TypedDict):
+    unique_name: str
+    organization_id: str
