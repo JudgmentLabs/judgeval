@@ -47,6 +47,7 @@ from judgeval.common.api.constants import (
     ScorerFetchPayload,
     ScorerExistsPayload,
     CustomScorerUploadPayload,
+    CustomScorerTemplateResponse,
 )
 from judgeval.utils.requests import requests
 from judgeval.common.api.json_encoder import json_encoder
@@ -277,7 +278,7 @@ class JudgmentApiClient:
         scorer_name: str,
         scorer_code: str,
         requirements_text: str,
-    ) -> bool:
+    ) -> CustomScorerTemplateResponse:
         """Upload custom scorer to backend"""
         payload: CustomScorerUploadPayload = {
             "scorer_name": scorer_name,
@@ -293,7 +294,7 @@ class JudgmentApiClient:
                 payload,
                 timeout=(10, 300),
             )
-            return response.get("status") == "success"
+            return response
         except JudgmentAPIException as e:
             raise e
 

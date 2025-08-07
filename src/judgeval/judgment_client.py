@@ -308,13 +308,13 @@ class JudgmentClient(metaclass=SingletonMeta):
             f"Uploading custom scorer: {unique_name}, this can take a couple of minutes..."
         )
         try:
-            success = self.api_client.upload_custom_scorer(
+            response = self.api_client.upload_custom_scorer(
                 scorer_name=unique_name,
                 scorer_code=scorer_code,
                 requirements_text=requirements_text,
             )
 
-            if success:
+            if response.status == "success":
                 judgeval_logger.info(
                     f"Successfully uploaded custom scorer: {unique_name}"
                 )

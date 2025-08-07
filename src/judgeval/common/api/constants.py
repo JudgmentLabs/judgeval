@@ -179,10 +179,9 @@ class CustomScorerUploadPayload(TypedDict):
     scorer_name: str
     scorer_code: str
     requirements_text: str
-    user_id: str
-    organization_id: str
 
 
-class CustomScorerFetchPayload(TypedDict):
-    unique_name: str
-    organization_id: str
+class CustomScorerTemplateResponse(TypedDict):
+    scorer_name: str
+    status: str
+    message: str

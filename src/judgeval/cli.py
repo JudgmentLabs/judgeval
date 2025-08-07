@@ -27,11 +27,11 @@ def upload_scorer(
     # Validate file paths
     if not Path(scorer_file_path).exists():
         judgeval_logger.error(f"Scorer file not found: {scorer_file_path}")
-        return
+        raise typer.Exit(1)
 
     if not Path(requirements_file_path).exists():
         judgeval_logger.error(f"Requirements file not found: {requirements_file_path}")
-        return
+        raise typer.Exit(1)
 
     try:
         client = JudgmentClient()
@@ -42,14 +42,12 @@ def upload_scorer(
             requirements_file_path=requirements_file_path,
         )
 
-        # Check status and return
-        status = (
-            getattr(result, "status", None) or result.get("status")
-            if isinstance(result, dict)
-            else None
-        )
-        return status == "success"
+        if not result:
+            judgeval_logger.error("Failed to upload custom scorer")
+            raise typer.Exit(1)
 
+        judgeval_logger.info(f"Successfully uploaded custom scorer: {unique_name}")
+        raise typer.Exit(0)
     except Exception:
         raise
 
