@@ -411,7 +411,7 @@ def run_eval(
 
     if (
         len(evaluation_run.custom_scorers) > 0
-        and len(evaluation_run.hosted_scorers) > 0
+        and len(evaluation_run.judgment_scorers) > 0
     ):
         error_msg = "We currently do not support running both local and Judgment API scorers at the same time. Please run your evaluation with either local scorers or Judgment API scorers, but not both."
         judgeval_logger.error(error_msg)
@@ -419,13 +419,13 @@ def run_eval(
 
     e2b_scorers = any(cs.e2b_enabled for cs in evaluation_run.custom_scorers)
 
-    if evaluation_run.hosted_scorers or e2b_scorers:
-        if evaluation_run.hosted_scorers and e2b_scorers:
+    if evaluation_run.judgment_scorers or e2b_scorers:
+        if evaluation_run.judgment_scorers and e2b_scorers:
             error_msg = "We currently do not support running both hosted custom scorers and Judgment API scorers at the same time. Please run your evaluation with one or the other, but not both."
             judgeval_logger.error(error_msg)
             raise ValueError(error_msg)
 
-        check_examples(evaluation_run.examples, evaluation_run.hosted_scorers)
+        check_examples(evaluation_run.examples, evaluation_run.judgment_scorers)
         stop_event = threading.Event()
         t = threading.Thread(
             target=progress_logger, args=(stop_event, "Running evaluation...")
@@ -447,8 +447,8 @@ def run_eval(
                 raise JudgmentAPIError(error_message)
 
             num_scorers = (
-                len(evaluation_run.hosted_scorers)
-                if evaluation_run.hosted_scorers
+                len(evaluation_run.judgment_scorers)
+                if evaluation_run.judgment_scorers
                 else sum(1 for cs in evaluation_run.custom_scorers if cs.e2b_enabled)
             )
             results, url = _poll_evaluation_until_complete(
