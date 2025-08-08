@@ -15,13 +15,15 @@ openai_Response = None
 openai_ParsedChatCompletion = None
 
 try:
-    from openai import OpenAI, AsyncOpenAI
+    from openai import OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI
     from openai.types.chat.chat_completion import ChatCompletion
     from openai.types.responses.response import Response
     from openai.types.chat import ParsedChatCompletion
 
     openai_OpenAI = OpenAI
     openai_AsyncOpenAI = AsyncOpenAI
+    openai_AzureOpenAI = AzureOpenAI
+    openai_AsyncAzureOpenAI = AsyncAzureOpenAI
     openai_ChatCompletion = ChatCompletion
     openai_Response = Response
     openai_ParsedChatCompletion = ParsedChatCompletion
@@ -97,6 +99,8 @@ __all__ = [
     "HAS_OPENAI",
     "openai_OpenAI",
     "openai_AsyncOpenAI",
+    "openai_AzureOpenAI",
+    "openai_AsyncAzureOpenAI",
     "openai_ChatCompletion",
     "openai_Response",
     "openai_ParsedChatCompletion",

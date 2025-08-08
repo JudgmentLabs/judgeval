@@ -1805,15 +1805,15 @@ def wrap(
         return wrapper
 
     if HAS_OPENAI:
-        from judgeval.common.tracer.providers import openai_OpenAI, openai_AsyncOpenAI
+        from judgeval.common.tracer.providers import openai_OpenAI, openai_AsyncOpenAI, openai_AzureOpenAI, openai_AsyncAzureOpenAI
 
         assert openai_OpenAI is not None, "OpenAI client not found"
         assert openai_AsyncOpenAI is not None, "OpenAI async client not found"
-        if isinstance(client, (openai_OpenAI)):
+        if isinstance(client, (openai_OpenAI, openai_AzureOpenAI)):
             setattr(client.chat.completions, "create", wrapped(original_create))
             setattr(client.responses, "create", wrapped(original_responses_create))
             setattr(client.beta.chat.completions, "parse", wrapped(original_beta_parse))
-        elif isinstance(client, (openai_AsyncOpenAI)):
+        elif isinstance(client, (openai_AsyncOpenAI, openai_AsyncAzureOpenAI)):
             setattr(client.chat.completions, "create", wrapped_async(original_create))
             setattr(
                 client.responses, "create", wrapped_async(original_responses_create)
@@ -1901,7 +1901,7 @@ def _get_client_config(
     """
 
     if HAS_OPENAI:
-        from judgeval.common.tracer.providers import openai_OpenAI, openai_AsyncOpenAI
+        from judgeval.common.tracer.providers import openai_OpenAI, openai_AsyncOpenAI, openai_AzureOpenAI, openai_AsyncAzureOpenAI
 
         assert openai_OpenAI is not None, "OpenAI client not found"
         assert openai_AsyncOpenAI is not None, "OpenAI async client not found"
@@ -1921,6 +1921,23 @@ def _get_client_config(
                 None,
                 client.beta.chat.completions.parse,
             )
+        elif isinstance(client, (openai_AzureOpenAI)):
+            return(
+                "AZURE_OPENAI_API_CALL",
+                client.chat.completions.create,
+                client.responses.create,
+                None,
+                client.beta.chat.completions.parse,
+            )
+        elif isinstance(client, (openai_AsyncAzureOpenAI)):
+            return(
+                "AZURE_OPENAI_API_CALL",
+                client.chat.completions.create,
+                client.responses.create,
+                None,
+                client.beta.chat.completions.parse,
+            )
+            
     if HAS_TOGETHER:
         from judgeval.common.tracer.providers import (
             together_Together,
@@ -2007,6 +2024,8 @@ def _format_output_data(
         from judgeval.common.tracer.providers import (
             openai_OpenAI,
             openai_AsyncOpenAI,
+            openai_AzureOpenAI,
+            openai_AsyncAzureOpenAI,
             openai_ChatCompletion,
             openai_Response,
             openai_ParsedChatCompletion,
@@ -2020,9 +2039,13 @@ def _format_output_data(
             "OpenAI parsed chat completion not found"
         )
 
-        if isinstance(client, (openai_OpenAI, openai_AsyncOpenAI)):
+        if isinstance(client, (openai_OpenAI, openai_AsyncOpenAI, openai_AzureOpenAI, openai_AsyncAzureOpenAI)):
             if isinstance(response, openai_ChatCompletion):
-                model_name = response.model
+                #added this to diff openai vs azure openai dont know if needed though
+                if isinstance(client, (openai_AzureOpenAI, openai_AsyncAzureOpenAI)):
+                    model_name = "(azure-openai)" + response.model 
+                else:
+                    model_name = response.model
                 prompt_tokens = response.usage.prompt_tokens if response.usage else 0
                 completion_tokens = (
                     response.usage.completion_tokens if response.usage else 0
@@ -2040,7 +2063,10 @@ def _format_output_data(
                 else:
                     message_content = response.choices[0].message.content
             elif isinstance(response, openai_Response):
-                model_name = response.model
+                if isinstance(client, (openai_AzureOpenAI, openai_AsyncAzureOpenAI)):
+                    model_name = "(azure-openai)" + response.model
+                else:
+                    model_name = response.model
                 prompt_tokens = response.usage.input_tokens if response.usage else 0
                 completion_tokens = (
                     response.usage.output_tokens if response.usage else 0
