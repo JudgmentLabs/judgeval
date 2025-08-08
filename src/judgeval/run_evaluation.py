@@ -417,7 +417,7 @@ def run_eval(
         judgeval_logger.error(error_msg)
         raise ValueError(error_msg)
 
-    e2b_scorers = [cs for cs in evaluation_run.custom_scorers if cs.e2b_enabled]
+    e2b_scorers = [cs for cs in evaluation_run.custom_scorers if cs.server_hosted]
 
     if evaluation_run.judgment_scorers or e2b_scorers:
         if evaluation_run.judgment_scorers and e2b_scorers:
@@ -454,7 +454,7 @@ def run_eval(
             num_scorers = (
                 len(evaluation_run.judgment_scorers)
                 if evaluation_run.judgment_scorers
-                else sum(1 for cs in evaluation_run.custom_scorers if cs.e2b_enabled)
+                else sum(1 for cs in evaluation_run.custom_scorers if cs.server_hosted)
             )
             results, url = _poll_evaluation_until_complete(
                 experiment_run_id=evaluation_run.id,

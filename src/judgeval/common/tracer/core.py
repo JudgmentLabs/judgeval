@@ -184,7 +184,7 @@ class TraceClient:
             f"{self.name.capitalize()}-{span_id}-{scorer.score_type.capitalize()}"
         )
         hosted_scoring = isinstance(scorer, APIScorerConfig) or (
-            isinstance(scorer, BaseScorer) and scorer.e2b_enabled
+            isinstance(scorer, BaseScorer) and scorer.server_hosted
         )
         if hosted_scoring:
             eval_run = EvaluationRun(

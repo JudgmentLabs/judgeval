@@ -40,7 +40,7 @@ class BaseScorer(BaseModel):
     error: Optional[str] = None  # The error message if the scorer failed
     additional_metadata: Optional[Dict] = None  # Additional metadata for the scorer
     user: Optional[str] = None  # The user ID of the scorer
-    e2b_enabled: bool = False  # Whether the scorer is enabled for e2b
+    server_hosted: bool = False  # Whether the scorer is enabled for e2b
 
     @model_validator(mode="after")
     @classmethod
