@@ -20,9 +20,11 @@ app = typer.Typer(
 
 @app.command("upload_scorer")
 def upload_scorer(
-    unique_name: str,
     scorer_file_path: str,
     requirements_file_path: str,
+    unique_name: str = typer.Option(
+        None, help="Custom name for the scorer (auto-detected if not provided)"
+    ),
 ):
     # Validate file paths
     if not Path(scorer_file_path).exists():
@@ -37,16 +39,15 @@ def upload_scorer(
         client = JudgmentClient()
 
         result = client.save_custom_scorer(
-            unique_name=unique_name,
             scorer_file_path=scorer_file_path,
             requirements_file_path=requirements_file_path,
+            unique_name=unique_name,
         )
 
         if not result:
             judgeval_logger.error("Failed to upload custom scorer")
             raise typer.Exit(1)
 
-        judgeval_logger.info(f"Successfully uploaded custom scorer: {unique_name}")
         raise typer.Exit(0)
     except Exception:
         raise
@@ -60,3 +61,5 @@ def version():
 
 if __name__ == "__main__":
     app()
+
+# judgeval upload_scorer /Users/alanzhang/repo/JudgmentLabs/judgeval/src/demo/profile_match_scorer.py /Users/alanzhang/repo/JudgmentLabs/judgeval/src/demo/requirements.txt
