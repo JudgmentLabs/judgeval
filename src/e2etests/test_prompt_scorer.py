@@ -30,7 +30,6 @@ def test_prompt_scorer_without_options(client: JudgmentClient, project_name: str
         model=DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name="test-run-prompt-scorer-without-options",
-        override=True,
     )
 
     # Verify results
@@ -76,7 +75,6 @@ def test_prompt_scorer_with_options(client: JudgmentClient, project_name: str):
         model=DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name="test-run-prompt-scorer-with-options",
-        override=True,
     )
 
     # Verify results
@@ -164,7 +162,6 @@ def test_custom_prompt_scorer(client: JudgmentClient, project_name: str):
         model=DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name="test-custom-prompt-scorer",
-        override=True,
     )
 
     # Verify results

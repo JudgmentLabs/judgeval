@@ -140,80 +140,6 @@ def check_missing_scorer_data(results: List[ScoringResult]) -> List[ScoringResul
     return results
 
 
-def check_experiment_type(
-    eval_name: str,
-    project_name: str,
-    judgment_api_key: str,
-    organization_id: str,
-    is_trace: bool,
-) -> None:
-    """
-    Checks if the current experiment, if one exists, has the same type (examples of traces)
-    """
-    api_client = JudgmentApiClient(judgment_api_key, organization_id)
-
-    try:
-        api_client.check_experiment_type(eval_name, project_name, is_trace)
-    except JudgmentAPIException as e:
-        if e.response.status_code == 422:
-            judgeval_logger.error(f"{e.response_json}")
-            raise ValueError(f"{e.response_json}")
-        else:
-            raise e
-    except Exception as e:
-        judgeval_logger.error(f"Failed to check if experiment type exists: {str(e)}")
-        raise JudgmentAPIError(f"Failed to check if experiment type exists: {str(e)}")
-
-
-def check_eval_run_name_exists(
-    eval_name: str, project_name: str, judgment_api_key: str, organization_id: str
-) -> None:
-    """
-    Checks if an evaluation run name already exists for a given project.
-
-    Args:
-        eval_name (str): Name of the evaluation run
-        project_name (str): Name of the project
-        judgment_api_key (str): API key for authentication
-
-    Raises:
-        ValueError: If the evaluation run name already exists
-        JudgmentAPIError: If there's an API error during the check
-    """
-    api_client = JudgmentApiClient(judgment_api_key, organization_id)
-    try:
-        api_client.check_eval_run_name_exists(eval_name, project_name)
-    except JudgmentAPIException as e:
-        if e.response.status_code == 409:
-            error_str = f"Eval run name '{eval_name}' already exists for this project. Please choose a different name, set the `override` flag to true, or set the `append` flag to true. See https://docs.judgmentlabs.ai/sdk-reference/judgment-client#override for more information."
-            judgeval_logger.error(error_str)
-            raise ValueError(error_str)
-        else:
-            raise e
-
-    except Exception as e:
-        judgeval_logger.error(f"Failed to check if eval run name exists: {str(e)}")
-        raise JudgmentAPIError(f"Failed to check if eval run name exists: {str(e)}")
-
-
-def check_example_keys(
-    keys: List[str],
-    eval_name: str,
-    project_name: str,
-    judgment_api_key: str,
-    organization_id: str,
-) -> None:
-    """
-    Checks if the current experiment (if one exists) has the same keys for example
-    """
-    api_client = JudgmentApiClient(judgment_api_key, organization_id)
-    try:
-        api_client.check_example_keys(keys, eval_name, project_name)
-    except Exception as e:
-        judgeval_logger.error(f"Failed to check if example keys match: {str(e)}")
-        raise JudgmentAPIError(f"Failed to check if example keys match: {str(e)}")
-
-
 def log_evaluation_results(
     scoring_results: List[ScoringResult],
     run: Union[EvaluationRun, TraceRun],
@@ -285,29 +211,10 @@ def check_examples(
 def run_trace_eval(
     trace_run: TraceRun,
     judgment_api_key: str,
-    override: bool = False,
     function: Optional[Callable] = None,
     tracer: Optional[Union[Tracer, "JudgevalCallbackHandler"]] = None,
     examples: Optional[List[Example]] = None,
 ) -> List[ScoringResult]:
-    # Call endpoint to check to see if eval run name exists (if we DON'T want to override and DO want to log results)
-    if not override and not trace_run.append:
-        check_eval_run_name_exists(
-            trace_run.eval_name,
-            trace_run.project_name,
-            judgment_api_key,
-            trace_run.organization_id,
-        )
-
-    if trace_run.append:
-        # Check that the current experiment, if one exists, has the same type (examples or traces)
-        check_experiment_type(
-            trace_run.eval_name,
-            trace_run.project_name,
-            judgment_api_key,
-            trace_run.organization_id,
-            True,
-        )
     if function and tracer and examples is not None:
         new_traces: List[Trace] = []
 
@@ -376,43 +283,8 @@ def run_trace_eval(
     return scoring_results
 
 
-async def get_evaluation_status(
-    eval_name: str, project_name: str, judgment_api_key: str, organization_id: str
-) -> Dict:
-    """
-    Gets the status of an async evaluation run.
-
-    Args:
-        eval_name (str): Name of the evaluation run
-        project_name (str): Name of the project
-        judgment_api_key (str): API key for authentication
-        organization_id (str): Organization ID for the evaluation
-
-    Returns:
-        Dict: Status information including:
-            - status: 'pending', 'running', 'completed', or 'failed'
-            - results: List of ScoringResult objects if completed
-            - error: Error message if failed
-    """
-    api_client = JudgmentApiClient(judgment_api_key, organization_id)
-    try:
-        return api_client.get_evaluation_status(eval_name, project_name)
-    except Exception as e:
-        raise JudgmentAPIError(
-            f"An error occurred while checking evaluation status: {str(e)}"
-        )
-
-
-def retrieve_counts(result: Dict):
-    scorer_data_count = 0
-    for example in result.get("examples", []):
-        for scorer in example.get("scorer_data", []):
-            scorer_data_count += 1
-    return scorer_data_count
-
-
 def _poll_evaluation_until_complete(
-    eval_name: str,
+    experiment_run_id: str,
     project_name: str,
     judgment_api_key: str,
     organization_id: str,
@@ -443,14 +315,16 @@ def _poll_evaluation_until_complete(
         poll_count += 1
         try:
             # Check status
-            status_response = api_client.get_evaluation_status(eval_name, project_name)
+            status_response = api_client.get_evaluation_status(
+                experiment_run_id, project_name
+            )
 
             if status_response.get("status") != "completed":
                 time.sleep(poll_interval_seconds)
                 continue
 
             results_response = api_client.fetch_evaluation_results(
-                project_name, eval_name
+                experiment_run_id, project_name
             )
             url = results_response.get("ui_results_url")
 
@@ -513,14 +387,12 @@ def progress_logger(stop_event, msg="Working...", interval=5):
 def run_eval(
     evaluation_run: EvaluationRun,
     judgment_api_key: str,
-    override: bool = False,
 ) -> List[ScoringResult]:
     """
     Executes an evaluation of `Example`s using one or more `Scorer`s
 
     Args:
         evaluation_run (EvaluationRun): Stores example and evaluation together for running
-        override (bool, optional): Whether to override existing evaluation run with same name. Defaults to False.
 
     Returns:
         List[ScoringResult]: A list of ScoringResult objects
@@ -533,34 +405,6 @@ def run_eval(
             raise ValueError(
                 f"All examples must have the same keys: {current_keys} != {keys}"
             )
-
-    # Call endpoint to check to see if eval run name exists (if we DON'T want to override and DO want to log results)
-    if not override and not evaluation_run.append:
-        check_eval_run_name_exists(
-            evaluation_run.eval_name,
-            evaluation_run.project_name,
-            judgment_api_key,
-            evaluation_run.organization_id,
-        )
-
-    if evaluation_run.append:
-        # Check that the current experiment, if one exists, has the same type (examples of traces)
-        check_experiment_type(
-            evaluation_run.eval_name,
-            evaluation_run.project_name,
-            judgment_api_key,
-            evaluation_run.organization_id,
-            False,
-        )
-
-        # Ensure that current experiment (if one exists) has the same keys for example
-        check_example_keys(
-            keys=list(keys),
-            eval_name=evaluation_run.eval_name,
-            project_name=evaluation_run.project_name,
-            judgment_api_key=judgment_api_key,
-            organization_id=evaluation_run.organization_id,
-        )
 
     judgment_scorers: List[APIScorerConfig] = []
     local_scorers: List[BaseScorer] = []
@@ -599,27 +443,14 @@ def run_eval(
                     f"Error adding evaluation to queue: {error_message}"
                 )
                 raise JudgmentAPIError(error_message)
-
-            old_scorer_data_count = 0
-            if evaluation_run.append:
-                try:
-                    results_response = api_client.fetch_evaluation_results(
-                        evaluation_run.project_name, evaluation_run.eval_name
-                    )
-                    old_scorer_data_count = retrieve_counts(results_response)
-                except Exception:
-                    # This usually means the user did append = True but the eval run name doesn't exist yet
-                    pass
-
             results, url = _poll_evaluation_until_complete(
-                eval_name=evaluation_run.eval_name,
+                experiment_run_id=evaluation_run.id,
                 project_name=evaluation_run.project_name,
                 judgment_api_key=judgment_api_key,
                 organization_id=evaluation_run.organization_id,
                 expected_scorer_data_count=(
                     len(evaluation_run.scorers) * len(evaluation_run.examples)
-                )
-                + old_scorer_data_count,
+                ),
             )
         finally:
             stop_event.set()

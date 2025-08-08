@@ -29,8 +29,6 @@ class TraceRun(BaseModel):
     scorers: List[Union[APIScorerConfig, BaseScorer]]
     model: Optional[str] = DEFAULT_GPT_MODEL
     trace_span_id: Optional[str] = None
-    append: Optional[bool] = False
-    override: Optional[bool] = False
     rules: Optional[List[Rule]] = None
     tools: Optional[List[Dict[str, Any]]] = None
 

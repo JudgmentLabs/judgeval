@@ -1,5 +1,7 @@
 from typing import List, Optional, Union
 from pydantic import BaseModel, field_validator, Field
+from datetime import datetime, timezone
+import uuid
 
 from judgeval.data import Example
 from judgeval.scorers import BaseScorer, APIScorerConfig
@@ -19,6 +21,7 @@ class EvaluationRun(BaseModel):
         metadata (Optional[Dict[str, Any]]): Additional metadata to include for this evaluation run, e.g. comments, dataset name, purpose, etc.
     """
 
+    id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()))
     organization_id: Optional[str] = None
     project_name: Optional[str] = Field(default=None, validate_default=True)
     eval_name: Optional[str] = Field(default=None, validate_default=True)
@@ -27,9 +30,10 @@ class EvaluationRun(BaseModel):
     model: Optional[str] = DEFAULT_GPT_MODEL
     trace_span_id: Optional[str] = None
     trace_id: Optional[str] = None
+    created_at: Optional[str] = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
     # API Key will be "" until user calls client.run_eval(), then API Key will be set
-    override: Optional[bool] = False
-    append: Optional[bool] = False
 
     def model_dump(self, **kwargs):
         data = super().model_dump(**kwargs)

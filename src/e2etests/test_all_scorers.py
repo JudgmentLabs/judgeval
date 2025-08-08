@@ -30,7 +30,6 @@ def test_ac_scorer(client: JudgmentClient, project_name: str):
         model=DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=EVAL_RUN_NAME,
-        override=True,
     )
     print_debug_on_failure(res[0])
 
@@ -56,7 +55,6 @@ def test_ar_scorer(client: JudgmentClient, project_name: str):
         model=DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=EVAL_RUN_NAME,
-        override=True,
     )
 
     print_debug_on_failure(res[0])
@@ -99,7 +97,6 @@ def test_faithfulness_scorer(client: JudgmentClient, project_name: str):
         model=DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=EVAL_RUN_NAME,
-        override=True,
     )
 
     print_debug_on_failure(res[0])
@@ -125,7 +122,6 @@ def test_instruction_adherence_scorer(client: JudgmentClient, project_name: str)
         model=DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=EVAL_RUN_NAME,
-        override=True,
     )
 
     print_debug_on_failure(res[0])
@@ -158,7 +154,6 @@ def test_execution_order_scorer(client: JudgmentClient, project_name: str):
         model=DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=EVAL_RUN_NAME,
-        override=True,
     )
 
     assert not res[0].success

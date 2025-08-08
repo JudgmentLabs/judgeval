@@ -43,142 +43,24 @@ def run_eval_helper(client: JudgmentClient, project_name: str, eval_run_name: st
     scorer = FaithfulnessScorer(threshold=0.5)
     scorer2 = AnswerRelevancyScorer(threshold=0.5)
 
-    client.run_evaluation(
+    res = client.run_evaluation(
         examples=[example1, example2],
         scorers=[scorer, scorer2],
         model=DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=eval_run_name,
     )
+    return res
 
 
 def test_run_eval(client: JudgmentClient, project_name: str, random_name: str):
     """Test basic evaluation workflow."""
 
-    run_eval_helper(client, project_name, random_name)
-    results = client.pull_eval(project_name=project_name, eval_run_name=random_name)
-    assert results, f"No evaluation results found for {random_name}"
+    res = run_eval_helper(client, project_name, random_name)
+    assert res, f"No evaluation results found for {random_name}"
 
-
-def test_run_eval_append(client: JudgmentClient, project_name: str, random_name: str):
-    """Test evaluation append behavior."""
-
-    run_eval_helper(client, project_name, random_name)
-    results = client.pull_eval(project_name=project_name, eval_run_name=random_name)
-    results = results["examples"]
-    assert results, f"No evaluation results found for {random_name}"
-    assert len(results) == 2
-
-    example1 = Example(
-        input="Generate a cold outreach email for TechCorp. Facts: They recently launched an AI-powered analytics platform. Their CEO Sarah Chen previously worked at Google. They have 50+ enterprise clients.",
-        actual_output="Dear Ms. Chen,\n\nI noticed TechCorp's recent launch of your AI analytics platform and was impressed by its enterprise-focused approach. Your experience from Google clearly shines through in building scalable solutions, as evidenced by your impressive 50+ enterprise client base.\n\nWould you be open to a brief call to discuss how we could potentially collaborate?\n\nBest regards,\nAlex",
-        retrieval_context=[
-            "TechCorp launched AI analytics platform in 2024",
-            "Sarah Chen is CEO, ex-Google executive",
-            "Current client base: 50+ enterprise customers",
-        ],
-    )
-    scorer = FaithfulnessScorer(threshold=0.5)
-
-    client.run_evaluation(
-        examples=[example1],
-        scorers=[scorer],
-        model=DEFAULT_TOGETHER_MODEL,
-        project_name=project_name,
-        eval_run_name=random_name,
-        append=True,
-    )
-
-    results = client.pull_eval(project_name=project_name, eval_run_name=random_name)
-    assert results, f"No evaluation results found for {random_name}"
-    results = results["examples"]
-    assert len(results) == 3
-    assert results[0]["scorer_data"][0]["score"] == 1.0
-
-
-def test_run_append_without_existing(
-    client: JudgmentClient, project_name: str, random_name: str
-):
-    """Test evaluation append behavior when the eval run does not exist."""
-
-    example1 = Example(
-        input="Generate a cold outreach email for TechCorp. Facts: They recently launched an AI-powered analytics platform. Their CEO Sarah Chen previously worked at Google. They have 50+ enterprise clients.",
-        actual_output="Dear Ms. Chen,\n\nI noticed TechCorp's recent launch of your AI analytics platform and was impressed by its enterprise-focused approach. Your experience from Google clearly shines through in building scalable solutions, as evidenced by your impressive 50+ enterprise client base.\n\nWould you be open to a brief call to discuss how we could potentially collaborate?\n\nBest regards,\nAlex",
-        retrieval_context=[
-            "TechCorp launched AI analytics platform in 2024",
-            "Sarah Chen is CEO, ex-Google executive",
-            "Current client base: 50+ enterprise customers",
-        ],
-    )
-    scorer = AnswerRelevancyScorer(threshold=0.5)
-
-    results = client.run_evaluation(
-        examples=[example1],
-        scorers=[scorer],
-        model="gpt-4o-mini",
-        project_name=project_name,
-        eval_run_name=random_name,
-        append=True,
-    )
-    assert results, f"No evaluation results found for {random_name}"
-    assert len(results) == 1
-    print(results)
-    assert results[0].success
-
-
-def test_run_mismatching_examples(
-    client: JudgmentClient, project_name: str, random_name: str
-):
-    """Test running evaluation with mismatching examples."""
-    example1 = Example(
-        input="What is the capital of France?",
-        actual_output="Paris",
-        expected_output="Paris",
-    )
-    example2 = Example(
-        input="What is the capital of France?",
-        actual_output="Paris",
-    )
-    scorer = AnswerRelevancyScorer(threshold=0.5)
-    with pytest.raises(Exception):
-        client.run_evaluation(
-            examples=[example1, example2],
-            scorers=[scorer],
-            project_name=project_name,
-            eval_run_name=random_name,
-        )
-
-
-def test_run_mismatching_examples_append(
-    client: JudgmentClient, project_name: str, random_name: str
-):
-    """Test running evaluation with mismatching examples."""
-    example1 = Example(
-        input="What is the capital of France?",
-        actual_output="Paris",
-        expected_output="Paris",
-    )
-    example2 = Example(
-        input="What is the capital of France?",
-        actual_output="Paris",
-    )
-    scorer = AnswerRelevancyScorer(threshold=0.5)
-    client.run_evaluation(
-        examples=[example1],
-        scorers=[scorer],
-        project_name=project_name,
-        eval_run_name=random_name,
-        append=True,
-    )
-
-    with pytest.raises(Exception):
-        client.run_evaluation(
-            examples=[example2],
-            scorers=[scorer],
-            project_name=project_name,
-            eval_run_name=random_name,
-            append=True,
-        )
+    res2 = run_eval_helper(client, project_name, random_name)
+    assert res2, f"No evaluation results found for {random_name}"
 
 
 @pytest.mark.asyncio
@@ -209,7 +91,6 @@ async def test_assert_test(client: JudgmentClient, project_name: str):
             examples=[example, example1, example2],
             scorers=[scorer],
             model=DEFAULT_TOGETHER_MODEL,
-            override=True,
         )
 
 
@@ -327,7 +208,6 @@ async def test_run_trace_eval(
         scorers=[scorer],
         project_name=project_name,
         eval_run_name=EVAL_RUN_NAME,
-        override=True,
     )
     assert results, (
         f"No evaluation results found for {EVAL_RUN_NAME} in project {project_name}"
@@ -362,66 +242,4 @@ async def test_run_trace_eval_with_project_mismatch(
             scorers=[scorer],
             project_name=project_name,
             eval_run_name=EVAL_RUN_NAME,
-            override=True,
-        )
-
-
-def test_override_eval(client: JudgmentClient, project_name: str, random_name: str):
-    """Test evaluation override behavior."""
-    example1 = Example(
-        input="What if these shoes don't fit?",
-        actual_output="We offer a 30-day full refund at no extra cost.",
-        retrieval_context=[
-            "All customers are eligible for a 30 day full refund at no extra cost."
-        ],
-    )
-
-    scorer = FaithfulnessScorer(threshold=0.5)
-
-    EVAL_RUN_NAME = random_name
-
-    # First run should succeed
-    client.run_evaluation(
-        examples=[example1],
-        scorers=[scorer],
-        model=DEFAULT_TOGETHER_MODEL,
-        project_name=project_name,
-        eval_run_name=EVAL_RUN_NAME,
-        override=False,
-    )
-
-    # This should fail because the eval run name already exists
-    with pytest.raises(ValueError, match="already exists"):
-        client.run_evaluation(
-            examples=[example1],
-            scorers=[scorer],
-            model=DEFAULT_TOGETHER_MODEL,
-            project_name=project_name,
-            eval_run_name=EVAL_RUN_NAME,
-            override=False,
-        )
-
-    # Third run with override=True should succeed
-    try:
-        client.run_evaluation(
-            examples=[example1],
-            scorers=[scorer],
-            model=DEFAULT_TOGETHER_MODEL,
-            project_name=project_name,
-            eval_run_name=EVAL_RUN_NAME,
-            override=True,
-        )
-    except ValueError as e:
-        print(f"Unexpected error in override run: {e}")
-        raise
-
-    # Final non-override run should fail
-    with pytest.raises(ValueError, match="already exists"):
-        client.run_evaluation(
-            examples=[example1],
-            scorers=[scorer],
-            model=DEFAULT_TOGETHER_MODEL,
-            project_name=project_name,
-            eval_run_name=EVAL_RUN_NAME,
-            override=False,
         )

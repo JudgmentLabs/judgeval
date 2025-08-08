@@ -592,7 +592,6 @@ async def test_real_judgee_tracking(client, project_name: str):
             model=DEFAULT_TOGETHER_MODEL,
             project_name=project_name,
             eval_run_name=EVAL_RUN_NAME,
-            override=True,
         )
         print(f"Evaluation response: {res}")
         print_debug_on_failure(res[0])
@@ -705,7 +704,6 @@ async def test_real_trace_and_judgee_tracking(client, project_name: str):
                     model=DEFAULT_TOGETHER_MODEL,
                     project_name=project_name,
                     eval_run_name=EVAL_RUN_NAME,
-                    override=True,
                 )
 
                 print(f"Evaluation response: {res}")
