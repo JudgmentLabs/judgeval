@@ -314,7 +314,7 @@ class JudgmentClient(metaclass=SingletonMeta):
                 requirements_text=requirements_text,
             )
 
-            if response.status == "success":
+            if response.get("status") == "success":
                 judgeval_logger.info(
                     f"Successfully uploaded custom scorer: {unique_name}"
                 )

@@ -52,7 +52,6 @@ JUDGMENT_GET_EVAL_STATUS_API_URL = f"{ROOT_API}/get_evaluation_status/"
 
 # Custom Scorers API
 JUDGMENT_CUSTOM_SCORER_UPLOAD_API_URL = f"{ROOT_API}/build_sandbox_template/"
-JUDGMENT_CUSTOM_SCORER_FETCH_API_URL = f"{ROOT_API}/custom-scorers/fetch/"
 
 
 # Evaluation API Payloads
