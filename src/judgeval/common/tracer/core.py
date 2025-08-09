@@ -2218,14 +2218,14 @@ def _format_output_data(
         assert ollama_Client is not None, "Ollama Client not found"
         assert ollama_AsyncClient is not None, "Ollama Async Client not found"
         if isinstance(client, (ollama_Client, ollama_AsyncClient)):
-            model_name = "ollama/" + response.model
-            prompt_tokens = response.prompt_eval_count or 0
-            completion_tokens = response.eval_count or 0
-            
+            model_name = "ollama/" + getattr(response, 'model', 'unknown')
+            prompt_tokens = getattr(response, 'prompt_eval_count', None) or 0
+            completion_tokens = getattr(response, 'eval_count', None) or 0
+            message_content = None
             if hasattr(response, 'message') and hasattr(response.message, 'content'):
-                message_content = response.message.content
+                message_content = getattr(response.message, 'content', '')
             elif hasattr(response, 'response'):
-                message_content = response.response
+                message_content = getattr(response, 'response', '')
                 
             return message_content, _create_usage(
                 model_name,
