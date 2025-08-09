@@ -58,6 +58,7 @@ from judgeval.common.tracer.providers import (
     HAS_ANTHROPIC,
     HAS_GOOGLE_GENAI,
     HAS_GROQ,
+    HAS_OLLAMA,
     ApiClient,
 )
 from judgeval.constants import DEFAULT_GPT_MODEL
@@ -1874,6 +1875,18 @@ def wrap(
             setattr(client.chat.completions, "create", wrapped(original_create))
         elif isinstance(client, (groq_AsyncGroq)):
             setattr(client.chat.completions, "create", wrapped_async(original_create))
+    
+    if HAS_OLLAMA:
+        from judgeval.common.tracer.providers import ollama_Client, ollama_AsyncClient
+
+        assert ollama_Client is not None, "Ollama Client not found"
+        assert ollama_AsyncClient is not None, "Ollama Async Client not found"
+        if isinstance(client, (ollama_Client)):
+            setattr(client, "chat", wrapped(original_create))
+            setattr(client, "generate", wrapped(original_responses_create))
+        if isinstance(client, (ollama_AsyncClient)):
+            setattr(client, "chat", wrapped_async(original_create))
+            setattr(client, "generate", wrapped_async(original_responses_create))
     return client
 
 
@@ -1997,6 +2010,21 @@ def _get_client_config(
             return "GROQ_API_CALL", client.chat.completions.create, None, None, None
         elif isinstance(client, (groq_AsyncGroq)):
             return "GROQ_API_CALL", client.chat.completions.create, None, None, None
+        
+    if HAS_OLLAMA:
+        from judgeval.common.tracer.providers import ollama_Client, ollama_AsyncClient
+
+        assert ollama_Client is not None, "Ollama Client not found"
+        assert ollama_AsyncClient is not None, "Ollama Async Client not found"
+        if isinstance(client, (ollama_Client, ollama_AsyncClient)):
+            return (
+                "OLLAMA_API_CALL",
+                client.chat,
+                client.generate,
+                None,
+                None,
+            )
+        
     raise ValueError(f"Unsupported client type: {type(client)}")
 
 
@@ -2183,6 +2211,30 @@ def _format_output_data(
                 cache_read_input_tokens,
                 cache_creation_input_tokens,
             )
+        
+    if HAS_OLLAMA:
+        from judgeval.common.tracer.providers import ollama_AsyncClient, ollama_Client
+
+        assert ollama_Client is not None, "Ollama Client not found"
+        assert ollama_AsyncClient is not None, "Ollama Async Client not found"
+        if isinstance(client, (ollama_Client, ollama_AsyncClient)):
+            model_name = "ollama/" + response.model
+            prompt_tokens = response.prompt_eval_count or 0
+            completion_tokens = response.eval_count or 0
+            
+            if hasattr(response, 'message') and hasattr(response.message, 'content'):
+                message_content = response.message.content
+            elif hasattr(response, 'response'):
+                message_content = response.response
+                
+            return message_content, _create_usage(
+                model_name,
+                prompt_tokens,
+                completion_tokens,
+                cache_read_input_tokens,
+                cache_creation_input_tokens,
+            )
+
 
     judgeval_logger.warning(f"Unsupported client type: {type(client)}")
     return None, None

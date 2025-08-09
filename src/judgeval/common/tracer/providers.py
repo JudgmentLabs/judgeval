@@ -88,6 +88,18 @@ try:
 except ImportError:
     pass
 
+HAS_OLLAMA = False
+ollama_Client = None
+ollama_AsyncClient = None
+
+try:
+    from ollama import Client, AsyncClient, chat
+    
+    ollama_Client = Client
+    ollama_AsyncClient = AsyncClient
+    HAS_OLLAMA = True
+except ImportError:
+    pass
 
 # TODO: if we support dependency groups we can have this better type, but during runtime, we do
 # not know which clients an end user might have installed.
@@ -120,4 +132,8 @@ __all__ = [
     "HAS_GROQ",
     "groq_Groq",
     "groq_AsyncGroq",
+    #Ollama
+    "HAS_OLLAMA",
+    "ollama_Client",
+    "ollama_AsyncClient",
 ]
