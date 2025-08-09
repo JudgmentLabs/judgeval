@@ -7,12 +7,11 @@ import os
 import importlib.util
 from pathlib import Path
 from uuid import uuid4
-from typing import Optional, List, Dict, Any, Union, Callable, TYPE_CHECKING
+from typing import Optional, List, Dict, Union
 
 from judgeval.data import (
     ScoringResult,
     Example,
-    Trace,
 )
 from judgeval.scorers import (
     APIScorerConfig,
@@ -22,19 +21,14 @@ from judgeval.data.evaluation_run import EvaluationRun
 from judgeval.run_evaluation import (
     run_eval,
     assert_test,
-    run_trace_eval,
 )
-from judgeval.data.trace_run import TraceRun
 from judgeval.common.api import JudgmentApiClient
 from judgeval.common.exceptions import JudgmentAPIError
-from judgeval.common.tracer import Tracer
 from judgeval.common.utils import validate_api_key
 from pydantic import BaseModel
 from judgeval.common.logger import judgeval_logger
 
 
-if TYPE_CHECKING:
-    from judgeval.integrations.langgraph import JudgevalCallbackHandler
 from judgeval.constants import DEFAULT_GPT_MODEL
 
 
@@ -85,47 +79,6 @@ class JudgmentClient(metaclass=SingletonMeta):
             raise JudgmentAPIError(f"Issue with passed in Judgment API key: {response}")
         else:
             judgeval_logger.info("Successfully initialized JudgmentClient!")
-
-    def run_trace_evaluation(
-        self,
-        scorers: List[Union[APIScorerConfig, BaseScorer]],
-        examples: Optional[List[Example]] = None,
-        function: Optional[Callable] = None,
-        tracer: Optional[Union[Tracer, JudgevalCallbackHandler]] = None,
-        traces: Optional[List[Trace]] = None,
-        tools: Optional[List[Dict[str, Any]]] = None,
-        project_name: str = "default_project",
-        eval_run_name: str = "default_eval_trace",
-        model: Optional[str] = DEFAULT_GPT_MODEL,
-    ) -> List[ScoringResult]:
-        try:
-            if examples and not function:
-                raise ValueError("Cannot pass in examples without a function")
-
-            if traces and function:
-                raise ValueError("Cannot pass in traces and function")
-
-            if examples and traces:
-                raise ValueError("Cannot pass in both examples and traces")
-
-            trace_run = TraceRun(
-                project_name=project_name,
-                eval_name=eval_run_name,
-                traces=traces,
-                scorers=scorers,
-                model=model,
-                organization_id=self.organization_id,
-                tools=tools,
-            )
-            return run_trace_eval(
-                trace_run, self.judgment_api_key, function, tracer, examples
-            )
-        except ValueError as e:
-            raise ValueError(
-                f"Please check your TraceRun object, one or more fields are invalid: \n{str(e)}"
-            )
-        except Exception as e:
-            raise Exception(f"An unexpected error occurred during evaluation: {str(e)}")
 
     def run_evaluation(
         self,
@@ -215,57 +168,6 @@ class JudgmentClient(metaclass=SingletonMeta):
             project_name=project_name,
             eval_run_name=eval_run_name,
         )
-        assert_test(results)
-
-    def assert_trace_test(
-        self,
-        scorers: List[Union[APIScorerConfig, BaseScorer]],
-        examples: Optional[List[Example]] = None,
-        function: Optional[Callable] = None,
-        tracer: Optional[Union[Tracer, JudgevalCallbackHandler]] = None,
-        traces: Optional[List[Trace]] = None,
-        tools: Optional[List[Dict[str, Any]]] = None,
-        model: Optional[str] = DEFAULT_GPT_MODEL,
-        project_name: str = "default_test",
-        eval_run_name: str = str(uuid4()),
-    ) -> None:
-        """
-        Asserts a test by running the evaluation and checking the results for success
-
-        Args:
-            examples (List[Example]): The examples to evaluate.
-            scorers (List[Union[APIScorerConfig, BaseScorer]]): A list of scorers to use for evaluation
-            model (str): The model used as a judge when using LLM as a Judge
-            project_name (str): The name of the project the evaluation results belong to
-            eval_run_name (str): A name for this evaluation run
-            function (Optional[Callable]): A function to use for evaluation
-            tracer (Optional[Union[Tracer, BaseCallbackHandler]]): A tracer to use for evaluation
-            tools (Optional[List[Dict[str, Any]]]): A list of tools to use for evaluation
-        """
-
-        # Check for enable_param_checking and tools
-        for scorer in scorers:
-            if hasattr(scorer, "kwargs") and scorer.kwargs is not None:
-                if scorer.kwargs.get("enable_param_checking") is True:
-                    if not tools:
-                        raise ValueError(
-                            f"You must provide the 'tools' argument to assert_test when using a scorer with enable_param_checking=True. If you do not want to do param checking, explicitly set enable_param_checking=False for the {scorer.__name__} scorer."
-                        )
-
-        results: List[ScoringResult]
-
-        results = self.run_trace_evaluation(
-            examples=examples,
-            traces=traces,
-            scorers=scorers,
-            model=model,
-            project_name=project_name,
-            eval_run_name=eval_run_name,
-            function=function,
-            tracer=tracer,
-            tools=tools,
-        )
-
         assert_test(results)
 
     def _extract_scorer_name(self, scorer_file_path: str) -> str:
