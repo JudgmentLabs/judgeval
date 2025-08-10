@@ -1918,7 +1918,9 @@ def _get_client_config(
 
         assert openai_OpenAI is not None, "OpenAI client not found"
         assert openai_AsyncOpenAI is not None, "OpenAI async client not found"
-        if isinstance(client, (openai_OpenAI)):
+        assert openai_AzureOpenAI is not None, "AzureOpenAI client not found"
+        assert openai_AsyncAzureOpenAI is not None, "AzureOpenAI async client not found"
+        if isinstance(client, (openai_OpenAI, openai_AsyncOpenAI)):
             return (
                 "OPENAI_API_CALL",
                 client.chat.completions.create,
@@ -1926,23 +1928,7 @@ def _get_client_config(
                 None,
                 client.beta.chat.completions.parse,
             )
-        elif isinstance(client, (openai_AsyncOpenAI)):
-            return (
-                "OPENAI_API_CALL",
-                client.chat.completions.create,
-                client.responses.create,
-                None,
-                client.beta.chat.completions.parse,
-            )
-        elif isinstance(client, (openai_AzureOpenAI)):
-            return(
-                "AZURE_OPENAI_API_CALL",
-                client.chat.completions.create,
-                client.responses.create,
-                None,
-                client.beta.chat.completions.parse,
-            )
-        elif isinstance(client, (openai_AsyncAzureOpenAI)):
+        elif isinstance(client, (openai_AzureOpenAI, openai_AsyncAzureOpenAI)):
             return(
                 "AZURE_OPENAI_API_CALL",
                 client.chat.completions.create,
