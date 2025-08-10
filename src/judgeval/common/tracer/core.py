@@ -1251,7 +1251,6 @@ class Tracer:
                         )
 
                     current_trace = self.get_current_trace()
-                    current_trace = self.get_current_trace()
 
                     agen = func(*args, **kwargs)
 
@@ -2397,7 +2396,6 @@ class _ObservedGeneratorProxy:
 
     def send(self, value):
         try:
-            self._trace_client.record_input({"send": value})
             if self._tracer.deep_tracing:
                 with _DeepTracer(self._tracer):
                     result = self._gen.send(value)
@@ -2409,6 +2407,7 @@ class _ObservedGeneratorProxy:
             current_trace = self._tracer.get_current_trace()
             if current_trace:
                 with current_trace.span(child_name, span_type="yield") as span_client:
+                    span_client.record_input({"send": value})
                     span_client.record_output(result)
             self._iteration_index += 1
             return result
@@ -2424,7 +2423,6 @@ class _ObservedGeneratorProxy:
 
     def throw(self, typ, val=None, tb=None):
         try:
-            self._trace_client.record_input({"throw": str(typ)})
             if self._tracer.deep_tracing:
                 with _DeepTracer(self._tracer):
                     result = self._gen.throw(typ, val, tb)
@@ -2436,6 +2434,7 @@ class _ObservedGeneratorProxy:
             current_trace = self._tracer.get_current_trace()
             if current_trace:
                 with current_trace.span(child_name, span_type="yield") as span_client:
+                    span_client.record_input({"throw": str(typ)})
                     span_client.record_output(result)
             self._iteration_index += 1
             return result
@@ -2507,7 +2506,6 @@ class _ObservedAsyncGeneratorProxy:
 
     async def asend(self, value):
         try:
-            self._trace_client.record_input({"send": value})
             if self._tracer.deep_tracing:
                 with _DeepTracer(self._tracer):
                     result = await self._agen.asend(value)
@@ -2517,6 +2515,7 @@ class _ObservedAsyncGeneratorProxy:
             current_trace = self._tracer.get_current_trace()
             if current_trace:
                 with current_trace.span(child_name, span_type="yield") as span_client:
+                    span_client.record_input({"send": value})
                     span_client.record_output(result)
             self._iteration_index += 1
             return result
@@ -2532,7 +2531,6 @@ class _ObservedAsyncGeneratorProxy:
 
     async def athrow(self, typ, val=None, tb=None):
         try:
-            self._trace_client.record_input({"throw": str(typ)})
             if self._tracer.deep_tracing:
                 with _DeepTracer(self._tracer):
                     result = await self._agen.athrow(typ, val, tb)
@@ -2542,6 +2540,7 @@ class _ObservedAsyncGeneratorProxy:
             current_trace = self._tracer.get_current_trace()
             if current_trace:
                 with current_trace.span(child_name, span_type="yield") as span_client:
+                    span_client.record_input({"throw": str(typ)})
                     span_client.record_output(result)
             self._iteration_index += 1
             return result
@@ -2562,27 +2561,4 @@ class _ObservedAsyncGeneratorProxy:
             await self._afinalize()
 
     async def _afinalize(self):
-        if not self._span_closed:
-            # Capture state after the async generator completes
-            try:
-                self._tracer._conditionally_capture_and_record_state(
-                    self._trace_client, self._original_args, is_before=False
-                )
-            except Exception:
-                pass
-            try:
-                # __exit__ is sync; it's safe to call here
-                self._span_cm.__exit__(None, None, None)
-            except Exception:
-                pass
-            self._span_closed = True
-
-            if self._created_trace:
-                try:
-                    self._trace_client.save(final_save=True)
-                except Exception:
-                    pass
-                try:
-                    self._tracer.reset_current_trace(self._trace_token)
-                except Exception:
-                    pass
+        pass
