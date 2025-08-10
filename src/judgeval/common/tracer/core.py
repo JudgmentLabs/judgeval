@@ -1233,9 +1233,7 @@ class Tracer:
         # --- Generator functions (sync and async) handling ---
         # For generators, we must keep the span open across iterations and record on each yield.
         try:
-            import inspect as _inspect  # localized to avoid shadowing module-level import
-
-            if _inspect.isasyncgenfunction(func):
+            if inspect.isasyncgenfunction(func):
 
                 @functools.wraps(func)
                 def async_generator_wrapper(*args, **kwargs):
@@ -1275,7 +1273,7 @@ class Tracer:
 
                 return async_generator_wrapper
 
-            if _inspect.isgeneratorfunction(func):
+            if inspect.isgeneratorfunction(func):
 
                 @functools.wraps(func)
                 def generator_wrapper(*args, **kwargs):
