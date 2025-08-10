@@ -4,6 +4,8 @@ Implements the JudgmentClient to interact with the Judgment API.
 
 from __future__ import annotations
 import os
+import importlib.util
+from pathlib import Path
 from uuid import uuid4
 from typing import Optional, List, Dict, Any, Union, Callable, TYPE_CHECKING
 
@@ -16,7 +18,7 @@ from judgeval.scorers import (
     APIScorerConfig,
     BaseScorer,
 )
-from judgeval.evaluation_run import EvaluationRun
+from judgeval.data.evaluation_run import EvaluationRun
 from judgeval.run_evaluation import (
     run_eval,
     assert_test,
@@ -265,3 +267,101 @@ class JudgmentClient(metaclass=SingletonMeta):
         )
 
         assert_test(results)
+
+    def _extract_scorer_name(self, scorer_file_path: str) -> str:
+        """Extract scorer name from the scorer file by importing it."""
+        try:
+            spec = importlib.util.spec_from_file_location(
+                "scorer_module", scorer_file_path
+            )
+            if spec is None or spec.loader is None:
+                raise ImportError(f"Could not load spec from {scorer_file_path}")
+
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+            for attr_name in dir(module):
+                attr = getattr(module, attr_name)
+                if (
+                    isinstance(attr, type)
+                    and any("Scorer" in str(base) for base in attr.__mro__)
+                    and attr.__module__ == "scorer_module"
+                ):
+                    try:
+                        # Instantiate the scorer and get its name
+                        scorer_instance = attr()
+                        if hasattr(scorer_instance, "name"):
+                            return scorer_instance.name
+                    except Exception:
+                        # Skip if instantiation fails
+                        continue
+
+            raise AttributeError("No scorer class found or could be instantiated")
+        except Exception as e:
+            judgeval_logger.warning(f"Could not extract scorer name: {e}")
+            return Path(scorer_file_path).stem
+
+    def save_custom_scorer(
+        self,
+        scorer_file_path: str,
+        requirements_file_path: Optional[str] = None,
+        unique_name: Optional[str] = None,
+    ) -> bool:
+        """
+        Upload custom ExampleScorer from files to backend.
+
+        Args:
+            scorer_file_path: Path to Python file containing CustomScorer class
+            requirements_file_path: Optional path to requirements.txt
+            unique_name: Optional unique identifier (auto-detected from scorer.name if not provided)
+
+        Returns:
+            bool: True if upload successful
+
+        Raises:
+            ValueError: If scorer file is invalid
+            FileNotFoundError: If scorer file doesn't exist
+        """
+        import os
+
+        if not os.path.exists(scorer_file_path):
+            raise FileNotFoundError(f"Scorer file not found: {scorer_file_path}")
+
+        # Auto-detect scorer name if not provided
+        if unique_name is None:
+            unique_name = self._extract_scorer_name(scorer_file_path)
+            judgeval_logger.info(f"Auto-detected scorer name: '{unique_name}'")
+
+        # Read scorer code
+        with open(scorer_file_path, "r") as f:
+            scorer_code = f.read()
+
+        # Read requirements (optional)
+        requirements_text = ""
+        if requirements_file_path and os.path.exists(requirements_file_path):
+            with open(requirements_file_path, "r") as f:
+                requirements_text = f.read()
+
+        # Upload to backend
+        judgeval_logger.info(
+            f"Uploading custom scorer: {unique_name}, this can take a couple of minutes..."
+        )
+        try:
+            response = self.api_client.upload_custom_scorer(
+                scorer_name=unique_name,
+                scorer_code=scorer_code,
+                requirements_text=requirements_text,
+            )
+
+            if response.get("status") == "success":
+                judgeval_logger.info(
+                    f"Successfully uploaded custom scorer: {unique_name}"
+                )
+                return True
+            else:
+                judgeval_logger.error(f"Failed to upload custom scorer: {unique_name}")
+                return False
+
+        except Exception as e:
+            judgeval_logger.error(f"Error uploading custom scorer: {e}")
+            raise

@@ -23,6 +23,7 @@ from judgeval.common.api.constants import (
     JUDGMENT_SCORER_SAVE_API_URL,
     JUDGMENT_SCORER_FETCH_API_URL,
     JUDGMENT_SCORER_EXISTS_API_URL,
+    JUDGMENT_CUSTOM_SCORER_UPLOAD_API_URL,
     JUDGMENT_DATASETS_APPEND_TRACES_API_URL,
 )
 from judgeval.common.api.constants import (
@@ -45,6 +46,8 @@ from judgeval.common.api.constants import (
     ScorerSavePayload,
     ScorerFetchPayload,
     ScorerExistsPayload,
+    CustomScorerUploadPayload,
+    CustomScorerTemplateResponse,
 )
 from judgeval.utils.requests import requests
 from judgeval.common.api.json_encoder import json_encoder
@@ -91,14 +94,20 @@ class JudgmentApiClient:
         method: Literal["POST", "PATCH", "GET", "DELETE"],
         url: str,
         payload: Any,
+        timeout: Optional[Union[float, tuple]] = None,
     ) -> Any:
+        # Prepare request kwargs with optional timeout
+        request_kwargs = self._request_kwargs()
+        if timeout is not None:
+            request_kwargs["timeout"] = timeout
+
         if method == "GET":
             r = requests.request(
                 method,
                 url,
                 params=payload,
                 headers=self._headers(),
-                **self._request_kwargs(),
+                **request_kwargs,
             )
         else:
             r = requests.request(
@@ -106,7 +115,7 @@ class JudgmentApiClient:
                 url,
                 json=json_encoder(payload),
                 headers=self._headers(),
-                **self._request_kwargs(),
+                **request_kwargs,
             )
 
         try:
@@ -263,6 +272,31 @@ class JudgmentApiClient:
                 response=e.response,
                 request=e.request,
             )
+
+    def upload_custom_scorer(
+        self,
+        scorer_name: str,
+        scorer_code: str,
+        requirements_text: str,
+    ) -> CustomScorerTemplateResponse:
+        """Upload custom scorer to backend"""
+        payload: CustomScorerUploadPayload = {
+            "scorer_name": scorer_name,
+            "scorer_code": scorer_code,
+            "requirements_text": requirements_text,
+        }
+
+        try:
+            # Use longer timeout for custom scorer upload (5 minutes)
+            response = self._do_request(
+                "POST",
+                JUDGMENT_CUSTOM_SCORER_UPLOAD_API_URL,
+                payload,
+                timeout=(10, 300),
+            )
+            return response
+        except JudgmentAPIException as e:
+            raise e
 
     def push_dataset(
         self,

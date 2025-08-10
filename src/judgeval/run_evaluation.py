@@ -24,7 +24,7 @@ from judgeval.common.logger import judgeval_logger
 if TYPE_CHECKING:
     from judgeval.common.tracer import Tracer
     from judgeval.data.trace_run import TraceRun
-    from judgeval.evaluation_run import EvaluationRun
+    from judgeval.data.evaluation_run import EvaluationRun
     from judgeval.integrations.langgraph import JudgevalCallbackHandler
 
 
@@ -406,24 +406,31 @@ def run_eval(
                 f"All examples must have the same keys: {current_keys} != {keys}"
             )
 
-    judgment_scorers: List[APIScorerConfig] = []
-    local_scorers: List[BaseScorer] = []
-    for scorer in evaluation_run.scorers:
-        if isinstance(scorer, APIScorerConfig):
-            judgment_scorers.append(scorer)
-        else:
-            local_scorers.append(scorer)
-
     results: List[ScoringResult] = []
     url = ""
 
-    if len(local_scorers) > 0 and len(judgment_scorers) > 0:
+    if (
+        len(evaluation_run.custom_scorers) > 0
+        and len(evaluation_run.judgment_scorers) > 0
+    ):
         error_msg = "We currently do not support running both local and Judgment API scorers at the same time. Please run your evaluation with either local scorers or Judgment API scorers, but not both."
         judgeval_logger.error(error_msg)
         raise ValueError(error_msg)
 
-    if len(judgment_scorers) > 0:
-        check_examples(evaluation_run.examples, judgment_scorers)
+    e2b_scorers = [cs for cs in evaluation_run.custom_scorers if cs.server_hosted]
+
+    if evaluation_run.judgment_scorers or e2b_scorers:
+        if evaluation_run.judgment_scorers and e2b_scorers:
+            error_msg = "We currently do not support running both hosted custom scorers and Judgment API scorers at the same time. Please run your evaluation with one or the other, but not both."
+            judgeval_logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        if len(e2b_scorers) > 1:
+            error_msg = "We currently do not support running multiple hosted custom scorers at the same time."
+            judgeval_logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        check_examples(evaluation_run.examples, evaluation_run.judgment_scorers)
         stop_event = threading.Event()
         t = threading.Thread(
             target=progress_logger, args=(stop_event, "Running evaluation...")
@@ -443,24 +450,27 @@ def run_eval(
                     f"Error adding evaluation to queue: {error_message}"
                 )
                 raise JudgmentAPIError(error_message)
+
+            num_scorers = (
+                len(evaluation_run.judgment_scorers)
+                if evaluation_run.judgment_scorers
+                else sum(1 for cs in evaluation_run.custom_scorers if cs.server_hosted)
+            )
             results, url = _poll_evaluation_until_complete(
                 experiment_run_id=evaluation_run.id,
                 project_name=evaluation_run.project_name,
                 judgment_api_key=judgment_api_key,
                 organization_id=evaluation_run.organization_id,
-                expected_scorer_data_count=(
-                    len(evaluation_run.scorers) * len(evaluation_run.examples)
-                ),
+                expected_scorer_data_count=(num_scorers * len(evaluation_run.examples)),
             )
         finally:
             stop_event.set()
             t.join()
-
-    if len(local_scorers) > 0:
+    else:
         results = safe_run_async(
             a_execute_scoring(
                 evaluation_run.examples,
-                local_scorers,
+                evaluation_run.custom_scorers,
                 model=evaluation_run.model,
                 throttle_value=0,
                 max_concurrent=MAX_CONCURRENT_EVALUATIONS,

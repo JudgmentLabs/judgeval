@@ -26,6 +26,7 @@ class BaseScorer(BaseModel):
     name: Optional[str] = (
         None  # name of your scorer (Faithfulness, PromptScorer-randomslug)
     )
+    class_name: Optional[str] = None  # The name of the class of the scorer
     score: Optional[float] = None  # The float score of the scorer run on the test case
     score_breakdown: Optional[Dict] = None
     reason: Optional[str] = ""
@@ -39,24 +40,22 @@ class BaseScorer(BaseModel):
     error: Optional[str] = None  # The error message if the scorer failed
     additional_metadata: Optional[Dict] = None  # Additional metadata for the scorer
     user: Optional[str] = None  # The user ID of the scorer
+    server_hosted: bool = False  # Whether the scorer is enabled for e2b
 
-    @model_validator(mode="before")
+    @model_validator(mode="after")
     @classmethod
-    def enforce_strict_threshold(cls, data: dict):
-        if data.get("strict_mode"):
-            data["threshold"] = 1.0
+    def enforce_strict_threshold(cls, data: "BaseScorer"):
+        if data.strict_mode:
+            data.threshold = 1.0
         return data
 
     @model_validator(mode="after")
     @classmethod
     def default_name(cls, m: "BaseScorer") -> "BaseScorer":
+        # Always set class_name to the string name of the class
+        m.class_name = m.__class__.__name__
         if not m.name:
-            # Try to use the class name if it exists and is not empty
-            class_name = getattr(m, "__class__", None)
-            if class_name and getattr(m.__class__, "__name__", None):
-                m.name = m.__class__.__name__
-            else:
-                m.name = m.score_type
+            m.name = m.class_name
         return m
 
     def _add_model(self, model: str):
