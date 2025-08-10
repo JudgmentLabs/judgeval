@@ -2367,11 +2367,6 @@ class _ObservedGeneratorProxy:
 
     def __next__(self):
         try:
-            if self._tracer.deep_tracing:
-                with _DeepTracer(self._tracer):
-                    value = next(self._gen)
-            else:
-                value = next(self._gen)
             # Child span per yield
             child_name = (
                 f"{self._base_span_name or 'generator'}.yield[{self._iteration_index}]"
@@ -2379,7 +2374,18 @@ class _ObservedGeneratorProxy:
             current_trace = self._tracer.get_current_trace()
             if current_trace:
                 with current_trace.span(child_name, span_type="yield") as span_client:
+                    if self._tracer.deep_tracing:
+                        with _DeepTracer(self._tracer):
+                            value = next(self._gen)
+                    else:
+                        value = next(self._gen)
                     span_client.record_output(value)
+            else:
+                if self._tracer.deep_tracing:
+                    with _DeepTracer(self._tracer):
+                        value = next(self._gen)
+                else:
+                    value = next(self._gen)
             self._iteration_index += 1
             return value
         except StopIteration:
@@ -2394,11 +2400,6 @@ class _ObservedGeneratorProxy:
 
     def send(self, value):
         try:
-            if self._tracer.deep_tracing:
-                with _DeepTracer(self._tracer):
-                    result = self._gen.send(value)
-            else:
-                result = self._gen.send(value)
             child_name = (
                 f"{self._base_span_name or 'generator'}.send[{self._iteration_index}]"
             )
@@ -2406,7 +2407,18 @@ class _ObservedGeneratorProxy:
             if current_trace:
                 with current_trace.span(child_name, span_type="yield") as span_client:
                     span_client.record_input({"send": value})
+                    if self._tracer.deep_tracing:
+                        with _DeepTracer(self._tracer):
+                            result = self._gen.send(value)
+                    else:
+                        result = self._gen.send(value)
                     span_client.record_output(result)
+            else:
+                if self._tracer.deep_tracing:
+                    with _DeepTracer(self._tracer):
+                        result = self._gen.send(value)
+                else:
+                    result = self._gen.send(value)
             self._iteration_index += 1
             return result
         except StopIteration:
@@ -2421,11 +2433,6 @@ class _ObservedGeneratorProxy:
 
     def throw(self, typ, val=None, tb=None):
         try:
-            if self._tracer.deep_tracing:
-                with _DeepTracer(self._tracer):
-                    result = self._gen.throw(typ, val, tb)
-            else:
-                result = self._gen.throw(typ, val, tb)
             child_name = (
                 f"{self._base_span_name or 'generator'}.throw[{self._iteration_index}]"
             )
@@ -2433,7 +2440,18 @@ class _ObservedGeneratorProxy:
             if current_trace:
                 with current_trace.span(child_name, span_type="yield") as span_client:
                     span_client.record_input({"throw": str(typ)})
+                    if self._tracer.deep_tracing:
+                        with _DeepTracer(self._tracer):
+                            result = self._gen.throw(typ, val, tb)
+                    else:
+                        result = self._gen.throw(typ, val, tb)
                     span_client.record_output(result)
+            else:
+                if self._tracer.deep_tracing:
+                    with _DeepTracer(self._tracer):
+                        result = self._gen.throw(typ, val, tb)
+                else:
+                    result = self._gen.throw(typ, val, tb)
             self._iteration_index += 1
             return result
         except StopIteration:
@@ -2480,16 +2498,22 @@ class _ObservedAsyncGeneratorProxy:
 
     async def __anext__(self):
         try:
-            if self._tracer.deep_tracing:
-                with _DeepTracer(self._tracer):
-                    value = await self._agen.__anext__()
-            else:
-                value = await self._agen.__anext__()
             child_name = f"{self._base_span_name or 'async_generator'}.yield[{self._iteration_index}]"
             current_trace = self._tracer.get_current_trace()
             if current_trace:
                 with current_trace.span(child_name, span_type="yield") as span_client:
+                    if self._tracer.deep_tracing:
+                        with _DeepTracer(self._tracer):
+                            value = await self._agen.__anext__()
+                    else:
+                        value = await self._agen.__anext__()
                     span_client.record_output(value)
+            else:
+                if self._tracer.deep_tracing:
+                    with _DeepTracer(self._tracer):
+                        value = await self._agen.__anext__()
+                else:
+                    value = await self._agen.__anext__()
             self._iteration_index += 1
             return value
         except StopAsyncIteration:
@@ -2504,17 +2528,23 @@ class _ObservedAsyncGeneratorProxy:
 
     async def asend(self, value):
         try:
-            if self._tracer.deep_tracing:
-                with _DeepTracer(self._tracer):
-                    result = await self._agen.asend(value)
-            else:
-                result = await self._agen.asend(value)
             child_name = f"{self._base_span_name or 'async_generator'}.send[{self._iteration_index}]"
             current_trace = self._tracer.get_current_trace()
             if current_trace:
                 with current_trace.span(child_name, span_type="yield") as span_client:
                     span_client.record_input({"send": value})
+                    if self._tracer.deep_tracing:
+                        with _DeepTracer(self._tracer):
+                            result = await self._agen.asend(value)
+                    else:
+                        result = await self._agen.asend(value)
                     span_client.record_output(result)
+            else:
+                if self._tracer.deep_tracing:
+                    with _DeepTracer(self._tracer):
+                        result = await self._agen.asend(value)
+                else:
+                    result = await self._agen.asend(value)
             self._iteration_index += 1
             return result
         except StopAsyncIteration:
@@ -2529,17 +2559,23 @@ class _ObservedAsyncGeneratorProxy:
 
     async def athrow(self, typ, val=None, tb=None):
         try:
-            if self._tracer.deep_tracing:
-                with _DeepTracer(self._tracer):
-                    result = await self._agen.athrow(typ, val, tb)
-            else:
-                result = await self._agen.athrow(typ, val, tb)
             child_name = f"{self._base_span_name or 'async_generator'}.throw[{self._iteration_index}]"
             current_trace = self._tracer.get_current_trace()
             if current_trace:
                 with current_trace.span(child_name, span_type="yield") as span_client:
                     span_client.record_input({"throw": str(typ)})
+                    if self._tracer.deep_tracing:
+                        with _DeepTracer(self._tracer):
+                            result = await self._agen.athrow(typ, val, tb)
+                    else:
+                        result = await self._agen.athrow(typ, val, tb)
                     span_client.record_output(result)
+            else:
+                if self._tracer.deep_tracing:
+                    with _DeepTracer(self._tracer):
+                        result = await self._agen.athrow(typ, val, tb)
+                else:
+                    result = await self._agen.athrow(typ, val, tb)
             self._iteration_index += 1
             return result
         except StopAsyncIteration:
