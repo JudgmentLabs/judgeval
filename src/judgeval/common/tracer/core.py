@@ -285,35 +285,13 @@ class TraceClient:
 
             self.otel_span_processor.queue_span_update(span, span_state="state_after")
 
-    async def _update_coroutine(self, span: TraceSpan, coroutine: Any, field: str):
-        """Helper method to update the output of a trace entry once the coroutine completes"""
-        try:
-            result = await coroutine
-            setattr(span, field, result)
-
-            if field == "output":
-                self.otel_span_processor.queue_span_update(span, span_state="output")
-
-            return result
-        except Exception as e:
-            setattr(span, field, f"Error: {str(e)}")
-
-            if field == "output":
-                self.otel_span_processor.queue_span_update(span, span_state="output")
-
-            raise
-
     def record_output(self, output: Any):
         current_span_id = self.get_current_span()
         if current_span_id:
             span = self.span_id_to_span[current_span_id]
-            span.output = "<pending>" if inspect.iscoroutine(output) else output
+            span.output = output
 
-            if inspect.iscoroutine(output):
-                asyncio.create_task(self._update_coroutine(span, output, "output"))
-
-            if not inspect.iscoroutine(output):
-                self.otel_span_processor.queue_span_update(span, span_state="output")
+            self.otel_span_processor.queue_span_update(span, span_state="output")
 
             return span
         return None
@@ -1310,6 +1288,38 @@ class Tracer:
                     _capture_exception_for_trace(current_trace, sys.exc_info())
                     raise e
 
+        async def _execute_in_span_async(
+            current_trace, span_name, span_type, async_execution_func, args, kwargs
+        ):
+            """Helper function to execute async code within a span context."""
+            with current_trace.span(span_name, span_type=span_type) as span:
+                _record_span_data(span, args, kwargs)
+
+                try:
+                    result = await async_execution_func()
+                    _finalize_span_data(span, result, args)
+                    return result
+                except Exception as e:
+                    _capture_exception_for_trace(current_trace, sys.exc_info())
+                    raise e
+
+        def _create_new_trace(self, span_name):
+            """Helper function to create a new trace and set it as current."""
+            trace_id = str(uuid.uuid4())
+            project = self.project_name
+
+            current_trace = TraceClient(
+                self,
+                trace_id,
+                span_name,
+                project_name=project,
+                enable_monitoring=self.enable_monitoring,
+                enable_evaluations=self.enable_evaluations,
+            )
+
+            trace_token = self.set_current_trace(current_trace)
+            return current_trace, trace_token
+
         def _execute_with_auto_trace_creation(
             span_name, span_type, execution_func, args, kwargs
         ):
@@ -1317,20 +1327,7 @@ class Tracer:
             current_trace = self.get_current_trace()
 
             if not current_trace:
-                # Create a new trace for this execution
-                trace_id = str(uuid.uuid4())
-                project = self.project_name
-
-                current_trace = TraceClient(
-                    self,
-                    trace_id,
-                    span_name,
-                    project_name=project,
-                    enable_monitoring=self.enable_monitoring,
-                    enable_evaluations=self.enable_evaluations,
-                )
-
-                trace_token = self.set_current_trace(current_trace)
+                current_trace, trace_token = _create_new_trace(self, span_name)
 
                 try:
                     result = _execute_in_span(
@@ -1349,6 +1346,39 @@ class Tracer:
                 # Use existing trace
                 return _execute_in_span(
                     current_trace, span_name, span_type, execution_func, args, kwargs
+                )
+
+        async def _execute_with_auto_trace_creation_async(
+            span_name, span_type, async_execution_func, args, kwargs
+        ):
+            """Helper function that handles automatic trace creation and async span execution."""
+            current_trace = self.get_current_trace()
+
+            if not current_trace:
+                current_trace, trace_token = _create_new_trace(self, span_name)
+
+                try:
+                    result = await _execute_in_span_async(
+                        current_trace,
+                        span_name,
+                        span_type,
+                        async_execution_func,
+                        args,
+                        kwargs,
+                    )
+                    return result
+                finally:
+                    # Cleanup the trace we created
+                    _cleanup_trace(current_trace, trace_token, "async_auto_trace")
+            else:
+                # Use existing trace
+                return await _execute_in_span_async(
+                    current_trace,
+                    span_name,
+                    span_type,
+                    async_execution_func,
+                    args,
+                    kwargs,
                 )
 
         # Check for generator functions first
@@ -1392,7 +1422,7 @@ class Tracer:
                     while True:
                         try:
                             # Handle automatic trace creation and span execution
-                            item = _execute_with_auto_trace_creation(
+                            item = await _execute_with_auto_trace_creation_async(
                                 original_span_name,
                                 span_type,
                                 lambda: async_generator.__anext__(),
@@ -1423,12 +1453,9 @@ class Tracer:
                     else:
                         return await func(*args, **kwargs)
 
-                result = _execute_with_auto_trace_creation(
+                result = await _execute_with_auto_trace_creation_async(
                     span_name, span_type, async_execution, args, kwargs
                 )
-
-                if inspect.iscoroutine(result):
-                    result = await result
 
                 return result
 
