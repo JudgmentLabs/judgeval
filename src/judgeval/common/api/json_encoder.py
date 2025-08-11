@@ -84,7 +84,7 @@ def json_encoder(
         )
 
     # Sequences
-    if isinstance(obj, (list, set, frozenset, GeneratorType, tuple, deque)):
+    if isinstance(obj, (list, set, frozenset, tuple, deque)):
         return _dump_sequence(
             obj=obj,
         )
@@ -169,16 +169,15 @@ def _dump_other(
     obj: Any,
 ) -> Any:
     """
-    Dump an object to a hashable object, using the same parameters as jsonable_encoder
+    Dump an object to a representation without iterating it.
+
+    Avoids calling dict(obj) which can consume iterators/generators or
+    invoke user-defined iteration protocols.
     """
     try:
-        data = dict(obj)
-    except Exception:
         return repr(obj)
-
-    return json_encoder(
-        data,
-    )
+    except Exception:
+        return str(obj)
 
 
 def iso_format(o: Union[datetime.date, datetime.time]) -> str:
@@ -218,7 +217,7 @@ ENCODERS_BY_TYPE: Dict[Type[Any], Callable[[Any], Any]] = {
     Enum: lambda o: o.value,
     frozenset: list,
     deque: list,
-    GeneratorType: list,
+    GeneratorType: repr,
     Path: str,
     Pattern: lambda o: o.pattern,
     SecretBytes: str,
