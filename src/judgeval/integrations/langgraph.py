@@ -133,7 +133,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         inputs: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Start tracking a span, ensuring trace client exists"""
-        if (name.startswith("__") and name.endswith("__")):
+        if name.startswith("__") and name.endswith("__"):
             return
         start_time = time.time()
         span_id = str(uuid.uuid4())
