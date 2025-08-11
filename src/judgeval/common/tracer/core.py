@@ -1248,27 +1248,17 @@ class Tracer:
                             args[0], class_name, self.class_identifiers
                         )
 
-                    current_trace = self.get_current_trace()
-
                     agen = func(*args, **kwargs)
-
-                    if current_trace:
-                        with current_trace.span(
-                            span_name, span_type=span_type
-                        ) as span_client:
-                            inputs = combine_args_kwargs(func, args, kwargs)
-                            span_client.record_input(inputs)
-                            if agent_name:
-                                span_client.record_agent_name(agent_name)
-                            if class_name and class_name in self.class_identifiers:
-                                span_client.record_class_name(class_name)
-                            span_client.record_output(agen)
 
                     return _ObservedAsyncGeneratorProxy(
                         inner_async_gen=agen,
                         tracer=self,
                         original_args=args,
                         base_span_name=span_name,
+                        func=func,
+                        class_name=class_name,
+                        agent_name=agent_name,
+                        span_type=span_type,
                     )
 
                 return async_generator_wrapper
@@ -1288,27 +1278,17 @@ class Tracer:
                             args[0], class_name, self.class_identifiers
                         )
 
-                    current_trace = self.get_current_trace()
-
                     gen = func(*args, **kwargs)
-
-                    if current_trace:
-                        with current_trace.span(
-                            span_name, span_type=span_type
-                        ) as span_client:
-                            inputs = combine_args_kwargs(func, args, kwargs)
-                            span_client.record_input(inputs)
-                            if agent_name:
-                                span_client.record_agent_name(agent_name)
-                            if class_name and class_name in self.class_identifiers:
-                                span_client.record_class_name(class_name)
-                            span_client.record_output(gen)
 
                     return _ObservedGeneratorProxy(
                         inner_gen=gen,
                         tracer=self,
                         original_args=args,
                         base_span_name=span_name,
+                        func=func,
+                        class_name=class_name,
+                        agent_name=agent_name,
+                        span_type=span_type,
                     )
 
                 return generator_wrapper
@@ -2355,39 +2335,100 @@ class _ObservedGeneratorProxy:
         tracer: "Tracer",
         original_args: tuple,
         base_span_name: Optional[str] = None,
+        func: Optional[Callable] = None,
+        class_name: Optional[str] = None,
+        agent_name: Optional[str] = None,
+        span_type: SpanType = "span",
     ):
         self._gen = inner_gen
         self._tracer = tracer
         self._original_args = original_args
         self._base_span_name = base_span_name
+        self._func = func
+        self._class_name = class_name
+        self._agent_name = agent_name
+        self._span_type = span_type
         self._iteration_index = 0
 
     def __iter__(self):
         return self
 
+    def _create_trace_if_needed(self):
+        """Create a trace context like normal functions do if none exists."""
+        current_trace = self._tracer.get_current_trace()
+        if not current_trace:
+            trace_id = str(uuid.uuid4())
+            project = self._tracer.project_name
+            current_trace = TraceClient(
+                self._tracer,
+                trace_id,
+                self._base_span_name or "generator",
+                project_name=project,
+                enable_monitoring=self._tracer.enable_monitoring,
+                enable_evaluations=self._tracer.enable_evaluations,
+            )
+            trace_token = self._tracer.set_current_trace(current_trace)
+            return current_trace, trace_token, True  # True means we created it
+        return current_trace, None, False  # False means it already existed
+
     def __next__(self):
         try:
-            # Child span per yield
-            child_name = (
-                f"{self._base_span_name or 'generator'}.yield[{self._iteration_index}]"
-            )
-            current_trace = self._tracer.get_current_trace()
-            if current_trace:
-                with current_trace.span(child_name, span_type="yield") as span_client:
+            current_trace, trace_token, created_trace = self._create_trace_if_needed()
+
+            try:
+                # Create main span for the generator function
+                with current_trace.span(
+                    self._base_span_name or "generator", span_type=self._span_type
+                ) as span_client:
+                    # Record inputs only on first iteration
+                    if self._iteration_index == 0 and self._func:
+                        inputs = combine_args_kwargs(
+                            self._func, self._original_args, {}
+                        )
+                        span_client.record_input(inputs)
+                        if self._agent_name:
+                            span_client.record_agent_name(self._agent_name)
+                        if (
+                            self._class_name
+                            and self._class_name in self._tracer.class_identifiers
+                        ):
+                            span_client.record_class_name(self._class_name)
+
                     if self._tracer.deep_tracing:
                         with _DeepTracer(self._tracer):
                             value = next(self._gen)
                     else:
                         value = next(self._gen)
+
                     span_client.record_output(value)
-            else:
-                if self._tracer.deep_tracing:
-                    with _DeepTracer(self._tracer):
-                        value = next(self._gen)
-                else:
-                    value = next(self._gen)
-            self._iteration_index += 1
-            return value
+
+                self._iteration_index += 1
+                return value
+            finally:
+                # Clean up trace if we created it (like normal functions do)
+                if created_trace:
+                    try:
+                        current_trace.save(final_save=True)
+                        complete_trace_data = {
+                            "trace_id": current_trace.trace_id,
+                            "name": current_trace.name,
+                            "created_at": datetime.fromtimestamp(
+                                current_trace.start_time or time.time(), timezone.utc
+                            ).isoformat(),
+                            "duration": current_trace.get_duration(),
+                            "trace_spans": [
+                                span.model_dump() for span in current_trace.trace_spans
+                            ],
+                            "offline_mode": self._tracer.offline_mode,
+                            "parent_trace_id": current_trace.parent_trace_id,
+                            "parent_name": current_trace.parent_name,
+                        }
+                        self._tracer.traces.append(complete_trace_data)
+                        self._tracer.reset_current_trace(trace_token)
+                    except Exception as e:
+                        judgeval_logger.warning(
+                            f"Issue with generator trace cleanup: {e}"
+                        )
         except StopIteration:
             self._finalize()
             raise
@@ -2400,27 +2441,48 @@ class _ObservedGeneratorProxy:
 
     def send(self, value):
         try:
-            child_name = (
-                f"{self._base_span_name or 'generator'}.send[{self._iteration_index}]"
-            )
-            current_trace = self._tracer.get_current_trace()
-            if current_trace:
-                with current_trace.span(child_name, span_type="yield") as span_client:
+            current_trace, trace_token, created_trace = self._create_trace_if_needed()
+
+            try:
+                with current_trace.span(
+                    self._base_span_name or "generator", span_type=self._span_type
+                ) as span_client:
                     span_client.record_input({"send": value})
+
                     if self._tracer.deep_tracing:
                         with _DeepTracer(self._tracer):
                             result = self._gen.send(value)
                     else:
                         result = self._gen.send(value)
+
                     span_client.record_output(result)
-            else:
-                if self._tracer.deep_tracing:
-                    with _DeepTracer(self._tracer):
-                        result = self._gen.send(value)
-                else:
-                    result = self._gen.send(value)
-            self._iteration_index += 1
-            return result
+
+                self._iteration_index += 1
+                return result
+            finally:
+                if created_trace:
+                    try:
+                        current_trace.save(final_save=True)
+                        complete_trace_data = {
+                            "trace_id": current_trace.trace_id,
+                            "name": current_trace.name,
+                            "created_at": datetime.fromtimestamp(
+                                current_trace.start_time or time.time(), timezone.utc
+                            ).isoformat(),
+                            "duration": current_trace.get_duration(),
+                            "trace_spans": [
+                                span.model_dump() for span in current_trace.trace_spans
+                            ],
+                            "offline_mode": self._tracer.offline_mode,
+                            "parent_trace_id": current_trace.parent_trace_id,
+                            "parent_name": current_trace.parent_name,
+                        }
+                        self._tracer.traces.append(complete_trace_data)
+                        self._tracer.reset_current_trace(trace_token)
+                    except Exception as e:
+                        judgeval_logger.warning(
+                            f"Issue with generator trace cleanup: {e}"
+                        )
         except StopIteration:
             self._finalize()
             raise
@@ -2433,27 +2495,48 @@ class _ObservedGeneratorProxy:
 
     def throw(self, typ, val=None, tb=None):
         try:
-            child_name = (
-                f"{self._base_span_name or 'generator'}.throw[{self._iteration_index}]"
-            )
-            current_trace = self._tracer.get_current_trace()
-            if current_trace:
-                with current_trace.span(child_name, span_type="yield") as span_client:
+            current_trace, trace_token, created_trace = self._create_trace_if_needed()
+
+            try:
+                with current_trace.span(
+                    self._base_span_name or "generator", span_type=self._span_type
+                ) as span_client:
                     span_client.record_input({"throw": str(typ)})
+
                     if self._tracer.deep_tracing:
                         with _DeepTracer(self._tracer):
                             result = self._gen.throw(typ, val, tb)
                     else:
                         result = self._gen.throw(typ, val, tb)
+
                     span_client.record_output(result)
-            else:
-                if self._tracer.deep_tracing:
-                    with _DeepTracer(self._tracer):
-                        result = self._gen.throw(typ, val, tb)
-                else:
-                    result = self._gen.throw(typ, val, tb)
-            self._iteration_index += 1
-            return result
+
+                self._iteration_index += 1
+                return result
+            finally:
+                if created_trace:
+                    try:
+                        current_trace.save(final_save=True)
+                        complete_trace_data = {
+                            "trace_id": current_trace.trace_id,
+                            "name": current_trace.name,
+                            "created_at": datetime.fromtimestamp(
+                                current_trace.start_time or time.time(), timezone.utc
+                            ).isoformat(),
+                            "duration": current_trace.get_duration(),
+                            "trace_spans": [
+                                span.model_dump() for span in current_trace.trace_spans
+                            ],
+                            "offline_mode": self._tracer.offline_mode,
+                            "parent_trace_id": current_trace.parent_trace_id,
+                            "parent_name": current_trace.parent_name,
+                        }
+                        self._tracer.traces.append(complete_trace_data)
+                        self._tracer.reset_current_trace(trace_token)
+                    except Exception as e:
+                        judgeval_logger.warning(
+                            f"Issue with generator trace cleanup: {e}"
+                        )
         except StopIteration:
             self._finalize()
             raise
@@ -2486,36 +2569,98 @@ class _ObservedAsyncGeneratorProxy:
         tracer: "Tracer",
         original_args: tuple,
         base_span_name: Optional[str] = None,
+        func: Optional[Callable] = None,
+        class_name: Optional[str] = None,
+        agent_name: Optional[str] = None,
+        span_type: SpanType = "span",
     ):
         self._agen = inner_async_gen
         self._tracer = tracer
         self._original_args = original_args
         self._base_span_name = base_span_name
+        self._func = func
+        self._class_name = class_name
+        self._agent_name = agent_name
+        self._span_type = span_type
         self._iteration_index = 0
 
     def __aiter__(self):
         return self
 
+    def _create_trace_if_needed(self):
+        """Create a trace context like normal functions do if none exists."""
+        current_trace = self._tracer.get_current_trace()
+        if not current_trace:
+            trace_id = str(uuid.uuid4())
+            project = self._tracer.project_name
+            current_trace = TraceClient(
+                self._tracer,
+                trace_id,
+                self._base_span_name or "async_generator",
+                project_name=project,
+                enable_monitoring=self._tracer.enable_monitoring,
+                enable_evaluations=self._tracer.enable_evaluations,
+            )
+            trace_token = self._tracer.set_current_trace(current_trace)
+            return current_trace, trace_token, True  # True means we created it
+        return current_trace, None, False  # False means it already existed
+
     async def __anext__(self):
         try:
-            child_name = f"{self._base_span_name or 'async_generator'}.yield[{self._iteration_index}]"
-            current_trace = self._tracer.get_current_trace()
-            if current_trace:
-                with current_trace.span(child_name, span_type="yield") as span_client:
+            current_trace, trace_token, created_trace = self._create_trace_if_needed()
+
+            try:
+                with current_trace.span(
+                    self._base_span_name or "async_generator", span_type=self._span_type
+                ) as span_client:
+                    # Record inputs only on first iteration
+                    if self._iteration_index == 0 and self._func:
+                        inputs = combine_args_kwargs(
+                            self._func, self._original_args, {}
+                        )
+                        span_client.record_input(inputs)
+                        if self._agent_name:
+                            span_client.record_agent_name(self._agent_name)
+                        if (
+                            self._class_name
+                            and self._class_name in self._tracer.class_identifiers
+                        ):
+                            span_client.record_class_name(self._class_name)
+
                     if self._tracer.deep_tracing:
                         with _DeepTracer(self._tracer):
                             value = await self._agen.__anext__()
                     else:
                         value = await self._agen.__anext__()
+
                     span_client.record_output(value)
-            else:
-                if self._tracer.deep_tracing:
-                    with _DeepTracer(self._tracer):
-                        value = await self._agen.__anext__()
-                else:
-                    value = await self._agen.__anext__()
-            self._iteration_index += 1
-            return value
+
+                self._iteration_index += 1
+                return value
+            finally:
+                if created_trace:
+                    try:
+                        current_trace.save(final_save=True)
+                        complete_trace_data = {
+                            "trace_id": current_trace.trace_id,
+                            "name": current_trace.name,
+                            "created_at": datetime.fromtimestamp(
+                                current_trace.start_time or time.time(), timezone.utc
+                            ).isoformat(),
+                            "duration": current_trace.get_duration(),
+                            "trace_spans": [
+                                span.model_dump() for span in current_trace.trace_spans
+                            ],
+                            "offline_mode": self._tracer.offline_mode,
+                            "parent_trace_id": current_trace.parent_trace_id,
+                            "parent_name": current_trace.parent_name,
+                        }
+                        self._tracer.traces.append(complete_trace_data)
+                        self._tracer.reset_current_trace(trace_token)
+                    except Exception as e:
+                        judgeval_logger.warning(
+                            f"Issue with async generator trace cleanup: {e}"
+                        )
         except StopAsyncIteration:
             await self._afinalize()
             raise
@@ -2528,25 +2673,48 @@ class _ObservedAsyncGeneratorProxy:
 
     async def asend(self, value):
         try:
-            child_name = f"{self._base_span_name or 'async_generator'}.send[{self._iteration_index}]"
-            current_trace = self._tracer.get_current_trace()
-            if current_trace:
-                with current_trace.span(child_name, span_type="yield") as span_client:
+            current_trace, trace_token, created_trace = self._create_trace_if_needed()
+
+            try:
+                with current_trace.span(
+                    self._base_span_name or "async_generator", span_type=self._span_type
+                ) as span_client:
                     span_client.record_input({"send": value})
+
                     if self._tracer.deep_tracing:
                         with _DeepTracer(self._tracer):
                             result = await self._agen.asend(value)
                     else:
                         result = await self._agen.asend(value)
+
                     span_client.record_output(result)
-            else:
-                if self._tracer.deep_tracing:
-                    with _DeepTracer(self._tracer):
-                        result = await self._agen.asend(value)
-                else:
-                    result = await self._agen.asend(value)
-            self._iteration_index += 1
-            return result
+
+                self._iteration_index += 1
+                return result
+            finally:
+                if created_trace:
+                    try:
+                        current_trace.save(final_save=True)
+                        complete_trace_data = {
+                            "trace_id": current_trace.trace_id,
+                            "name": current_trace.name,
+                            "created_at": datetime.fromtimestamp(
+                                current_trace.start_time or time.time(), timezone.utc
+                            ).isoformat(),
+                            "duration": current_trace.get_duration(),
+                            "trace_spans": [
+                                span.model_dump() for span in current_trace.trace_spans
+                            ],
+                            "offline_mode": self._tracer.offline_mode,
+                            "parent_trace_id": current_trace.parent_trace_id,
+                            "parent_name": current_trace.parent_name,
+                        }
+                        self._tracer.traces.append(complete_trace_data)
+                        self._tracer.reset_current_trace(trace_token)
+                    except Exception as e:
+                        judgeval_logger.warning(
+                            f"Issue with async generator trace cleanup: {e}"
+                        )
         except StopAsyncIteration:
             await self._afinalize()
             raise
@@ -2559,25 +2727,48 @@ class _ObservedAsyncGeneratorProxy:
 
     async def athrow(self, typ, val=None, tb=None):
         try:
-            child_name = f"{self._base_span_name or 'async_generator'}.throw[{self._iteration_index}]"
-            current_trace = self._tracer.get_current_trace()
-            if current_trace:
-                with current_trace.span(child_name, span_type="yield") as span_client:
+            current_trace, trace_token, created_trace = self._create_trace_if_needed()
+
+            try:
+                with current_trace.span(
+                    self._base_span_name or "async_generator", span_type=self._span_type
+                ) as span_client:
                     span_client.record_input({"throw": str(typ)})
+
                     if self._tracer.deep_tracing:
                         with _DeepTracer(self._tracer):
                             result = await self._agen.athrow(typ, val, tb)
                     else:
                         result = await self._agen.athrow(typ, val, tb)
+
                     span_client.record_output(result)
-            else:
-                if self._tracer.deep_tracing:
-                    with _DeepTracer(self._tracer):
-                        result = await self._agen.athrow(typ, val, tb)
-                else:
-                    result = await self._agen.athrow(typ, val, tb)
-            self._iteration_index += 1
-            return result
+
+                self._iteration_index += 1
+                return result
+            finally:
+                if created_trace:
+                    try:
+                        current_trace.save(final_save=True)
+                        complete_trace_data = {
+                            "trace_id": current_trace.trace_id,
+                            "name": current_trace.name,
+                            "created_at": datetime.fromtimestamp(
+                                current_trace.start_time or time.time(), timezone.utc
+                            ).isoformat(),
+                            "duration": current_trace.get_duration(),
+                            "trace_spans": [
+                                span.model_dump() for span in current_trace.trace_spans
+                            ],
+                            "offline_mode": self._tracer.offline_mode,
+                            "parent_trace_id": current_trace.parent_trace_id,
+                            "parent_name": current_trace.parent_name,
+                        }
+                        self._tracer.traces.append(complete_trace_data)
+                        self._tracer.reset_current_trace(trace_token)
+                    except Exception as e:
+                        judgeval_logger.warning(
+                            f"Issue with async generator trace cleanup: {e}"
+                        )
         except StopAsyncIteration:
             await self._afinalize()
             raise
