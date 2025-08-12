@@ -2229,12 +2229,12 @@ def _format_output_data(
                 message_content = getattr(response, 'response', '')
                 
             return message_content, TraceUsage(
-                prompt_tokens,
-                completion_tokens,
-                prompt_tokens + completion_tokens,
-                cache_read_input_tokens,
-                cache_creation_input_tokens,
-                model_name,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=prompt_tokens + completion_tokens,
+                cache_read_input_tokens=cache_read_input_tokens,
+                cache_creation_input_tokens=cache_creation_input_tokens,
+                model_name=model_name,
             )
 
 
