@@ -52,49 +52,35 @@ class JudgmentSyncClient:
             )
         return _handle_response(r)
 
-    def check_experiment_type(self, payload: CheckExperimentTypeJudgmentType) -> Any:
-        return self._request(
-            "POST",
-            url_for("/check_experiment_type/"),
-            payload,
-        )
-
-    def eval_run_name_exists(self, payload: EvalRunNameCheckJudgmentType) -> Any:
-        return self._request(
-            "POST",
-            url_for("/eval-run-name-exists/"),
-            payload,
-        )
-
-    def add_to_run_eval_queue(self, payload: JudgmentEvalJudgmentType) -> Any:
+    def add_to_run_eval_queue(self, payload: EvaluationRun) -> Any:
         return self._request(
             "POST",
             url_for("/add_to_run_eval_queue/"),
             payload,
         )
 
-    def evaluate_trace(self, payload: TraceRunJudgmentType) -> Any:
+    def evaluate_trace(self, payload: TraceRun) -> Any:
         return self._request(
             "POST",
             url_for("/evaluate_trace/"),
             payload,
         )
 
-    def evaluate(self, payload: JudgmentEvalJudgmentType) -> Any:
+    def evaluate(self, payload: EvaluationRun) -> Any:
         return self._request(
             "POST",
             url_for("/evaluate/"),
             payload,
         )
 
-    def log_eval_results(self, payload: EvalResultsJudgmentType) -> Any:
+    def log_eval_results(self, payload: EvalResults) -> Any:
         return self._request(
             "POST",
             url_for("/log_eval_results/"),
             payload,
         )
 
-    def fetch_experiment_run(self, payload: EvalResultsFetchJudgmentType) -> Any:
+    def fetch_experiment_run(self, payload: EvalResultsFetch) -> Any:
         return self._request(
             "POST",
             url_for("/fetch_experiment_run/"),
@@ -108,112 +94,104 @@ class JudgmentSyncClient:
             {},
         )
 
-    def datasets_insert_examples(
-        self, payload: DatasetInsertExamplesJudgmentType
-    ) -> Any:
+    def datasets_insert_examples(self, payload: DatasetInsertExamples) -> Any:
         return self._request(
             "POST",
             url_for("/datasets/insert_examples/"),
             payload,
         )
 
-    def datasets_pull_for_judgeval(self, payload: DatasetFetchJudgmentType) -> Any:
+    def datasets_pull_for_judgeval(self, payload: DatasetFetch) -> Any:
         return self._request(
             "POST",
             url_for("/datasets/pull_for_judgeval/"),
             payload,
         )
 
-    def datasets_fetch_stats_by_project(
-        self, payload: DatasetFetchStatsByProjectJudgmentType
-    ) -> Any:
+    def datasets_fetch_stats_by_project(self, payload: DatasetFetchStatsByProject) -> Any:
         return self._request(
             "POST",
             url_for("/datasets/fetch_stats_by_project/"),
             payload,
         )
 
-    def datasets_push(self, payload: DatasetPushJudgmentType) -> Any:
+    def datasets_push(self, payload: DatasetPush) -> Any:
         return self._request(
             "POST",
             url_for("/datasets/push/"),
             payload,
         )
 
-    def traces_upsert(self, payload: TraceSaveJudgmentType) -> Any:
+    def traces_upsert(self, payload: TraceSave) -> Any:
         return self._request(
             "POST",
             url_for("/traces/upsert/"),
             payload,
         )
 
-    def traces_fetch(self, payload: TraceFetchJudgmentType) -> Any:
+    def traces_fetch(self, payload: TraceFetch) -> Any:
         return self._request(
             "POST",
             url_for("/traces/fetch/"),
             payload,
         )
 
-    def traces_spans_batch(self, payload: SpansBatchRequestJudgmentType) -> Any:
+    def traces_add_to_dataset(self, payload: TraceAddToDataset) -> Any:
+        return self._request(
+            "POST",
+            url_for("/traces/add_to_dataset/"),
+            payload,
+        )
+
+    def traces_spans_batch(self, payload: SpansBatchRequest) -> Any:
         return self._request(
             "POST",
             url_for("/traces/spans/batch/"),
             payload,
         )
 
-    def traces_evaluation_runs_batch(
-        self, payload: EvaluationRunsBatchRequestJudgmentType
-    ) -> Any:
+    def traces_evaluation_runs_batch(self, payload: EvaluationRunsBatchRequest) -> Any:
         return self._request(
             "POST",
             url_for("/traces/evaluation_runs/batch/"),
             payload,
         )
 
-    def projects_add(
-        self, payload: ProjectAddJudgmentType
-    ) -> ProjectAddResponseJudgmentType:
+    def projects_add(self, payload: ProjectAdd) -> ProjectAddResponse:
         return self._request(
             "POST",
             url_for("/projects/add/"),
             payload,
         )
 
-    def scorer_exists(
-        self, payload: ScorerExistsRequestJudgmentType
-    ) -> ScorerExistsResponseJudgmentType:
+    def scorer_exists(self, payload: ScorerExistsRequest) -> ScorerExistsResponse:
         return self._request(
             "POST",
             url_for("/scorer_exists/"),
             payload,
         )
 
-    def save_scorer(
-        self, payload: SavePromptScorerRequestJudgmentType
-    ) -> SavePromptScorerResponseJudgmentType:
+    def save_scorer(self, payload: SavePromptScorerRequest) -> SavePromptScorerResponse:
         return self._request(
             "POST",
             url_for("/save_scorer/"),
             payload,
         )
 
-    def fetch_scorer(
-        self, payload: FetchPromptScorerRequestJudgmentType
-    ) -> FetchPromptScorerResponseJudgmentType:
+    def fetch_scorer(self, payload: FetchPromptScorerRequest) -> FetchPromptScorerResponse:
         return self._request(
             "POST",
             url_for("/fetch_scorer/"),
             payload,
         )
 
-    def projects_resolve(
-        self, payload: ResolveProjectNameRequestJudgmentType
-    ) -> ResolveProjectNameResponseJudgmentType:
+    def projects_resolve(self, payload: ResolveProjectNameRequest) -> ResolveProjectNameResponse:
         return self._request(
             "POST",
             url_for("/projects/resolve/"),
             payload,
         )
+
 
 
 class JudgmentAsyncClient:
@@ -243,51 +221,35 @@ class JudgmentAsyncClient:
             )
         return _handle_response(await r)
 
-    async def check_experiment_type(
-        self, payload: CheckExperimentTypeJudgmentType
-    ) -> Any:
-        return await self._request(
-            "POST",
-            url_for("/check_experiment_type/"),
-            payload,
-        )
-
-    async def eval_run_name_exists(self, payload: EvalRunNameCheckJudgmentType) -> Any:
-        return await self._request(
-            "POST",
-            url_for("/eval-run-name-exists/"),
-            payload,
-        )
-
-    async def add_to_run_eval_queue(self, payload: JudgmentEvalJudgmentType) -> Any:
+    async def add_to_run_eval_queue(self, payload: EvaluationRun) -> Any:
         return await self._request(
             "POST",
             url_for("/add_to_run_eval_queue/"),
             payload,
         )
 
-    async def evaluate_trace(self, payload: TraceRunJudgmentType) -> Any:
+    async def evaluate_trace(self, payload: TraceRun) -> Any:
         return await self._request(
             "POST",
             url_for("/evaluate_trace/"),
             payload,
         )
 
-    async def evaluate(self, payload: JudgmentEvalJudgmentType) -> Any:
+    async def evaluate(self, payload: EvaluationRun) -> Any:
         return await self._request(
             "POST",
             url_for("/evaluate/"),
             payload,
         )
 
-    async def log_eval_results(self, payload: EvalResultsJudgmentType) -> Any:
+    async def log_eval_results(self, payload: EvalResults) -> Any:
         return await self._request(
             "POST",
             url_for("/log_eval_results/"),
             payload,
         )
 
-    async def fetch_experiment_run(self, payload: EvalResultsFetchJudgmentType) -> Any:
+    async def fetch_experiment_run(self, payload: EvalResultsFetch) -> Any:
         return await self._request(
             "POST",
             url_for("/fetch_experiment_run/"),
@@ -301,114 +263,104 @@ class JudgmentAsyncClient:
             {},
         )
 
-    async def datasets_insert_examples(
-        self, payload: DatasetInsertExamplesJudgmentType
-    ) -> Any:
+    async def datasets_insert_examples(self, payload: DatasetInsertExamples) -> Any:
         return await self._request(
             "POST",
             url_for("/datasets/insert_examples/"),
             payload,
         )
 
-    async def datasets_pull_for_judgeval(
-        self, payload: DatasetFetchJudgmentType
-    ) -> Any:
+    async def datasets_pull_for_judgeval(self, payload: DatasetFetch) -> Any:
         return await self._request(
             "POST",
             url_for("/datasets/pull_for_judgeval/"),
             payload,
         )
 
-    async def datasets_fetch_stats_by_project(
-        self, payload: DatasetFetchStatsByProjectJudgmentType
-    ) -> Any:
+    async def datasets_fetch_stats_by_project(self, payload: DatasetFetchStatsByProject) -> Any:
         return await self._request(
             "POST",
             url_for("/datasets/fetch_stats_by_project/"),
             payload,
         )
 
-    async def datasets_push(self, payload: DatasetPushJudgmentType) -> Any:
+    async def datasets_push(self, payload: DatasetPush) -> Any:
         return await self._request(
             "POST",
             url_for("/datasets/push/"),
             payload,
         )
 
-    async def traces_upsert(self, payload: TraceSaveJudgmentType) -> Any:
+    async def traces_upsert(self, payload: TraceSave) -> Any:
         return await self._request(
             "POST",
             url_for("/traces/upsert/"),
             payload,
         )
 
-    async def traces_fetch(self, payload: TraceFetchJudgmentType) -> Any:
+    async def traces_fetch(self, payload: TraceFetch) -> Any:
         return await self._request(
             "POST",
             url_for("/traces/fetch/"),
             payload,
         )
 
-    async def traces_spans_batch(self, payload: SpansBatchRequestJudgmentType) -> Any:
+    async def traces_add_to_dataset(self, payload: TraceAddToDataset) -> Any:
+        return await self._request(
+            "POST",
+            url_for("/traces/add_to_dataset/"),
+            payload,
+        )
+
+    async def traces_spans_batch(self, payload: SpansBatchRequest) -> Any:
         return await self._request(
             "POST",
             url_for("/traces/spans/batch/"),
             payload,
         )
 
-    async def traces_evaluation_runs_batch(
-        self, payload: EvaluationRunsBatchRequestJudgmentType
-    ) -> Any:
+    async def traces_evaluation_runs_batch(self, payload: EvaluationRunsBatchRequest) -> Any:
         return await self._request(
             "POST",
             url_for("/traces/evaluation_runs/batch/"),
             payload,
         )
 
-    async def projects_add(
-        self, payload: ProjectAddJudgmentType
-    ) -> ProjectAddResponseJudgmentType:
+    async def projects_add(self, payload: ProjectAdd) -> ProjectAddResponse:
         return await self._request(
             "POST",
             url_for("/projects/add/"),
             payload,
         )
 
-    async def scorer_exists(
-        self, payload: ScorerExistsRequestJudgmentType
-    ) -> ScorerExistsResponseJudgmentType:
+    async def scorer_exists(self, payload: ScorerExistsRequest) -> ScorerExistsResponse:
         return await self._request(
             "POST",
             url_for("/scorer_exists/"),
             payload,
         )
 
-    async def save_scorer(
-        self, payload: SavePromptScorerRequestJudgmentType
-    ) -> SavePromptScorerResponseJudgmentType:
+    async def save_scorer(self, payload: SavePromptScorerRequest) -> SavePromptScorerResponse:
         return await self._request(
             "POST",
             url_for("/save_scorer/"),
             payload,
         )
 
-    async def fetch_scorer(
-        self, payload: FetchPromptScorerRequestJudgmentType
-    ) -> FetchPromptScorerResponseJudgmentType:
+    async def fetch_scorer(self, payload: FetchPromptScorerRequest) -> FetchPromptScorerResponse:
         return await self._request(
             "POST",
             url_for("/fetch_scorer/"),
             payload,
         )
 
-    async def projects_resolve(
-        self, payload: ResolveProjectNameRequestJudgmentType
-    ) -> ResolveProjectNameResponseJudgmentType:
+    async def projects_resolve(self, payload: ResolveProjectNameRequest) -> ResolveProjectNameResponse:
         return await self._request(
             "POST",
             url_for("/projects/resolve/"),
             payload,
         )
+
 
 
 __all__ = [

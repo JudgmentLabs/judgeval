@@ -1,48 +1,52 @@
-from typing import Dict, List, Optional, Union
+import asyncio
+from typing import Dict, List, Optional, Union, Any
 from pydantic import BaseModel, field_validator, Field
 
 from judgeval.api import JudgmentSyncClient
-from judgeval.data import Example
-from judgeval.data.result import ScoringResult
+from judgeval.data import Example, ScoringResult
 from judgeval.data.trace_run import TraceRun
-from judgeval.exceptions import JudgmentAPIError
 from judgeval.logger import judgeval_logger
 from judgeval.scorers import BaseScorer, APIScorerConfig
-from judgeval.env import JUDGMENT_DEFAULT_GPT_MODEL
+from judgeval.env import JUDGMENT_DEFAULT_GPT_MODEL, JUDGMENT_MAX_CONCURRENT_EVALUATIONS
 from judgeval.constants import ACCEPTABLE_MODELS
-from judgeval.data.judgment_types import ScoringResultJudgmentType
+from judgeval.exceptions import JudgmentAPIError
 
 
 class EvaluationRun(BaseModel):
     """
     Stores example and evaluation scorers together for running an eval task
-
-    Args:
-        project_name (str): The name of the project the evaluation results belong to
-        eval_name (str): A name for this evaluation run
-        examples (List[Example]): The examples to evaluate
-        scorers (List[Union[JudgmentScorer, BaseScorer]]): A list of scorers to use for evaluation
-        model (str): The model used as a judge when using LLM as a Judge
-        metadata (Optional[Dict[str, Any]]): Additional metadata to include for this evaluation run, e.g. comments, dataset name, purpose, etc.
     """
 
     organization_id: Optional[str] = None
     project_name: Optional[str] = Field(default=None, validate_default=True)
     eval_name: Optional[str] = Field(default=None, validate_default=True)
     examples: List[Example]
-    scorers: List[Union[APIScorerConfig, BaseScorer]]
-    model: Optional[str] = JUDGMENT_DEFAULT_GPT_MODEL
+    custom_scorers: List[BaseScorer] = Field(default_factory=list)
+    judgment_scorers: List[APIScorerConfig] = Field(default_factory=list)
+    model: str = JUDGMENT_DEFAULT_GPT_MODEL
     trace_span_id: Optional[str] = None
     trace_id: Optional[str] = None
     override: Optional[bool] = False
     append: Optional[bool] = False
 
+    def __init__(
+        self,
+        scorers: Optional[List[Union[BaseScorer, APIScorerConfig]]] = None,
+        **kwargs,
+    ):
+        """Initialize EvaluationRun with automatic scorer classification."""
+        if scorers is not None:
+            custom_scorers = [s for s in scorers if isinstance(s, BaseScorer)]
+            judgment_scorers = [s for s in scorers if isinstance(s, APIScorerConfig)]
+            kwargs["custom_scorers"] = custom_scorers
+            kwargs["judgment_scorers"] = judgment_scorers
+        super().__init__(**kwargs)
+
     def model_dump(self, **kwargs):
         data = super().model_dump(**kwargs)
-
-        data["scorers"] = [scorer.model_dump() for scorer in self.scorers]
+        data["custom_scorers"] = [s.model_dump() for s in self.custom_scorers]
+        data["judgment_scorers"] = [s.model_dump() for s in self.judgment_scorers]
         data["examples"] = [example.model_dump() for example in self.examples]
-
         return data
 
     @field_validator("examples")
@@ -54,29 +58,15 @@ class EvaluationRun(BaseModel):
                 raise ValueError(f"Item of type {type(item)} is not a Example")
         return v
 
-    @field_validator("scorers", mode="before")
-    def validate_scorers(cls, v):
-        if not v:
-            raise ValueError("Scorers cannot be empty.")
-        if not all(
-            isinstance(scorer, BaseScorer) or isinstance(scorer, APIScorerConfig)
-            for scorer in v
-        ):
-            raise ValueError(
-                "All scorers must be of type BaseScorer or APIScorerConfig."
-            )
-        return v
-
     @field_validator("model")
     def validate_model(cls, v, values):
         if not v:
             raise ValueError("Model cannot be empty.")
 
-        # Check if model is string or list of strings
         if isinstance(v, str):
             if v not in ACCEPTABLE_MODELS:
                 raise ValueError(
-                    f"Model name {v} not recognized. Please select a valid model name.)"
+                    f"Model name {v} not recognized. Please select a valid model name."
                 )
             return v
 
@@ -84,78 +74,137 @@ class EvaluationRun(BaseModel):
         arbitrary_types_allowed = True
 
 
-def execute_api_trace_eval(trace_run: TraceRun, judgment_api_key: str) -> Dict:
-    # submit API request to execute evals
-    if not judgment_api_key or not trace_run.organization_id:
-        raise ValueError("API key and organization ID are required")
-    api_client = JudgmentSyncClient(judgment_api_key, trace_run.organization_id)
-    return api_client.run_trace_evaluation(trace_run.model_dump(warnings=False))
+async def a_execute_scoring(
+    examples: List[Example],
+    scorers: List[BaseScorer],
+    model: str,
+    throttle_value: int = 0,
+    max_concurrent: int = 10,
+) -> List[ScoringResult]:
+    """
+    Execute scoring locally using custom scorers
+    """
+    from judgeval.data import generate_scoring_result, create_scorer_data
+    import time
+
+    semaphore = asyncio.Semaphore(max_concurrent)
+
+    async def safe_a_score_example(scorer: BaseScorer, example: Example):
+        """Safely scores an Example using a BaseScorer"""
+        try:
+            if hasattr(scorer, "a_score_example"):
+                score = await getattr(scorer, "a_score_example")(example)
+                if score is None:
+                    raise Exception("a_score_example need to return a score")
+                elif score < 0:
+                    judgeval_logger.warning("score cannot be less than 0, setting to 0")
+                    score = 0
+                elif score > 1:
+                    judgeval_logger.warning(
+                        "score cannot be greater than 1, setting to 1"
+                    )
+                    score = 1
+                scorer.score = score
+                scorer.success = getattr(scorer, "success_check", lambda: True)()
+            else:
+                raise Exception(
+                    f"Scorer {scorer.score_type} does not have a_score_example method"
+                )
+        except Exception as e:
+            judgeval_logger.error(f"Error during scoring: {str(e)}")
+            scorer.error = str(e)
+            scorer.success = False
+            scorer.score = 0
+
+    async def execute_with_semaphore(func, *args, **kwargs):
+        async with semaphore:
+            try:
+                return await func(*args, **kwargs)
+            except Exception as e:
+                judgeval_logger.error(f"Error executing function: {e}")
+                return None
+
+    async def a_eval_examples_helper(
+        scorers_list: List[BaseScorer],
+        example: Example,
+        scoring_results: List[Optional[ScoringResult]],
+        score_index: int,
+    ):
+        """Evaluate a single example using a list of scorers"""
+        scoring_start_time = time.perf_counter()
+
+        # Add model to scorers if not present
+        for scorer in scorers_list:
+            if not getattr(scorer, "model", None):
+                scorer.model = model
+
+        # Score the example with all scorers
+        tasks = [safe_a_score_example(scorer, example) for scorer in scorers_list]
+        await asyncio.gather(*tasks)
+
+        # Collect results
+        success = True
+        scorer_data_list = []
+        for scorer in scorers_list:
+            if getattr(scorer, "skipped", False):
+                continue
+            try:
+                scorer_data = create_scorer_data(scorer)
+                for s in scorer_data:
+                    success = success and s.success
+                scorer_data_list.extend(scorer_data)
+            except Exception as e:
+                judgeval_logger.error(f"Error creating scorer data: {e}")
+                success = False
+
+        scoring_end_time = time.perf_counter()
+        run_duration = scoring_end_time - scoring_start_time
+
+        scoring_result = generate_scoring_result(
+            example, scorer_data_list, run_duration, success
+        )
+        scoring_results[score_index] = scoring_result
+
+    # Initialize results list
+    scoring_results: List[Optional[ScoringResult]] = [None for _ in examples]
+    tasks = []
+
+    # Create tasks for each example
+    for i, example in enumerate(examples):
+        if isinstance(example, Example):
+            if len(scorers) == 0:
+                continue
+
+            # Clone scorers for each example to avoid conflicts
+            cloned_scorers = [scorer.model_copy() for scorer in scorers]
+
+            task = execute_with_semaphore(
+                a_eval_examples_helper, cloned_scorers, example, scoring_results, i
+            )
+            tasks.append(asyncio.create_task(task))
+
+            if throttle_value > 0:
+                await asyncio.sleep(throttle_value)
+
+    # Wait for all tasks to complete
+    await asyncio.gather(*tasks)
+
+    # Filter out None results
+    return [result for result in scoring_results if result is not None]
 
 
 def check_missing_scorer_data(results: List[ScoringResult]) -> List[ScoringResult]:
     """
     Checks if any `ScoringResult` objects are missing `scorers_data`.
-
-    If any are missing, logs an error and returns the results.
     """
     for i, result in enumerate(results):
         if not result.scorers_data:
             judgeval_logger.error(
                 f"Scorer data is missing for example {i}. "
                 "This is usually caused when the example does not contain "
-                "the fields required by the scorer. "
-                "Check that your example contains the fields required by the scorers. "
-                # TODO: add docs link here for reference.
-                "See https://docs.judgmentlabs.ai/sdk-reference/judgment-client#override for more information."
+                "the fields required by the scorer."
             )
     return results
-
-
-def check_example_keys(
-    keys: List[str],
-    eval_name: str,
-    project_name: str,
-    judgment_api_key: str,
-    organization_id: str,
-) -> None:
-    """
-    Checks if the current experiment (if one exists) has the same keys for example
-    """
-    api_client = JudgmentSyncClient(judgment_api_key, organization_id)
-    api_client.check_example_keys(keys, eval_name, project_name)
-
-
-def check_experiment_type(
-    eval_name: str,
-    project_name: str,
-    judgment_api_key: str,
-    organization_id: str,
-    is_trace: bool,
-) -> None:
-    """
-    Checks if the current experiment, if one exists, has the same type (examples of traces)
-    """
-    api_client = JudgmentSyncClient(judgment_api_key, organization_id)
-    api_client.check_experiment_type(eval_name, project_name, is_trace)
-
-
-def check_eval_run_name_exists(
-    eval_name: str, project_name: str, judgment_api_key: str, organization_id: str
-) -> None:
-    """
-    Checks if an evaluation run name already exists for a given project.
-
-    Args:
-        eval_name (str): Name of the evaluation run
-        project_name (str): Name of the project
-        judgment_api_key (str): API key for authentication
-
-    Raises:
-        ValueError: If the evaluation run name already exists
-        JudgmentAPIError: If there's an API error during the check
-    """
-    api_client = JudgmentSyncClient(judgment_api_key, organization_id)
-    api_client.check_eval_run_name_exists(eval_name, project_name)
 
 
 def log_evaluation_results(
@@ -165,35 +214,137 @@ def log_evaluation_results(
 ) -> str:
     """
     Logs evaluation results to the Judgment API database.
-
-    Args:
-        merged_results (List[ScoringResult]): The results to log
-        evaluation_run (EvaluationRun): The evaluation run containing project info and API key
-        judgment_api_key (str): The API key for the Judgment API
-
-    Raises:
-        JudgmentAPIError: If there's an API error during logging
-        ValueError: If there's a validation error with the results
     """
-    if not judgment_api_key or not run.organization_id:
-        raise ValueError("API key and organization ID are required")
+    try:
+        if not judgment_api_key or not run.organization_id:
+            raise ValueError("API key and organization ID are required")
 
-    api_client = JudgmentSyncClient(judgment_api_key, run.organization_id)
-    response = api_client.log_evaluation_results(
-        [result.model_dump(warnings=False) for result in scoring_results],
-        run.model_dump(warnings=False),
-    )
-    url = response.get("ui_results_url")
-    return url
+        api_client = JudgmentSyncClient(judgment_api_key, run.organization_id)
+
+        # Convert to the format expected by the API
+        eval_results: Any = {
+            "results": [
+                result.model_dump(warnings=False) for result in scoring_results
+            ],
+            "run": run.model_dump(warnings=False),
+        }
+
+        response = api_client.log_eval_results(eval_results)
+        return response.get("ui_results_url", "")
+
+    except Exception as e:
+        judgeval_logger.error(f"Failed to save evaluation results to DB: {str(e)}")
+        raise ValueError(
+            f"Request failed while saving evaluation results to DB: {str(e)}"
+        )
 
 
-def run_evaluation(eval: EvaluationRun) -> List[ScoringResult]:
-    keys = eval.examples[0].get_fields().keys()
-    for example in eval.examples:
-        if example.get_fields().keys() != keys:
-            raise ValueError("All examples must have the same fields")
+def execute_api_eval(evaluation_run: EvaluationRun, judgment_api_key: str) -> Dict:
+    """
+    Executes an evaluation using the Judgment API.
+    """
+    try:
+        if not judgment_api_key or not evaluation_run.organization_id:
+            raise ValueError("API key and organization ID are required")
 
-    return []
+        api_client = JudgmentSyncClient(
+            judgment_api_key, evaluation_run.organization_id
+        )
+
+        # Convert to API format
+        eval_request: Any = {
+            "examples": [ex.model_dump() for ex in evaluation_run.examples],
+            "model": evaluation_run.model,
+        }
+
+        return api_client.evaluate(eval_request)
+
+    except Exception as e:
+        judgeval_logger.error(f"Error: {e}")
+        raise ValueError(
+            f"An error occurred while executing the Judgment API request: {str(e)}"
+        )
+
+
+def run_evaluation(
+    evaluation_run: EvaluationRun, judgment_api_key: str
+) -> List[ScoringResult]:
+    """
+    Executes an evaluation of `Example`s using one or more `Scorer`s
+    """
+    # Validate required fields
+    if not evaluation_run.organization_id:
+        raise ValueError("organization_id is required")
+
+    # Check that every example has the same keys
+    keys = evaluation_run.examples[0].model_dump().keys()
+    for example in evaluation_run.examples:
+        current_keys = example.model_dump().keys()
+        if current_keys != keys:
+            raise ValueError(
+                f"All examples must have the same keys: {current_keys} != {keys}"
+            )
+
+    results: List[ScoringResult] = []
+    url = ""
+
+    # Check for mixed scorer types
+    if (
+        len(evaluation_run.custom_scorers) > 0
+        and len(evaluation_run.judgment_scorers) > 0
+    ):
+        error_msg = "We currently do not support running both local and Judgment API scorers at the same time. Please run your evaluation with either local scorers or Judgment API scorers, but not both."
+        judgeval_logger.error(error_msg)
+        raise ValueError(error_msg)
+
+    # Check for server-hosted scorers
+    e2b_scorers = [
+        cs
+        for cs in evaluation_run.custom_scorers
+        if getattr(cs, "server_hosted", False)
+    ]
+
+    if evaluation_run.judgment_scorers or e2b_scorers:
+        if evaluation_run.judgment_scorers and e2b_scorers:
+            error_msg = "We currently do not support running both hosted custom scorers and Judgment API scorers at the same time. Please run your evaluation with one or the other, but not both."
+            judgeval_logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        if len(e2b_scorers) > 1:
+            error_msg = "We currently do not support running multiple hosted custom scorers at the same time."
+            judgeval_logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        # Use API-based evaluation
+        judgeval_logger.info("Running evaluation using Judgment API scorers...")
+        try:
+            response_data = execute_api_eval(evaluation_run, judgment_api_key)
+            results = [
+                ScoringResult(**result) for result in response_data.get("results", [])
+            ]
+            url = response_data.get("ui_results_url", "")
+        except Exception as e:
+            raise ValueError(f"Error during API evaluation: {str(e)}")
+    else:
+        # Use local evaluation - simplified async call
+        judgeval_logger.info("Running evaluation using local scorers...")
+        results = asyncio.run(
+            a_execute_scoring(
+                evaluation_run.examples,
+                evaluation_run.custom_scorers,
+                model=evaluation_run.model,
+                throttle_value=0,
+                max_concurrent=JUDGMENT_MAX_CONCURRENT_EVALUATIONS,
+            )
+        )
+
+        # Log results to API
+        url = log_evaluation_results(results, evaluation_run, judgment_api_key)
+
+    if url:
+        judgeval_logger.info(f"🔍 You can view your evaluation results here: {url}")
+
+    return check_missing_scorer_data(results)
 
 
 __all__ = ("EvaluationRun", "run_evaluation")

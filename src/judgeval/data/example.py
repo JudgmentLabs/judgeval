@@ -5,7 +5,7 @@ Classes for representing examples in a dataset.
 from enum import Enum
 from datetime import datetime
 from typing import Dict, Any, Optional
-from judgeval.data.judgment_types import ExampleJudgmentType
+from judgeval.data.judgment_types import Example as JudgmentExample
 
 
 class ExampleParams(str, Enum):
@@ -19,7 +19,7 @@ class ExampleParams(str, Enum):
     ADDITIONAL_METADATA = "additional_metadata"
 
 
-class Example(ExampleJudgmentType):
+class Example(JudgmentExample):
     example_id: str = ""
     created_at: str = datetime.now().isoformat()
     name: Optional[str] = None

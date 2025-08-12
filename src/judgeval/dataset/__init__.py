@@ -28,7 +28,12 @@ class Dataset:
         project_name: str,
     ):
         client = JudgmentSyncClient(cls.judgment_api_key, cls.organization_id)
-        dataset = client.pull_dataset(name, project_name)
+        dataset = client.datasets_pull_for_judgeval(
+            {
+                "dataset_alias": name,
+                "project_name": project_name,
+            },
+        )
         if not dataset:
             raise ValueError(f"Dataset {name} not found in project {project_name}")
         examples = dataset.get("examples", [])
@@ -62,13 +67,16 @@ class Dataset:
             traces = []
 
         client = JudgmentSyncClient(cls.judgment_api_key, cls.organization_id)
-        client.push_dataset(
-            name,
-            project_name,
-            examples=[e.model_dump() for e in examples],
-            traces=[t.model_dump() for t in traces],
-            overwrite=overwrite,
+        client.datasets_push(
+            {
+                "dataset_alias": name,
+                "project_name": project_name,
+                "examples": [e.model_dump() for e in examples],  # type: ignore
+                "traces": [t.model_dump() for t in traces],  # type: ignore
+                "overwrite": overwrite,
+            }
         )
+
         judgeval_logger.info(f"Succesfull created dataset {name}!")
         return cls(
             name=name,
@@ -116,10 +124,19 @@ class Dataset:
 
     def add_examples(self, examples: List[Example]) -> None:
         client = JudgmentSyncClient(self.judgment_api_key, self.organization_id)
-        client.append_examples(
-            dataset_alias=self.name,
-            project_name=self.project_name,
-            examples=[e.model_dump() for e in examples],
+        client.datasets_insert_examples(
+            {
+                "dataset_alias": self.name,
+                "project_name": self.project_name,
+                "examples": [
+                    {
+                        "name": e.name,
+                        "created_at": e.created_at,
+                        "example_id": e.example_id,
+                    }
+                    for e in examples
+                ],
+            }
         )
 
     def add_traces(self, traces: List[Trace]) -> None:

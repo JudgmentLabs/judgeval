@@ -13,6 +13,7 @@ datamodel-codegen \
   --use-annotated \
   --field-constraints \
   --use-default-kwarg \
+  --use-field-description \
   --formatters ruff-format \
 
 
@@ -24,6 +25,7 @@ datamodel-codegen \
   --target-python-version 3.10 \
   --use-annotated \
   --use-default-kwarg \
+  --use-field-description \
   --formatters ruff-format \
 
 # Generate the api.py file based on the schema in openapi.json.

@@ -21,6 +21,7 @@ JUDGEVAL_PATHS: List[str] = [
     "/traces/evaluation_runs/batch/",
     "/traces/fetch/",
     "/traces/upsert/",
+    "/traces/add_to_dataset/",
     "/projects/add/",
     "/evaluate/",
     "/evaluate_trace/",
@@ -28,8 +29,6 @@ JUDGEVAL_PATHS: List[str] = [
     "/fetch_experiment_run/",
     "/add_to_run_eval_queue/",
     "/get_evaluation_status/",
-    "/check_experiment_type/",
-    "/eval-run-name-exists/",
     "/save_scorer/",
     "/fetch_scorer/",
     "/scorer_exists/",
@@ -233,6 +232,8 @@ def generate_api_file() -> str:
                 request_schema = get_request_schema(operation)
                 response_schema = get_response_schema(operation)
 
+                print(method_name, request_schema, response_schema, file=sys.stderr)
+
                 if not request_schema:
                     print(f"No request type found for {method_name}", file=sys.stderr)
 
@@ -241,12 +242,8 @@ def generate_api_file() -> str:
                         f"No response schema found for {method_name}", file=sys.stderr
                     )
 
-                request_type = (
-                    f"{request_schema}JudgmentType" if request_schema else None
-                )
-                response_type = (
-                    f"{response_schema}JudgmentType" if response_schema else "Any"
-                )
+                request_type = request_schema if request_schema else None
+                response_type = response_schema if response_schema else "Any"
 
                 method_info = {
                     "name": method_name,
