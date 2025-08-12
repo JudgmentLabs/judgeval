@@ -2070,17 +2070,8 @@ def _format_output_data(
                     message_content = response.choices[0].message.parsed
                 else:
                     message_content = response.choices[0].message.content
-                #lite llm does not hace azure price calcuylations its mostly enterpise and compute based so dependent on user
                 if isinstance(client, (openai_AzureOpenAI, openai_AsyncAzureOpenAI)):
-                    model_name = "(azure-openai)" + response.model 
-                    return message_content, TraceUsage(
-                        prompt_tokens=prompt_tokens,
-                        completion_tokens=completion_tokens,
-                        total_tokens=prompt_tokens + completion_tokens,
-                        cache_read_input_tokens=cache_read_input_tokens,
-                        cache_creation_input_tokens=cache_creation_input_tokens,
-                        model_name=model_name,
-                    )
+                    model_name = "azure/" + response.model 
                 else:
                     model_name = response.model
             elif isinstance(response, openai_Response):
@@ -2100,15 +2091,7 @@ def _format_output_data(
                         if hasattr(seg, "text")
                     )
                 if isinstance(client, (openai_AzureOpenAI, openai_AsyncAzureOpenAI)):
-                    model_name = "(azure-openai)" + response.model
-                    return message_content, TraceUsage(
-                        prompt_tokens=prompt_tokens,
-                        completion_tokens=completion_tokens,
-                        total_tokens=prompt_tokens + completion_tokens,
-                        cache_read_input_tokens=cache_read_input_tokens,
-                        cache_creation_input_tokens=cache_creation_input_tokens,
-                        model_name=model_name,
-                    )
+                    model_name = "azure/" + response.model
                 else:
                     model_name = response.model
             # Note: LiteLLM seems to use cache_read_input_tokens to calculate the cost for OpenAI
