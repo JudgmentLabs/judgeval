@@ -56,6 +56,23 @@ def get_method_name_from_path(path: str, method: str) -> str:
     return path.strip("/").replace("/", "_").replace("-", "_")
 
 
+def get_query_parameters(operation: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Extract query parameters from the operation."""
+    parameters = operation.get("parameters", [])
+    query_params = []
+
+    for param in parameters:
+        if param.get("in") == "query":
+            param_info = {
+                "name": param["name"],
+                "required": param.get("required", False),
+                "type": param.get("schema", {}).get("type", "str"),
+            }
+            query_params.append(param_info)
+
+    return query_params
+
+
 def get_request_schema(operation: Dict[str, Any]) -> Optional[str]:
     request_body = operation.get("requestBody", {})
     if not request_body:
@@ -87,15 +104,34 @@ def get_response_schema(operation: Dict[str, Any]) -> Optional[str]:
 def generate_method_signature(
     method_name: str,
     request_type: Optional[str],
+    query_params: List[Dict[str, Any]],
     response_type: str,
     is_async: bool = False,
 ) -> str:
     async_prefix = "async " if is_async else ""
 
+    params = ["self"]
+
+    # Add required query parameters first
+    for param in query_params:
+        if param["required"]:
+            param_name = param["name"]
+            param_type = "str"  # Default to str for simplicity
+            params.append(f"{param_name}: {param_type}")
+
+    # Add request body parameter if it exists
     if request_type:
-        return f"{async_prefix}def {method_name}(self, payload: {request_type}) -> {response_type}:"
-    else:
-        return f"{async_prefix}def {method_name}(self) -> {response_type}:"
+        params.append(f"payload: {request_type}")
+
+    # Add optional query parameters last
+    for param in query_params:
+        if not param["required"]:
+            param_name = param["name"]
+            param_type = "str"  # Default to str for simplicity
+            params.append(f"{param_name}: Optional[{param_type}] = None")
+
+    params_str = ", ".join(params)
+    return f"{async_prefix}def {method_name}({params_str}) -> {response_type}:"
 
 
 def generate_method_body(
@@ -103,17 +139,43 @@ def generate_method_body(
     path: str,
     method: str,
     request_type: Optional[str],
+    query_params: List[Dict[str, Any]],
     is_async: bool = False,
 ) -> str:
     async_prefix = "await " if is_async else ""
 
-    if method == "GET":
-        return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}"),\n            {{}},\n        )'
+    # Build query parameters dict if they exist
+    if query_params:
+        query_lines = ["query_params = {}"]
+        for param in query_params:
+            param_name = param["name"]
+            if param["required"]:
+                query_lines.append(f"query_params['{param_name}'] = {param_name}")
+            else:
+                query_lines.append(f"if {param_name} is not None:")
+                query_lines.append(f"    query_params['{param_name}'] = {param_name}")
+        query_setup = "\n        ".join(query_lines)
+        query_param = "query_params"
     else:
-        if request_type:
-            return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}"),\n            payload,\n        )'
+        query_setup = ""
+        query_param = "{}"
+
+    if method == "GET":
+        if query_setup:
+            return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}"),\n            {query_param},\n        )'
         else:
             return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}"),\n            {{}},\n        )'
+    else:
+        if request_type:
+            if query_setup:
+                return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}"),\n            payload,\n            params={query_param},\n        )'
+            else:
+                return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}"),\n            payload,\n        )'
+        else:
+            if query_setup:
+                return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}"),\n            {{}},\n            params={query_param},\n        )'
+            else:
+                return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}"),\n            {{}},\n        )'
 
 
 def generate_client_class(
@@ -133,14 +195,14 @@ def generate_client_class(
     request_method = "async def _request" if is_async else "def _request"
     lines.append(f"    {request_method}(")
     lines.append(
-        '        self, method: Literal["POST", "PATCH", "GET", "DELETE"], url: str, payload: Any'
+        '        self, method: Literal["POST", "PATCH", "GET", "DELETE"], url: str, payload: Any, params: Optional[Dict[str, Any]] = None'
     )
     lines.append("    ) -> Any:")
     lines.append('        if method == "GET":')
     lines.append("            r = self.client.request(")
     lines.append("                method,")
     lines.append("                url,")
-    lines.append("                params=payload,")
+    lines.append("                params=payload if params is None else params,")
     lines.append(
         "                headers=_headers(self.api_key, self.organization_id),"
     )
@@ -150,6 +212,7 @@ def generate_client_class(
     lines.append("                method,")
     lines.append("                url,")
     lines.append("                json=json_encoder(payload),")
+    lines.append("                params=params,")
     lines.append(
         "                headers=_headers(self.api_key, self.organization_id),"
     )
@@ -165,15 +228,16 @@ def generate_client_class(
         path = method_info["path"]
         http_method = method_info["method"]
         request_type = method_info["request_type"]
+        query_params = method_info["query_params"]
         response_type = method_info["response_type"]
 
         signature = generate_method_signature(
-            method_name, request_type, response_type, is_async
+            method_name, request_type, query_params, response_type, is_async
         )
         lines.append(f"    {signature}")
 
         body = generate_method_body(
-            method_name, path, http_method, request_type, is_async
+            method_name, path, http_method, request_type, query_params, is_async
         )
         lines.append(f"        {body}")
         lines.append("")
@@ -231,8 +295,15 @@ def generate_api_file() -> str:
                 method_name = get_method_name_from_path(path, method.upper())
                 request_schema = get_request_schema(operation)
                 response_schema = get_response_schema(operation)
+                query_params = get_query_parameters(operation)
 
-                print(method_name, request_schema, response_schema, file=sys.stderr)
+                print(
+                    method_name,
+                    request_schema,
+                    response_schema,
+                    query_params,
+                    file=sys.stderr,
+                )
 
                 if not request_schema:
                     print(f"No request type found for {method_name}", file=sys.stderr)
@@ -250,6 +321,7 @@ def generate_api_file() -> str:
                     "path": path,
                     "method": method.upper(),
                     "request_type": request_type,
+                    "query_params": query_params,
                     "response_type": response_type,
                 }
 

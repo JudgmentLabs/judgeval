@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from judgeval.data.result import ScoringResult
-from judgeval.evaluation import EvaluationRun, run_evaluation
+from judgeval.evaluation import run_eval
+from judgeval.data.evaluation_run import EvaluationRun
 
 
 from typing import List, Never, Optional, Union
@@ -44,19 +45,11 @@ class JudgmentClient(metaclass=SingletonMeta):
         project_name: str,
         eval_run_name: str,
         model: str = JUDGMENT_DEFAULT_GPT_MODEL,
-        override: bool = False,
-        append: bool = False,
-        async_execute: bool = False,
     ) -> List[ScoringResult]:
         ...
 
-        if override and append:
-            raise ValueError("Cannot override and append at the same time")
-
         try:
             eval = EvaluationRun(
-                append=append,
-                override=override,
                 project_name=project_name,
                 eval_name=eval_run_name,
                 examples=examples,
@@ -65,7 +58,7 @@ class JudgmentClient(metaclass=SingletonMeta):
                 organization_id=self.organization_id,
             )
 
-            return run_evaluation(eval, self.api_key)
+            return run_eval(eval, self.api_key)
 
         except ValueError as e:
             raise ValueError(
