@@ -2090,7 +2090,7 @@ def _get_client_config(
 
     # Check for TrainableModel
     try:
-        from judgeval.common.trainer.trainer import TrainableModel
+        from judgeval.common.trainer.trainable_model import TrainableModel
 
         if isinstance(client, TrainableModel):
             return (
@@ -2283,7 +2283,7 @@ def _format_output_data(
 
     # Check for TrainableModel
     try:
-        from judgeval.common.trainer.trainer import TrainableModel
+        from judgeval.common.trainer.trainable_model import TrainableModel
 
         if isinstance(client, TrainableModel):
             # TrainableModel uses Fireworks LLM internally, so response format should be similar to OpenAI
