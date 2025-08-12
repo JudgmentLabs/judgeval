@@ -20,6 +20,7 @@ dependencies = [
     "dotenv",
     "httpx>=0.28.1",
     "litellm>=1.61.15",
+    "nest-asyncio>=1.6.0",
     "opentelemetry-exporter-otlp>=1.36.0",
     "opentelemetry-sdk>=1.36.0",
     "opentelemetry-semantic-conventions>=0.57b0",

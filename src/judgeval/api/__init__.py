@@ -34,13 +34,13 @@ class JudgmentSyncClient:
         self.client = httpx.Client(timeout=30)
 
     def _request(
-        self, method: Literal["POST", "PATCH", "GET", "DELETE"], url: str, payload: Any
+        self, method: Literal["POST", "PATCH", "GET", "DELETE"], url: str, payload: Any, params: Optional[Dict[str, Any]] = None
     ) -> Any:
         if method == "GET":
             r = self.client.request(
                 method,
                 url,
-                params=payload,
+                params=payload if params is None else params,
                 headers=_headers(self.api_key, self.organization_id),
             )
         else:
@@ -48,6 +48,7 @@ class JudgmentSyncClient:
                 method,
                 url,
                 json=json_encoder(payload),
+                params=params,
                 headers=_headers(self.api_key, self.organization_id),
             )
         return _handle_response(r)
@@ -66,11 +67,15 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def evaluate(self, payload: EvaluationRun) -> Any:
+    def evaluate(self, payload: EvaluationRun, stream: Optional[str] = None) -> Any:
+        query_params = {}
+        if stream is not None:
+            query_params['stream'] = stream
         return self._request(
             "POST",
             url_for("/evaluate/"),
             payload,
+            params=query_params,
         )
 
     def log_eval_results(self, payload: EvalResults) -> Any:
@@ -87,11 +92,14 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def get_evaluation_status(self) -> Any:
+    def get_evaluation_status(self, experiment_run_id: str, project_name: str) -> Any:
+        query_params = {}
+        query_params['experiment_run_id'] = experiment_run_id
+        query_params['project_name'] = project_name
         return self._request(
             "GET",
             url_for("/get_evaluation_status/"),
-            {},
+            query_params,
         )
 
     def datasets_insert_examples(self, payload: DatasetInsertExamples) -> Any:
@@ -203,13 +211,13 @@ class JudgmentAsyncClient:
         self.client = httpx.AsyncClient(timeout=30)
 
     async def _request(
-        self, method: Literal["POST", "PATCH", "GET", "DELETE"], url: str, payload: Any
+        self, method: Literal["POST", "PATCH", "GET", "DELETE"], url: str, payload: Any, params: Optional[Dict[str, Any]] = None
     ) -> Any:
         if method == "GET":
             r = self.client.request(
                 method,
                 url,
-                params=payload,
+                params=payload if params is None else params,
                 headers=_headers(self.api_key, self.organization_id),
             )
         else:
@@ -217,6 +225,7 @@ class JudgmentAsyncClient:
                 method,
                 url,
                 json=json_encoder(payload),
+                params=params,
                 headers=_headers(self.api_key, self.organization_id),
             )
         return _handle_response(await r)
@@ -235,11 +244,15 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def evaluate(self, payload: EvaluationRun) -> Any:
+    async def evaluate(self, payload: EvaluationRun, stream: Optional[str] = None) -> Any:
+        query_params = {}
+        if stream is not None:
+            query_params['stream'] = stream
         return await self._request(
             "POST",
             url_for("/evaluate/"),
             payload,
+            params=query_params,
         )
 
     async def log_eval_results(self, payload: EvalResults) -> Any:
@@ -256,11 +269,14 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def get_evaluation_status(self) -> Any:
+    async def get_evaluation_status(self, experiment_run_id: str, project_name: str) -> Any:
+        query_params = {}
+        query_params['experiment_run_id'] = experiment_run_id
+        query_params['project_name'] = project_name
         return await self._request(
             "GET",
             url_for("/get_evaluation_status/"),
-            {},
+            query_params,
         )
 
     async def datasets_insert_examples(self, payload: DatasetInsertExamples) -> Any:
