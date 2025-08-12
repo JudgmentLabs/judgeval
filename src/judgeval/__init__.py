@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from judgeval.evaluation import EvaluationRun
+from judgeval.data.result import ScoringResult
+from judgeval.evaluation import EvaluationRun, run_evaluation
 
 
-from typing import List, Never, Optional
-from judgeval.data.judgment_types import ExampleJudgmentType, ScoringResultJudgmentType
+from typing import List, Never, Optional, Union
+from judgeval.scorers import BaseScorer, APIScorerConfig
+from judgeval.data.example import Example
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_DEFAULT_GPT_MODEL, JUDGMENT_ORG_ID
+from judgeval.scorers.api_scorer import APIScorerConfig
 from judgeval.utils.meta import SingletonMeta
 from judgeval.exceptions import JudgmentRuntimeError
 
@@ -15,8 +18,8 @@ class JudgmentClient(metaclass=SingletonMeta):
 
     def __init__(
         self,
-        api_key: Optional[str],
-        organization_id: Optional[str],
+        api_key: Optional[str] = None,
+        organization_id: Optional[str] = None,
     ):
         _api_key = api_key or JUDGMENT_API_KEY
         _organization_id = organization_id or JUDGMENT_ORG_ID
@@ -36,15 +39,15 @@ class JudgmentClient(metaclass=SingletonMeta):
 
     def run_evaluation(
         self,
-        examples: List[ExampleJudgmentType],
-        scorers: List[Never],
+        examples: List[Example],
+        scorers: List[Union[APIScorerConfig, BaseScorer]],
         project_name: str,
         eval_run_name: str,
         model: str = JUDGMENT_DEFAULT_GPT_MODEL,
         override: bool = False,
         append: bool = False,
         async_execute: bool = False,
-    ) -> List[ScoringResultJudgmentType]:
+    ) -> List[ScoringResult]:
         ...
 
         if override and append:
@@ -62,7 +65,7 @@ class JudgmentClient(metaclass=SingletonMeta):
                 organization_id=self.organization_id,
             )
 
-            return run_evaluation(eval)
+            return run_evaluation(eval, self.api_key)
 
         except ValueError as e:
             raise ValueError(

@@ -1,5 +1,5 @@
-from judgeval.data.judgment_types import ToolJudgmentType
+from judgeval.data.judgment_types import Tool as JudgmentTool
 
 
-class Tool(ToolJudgmentType):
+class Tool(JudgmentTool):
     pass

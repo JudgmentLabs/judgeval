@@ -22,6 +22,7 @@ dependencies = [
     "litellm>=1.61.15",
     "opentelemetry-exporter-otlp>=1.36.0",
     "opentelemetry-sdk>=1.36.0",
+    "opentelemetry-semantic-conventions>=0.57b0",
     "orjson>=3.9.0",
 ]
 
@@ -55,6 +56,7 @@ dev = [
     "langchain-core>=0.3.72",
     "mypy>=1.17.1",
     "openai>=1.99.0",
+    "opentelemetry-instrumentation-openai>=0.44.1",
     "ruff>=0.12.7",
     "together>=1.5.21",
     "types-pyyaml>=6.0.12.20250516",

@@ -1,6 +1,5 @@
 from __future__ import annotations
 from contextvars import ContextVar
-from datetime import timedelta
 import functools
 import inspect
 import random
@@ -23,7 +22,7 @@ from warnings import warn
 from opentelemetry.context import Context
 from opentelemetry.sdk.trace import SpanProcessor, TracerProvider
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace import (
     Status,
     StatusCode,
@@ -40,8 +39,6 @@ from judgeval.env import (
     JUDGMENT_DEFAULT_GPT_MODEL,
     JUDGMENT_ORG_ID,
 )
-from judgeval.evaluation import EvaluationRun
-from judgeval.exceptions import JudgmentAPIError, JudgmentRuntimeError
 from judgeval.logger import judgeval_logger
 from judgeval.scorers.api_scorer import APIScorerConfig
 from judgeval.scorers.base_scorer import BaseScorer
@@ -52,9 +49,10 @@ from judgeval.version import get_version
 from judgeval.warnings import JudgmentWarning
 
 from judgeval.tracer.exporters import JudgmentSpanExporter
-from judgeval.tracer.keys import EventKeys, ResourceKeys
+from judgeval.tracer.keys import AttributeKeys, ResourceKeys
 from judgeval.api import JudgmentSyncClient
 from judgeval.tracer.llm import wrap_provider
+from judgeval.utils.url import url_for
 
 C = TypeVar("C", bound=Callable)
 Cls = TypeVar("Cls", bound=Type)
@@ -113,7 +111,6 @@ class Tracer:
         project_name: str,
         api_key: Optional[str] = None,
         organization_id: Optional[str] = None,
-        api_url: Optional[str] = None,
         deep_tracing: bool = False,
         enable_monitoring: bool = True,
         enable_evaluation: bool = False,
@@ -135,7 +132,7 @@ class Tracer:
         self.api_key = _api_key
         self.organization_id = _organization_id
         self.project_name = project_name
-        self.api_url = api_url or JUDGMENT_API_URL
+        self.api_url = url_for("/otel/v1/traces")
 
         self.deep_tracing = deep_tracing
         self.enable_monitoring = enable_monitoring
@@ -147,29 +144,23 @@ class Tracer:
         # TODO:
         self.context = ContextVar(f"judgeval:tracer:{project_name}")
 
-        project_id = resolve_project_id(
-            self.api_key, self.organization_id, self.project_name
-        )
-
-        if project_id is None:
-            if self.enable_monitoring:
-                judgeval_logger.error(
-                    f"Failed to resolve project {self.project_name}, please create it first at https://app.judgmentlabs.ai/projects. Skipping monitoring and evaluation."
-                )
-            self.enable_monitoring = False
-            self.enable_evaluation = False
-
         if self.enable_monitoring:
-            assert project_id is not None
-            self.provider = TracerProvider(
-                resource=Resource.create(
-                    {
-                        "service.name": self.project_name,
-                        ResourceKeys.JUDGMENT_PROJECT_ID: project_id,
-                    }
-                ),
+            project_id = resolve_project_id(
+                self.api_key, self.organization_id, self.project_name
             )
 
+            resource_attributes = {
+                ResourceKeys.SERVICE_NAME: self.project_name,
+            }
+
+            if project_id is not None:
+                resource_attributes[ResourceKeys.JUDGMENT_PROJECT_ID] = project_id
+            else:
+                judgeval_logger.error(
+                    f"Failed to resolve project {self.project_name}, please create it first at https://app.judgmentlabs.ai/projects. Skipping Judgment export."
+                )
+
+            resource = Resource.create(resource_attributes)
             self.processors.append(
                 BatchSpanProcessor(
                     JudgmentSpanExporter(
@@ -182,6 +173,7 @@ class Tracer:
                 )
             )
 
+            self.provider = TracerProvider(resource=resource)
             for processor in self.processors:
                 self.provider.add_span_processor(processor)
 
@@ -208,11 +200,9 @@ class Tracer:
             n = name or f.__qualname__
             with sync_span_context(self, n, attributes) as span:
                 try:
-                    span.add_event(
-                        EventKeys.JUDGMENT_INPUT,
-                        {
-                            "value": safe_serialize(format_inputs(f, args, kwargs)),
-                        },
+                    span.set_attribute(
+                        AttributeKeys.JUDGMENT_INPUT,
+                        safe_serialize(format_inputs(f, args, kwargs)),
                     )
 
                     result = f(*args, **kwargs)
@@ -221,11 +211,9 @@ class Tracer:
                     span.set_status(Status(StatusCode.ERROR, str(user_exc)))
                     raise
                 if span is not None:
-                    span.add_event(
-                        EventKeys.JUDGMENT_OUTPUT,
-                        {
-                            "value": safe_serialize(result),
-                        },
+                    span.set_attribute(
+                        AttributeKeys.JUDGMENT_OUTPUT,
+                        safe_serialize(result),
                     )
                 return result
 
@@ -239,11 +227,9 @@ class Tracer:
             n = name or f.__qualname__
             with sync_span_context(self, n, attributes) as span:
                 try:
-                    span.add_event(
-                        EventKeys.JUDGMENT_INPUT,
-                        {
-                            "value": safe_serialize(format_inputs(f, args, kwargs)),
-                        },
+                    span.set_attribute(
+                        AttributeKeys.JUDGMENT_INPUT,
+                        safe_serialize(format_inputs(f, args, kwargs)),
                     )
                     result = await f(*args, **kwargs)
                 except Exception as user_exc:
@@ -251,11 +237,9 @@ class Tracer:
                     span.set_status(Status(StatusCode.ERROR, str(user_exc)))
                     raise
                 if span is not None:
-                    span.add_event(
-                        EventKeys.JUDGMENT_OUTPUT,
-                        {
-                            "value": safe_serialize(result),
-                        },
+                    span.set_attribute(
+                        AttributeKeys.JUDGMENT_OUTPUT,
+                        safe_serialize(result),
                     )
                 return result
 
@@ -280,7 +264,7 @@ class Tracer:
 
         name = func.__qualname__
         attributes = {
-            "span.type": span_type,
+            AttributeKeys.SPAN_TYPE: span_type,
         }
 
         if inspect.iscoroutinefunction(func):

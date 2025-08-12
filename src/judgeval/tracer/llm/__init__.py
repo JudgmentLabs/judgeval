@@ -1,4 +1,5 @@
 from __future__ import annotations
+import functools
 import sys
 from typing import Callable, Tuple, Optional, Any, TYPE_CHECKING
 from functools import wraps
@@ -15,7 +16,7 @@ from judgeval.tracer.llm.providers import (
     ApiClient,
 )
 from judgeval.tracer.managers import sync_span_context, async_span_context
-from judgeval.tracer.keys import EventKeys
+from judgeval.tracer.keys import AttributeKeys
 from judgeval.utils.serialize import safe_serialize
 
 if TYPE_CHECKING:
@@ -49,20 +50,32 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
     span_name, original_create = _get_client_config(client)
 
     def wrapped(function):
+        @functools.wraps(function)
         def wrapper(*args, **kwargs):
-            with sync_span_context(tracer, span_name, {"span.type": "llm"}) as span:
-                span.add_event(
-                    EventKeys.JUDGMENT_INPUT, {"value": safe_serialize(kwargs)}
-                )
+            with sync_span_context(
+                tracer, span_name, {AttributeKeys.SPAN_TYPE: "llm"}
+            ) as span:
+                span.set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
                 try:
                     response = function(*args, **kwargs)
                     output, usage = _format_output_data(client, response)
                     if output:
-                        span.add_event(EventKeys.JUDGMENT_OUTPUT, {"value": output})
+                        span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, output)
                     if usage:
-                        span.add_event(
-                            EventKeys.LLM_USAGE, {"value": safe_serialize(usage)}
-                        )
+                        if usage.prompt_tokens:
+                            span.set_attribute(
+                                AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
+                                usage.prompt_tokens,
+                            )
+                        if usage.completion_tokens:
+                            span.set_attribute(
+                                AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
+                                usage.completion_tokens,
+                            )
+                            span.set_attribute(
+                                AttributeKeys.GEN_AI_USAGE_COMPLETION_TOKENS,
+                                usage.completion_tokens,
+                            )
                     return response
                 except Exception as e:
                     span.record_exception(e)
@@ -71,22 +84,32 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
         return wrapper
 
     def wrapped_async(function):
+        @functools.wraps(function)
         async def wrapper(*args, **kwargs):
             async with async_span_context(
-                tracer, span_name, {"span.type": "llm"}
+                tracer, span_name, {AttributeKeys.SPAN_TYPE: "llm"}
             ) as span:
-                span.add_event(
-                    EventKeys.JUDGMENT_INPUT, {"value": safe_serialize(kwargs)}
-                )
+                span.set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
                 try:
                     response = await function(*args, **kwargs)
                     output, usage = _format_output_data(client, response)
                     if output:
-                        span.add_event(EventKeys.JUDGMENT_OUTPUT, {"value": output})
+                        span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, output)
                     if usage:
-                        span.add_event(
-                            EventKeys.LLM_USAGE, {"value": safe_serialize(usage)}
-                        )
+                        if usage.prompt_tokens:
+                            span.set_attribute(
+                                AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
+                                usage.prompt_tokens,
+                            )
+                        if usage.completion_tokens:
+                            span.set_attribute(
+                                AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
+                                usage.completion_tokens,
+                            )
+                            span.set_attribute(
+                                AttributeKeys.GEN_AI_USAGE_COMPLETION_TOKENS,
+                                usage.completion_tokens,
+                            )
                     return response
                 except Exception as e:
                     span.record_exception(e)
@@ -100,7 +123,6 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
         assert openai_OpenAI is not None, "OpenAI client not found"
         assert openai_AsyncOpenAI is not None, "OpenAI async client not found"
         if isinstance(client, openai_OpenAI):
-            print("wrapping openai")
             setattr(client.chat.completions, "create", wrapped(original_create))
         elif isinstance(client, openai_AsyncOpenAI):
             setattr(client.chat.completions, "create", wrapped_async(original_create))

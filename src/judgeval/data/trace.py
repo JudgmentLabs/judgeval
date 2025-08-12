@@ -1,17 +1,17 @@
 from datetime import datetime, timezone
 from judgeval.data.judgment_types import (
-    TraceUsageJudgmentType,
-    TraceSpanJudgmentType,
-    TraceJudgmentType,
+    TraceUsage as JudgmentTraceUsage,
+    TraceSpan as JudgmentTraceSpan,
+    Trace as JudgmentTrace,
 )
 from judgeval.utils.serialize import json_encoder
 
 
-class TraceUsage(TraceUsageJudgmentType):
+class TraceUsage(JudgmentTraceUsage):
     pass
 
 
-class TraceSpan(TraceSpanJudgmentType):
+class TraceSpan(JudgmentTraceSpan):
     def model_dump(self, **kwargs):
         return {
             "span_id": self.span_id,
@@ -37,5 +37,5 @@ class TraceSpan(TraceSpanJudgmentType):
         }
 
 
-class Trace(TraceJudgmentType):
+class Trace(JudgmentTrace):
     pass
