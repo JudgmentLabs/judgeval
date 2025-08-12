@@ -19,7 +19,7 @@ def push_prompt_scorer(
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
         r = client.save_scorer(name, prompt, threshold, options)
-    except JudgmentAPIException as e:
+    except JudgmentAPIError as e:
         if e.status_code == 500:
             raise JudgmentAPIError(
                 status_code=e.status_code,
@@ -41,7 +41,7 @@ def fetch_prompt_scorer(
 ):
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
-        scorer_config = client.fetch_scorer(name)["scorer"]
+        scorer_config = client.fetch_scorer({"name": name})["scorer"]
         scorer_config.pop("created_at")
         scorer_config.pop("updated_at")
         return scorer_config
@@ -66,7 +66,7 @@ def scorer_exists(
 ):
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
-        return client.scorer_exists(name)["exists"]
+        return client.scorer_exists({"name": name})["exists"]
     except JudgmentAPIError as e:
         if e.status_code == 500:
             raise JudgmentAPIError(

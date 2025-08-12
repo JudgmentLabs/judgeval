@@ -65,6 +65,7 @@ dev = [
     "google-genai>=1.28.0",
     "groq>=0.30.0",
     "langchain-core>=0.3.72",
+    "langgraph>=0.6.4",
     "mypy>=1.17.1",
     "openai>=1.99.0",
     "opentelemetry-instrumentation-openai>=0.44.1",
