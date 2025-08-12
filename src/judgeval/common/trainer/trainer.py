@@ -1,6 +1,6 @@
 import asyncio
 import time
-from typing import Optional
+from typing import Optional, Callable, Any, List
 from fireworks import LLM, Dataset
 from .config import TrainerConfig
 from judgeval.tracer import Tracer, wrap
@@ -142,6 +142,9 @@ class JudgmentTrainer:
 
     async def generate_rollouts_and_rewards(
         self,
+        agent_function: Callable[[Any], Any],
+        reward_function: Callable[[Any, Any], float],
+        prompts: List[Any],
         num_prompts: Optional[int] = None,
         num_generations_per_prompt: Optional[int] = None,
         concurrency: Optional[int] = None,
@@ -151,14 +154,17 @@ class JudgmentTrainer:
         Each sample contains multiple generations for Policy Optimization.
 
         Args:
-            num_prompts: Number of prompts to use (defaults to config value)
+            agent_function: Function/agent to call for generating responses
+            reward_function: Function to compute reward given prompt and response
+            prompts: List of prompts to use for training
+            num_prompts: Number of prompts to use (defaults to config value, limited by prompts list length)
             num_generations_per_prompt: Generations per prompt (defaults to config value)
             concurrency: Concurrency limit (defaults to config value)
 
         Returns:
             List of dataset rows containing samples with messages and evaluations
         """
-        num_prompts = num_prompts or self.config.num_prompts
+        num_prompts = min(num_prompts or self.config.num_prompts, len(prompts))
         num_generations_per_prompt = (
             num_generations_per_prompt or self.config.num_generations_per_prompt
         )
@@ -170,49 +176,32 @@ class JudgmentTrainer:
         async def generate_single_response(prompt_id, generation_id):
             """Generate a single response for a given prompt."""
             async with semaphore:
-                # Define the conversation turns
-                user_prompts = [
-                    f"What is {prompt_id} + {prompt_id}?",
-                    "Now multiply that result by 2.",
-                    "Now add 10 to the result.",
-                ]
+                # Get prompt from the provided list
+                prompt_input = prompts[prompt_id]
 
-                messages = []
-                responses = []
+                # Call the agent function with the current model and prompt
+                response_data = await agent_function(
+                    model=self.trainable_model,
+                    prompt_input=prompt_input,
+                    config=self.config,
+                )
 
-                # Loop through each turn
-                for turn, user_prompt in enumerate(user_prompts):
-                    # Add user message
-                    messages.append({"role": "user", "content": user_prompt})
+                # Extract messages from response_data or trace
+                messages = response_data.get("messages", [])
 
-                    # Get model response
-                    response = await self.trainable_model.chat.completions.acreate(
-                        messages=messages,
-                        max_tokens=self.config.max_tokens,
-                        temperature=self.config.temperature,
-                        n=1,
-                    )
+                # Extract the actual conversation from the trace if available
+                try:
+                    print("messages", messages)
+                    traced_messages = self.tracer.get_current_message_history()
+                    if traced_messages:
+                        messages = traced_messages
+                    print("traced_messages", traced_messages)
+                except Exception:
+                    # Fallback to response_data messages if trace extraction fails
+                    pass
 
-                    assistant_response = response.choices[0].message.content
-                    responses.append(assistant_response)
-
-                    # Add assistant response to conversation
-                    messages.append(
-                        {"role": "assistant", "content": assistant_response}
-                    )
-
-                # Compute reward based on both responses
-                first_correct = str(prompt_id + prompt_id) in responses[0]
-                expected_final = (prompt_id + prompt_id) * 2
-                second_correct = str(expected_final) in responses[1]
-                third_correct = str(expected_final + 10) in responses[2]
-
-                if first_correct and second_correct and third_correct:
-                    reward = 1.0  # Both answers correct
-                elif first_correct or second_correct or third_correct:
-                    reward = 0.5  # Partial credit
-                else:
-                    reward = 0.0  # Both incorrect
+                # Compute reward using provided reward function
+                reward = reward_function(prompt_input, response_data)
 
             return {
                 "prompt_id": prompt_id,
@@ -252,7 +241,12 @@ class JudgmentTrainer:
 
         return dataset_rows
 
-    async def run_reinforcement_learning(self):
+    async def run_reinforcement_learning(
+        self,
+        agent_function: Callable[[Any], Any],
+        reward_function: Callable[[Any, Any], float],
+        prompts: List[Any],
+    ):
         """
         Run the iterative reinforcement learning loop.
 
@@ -261,6 +255,11 @@ class JudgmentTrainer:
         2. Generates rollouts and computes rewards
         3. Trains a new model using reinforcement learning
         4. Waits for training completion
+
+        Args:
+            agent_function: Function/agent to call for generating responses
+            reward_function: Function to compute reward given prompt and response
+            prompts: List of prompts to use for training
         """
 
         print("Starting reinforcement learning")
@@ -273,7 +272,9 @@ class JudgmentTrainer:
             self.trainable_model.advance_to_next_step(step)
 
             # Generate rollouts and rewards using current model snapshot
-            dataset_rows = await self.generate_rollouts_and_rewards()
+            dataset_rows = await self.generate_rollouts_and_rewards(
+                agent_function, reward_function, prompts
+            )
 
             # Create dataset from dataset rows
             dataset = Dataset.from_list(dataset_rows)
@@ -298,10 +299,23 @@ class JudgmentTrainer:
 
         print("Reinforcement learning complete!")
 
-    def train(self):
+    def train(
+        self,
+        agent_function: Callable[[Any], Any],
+        reward_function: Callable[[Any, Any], float],
+        prompts: List[Any],
+    ):
         """
         Start the training process.
 
         This is the main entry point for running the reinforcement learning training.
+
+        Args:
+            agent_function: Function/agent to call for generating responses.
+                           Should accept (model, prompt_input, config) and return response data
+            reward_function: Function to compute reward given (prompt_input, response_data)
+            prompts: List of prompts to use for training
         """
-        asyncio.run(self.run_reinforcement_learning())
+        asyncio.run(
+            self.run_reinforcement_learning(agent_function, reward_function, prompts)
+        )

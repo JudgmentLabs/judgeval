@@ -1731,6 +1731,93 @@ class Tracer:
                     f"Error during background service shutdown: {e}"
                 )
 
+    def trace_to_message_history(
+        self, trace: Union[Trace, TraceClient]
+    ) -> List[Dict[str, str]]:
+        """
+        Extract message history from a trace for training purposes.
+
+        This method processes trace spans to reconstruct the conversation flow,
+        extracting messages in chronological order from LLM, user, and tool spans.
+
+        Args:
+            trace: Trace or TraceClient instance to extract messages from
+
+        Returns:
+            List of message dictionaries with 'role' and 'content' keys
+
+        Raises:
+            ValueError: If no trace is provided
+        """
+        if not trace:
+            raise ValueError("No trace provided")
+
+        # Handle both Trace and TraceClient objects
+        if isinstance(trace, TraceClient):
+            spans = trace.trace_spans
+        else:
+            spans = trace.trace_spans if hasattr(trace, "trace_spans") else []
+
+        messages = []
+        first_found = False
+
+        # Process spans in chronological order
+        for span in sorted(
+            spans, key=lambda s: s.created_at if hasattr(s, "created_at") else 0
+        ):
+            # Skip spans without output (except for first LLM span which may have input messages)
+            if span.output is None and span.span_type != "llm":
+                continue
+
+            if span.span_type == "llm":
+                # For the first LLM span, extract input messages (system + user prompts)
+                if not first_found and hasattr(span, "inputs") and span.inputs:
+                    input_messages = span.inputs.get("messages", [])
+                    if input_messages:
+                        first_found = True
+                        # Add input messages (typically system and user messages)
+                        for msg in input_messages:
+                            if (
+                                isinstance(msg, dict)
+                                and "role" in msg
+                                and "content" in msg
+                            ):
+                                messages.append(
+                                    {"role": msg["role"], "content": msg["content"]}
+                                )
+
+                # Add assistant response from span output
+                if span.output is not None:
+                    messages.append({"role": "assistant", "content": str(span.output)})
+
+            elif span.span_type == "user":
+                # Add user messages
+                if span.output is not None:
+                    messages.append({"role": "user", "content": str(span.output)})
+
+            elif span.span_type == "tool":
+                # Add tool responses as user messages (common pattern in training)
+                if span.output is not None:
+                    messages.append({"role": "user", "content": str(span.output)})
+
+        return messages
+
+    def get_current_message_history(self) -> List[Dict[str, str]]:
+        """
+        Get message history from the current trace.
+
+        Returns:
+            List of message dictionaries from the current trace context
+
+        Raises:
+            ValueError: If no current trace is found
+        """
+        current_trace = self.get_current_trace()
+        if not current_trace:
+            raise ValueError("No current trace found")
+
+        return self.trace_to_message_history(current_trace)
+
 
 def _get_current_trace(
     trace_across_async_contexts: bool = Tracer.trace_across_async_contexts,
@@ -2205,18 +2292,26 @@ def _format_output_data(
                 and hasattr(response, "usage")
                 and hasattr(response, "choices")
             ):
-                model_name = "fireworks/" + response.model
+                model_name = (
+                    response.model
+                )  # Keep original model name without fireworks prefix
                 prompt_tokens = response.usage.prompt_tokens if response.usage else 0
                 completion_tokens = (
                     response.usage.completion_tokens if response.usage else 0
                 )
                 message_content = response.choices[0].message.content
-                return message_content, _create_usage(
-                    model_name,
-                    prompt_tokens,
-                    completion_tokens,
-                    cache_read_input_tokens,
-                    cache_creation_input_tokens,
+
+                # Don't calculate costs for Fireworks TrainableModel since it's not supported by LiteLLM
+                return message_content, TraceUsage(
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=prompt_tokens + completion_tokens,
+                    cache_read_input_tokens=cache_read_input_tokens,
+                    cache_creation_input_tokens=cache_creation_input_tokens,
+                    prompt_tokens_cost_usd=None,  # Skip cost calculation
+                    completion_tokens_cost_usd=None,  # Skip cost calculation
+                    total_cost_usd=None,  # Skip cost calculation
+                    model_name=model_name,
                 )
     except ImportError:
         pass  # TrainableModel not available
