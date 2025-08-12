@@ -3,6 +3,104 @@ import time
 from typing import Optional
 from fireworks import LLM, Dataset
 from .config import TrainerConfig
+from judgeval.tracer import Tracer, wrap
+
+
+class TrainableModel:
+    """
+    A wrapper class for managing model snapshots during training.
+
+    This class automatically handles model snapshot creation and management
+    during the GRPO (Generative Reinforcement Learning from Policy Optimization) process,
+    abstracting away manual snapshot management from users.
+    """
+
+    def __init__(self, config: TrainerConfig):
+        """
+        Initialize the TrainableModel.
+
+        Args:
+            config: TrainerConfig instance with model configuration
+        """
+        self.config = config
+        self.current_step = 0
+        self._current_model = None
+
+        # Initialize base model
+        self._base_model = self._create_base_model()
+        self._current_model = self._base_model
+
+    def _create_base_model(self):
+        """Create and configure the base model."""
+        base_model = LLM(
+            model=self.config.base_model_name,
+            deployment_type="on-demand",
+            id=self.config.deployment_id,
+            enable_addons=self.config.enable_addons,
+        )
+        base_model.apply()
+        return base_model
+
+    def get_current_model(self):
+        """Get the current model snapshot for generation."""
+        return self._current_model
+
+    @property
+    def chat(self):
+        """OpenAI-compatible chat interface."""
+        return self._current_model.chat
+
+    @property
+    def completions(self):
+        """OpenAI-compatible completions interface."""
+        return self._current_model.completions
+
+    def advance_to_next_step(self, step: int):
+        """
+        Advance to the next training step and update the current model snapshot.
+
+        Args:
+            step: The current training step number
+        """
+        self.current_step = step
+
+        if step == 0:
+            # Use base model for first step
+            self._current_model = self._base_model
+        else:
+            # Create new model snapshot from previous training step
+            model_name = (
+                f"accounts/{self.config.user_id}/models/{self.config.model_id}-v{step}"
+            )
+            self._current_model = LLM(
+                model=model_name,
+                deployment_type="on-demand-lora",
+                base_id=self.config.deployment_id,
+            )
+            # Ensure deployment is ready
+            self._current_model.apply()
+        self._current_model = wrap(self._current_model)
+
+    def perform_reinforcement_step(self, dataset, step: int):
+        """
+        Perform a reinforcement learning step using the current model.
+
+        Args:
+            dataset: Training dataset for the reinforcement step
+            step: Current step number for output model naming
+
+        Returns:
+            Training job object
+        """
+        model_name = f"{self.config.model_id}-v{step + 1}"
+        return self._current_model.reinforcement_step(
+            dataset=dataset,
+            output_model=model_name,
+            epochs=self.config.epochs,
+            learning_rate=self.config.learning_rate,
+            accelerator_count=self.config.accelerator_count,
+            accelerator_type=self.config.accelerator_type,
+        )
 
 
 class JudgmentTrainer:
@@ -13,17 +111,21 @@ class JudgmentTrainer:
     through reinforcement learning steps based on generated rollouts and rewards.
     """
 
-    def __init__(self, config: Optional[TrainerConfig] = None):
+    def __init__(
+        self, config: Optional[TrainerConfig] = None, tracer: Optional[Tracer] = None
+    ):
         """
         Initialize the JudgmentTrainer.
 
         Args:
             config: TrainerConfig instance with training parameters. If None, uses default config.
+            tracer: Optional tracer for observability
         """
         self.config = config or TrainerConfig()
+        self.tracer = tracer
 
-        # Initialize base model
-        self.base_model = self._initialize_base_model()
+        # Initialize trainable model wrapper
+        self.trainable_model = TrainableModel(self.config)
 
     def _initialize_base_model(self):
         """Initialize the base model with PEFT addon support."""
@@ -41,17 +143,15 @@ class JudgmentTrainer:
 
     async def generate_rollouts_and_rewards(
         self,
-        llm,
         num_prompts: Optional[int] = None,
         num_generations_per_prompt: Optional[int] = None,
         concurrency: Optional[int] = None,
     ):
         """
-        Generate rollouts and compute rewards for the given model using concurrent generation.
+        Generate rollouts and compute rewards using the current model snapshot.
         Each sample contains multiple generations for Policy Optimization.
 
         Args:
-            llm: The language model to use for generation
             num_prompts: Number of prompts to use (defaults to config value)
             num_generations_per_prompt: Generations per prompt (defaults to config value)
             concurrency: Concurrency limit (defaults to config value)
@@ -67,6 +167,7 @@ class JudgmentTrainer:
 
         semaphore = asyncio.Semaphore(concurrency)
 
+        @self.tracer.observe(span_type="function")
         async def generate_single_response(prompt_id, generation_id):
             """Generate a single response for a given prompt."""
             async with semaphore:
@@ -74,7 +175,7 @@ class JudgmentTrainer:
                     {"role": "user", "content": f"What is {prompt_id} + {prompt_id}?"}
                 ]
 
-                response = await llm.chat.completions.acreate(
+                response = await self.trainable_model.chat.completions.acreate(
                     messages=messages,
                     max_tokens=self.config.max_tokens,
                     temperature=self.config.temperature,
@@ -89,13 +190,13 @@ class JudgmentTrainer:
                 else:
                     reward = 0.0  # Incorrect answer
 
-                return {
-                    "prompt_id": prompt_id,
-                    "generation_id": generation_id,
-                    "messages": messages
-                    + [{"role": "assistant", "content": assistant_message}],
-                    "evals": {"score": reward},
-                }
+            return {
+                "prompt_id": prompt_id,
+                "generation_id": generation_id,
+                "messages": messages
+                + [{"role": "assistant", "content": assistant_message}],
+                "evals": {"score": reward},
+            }
 
         # Create all generation tasks concurrently
         coros = []
@@ -133,7 +234,7 @@ class JudgmentTrainer:
         Run the iterative reinforcement learning loop.
 
         This method performs multiple steps of reinforcement learning, where each step:
-        1. Creates or loads a model snapshot
+        1. Advances to the appropriate model snapshot
         2. Generates rollouts and computes rewards
         3. Trains a new model using reinforcement learning
         4. Waits for training completion
@@ -145,39 +246,18 @@ class JudgmentTrainer:
                 f"Starting reinforcement learning step {step + 1}/{self.config.num_steps}"
             )
 
-            model_snapshot = None
-            # Create deployment for current model snapshot
-            if step == 0:
-                # Use base model for first step
-                model_snapshot = self.base_model
-            else:
-                model_name = f"accounts/minhp/models/improved-model-v{step}"
-                print("model_name", model_name)
-                model_snapshot = LLM(
-                    model=model_name,  # Use the LoRA model directly
-                    deployment_type="on-demand-lora",
-                    base_id=self.config.deployment_id,  # Use the same deployment ID
-                )
+            # Advance trainable model to the current step
+            self.trainable_model.advance_to_next_step(step)
 
-            # Ensure deployment is ready
-            model_snapshot.apply()
-
-            # Generate rollouts and rewards
-            dataset_rows = await self.generate_rollouts_and_rewards(model_snapshot)
+            # Generate rollouts and rewards using current model snapshot
+            dataset_rows = await self.generate_rollouts_and_rewards()
 
             # Create dataset from dataset rows
             dataset = Dataset.from_list(dataset_rows)
             dataset.sync()
 
-            # Perform reinforcement learning step
-            job = model_snapshot.reinforcement_step(
-                dataset=dataset,
-                output_model=f"improved-model-v{step + 1}",
-                epochs=self.config.epochs,
-                learning_rate=self.config.learning_rate,
-                accelerator_count=self.config.accelerator_count,
-                accelerator_type=self.config.accelerator_type,
-            )
+            # Perform reinforcement learning step using trainable model
+            job = self.trainable_model.perform_reinforcement_step(dataset, step)
 
             # Wait for training completion
             while not job.is_completed:

@@ -1746,7 +1746,7 @@ def wrap(
 ) -> Any:
     """
     Wraps an API client to add tracing capabilities.
-    Supports OpenAI, Together, Anthropic, and Google GenAI clients.
+    Supports OpenAI, Together, Anthropic, Google GenAI clients, and TrainableModel.
     Patches both '.create' and Anthropic's '.stream' methods using a wrapper class.
     """
     (
@@ -1871,6 +1871,29 @@ def wrap(
             setattr(client.chat.completions, "create", wrapped(original_create))
         elif isinstance(client, (groq_AsyncGroq)):
             setattr(client.chat.completions, "create", wrapped_async(original_create))
+
+    # Check for TrainableModel from judgeval.common.trainer.trainer
+    try:
+        from judgeval.common.trainer.trainer import TrainableModel
+
+        if isinstance(client, TrainableModel):
+            # Wrap the chat.completions.create method (accessed via property)
+            original_chat = client.chat
+            if hasattr(original_chat, "completions") and hasattr(
+                original_chat.completions, "create"
+            ):
+                setattr(original_chat.completions, "create", wrapped(original_create))
+            if hasattr(original_chat, "completions") and hasattr(
+                original_chat.completions, "acreate"
+            ):
+                setattr(
+                    original_chat.completions,
+                    "acreate",
+                    wrapped_async(getattr(original_chat.completions, "acreate")),
+                )
+    except ImportError:
+        pass  # TrainableModel not available
+
     return client
 
 
@@ -1977,6 +2000,22 @@ def _get_client_config(
             return "GROQ_API_CALL", client.chat.completions.create, None, None, None
         elif isinstance(client, (groq_AsyncGroq)):
             return "GROQ_API_CALL", client.chat.completions.create, None, None, None
+
+    # Check for TrainableModel
+    try:
+        from judgeval.common.trainer.trainer import TrainableModel
+
+        if isinstance(client, TrainableModel):
+            return (
+                "FIREWORKS_TRAINABLE_MODEL_CALL",
+                client.chat.completions.create,
+                None,
+                None,
+                None,
+            )
+    except ImportError:
+        pass  # TrainableModel not available
+
     raise ValueError(f"Unsupported client type: {type(client)}")
 
 
@@ -2154,6 +2193,33 @@ def _format_output_data(
                 cache_read_input_tokens,
                 cache_creation_input_tokens,
             )
+
+    # Check for TrainableModel
+    try:
+        from judgeval.common.trainer.trainer import TrainableModel
+
+        if isinstance(client, TrainableModel):
+            # TrainableModel uses Fireworks LLM internally, so response format should be similar to OpenAI
+            if (
+                hasattr(response, "model")
+                and hasattr(response, "usage")
+                and hasattr(response, "choices")
+            ):
+                model_name = "fireworks/" + response.model
+                prompt_tokens = response.usage.prompt_tokens if response.usage else 0
+                completion_tokens = (
+                    response.usage.completion_tokens if response.usage else 0
+                )
+                message_content = response.choices[0].message.content
+                return message_content, _create_usage(
+                    model_name,
+                    prompt_tokens,
+                    completion_tokens,
+                    cache_read_input_tokens,
+                    cache_creation_input_tokens,
+                )
+    except ImportError:
+        pass  # TrainableModel not available
 
     judgeval_logger.warning(f"Unsupported client type: {type(client)}")
     return None, None
