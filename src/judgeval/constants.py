@@ -4,6 +4,42 @@ from enum import Enum
 from typing import Set
 import litellm
 
+
+class APIScorerType(str, Enum):
+    """
+    Collection of proprietary scorers implemented by Judgment.
+
+    These are ready-made evaluation scorers that can be used to evaluate
+    Examples via the Judgment API.
+    """
+
+    PROMPT_SCORER = "Prompt Scorer"
+    FAITHFULNESS = "Faithfulness"
+    ANSWER_RELEVANCY = "Answer Relevancy"
+    ANSWER_CORRECTNESS = "Answer Correctness"
+    INSTRUCTION_ADHERENCE = "Instruction Adherence"
+    EXECUTION_ORDER = "Execution Order"
+    DERAILMENT = "Derailment"
+    TOOL_ORDER = "Tool Order"
+    CLASSIFIER = "Classifier"
+    TOOL_DEPENDENCY = "Tool Dependency"
+    CUSTOM = "Custom"
+
+    @classmethod
+    def __missing__(cls, value: str) -> APIScorerType:
+        # Handle case-insensitive lookup
+        for member in cls:
+            if member.value == value.lower():
+                return member
+
+        raise ValueError(f"Invalid scorer type: {value}")
+
+
+UNBOUNDED_SCORERS: Set[APIScorerType] = (
+    set()
+)  # scorers whose scores are not bounded between 0-1
+
+
 LITELLM_SUPPORTED_MODELS: Set[str] = set(litellm.model_list)
 
 
@@ -68,38 +104,3 @@ JUDGMENT_SUPPORTED_MODELS = {"osiris-large", "osiris-mini", "osiris"}
 ACCEPTABLE_MODELS = (
     set(litellm.model_list) | set(TOGETHER_SUPPORTED_MODELS) | JUDGMENT_SUPPORTED_MODELS
 )
-
-
-class APIScorerType(str, Enum):
-    """
-    Collection of proprietary scorers implemented by Judgment.
-
-    These are ready-made evaluation scorers that can be used to evaluate
-    Examples via the Judgment API.
-    """
-
-    PROMPT_SCORER = "Prompt Scorer"
-    FAITHFULNESS = "Faithfulness"
-    ANSWER_RELEVANCY = "Answer Relevancy"
-    ANSWER_CORRECTNESS = "Answer Correctness"
-    INSTRUCTION_ADHERENCE = "Instruction Adherence"
-    EXECUTION_ORDER = "Execution Order"
-    DERAILMENT = "Derailment"
-    TOOL_ORDER = "Tool Order"
-    CLASSIFIER = "Classifier"
-    TOOL_DEPENDENCY = "Tool Dependency"
-    CUSTOM = "Custom"
-
-    @classmethod
-    def __missing__(cls, value: str) -> APIScorerType:
-        # Handle case-insensitive lookup
-        for member in cls:
-            if member.value == value.lower():
-                return member
-
-        raise ValueError(f"Invalid scorer type: {value}")
-
-
-UNBOUNDED_SCORERS: Set[APIScorerType] = (
-    set()
-)  # scorers whose scores are not bounded between 0-1

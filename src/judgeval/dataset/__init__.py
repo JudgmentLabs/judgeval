@@ -141,10 +141,12 @@ class Dataset:
 
     def add_traces(self, traces: List[Trace]) -> None:
         client = JudgmentSyncClient(self.judgment_api_key, self.organization_id)
-        client.append_traces(
-            dataset_alias=self.name,
-            project_name=self.project_name,
-            traces=[t.model_dump() for t in traces],
+        client.traces_add_to_dataset(
+            {
+                "dataset_alias": self.name,
+                "project_name": self.project_name,
+                "traces": [t.model_dump() for t in traces],  # type: ignore
+            }
         )
 
     def save_as(
@@ -190,10 +192,6 @@ class Dataset:
             raise TypeError(
                 f"Invalid file type: {file_type}. Please choose from {ACCEPTABLE_FILE_TYPES}"
             )
-
-    def delete(self):
-        client = JudgmentSyncClient(self.judgment_api_key, self.organization_id)
-        client.delete_dataset(self.name, self.project_name)
 
     def __iter__(self):
         return iter(self.examples)
