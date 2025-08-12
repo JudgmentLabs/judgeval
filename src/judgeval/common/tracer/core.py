@@ -2055,11 +2055,6 @@ def _format_output_data(
 
         if isinstance(client, (openai_OpenAI, openai_AsyncOpenAI, openai_AzureOpenAI, openai_AsyncAzureOpenAI)):
             if isinstance(response, openai_ChatCompletion):
-                #added this to diff openai vs azure openai dont know if needed though
-                if isinstance(client, (openai_AzureOpenAI, openai_AsyncAzureOpenAI)):
-                    model_name = "(azure-openai)" + response.model 
-                else:
-                    model_name = response.model
                 prompt_tokens = response.usage.prompt_tokens if response.usage else 0
                 completion_tokens = (
                     response.usage.completion_tokens if response.usage else 0
@@ -2071,16 +2066,24 @@ def _format_output_data(
                     and response.usage.prompt_tokens_details.cached_tokens
                     else 0
                 )
-
                 if isinstance(response, openai_ParsedChatCompletion):
                     message_content = response.choices[0].message.parsed
                 else:
                     message_content = response.choices[0].message.content
-            elif isinstance(response, openai_Response):
+                #lite llm does not hace azure price calcuylations its mostly enterpise and compute based so dependent on user
                 if isinstance(client, (openai_AzureOpenAI, openai_AsyncAzureOpenAI)):
-                    model_name = "(azure-openai)" + response.model
+                    model_name = "(azure-openai)" + response.model 
+                    return message_content, TraceUsage(
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens,
+                        total_tokens=prompt_tokens + completion_tokens,
+                        cache_read_input_tokens=cache_read_input_tokens,
+                        cache_creation_input_tokens=cache_creation_input_tokens,
+                        model_name=model_name,
+                    )
                 else:
                     model_name = response.model
+            elif isinstance(response, openai_Response):
                 prompt_tokens = response.usage.input_tokens if response.usage else 0
                 completion_tokens = (
                     response.usage.output_tokens if response.usage else 0
@@ -2096,6 +2099,18 @@ def _format_output_data(
                         for seg in response.output[0].content
                         if hasattr(seg, "text")
                     )
+                if isinstance(client, (openai_AzureOpenAI, openai_AsyncAzureOpenAI)):
+                    model_name = "(azure-openai)" + response.model
+                    return message_content, TraceUsage(
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens,
+                        total_tokens=prompt_tokens + completion_tokens,
+                        cache_read_input_tokens=cache_read_input_tokens,
+                        cache_creation_input_tokens=cache_creation_input_tokens,
+                        model_name=model_name,
+                    )
+                else:
+                    model_name = response.model
             # Note: LiteLLM seems to use cache_read_input_tokens to calculate the cost for OpenAI
             return message_content, _create_usage(
                 model_name,
@@ -2213,12 +2228,13 @@ def _format_output_data(
             elif hasattr(response, 'response'):
                 message_content = getattr(response, 'response', '')
                 
-            return message_content, _create_usage(
-                model_name,
+            return message_content, TraceUsage(
                 prompt_tokens,
                 completion_tokens,
+                prompt_tokens + completion_tokens,
                 cache_read_input_tokens,
                 cache_creation_input_tokens,
+                model_name,
             )
 
 

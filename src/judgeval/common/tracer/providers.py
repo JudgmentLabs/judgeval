@@ -93,7 +93,7 @@ ollama_Client = None
 ollama_AsyncClient = None
 
 try:
-    from ollama import Client, AsyncClient, chat
+    from ollama import Client, AsyncClient
     
     ollama_Client = Client
     ollama_AsyncClient = AsyncClient
