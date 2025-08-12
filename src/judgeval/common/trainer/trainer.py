@@ -79,7 +79,6 @@ class TrainableModel:
             )
             # Ensure deployment is ready
             self._current_model.apply()
-        self._current_model = wrap(self._current_model)
 
     def perform_reinforcement_step(self, dataset, step: int):
         """
@@ -125,7 +124,7 @@ class JudgmentTrainer:
         self.tracer = tracer
 
         # Initialize trainable model wrapper
-        self.trainable_model = TrainableModel(self.config)
+        self.trainable_model = wrap(TrainableModel(self.config))
 
     def _initialize_base_model(self):
         """Initialize the base model with PEFT addon support."""
@@ -171,30 +170,54 @@ class JudgmentTrainer:
         async def generate_single_response(prompt_id, generation_id):
             """Generate a single response for a given prompt."""
             async with semaphore:
-                messages = [
-                    {"role": "user", "content": f"What is {prompt_id} + {prompt_id}?"}
+                # Define the conversation turns
+                user_prompts = [
+                    f"What is {prompt_id} + {prompt_id}?",
+                    "Now multiply that result by 2.",
+                    "Now add 10 to the result.",
                 ]
 
-                response = await self.trainable_model.chat.completions.acreate(
-                    messages=messages,
-                    max_tokens=self.config.max_tokens,
-                    temperature=self.config.temperature,
-                    n=1,  # Generate one response at a time
-                )
+                messages = []
+                responses = []
 
-                assistant_message = response.choices[0].message.content
+                # Loop through each turn
+                for turn, user_prompt in enumerate(user_prompts):
+                    # Add user message
+                    messages.append({"role": "user", "content": user_prompt})
 
-                # Compute reward for this generation
-                if str(prompt_id + prompt_id) in assistant_message:
-                    reward = 1.0  # Correct answer
+                    # Get model response
+                    response = await self.trainable_model.chat.completions.acreate(
+                        messages=messages,
+                        max_tokens=self.config.max_tokens,
+                        temperature=self.config.temperature,
+                        n=1,
+                    )
+
+                    assistant_response = response.choices[0].message.content
+                    responses.append(assistant_response)
+
+                    # Add assistant response to conversation
+                    messages.append(
+                        {"role": "assistant", "content": assistant_response}
+                    )
+
+                # Compute reward based on both responses
+                first_correct = str(prompt_id + prompt_id) in responses[0]
+                expected_final = (prompt_id + prompt_id) * 2
+                second_correct = str(expected_final) in responses[1]
+                third_correct = str(expected_final + 10) in responses[2]
+
+                if first_correct and second_correct and third_correct:
+                    reward = 1.0  # Both answers correct
+                elif first_correct or second_correct or third_correct:
+                    reward = 0.5  # Partial credit
                 else:
-                    reward = 0.0  # Incorrect answer
+                    reward = 0.0  # Both incorrect
 
             return {
                 "prompt_id": prompt_id,
                 "generation_id": generation_id,
-                "messages": messages
-                + [{"role": "assistant", "content": assistant_message}],
+                "messages": messages,
                 "evals": {"score": reward},
             }
 
