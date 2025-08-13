@@ -32,10 +32,10 @@ from opentelemetry.trace import (
     get_current_span,
 )
 
+from judgeval.data.evaluation_run import EvaluationRun
 from judgeval.data.example import Example
 from judgeval.env import (
     JUDGMENT_API_KEY,
-    JUDGMENT_API_URL,
     JUDGMENT_DEFAULT_GPT_MODEL,
     JUDGMENT_ORG_ID,
 )
@@ -53,6 +53,7 @@ from judgeval.tracer.keys import AttributeKeys, ResourceKeys
 from judgeval.api import JudgmentSyncClient
 from judgeval.tracer.llm import wrap_provider
 from judgeval.utils.url import url_for
+from judgeval.tracer.local_eval_queue import LocalEvaluationQueue
 
 C = TypeVar("C", bound=Callable)
 Cls = TypeVar("Cls", bound=Type)
@@ -68,7 +69,7 @@ def resolve_project_id(
             organization_id=organization_id,
         )
         return client.projects_resolve({"project_name": project_name})["project_id"]
-    except Exception as e:
+    except Exception:
         return None
 
 
@@ -103,6 +104,8 @@ class Tracer:
     provider: ABCTracerProvider
     tracer: ABCTracer
     context: ContextVar[Context]
+    api_client: JudgmentSyncClient
+    local_eval_queue: LocalEvaluationQueue
 
     def __init__(
         self,
@@ -181,6 +184,11 @@ class Tracer:
             JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME,
             get_version(),
         )
+        self.api_client = JudgmentSyncClient(
+            api_key=self.api_key,
+            organization_id=self.organization_id,
+        )
+        self.local_eval_queue = LocalEvaluationQueue()
 
         Tracer._active_tracers[self.project_name] = self
 
@@ -356,6 +364,37 @@ class Tracer:
                 "Sampling rate is %s, skipping evaluation." % sampling_rate
             )
             return
+
+        span_id = self.get_current_span().get_span_context().span_id
+        hosted_scoring = isinstance(scorer, APIScorerConfig) or (
+            isinstance(scorer, BaseScorer) and scorer.server_hosted
+        )
+        if hosted_scoring:
+            eval_run_name = f"async_evaluate_{span_id}"  # note this name doesnt matter because we don't save the experiment only the example and scorer_data
+            eval_run = EvaluationRun(
+                organization_id=self.tracer.organization_id,
+                project_name=self.project_name,
+                eval_name=eval_run_name,
+                examples=[example],
+                scorers=[scorer],
+                model=model,
+            )
+
+            self.api_client.add_to_run_eval_queue(eval_run.model_dump(warnings=False))
+        else:
+            # Handle custom scorers using local evaluation queue
+            eval_run = EvaluationRun(
+                organization_id=self.tracer.organization_id,
+                project_name=self.project_name,
+                eval_name=eval_run_name,
+                examples=[example],
+                scorers=[scorer],
+                model=model,
+                trace_span_id=span_id,
+            )
+
+            # Enqueue the evaluation run to the local evaluation queue
+            self.tracer.local_eval_queue.enqueue(eval_run)
 
 
 def wrap(client: ApiClient) -> ApiClient:
