@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+from typing import Optional, Dict, Any
+import json
 
 
 @dataclass
@@ -8,7 +10,7 @@ class TrainerConfig:
     base_model_name: str = "qwen2p5-7b-instruct"
     deployment_id: str = "my-base-deployment"
     user_id: str = "minhp"  # User ID for model naming
-    model_id: str = "test-improved-model-multi-turn-v7"  # Base model ID for naming
+    model_id: str = "test-improved-model-multi-turn-v8"  # Base model ID for naming
     num_steps: int = 5
     num_prompts: int = (
         5  # Number of rollouts per input (was num_generations_per_prompt)
@@ -24,3 +26,102 @@ class TrainerConfig:
     temperature: float = 1.5
     max_tokens: int = 50
     enable_addons: bool = True
+
+
+@dataclass
+class ModelConfig:
+    """
+    Configuration class for storing and loading trained model state.
+
+    This class enables persistence of trained models so they can be loaded
+    and used later without retraining.
+
+    Example usage:
+        # After training
+        trainer = JudgmentTrainer(config)
+        model_config = trainer.train(agent_function, scorers, prompts)
+
+        # Save the trained model configuration
+        model_config.save_to_file("my_trained_model.json")
+
+        # Later, load and use the trained model
+        loaded_config = ModelConfig.load_from_file("my_trained_model.json")
+        trained_model = TrainableModel.from_model_config(loaded_config)
+
+        # Use the trained model for inference
+        response = trained_model.chat.completions.create(
+            model="current",  # Uses the loaded trained model
+            messages=[{"role": "user", "content": "Hello!"}]
+        )
+    """
+
+    # Base model configuration
+    base_model_name: str
+    deployment_id: str
+    user_id: str
+    model_id: str
+    enable_addons: bool
+
+    # Training state
+    current_step: int
+    total_steps: int
+
+    # Current model information
+    current_model_name: Optional[str] = None
+    is_trained: bool = False
+
+    # Training parameters used (for reference)
+    training_params: Optional[Dict[str, Any]] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert ModelConfig to dictionary for serialization."""
+        return {
+            "base_model_name": self.base_model_name,
+            "deployment_id": self.deployment_id,
+            "user_id": self.user_id,
+            "model_id": self.model_id,
+            "enable_addons": self.enable_addons,
+            "current_step": self.current_step,
+            "total_steps": self.total_steps,
+            "current_model_name": self.current_model_name,
+            "is_trained": self.is_trained,
+            "training_params": self.training_params,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ModelConfig":
+        """Create ModelConfig from dictionary."""
+        return cls(
+            base_model_name=data["base_model_name"],
+            deployment_id=data["deployment_id"],
+            user_id=data["user_id"],
+            model_id=data["model_id"],
+            enable_addons=data["enable_addons"],
+            current_step=data["current_step"],
+            total_steps=data["total_steps"],
+            current_model_name=data.get("current_model_name"),
+            is_trained=data.get("is_trained", False),
+            training_params=data.get("training_params"),
+        )
+
+    def to_json(self) -> str:
+        """Convert ModelConfig to JSON string."""
+        return json.dumps(self.to_dict(), indent=2)
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "ModelConfig":
+        """Create ModelConfig from JSON string."""
+        data = json.loads(json_str)
+        return cls.from_dict(data)
+
+    def save_to_file(self, filepath: str):
+        """Save ModelConfig to a JSON file."""
+        with open(filepath, "w") as f:
+            f.write(self.to_json())
+
+    @classmethod
+    def load_from_file(cls, filepath: str) -> "ModelConfig":
+        """Load ModelConfig from a JSON file."""
+        with open(filepath, "r") as f:
+            json_str = f.read()
+        return cls.from_json(json_str)

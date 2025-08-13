@@ -2,7 +2,7 @@ import asyncio
 import time
 from typing import Optional, Callable, Any, List, Union
 from fireworks import LLM, Dataset
-from .config import TrainerConfig
+from .config import TrainerConfig, ModelConfig
 from .trainable_model import TrainableModel
 from judgeval.tracer import Tracer
 from judgeval.judgment_client import JudgmentClient
@@ -39,7 +39,10 @@ class JudgmentTrainer:
         self.project_name = project_name or "judgment_training"
 
         # Initialize trainable model wrapper
-        self.trainable_model = trainable_model
+        if trainable_model is None:
+            self.trainable_model = TrainableModel(self.config)
+        else:
+            self.trainable_model = trainable_model
 
         # Initialize judgment client for evaluation
         self.judgment_client = JudgmentClient()
@@ -181,7 +184,7 @@ class JudgmentTrainer:
         agent_function: Callable[[Any], Any],
         scorers: List[Union[APIScorerConfig, BaseScorer]],
         prompts: List[Any],
-    ):
+    ) -> ModelConfig:
         """
         Run the iterative reinforcement learning loop.
 
@@ -195,10 +198,30 @@ class JudgmentTrainer:
             agent_function: Function/agent to call for generating responses
             scorers: List of scorer objects to evaluate responses
             prompts: List of prompts to use for training
+
+        Returns:
+            ModelConfig: Configuration of the trained model for future loading
         """
 
         print("Starting reinforcement learning")
-        for step in range(self.config.num_steps):
+
+        # Store training parameters for the model config
+        training_params = {
+            "num_steps": self.config.num_steps,
+            "num_prompts": self.config.num_prompts,
+            "num_generations_per_prompt": self.config.num_generations_per_prompt,
+            "epochs": self.config.epochs,
+            "learning_rate": self.config.learning_rate,
+            "accelerator_count": self.config.accelerator_count,
+            "accelerator_type": self.config.accelerator_type,
+            "temperature": self.config.temperature,
+            "max_tokens": self.config.max_tokens,
+        }
+
+        # Start from the current step of the model (useful for resuming training)
+        start_step = self.trainable_model.current_step
+
+        for step in range(start_step, self.config.num_steps):
             print(
                 f"Starting reinforcement learning step {step + 1}/{self.config.num_steps}"
             )
@@ -234,12 +257,18 @@ class JudgmentTrainer:
 
         print("Reinforcement learning complete!")
 
+        # Update the model to the final step
+        self.trainable_model.advance_to_next_step(self.config.num_steps)
+
+        # Return the final model configuration
+        return self.trainable_model.get_model_config(training_params)
+
     def train(
         self,
         agent_function: Callable[[Any], Any],
         scorers: List[Union[APIScorerConfig, BaseScorer]],
         prompts: List[Any],
-    ):
+    ) -> ModelConfig:
         """
         Start the training process.
 
@@ -250,5 +279,10 @@ class JudgmentTrainer:
                            Should accept (model, prompt_input, config) and return response data
             scorers: List of scorer objects to evaluate responses
             prompts: List of prompts to use for training
+
+        Returns:
+            ModelConfig: Configuration of the trained model for future loading
         """
-        asyncio.run(self.run_reinforcement_learning(agent_function, scorers, prompts))
+        return asyncio.run(
+            self.run_reinforcement_learning(agent_function, scorers, prompts)
+        )

@@ -1,5 +1,6 @@
 from fireworks import LLM
-from .config import TrainerConfig
+from .config import TrainerConfig, ModelConfig
+from typing import Optional, Dict, Any
 
 
 class TrainableModel:
@@ -26,6 +27,38 @@ class TrainableModel:
         self._base_model = self._create_base_model()
         self._current_model = self._base_model
 
+    @classmethod
+    def from_model_config(cls, model_config: ModelConfig) -> "TrainableModel":
+        """
+        Create a TrainableModel from a saved ModelConfig.
+
+        Args:
+            model_config: ModelConfig instance with saved model state
+
+        Returns:
+            TrainableModel instance configured to use the saved model
+        """
+        # Create a TrainerConfig from the ModelConfig
+        trainer_config = TrainerConfig(
+            base_model_name=model_config.base_model_name,
+            deployment_id=model_config.deployment_id,
+            user_id=model_config.user_id,
+            model_id=model_config.model_id,
+            enable_addons=model_config.enable_addons,
+        )
+
+        # Create instance
+        instance = cls(trainer_config)
+
+        # Restore the training state
+        instance.current_step = model_config.current_step
+
+        # If there's a trained model, load it
+        if model_config.is_trained and model_config.current_model_name:
+            instance._load_trained_model(model_config.current_model_name)
+
+        return instance
+
     def _create_base_model(self):
         """Create and configure the base model."""
         base_model = LLM(
@@ -36,6 +69,15 @@ class TrainableModel:
         )
         base_model.apply()
         return base_model
+
+    def _load_trained_model(self, model_name: str):
+        """Load a trained model by name."""
+        self._current_model = LLM(
+            model=model_name,
+            deployment_type="on-demand-lora",
+            base_id=self.config.deployment_id,
+        )
+        self._current_model.apply()
 
     def get_current_model(self):
         """Get the current model snapshot for generation."""
@@ -96,3 +138,49 @@ class TrainableModel:
             accelerator_count=self.config.accelerator_count,
             accelerator_type=self.config.accelerator_type,
         )
+
+    def get_model_config(
+        self, training_params: Optional[Dict[str, Any]] = None
+    ) -> ModelConfig:
+        """
+        Get the current model configuration for persistence.
+
+        Args:
+            training_params: Optional training parameters to include in config
+
+        Returns:
+            ModelConfig instance with current model state
+        """
+        # Determine current model name
+        current_model_name = None
+        is_trained = False
+
+        if self.current_step > 0:
+            current_model_name = f"accounts/{self.config.user_id}/models/{self.config.model_id}-v{self.current_step}"
+            is_trained = True
+
+        return ModelConfig(
+            base_model_name=self.config.base_model_name,
+            deployment_id=self.config.deployment_id,
+            user_id=self.config.user_id,
+            model_id=self.config.model_id,
+            enable_addons=self.config.enable_addons,
+            current_step=self.current_step,
+            total_steps=self.config.num_steps,
+            current_model_name=current_model_name,
+            is_trained=is_trained,
+            training_params=training_params,
+        )
+
+    def save_model_config(
+        self, filepath: str, training_params: Optional[Dict[str, Any]] = None
+    ):
+        """
+        Save the current model configuration to a file.
+
+        Args:
+            filepath: Path to save the configuration file
+            training_params: Optional training parameters to include in config
+        """
+        model_config = self.get_model_config(training_params)
+        model_config.save_to_file(filepath)
