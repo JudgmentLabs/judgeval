@@ -38,7 +38,7 @@ def upload_scorer(
     try:
         client = JudgmentClient()
 
-        result = client.save_custom_scorer(
+        result = client.upload_custom_scorer(
             scorer_file_path=scorer_file_path,
             requirements_file_path=requirements_file_path,
             unique_name=unique_name,

@@ -301,7 +301,7 @@ class JudgmentClient(metaclass=SingletonMeta):
             judgeval_logger.warning(f"Could not extract scorer name: {e}")
             return Path(scorer_file_path).stem
 
-    def save_custom_scorer(
+    def upload_custom_scorer(
         self,
         scorer_file_path: str,
         requirements_file_path: Optional[str] = None,
@@ -342,10 +342,6 @@ class JudgmentClient(metaclass=SingletonMeta):
             with open(requirements_file_path, "r") as f:
                 requirements_text = f.read()
 
-        # Upload to backend
-        judgeval_logger.info(
-            f"Uploading custom scorer: {unique_name}, this can take a couple of minutes..."
-        )
         try:
             response = self.api_client.upload_custom_scorer(
                 scorer_name=unique_name,
