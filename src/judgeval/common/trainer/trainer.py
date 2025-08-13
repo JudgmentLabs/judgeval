@@ -1,7 +1,7 @@
 import asyncio
 import time
 from typing import Optional, Callable, Any, List, Union
-from fireworks import LLM, Dataset
+from fireworks import Dataset
 from .config import TrainerConfig, ModelConfig
 from .trainable_model import TrainableModel
 from judgeval.tracer import Tracer
@@ -46,20 +46,6 @@ class JudgmentTrainer:
 
         # Initialize judgment client for evaluation
         self.judgment_client = JudgmentClient()
-
-    def _initialize_base_model(self):
-        """Initialize the base model with PEFT addon support."""
-
-        base_model = LLM(
-            model=self.config.base_model_name,
-            deployment_type="on-demand",
-            id=self.config.deployment_id,
-            enable_addons=self.config.enable_addons,
-        )
-
-        # Apply deployment configuration to Fireworks
-        base_model.apply()
-        return base_model
 
     async def generate_rollouts_and_rewards(
         self,
@@ -111,8 +97,9 @@ class JudgmentTrainer:
                     traced_messages = self.tracer.get_current_message_history()
                     if traced_messages:
                         messages = traced_messages
-                except Exception:
-                    # Fallback to response_data messages if trace extraction fails
+                except Exception as e:
+                    # Fallback to response_data messages if trace extraction fails, but log the error
+                    print(f"Warning: Failed to get message history from trace: {e}")
                     pass
 
                 # Create an Example object from the response data for evaluation
