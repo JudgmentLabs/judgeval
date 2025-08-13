@@ -101,18 +101,16 @@ class JudgmentTrainer:
                 prompt_input = prompts[prompt_id]
 
                 # Call the agent function with the current model and prompt
-                response_data = await agent_function(prompt_input)
+                response_data = await agent_function(**prompt_input)
 
                 # Extract messages from response_data or trace
                 messages = response_data.get("messages", [])
 
                 # Extract the actual conversation from the trace if available
                 try:
-                    print("messages", messages)
                     traced_messages = self.tracer.get_current_message_history()
                     if traced_messages:
                         messages = traced_messages
-                    print("traced_messages", traced_messages)
                 except Exception:
                     # Fallback to response_data messages if trace extraction fails
                     pass
