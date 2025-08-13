@@ -216,12 +216,7 @@ class JudgmentTrainer:
 
             # Advance trainable model to the current step
             if step > 0:
-                with _spinner_progress(
-                    f"Deploying model snapshot for step {step_num}",
-                    step_num,
-                    self.config.num_steps,
-                ):
-                    self.trainable_model.advance_to_next_step(step)
+                self.trainable_model.advance_to_next_step(step)
             else:
                 self.trainable_model.advance_to_next_step(step)
 
