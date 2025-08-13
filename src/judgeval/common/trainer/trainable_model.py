@@ -1,7 +1,7 @@
 from fireworks import LLM
 from .config import TrainerConfig, ModelConfig
 from typing import Optional, Dict, Any, Callable
-from .console import shared_console, _model_spinner_progress, _print_model_progress
+from .console import _model_spinner_progress, _print_model_progress
 
 
 class TrainableModel:
@@ -63,19 +63,17 @@ class TrainableModel:
 
     def _create_base_model(self):
         """Create and configure the base model."""
-        with _model_spinner_progress("Creating and deploying base model..."):
-            shared_console.print(
-                "  └─ Creating base model instance...", style="dim blue"
-            )
+        with _model_spinner_progress(
+            "Creating and deploying base model..."
+        ) as update_progress:
+            update_progress("Creating base model instance...")
             base_model = LLM(
                 model=self.config.base_model_name,
                 deployment_type="on-demand",
                 id=self.config.deployment_id,
                 enable_addons=self.config.enable_addons,
             )
-            shared_console.print(
-                "  └─ Applying deployment configuration...", style="dim blue"
-            )
+            update_progress("Applying deployment configuration...")
             base_model.apply()
         _print_model_progress("Base model deployment ready")
         return base_model
@@ -84,18 +82,14 @@ class TrainableModel:
         """Load a trained model by name."""
         with _model_spinner_progress(
             f"Loading and deploying trained model: {model_name}"
-        ):
-            shared_console.print(
-                "  └─ Creating trained model instance...", style="dim blue"
-            )
+        ) as update_progress:
+            update_progress("Creating trained model instance...")
             self._current_model = LLM(
                 model=model_name,
                 deployment_type="on-demand-lora",
                 base_id=self.config.deployment_id,
             )
-            shared_console.print(
-                "  └─ Applying deployment configuration...", style="dim blue"
-            )
+            update_progress("Applying deployment configuration...")
             self._current_model.apply()
         _print_model_progress("Trained model deployment ready")
 
@@ -136,18 +130,14 @@ class TrainableModel:
             )
             with _model_spinner_progress(
                 f"Creating and deploying model snapshot: {model_name}"
-            ):
-                shared_console.print(
-                    "  └─ Creating model snapshot instance...", style="dim blue"
-                )
+            ) as update_progress:
+                update_progress("Creating model snapshot instance...")
                 self._current_model = LLM(
                     model=model_name,
                     deployment_type="on-demand-lora",
                     base_id=self.config.deployment_id,
                 )
-                shared_console.print(
-                    "  └─ Applying deployment configuration...", style="dim blue"
-                )
+                update_progress("Applying deployment configuration...")
                 # Ensure deployment is ready
                 self._current_model.apply()
             _print_model_progress("Model snapshot deployment ready")

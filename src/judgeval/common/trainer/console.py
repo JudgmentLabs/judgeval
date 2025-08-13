@@ -30,8 +30,15 @@ def _model_spinner_progress(message: str):
     """Context manager for model operation spinner-based progress display."""
     spinner = Spinner("dots", text=Text(f"[Model] {message}", style="blue"))
 
-    with Live(spinner, console=shared_console, refresh_per_second=10):
-        yield
+    with Live(spinner, console=shared_console, refresh_per_second=10) as live:
+
+        def update_progress(progress_message: str):
+            """Update the spinner with a new progress message."""
+            new_text = f"[Model] {message}\n  └─ {progress_message}"
+            spinner.text = Text(new_text, style="blue")
+            live.update(spinner)
+
+        yield update_progress
 
 
 def _print_progress(
