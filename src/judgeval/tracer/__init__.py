@@ -84,6 +84,8 @@ class Tracer:
         "deep_tracing",
         "enable_monitoring",
         "enable_evaluation",
+        "api_client",
+        "local_eval_queue",
         # Otel
         "processors",
         "provider",
@@ -98,14 +100,14 @@ class Tracer:
     deep_tracing: bool
     enable_monitoring: bool
     enable_evaluation: bool
+    api_client: JudgmentSyncClient
+    local_eval_queue: LocalEvaluationQueue
 
     # Judgeval supports sending raw spans to through any otel compatible span processor.
     processors: List[SpanProcessor]
     provider: ABCTracerProvider
     tracer: ABCTracer
     context: ContextVar[Context]
-    api_client: JudgmentSyncClient
-    local_eval_queue: LocalEvaluationQueue
 
     def __init__(
         self,
