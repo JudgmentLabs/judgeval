@@ -8,6 +8,7 @@ from judgeval.tracer import Tracer
 from judgeval.judgment_client import JudgmentClient
 from judgeval.scorers import BaseScorer, APIScorerConfig
 from judgeval.data import Example
+from .console import _spinner_progress, _print_progress, _print_progress_update
 
 
 class JudgmentTrainer:
@@ -141,16 +142,17 @@ class JudgmentTrainer:
                 coros.append(coro)
 
         # Execute all generations concurrently
-        print(f"Starting {len(coros)} concurrent generations...")
-        num_completed = 0
-        results = []
+        with _spinner_progress(f"Generating {len(coros)} rollouts..."):
+            num_completed = 0
+            results = []
 
-        for coro in asyncio.as_completed(coros):
-            result = await coro
-            results.append(result)
-            num_completed += 1
-            if num_completed % 10 == 0:
-                print(f"Completed {num_completed}/{len(coros)} generations")
+            for coro in asyncio.as_completed(coros):
+                result = await coro
+                results.append(result)
+                num_completed += 1
+                # Don't print intermediate progress during spinner operation
+
+        _print_progress(f"Generated {len(results)} rollouts successfully")
 
         # Group results by prompt_id to create dataset rows
         dataset_rows = []
@@ -188,7 +190,7 @@ class JudgmentTrainer:
             ModelConfig: Configuration of the trained model for future loading
         """
 
-        print("Starting reinforcement learning")
+        _print_progress("Starting reinforcement learning training")
 
         # Store training parameters for the model config
         training_params = {
@@ -207,12 +209,21 @@ class JudgmentTrainer:
         start_step = self.trainable_model.current_step
 
         for step in range(start_step, self.config.num_steps):
-            print(
-                f"Starting reinforcement learning step {step + 1}/{self.config.num_steps}"
+            step_num = step + 1
+            _print_progress(
+                f"Starting training step {step_num}", step_num, self.config.num_steps
             )
 
             # Advance trainable model to the current step
-            self.trainable_model.advance_to_next_step(step)
+            if step > 0:
+                with _spinner_progress(
+                    f"Deploying model snapshot for step {step_num}",
+                    step_num,
+                    self.config.num_steps,
+                ):
+                    self.trainable_model.advance_to_next_step(step)
+            else:
+                self.trainable_model.advance_to_next_step(step)
 
             # Generate rollouts and rewards using current model snapshot
             dataset_rows = await self.generate_rollouts_and_rewards(
@@ -220,30 +231,60 @@ class JudgmentTrainer:
             )
 
             # Create dataset from dataset rows
-            dataset = Dataset.from_list(dataset_rows)
-            dataset.sync()
+            with _spinner_progress(
+                "Preparing training dataset", step_num, self.config.num_steps
+            ):
+                dataset = Dataset.from_list(dataset_rows)
+                dataset.sync()
 
             # Perform reinforcement learning step using trainable model
+            _print_progress(
+                "Starting reinforcement training", step_num, self.config.num_steps
+            )
             job = self.trainable_model.perform_reinforcement_step(dataset, step)
 
-            # Wait for training completion
-            while not job.is_completed:
-                job.raise_if_bad_state()
-                print(f"Training state: {job.state}")
-                time.sleep(10)
-                job = job.get()
-                if job is None:
-                    raise Exception("Job was deleted while waiting for completion")
+            # Wait for training completion with better progress indicators
+            last_state = None
+            with _spinner_progress(
+                "Training job in progress", step_num, self.config.num_steps
+            ):
+                while not job.is_completed:
+                    job.raise_if_bad_state()
+                    current_state = job.state
 
-            print(f"Step {step + 1} completed! New model: {job.output_model}")
+                    # Only print state changes to avoid spam
+                    if current_state != last_state:
+                        if current_state in ["uploading", "validating"]:
+                            _print_progress_update(
+                                f"Training job: {current_state} data"
+                            )
+                        elif current_state == "training":
+                            _print_progress_update(
+                                "Training job: model training in progress"
+                            )
+                        else:
+                            _print_progress_update(f"Training job: {current_state}")
+                        last_state = current_state
+
+                    time.sleep(10)
+                    job = job.get()
+                    if job is None:
+                        raise Exception("Job was deleted while waiting for completion")
+
+            _print_progress(
+                f"Training completed! New model: {job.output_model}",
+                step_num,
+                self.config.num_steps,
+            )
 
             # Clean up dataset
             dataset.delete()
 
-        print("Reinforcement learning complete!")
+        _print_progress("All training steps completed!")
 
         # Update the model to the final step
-        self.trainable_model.advance_to_next_step(self.config.num_steps)
+        with _spinner_progress("Deploying final trained model"):
+            self.trainable_model.advance_to_next_step(self.config.num_steps)
 
         # Return the final model configuration
         return self.trainable_model.get_model_config(training_params)

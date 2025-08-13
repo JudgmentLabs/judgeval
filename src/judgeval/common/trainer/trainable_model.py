@@ -1,6 +1,7 @@
 from fireworks import LLM
 from .config import TrainerConfig, ModelConfig
 from typing import Optional, Dict, Any, Callable
+from .console import shared_console, _model_spinner_progress, _print_model_progress
 
 
 class TrainableModel:
@@ -62,23 +63,41 @@ class TrainableModel:
 
     def _create_base_model(self):
         """Create and configure the base model."""
-        base_model = LLM(
-            model=self.config.base_model_name,
-            deployment_type="on-demand",
-            id=self.config.deployment_id,
-            enable_addons=self.config.enable_addons,
-        )
-        base_model.apply()
+        with _model_spinner_progress("Creating and deploying base model..."):
+            shared_console.print(
+                "  └─ Creating base model instance...", style="dim blue"
+            )
+            base_model = LLM(
+                model=self.config.base_model_name,
+                deployment_type="on-demand",
+                id=self.config.deployment_id,
+                enable_addons=self.config.enable_addons,
+            )
+            shared_console.print(
+                "  └─ Applying deployment configuration...", style="dim blue"
+            )
+            base_model.apply()
+        _print_model_progress("Base model deployment ready")
         return base_model
 
     def _load_trained_model(self, model_name: str):
         """Load a trained model by name."""
-        self._current_model = LLM(
-            model=model_name,
-            deployment_type="on-demand-lora",
-            base_id=self.config.deployment_id,
-        )
-        self._current_model.apply()
+        with _model_spinner_progress(
+            f"Loading and deploying trained model: {model_name}"
+        ):
+            shared_console.print(
+                "  └─ Creating trained model instance...", style="dim blue"
+            )
+            self._current_model = LLM(
+                model=model_name,
+                deployment_type="on-demand-lora",
+                base_id=self.config.deployment_id,
+            )
+            shared_console.print(
+                "  └─ Applying deployment configuration...", style="dim blue"
+            )
+            self._current_model.apply()
+        _print_model_progress("Trained model deployment ready")
 
         # Re-apply tracer wrapping if it was previously applied
         if self._tracer_wrapper_func:
@@ -115,13 +134,23 @@ class TrainableModel:
             model_name = (
                 f"accounts/{self.config.user_id}/models/{self.config.model_id}-v{step}"
             )
-            self._current_model = LLM(
-                model=model_name,
-                deployment_type="on-demand-lora",
-                base_id=self.config.deployment_id,
-            )
-            # Ensure deployment is ready
-            self._current_model.apply()
+            with _model_spinner_progress(
+                f"Creating and deploying model snapshot: {model_name}"
+            ):
+                shared_console.print(
+                    "  └─ Creating model snapshot instance...", style="dim blue"
+                )
+                self._current_model = LLM(
+                    model=model_name,
+                    deployment_type="on-demand-lora",
+                    base_id=self.config.deployment_id,
+                )
+                shared_console.print(
+                    "  └─ Applying deployment configuration...", style="dim blue"
+                )
+                # Ensure deployment is ready
+                self._current_model.apply()
+            _print_model_progress("Model snapshot deployment ready")
 
             # Re-apply tracer wrapping if it was previously applied
             if self._tracer_wrapper_func:
