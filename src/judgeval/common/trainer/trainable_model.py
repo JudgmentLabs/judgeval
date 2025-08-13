@@ -1,6 +1,6 @@
 from fireworks import LLM
 from .config import TrainerConfig, ModelConfig
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable
 
 
 class TrainableModel:
@@ -22,6 +22,7 @@ class TrainableModel:
         self.config = config
         self.current_step = 0
         self._current_model = None
+        self._tracer_wrapper_func = None  # Store reference to tracer wrapper
 
         # Initialize base model
         self._base_model = self._create_base_model()
@@ -79,6 +80,10 @@ class TrainableModel:
         )
         self._current_model.apply()
 
+        # Re-apply tracer wrapping if it was previously applied
+        if self._tracer_wrapper_func:
+            self._tracer_wrapper_func(self._current_model)
+
     def get_current_model(self):
         """Get the current model snapshot for generation."""
         return self._current_model
@@ -117,6 +122,10 @@ class TrainableModel:
             )
             # Ensure deployment is ready
             self._current_model.apply()
+
+            # Re-apply tracer wrapping if it was previously applied
+            if self._tracer_wrapper_func:
+                self._tracer_wrapper_func(self._current_model)
 
     def perform_reinforcement_step(self, dataset, step: int):
         """
@@ -184,3 +193,15 @@ class TrainableModel:
         """
         model_config = self.get_model_config(training_params)
         model_config.save_to_file(filepath)
+
+    def _register_tracer_wrapper(self, wrapper_func: Callable):
+        """
+        Register a tracer wrapper function to be reapplied when models change.
+
+        This is called internally by the tracer's wrap() function to ensure
+        that new model instances created during training are automatically wrapped.
+
+        Args:
+            wrapper_func: Function that wraps a model instance with tracing
+        """
+        self._tracer_wrapper_func = wrapper_func

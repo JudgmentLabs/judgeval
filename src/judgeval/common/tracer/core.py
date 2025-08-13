@@ -1964,20 +1964,30 @@ def wrap(
         from judgeval.common.trainer import TrainableModel
 
         if isinstance(client, TrainableModel):
-            # Wrap the chat.completions.create method (accessed via property)
-            original_chat = client.chat
-            if hasattr(original_chat, "completions") and hasattr(
-                original_chat.completions, "create"
-            ):
-                setattr(original_chat.completions, "create", wrapped(original_create))
-            if hasattr(original_chat, "completions") and hasattr(
-                original_chat.completions, "acreate"
-            ):
-                setattr(
-                    original_chat.completions,
-                    "acreate",
-                    wrapped_async(getattr(original_chat.completions, "acreate")),
-                )
+            # Define a wrapper function that can be reapplied to new model instances
+            def wrap_model_instance(model_instance):
+                """Wrap a model instance with tracing functionality"""
+                if hasattr(model_instance, "chat") and hasattr(
+                    model_instance.chat, "completions"
+                ):
+                    if hasattr(model_instance.chat.completions, "create"):
+                        setattr(
+                            model_instance.chat.completions,
+                            "create",
+                            wrapped(model_instance.chat.completions.create),
+                        )
+                    if hasattr(model_instance.chat.completions, "acreate"):
+                        setattr(
+                            model_instance.chat.completions,
+                            "acreate",
+                            wrapped_async(model_instance.chat.completions.acreate),
+                        )
+
+            # Register the wrapper function with the TrainableModel
+            client._register_tracer_wrapper(wrap_model_instance)
+
+            # Apply wrapping to the current model
+            wrap_model_instance(client._current_model)
     except ImportError:
         pass  # TrainableModel not available
 
@@ -2095,7 +2105,7 @@ def _get_client_config(
         if isinstance(client, TrainableModel):
             return (
                 "FIREWORKS_TRAINABLE_MODEL_CALL",
-                client.chat.completions.create,
+                client._current_model.chat.completions.create,
                 None,
                 None,
                 None,
