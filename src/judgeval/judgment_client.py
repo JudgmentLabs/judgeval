@@ -134,6 +134,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         model: Optional[str] = DEFAULT_GPT_MODEL,
         project_name: str = "default_project",
         eval_run_name: str = "default_eval_run",
+        show_url: bool = True,
     ) -> List[ScoringResult]:
         """
         Executes an evaluation of `Example`s using one or more `Scorer`s
@@ -161,6 +162,7 @@ class JudgmentClient(metaclass=SingletonMeta):
             return run_eval(
                 eval,
                 self.judgment_api_key,
+                show_url=show_url,
             )
         except ValueError as e:
             raise ValueError(
