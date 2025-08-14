@@ -815,6 +815,8 @@ class Tracer:
         == "true",
         enable_evaluations: bool = os.getenv("JUDGMENT_EVALUATIONS", "true").lower()
         == "true",
+        show_trace_urls: bool = os.getenv("JUDGMENT_SHOW_TRACE_URLS", "true").lower()
+        == "true",
         # S3 configuration
         use_s3: bool = False,
         s3_bucket_name: Optional[str] = None,
@@ -859,6 +861,7 @@ class Tracer:
             self.traces: List[Trace] = []
             self.enable_monitoring: bool = enable_monitoring
             self.enable_evaluations: bool = enable_evaluations
+            self.show_trace_urls: bool = show_trace_urls
             self.class_identifiers: Dict[
                 str, str
             ] = {}  # Dictionary to store class identifiers

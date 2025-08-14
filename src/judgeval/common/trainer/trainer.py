@@ -37,6 +37,7 @@ class JudgmentTrainer:
         """
         self.config = config or TrainerConfig()
         self.tracer = tracer
+        self.tracer.show_trace_urls = False
         self.project_name = project_name or "judgment_training"
 
         # Initialize trainable model wrapper
@@ -115,6 +116,7 @@ class JudgmentTrainer:
                     scorers=scorers,
                     project_name=self.project_name,
                     eval_run_name=f"training_step_{self.trainable_model.current_step}_prompt_{prompt_id}_gen_{generation_id}",
+                    show_eval_urls=False,
                 )
 
                 # Extract reward from scoring results
@@ -289,6 +291,7 @@ class JudgmentTrainer:
         agent_function: Callable[[Any], Any],
         scorers: List[Union[APIScorerConfig, BaseScorer]],
         prompts: List[Any],
+        rft_provider: Optional[str] = None,
     ) -> ModelConfig:
         """
         Start the training process.
@@ -300,8 +303,14 @@ class JudgmentTrainer:
                            Should accept (model, prompt_input, config) and return response data
             scorers: List of scorer objects to evaluate responses
             prompts: List of prompts to use for training
+            rft_provider: RFT provider to use for training ("fireworks", "together", "openai", etc.).
+                         If None, uses the provider specified in the config (defaults to "fireworks").
 
         Returns:
             ModelConfig: Configuration of the trained model for future loading
         """
+        # Update config with provided RFT provider if specified
+        if rft_provider is not None:
+            self.config.rft_provider = rft_provider
+
         return await self.run_reinforcement_learning(agent_function, scorers, prompts)
