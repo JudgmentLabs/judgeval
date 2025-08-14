@@ -116,7 +116,7 @@ class JudgmentTrainer:
                     scorers=scorers,
                     project_name=self.project_name,
                     eval_run_name=f"training_step_{self.trainable_model.current_step}_prompt_{prompt_id}_gen_{generation_id}",
-                    show_eval_urls=False,
+                    show_url=False,
                 )
 
                 # Extract reward from scoring results

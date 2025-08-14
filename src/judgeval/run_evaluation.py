@@ -278,15 +278,9 @@ def run_trace_eval(
         response_data["agent_results"], trace_run, judgment_api_key
     )
 
-    # Check if tracer has show_eval_urls setting and respect it
-    show_url = True
-    if tracer and hasattr(tracer, "show_eval_urls"):
-        show_url = tracer.show_eval_urls
-
-    if show_url:
-        rprint(
-            f"\n🔍 You can view your evaluation results here: [rgb(106,0,255)][link={url}]View Results[/link]\n"
-        )
+    rprint(
+        f"\n🔍 You can view your evaluation results here: [rgb(106,0,255)][link={url}]View Results[/link]\n"
+    )
     return scoring_results
 
 
