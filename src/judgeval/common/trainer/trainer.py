@@ -304,4 +304,4 @@ class JudgmentTrainer:
         Returns:
             ModelConfig: Configuration of the trained model for future loading
         """
-        return self.run_reinforcement_learning(agent_function, scorers, prompts)
+        return await self.run_reinforcement_learning(agent_function, scorers, prompts)
