@@ -1,6 +1,5 @@
 import asyncio
 import time
-import nest_asyncio
 from typing import Optional, Callable, Any, List, Union
 from fireworks import Dataset
 from .config import TrainerConfig, ModelConfig
@@ -9,6 +8,7 @@ from judgeval.tracer import Tracer
 from judgeval.judgment_client import JudgmentClient
 from judgeval.scorers import BaseScorer, APIScorerConfig
 from judgeval.data import Example
+from judgeval.utils.async_utils import safe_run_async
 from .console import _spinner_progress, _print_progress, _print_progress_update
 
 
@@ -285,25 +285,6 @@ class JudgmentTrainer:
         # Return the final model configuration
         return self.trainable_model.get_model_config(training_params)
 
-    def _get_or_create_event_loop(self) -> asyncio.AbstractEventLoop:
-        """
-        Get or create an asyncio event loop, handling nested loop scenarios.
-
-        Returns:
-            asyncio.AbstractEventLoop: The current or newly created event loop.
-        """
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # Apply nest_asyncio patch to allow nested async execution
-                nest_asyncio.apply()
-            if loop.is_closed():
-                raise RuntimeError("Event loop is closed")
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        return loop
-
     def train(
         self,
         agent_function: Callable[[Any], Any],
@@ -314,7 +295,6 @@ class JudgmentTrainer:
         Start the training process.
 
         This is the main entry point for running the reinforcement learning training.
-        Handles both scenarios where an event loop is already running and when it's not.
 
         Args:
             agent_function: Function/agent to call for generating responses.
@@ -327,19 +307,32 @@ class JudgmentTrainer:
         """
         try:
             # Check if we're already in an async context
-            loop = asyncio.get_running_loop()
-            if loop.is_running():
-                # We're in an async context (like Jupyter), apply nest_asyncio to allow nested calls
-                nest_asyncio.apply()
-                # Use asyncio.run which will now work with nest_asyncio
-                return asyncio.run(
-                    self.run_reinforcement_learning(agent_function, scorers, prompts)
-                )
-        except RuntimeError:
-            # No running event loop, safe to use asyncio.run()
+            asyncio.get_running_loop()
+            # If we get here, we're in an async context - use nest_asyncio or thread approach
+            import nest_asyncio
+
+            nest_asyncio.apply()
             return asyncio.run(
                 self.run_reinforcement_learning(agent_function, scorers, prompts)
             )
+        except RuntimeError:
+            # No running loop, safe to use safe_run_async
+            return safe_run_async(
+                self.run_reinforcement_learning(agent_function, scorers, prompts)
+            )
+        except ImportError:
+            # nest_asyncio not available, fall back to thread approach
+            import concurrent.futures
+
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(
+                    lambda: asyncio.run(
+                        self.run_reinforcement_learning(
+                            agent_function, scorers, prompts
+                        )
+                    )
+                )
+                return future.result()
 
     async def train_async(
         self,
@@ -350,7 +343,8 @@ class JudgmentTrainer:
         """
         Async version of the training process.
 
-        Use this method when you're already in an async context and want to await the training.
+        This is the async entry point for running the reinforcement learning training.
+        Use this method if you're already in an async context.
 
         Args:
             agent_function: Function/agent to call for generating responses.
