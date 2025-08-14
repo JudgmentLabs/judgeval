@@ -10,13 +10,13 @@ class TrainerConfig:
     base_model_name: str = "qwen2p5-7b-instruct"
     deployment_id: str = "my-base-deployment"
     user_id: str = "minhp"  # User ID for model naming
-    model_id: str = "test-improved-model-demo-v6"  # Base model ID for naming
-    num_steps: int = 3
+    model_id: str = "test-improved-model-demo-complex-v3"  # Base model ID for naming
+    num_steps: int = 5
     num_prompts: int = (
         5  # Number of rollouts per input (was num_generations_per_prompt)
     )
     num_generations_per_prompt: int = (
-        2  # Number of inputs to sample per step (was num_prompts)
+        4  # Number of inputs to sample per step (was num_prompts)
     )
     concurrency: int = 100
     epochs: int = 1
