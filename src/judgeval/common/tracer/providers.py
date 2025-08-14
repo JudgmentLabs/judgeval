@@ -15,13 +15,15 @@ openai_Response = None
 openai_ParsedChatCompletion = None
 
 try:
-    from openai import OpenAI, AsyncOpenAI
+    from openai import OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI
     from openai.types.chat.chat_completion import ChatCompletion
     from openai.types.responses.response import Response
     from openai.types.chat import ParsedChatCompletion
 
     openai_OpenAI = OpenAI
     openai_AsyncOpenAI = AsyncOpenAI
+    openai_AzureOpenAI = AzureOpenAI
+    openai_AsyncAzureOpenAI = AsyncAzureOpenAI
     openai_ChatCompletion = ChatCompletion
     openai_Response = Response
     openai_ParsedChatCompletion = ParsedChatCompletion
@@ -86,6 +88,18 @@ try:
 except ImportError:
     pass
 
+HAS_OLLAMA = False
+ollama_Client = None
+ollama_AsyncClient = None
+
+try:
+    from ollama import Client, AsyncClient
+    
+    ollama_Client = Client
+    ollama_AsyncClient = AsyncClient
+    HAS_OLLAMA = True
+except ImportError:
+    pass
 
 # TODO: if we support dependency groups we can have this better type, but during runtime, we do
 # not know which clients an end user might have installed.
@@ -97,6 +111,8 @@ __all__ = [
     "HAS_OPENAI",
     "openai_OpenAI",
     "openai_AsyncOpenAI",
+    "openai_AzureOpenAI",
+    "openai_AsyncAzureOpenAI",
     "openai_ChatCompletion",
     "openai_Response",
     "openai_ParsedChatCompletion",
@@ -116,4 +132,8 @@ __all__ = [
     "HAS_GROQ",
     "groq_Groq",
     "groq_AsyncGroq",
+    #Ollama
+    "HAS_OLLAMA",
+    "ollama_Client",
+    "ollama_AsyncClient",
 ]
