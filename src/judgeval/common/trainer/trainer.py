@@ -284,7 +284,7 @@ class JudgmentTrainer:
         # Return the final model configuration
         return self.trainable_model.get_model_config(training_params)
 
-    def train(
+    async def train(
         self,
         agent_function: Callable[[Any], Any],
         scorers: List[Union[APIScorerConfig, BaseScorer]],
@@ -304,6 +304,4 @@ class JudgmentTrainer:
         Returns:
             ModelConfig: Configuration of the trained model for future loading
         """
-        return asyncio.run(
-            self.run_reinforcement_learning(agent_function, scorers, prompts)
-        )
+        return self.run_reinforcement_learning(agent_function, scorers, prompts)
