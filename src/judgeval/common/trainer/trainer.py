@@ -8,7 +8,6 @@ from judgeval.tracer import Tracer
 from judgeval.judgment_client import JudgmentClient
 from judgeval.scorers import BaseScorer, APIScorerConfig
 from judgeval.data import Example
-from judgeval.utils.async_utils import safe_run_async
 from .console import _spinner_progress, _print_progress, _print_progress_update
 
 
@@ -305,6 +304,6 @@ class JudgmentTrainer:
         Returns:
             ModelConfig: Configuration of the trained model for future loading
         """
-        return safe_run_async(
+        return asyncio.run(
             self.run_reinforcement_learning(agent_function, scorers, prompts)
         )
