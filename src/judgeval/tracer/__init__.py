@@ -227,6 +227,19 @@ class Tracer:
                     AttributeKeys.JUDGMENT_AGENT_INSTANCE_NAME,
                     current_agent_context["instance_name"],
                 )
+            if "parent_agent_id" in current_agent_context:
+                span.set_attribute(
+                    AttributeKeys.JUDGMENT_PARENT_AGENT_ID,
+                    current_agent_context["parent_agent_id"],
+                )
+            if "is_agent_entry_point" in current_agent_context:
+                span.set_attribute(
+                    AttributeKeys.JUDGMENT_IS_AGENT_ENTRY_POINT,
+                    current_agent_context["is_agent_entry_point"],
+                )
+                current_agent_context["is_agent_entry_point"] = (
+                    "false"  # only true for entry point to agent
+                )
 
     def _wrap_sync(
         self, f: Callable, name: Optional[str], attributes: Optional[Dict[str, Any]]
@@ -350,7 +363,6 @@ class Tracer:
         if not self.enable_monitoring:
             return func
 
-        agent_id = str(uuid.uuid4())
         class_name = None
         if hasattr(func, "__qualname__") and "." in func.__qualname__:
             parts = func.__qualname__.split(".")
@@ -362,6 +374,7 @@ class Tracer:
 
                 @functools.wraps(f)
                 async def async_wrapper(*args, **kwargs):
+                    agent_id = str(uuid.uuid4())
                     agent_context = {"agent_id": agent_id}
                     if class_name:
                         agent_context["class_name"] = class_name
@@ -372,6 +385,12 @@ class Tracer:
                             agent_context["instance_name"] = instance_name
                         except Exception:
                             pass
+                    current_agent_context = _current_agent_context.get()
+                    if current_agent_context and "agent_id" in current_agent_context:
+                        agent_context["parent_agent_id"] = current_agent_context[
+                            "agent_id"
+                        ]
+                    agent_context["is_agent_entry_point"] = "true"
                     token = _current_agent_context.set(agent_context)
                     try:
                         return await f(*args, **kwargs)
@@ -383,6 +402,7 @@ class Tracer:
 
                 @functools.wraps(f)
                 def sync_wrapper(*args, **kwargs):
+                    agent_id = str(uuid.uuid4())
                     agent_context = {"agent_id": agent_id}
                     if class_name:
                         agent_context["class_name"] = class_name
@@ -393,6 +413,12 @@ class Tracer:
                             agent_context["instance_name"] = instance_name
                         except Exception:
                             pass
+                    current_agent_context = _current_agent_context.get()
+                    if current_agent_context and "agent_id" in current_agent_context:
+                        agent_context["parent_agent_id"] = current_agent_context[
+                            "agent_id"
+                        ]
+                    agent_context["is_agent_entry_point"] = "true"
                     token = _current_agent_context.set(agent_context)
                     try:
                         return f(*args, **kwargs)

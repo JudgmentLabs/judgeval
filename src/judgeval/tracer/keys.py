@@ -16,9 +16,10 @@ class AttributeKeys:
 
     # Agent specific attributes (custom namespace)
     JUDGMENT_AGENT_ID = "judgment.agent_id"
+    JUDGMENT_PARENT_AGENT_ID = "judgment.parent_agent_id"
     JUDGMENT_AGENT_CLASS_NAME = "judgment.agent_class_name"
     JUDGMENT_AGENT_INSTANCE_NAME = "judgment.agent_instance_name"
-    JUDGMENT_AGENT_IS_ENTRY_POINT = "judgment.agent_is_entry_point"
+    JUDGMENT_IS_AGENT_ENTRY_POINT = "judgment.is_agent_entry_point"
 
     # GenAI-specific attributes (semantic conventions)
     GEN_AI_PROMPT = gen_ai_attributes.GEN_AI_PROMPT
