@@ -8,7 +8,6 @@ from judgeval.tracer import Tracer
 from judgeval.judgment_client import JudgmentClient
 from judgeval.scorers import BaseScorer, APIScorerConfig
 from judgeval.data import Example
-from judgeval.utils.async_utils import safe_run_async
 from .console import _spinner_progress, _print_progress, _print_progress_update
 
 
@@ -305,54 +304,4 @@ class JudgmentTrainer:
         Returns:
             ModelConfig: Configuration of the trained model for future loading
         """
-        try:
-            # Check if we're already in an async context
-            asyncio.get_running_loop()
-            # If we get here, we're in an async context - use nest_asyncio or thread approach
-            import nest_asyncio
-
-            nest_asyncio.apply()
-            return asyncio.run(
-                self.run_reinforcement_learning(agent_function, scorers, prompts)
-            )
-        except RuntimeError:
-            # No running loop, safe to use safe_run_async
-            return safe_run_async(
-                self.run_reinforcement_learning(agent_function, scorers, prompts)
-            )
-        except ImportError:
-            # nest_asyncio not available, fall back to thread approach
-            import concurrent.futures
-
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(
-                    lambda: asyncio.run(
-                        self.run_reinforcement_learning(
-                            agent_function, scorers, prompts
-                        )
-                    )
-                )
-                return future.result()
-
-    async def train_async(
-        self,
-        agent_function: Callable[[Any], Any],
-        scorers: List[Union[APIScorerConfig, BaseScorer]],
-        prompts: List[Any],
-    ) -> ModelConfig:
-        """
-        Async version of the training process.
-
-        This is the async entry point for running the reinforcement learning training.
-        Use this method if you're already in an async context.
-
-        Args:
-            agent_function: Function/agent to call for generating responses.
-                           Should accept (model, prompt_input, config) and return response data
-            scorers: List of scorer objects to evaluate responses
-            prompts: List of prompts to use for training
-
-        Returns:
-            ModelConfig: Configuration of the trained model for future loading
-        """
-        return await self.run_reinforcement_learning(agent_function, scorers, prompts)
+        return self.run_reinforcement_learning(agent_function, scorers, prompts)
