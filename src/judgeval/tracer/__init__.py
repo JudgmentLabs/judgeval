@@ -3,6 +3,7 @@ from contextvars import ContextVar
 import functools
 import inspect
 import random
+import uuid
 from typing import (
     Any,
     Union,
@@ -58,6 +59,10 @@ from judgeval.tracer.local_eval_queue import LocalEvaluationQueue
 C = TypeVar("C", bound=Callable)
 Cls = TypeVar("Cls", bound=Type)
 ApiClient = TypeVar("ApiClient", bound=Any)
+
+_current_agent_context: ContextVar[Optional[Dict[str, str]]] = ContextVar(
+    "current_agent_context", default=None
+)
 
 
 def resolve_project_id(
@@ -202,6 +207,27 @@ class Tracer:
     def get_tracer(self):
         return self.tracer
 
+    def _add_agent_attributes_to_span(
+        self, span, attributes: Optional[Dict[str, Any]] = None
+    ):
+        """Add agent ID, class name, and instance name to span if they exist in context"""
+        current_agent_context = _current_agent_context.get()
+        if current_agent_context:
+            if "agent_id" in current_agent_context:
+                span.set_attribute(
+                    AttributeKeys.JUDGMENT_AGENT_ID, current_agent_context["agent_id"]
+                )
+            if "class_name" in current_agent_context:
+                span.set_attribute(
+                    AttributeKeys.JUDGMENT_AGENT_CLASS_NAME,
+                    current_agent_context["class_name"],
+                )
+            if "instance_name" in current_agent_context:
+                span.set_attribute(
+                    AttributeKeys.JUDGMENT_AGENT_INSTANCE_NAME,
+                    current_agent_context["instance_name"],
+                )
+
     def _wrap_sync(
         self, f: Callable, name: Optional[str], attributes: Optional[Dict[str, Any]]
     ):
@@ -209,6 +235,7 @@ class Tracer:
         def wrapper(*args, **kwargs):
             n = name or f.__qualname__
             with sync_span_context(self, n, attributes) as span:
+                self._add_agent_attributes_to_span(span, attributes)
                 try:
                     span.set_attribute(
                         AttributeKeys.JUDGMENT_INPUT,
@@ -236,6 +263,7 @@ class Tracer:
         async def wrapper(*args, **kwargs):
             n = name or f.__qualname__
             with sync_span_context(self, n, attributes) as span:
+                self._add_agent_attributes_to_span(span, attributes)
                 try:
                     span.set_attribute(
                         AttributeKeys.JUDGMENT_INPUT,
@@ -281,6 +309,99 @@ class Tracer:
             return self._wrap_async(func, name, attributes)
         else:
             return self._wrap_sync(func, name, attributes)
+
+    @overload
+    def agent(self, func: C, /, *, identifier: str | None = None) -> C: ...
+
+    @overload
+    def agent(
+        self, func: None = None, /, *, identifier: str | None = None
+    ) -> Callable[[C], C]: ...
+
+    def agent(
+        self, func: Callable | None = None, /, *, identifier: str | None = None
+    ) -> Callable | None:
+        """
+        Agent decorator that creates an agent ID and propagates it to child spans.
+        Also captures and propagates the class name if the decorated function is a method.
+        Optionally captures instance name based on the specified identifier attribute.
+
+        This decorator should be used in combination with @observe decorator:
+
+        class MyAgent:
+            def __init__(self, name):
+                self.name = name
+
+            @judgment.agent(identifier="name")
+            @judgment.observe(span_type="function")
+            def my_agent_method(self):
+                # This span and all child spans will have:
+                # - agent_id: auto-generated UUID
+                # - class_name: "MyAgent"
+                # - instance_name: self.name value
+                pass
+
+        Args:
+            identifier: Name of the instance attribute to use as the instance name
+        """
+        if func is None:
+            return partial(self.agent, identifier=identifier)
+
+        if not self.enable_monitoring:
+            return func
+
+        agent_id = str(uuid.uuid4())
+        class_name = None
+        if hasattr(func, "__qualname__") and "." in func.__qualname__:
+            parts = func.__qualname__.split(".")
+            if len(parts) >= 2:
+                class_name = parts[-2]
+
+        def _wrap_with_agent_context(f: Callable):
+            if inspect.iscoroutinefunction(f):
+
+                @functools.wraps(f)
+                async def async_wrapper(*args, **kwargs):
+                    agent_context = {"agent_id": agent_id}
+                    if class_name:
+                        agent_context["class_name"] = class_name
+
+                    if identifier and args and hasattr(args[0], identifier):
+                        try:
+                            instance_name = str(getattr(args[0], identifier))
+                            agent_context["instance_name"] = instance_name
+                        except Exception:
+                            pass
+                    token = _current_agent_context.set(agent_context)
+                    try:
+                        return await f(*args, **kwargs)
+                    finally:
+                        _current_agent_context.reset(token)
+
+                return async_wrapper
+            else:
+
+                @functools.wraps(f)
+                def sync_wrapper(*args, **kwargs):
+                    agent_context = {"agent_id": agent_id}
+                    if class_name:
+                        agent_context["class_name"] = class_name
+
+                    if identifier and args and hasattr(args[0], identifier):
+                        try:
+                            instance_name = str(getattr(args[0], identifier))
+                            agent_context["instance_name"] = instance_name
+                        except Exception:
+                            pass
+                    token = _current_agent_context.set(agent_context)
+                    try:
+                        return f(*args, **kwargs)
+                    finally:
+                        _current_agent_context.reset(token)
+
+                return sync_wrapper
+
+        return _wrap_with_agent_context(func)
 
     @overload
     def observe_tools(
