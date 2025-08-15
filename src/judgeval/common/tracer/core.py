@@ -2305,26 +2305,23 @@ def _format_output_data(
                 and hasattr(response, "usage")
                 and hasattr(response, "choices")
             ):
-                model_name = (
-                    response.model
-                )  # Keep original model name without fireworks prefix
+                model_name = response.model
                 prompt_tokens = response.usage.prompt_tokens if response.usage else 0
                 completion_tokens = (
                     response.usage.completion_tokens if response.usage else 0
                 )
                 message_content = response.choices[0].message.content
 
-                # Don't calculate costs for Fireworks TrainableModel since it's not supported by LiteLLM
-                return message_content, TraceUsage(
-                    prompt_tokens=prompt_tokens,
-                    completion_tokens=completion_tokens,
-                    total_tokens=prompt_tokens + completion_tokens,
-                    cache_read_input_tokens=cache_read_input_tokens,
-                    cache_creation_input_tokens=cache_creation_input_tokens,
-                    prompt_tokens_cost_usd=None,  # Skip cost calculation
-                    completion_tokens_cost_usd=None,  # Skip cost calculation
-                    total_cost_usd=None,  # Skip cost calculation
-                    model_name=model_name,
+                # Use LiteLLM cost calculation with fireworks_ai prefix
+                # LiteLLM supports Fireworks AI models for cost calculation when prefixed with "fireworks_ai/"
+                fireworks_model_name = f"fireworks_ai/{model_name}"
+                print(fireworks_model_name)
+                return message_content, _create_usage(
+                    fireworks_model_name,
+                    prompt_tokens,
+                    completion_tokens,
+                    cache_read_input_tokens,
+                    cache_creation_input_tokens,
                 )
     except ImportError:
         pass  # TrainableModel not available

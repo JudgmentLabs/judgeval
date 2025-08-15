@@ -9,7 +9,7 @@ class TrainableModel:
     A wrapper class for managing model snapshots during training.
 
     This class automatically handles model snapshot creation and management
-    during the GRPO (Generative Reinforcement Learning from Policy Optimization) process,
+    during the RFT (Reinforcement Fine-Tuning) process,
     abstracting away manual snapshot management from users.
     """
 
@@ -23,9 +23,8 @@ class TrainableModel:
         self.config = config
         self.current_step = 0
         self._current_model = None
-        self._tracer_wrapper_func = None  # Store reference to tracer wrapper
+        self._tracer_wrapper_func = None
 
-        # Initialize base model
         self._base_model = self._create_base_model()
         self._current_model = self._base_model
 
@@ -49,13 +48,9 @@ class TrainableModel:
             enable_addons=model_config.enable_addons,
         )
 
-        # Create instance
         instance = cls(trainer_config)
-
-        # Restore the training state
         instance.current_step = model_config.current_step
 
-        # If there's a trained model, load it
         if model_config.is_trained and model_config.current_model_name:
             instance._load_trained_model(model_config.current_model_name)
 
@@ -93,12 +88,10 @@ class TrainableModel:
             self._current_model.apply()
         _print_model_progress("Trained model deployment ready")
 
-        # Re-apply tracer wrapping if it was previously applied
         if self._tracer_wrapper_func:
             self._tracer_wrapper_func(self._current_model)
 
     def get_current_model(self):
-        """Get the current model snapshot for generation."""
         return self._current_model
 
     @property
@@ -121,10 +114,8 @@ class TrainableModel:
         self.current_step = step
 
         if step == 0:
-            # Use base model for first step
             self._current_model = self._base_model
         else:
-            # Create new model snapshot from previous training step
             model_name = (
                 f"accounts/{self.config.user_id}/models/{self.config.model_id}-v{step}"
             )
@@ -138,11 +129,9 @@ class TrainableModel:
                     base_id=self.config.deployment_id,
                 )
                 update_progress("Applying deployment configuration...")
-                # Ensure deployment is ready
                 self._current_model.apply()
             _print_model_progress("Model snapshot deployment ready")
 
-            # Re-apply tracer wrapping if it was previously applied
             if self._tracer_wrapper_func:
                 self._tracer_wrapper_func(self._current_model)
 
@@ -179,7 +168,6 @@ class TrainableModel:
         Returns:
             ModelConfig instance with current model state
         """
-        # Determine current model name
         current_model_name = None
         is_trained = False
 
