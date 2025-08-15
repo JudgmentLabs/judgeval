@@ -2315,7 +2315,6 @@ def _format_output_data(
                 # Use LiteLLM cost calculation with fireworks_ai prefix
                 # LiteLLM supports Fireworks AI models for cost calculation when prefixed with "fireworks_ai/"
                 fireworks_model_name = f"fireworks_ai/{model_name}"
-                print(fireworks_model_name)
                 return message_content, _create_usage(
                     fireworks_model_name,
                     prompt_tokens,

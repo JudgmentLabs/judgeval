@@ -7,10 +7,10 @@ import json
 class TrainerConfig:
     """Configuration class for JudgmentTrainer parameters."""
 
-    base_model_name: str = "qwen2p5-7b-instruct"
-    deployment_id: str = "my-base-deployment"
+    deployment_id: str
     user_id: str
     model_id: str
+    base_model_name: str = "qwen2p5-7b-instruct"
     rft_provider: str = "fireworks"
     num_steps: int = 5
     num_generations_per_prompt: int = (

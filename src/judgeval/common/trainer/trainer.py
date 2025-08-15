@@ -45,6 +45,7 @@ class JudgmentTrainer:
         else:
             self.trainable_model = trainable_model
 
+        print(self.config)
         self.judgment_client = JudgmentClient()
 
     async def generate_rollouts_and_rewards(
