@@ -21,9 +21,9 @@ class JudgmentTrainer:
 
     def __init__(
         self,
-        config: Optional[TrainerConfig] = None,
-        trainable_model: Optional[TrainableModel] = None,
-        tracer: Optional[Tracer] = None,
+        config: TrainerConfig,
+        trainable_model: TrainableModel,
+        tracer: Tracer,
         project_name: Optional[str] = None,
     ):
         """
@@ -35,7 +35,7 @@ class JudgmentTrainer:
             trainable_model: Optional trainable model instance
             project_name: Project name for organizing training runs and evaluations
         """
-        self.config = config or TrainerConfig()
+        self.config = config
         self.tracer = tracer
         self.tracer.show_trace_urls = False
         self.project_name = project_name or "judgment_training"
@@ -198,10 +198,7 @@ class JudgmentTrainer:
                 f"Starting training step {step_num}", step_num, self.config.num_steps
             )
 
-            if step > 0:
-                self.trainable_model.advance_to_next_step(step)
-            else:
-                self.trainable_model.advance_to_next_step(step)
+            self.trainable_model.advance_to_next_step(step)
 
             dataset_rows = await self.generate_rollouts_and_rewards(
                 agent_function, scorers, prompts
