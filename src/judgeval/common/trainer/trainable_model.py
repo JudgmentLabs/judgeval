@@ -2,6 +2,7 @@ from fireworks import LLM
 from .config import TrainerConfig, ModelConfig
 from typing import Optional, Dict, Any, Callable
 from .console import _model_spinner_progress, _print_model_progress
+from judgeval.common.exceptions import JudgmentAPIError
 
 
 class TrainableModel:
@@ -20,13 +21,18 @@ class TrainableModel:
         Args:
             config: TrainerConfig instance with model configuration
         """
-        self.config = config
-        self.current_step = 0
-        self._current_model = None
-        self._tracer_wrapper_func = None
+        try:
+            self.config = config
+            self.current_step = 0
+            self._current_model = None
+            self._tracer_wrapper_func = None
 
-        self._base_model = self._create_base_model()
-        self._current_model = self._base_model
+            self._base_model = self._create_base_model()
+            self._current_model = self._base_model
+        except Exception as e:
+            raise JudgmentAPIError(
+                f"Failed to initialize TrainableModel: {str(e)}"
+            ) from e
 
     @classmethod
     def from_model_config(cls, model_config: ModelConfig) -> "TrainableModel":
@@ -58,38 +64,48 @@ class TrainableModel:
 
     def _create_base_model(self):
         """Create and configure the base model."""
-        with _model_spinner_progress(
-            "Creating and deploying base model..."
-        ) as update_progress:
-            update_progress("Creating base model instance...")
-            base_model = LLM(
-                model=self.config.base_model_name,
-                deployment_type="on-demand",
-                id=self.config.deployment_id,
-                enable_addons=self.config.enable_addons,
-            )
-            update_progress("Applying deployment configuration...")
-            base_model.apply()
-        _print_model_progress("Base model deployment ready")
-        return base_model
+        try:
+            with _model_spinner_progress(
+                "Creating and deploying base model..."
+            ) as update_progress:
+                update_progress("Creating base model instance...")
+                base_model = LLM(
+                    model=self.config.base_model_name,
+                    deployment_type="on-demand",
+                    id=self.config.deployment_id,
+                    enable_addons=self.config.enable_addons,
+                )
+                update_progress("Applying deployment configuration...")
+                base_model.apply()
+            _print_model_progress("Base model deployment ready")
+            return base_model
+        except Exception as e:
+            raise JudgmentAPIError(
+                f"Failed to create and deploy base model '{self.config.base_model_name}': {str(e)}"
+            ) from e
 
     def _load_trained_model(self, model_name: str):
         """Load a trained model by name."""
-        with _model_spinner_progress(
-            f"Loading and deploying trained model: {model_name}"
-        ) as update_progress:
-            update_progress("Creating trained model instance...")
-            self._current_model = LLM(
-                model=model_name,
-                deployment_type="on-demand-lora",
-                base_id=self.config.deployment_id,
-            )
-            update_progress("Applying deployment configuration...")
-            self._current_model.apply()
-        _print_model_progress("Trained model deployment ready")
+        try:
+            with _model_spinner_progress(
+                f"Loading and deploying trained model: {model_name}"
+            ) as update_progress:
+                update_progress("Creating trained model instance...")
+                self._current_model = LLM(
+                    model=model_name,
+                    deployment_type="on-demand-lora",
+                    base_id=self.config.deployment_id,
+                )
+                update_progress("Applying deployment configuration...")
+                self._current_model.apply()
+            _print_model_progress("Trained model deployment ready")
 
-        if self._tracer_wrapper_func:
-            self._tracer_wrapper_func(self._current_model)
+            if self._tracer_wrapper_func:
+                self._tracer_wrapper_func(self._current_model)
+        except Exception as e:
+            raise JudgmentAPIError(
+                f"Failed to load and deploy trained model '{model_name}': {str(e)}"
+            ) from e
 
     def get_current_model(self):
         return self._current_model
@@ -111,29 +127,32 @@ class TrainableModel:
         Args:
             step: The current training step number
         """
-        self.current_step = step
+        try:
+            self.current_step = step
 
-        if step == 0:
-            self._current_model = self._base_model
-        else:
-            model_name = (
-                f"accounts/{self.config.user_id}/models/{self.config.model_id}-v{step}"
-            )
-            with _model_spinner_progress(
-                f"Creating and deploying model snapshot: {model_name}"
-            ) as update_progress:
-                update_progress("Creating model snapshot instance...")
-                self._current_model = LLM(
-                    model=model_name,
-                    deployment_type="on-demand-lora",
-                    base_id=self.config.deployment_id,
-                )
-                update_progress("Applying deployment configuration...")
-                self._current_model.apply()
-            _print_model_progress("Model snapshot deployment ready")
+            if step == 0:
+                self._current_model = self._base_model
+            else:
+                model_name = f"accounts/{self.config.user_id}/models/{self.config.model_id}-v{step}"
+                with _model_spinner_progress(
+                    f"Creating and deploying model snapshot: {model_name}"
+                ) as update_progress:
+                    update_progress("Creating model snapshot instance...")
+                    self._current_model = LLM(
+                        model=model_name,
+                        deployment_type="on-demand-lora",
+                        base_id=self.config.deployment_id,
+                    )
+                    update_progress("Applying deployment configuration...")
+                    self._current_model.apply()
+                _print_model_progress("Model snapshot deployment ready")
 
-            if self._tracer_wrapper_func:
-                self._tracer_wrapper_func(self._current_model)
+                if self._tracer_wrapper_func:
+                    self._tracer_wrapper_func(self._current_model)
+        except Exception as e:
+            raise JudgmentAPIError(
+                f"Failed to advance to training step {step}: {str(e)}"
+            ) from e
 
     def perform_reinforcement_step(self, dataset, step: int):
         """
@@ -146,15 +165,20 @@ class TrainableModel:
         Returns:
             Training job object
         """
-        model_name = f"{self.config.model_id}-v{step + 1}"
-        return self._current_model.reinforcement_step(
-            dataset=dataset,
-            output_model=model_name,
-            epochs=self.config.epochs,
-            learning_rate=self.config.learning_rate,
-            accelerator_count=self.config.accelerator_count,
-            accelerator_type=self.config.accelerator_type,
-        )
+        try:
+            model_name = f"{self.config.model_id}-v{step + 1}"
+            return self._current_model.reinforcement_step(
+                dataset=dataset,
+                output_model=model_name,
+                epochs=self.config.epochs,
+                learning_rate=self.config.learning_rate,
+                accelerator_count=self.config.accelerator_count,
+                accelerator_type=self.config.accelerator_type,
+            )
+        except Exception as e:
+            raise JudgmentAPIError(
+                f"Failed to start reinforcement learning step {step + 1}: {str(e)}"
+            ) from e
 
     def get_model_config(
         self, training_params: Optional[Dict[str, Any]] = None

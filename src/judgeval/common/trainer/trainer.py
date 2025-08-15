@@ -9,6 +9,7 @@ from judgeval.judgment_client import JudgmentClient
 from judgeval.scorers import BaseScorer, APIScorerConfig
 from judgeval.data import Example
 from .console import _spinner_progress, _print_progress, _print_progress_update
+from judgeval.common.exceptions import JudgmentAPIError
 
 
 class JudgmentTrainer:
@@ -35,17 +36,22 @@ class JudgmentTrainer:
             trainable_model: Optional trainable model instance
             project_name: Project name for organizing training runs and evaluations
         """
-        self.config = config
-        self.tracer = tracer
-        self.tracer.show_trace_urls = False
-        self.project_name = project_name or "judgment_training"
+        try:
+            self.config = config
+            self.tracer = tracer
+            self.tracer.show_trace_urls = False
+            self.project_name = project_name or "judgment_training"
 
-        if trainable_model is None:
-            self.trainable_model = TrainableModel(self.config)
-        else:
-            self.trainable_model = trainable_model
+            if trainable_model is None:
+                self.trainable_model = TrainableModel(self.config)
+            else:
+                self.trainable_model = trainable_model
 
-        self.judgment_client = JudgmentClient()
+            self.judgment_client = JudgmentClient()
+        except Exception as e:
+            raise JudgmentAPIError(
+                f"Failed to initialize JudgmentTrainer: {str(e)}"
+            ) from e
 
     async def generate_rollouts_and_rewards(
         self,
@@ -83,45 +89,52 @@ class JudgmentTrainer:
 
         @self.tracer.observe(span_type="function")
         async def generate_single_response(prompt_id, generation_id):
-            async with semaphore:
-                prompt_input = prompts[prompt_id]
-                response_data = await agent_function(**prompt_input)
-                messages = response_data.get("messages", [])
+            try:
+                async with semaphore:
+                    prompt_input = prompts[prompt_id]
+                    response_data = await agent_function(**prompt_input)
+                    messages = response_data.get("messages", [])
 
-                try:
-                    traced_messages = self.tracer.get_current_message_history()
-                    if traced_messages:
-                        messages = traced_messages
-                except Exception as e:
-                    print(f"Warning: Failed to get message history from trace: {e}")
-                    pass
+                    try:
+                        traced_messages = self.tracer.get_current_message_history()
+                        if traced_messages:
+                            messages = traced_messages
+                    except Exception as e:
+                        print(f"Warning: Failed to get message history from trace: {e}")
+                        pass
 
-                example = Example(
-                    input=prompt_input, messages=messages, actual_output=response_data
-                )
+                    example = Example(
+                        input=prompt_input,
+                        messages=messages,
+                        actual_output=response_data,
+                    )
 
-                scoring_results = self.judgment_client.run_evaluation(
-                    examples=[example],
-                    scorers=scorers,
-                    project_name=self.project_name,
-                    eval_run_name=f"training_step_{self.trainable_model.current_step}_prompt_{prompt_id}_gen_{generation_id}",
-                    show_url=False,
-                )
+                    scoring_results = self.judgment_client.run_evaluation(
+                        examples=[example],
+                        scorers=scorers,
+                        project_name=self.project_name,
+                        eval_run_name=f"training_step_{self.trainable_model.current_step}_prompt_{prompt_id}_gen_{generation_id}",
+                        show_url=False,
+                    )
 
-                if scoring_results and scoring_results[0].scorers_data:
-                    reward = sum(
-                        scorer_data.score
-                        for scorer_data in scoring_results[0].scorers_data
-                    ) / len(scoring_results[0].scorers_data)
-                else:
-                    reward = 0.0
+                    if scoring_results and scoring_results[0].scorers_data:
+                        reward = sum(
+                            scorer_data.score
+                            for scorer_data in scoring_results[0].scorers_data
+                        ) / len(scoring_results[0].scorers_data)
+                    else:
+                        reward = 0.0
 
-            return {
-                "prompt_id": prompt_id,
-                "generation_id": generation_id,
-                "messages": messages,
-                "evals": {"score": reward},
-            }
+                return {
+                    "prompt_id": prompt_id,
+                    "generation_id": generation_id,
+                    "messages": messages,
+                    "evals": {"score": reward},
+                }
+            except Exception as e:
+                raise JudgmentAPIError(
+                    f"Failed to generate rollout for prompt {prompt_id}, generation {generation_id}: {str(e)}"
+                ) from e
 
         coros = []
         for prompt_id in range(num_prompts_per_step):
@@ -140,16 +153,21 @@ class JudgmentTrainer:
 
         _print_progress(f"Generated {len(results)} rollouts successfully")
 
-        dataset_rows = []
-        for prompt_id in range(num_prompts_per_step):
-            prompt_generations = [r for r in results if r["prompt_id"] == prompt_id]
-            sample_generations = [
-                {"messages": gen["messages"], "evals": gen["evals"]}
-                for gen in prompt_generations
-            ]
-            dataset_rows.append({"samples": sample_generations})
+        try:
+            dataset_rows = []
+            for prompt_id in range(num_prompts_per_step):
+                prompt_generations = [r for r in results if r["prompt_id"] == prompt_id]
+                sample_generations = [
+                    {"messages": gen["messages"], "evals": gen["evals"]}
+                    for gen in prompt_generations
+                ]
+                dataset_rows.append({"samples": sample_generations})
 
-        return dataset_rows
+            return dataset_rows
+        except Exception as e:
+            raise JudgmentAPIError(
+                f"Failed to process rollout results into dataset format: {str(e)}"
+            ) from e
 
     async def run_reinforcement_learning(
         self,
@@ -197,61 +215,95 @@ class JudgmentTrainer:
                 f"Starting training step {step_num}", step_num, self.config.num_steps
             )
 
-            self.trainable_model.advance_to_next_step(step)
+            try:
+                self.trainable_model.advance_to_next_step(step)
 
-            dataset_rows = await self.generate_rollouts_and_rewards(
-                agent_function, scorers, prompts
-            )
+                dataset_rows = await self.generate_rollouts_and_rewards(
+                    agent_function, scorers, prompts
+                )
 
-            with _spinner_progress(
-                "Preparing training dataset", step_num, self.config.num_steps
-            ):
-                dataset = Dataset.from_list(dataset_rows)
-                dataset.sync()
+                with _spinner_progress(
+                    "Preparing training dataset", step_num, self.config.num_steps
+                ):
+                    try:
+                        dataset = Dataset.from_list(dataset_rows)
+                        dataset.sync()
+                    except Exception as e:
+                        raise JudgmentAPIError(
+                            f"Failed to create training dataset for step {step_num}: {str(e)}"
+                        ) from e
 
-            _print_progress(
-                "Starting reinforcement training", step_num, self.config.num_steps
-            )
-            job = self.trainable_model.perform_reinforcement_step(dataset, step)
+                _print_progress(
+                    "Starting reinforcement training", step_num, self.config.num_steps
+                )
+                job = self.trainable_model.perform_reinforcement_step(dataset, step)
 
-            last_state = None
-            with _spinner_progress(
-                "Training job in progress", step_num, self.config.num_steps
-            ):
-                while not job.is_completed:
-                    job.raise_if_bad_state()
-                    current_state = job.state
+                last_state = None
+                with _spinner_progress(
+                    "Training job in progress", step_num, self.config.num_steps
+                ):
+                    try:
+                        while not job.is_completed:
+                            job.raise_if_bad_state()
+                            current_state = job.state
 
-                    if current_state != last_state:
-                        if current_state in ["uploading", "validating"]:
-                            _print_progress_update(
-                                f"Training job: {current_state} data"
-                            )
-                        elif current_state == "training":
-                            _print_progress_update(
-                                "Training job: model training in progress"
-                            )
-                        else:
-                            _print_progress_update(f"Training job: {current_state}")
-                        last_state = current_state
+                            if current_state != last_state:
+                                if current_state in ["uploading", "validating"]:
+                                    _print_progress_update(
+                                        f"Training job: {current_state} data"
+                                    )
+                                elif current_state == "training":
+                                    _print_progress_update(
+                                        "Training job: model training in progress"
+                                    )
+                                else:
+                                    _print_progress_update(
+                                        f"Training job: {current_state}"
+                                    )
+                                last_state = current_state
 
-                    time.sleep(10)
-                    job = job.get()
-                    if job is None:
-                        raise Exception("Job was deleted while waiting for completion")
+                            time.sleep(10)
+                            job = job.get()
+                            if job is None:
+                                raise JudgmentAPIError(
+                                    "Training job was deleted while waiting for completion"
+                                )
+                    except Exception as e:
+                        if "Training job was deleted" in str(e):
+                            raise e  # Re-raise JudgmentAPIError as-is
+                        raise JudgmentAPIError(
+                            f"Training job failed during step {step_num}: {str(e)}"
+                        ) from e
 
-            _print_progress(
-                f"Training completed! New model: {job.output_model}",
-                step_num,
-                self.config.num_steps,
-            )
+                _print_progress(
+                    f"Training completed! New model: {job.output_model}",
+                    step_num,
+                    self.config.num_steps,
+                )
 
-            dataset.delete()
+                try:
+                    dataset.delete()
+                except Exception as e:
+                    # Log warning but don't fail the training
+                    print(f"Warning: Failed to delete training dataset: {e}")
+
+            except JudgmentAPIError:
+                # Re-raise JudgmentAPIError as-is
+                raise
+            except Exception as e:
+                raise JudgmentAPIError(
+                    f"Training step {step_num} failed: {str(e)}"
+                ) from e
 
         _print_progress("All training steps completed!")
 
-        with _spinner_progress("Deploying final trained model"):
-            self.trainable_model.advance_to_next_step(self.config.num_steps)
+        try:
+            with _spinner_progress("Deploying final trained model"):
+                self.trainable_model.advance_to_next_step(self.config.num_steps)
+        except Exception as e:
+            raise JudgmentAPIError(
+                f"Failed to deploy final trained model: {str(e)}"
+            ) from e
 
         return self.trainable_model.get_model_config(training_params)
 
@@ -277,7 +329,15 @@ class JudgmentTrainer:
         Returns:
             ModelConfig: Configuration of the trained model for future loading
         """
-        if rft_provider is not None:
-            self.config.rft_provider = rft_provider
+        try:
+            if rft_provider is not None:
+                self.config.rft_provider = rft_provider
 
-        return await self.run_reinforcement_learning(agent_function, scorers, prompts)
+            return await self.run_reinforcement_learning(
+                agent_function, scorers, prompts
+            )
+        except JudgmentAPIError:
+            # Re-raise JudgmentAPIError as-is
+            raise
+        except Exception as e:
+            raise JudgmentAPIError(f"Training process failed: {str(e)}") from e
