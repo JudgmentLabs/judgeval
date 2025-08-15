@@ -16,6 +16,7 @@ from typing import (
     Type,
     TypeVar,
     overload,
+    Literal,
 )
 from functools import partial
 from warnings import warn
@@ -60,9 +61,9 @@ C = TypeVar("C", bound=Callable)
 Cls = TypeVar("Cls", bound=Type)
 ApiClient = TypeVar("ApiClient", bound=Any)
 
-_current_agent_context: ContextVar[Optional[Dict[str, str | bool]]] = ContextVar(
-    "current_agent_context", default=None
-)
+_current_agent_context: ContextVar[
+    Optional[Dict[str, str | bool | Dict | List | None]]
+] = ContextVar("current_agent_context", default=None)
 
 _current_cost_context: ContextVar[Optional[Dict[str, float]]] = ContextVar(
     "current_cost_context", default=None
@@ -265,6 +266,51 @@ class Tracer:
                     False  # only true for entry point to agent
                 )
 
+    def record_instance_state(self, record_point: Literal["before", "after"], span):
+        current_agent_context = _current_agent_context.get()
+
+        if current_agent_context and current_agent_context.get("track_state"):
+            instance_untyped = current_agent_context.get("instance", None)
+            instance = (
+                instance_untyped if isinstance(instance_untyped, object) else None
+            )
+            track_attributes_untyped = current_agent_context.get(
+                "track_attributes", None
+            )
+            track_attributes: List | None = (
+                track_attributes_untyped
+                if isinstance(track_attributes_untyped, list)
+                else None
+            )
+            field_mappings_untyped = current_agent_context.get("field_mappings", {})
+            field_mappings: Dict[str, str] = (
+                field_mappings_untyped
+                if isinstance(field_mappings_untyped, dict)
+                else {}
+            )
+            if track_attributes is not None:
+                attributes = {
+                    field_mappings.get(attr, attr): getattr(instance, attr, None)
+                    for attr in track_attributes
+                }
+            else:
+                attributes = {
+                    field_mappings.get(k, k): v
+                    for k, v in instance.__dict__.items()
+                    if not k.startswith("_")
+                }
+
+            if record_point == "before":
+                span.set_attribute(
+                    AttributeKeys.JUDGMENT_STATE_BEFORE,
+                    safe_serialize(attributes),
+                )
+            else:
+                span.set_attribute(
+                    AttributeKeys.JUDGMENT_STATE_AFTER,
+                    safe_serialize(attributes),
+                )
+
     def _wrap_sync(
         self, f: Callable, name: Optional[str], attributes: Optional[Dict[str, Any]]
     ):
@@ -273,6 +319,7 @@ class Tracer:
             n = name or f.__qualname__
             with sync_span_context(self, n, attributes) as span:
                 self.add_agent_attributes_to_span(span, attributes)
+                self.record_instance_state("before", span)
                 try:
                     span.set_attribute(
                         AttributeKeys.JUDGMENT_INPUT,
@@ -289,6 +336,7 @@ class Tracer:
                         AttributeKeys.JUDGMENT_OUTPUT,
                         safe_serialize(result),
                     )
+                self.record_instance_state("after", span)
                 return result
 
         return wrapper
@@ -301,6 +349,7 @@ class Tracer:
             n = name or f.__qualname__
             with sync_span_context(self, n, attributes) as span:
                 self.add_agent_attributes_to_span(span, attributes)
+                self.record_instance_state("before", span)
                 try:
                     span.set_attribute(
                         AttributeKeys.JUDGMENT_INPUT,
@@ -316,6 +365,7 @@ class Tracer:
                         AttributeKeys.JUDGMENT_OUTPUT,
                         safe_serialize(result),
                     )
+                self.record_instance_state("after", span)
                 return result
 
         return wrapper
@@ -348,15 +398,38 @@ class Tracer:
             return self._wrap_sync(func, name, attributes)
 
     @overload
-    def agent(self, func: C, /, *, identifier: str | None = None) -> C: ...
+    def agent(
+        self,
+        func: C,
+        /,
+        *,
+        identifier: str | None = None,
+        track_state: bool = False,
+        track_attributes: List[str] | None = None,
+        field_mappings: Dict[str, str] = {},
+    ) -> C: ...
 
     @overload
     def agent(
-        self, func: None = None, /, *, identifier: str | None = None
+        self,
+        func: None = None,
+        /,
+        *,
+        identifier: str | None = None,
+        track_state: bool = False,
+        track_attributes: List[str] | None = None,
+        field_mappings: Dict[str, str] = {},
     ) -> Callable[[C], C]: ...
 
     def agent(
-        self, func: Callable | None = None, /, *, identifier: str | None = None
+        self,
+        func: Callable | None = None,
+        /,
+        *,
+        identifier: str | None = None,
+        track_state: bool = False,
+        track_attributes: List[str] | None = None,
+        field_mappings: Dict[str, str] = {},
     ) -> Callable | None:
         """
         Agent decorator that creates an agent ID and propagates it to child spans.
@@ -382,7 +455,13 @@ class Tracer:
             identifier: Name of the instance attribute to use as the instance name
         """
         if func is None:
-            return partial(self.agent, identifier=identifier)
+            return partial(
+                self.agent,
+                identifier=identifier,
+                track_state=track_state,
+                track_attributes=track_attributes,
+                field_mappings=field_mappings,
+            )
 
         if not self.enable_monitoring:
             return func
@@ -403,9 +482,17 @@ class Tracer:
                     if class_name:
                         agent_context["class_name"] = class_name
 
-                    if identifier and args and hasattr(args[0], identifier):
+                    agent_context["track_state"] = track_state
+                    agent_context["track_attributes"] = track_attributes
+                    agent_context["field_mappings"] = field_mappings
+
+                    instance = args[0] if args else None
+
+                    agent_context["instance"] = instance
+
+                    if identifier and instance and hasattr(instance, identifier):
                         try:
-                            instance_name = str(getattr(args[0], identifier))
+                            instance_name = str(getattr(instance, identifier))
                             agent_context["instance_name"] = instance_name
                         except Exception:
                             pass
@@ -430,6 +517,14 @@ class Tracer:
                     agent_context = {"agent_id": agent_id}
                     if class_name:
                         agent_context["class_name"] = class_name
+
+                    agent_context["track_state"] = track_state
+                    agent_context["track_attributes"] = track_attributes
+                    agent_context["field_mappings"] = field_mappings
+
+                    instance = args[0] if args else None
+
+                    agent_context["instance"] = instance
 
                     if identifier and args and hasattr(args[0], identifier):
                         try:
