@@ -51,7 +51,7 @@ JUDGMENT_ADD_TO_RUN_EVAL_QUEUE_API_URL = f"{ROOT_API}/add_to_run_eval_queue/"
 JUDGMENT_GET_EVAL_STATUS_API_URL = f"{ROOT_API}/get_evaluation_status/"
 
 # Custom Scorers API
-JUDGMENT_CUSTOM_SCORER_UPLOAD_API_URL = f"{ROOT_API}/build_sandbox_template/"
+JUDGMENT_CUSTOM_SCORER_UPLOAD_API_URL = f"{ROOT_API}/upload_scorer/"
 
 
 # Evaluation API Payloads
