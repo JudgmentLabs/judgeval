@@ -20,6 +20,7 @@ class AttributeKeys:
     JUDGMENT_AGENT_CLASS_NAME = "judgment.agent_class_name"
     JUDGMENT_AGENT_INSTANCE_NAME = "judgment.agent_instance_name"
     JUDGMENT_IS_AGENT_ENTRY_POINT = "judgment.is_agent_entry_point"
+    JUDGMENT_CUMULATIVE_LLM_COST = "judgment.cumulative_llm_cost"
 
     # GenAI-specific attributes (semantic conventions)
     GEN_AI_PROMPT = gen_ai_attributes.GEN_AI_PROMPT
@@ -33,6 +34,10 @@ class AttributeKeys:
     GEN_AI_REQUEST_TEMPERATURE = gen_ai_attributes.GEN_AI_REQUEST_TEMPERATURE
     GEN_AI_REQUEST_MAX_TOKENS = gen_ai_attributes.GEN_AI_REQUEST_MAX_TOKENS
     GEN_AI_RESPONSE_FINISH_REASONS = gen_ai_attributes.GEN_AI_RESPONSE_FINISH_REASONS
+
+    # GenAI-specific attributes (custom namespace)
+    GEN_AI_USAGE_TOTAL_TOKENS = "gen_ai.usage.total_tokens"
+    GEN_AI_USAGE_TOTAL_COST = "gen_ai.usage.total_cost"
 
 
 class ResourceKeys:

@@ -60,8 +60,12 @@ C = TypeVar("C", bound=Callable)
 Cls = TypeVar("Cls", bound=Type)
 ApiClient = TypeVar("ApiClient", bound=Any)
 
-_current_agent_context: ContextVar[Optional[Dict[str, str]]] = ContextVar(
+_current_agent_context: ContextVar[Optional[Dict[str, str | bool]]] = ContextVar(
     "current_agent_context", default=None
+)
+
+_current_cost_context: ContextVar[Optional[Dict[str, float]]] = ContextVar(
+    "current_cost_context", default=None
 )
 
 
@@ -207,7 +211,27 @@ class Tracer:
     def get_tracer(self):
         return self.tracer
 
-    def _add_agent_attributes_to_span(
+    def get_current_agent_context(self):
+        return _current_agent_context
+
+    def get_current_cost_context(self):
+        return _current_cost_context
+
+    def add_cost_to_current_context(self, cost: float) -> None:
+        """Add cost to the current cost context and update span attribute."""
+        current_cost_context = _current_cost_context.get()
+        if current_cost_context is not None:
+            current_cumulative_cost = current_cost_context.get("cumulative_cost", 0.0)
+            new_cumulative_cost = float(current_cumulative_cost) + cost
+            current_cost_context["cumulative_cost"] = new_cumulative_cost
+
+            span = get_current_span()
+            if span and span.is_recording():
+                span.set_attribute(
+                    AttributeKeys.JUDGMENT_CUMULATIVE_LLM_COST, new_cumulative_cost
+                )
+
+    def add_agent_attributes_to_span(
         self, span, attributes: Optional[Dict[str, Any]] = None
     ):
         """Add agent ID, class name, and instance name to span if they exist in context"""
@@ -238,7 +262,7 @@ class Tracer:
                     current_agent_context["is_agent_entry_point"],
                 )
                 current_agent_context["is_agent_entry_point"] = (
-                    "false"  # only true for entry point to agent
+                    False  # only true for entry point to agent
                 )
 
     def _wrap_sync(
@@ -248,7 +272,7 @@ class Tracer:
         def wrapper(*args, **kwargs):
             n = name or f.__qualname__
             with sync_span_context(self, n, attributes) as span:
-                self._add_agent_attributes_to_span(span, attributes)
+                self.add_agent_attributes_to_span(span, attributes)
                 try:
                     span.set_attribute(
                         AttributeKeys.JUDGMENT_INPUT,
@@ -276,7 +300,7 @@ class Tracer:
         async def wrapper(*args, **kwargs):
             n = name or f.__qualname__
             with sync_span_context(self, n, attributes) as span:
-                self._add_agent_attributes_to_span(span, attributes)
+                self.add_agent_attributes_to_span(span, attributes)
                 try:
                     span.set_attribute(
                         AttributeKeys.JUDGMENT_INPUT,
@@ -390,7 +414,7 @@ class Tracer:
                         agent_context["parent_agent_id"] = current_agent_context[
                             "agent_id"
                         ]
-                    agent_context["is_agent_entry_point"] = "true"
+                    agent_context["is_agent_entry_point"] = True
                     token = _current_agent_context.set(agent_context)
                     try:
                         return await f(*args, **kwargs)
@@ -418,7 +442,7 @@ class Tracer:
                         agent_context["parent_agent_id"] = current_agent_context[
                             "agent_id"
                         ]
-                    agent_context["is_agent_entry_point"] = "true"
+                    agent_context["is_agent_entry_point"] = True
                     token = _current_agent_context.set(agent_context)
                     try:
                         return f(*args, **kwargs)
