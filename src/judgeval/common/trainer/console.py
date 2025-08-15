@@ -126,10 +126,7 @@ def _model_spinner_progress(message: str):
         def update_progress(progress_message: str):
             print(f"  └─ {progress_message}")
 
-        try:
-            yield update_progress
-        finally:
-            print(f"✅ [Model] {message} - Complete")
+        yield update_progress
 
 
 def _print_progress(
@@ -146,10 +143,7 @@ def _print_progress_update(
     message: str, step: Optional[int] = None, total_steps: Optional[int] = None
 ):
     """Print progress update message (for status changes during long operations)."""
-    if step is not None and total_steps is not None:
-        safe_print(f"  └─ {message}", style="yellow")
-    else:
-        safe_print(f"  └─ {message}", style="yellow")
+    safe_print(f"  └─ {message}", style="yellow")
 
 
 def _print_model_progress(message: str):

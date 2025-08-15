@@ -9,18 +9,14 @@ class TrainerConfig:
 
     base_model_name: str = "qwen2p5-7b-instruct"
     deployment_id: str = "my-base-deployment"
-    user_id: str = "minhp"  # User ID for model naming
-    model_id: str = "test-improved-model-demo-complex-v3"  # Base model ID for naming
-    rft_provider: str = (
-        "fireworks"  # RFT provider: "fireworks", "together", "openai", etc.
-    )
+    user_id: str
+    model_id: str
+    rft_provider: str = "fireworks"
     num_steps: int = 5
-    num_prompts: int = (
-        5  # Number of rollouts per input (was num_generations_per_prompt)
-    )
     num_generations_per_prompt: int = (
-        4  # Number of inputs to sample per step (was num_prompts)
+        5  # Number of rollouts/generations per input prompt
     )
+    num_prompts_per_step: int = 4  # Number of input prompts to sample per training step
     concurrency: int = 100
     epochs: int = 1
     learning_rate: float = 1e-5
@@ -40,7 +36,6 @@ class ModelConfig:
     and used later without retraining.
 
     Example usage:
-        # After training
         trainer = JudgmentTrainer(config)
         model_config = trainer.train(agent_function, scorers, prompts)
 
@@ -95,13 +90,13 @@ class ModelConfig:
     def from_dict(cls, data: Dict[str, Any]) -> "ModelConfig":
         """Create ModelConfig from dictionary."""
         return cls(
-            base_model_name=data["base_model_name"],
-            deployment_id=data["deployment_id"],
-            user_id=data["user_id"],
-            model_id=data["model_id"],
-            enable_addons=data["enable_addons"],
-            current_step=data["current_step"],
-            total_steps=data["total_steps"],
+            base_model_name=data.get("base_model_name", "qwen2p5-7b-instruct"),
+            deployment_id=data.get("deployment_id", "my-base-deployment"),
+            user_id=data.get("user_id", ""),
+            model_id=data.get("model_id", ""),
+            enable_addons=data.get("enable_addons", True),
+            current_step=data.get("current_step", 0),
+            total_steps=data.get("total_steps", 0),
             current_model_name=data.get("current_model_name"),
             is_trained=data.get("is_trained", False),
             training_params=data.get("training_params"),

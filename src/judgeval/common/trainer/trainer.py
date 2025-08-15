@@ -13,7 +13,7 @@ from .console import _spinner_progress, _print_progress, _print_progress_update
 
 class JudgmentTrainer:
     """
-    A reinforcement learning trainer for judgment models using Fireworks AI.
+    A reinforcement learning trainer for Judgment models using Fine-Tuning.
 
     This class handles the iterative training process where models are improved
     through reinforcement learning fine-tuning based on generated rollouts and rewards.
@@ -52,7 +52,7 @@ class JudgmentTrainer:
         agent_function: Callable[[Any], Any],
         scorers: List[Union[APIScorerConfig, BaseScorer]],
         prompts: List[Any],
-        num_prompts: Optional[int] = None,
+        num_prompts_per_step: Optional[int] = None,
         num_generations_per_prompt: Optional[int] = None,
         concurrency: Optional[int] = None,
     ):
@@ -64,14 +64,16 @@ class JudgmentTrainer:
             agent_function: Function/agent to call for generating responses
             scorers: List of scorer objects to evaluate responses
             prompts: List of prompts to use for training
-            num_prompts: Number of prompts to use (defaults to config value, limited by prompts list length)
+            num_prompts_per_step: Number of prompts to use per step (defaults to config value, limited by prompts list length)
             num_generations_per_prompt: Generations per prompt (defaults to config value)
             concurrency: Concurrency limit (defaults to config value)
 
         Returns:
             List of dataset rows containing samples with messages and evaluations
         """
-        num_prompts = min(num_prompts or self.config.num_prompts, len(prompts))
+        num_prompts_per_step = min(
+            num_prompts_per_step or self.config.num_prompts_per_step, len(prompts)
+        )
         num_generations_per_prompt = (
             num_generations_per_prompt or self.config.num_generations_per_prompt
         )
@@ -122,7 +124,7 @@ class JudgmentTrainer:
             }
 
         coros = []
-        for prompt_id in range(num_prompts):
+        for prompt_id in range(num_prompts_per_step):
             for generation_id in range(num_generations_per_prompt):
                 coro = generate_single_response(prompt_id, generation_id)
                 coros.append(coro)
@@ -139,7 +141,7 @@ class JudgmentTrainer:
         _print_progress(f"Generated {len(results)} rollouts successfully")
 
         dataset_rows = []
-        for prompt_id in range(num_prompts):
+        for prompt_id in range(num_prompts_per_step):
             prompt_generations = [r for r in results if r["prompt_id"] == prompt_id]
             sample_generations = [
                 {"messages": gen["messages"], "evals": gen["evals"]}
@@ -170,14 +172,14 @@ class JudgmentTrainer:
             prompts: List of prompts to use for training
 
         Returns:
-            ModelConfig: Configuration of the trained model for future loading
+            ModelConfig: Configuration of the trained model for inference and future training
         """
 
         _print_progress("Starting reinforcement learning training")
 
         training_params = {
             "num_steps": self.config.num_steps,
-            "num_prompts": self.config.num_prompts,
+            "num_prompts_per_step": self.config.num_prompts_per_step,
             "num_generations_per_prompt": self.config.num_generations_per_prompt,
             "epochs": self.config.epochs,
             "learning_rate": self.config.learning_rate,
