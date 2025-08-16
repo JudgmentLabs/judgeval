@@ -14,7 +14,7 @@ class TrainerConfig:
     rft_provider: str = "fireworks"
     num_steps: int = 5
     num_generations_per_prompt: int = (
-        5  # Number of rollouts/generations per input prompt
+        4  # Number of rollouts/generations per input prompt
     )
     num_prompts_per_step: int = 4  # Number of input prompts to sample per training step
     concurrency: int = 100
