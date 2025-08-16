@@ -90,6 +90,7 @@ def validate_trace_token_counts(
         "TOGETHER_API_CALL",
         "GOOGLE_API_CALL",
         "GROQ_API_CALL",
+        "FIREWORKS_TRAINABLE_MODEL_CALL",
     }
 
     for span in trace_spans:

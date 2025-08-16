@@ -6,10 +6,10 @@ import time
 import orjson
 import sys
 import threading
-from typing import List, Dict, Union, Optional, Callable, Tuple, Any, TYPE_CHECKING
+from typing import List, Dict, Union, Tuple, Any, TYPE_CHECKING
 from rich import print as rprint
 
-from judgeval.data import ScorerData, ScoringResult, Example, Trace
+from judgeval.data import ScorerData, ScoringResult, Example
 from judgeval.scorers import BaseScorer, APIScorerConfig
 from judgeval.scorers.score import a_execute_scoring
 from judgeval.common.api import JudgmentApiClient
@@ -22,10 +22,7 @@ from judgeval.common.logger import judgeval_logger
 
 
 if TYPE_CHECKING:
-    from judgeval.common.tracer import Tracer
-    from judgeval.data.trace_run import TraceRun
     from judgeval.data.evaluation_run import EvaluationRun
-    from judgeval.integrations.langgraph import JudgevalCallbackHandler
 
 
 def safe_run_async(coro):
@@ -99,29 +96,6 @@ def execute_api_eval(evaluation_run: EvaluationRun) -> Dict:
         )
 
 
-def execute_api_trace_eval(trace_run: TraceRun, judgment_api_key: str) -> Dict:
-    """
-    Executes an evaluation of a list of `Trace`s using one or more `JudgmentScorer`s via the Judgment API.
-    """
-
-    try:
-        # submit API request to execute evals
-        if not judgment_api_key or not trace_run.organization_id:
-            raise ValueError("API key and organization ID are required")
-        api_client = JudgmentApiClient(judgment_api_key, trace_run.organization_id)
-        return api_client.run_trace_evaluation(trace_run.model_dump(warnings=False))
-    except Exception as e:
-        judgeval_logger.error(f"Error: {e}")
-
-        details = "An unknown error occurred."
-        if isinstance(e, JudgmentAPIException):
-            details = e.response_json.get("detail", "An unknown error occurred.")
-
-        raise JudgmentAPIError(
-            "An error occurred while executing the Judgment API request: " + details
-        )
-
-
 def check_missing_scorer_data(results: List[ScoringResult]) -> List[ScoringResult]:
     """
     Checks if any `ScoringResult` objects are missing `scorers_data`.
@@ -142,7 +116,7 @@ def check_missing_scorer_data(results: List[ScoringResult]) -> List[ScoringResul
 
 def log_evaluation_results(
     scoring_results: List[ScoringResult],
-    run: Union[EvaluationRun, TraceRun],
+    run: EvaluationRun,
     judgment_api_key: str,
 ) -> str:
     """
@@ -206,81 +180,6 @@ def check_examples(
             sys.exit(0)
         else:
             rprint("[green]Continuing...[/green]")
-
-
-def run_trace_eval(
-    trace_run: TraceRun,
-    judgment_api_key: str,
-    function: Optional[Callable] = None,
-    tracer: Optional[Union[Tracer, "JudgevalCallbackHandler"]] = None,
-    examples: Optional[List[Example]] = None,
-) -> List[ScoringResult]:
-    if function and tracer and examples is not None:
-        new_traces: List[Trace] = []
-
-        # Handle case where tracer is actually a callback handler
-        actual_tracer = tracer
-        if hasattr(tracer, "tracer") and hasattr(tracer.tracer, "traces"):
-            # This is a callback handler, get the underlying tracer
-            actual_tracer = tracer.tracer
-
-        if trace_run.project_name != actual_tracer.project_name:
-            raise ValueError(
-                f"Project name mismatch between run_trace_eval and tracer. "
-                f"Trace run: {trace_run.project_name}, "
-                f"Tracer: {actual_tracer.project_name}"
-            )
-
-        actual_tracer.offline_mode = True
-        actual_tracer.traces = []
-        judgeval_logger.info("Running agent function: ")
-        for example in examples:
-            if example.input:
-                if isinstance(example.input, str):
-                    function(example.input)
-                elif isinstance(example.input, dict):
-                    function(**example.input)
-                else:
-                    raise ValueError(
-                        f"Input must be string or dict, got {type(example.input)}"
-                    )
-            else:
-                function()
-
-        for i, trace in enumerate(actual_tracer.traces):
-            # We set the root-level trace span with the expected tools of the Trace
-            trace = Trace(**trace)
-            trace.trace_spans[0].expected_tools = examples[i].expected_tools
-            new_traces.append(trace)
-        trace_run.traces = new_traces
-        actual_tracer.traces = []
-
-    # Execute evaluation using Judgment API
-    try:  # execute an EvaluationRun with just JudgmentScorers
-        judgeval_logger.info("Executing Trace Evaluation... ")
-        response_data: Dict = execute_api_trace_eval(trace_run, judgment_api_key)
-        scoring_results = [
-            ScoringResult(**result) for result in response_data["results"]
-        ]
-    except JudgmentAPIError as e:
-        raise JudgmentAPIError(
-            f"An error occurred while executing the Judgment API request: {str(e)}"
-        )
-    except ValueError as e:
-        raise ValueError(
-            f"Please check your TraceRun object, one or more fields are invalid: {str(e)}"
-        )
-
-    # Convert the response data to `ScoringResult` objects
-    # TODO: allow for custom scorer on traces
-
-    url = log_evaluation_results(
-        response_data["agent_results"], trace_run, judgment_api_key
-    )
-    rprint(
-        f"\n🔍 You can view your evaluation results here: [rgb(106,0,255)][link={url}]View Results[/link]\n"
-    )
-    return scoring_results
 
 
 def _poll_evaluation_until_complete(
@@ -387,12 +286,15 @@ def progress_logger(stop_event, msg="Working...", interval=5):
 def run_eval(
     evaluation_run: EvaluationRun,
     judgment_api_key: str,
+    show_url: bool = True,
 ) -> List[ScoringResult]:
     """
     Executes an evaluation of `Example`s using one or more `Scorer`s
 
     Args:
         evaluation_run (EvaluationRun): Stores example and evaluation together for running
+        judgment_api_key (str): API key for authentication
+        show_url (bool): Whether to display the evaluation results URL. Defaults to True.
 
     Returns:
         List[ScoringResult]: A list of ScoringResult objects
@@ -481,9 +383,10 @@ def run_eval(
             scoring_result.model_dump(warnings=False) for scoring_result in results
         ]
         url = log_evaluation_results(send_results, evaluation_run, judgment_api_key)
-    rprint(
-        f"\n🔍 You can view your evaluation results here: [rgb(106,0,255)][link={url}]View Results[/link]\n"
-    )
+    if show_url:
+        rprint(
+            f"\n🔍 You can view your evaluation results here: [rgb(106,0,255)][link={url}]View Results[/link]\n"
+        )
     return results
 
 

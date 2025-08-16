@@ -71,7 +71,12 @@ class TraceManagerClient:
 
         server_response = self.api_client.upsert_trace(trace_data)
 
-        if not offline_mode and show_link and "ui_results_url" in server_response:
+        if (
+            not offline_mode
+            and show_link
+            and "ui_results_url" in server_response
+            and self.tracer.show_trace_urls
+        ):
             pretty_str = f"\n🔍 You can view your trace data here: [rgb(106,0,255)][link={server_response['ui_results_url']}]View Trace[/link]\n"
             rprint(pretty_str)
 

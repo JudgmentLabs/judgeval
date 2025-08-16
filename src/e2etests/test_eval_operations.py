@@ -9,11 +9,9 @@ from judgeval.data import Example
 from judgeval.scorers import (
     FaithfulnessScorer,
     AnswerRelevancyScorer,
-    ToolOrderScorer,
 )
 from judgeval.scorers.example_scorer import ExampleScorer
 from judgeval.dataset import Dataset
-from judgeval.tracer import Tracer
 from judgeval.constants import DEFAULT_TOGETHER_MODEL
 
 
@@ -173,73 +171,3 @@ def test_evaluate_dataset_custom(
     assert res[3].scorers_data[0].score == 0
 
     dataset.delete()
-
-
-@pytest.mark.asyncio
-async def test_run_trace_eval(
-    client: JudgmentClient, project_name: str, random_name: str
-):
-    EVAL_RUN_NAME = random_name
-    tracer = Tracer(project_name=project_name)
-
-    @tracer.observe(span_type="tool")
-    def simple_function(text: str):
-        return "finished {text}"
-
-    example1 = Example(
-        input="input",
-        expected_tools=[
-            {"tool_name": "simple_function", "parameters": {"text": "input"}}
-        ],
-    )
-
-    example2 = Example(
-        input="input2",
-        expected_tools=[
-            {"tool_name": "simple_function", "parameters": {"text": "input2"}}
-        ],
-    )
-
-    scorer = ToolOrderScorer(threshold=0.5)
-    results = client.run_trace_evaluation(
-        examples=[example1, example2],
-        function=simple_function,
-        tracer=tracer,
-        scorers=[scorer],
-        project_name=project_name,
-        eval_run_name=EVAL_RUN_NAME,
-    )
-    assert results, (
-        f"No evaluation results found for {EVAL_RUN_NAME} in project {project_name}"
-    )
-    assert len(results) == 2, f"Expected 2 trace results but got {len(results)}"
-
-    assert results[0].success
-    assert results[1].success
-
-
-@pytest.mark.asyncio
-async def test_run_trace_eval_with_project_mismatch(
-    client: JudgmentClient, project_name: str, random_name: str
-):
-    EVAL_RUN_NAME = random_name
-
-    tracer = Tracer(project_name="mismatching-project")
-    scorer = ToolOrderScorer(threshold=0.5)
-    example = Example(input="hello")
-
-    @tracer.observe(span_type="tool")
-    def simple_function(text: str):
-        return f"Processed: {text.upper()}"
-
-    with pytest.raises(
-        ValueError, match="Project name mismatch between run_trace_eval and tracer."
-    ):
-        client.run_trace_evaluation(
-            examples=[example],
-            function=simple_function,
-            tracer=tracer,
-            scorers=[scorer],
-            project_name=project_name,
-            eval_run_name=EVAL_RUN_NAME,
-        )

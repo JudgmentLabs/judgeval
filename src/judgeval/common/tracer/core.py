@@ -815,6 +815,8 @@ class Tracer:
         == "true",
         enable_evaluations: bool = os.getenv("JUDGMENT_EVALUATIONS", "true").lower()
         == "true",
+        show_trace_urls: bool = os.getenv("JUDGMENT_SHOW_TRACE_URLS", "true").lower()
+        == "true",
         # S3 configuration
         use_s3: bool = False,
         s3_bucket_name: Optional[str] = None,
@@ -859,6 +861,7 @@ class Tracer:
             self.traces: List[Trace] = []
             self.enable_monitoring: bool = enable_monitoring
             self.enable_evaluations: bool = enable_evaluations
+            self.show_trace_urls: bool = show_trace_urls
             self.class_identifiers: Dict[
                 str, str
             ] = {}  # Dictionary to store class identifiers
@@ -1731,6 +1734,93 @@ class Tracer:
                     f"Error during background service shutdown: {e}"
                 )
 
+    def trace_to_message_history(
+        self, trace: Union[Trace, TraceClient]
+    ) -> List[Dict[str, str]]:
+        """
+        Extract message history from a trace for training purposes.
+
+        This method processes trace spans to reconstruct the conversation flow,
+        extracting messages in chronological order from LLM, user, and tool spans.
+
+        Args:
+            trace: Trace or TraceClient instance to extract messages from
+
+        Returns:
+            List of message dictionaries with 'role' and 'content' keys
+
+        Raises:
+            ValueError: If no trace is provided
+        """
+        if not trace:
+            raise ValueError("No trace provided")
+
+        # Handle both Trace and TraceClient objects
+        if isinstance(trace, TraceClient):
+            spans = trace.trace_spans
+        else:
+            spans = trace.trace_spans if hasattr(trace, "trace_spans") else []
+
+        messages = []
+        first_found = False
+
+        # Process spans in chronological order
+        for span in sorted(
+            spans, key=lambda s: s.created_at if hasattr(s, "created_at") else 0
+        ):
+            # Skip spans without output (except for first LLM span which may have input messages)
+            if span.output is None and span.span_type != "llm":
+                continue
+
+            if span.span_type == "llm":
+                # For the first LLM span, extract input messages (system + user prompts)
+                if not first_found and hasattr(span, "inputs") and span.inputs:
+                    input_messages = span.inputs.get("messages", [])
+                    if input_messages:
+                        first_found = True
+                        # Add input messages (typically system and user messages)
+                        for msg in input_messages:
+                            if (
+                                isinstance(msg, dict)
+                                and "role" in msg
+                                and "content" in msg
+                            ):
+                                messages.append(
+                                    {"role": msg["role"], "content": msg["content"]}
+                                )
+
+                # Add assistant response from span output
+                if span.output is not None:
+                    messages.append({"role": "assistant", "content": str(span.output)})
+
+            elif span.span_type == "user":
+                # Add user messages
+                if span.output is not None:
+                    messages.append({"role": "user", "content": str(span.output)})
+
+            elif span.span_type == "tool":
+                # Add tool responses as user messages (common pattern in training)
+                if span.output is not None:
+                    messages.append({"role": "user", "content": str(span.output)})
+
+        return messages
+
+    def get_current_message_history(self) -> List[Dict[str, str]]:
+        """
+        Get message history from the current trace.
+
+        Returns:
+            List of message dictionaries from the current trace context
+
+        Raises:
+            ValueError: If no current trace is found
+        """
+        current_trace = self.get_current_trace()
+        if not current_trace:
+            raise ValueError("No current trace found")
+
+        return self.trace_to_message_history(current_trace)
+
 
 def _get_current_trace(
     trace_across_async_contexts: bool = Tracer.trace_across_async_contexts,
@@ -1746,7 +1836,7 @@ def wrap(
 ) -> Any:
     """
     Wraps an API client to add tracing capabilities.
-    Supports OpenAI, Together, Anthropic, and Google GenAI clients.
+    Supports OpenAI, Together, Anthropic, Google GenAI clients, and TrainableModel.
     Patches both '.create' and Anthropic's '.stream' methods using a wrapper class.
     """
     (
@@ -1871,6 +1961,39 @@ def wrap(
             setattr(client.chat.completions, "create", wrapped(original_create))
         elif isinstance(client, (groq_AsyncGroq)):
             setattr(client.chat.completions, "create", wrapped_async(original_create))
+
+    # Check for TrainableModel from judgeval.common.trainer
+    try:
+        from judgeval.common.trainer import TrainableModel
+
+        if isinstance(client, TrainableModel):
+            # Define a wrapper function that can be reapplied to new model instances
+            def wrap_model_instance(model_instance):
+                """Wrap a model instance with tracing functionality"""
+                if hasattr(model_instance, "chat") and hasattr(
+                    model_instance.chat, "completions"
+                ):
+                    if hasattr(model_instance.chat.completions, "create"):
+                        setattr(
+                            model_instance.chat.completions,
+                            "create",
+                            wrapped(model_instance.chat.completions.create),
+                        )
+                    if hasattr(model_instance.chat.completions, "acreate"):
+                        setattr(
+                            model_instance.chat.completions,
+                            "acreate",
+                            wrapped_async(model_instance.chat.completions.acreate),
+                        )
+
+            # Register the wrapper function with the TrainableModel
+            client._register_tracer_wrapper(wrap_model_instance)
+
+            # Apply wrapping to the current model
+            wrap_model_instance(client._current_model)
+    except ImportError:
+        pass  # TrainableModel not available
+
     return client
 
 
@@ -1977,6 +2100,22 @@ def _get_client_config(
             return "GROQ_API_CALL", client.chat.completions.create, None, None, None
         elif isinstance(client, (groq_AsyncGroq)):
             return "GROQ_API_CALL", client.chat.completions.create, None, None, None
+
+    # Check for TrainableModel
+    try:
+        from judgeval.common.trainer import TrainableModel
+
+        if isinstance(client, TrainableModel):
+            return (
+                "FIREWORKS_TRAINABLE_MODEL_CALL",
+                client._current_model.chat.completions.create,
+                None,
+                None,
+                None,
+            )
+    except ImportError:
+        pass  # TrainableModel not available
+
     raise ValueError(f"Unsupported client type: {type(client)}")
 
 
@@ -2154,6 +2293,37 @@ def _format_output_data(
                 cache_read_input_tokens,
                 cache_creation_input_tokens,
             )
+
+    # Check for TrainableModel
+    try:
+        from judgeval.common.trainer import TrainableModel
+
+        if isinstance(client, TrainableModel):
+            # TrainableModel uses Fireworks LLM internally, so response format should be similar to OpenAI
+            if (
+                hasattr(response, "model")
+                and hasattr(response, "usage")
+                and hasattr(response, "choices")
+            ):
+                model_name = response.model
+                prompt_tokens = response.usage.prompt_tokens if response.usage else 0
+                completion_tokens = (
+                    response.usage.completion_tokens if response.usage else 0
+                )
+                message_content = response.choices[0].message.content
+
+                # Use LiteLLM cost calculation with fireworks_ai prefix
+                # LiteLLM supports Fireworks AI models for cost calculation when prefixed with "fireworks_ai/"
+                fireworks_model_name = f"fireworks_ai/{model_name}"
+                return message_content, _create_usage(
+                    fireworks_model_name,
+                    prompt_tokens,
+                    completion_tokens,
+                    cache_read_input_tokens,
+                    cache_creation_input_tokens,
+                )
+    except ImportError:
+        pass  # TrainableModel not available
 
     judgeval_logger.warning(f"Unsupported client type: {type(client)}")
     return None, None
