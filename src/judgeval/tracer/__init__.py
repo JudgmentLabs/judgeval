@@ -20,6 +20,7 @@ from typing import (
 )
 from functools import partial
 from warnings import warn
+from contextvars import Token
 
 from opentelemetry.context import Context
 from opentelemetry.sdk.trace import SpanProcessor, TracerProvider
@@ -232,9 +233,7 @@ class Tracer:
                     AttributeKeys.JUDGMENT_CUMULATIVE_LLM_COST, new_cumulative_cost
                 )
 
-    def add_agent_attributes_to_span(
-        self, span, attributes: Optional[Dict[str, Any]] = None
-    ):
+    def add_agent_attributes_to_span(self, span):
         """Add agent ID, class name, and instance name to span if they exist in context"""
         current_agent_context = _current_agent_context.get()
         if current_agent_context:
@@ -318,7 +317,7 @@ class Tracer:
         def wrapper(*args, **kwargs):
             n = name or f.__qualname__
             with sync_span_context(self, n, attributes) as span:
-                self.add_agent_attributes_to_span(span, attributes)
+                self.add_agent_attributes_to_span(span)
                 self.record_instance_state("before", span)
                 try:
                     span.set_attribute(
@@ -348,7 +347,7 @@ class Tracer:
         async def wrapper(*args, **kwargs):
             n = name or f.__qualname__
             with sync_span_context(self, n, attributes) as span:
-                self.add_agent_attributes_to_span(span, attributes)
+                self.add_agent_attributes_to_span(span)
                 self.record_instance_state("before", span)
                 try:
                     span.set_attribute(
@@ -472,37 +471,54 @@ class Tracer:
             if len(parts) >= 2:
                 class_name = parts[-2]
 
+        def _create_agent_context(args) -> Token:
+            """Create agent context and return token"""
+            agent_id = str(uuid.uuid4())
+            agent_context: Dict[str, str | bool | Dict | List | Any] = {
+                "agent_id": agent_id
+            }
+
+            if class_name:
+                agent_context["class_name"] = class_name
+
+            agent_context["track_state"] = track_state
+            agent_context["track_attributes"] = track_attributes
+            agent_context["field_mappings"] = field_mappings
+
+            instance = args[0] if args else None
+            agent_context["instance"] = instance
+
+            if identifier:
+                if not class_name or not instance or not isinstance(instance, object):
+                    raise Exception(
+                        "'identifier' is set but no class name or instance is available. 'identifier' can only be specified when using the agent() decorator on a class method."
+                    )
+                if (
+                    instance
+                    and hasattr(instance, identifier)
+                    and not callable(getattr(instance, identifier))
+                ):
+                    instance_name = str(getattr(instance, identifier))
+                    agent_context["instance_name"] = instance_name
+                else:
+                    raise Exception(
+                        f"Attribute {identifier} does not exist for {class_name}. Check your agent() decorator."
+                    )
+
+            current_agent_context = _current_agent_context.get()
+            if current_agent_context and "agent_id" in current_agent_context:
+                agent_context["parent_agent_id"] = current_agent_context["agent_id"]
+
+            agent_context["is_agent_entry_point"] = True
+            token = _current_agent_context.set(agent_context)
+            return token
+
         def _wrap_with_agent_context(f: Callable):
             if inspect.iscoroutinefunction(f):
 
                 @functools.wraps(f)
                 async def async_wrapper(*args, **kwargs):
-                    agent_id = str(uuid.uuid4())
-                    agent_context = {"agent_id": agent_id}
-                    if class_name:
-                        agent_context["class_name"] = class_name
-
-                    agent_context["track_state"] = track_state
-                    agent_context["track_attributes"] = track_attributes
-                    agent_context["field_mappings"] = field_mappings
-
-                    instance = args[0] if args else None
-
-                    agent_context["instance"] = instance
-
-                    if identifier and instance and hasattr(instance, identifier):
-                        try:
-                            instance_name = str(getattr(instance, identifier))
-                            agent_context["instance_name"] = instance_name
-                        except Exception:
-                            pass
-                    current_agent_context = _current_agent_context.get()
-                    if current_agent_context and "agent_id" in current_agent_context:
-                        agent_context["parent_agent_id"] = current_agent_context[
-                            "agent_id"
-                        ]
-                    agent_context["is_agent_entry_point"] = True
-                    token = _current_agent_context.set(agent_context)
+                    token = _create_agent_context(args)
                     try:
                         return await f(*args, **kwargs)
                     finally:
@@ -513,32 +529,7 @@ class Tracer:
 
                 @functools.wraps(f)
                 def sync_wrapper(*args, **kwargs):
-                    agent_id = str(uuid.uuid4())
-                    agent_context = {"agent_id": agent_id}
-                    if class_name:
-                        agent_context["class_name"] = class_name
-
-                    agent_context["track_state"] = track_state
-                    agent_context["track_attributes"] = track_attributes
-                    agent_context["field_mappings"] = field_mappings
-
-                    instance = args[0] if args else None
-
-                    agent_context["instance"] = instance
-
-                    if identifier and args and hasattr(args[0], identifier):
-                        try:
-                            instance_name = str(getattr(args[0], identifier))
-                            agent_context["instance_name"] = instance_name
-                        except Exception:
-                            pass
-                    current_agent_context = _current_agent_context.get()
-                    if current_agent_context and "agent_id" in current_agent_context:
-                        agent_context["parent_agent_id"] = current_agent_context[
-                            "agent_id"
-                        ]
-                    agent_context["is_agent_entry_point"] = True
-                    token = _current_agent_context.set(agent_context)
+                    token = _create_agent_context(args)
                     try:
                         return f(*args, **kwargs)
                     finally:
