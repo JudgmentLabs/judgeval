@@ -72,9 +72,9 @@ dev = [
     "langchain-core>=0.3.72",
     "langgraph>=0.6.4",
     "mypy>=1.17.1",
-    "openai>=1.99.0",
+    "openai>=1.78.1",
     "opentelemetry-instrumentation-openai>=0.44.1",
-    "ruff>=0.12.7",
+    "ruff>=0.9.1,<0.10.0",
     "together>=1.5.21",
     "types-pyyaml>=6.0.12.20250516",
 ]
