@@ -53,7 +53,7 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
         @functools.wraps(function)
         def wrapper(*args, **kwargs):
             with sync_span_context(
-                tracer, span_name, {AttributeKeys.SPAN_TYPE: "llm"}
+                tracer, span_name, {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
             ) as span:
                 span.set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
                 try:
@@ -87,7 +87,7 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
         @functools.wraps(function)
         async def wrapper(*args, **kwargs):
             async with async_span_context(
-                tracer, span_name, {AttributeKeys.SPAN_TYPE: "llm"}
+                tracer, span_name, {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
             ) as span:
                 span.set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
                 try:

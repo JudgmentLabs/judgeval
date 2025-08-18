@@ -274,7 +274,7 @@ class Tracer:
 
         name = func.__qualname__
         attributes = {
-            AttributeKeys.SPAN_TYPE: span_type,
+            AttributeKeys.JUDGMENT_SPAN_KIND: span_type,
         }
 
         if inspect.iscoroutinefunction(func):

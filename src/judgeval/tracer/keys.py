@@ -8,9 +8,8 @@ from opentelemetry.semconv._incubating.attributes import gen_ai_attributes
 
 
 class AttributeKeys:
-    SPAN_TYPE = SpanAttributes.TYPE
-
     # General function tracing attributes (custom namespace)
+    JUDGMENT_SPAN_KIND = "judgment.span_kind"
     JUDGMENT_INPUT = "judgment.input"
     JUDGMENT_OUTPUT = "judgment.output"
 
