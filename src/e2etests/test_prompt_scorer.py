@@ -1,6 +1,6 @@
 from judgeval.scorers import PromptScorer
 from uuid import uuid4
-from judgeval.judgment_client import JudgmentClient
+from judgeval import JudgmentClient
 from judgeval.data import Example
 from judgeval.constants import DEFAULT_TOGETHER_MODEL
 

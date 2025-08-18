@@ -33,6 +33,8 @@ dependencies = [
     "click<8.2.0",
     "typer>=0.9.0",
     "fireworks-ai>=0.19.18",
+    "pre-commit>=4.3.0",
+    "pytest>=8.4.1",
 ]
 
 [project.urls]
