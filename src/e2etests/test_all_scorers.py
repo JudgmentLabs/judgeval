@@ -11,7 +11,7 @@ from judgeval.scorers import (
     ExecutionOrderScorer,
 )
 from judgeval.data import Example
-from judgeval.constants import DEFAULT_TOGETHER_MODEL
+from judgeval.env import JUDGMENT_DEFAULT_TOGETHER_MODEL
 
 
 def test_ac_scorer(client: JudgmentClient, project_name: str):
@@ -27,7 +27,7 @@ def test_ac_scorer(client: JudgmentClient, project_name: str):
     res = client.run_evaluation(
         examples=[example],
         scorers=[scorer],
-        model=DEFAULT_TOGETHER_MODEL,
+        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=EVAL_RUN_NAME,
     )
@@ -52,7 +52,7 @@ def test_ar_scorer(client: JudgmentClient, project_name: str):
     res = client.run_evaluation(
         examples=[example_1, example_2],
         scorers=[scorer],
-        model=DEFAULT_TOGETHER_MODEL,
+        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=EVAL_RUN_NAME,
     )
@@ -94,7 +94,7 @@ def test_faithfulness_scorer(client: JudgmentClient, project_name: str):
     res = client.run_evaluation(
         examples=[faithful_example, contradictory_example],
         scorers=[scorer],
-        model=DEFAULT_TOGETHER_MODEL,
+        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=EVAL_RUN_NAME,
     )
@@ -119,7 +119,7 @@ def test_instruction_adherence_scorer(client: JudgmentClient, project_name: str)
     res = client.run_evaluation(
         examples=[example_1],
         scorers=[scorer],
-        model=DEFAULT_TOGETHER_MODEL,
+        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=EVAL_RUN_NAME,
     )
@@ -151,7 +151,7 @@ def test_execution_order_scorer(client: JudgmentClient, project_name: str):
     res = client.run_evaluation(
         examples=[example],
         scorers=[ExecutionOrderScorer(threshold=1, should_consider_ordering=True)],
-        model=DEFAULT_TOGETHER_MODEL,
+        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=EVAL_RUN_NAME,
     )

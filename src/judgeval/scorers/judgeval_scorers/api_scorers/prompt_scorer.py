@@ -18,7 +18,14 @@ def push_prompt_scorer(
 ) -> str:
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
-        r = client.save_scorer(name, prompt, threshold, options)
+        r = client.save_scorer(
+            payload={
+                "name": name,
+                "prompt": prompt,
+                "threshold": threshold,
+                "options": options,
+            }
+        )
     except JudgmentAPIError as e:
         if e.status_code == 500:
             raise JudgmentAPIError(

@@ -87,3 +87,6 @@ exclude = ["src/e2etests/*", "src/tests/*", "src/demo/*"]
 
 [tool.ruff]
 exclude = ["docs"]
+
+[tool.ruff.lint]
+ignore = ["F403", "F405"]  # F403: star import, F405: undefined name from star import

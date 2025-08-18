@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Mapping, Literal, Optional
+from typing import Dict, Any, Mapping, Literal, Optional
 import httpx
 from httpx import Response
 from judgeval.exceptions import JudgmentAPIError
@@ -34,7 +34,11 @@ class JudgmentSyncClient:
         self.client = httpx.Client(timeout=30)
 
     def _request(
-        self, method: Literal["POST", "PATCH", "GET", "DELETE"], url: str, payload: Any, params: Optional[Dict[str, Any]] = None
+        self,
+        method: Literal["POST", "PATCH", "GET", "DELETE"],
+        url: str,
+        payload: Any,
+        params: Optional[Dict[str, Any]] = None,
     ) -> Any:
         if method == "GET":
             r = self.client.request(
@@ -70,7 +74,7 @@ class JudgmentSyncClient:
     def evaluate(self, payload: EvaluationRun, stream: Optional[str] = None) -> Any:
         query_params = {}
         if stream is not None:
-            query_params['stream'] = stream
+            query_params["stream"] = stream
         return self._request(
             "POST",
             url_for("/evaluate/"),
@@ -94,8 +98,8 @@ class JudgmentSyncClient:
 
     def get_evaluation_status(self, experiment_run_id: str, project_name: str) -> Any:
         query_params = {}
-        query_params['experiment_run_id'] = experiment_run_id
-        query_params['project_name'] = project_name
+        query_params["experiment_run_id"] = experiment_run_id
+        query_params["project_name"] = project_name
         return self._request(
             "GET",
             url_for("/get_evaluation_status/"),
@@ -116,7 +120,9 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def datasets_fetch_stats_by_project(self, payload: DatasetFetchStatsByProject) -> Any:
+    def datasets_fetch_stats_by_project(
+        self, payload: DatasetFetchStatsByProject
+    ) -> Any:
         return self._request(
             "POST",
             url_for("/datasets/fetch_stats_by_project/"),
@@ -172,6 +178,13 @@ class JudgmentSyncClient:
             payload,
         )
 
+    def projects_delete(self, payload: ProjectDelete) -> ProjectDeleteResponse:
+        return self._request(
+            "DELETE",
+            url_for("/projects/delete_from_judgeval/"),
+            payload,
+        )
+
     def scorer_exists(self, payload: ScorerExistsRequest) -> ScorerExistsResponse:
         return self._request(
             "POST",
@@ -186,20 +199,32 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def fetch_scorer(self, payload: FetchPromptScorerRequest) -> FetchPromptScorerResponse:
+    def upload_custom_scorer(
+        self, payload: UploadCustomScorerRequest
+    ) -> UploadCustomScorerResponse:
+        return self._request(
+            "POST",
+            url_for("/upload_custom_scorer/"),
+            payload,
+        )
+
+    def fetch_scorer(
+        self, payload: FetchPromptScorerRequest
+    ) -> FetchPromptScorerResponse:
         return self._request(
             "POST",
             url_for("/fetch_scorer/"),
             payload,
         )
 
-    def projects_resolve(self, payload: ResolveProjectNameRequest) -> ResolveProjectNameResponse:
+    def projects_resolve(
+        self, payload: ResolveProjectNameRequest
+    ) -> ResolveProjectNameResponse:
         return self._request(
             "POST",
             url_for("/projects/resolve/"),
             payload,
         )
-
 
 
 class JudgmentAsyncClient:
@@ -211,7 +236,11 @@ class JudgmentAsyncClient:
         self.client = httpx.AsyncClient(timeout=30)
 
     async def _request(
-        self, method: Literal["POST", "PATCH", "GET", "DELETE"], url: str, payload: Any, params: Optional[Dict[str, Any]] = None
+        self,
+        method: Literal["POST", "PATCH", "GET", "DELETE"],
+        url: str,
+        payload: Any,
+        params: Optional[Dict[str, Any]] = None,
     ) -> Any:
         if method == "GET":
             r = self.client.request(
@@ -244,10 +273,12 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def evaluate(self, payload: EvaluationRun, stream: Optional[str] = None) -> Any:
+    async def evaluate(
+        self, payload: EvaluationRun, stream: Optional[str] = None
+    ) -> Any:
         query_params = {}
         if stream is not None:
-            query_params['stream'] = stream
+            query_params["stream"] = stream
         return await self._request(
             "POST",
             url_for("/evaluate/"),
@@ -269,10 +300,12 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def get_evaluation_status(self, experiment_run_id: str, project_name: str) -> Any:
+    async def get_evaluation_status(
+        self, experiment_run_id: str, project_name: str
+    ) -> Any:
         query_params = {}
-        query_params['experiment_run_id'] = experiment_run_id
-        query_params['project_name'] = project_name
+        query_params["experiment_run_id"] = experiment_run_id
+        query_params["project_name"] = project_name
         return await self._request(
             "GET",
             url_for("/get_evaluation_status/"),
@@ -293,7 +326,9 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def datasets_fetch_stats_by_project(self, payload: DatasetFetchStatsByProject) -> Any:
+    async def datasets_fetch_stats_by_project(
+        self, payload: DatasetFetchStatsByProject
+    ) -> Any:
         return await self._request(
             "POST",
             url_for("/datasets/fetch_stats_by_project/"),
@@ -304,6 +339,13 @@ class JudgmentAsyncClient:
         return await self._request(
             "POST",
             url_for("/datasets/push/"),
+            payload,
+        )
+
+    async def datasets_delete(self, payload: DatasetDelete) -> Any:
+        return await self._request(
+            "POST",
+            url_for("/datasets/delete/"),
             payload,
         )
 
@@ -335,7 +377,9 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def traces_evaluation_runs_batch(self, payload: EvaluationRunsBatchRequest) -> Any:
+    async def traces_evaluation_runs_batch(
+        self, payload: EvaluationRunsBatchRequest
+    ) -> Any:
         return await self._request(
             "POST",
             url_for("/traces/evaluation_runs/batch/"),
@@ -356,27 +400,32 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def save_scorer(self, payload: SavePromptScorerRequest) -> SavePromptScorerResponse:
+    async def save_scorer(
+        self, payload: SavePromptScorerRequest
+    ) -> SavePromptScorerResponse:
         return await self._request(
             "POST",
             url_for("/save_scorer/"),
             payload,
         )
 
-    async def fetch_scorer(self, payload: FetchPromptScorerRequest) -> FetchPromptScorerResponse:
+    async def fetch_scorer(
+        self, payload: FetchPromptScorerRequest
+    ) -> FetchPromptScorerResponse:
         return await self._request(
             "POST",
             url_for("/fetch_scorer/"),
             payload,
         )
 
-    async def projects_resolve(self, payload: ResolveProjectNameRequest) -> ResolveProjectNameResponse:
+    async def projects_resolve(
+        self, payload: ResolveProjectNameRequest
+    ) -> ResolveProjectNameResponse:
         return await self._request(
             "POST",
             url_for("/projects/resolve/"),
             payload,
         )
-
 
 
 __all__ = [

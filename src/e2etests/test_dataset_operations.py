@@ -8,15 +8,15 @@ import pytest
 from judgeval import JudgmentClient
 from judgeval.data import Example
 from judgeval.dataset import Dataset
+from e2etests.utils import create_project, delete_project
 
 
 def test_create_dataset(client: JudgmentClient, project_name: str, random_name: str):
     """Test dataset creation"""
-    dataset = Dataset.create(
+    Dataset.create(
         name=random_name,
         project_name=project_name,
     )
-    dataset.delete()
 
 
 def test_create_dataset_with_example(
@@ -29,14 +29,13 @@ def test_create_dataset_with_example(
         examples=[Example(input="input 1", actual_output="output 1")],
     )
     assert dataset, "Failed to push dataset"
-    dataset.delete()
 
 
 def test_create_dataset_across_projects(
     client: JudgmentClient, project_name: str, random_name: str
 ):
     """Test that the same name for a dataset can be used across projects."""
-    client.create_project(project_name=random_name)
+    create_project(project_name=random_name)
     dataset = Dataset.create(
         name=random_name,
         project_name=project_name,
@@ -52,10 +51,7 @@ def test_create_dataset_across_projects(
     )
 
     assert dataset2, "Failed to push dataset"
-
-    dataset.delete()
-    dataset2.delete()
-    client.delete_project(project_name=random_name)
+    delete_project(project_name=random_name)
 
 
 def test_create_dataset_error(
@@ -123,9 +119,6 @@ def test_pull_dataset(client: JudgmentClient, project_name: str):
             f"Example should have .actual_output be 'output {i}' but got '{e.actual_output}'"
         )
 
-    dataset1.delete()
-    dataset2.delete()
-
 
 def test_append_dataset(client: JudgmentClient, project_name: str, random_name: str):
     """Test dataset editing."""
@@ -151,8 +144,6 @@ def test_append_dataset(client: JudgmentClient, project_name: str, random_name: 
         f"Dataset should have {initial_example_count + 3} examples, but has {len(dataset.examples)}"
     )
 
-    dataset.delete()
-
 
 def test_overwrite_dataset(client: JudgmentClient, project_name: str, random_name: str):
     """Test dataset overwriting."""
@@ -176,5 +167,3 @@ def test_overwrite_dataset(client: JudgmentClient, project_name: str, random_nam
     dataset = Dataset.get(name=random_name, project_name=project_name)
     assert dataset, "Failed to pull dataset"
     assert len(dataset.examples) == 2, "Dataset should have 2 examples"
-
-    dataset.delete()

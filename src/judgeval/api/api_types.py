@@ -17,6 +17,11 @@ class DatasetFetch(TypedDict):
     project_name: str
 
 
+class DatasetDelete(TypedDict):
+    dataset_alias: str
+    project_name: str
+
+
 class DatasetFetchStatsByProject(TypedDict):
     project_name: str
 
@@ -59,6 +64,14 @@ class ProjectAddResponse(TypedDict):
     project_id: str
 
 
+class ProjectDelete(TypedDict):
+    project_name: str
+
+
+class ProjectDeleteResponse(TypedDict):
+    project_id: str
+
+
 class ScorerExistsRequest(TypedDict):
     name: str
 
@@ -81,6 +94,16 @@ class SavePromptScorerResponse(TypedDict):
 
 class FetchPromptScorerRequest(TypedDict):
     name: str
+
+
+class UploadCustomScorerRequest(TypedDict):
+    scorer_name: str
+    scorer_code: str
+    requirements_text: str
+
+
+class UploadCustomScorerResponse(TypedDict):
+    status: str
 
 
 class ResolveProjectNameRequest(TypedDict):

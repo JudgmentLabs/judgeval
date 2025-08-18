@@ -10,6 +10,7 @@ import logging
 from dotenv import load_dotenv
 
 from judgeval import JudgmentClient
+from e2etests.utils import delete_project, create_project
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -39,12 +40,12 @@ def client(project_name: str) -> JudgmentClient:
     """Create a single JudgmentClient instance for all tests."""
     # Setup
     client = JudgmentClient(api_key=API_KEY, organization_id=ORGANIZATION_ID)
-    client.create_project(project_name=project_name)
+    create_project(project_name=project_name)
     yield client
     # Teardown
     # Add more projects to delete as needed
-    client.delete_project(project_name=project_name)
-    client.delete_project(
+    delete_project(project_name=project_name)
+    delete_project(
         project_name="e2e-tests-gkzqvtrbwnyl"
     )  # this is hard coded in test_tracer.py since we can't export fixture
 

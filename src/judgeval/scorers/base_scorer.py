@@ -29,6 +29,9 @@ class BaseScorer(BaseModel):
     # name of your scorer (Faithfulness, PromptScorer-randomslug)
     name: Optional[str] = None
 
+    # The name of the class of the scorer
+    class_name: Optional[str] = None
+
     # The float score of the scorer run on the test case
     score: Optional[float] = None
 

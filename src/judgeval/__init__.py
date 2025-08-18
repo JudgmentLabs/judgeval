@@ -5,13 +5,15 @@ from judgeval.evaluation import run_eval
 from judgeval.data.evaluation_run import EvaluationRun
 
 
-from typing import List, Never, Optional, Union
+from typing import List, Optional, Union
 from judgeval.scorers import BaseScorer, APIScorerConfig
 from judgeval.data.example import Example
+from judgeval.logger import judgeval_logger
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_DEFAULT_GPT_MODEL, JUDGMENT_ORG_ID
-from judgeval.scorers.api_scorer import APIScorerConfig
 from judgeval.utils.meta import SingletonMeta
 from judgeval.exceptions import JudgmentRuntimeError
+from judgeval.utils.file_utils import extract_scorer_name
+from judgeval.api import JudgmentSyncClient
 
 
 class JudgmentClient(metaclass=SingletonMeta):
@@ -46,8 +48,6 @@ class JudgmentClient(metaclass=SingletonMeta):
         eval_run_name: str,
         model: str = JUDGMENT_DEFAULT_GPT_MODEL,
     ) -> List[ScoringResult]:
-        ...
-
         try:
             eval = EvaluationRun(
                 project_name=project_name,
@@ -69,6 +69,70 @@ class JudgmentClient(metaclass=SingletonMeta):
             raise JudgmentRuntimeError(
                 f"An unexpected error occured during evaluation: {e}"
             ) from e
+
+    def upload_custom_scorer(
+        self,
+        scorer_file_path: str,
+        requirements_file_path: Optional[str] = None,
+        unique_name: Optional[str] = None,
+    ) -> bool:
+        """
+        Upload custom ExampleScorer from files to backend.
+
+        Args:
+            scorer_file_path: Path to Python file containing CustomScorer class
+            requirements_file_path: Optional path to requirements.txt
+            unique_name: Optional unique identifier (auto-detected from scorer.name if not provided)
+
+        Returns:
+            bool: True if upload successful
+
+        Raises:
+            ValueError: If scorer file is invalid
+            FileNotFoundError: If scorer file doesn't exist
+        """
+        import os
+
+        if not os.path.exists(scorer_file_path):
+            raise FileNotFoundError(f"Scorer file not found: {scorer_file_path}")
+
+        # Auto-detect scorer name if not provided
+        if unique_name is None:
+            unique_name = extract_scorer_name(scorer_file_path)
+            judgeval_logger.info(f"Auto-detected scorer name: '{unique_name}'")
+
+        # Read scorer code
+        with open(scorer_file_path, "r") as f:
+            scorer_code = f.read()
+
+        # Read requirements (optional)
+        requirements_text = ""
+        if requirements_file_path and os.path.exists(requirements_file_path):
+            with open(requirements_file_path, "r") as f:
+                requirements_text = f.read()
+
+        try:
+            client = JudgmentSyncClient(
+                api_key=JUDGMENT_API_KEY, organization_id=JUDGMENT_ORG_ID
+            )
+            response = client.upload_custom_scorer(
+                scorer_name=unique_name,
+                scorer_code=scorer_code,
+                requirements_text=requirements_text,
+            )
+
+            if response.get("status") == "success":
+                judgeval_logger.info(
+                    f"Successfully uploaded custom scorer: {unique_name}"
+                )
+                return True
+            else:
+                judgeval_logger.error(f"Failed to upload custom scorer: {unique_name}")
+                return False
+
+        except Exception as e:
+            judgeval_logger.error(f"Error uploading custom scorer: {e}")
+            raise
 
 
 __all__ = ("JudgmentClient",)
