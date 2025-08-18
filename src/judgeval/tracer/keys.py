@@ -38,7 +38,6 @@ class AttributeKeys:
     GEN_AI_RESPONSE_FINISH_REASONS = gen_ai_attributes.GEN_AI_RESPONSE_FINISH_REASONS
 
     # GenAI-specific attributes (custom namespace)
-    GEN_AI_USAGE_TOTAL_TOKENS = "gen_ai.usage.total_tokens"
     GEN_AI_USAGE_TOTAL_COST = "gen_ai.usage.total_cost"
 
 

@@ -76,11 +76,6 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
                                 AttributeKeys.GEN_AI_USAGE_COMPLETION_TOKENS,
                                 usage.completion_tokens,
                             )
-                        if usage.total_tokens:
-                            span.set_attribute(
-                                AttributeKeys.GEN_AI_USAGE_TOTAL_TOKENS,
-                                usage.total_tokens,
-                            )
                         if usage.total_cost_usd:
                             span.set_attribute(
                                 AttributeKeys.GEN_AI_USAGE_TOTAL_COST,
@@ -122,11 +117,6 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
                             span.set_attribute(
                                 AttributeKeys.GEN_AI_USAGE_COMPLETION_TOKENS,
                                 usage.completion_tokens,
-                            )
-                        if usage.total_tokens:
-                            span.set_attribute(
-                                AttributeKeys.GEN_AI_USAGE_TOTAL_TOKENS,
-                                usage.total_tokens,
                             )
                         if usage.total_cost_usd:
                             span.set_attribute(

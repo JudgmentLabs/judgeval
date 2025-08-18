@@ -50,6 +50,7 @@ from judgeval.tracer.managers import sync_span_context
 from judgeval.utils.serialize import safe_serialize
 from judgeval.version import get_version
 from judgeval.warnings import JudgmentWarning
+from judgeval.exceptions import JudgmentRuntimeError
 
 from judgeval.tracer.exporters import JudgmentSpanExporter
 from judgeval.tracer.keys import AttributeKeys, ResourceKeys
@@ -490,7 +491,7 @@ class Tracer:
 
             if identifier:
                 if not class_name or not instance or not isinstance(instance, object):
-                    raise Exception(
+                    raise JudgmentRuntimeError(
                         "'identifier' is set but no class name or instance is available. 'identifier' can only be specified when using the agent() decorator on a class method."
                     )
                 if (
@@ -501,7 +502,7 @@ class Tracer:
                     instance_name = str(getattr(instance, identifier))
                     agent_context["instance_name"] = instance_name
                 else:
-                    raise Exception(
+                    raise JudgmentRuntimeError(
                         f"Attribute {identifier} does not exist for {class_name}. Check your agent() decorator."
                     )
 
