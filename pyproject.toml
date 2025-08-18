@@ -35,6 +35,7 @@ dependencies = [
     "fireworks-ai>=0.19.18",
     "pre-commit>=4.3.0",
     "pytest>=8.4.1",
+    "boto3>=1.40.11",
 ]
 
 [project.urls]

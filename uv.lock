@@ -1259,6 +1259,7 @@ name = "judgeval"
 version = "0.0.0"
 source = { editable = "." }
 dependencies = [
+    { name = "boto3" },
     { name = "click" },
     { name = "dotenv" },
     { name = "fireworks-ai" },
@@ -1308,6 +1309,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "boto3", specifier = ">=1.40.11" },
     { name = "boto3", marker = "extra == 's3'", specifier = ">=1.40.11" },
     { name = "click", specifier = "<8.2.0" },
     { name = "dotenv" },
