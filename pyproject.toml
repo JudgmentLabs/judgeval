@@ -25,6 +25,8 @@ dependencies = [
     "opentelemetry-sdk>=1.36.0",
     "opentelemetry-semantic-conventions>=0.57b0",
     "orjson>=3.9.0",
+    "pre-commit>=4.3.0",
+    "pytest>=8.4.1",
 ]
 
 [project.urls]

@@ -368,35 +368,75 @@ class Tracer:
             return
 
         span_id = self.get_current_span().get_span_context().span_id
+        trace_id = self.get_current_span().get_span_context().trace_id
         hosted_scoring = isinstance(scorer, APIScorerConfig) or (
             isinstance(scorer, BaseScorer) and scorer.server_hosted
         )
+        eval_run_name = f"async_evaluate_{span_id}"  # note this name doesnt matter because we don't save the experiment only the example and scorer_data
         if hosted_scoring:
-            eval_run_name = f"async_evaluate_{span_id}"  # note this name doesnt matter because we don't save the experiment only the example and scorer_data
             eval_run = EvaluationRun(
-                organization_id=self.tracer.organization_id,
-                project_name=self.project_name,
-                eval_name=eval_run_name,
-                examples=[example],
-                scorers=[scorer],
-                model=model,
-            )
-
-            self.api_client.add_to_run_eval_queue(eval_run.model_dump(warnings=False))
-        else:
-            # Handle custom scorers using local evaluation queue
-            eval_run = EvaluationRun(
-                organization_id=self.tracer.organization_id,
+                organization_id=self.organization_id,
                 project_name=self.project_name,
                 eval_name=eval_run_name,
                 examples=[example],
                 scorers=[scorer],
                 model=model,
                 trace_span_id=span_id,
+                trace_id=trace_id,
+            )
+
+            self.api_client.add_to_run_eval_queue(eval_run.model_dump(warnings=False))
+        else:
+            # Handle custom scorers using local evaluation queue
+            eval_run = EvaluationRun(
+                organization_id=self.organization_id,
+                project_name=self.project_name,
+                eval_name=eval_run_name,
+                examples=[example],
+                scorers=[scorer],
+                model=model,
+                trace_span_id=span_id,
+                trace_id=trace_id,
             )
 
             # Enqueue the evaluation run to the local evaluation queue
-            self.tracer.local_eval_queue.enqueue(eval_run)
+            self.local_eval_queue.enqueue(eval_run)
+
+    def wait_for_completion(self, timeout: Optional[float] = 30.0) -> bool:
+        """Wait for all evaluations and span processing to complete.
+
+        This method blocks until all queued evaluations are processed and
+        all pending spans are flushed to the server.
+
+        Args:
+            timeout: Maximum time to wait in seconds. Defaults to 30 seconds.
+                    None means wait indefinitely.
+
+        Returns:
+            True if all processing completed within the timeout, False otherwise.
+
+        """
+        try:
+            judgeval_logger.debug(
+                "Waiting for all evaluations and spans to complete..."
+            )
+
+            # Wait for all queued evaluation work to complete
+            eval_completed = self.local_eval_queue.wait_for_completion()
+            if not eval_completed:
+                judgeval_logger.warning(
+                    f"Local evaluation queue did not complete within {timeout} seconds"
+                )
+                return False
+
+            self.flush_background_spans()
+
+            judgeval_logger.debug("All evaluations and spans completed successfully")
+            return True
+
+        except Exception as e:
+            judgeval_logger.warning(f"Error while waiting for completion: {e}")
+            return False
 
 
 def wrap(client: ApiClient) -> ApiClient:
