@@ -118,7 +118,7 @@ class Tracer:
         organization_id: Optional[str] = None,
         deep_tracing: bool = False,
         enable_monitoring: bool = True,
-        enable_evaluation: bool = False,
+        enable_evaluation: bool = True,
         processors: List[SpanProcessor] = [],
     ):
         _api_key = api_key or JUDGMENT_API_KEY
@@ -367,8 +367,9 @@ class Tracer:
             )
             return
 
-        span_id = self.get_current_span().get_span_context().span_id
-        trace_id = self.get_current_span().get_span_context().trace_id
+        span_context = self.get_current_span().get_span_context()
+        trace_id = format(span_context.trace_id, "032x")
+        span_id = format(span_context.span_id, "016x")
         hosted_scoring = isinstance(scorer, APIScorerConfig) or (
             isinstance(scorer, BaseScorer) and scorer.server_hosted
         )
