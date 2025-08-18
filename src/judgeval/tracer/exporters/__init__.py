@@ -7,6 +7,7 @@ from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExport
 from typing import Sequence
 
 from judgeval.tracer.exporters.store import ABCSpanStore
+from judgeval.tracer.exporters.s3 import S3Exporter
 
 
 class JudgmentSpanExporter(OTLPSpanExporter):
@@ -32,4 +33,4 @@ class InMemorySpanExporter(SpanExporter):
         return SpanExportResult.SUCCESS
 
 
-__all__ = ("JudgmentSpanExporter", "InMemorySpanExporter")
+__all__ = ("JudgmentSpanExporter", "InMemorySpanExporter", "S3Exporter")
