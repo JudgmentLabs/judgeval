@@ -16,6 +16,8 @@ from judgeval.data import ScoringResult
 from judgeval.data.evaluation_run import EvaluationRun
 from judgeval.utils.async_utils import safe_run_async
 from judgeval.scorers.score import a_execute_scoring
+from judgeval.api import JudgmentSyncClient
+from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_ORG_ID
 
 
 class LocalEvaluationQueue:
@@ -37,6 +39,10 @@ class LocalEvaluationQueue:
         self._num_workers = num_workers  # Number of worker threads
         self._worker_threads: List[threading.Thread] = []
         self._shutdown_event = threading.Event()
+        self._api_client = JudgmentSyncClient(
+            api_key=JUDGMENT_API_KEY,
+            organization_id=JUDGMENT_ORG_ID,
+        )
 
     def enqueue(self, evaluation_run: EvaluationRun) -> None:
         """Add evaluation run to the queue."""
@@ -83,13 +89,8 @@ class LocalEvaluationQueue:
 
     def start_workers(
         self,
-        callback: Optional[Callable[[EvaluationRun, List[ScoringResult]], None]] = None,
     ) -> List[threading.Thread]:
         """Start multiple background threads to process runs in parallel.
-
-        Args:
-            callback: Optional function called after each run with (run, results).
-
         Returns:
             List of started worker threads.
         """
@@ -107,8 +108,10 @@ class LocalEvaluationQueue:
 
                     try:
                         results = self._process_run(run)
-                        if callback:
-                            callback(run, results)
+                        results_dict = [result.model_dump() for result in results]
+                        self._api_client.log_eval_results(
+                            payload={"results": results_dict, "run": run.model_dump()}
+                        )
                     except Exception as exc:
                         judgeval_logger.error(
                             f"Worker {worker_id} error processing {run.eval_name}: {exc}"

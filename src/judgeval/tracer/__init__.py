@@ -192,6 +192,9 @@ class Tracer:
         )
         self.local_eval_queue = LocalEvaluationQueue()
 
+        if self.enable_evaluation and self.enable_monitoring:
+            self.local_eval_queue.start_workers()
+
         Tracer._active_tracers[self.project_name] = self
 
     def get_current_span(self):
