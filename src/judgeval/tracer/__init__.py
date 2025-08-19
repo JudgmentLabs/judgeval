@@ -17,6 +17,7 @@ from typing import (
     TypeVar,
     overload,
     Literal,
+    TypedDict,
 )
 from functools import partial
 from warnings import warn
@@ -63,9 +64,19 @@ C = TypeVar("C", bound=Callable)
 Cls = TypeVar("Cls", bound=Type)
 ApiClient = TypeVar("ApiClient", bound=Any)
 
-_current_agent_context: ContextVar[
-    Optional[Dict[str, str | bool | Dict | List | None]]
-] = ContextVar("current_agent_context", default=None)
+
+class AgentContext(TypedDict):
+    agent_id: str
+    class_name: str | None
+    track_state: bool
+    track_attributes: List[str] | None
+    field_mappings: Dict[str, str]
+    instance: Any
+
+
+_current_agent_context: ContextVar[Optional[AgentContext]] = ContextVar(
+    "current_agent_context", default=None
+)
 
 _current_cost_context: ContextVar[Optional[Dict[str, float]]] = ContextVar(
     "current_cost_context", default=None
@@ -270,24 +281,10 @@ class Tracer:
         current_agent_context = _current_agent_context.get()
 
         if current_agent_context and current_agent_context.get("track_state"):
-            instance_untyped = current_agent_context.get("instance", None)
-            instance = (
-                instance_untyped if isinstance(instance_untyped, object) else None
-            )
-            track_attributes_untyped = current_agent_context.get(
-                "track_attributes", None
-            )
-            track_attributes: List | None = (
-                track_attributes_untyped
-                if isinstance(track_attributes_untyped, list)
-                else None
-            )
-            field_mappings_untyped = current_agent_context.get("field_mappings", {})
-            field_mappings: Dict[str, str] = (
-                field_mappings_untyped
-                if isinstance(field_mappings_untyped, dict)
-                else {}
-            )
+            instance = current_agent_context.get("instance")
+            track_attributes = current_agent_context.get("track_attributes")
+            field_mappings = current_agent_context.get("field_mappings", {})
+
             if track_attributes is not None:
                 attributes = {
                     field_mappings.get(attr, attr): getattr(instance, attr, None)
@@ -299,17 +296,12 @@ class Tracer:
                     for k, v in instance.__dict__.items()
                     if not k.startswith("_")
                 }
-
-            if record_point == "before":
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_STATE_BEFORE,
-                    safe_serialize(attributes),
-                )
-            else:
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_STATE_AFTER,
-                    safe_serialize(attributes),
-                )
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_STATE_BEFORE
+                if record_point == "before"
+                else AttributeKeys.JUDGMENT_STATE_AFTER,
+                safe_serialize(attributes),
+            )
 
     def _wrap_sync(
         self, f: Callable, name: Optional[str], attributes: Optional[Dict[str, Any]]
