@@ -15,6 +15,8 @@ from typing import (
     Type,
     TypeVar,
     overload,
+    Literal,
+    TypedDict,
 )
 from functools import partial
 from warnings import warn
@@ -43,7 +45,11 @@ from judgeval.logger import judgeval_logger
 from judgeval.scorers.api_scorer import APIScorerConfig
 from judgeval.scorers.base_scorer import BaseScorer
 from judgeval.tracer.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
-from judgeval.tracer.managers import sync_span_context
+from judgeval.tracer.managers import (
+    sync_span_context,
+    sync_agent_context,
+    async_agent_context,
+)
 from judgeval.utils.serialize import safe_serialize
 from judgeval.version import get_version
 from judgeval.warnings import JudgmentWarning
@@ -58,6 +64,15 @@ from judgeval.tracer.local_eval_queue import LocalEvaluationQueue
 C = TypeVar("C", bound=Callable)
 Cls = TypeVar("Cls", bound=Type)
 ApiClient = TypeVar("ApiClient", bound=Any)
+
+
+class AgentContext(TypedDict):
+    agent_id: str
+    class_name: str | None
+    track_state: bool
+    track_attributes: List[str] | None
+    field_mappings: Dict[str, str]
+    instance: Any
 
 
 def resolve_project_id(
@@ -91,6 +106,9 @@ class Tracer:
         "provider",
         "tracer",
         "context",
+        # Agent
+        "agent_context",
+        "cost_context",
     )
 
     api_key: str
@@ -108,6 +126,9 @@ class Tracer:
     provider: ABCTracerProvider
     tracer: ABCTracer
     context: ContextVar[Context]
+
+    agent_context: ContextVar[Optional[AgentContext]]
+    cost_context: ContextVar[Optional[Dict[str, float]]]
 
     def __init__(
         self,
@@ -148,6 +169,9 @@ class Tracer:
 
         # TODO:
         self.context = ContextVar(f"judgeval:tracer:{project_name}")
+
+        self.agent_context = ContextVar("current_agent_context", default=None)
+        self.cost_context = ContextVar("current_cost_context", default=None)
 
         if self.enable_monitoring:
             project_id = resolve_project_id(
@@ -202,6 +226,84 @@ class Tracer:
     def get_tracer(self):
         return self.tracer
 
+    def get_current_agent_context(self):
+        return self.agent_context
+
+    def get_current_cost_context(self):
+        return self.cost_context
+
+    def add_cost_to_current_context(self, cost: float) -> None:
+        """Add cost to the current cost context and update span attribute."""
+        current_cost_context = self.cost_context.get()
+        if current_cost_context is not None:
+            current_cumulative_cost = current_cost_context.get("cumulative_cost", 0.0)
+            new_cumulative_cost = float(current_cumulative_cost) + cost
+            current_cost_context["cumulative_cost"] = new_cumulative_cost
+
+            span = get_current_span()
+            if span and span.is_recording():
+                span.set_attribute(
+                    AttributeKeys.JUDGMENT_CUMULATIVE_LLM_COST, new_cumulative_cost
+                )
+
+    def add_agent_attributes_to_span(self, span):
+        """Add agent ID, class name, and instance name to span if they exist in context"""
+        current_agent_context = self.agent_context.get()
+        if current_agent_context:
+            if "agent_id" in current_agent_context:
+                span.set_attribute(
+                    AttributeKeys.JUDGMENT_AGENT_ID, current_agent_context["agent_id"]
+                )
+            if "class_name" in current_agent_context:
+                span.set_attribute(
+                    AttributeKeys.JUDGMENT_AGENT_CLASS_NAME,
+                    current_agent_context["class_name"],
+                )
+            if "instance_name" in current_agent_context:
+                span.set_attribute(
+                    AttributeKeys.JUDGMENT_AGENT_INSTANCE_NAME,
+                    current_agent_context["instance_name"],
+                )
+            if "parent_agent_id" in current_agent_context:
+                span.set_attribute(
+                    AttributeKeys.JUDGMENT_PARENT_AGENT_ID,
+                    current_agent_context["parent_agent_id"],
+                )
+            if "is_agent_entry_point" in current_agent_context:
+                span.set_attribute(
+                    AttributeKeys.JUDGMENT_IS_AGENT_ENTRY_POINT,
+                    current_agent_context["is_agent_entry_point"],
+                )
+                current_agent_context["is_agent_entry_point"] = (
+                    False  # only true for entry point to agent
+                )
+
+    def record_instance_state(self, record_point: Literal["before", "after"], span):
+        current_agent_context = self.agent_context.get()
+
+        if current_agent_context and current_agent_context.get("track_state"):
+            instance = current_agent_context.get("instance")
+            track_attributes = current_agent_context.get("track_attributes")
+            field_mappings = current_agent_context.get("field_mappings", {})
+
+            if track_attributes is not None:
+                attributes = {
+                    field_mappings.get(attr, attr): getattr(instance, attr, None)
+                    for attr in track_attributes
+                }
+            else:
+                attributes = {
+                    field_mappings.get(k, k): v
+                    for k, v in instance.__dict__.items()
+                    if not k.startswith("_")
+                }
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_STATE_BEFORE
+                if record_point == "before"
+                else AttributeKeys.JUDGMENT_STATE_AFTER,
+                safe_serialize(attributes),
+            )
+
     def _wrap_sync(
         self, f: Callable, name: Optional[str], attributes: Optional[Dict[str, Any]]
     ):
@@ -209,6 +311,8 @@ class Tracer:
         def wrapper(*args, **kwargs):
             n = name or f.__qualname__
             with sync_span_context(self, n, attributes) as span:
+                self.add_agent_attributes_to_span(span)
+                self.record_instance_state("before", span)
                 try:
                     span.set_attribute(
                         AttributeKeys.JUDGMENT_INPUT,
@@ -225,6 +329,7 @@ class Tracer:
                         AttributeKeys.JUDGMENT_OUTPUT,
                         safe_serialize(result),
                     )
+                self.record_instance_state("after", span)
                 return result
 
         return wrapper
@@ -236,6 +341,8 @@ class Tracer:
         async def wrapper(*args, **kwargs):
             n = name or f.__qualname__
             with sync_span_context(self, n, attributes) as span:
+                self.add_agent_attributes_to_span(span)
+                self.record_instance_state("before", span)
                 try:
                     span.set_attribute(
                         AttributeKeys.JUDGMENT_INPUT,
@@ -251,6 +358,7 @@ class Tracer:
                         AttributeKeys.JUDGMENT_OUTPUT,
                         safe_serialize(result),
                     )
+                self.record_instance_state("after", span)
                 return result
 
         return wrapper
@@ -281,6 +389,114 @@ class Tracer:
             return self._wrap_async(func, name, attributes)
         else:
             return self._wrap_sync(func, name, attributes)
+
+    @overload
+    def agent(
+        self,
+        func: C,
+        /,
+        *,
+        identifier: str | None = None,
+        track_state: bool = False,
+        track_attributes: List[str] | None = None,
+        field_mappings: Dict[str, str] = {},
+    ) -> C: ...
+
+    @overload
+    def agent(
+        self,
+        func: None = None,
+        /,
+        *,
+        identifier: str | None = None,
+        track_state: bool = False,
+        track_attributes: List[str] | None = None,
+        field_mappings: Dict[str, str] = {},
+    ) -> Callable[[C], C]: ...
+
+    def agent(
+        self,
+        func: Callable | None = None,
+        /,
+        *,
+        identifier: str | None = None,
+        track_state: bool = False,
+        track_attributes: List[str] | None = None,
+        field_mappings: Dict[str, str] = {},
+    ) -> Callable | None:
+        """
+        Agent decorator that creates an agent ID and propagates it to child spans.
+        Also captures and propagates the class name if the decorated function is a method.
+        Optionally captures instance name based on the specified identifier attribute.
+
+        This decorator should be used in combination with @observe decorator:
+
+        class MyAgent:
+            def __init__(self, name):
+                self.name = name
+
+            @judgment.agent(identifier="name")
+            @judgment.observe(span_type="function")
+            def my_agent_method(self):
+                # This span and all child spans will have:
+                # - agent_id: auto-generated UUID
+                # - class_name: "MyAgent"
+                # - instance_name: self.name value
+                pass
+
+        Args:
+            identifier: Name of the instance attribute to use as the instance name
+        """
+        if func is None:
+            return partial(
+                self.agent,
+                identifier=identifier,
+                track_state=track_state,
+                track_attributes=track_attributes,
+                field_mappings=field_mappings,
+            )
+
+        if not self.enable_monitoring:
+            return func
+
+        class_name = None
+        if hasattr(func, "__qualname__") and "." in func.__qualname__:
+            parts = func.__qualname__.split(".")
+            if len(parts) >= 2:
+                class_name = parts[-2]
+
+        if inspect.iscoroutinefunction(func):
+
+            @functools.wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                async with async_agent_context(
+                    tracer=self,
+                    args=args,
+                    class_name=class_name,
+                    identifier=identifier,
+                    track_state=track_state,
+                    track_attributes=track_attributes,
+                    field_mappings=field_mappings,
+                ):
+                    return await func(*args, **kwargs)
+
+            return async_wrapper
+        else:
+
+            @functools.wraps(func)
+            def sync_wrapper(*args, **kwargs):
+                with sync_agent_context(
+                    tracer=self,
+                    args=args,
+                    class_name=class_name,
+                    identifier=identifier,
+                    track_state=track_state,
+                    track_attributes=track_attributes,
+                    field_mappings=field_mappings,
+                ):
+                    return func(*args, **kwargs)
+
+            return sync_wrapper
 
     @overload
     def observe_tools(

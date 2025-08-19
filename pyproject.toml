@@ -67,6 +67,7 @@ dev = [
     "ruff>=0.12.7",
     "together>=1.5.21",
     "types-pyyaml>=6.0.12.20250516",
+    "pre-commit>=4.2.0",
 ]
 
 

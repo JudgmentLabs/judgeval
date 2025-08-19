@@ -1,6 +1,5 @@
 from __future__ import annotations
 import functools
-import sys
 from typing import Callable, Tuple, Optional, Any, TYPE_CHECKING
 from functools import wraps
 from judgeval.data.trace import TraceUsage
@@ -55,6 +54,7 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
             with sync_span_context(
                 tracer, span_name, {AttributeKeys.SPAN_TYPE: "llm"}
             ) as span:
+                tracer.add_agent_attributes_to_span(span)
                 span.set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
                 try:
                     response = function(*args, **kwargs)
@@ -76,6 +76,13 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
                                 AttributeKeys.GEN_AI_USAGE_COMPLETION_TOKENS,
                                 usage.completion_tokens,
                             )
+                        if usage.total_cost_usd:
+                            span.set_attribute(
+                                AttributeKeys.GEN_AI_USAGE_TOTAL_COST,
+                                usage.total_cost_usd,
+                            )
+                            # Add cost to cumulative context tracking
+                            tracer.add_cost_to_current_context(usage.total_cost_usd)
                     return response
                 except Exception as e:
                     span.record_exception(e)
@@ -89,6 +96,7 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
             async with async_span_context(
                 tracer, span_name, {AttributeKeys.SPAN_TYPE: "llm"}
             ) as span:
+                tracer.add_agent_attributes_to_span(span)
                 span.set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
                 try:
                     response = await function(*args, **kwargs)
@@ -110,6 +118,12 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
                                 AttributeKeys.GEN_AI_USAGE_COMPLETION_TOKENS,
                                 usage.completion_tokens,
                             )
+                        if usage.total_cost_usd:
+                            span.set_attribute(
+                                AttributeKeys.GEN_AI_USAGE_TOTAL_COST,
+                                usage.total_cost_usd,
+                            )
+                            tracer.add_cost_to_current_context(usage.total_cost_usd)
                     return response
                 except Exception as e:
                     span.record_exception(e)
@@ -160,9 +174,9 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
         )
 
         assert google_genai_Client is not None, "Google GenAI client not found"
-        assert (
-            google_genai_AsyncClient is not None
-        ), "Google GenAI async client not found"
+        assert google_genai_AsyncClient is not None, (
+            "Google GenAI async client not found"
+        )
         if isinstance(client, google_genai_Client):
             setattr(client.models, "generate_content", wrapped(original_create))
         elif isinstance(client, google_genai_AsyncClient):
@@ -225,9 +239,9 @@ def _get_client_config(client: ApiClient) -> tuple[str, Callable]:
         )
 
         assert google_genai_Client is not None, "Google GenAI client not found"
-        assert (
-            google_genai_AsyncClient is not None
-        ), "Google GenAI async client not found"
+        assert google_genai_AsyncClient is not None, (
+            "Google GenAI async client not found"
+        )
         if isinstance(client, google_genai_Client):
             return "GOOGLE_API_CALL", client.models.generate_content
         elif isinstance(client, google_genai_AsyncClient):
@@ -269,9 +283,9 @@ def _format_output_data(
         assert openai_AsyncOpenAI is not None, "OpenAI async client not found"
         assert openai_ChatCompletion is not None, "OpenAI chat completion not found"
         assert openai_Response is not None, "OpenAI response not found"
-        assert (
-            openai_ParsedChatCompletion is not None
-        ), "OpenAI parsed chat completion not found"
+        assert openai_ParsedChatCompletion is not None, (
+            "OpenAI parsed chat completion not found"
+        )
 
         if isinstance(client, openai_OpenAI) or isinstance(client, openai_AsyncOpenAI):
             if isinstance(response, openai_ChatCompletion):
@@ -318,7 +332,11 @@ def _format_output_data(
                     else 0
                 )
                 output0 = response.output[0]
-                if hasattr(output0, "content") and output0.content and hasattr(output0.content, "__iter__"):  # type: ignore[attr-defined]
+                if (
+                    hasattr(output0, "content")
+                    and output0.content
+                    and hasattr(output0.content, "__iter__")
+                ):  # type: ignore[attr-defined]
                     message_content = "".join(
                         seg.text  # type: ignore[attr-defined]
                         for seg in output0.content  # type: ignore[attr-defined]
@@ -346,9 +364,23 @@ def _format_output_data(
             client, together_AsyncTogether
         ):
             model_name = (response.model or "") if hasattr(response, "model") else ""
-            prompt_tokens = response.usage.prompt_tokens if hasattr(response.usage, "prompt_tokens") and response.usage.prompt_tokens is not None else 0  # type: ignore[attr-defined]
-            completion_tokens = response.usage.completion_tokens if hasattr(response.usage, "completion_tokens") and response.usage.completion_tokens is not None else 0  # type: ignore[attr-defined]
-            message_content = response.choices[0].message.content if hasattr(response, "choices") else None  # type: ignore[attr-defined]
+            prompt_tokens = (
+                response.usage.prompt_tokens
+                if hasattr(response.usage, "prompt_tokens")
+                and response.usage.prompt_tokens is not None
+                else 0
+            )  # type: ignore[attr-defined]
+            completion_tokens = (
+                response.usage.completion_tokens
+                if hasattr(response.usage, "completion_tokens")
+                and response.usage.completion_tokens is not None
+                else 0
+            )  # type: ignore[attr-defined]
+            message_content = (
+                response.choices[0].message.content
+                if hasattr(response, "choices")
+                else None
+            )  # type: ignore[attr-defined]
 
             if model_name:
                 return message_content, _create_usage(
@@ -366,9 +398,9 @@ def _format_output_data(
         )
 
         assert google_genai_Client is not None, "Google GenAI client not found"
-        assert (
-            google_genai_AsyncClient is not None
-        ), "Google GenAI async client not found"
+        assert google_genai_AsyncClient is not None, (
+            "Google GenAI async client not found"
+        )
         if isinstance(client, google_genai_Client) or isinstance(
             client, google_genai_AsyncClient
         ):
@@ -467,9 +499,23 @@ def _format_output_data(
         assert groq_AsyncGroq is not None, "Groq async client not found"
         if isinstance(client, groq_Groq) or isinstance(client, groq_AsyncGroq):
             model_name = (response.model or "") if hasattr(response, "model") else ""
-            prompt_tokens = response.usage.prompt_tokens if hasattr(response.usage, "prompt_tokens") and response.usage.prompt_tokens is not None else 0  # type: ignore[attr-defined]
-            completion_tokens = response.usage.completion_tokens if hasattr(response.usage, "completion_tokens") and response.usage.completion_tokens is not None else 0  # type: ignore[attr-defined]
-            message_content = response.choices[0].message.content if hasattr(response, "choices") else None  # type: ignore[attr-defined]
+            prompt_tokens = (
+                response.usage.prompt_tokens
+                if hasattr(response.usage, "prompt_tokens")
+                and response.usage.prompt_tokens is not None
+                else 0
+            )  # type: ignore[attr-defined]
+            completion_tokens = (
+                response.usage.completion_tokens
+                if hasattr(response.usage, "completion_tokens")
+                and response.usage.completion_tokens is not None
+                else 0
+            )  # type: ignore[attr-defined]
+            message_content = (
+                response.choices[0].message.content
+                if hasattr(response, "choices")
+                else None
+            )  # type: ignore[attr-defined]
 
             if model_name:
                 return message_content, _create_usage(
