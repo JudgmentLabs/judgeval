@@ -75,15 +75,6 @@ class AgentContext(TypedDict):
     instance: Any
 
 
-_current_agent_context: ContextVar[Optional[AgentContext]] = ContextVar(
-    "current_agent_context", default=None
-)
-
-_current_cost_context: ContextVar[Optional[Dict[str, float]]] = ContextVar(
-    "current_cost_context", default=None
-)
-
-
 def resolve_project_id(
     api_key: str, organization_id: str, project_name: str
 ) -> str | None:
@@ -115,6 +106,9 @@ class Tracer:
         "provider",
         "tracer",
         "context",
+        # Agent
+        "agent_context",
+        "cost_context",
     )
 
     api_key: str
@@ -132,6 +126,9 @@ class Tracer:
     provider: ABCTracerProvider
     tracer: ABCTracer
     context: ContextVar[Context]
+
+    agent_context: ContextVar[Optional[AgentContext]]
+    cost_context: ContextVar[Optional[Dict[str, float]]]
 
     def __init__(
         self,
@@ -172,6 +169,9 @@ class Tracer:
 
         # TODO:
         self.context = ContextVar(f"judgeval:tracer:{project_name}")
+
+        self.agent_context = ContextVar("current_agent_context", default=None)
+        self.cost_context = ContextVar("current_cost_context", default=None)
 
         if self.enable_monitoring:
             project_id = resolve_project_id(
@@ -227,14 +227,14 @@ class Tracer:
         return self.tracer
 
     def get_current_agent_context(self):
-        return _current_agent_context
+        return self.agent_context
 
     def get_current_cost_context(self):
-        return _current_cost_context
+        return self.cost_context
 
     def add_cost_to_current_context(self, cost: float) -> None:
         """Add cost to the current cost context and update span attribute."""
-        current_cost_context = _current_cost_context.get()
+        current_cost_context = self.cost_context.get()
         if current_cost_context is not None:
             current_cumulative_cost = current_cost_context.get("cumulative_cost", 0.0)
             new_cumulative_cost = float(current_cumulative_cost) + cost
@@ -248,7 +248,7 @@ class Tracer:
 
     def add_agent_attributes_to_span(self, span):
         """Add agent ID, class name, and instance name to span if they exist in context"""
-        current_agent_context = _current_agent_context.get()
+        current_agent_context = self.agent_context.get()
         if current_agent_context:
             if "agent_id" in current_agent_context:
                 span.set_attribute(
@@ -279,7 +279,7 @@ class Tracer:
                 )
 
     def record_instance_state(self, record_point: Literal["before", "after"], span):
-        current_agent_context = _current_agent_context.get()
+        current_agent_context = self.agent_context.get()
 
         if current_agent_context and current_agent_context.get("track_state"):
             instance = current_agent_context.get("instance")
