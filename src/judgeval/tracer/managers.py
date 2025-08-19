@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager, contextmanager
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING, Dict, Optional, List, Any
 from judgeval.tracer.keys import AttributeKeys
+import uuid
+from judgeval.exceptions import JudgmentRuntimeError
 
 if TYPE_CHECKING:
     from judgeval.tracer import Tracer
@@ -61,3 +63,104 @@ async def async_span_context(
         current_cost_context.reset(cost_token)
         child_cost = float(cost_context.get("cumulative_cost", 0.0))
         tracer.add_cost_to_current_context(child_cost)
+
+
+def create_agent_context(
+    tracer: Tracer,
+    args: tuple,
+    class_name: Optional[str] = None,
+    identifier: Optional[str] = None,
+    track_state: bool = False,
+    track_attributes: Optional[List[str]] = None,
+    field_mappings: Optional[Dict[str, str]] = None,
+):
+    """Create agent context and return token for cleanup"""
+    agent_id = str(uuid.uuid4())
+    agent_context: Dict[str, str | bool | Dict | List | Any] = {"agent_id": agent_id}
+
+    if class_name:
+        agent_context["class_name"] = class_name
+
+    agent_context["track_state"] = track_state
+    agent_context["track_attributes"] = track_attributes or []
+    agent_context["field_mappings"] = field_mappings or {}
+
+    instance = args[0] if args else None
+    agent_context["instance"] = instance
+
+    if identifier:
+        if not class_name or not instance or not isinstance(instance, object):
+            raise JudgmentRuntimeError(
+                "'identifier' is set but no class name or instance is available. 'identifier' can only be specified when using the agent() decorator on a class method."
+            )
+        if (
+            instance
+            and hasattr(instance, identifier)
+            and not callable(getattr(instance, identifier))
+        ):
+            instance_name = str(getattr(instance, identifier))
+            agent_context["instance_name"] = instance_name
+        else:
+            raise JudgmentRuntimeError(
+                f"Attribute {identifier} does not exist for {class_name}. Check your agent() decorator."
+            )
+
+    current_agent_context = tracer.get_current_agent_context().get()
+    if current_agent_context and "agent_id" in current_agent_context:
+        agent_context["parent_agent_id"] = current_agent_context["agent_id"]
+
+    agent_context["is_agent_entry_point"] = True
+    token = tracer.get_current_agent_context().set(agent_context)
+    return token
+
+
+@contextmanager
+def sync_agent_context(
+    tracer: Tracer,
+    args: tuple,
+    class_name: Optional[str] = None,
+    identifier: Optional[str] = None,
+    track_state: bool = False,
+    track_attributes: Optional[List[str]] = None,
+    field_mappings: Optional[Dict[str, str]] = None,
+):
+    """Context manager for synchronous agent context"""
+    token = create_agent_context(
+        tracer=tracer,
+        args=args,
+        class_name=class_name,
+        identifier=identifier,
+        track_state=track_state,
+        track_attributes=track_attributes,
+        field_mappings=field_mappings,
+    )
+    try:
+        yield
+    finally:
+        tracer.get_current_agent_context().reset(token)
+
+
+@asynccontextmanager
+async def async_agent_context(
+    tracer: Tracer,
+    args: tuple,
+    class_name: Optional[str] = None,
+    identifier: Optional[str] = None,
+    track_state: bool = False,
+    track_attributes: Optional[List[str]] = None,
+    field_mappings: Optional[Dict[str, str]] = None,
+):
+    """Context manager for asynchronous agent context"""
+    token = create_agent_context(
+        tracer=tracer,
+        args=args,
+        class_name=class_name,
+        identifier=identifier,
+        track_state=track_state,
+        track_attributes=track_attributes,
+        field_mappings=field_mappings,
+    )
+    try:
+        yield
+    finally:
+        tracer.get_current_agent_context().reset(token)

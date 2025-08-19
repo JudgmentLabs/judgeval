@@ -3,7 +3,6 @@ from contextvars import ContextVar
 import functools
 import inspect
 import random
-import uuid
 from typing import (
     Any,
     Union,
@@ -21,7 +20,6 @@ from typing import (
 )
 from functools import partial
 from warnings import warn
-from contextvars import Token
 
 from opentelemetry.context import Context
 from opentelemetry.sdk.trace import SpanProcessor, TracerProvider
@@ -47,11 +45,14 @@ from judgeval.logger import judgeval_logger
 from judgeval.scorers.api_scorer import APIScorerConfig
 from judgeval.scorers.base_scorer import BaseScorer
 from judgeval.tracer.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
-from judgeval.tracer.managers import sync_span_context
+from judgeval.tracer.managers import (
+    sync_span_context,
+    sync_agent_context,
+    async_agent_context,
+)
 from judgeval.utils.serialize import safe_serialize
 from judgeval.version import get_version
 from judgeval.warnings import JudgmentWarning
-from judgeval.exceptions import JudgmentRuntimeError
 
 from judgeval.tracer.exporters import JudgmentSpanExporter
 from judgeval.tracer.keys import AttributeKeys, ResourceKeys
@@ -464,73 +465,38 @@ class Tracer:
             if len(parts) >= 2:
                 class_name = parts[-2]
 
-        def _create_agent_context(args) -> Token:
-            """Create agent context and return token"""
-            agent_id = str(uuid.uuid4())
-            agent_context: Dict[str, str | bool | Dict | List | Any] = {
-                "agent_id": agent_id
-            }
+        if inspect.iscoroutinefunction(func):
 
-            if class_name:
-                agent_context["class_name"] = class_name
-
-            agent_context["track_state"] = track_state
-            agent_context["track_attributes"] = track_attributes
-            agent_context["field_mappings"] = field_mappings
-
-            instance = args[0] if args else None
-            agent_context["instance"] = instance
-
-            if identifier:
-                if not class_name or not instance or not isinstance(instance, object):
-                    raise JudgmentRuntimeError(
-                        "'identifier' is set but no class name or instance is available. 'identifier' can only be specified when using the agent() decorator on a class method."
-                    )
-                if (
-                    instance
-                    and hasattr(instance, identifier)
-                    and not callable(getattr(instance, identifier))
+            @functools.wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                async with async_agent_context(
+                    tracer=self,
+                    args=args,
+                    class_name=class_name,
+                    identifier=identifier,
+                    track_state=track_state,
+                    track_attributes=track_attributes,
+                    field_mappings=field_mappings,
                 ):
-                    instance_name = str(getattr(instance, identifier))
-                    agent_context["instance_name"] = instance_name
-                else:
-                    raise JudgmentRuntimeError(
-                        f"Attribute {identifier} does not exist for {class_name}. Check your agent() decorator."
-                    )
+                    return await func(*args, **kwargs)
 
-            current_agent_context = _current_agent_context.get()
-            if current_agent_context and "agent_id" in current_agent_context:
-                agent_context["parent_agent_id"] = current_agent_context["agent_id"]
+            return async_wrapper
+        else:
 
-            agent_context["is_agent_entry_point"] = True
-            token = _current_agent_context.set(agent_context)
-            return token
+            @functools.wraps(func)
+            def sync_wrapper(*args, **kwargs):
+                with sync_agent_context(
+                    tracer=self,
+                    args=args,
+                    class_name=class_name,
+                    identifier=identifier,
+                    track_state=track_state,
+                    track_attributes=track_attributes,
+                    field_mappings=field_mappings,
+                ):
+                    return func(*args, **kwargs)
 
-        def _wrap_with_agent_context(f: Callable):
-            if inspect.iscoroutinefunction(f):
-
-                @functools.wraps(f)
-                async def async_wrapper(*args, **kwargs):
-                    token = _create_agent_context(args)
-                    try:
-                        return await f(*args, **kwargs)
-                    finally:
-                        _current_agent_context.reset(token)
-
-                return async_wrapper
-            else:
-
-                @functools.wraps(f)
-                def sync_wrapper(*args, **kwargs):
-                    token = _create_agent_context(args)
-                    try:
-                        return f(*args, **kwargs)
-                    finally:
-                        _current_agent_context.reset(token)
-
-                return sync_wrapper
-
-        return _wrap_with_agent_context(func)
+            return sync_wrapper
 
     @overload
     def observe_tools(
