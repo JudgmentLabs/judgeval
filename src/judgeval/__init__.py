@@ -116,9 +116,11 @@ class JudgmentClient(metaclass=SingletonMeta):
                 api_key=JUDGMENT_API_KEY, organization_id=JUDGMENT_ORG_ID
             )
             response = client.upload_custom_scorer(
-                scorer_name=unique_name,
-                scorer_code=scorer_code,
-                requirements_text=requirements_text,
+                payload={
+                    "scorer_name": unique_name,
+                    "scorer_code": scorer_code,
+                    "requirements_text": requirements_text,
+                }
             )
 
             if response.get("status") == "success":

@@ -3,8 +3,8 @@
 import typer
 from pathlib import Path
 from dotenv import load_dotenv
-from judgeval.common.logger import judgeval_logger
-from judgeval.judgment_client import JudgmentClient
+from judgeval.logger import judgeval_logger
+from judgeval import JudgmentClient
 
 load_dotenv()
 
