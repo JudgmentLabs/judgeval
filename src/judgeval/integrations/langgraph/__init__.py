@@ -179,7 +179,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         try:
             # Create span attributes
             attributes = {
-                AttributeKeys.SPAN_TYPE: span_type,
+                AttributeKeys.JUDGMENT_SPAN_KIND: span_type,
             }
 
             # Add metadata and tags

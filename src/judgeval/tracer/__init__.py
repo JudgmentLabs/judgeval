@@ -120,6 +120,7 @@ class Tracer:
         enable_monitoring: bool = True,
         enable_evaluation: bool = True,
         processors: List[SpanProcessor] = [],
+        resource_attributes: Optional[Dict[str, Any]] = None,
     ):
         _api_key = api_key or JUDGMENT_API_KEY
         _organization_id = organization_id or JUDGMENT_ORG_ID
@@ -154,9 +155,12 @@ class Tracer:
                 self.api_key, self.organization_id, self.project_name
             )
 
-            resource_attributes = {
-                ResourceKeys.SERVICE_NAME: self.project_name,
-            }
+            resource_attributes = resource_attributes or {}
+            resource_attributes.update(
+                {
+                    ResourceKeys.SERVICE_NAME: self.project_name,
+                }
+            )
 
             if project_id is not None:
                 resource_attributes[ResourceKeys.JUDGMENT_PROJECT_ID] = project_id

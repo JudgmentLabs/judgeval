@@ -4,22 +4,9 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from judgeval.tracer import Tracer
 from judgeval.tracer.exporters import S3Exporter
 
-exporter = S3Exporter(
-    bucket_name="ahh-judgment-staging-test-bucket",
-    prefix="test/",
-    endpoint_url="https://storage.googleapis.com",
-)
-
-try:
-    response = exporter.s3_client.head_bucket(Bucket="ahh-judgment-staging-test-bucket")
-    print(response)
-    print("✓ Bucket access successful")
-except Exception as e:
-    print(f"✗ Bucket access failed: {e}")
 
 tracer = Tracer(
-    project_name="ahh",
-    processors=[BatchSpanProcessor(exporter)],
+    project_name="errors",
 )
 
 
@@ -30,4 +17,58 @@ def fib(n):
     return fib(n - 1) + fib(n - 2)
 
 
-fib(10)
+@tracer.observe
+def error():
+    raise Exception("error")
+
+
+# Test order
+
+import time
+
+
+@tracer.observe
+def call1():
+    time.sleep(1)
+    return 1
+
+
+@tracer.observe
+def call2():
+    time.sleep(1)
+    return 2
+
+
+@tracer.observe
+def call3():
+    time.sleep(1)
+    return 3
+
+
+@tracer.observe
+def call4():
+    time.sleep(1)
+    return 4
+
+
+@tracer.observe
+def call5():
+    time.sleep(1)
+    return 5
+
+
+@tracer.observe
+def main():
+    fib(2)
+
+    call1()
+    call2()
+    call3()
+    call4()
+    call5()
+
+    error()
+
+
+if __name__ == "__main__":
+    main()
