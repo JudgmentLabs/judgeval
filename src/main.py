@@ -22,52 +22,28 @@ def error():
     raise Exception("error")
 
 
-# Test order
-
-import time
+import textwrap
 
 
 @tracer.observe
-def call1():
-    time.sleep(1)
-    return 1
+def xss():
+    return textwrap.dedent(
+        """
+        # markdown title
+        ### hi
 
-
-@tracer.observe
-def call2():
-    time.sleep(1)
-    return 2
-
-
-@tracer.observe
-def call3():
-    time.sleep(1)
-    return 3
-
-
-@tracer.observe
-def call4():
-    time.sleep(1)
-    return 4
-
-
-@tracer.observe
-def call5():
-    time.sleep(1)
-    return 5
+        ```py
+        def foo():
+            print("foo")
+        ```
+        """
+    )
 
 
 @tracer.observe
 def main():
     fib(2)
-
-    call1()
-    call2()
-    call3()
-    call4()
-    call5()
-
-    error()
+    xss()
 
 
 if __name__ == "__main__":

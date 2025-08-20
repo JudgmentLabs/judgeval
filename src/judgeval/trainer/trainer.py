@@ -5,11 +5,11 @@ from fireworks import Dataset
 from .config import TrainerConfig, ModelConfig
 from .trainable_model import TrainableModel
 from judgeval.tracer import Tracer
-from judgeval.judgment_client import JudgmentClient
+from judgeval import JudgmentClient
 from judgeval.scorers import BaseScorer, APIScorerConfig
 from judgeval.data import Example
 from .console import _spinner_progress, _print_progress, _print_progress_update
-from judgeval.common.exceptions import JudgmentAPIError
+from judgeval.exceptions import JudgmentRuntimeError
 
 
 class JudgmentTrainer:
@@ -49,7 +49,7 @@ class JudgmentTrainer:
 
             self.judgment_client = JudgmentClient()
         except Exception as e:
-            raise JudgmentAPIError(
+            raise JudgmentRuntimeError(
                 f"Failed to initialize JudgmentTrainer: {str(e)}"
             ) from e
 
@@ -246,7 +246,7 @@ class JudgmentTrainer:
                     time.sleep(10)
                     job = job.get()
                     if job is None:
-                        raise JudgmentAPIError(
+                        raise JudgmentRuntimeError(
                             "Training job was deleted while waiting for completion"
                         )
 
@@ -294,8 +294,8 @@ class JudgmentTrainer:
             return await self.run_reinforcement_learning(
                 agent_function, scorers, prompts
             )
-        except JudgmentAPIError:
+        except JudgmentRuntimeError:
             # Re-raise JudgmentAPIError as-is
             raise
         except Exception as e:
-            raise JudgmentAPIError(f"Training process failed: {str(e)}") from e
+            raise JudgmentRuntimeError(f"Training process failed: {str(e)}") from e

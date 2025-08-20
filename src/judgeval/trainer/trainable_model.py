@@ -2,7 +2,7 @@ from fireworks import LLM
 from .config import TrainerConfig, ModelConfig
 from typing import Optional, Dict, Any, Callable
 from .console import _model_spinner_progress, _print_model_progress
-from judgeval.common.exceptions import JudgmentAPIError
+from judgeval.exceptions import JudgmentRuntimeError
 
 
 class TrainableModel:
@@ -14,6 +14,12 @@ class TrainableModel:
     abstracting away manual snapshot management from users.
     """
 
+    config: TrainerConfig
+    current_step: int
+    _current_model: LLM
+    _tracer_wrapper_func: Optional[Callable]
+    _base_model: LLM
+
     def __init__(self, config: TrainerConfig):
         """
         Initialize the TrainableModel.
@@ -24,13 +30,12 @@ class TrainableModel:
         try:
             self.config = config
             self.current_step = 0
-            self._current_model = None
             self._tracer_wrapper_func = None
 
             self._base_model = self._create_base_model()
             self._current_model = self._base_model
         except Exception as e:
-            raise JudgmentAPIError(
+            raise JudgmentRuntimeError(
                 f"Failed to initialize TrainableModel: {str(e)}"
             ) from e
 
@@ -80,7 +85,7 @@ class TrainableModel:
             _print_model_progress("Base model deployment ready")
             return base_model
         except Exception as e:
-            raise JudgmentAPIError(
+            raise JudgmentRuntimeError(
                 f"Failed to create and deploy base model '{self.config.base_model_name}': {str(e)}"
             ) from e
 
@@ -103,7 +108,7 @@ class TrainableModel:
             if self._tracer_wrapper_func:
                 self._tracer_wrapper_func(self._current_model)
         except Exception as e:
-            raise JudgmentAPIError(
+            raise JudgmentRuntimeError(
                 f"Failed to load and deploy trained model '{model_name}': {str(e)}"
             ) from e
 
@@ -150,7 +155,7 @@ class TrainableModel:
                 if self._tracer_wrapper_func:
                     self._tracer_wrapper_func(self._current_model)
         except Exception as e:
-            raise JudgmentAPIError(
+            raise JudgmentRuntimeError(
                 f"Failed to advance to training step {step}: {str(e)}"
             ) from e
 
@@ -176,7 +181,7 @@ class TrainableModel:
                 accelerator_type=self.config.accelerator_type,
             )
         except Exception as e:
-            raise JudgmentAPIError(
+            raise JudgmentRuntimeError(
                 f"Failed to start reinforcement learning step {step + 1}: {str(e)}"
             ) from e
 

@@ -1,6 +1,11 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, TYPE_CHECKING
 import json
+
+if TYPE_CHECKING:
+    from fireworks.llm.llm_reinforcement_step import ReinforcementAcceleratorTypeLiteral
 
 
 @dataclass
@@ -13,15 +18,13 @@ class TrainerConfig:
     base_model_name: str = "qwen2p5-7b-instruct"
     rft_provider: str = "fireworks"
     num_steps: int = 5
-    num_generations_per_prompt: int = (
-        4  # Number of rollouts/generations per input prompt
-    )
-    num_prompts_per_step: int = 4  # Number of input prompts to sample per training step
+    num_generations_per_prompt: int = 4
+    num_prompts_per_step: int = 4
     concurrency: int = 100
     epochs: int = 1
     learning_rate: float = 1e-5
     accelerator_count: int = 1
-    accelerator_type: str = "NVIDIA_A100_80GB"
+    accelerator_type: ReinforcementAcceleratorTypeLiteral = "NVIDIA_A100_80GB"
     temperature: float = 1.5
     max_tokens: int = 50
     enable_addons: bool = True
@@ -87,7 +90,7 @@ class ModelConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ModelConfig":
+    def from_dict(cls, data: Dict[str, Any]) -> ModelConfig:
         """Create ModelConfig from dictionary."""
         return cls(
             base_model_name=data.get("base_model_name", "qwen2p5-7b-instruct"),
@@ -107,7 +110,7 @@ class ModelConfig:
         return json.dumps(self.to_dict(), indent=2)
 
     @classmethod
-    def from_json(cls, json_str: str) -> "ModelConfig":
+    def from_json(cls, json_str: str) -> ModelConfig:
         """Create ModelConfig from JSON string."""
         data = json.loads(json_str)
         return cls.from_dict(data)
@@ -118,7 +121,7 @@ class ModelConfig:
             f.write(self.to_json())
 
     @classmethod
-    def load_from_file(cls, filepath: str) -> "ModelConfig":
+    def load_from_file(cls, filepath: str) -> ModelConfig:
         """Load ModelConfig from a JSON file."""
         with open(filepath, "r") as f:
             json_str = f.read()

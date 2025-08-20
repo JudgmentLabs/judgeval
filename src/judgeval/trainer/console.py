@@ -2,9 +2,10 @@ from contextlib import contextmanager
 from typing import Optional
 import sys
 import os
+from judgeval.utils.cache import use_once
 
 
-# Detect if we're running in a Jupyter environment
+@use_once
 def _is_jupyter_environment():
     """Check if we're running in a Jupyter notebook or similar environment."""
     try:
@@ -22,28 +23,23 @@ def _is_jupyter_environment():
         return False
 
 
-# Check environment once at import time
 IS_JUPYTER = _is_jupyter_environment()
 
 if not IS_JUPYTER:
-    # Safe to use Rich in non-Jupyter environments
     try:
         from rich.console import Console
         from rich.spinner import Spinner
         from rich.live import Live
         from rich.text import Text
 
-        # Shared console instance for the trainer module to avoid conflicts
         shared_console = Console()
         RICH_AVAILABLE = True
     except ImportError:
         RICH_AVAILABLE = False
 else:
-    # In Jupyter, avoid Rich to prevent recursion issues
     RICH_AVAILABLE = False
 
 
-# Fallback implementations for when Rich is not available or safe
 class SimpleSpinner:
     def __init__(self, name, text):
         self.text = text
@@ -69,7 +65,6 @@ def safe_print(message, style=None):
     if RICH_AVAILABLE and not IS_JUPYTER:
         shared_console.print(message, style=style)
     else:
-        # Use simple print with emoji indicators for different styles
         if style == "green":
             print(f"✅ {message}")
         elif style == "yellow":
@@ -97,7 +92,6 @@ def _spinner_progress(
         with Live(spinner, console=shared_console, refresh_per_second=10):
             yield
     else:
-        # Fallback for Jupyter or when Rich is not available
         print(f"🔄 {full_message}")
         try:
             yield
@@ -120,7 +114,6 @@ def _model_spinner_progress(message: str):
 
             yield update_progress
     else:
-        # Fallback for Jupyter or when Rich is not available
         print(f"🔵 [Model] {message}")
 
         def update_progress(progress_message: str):
