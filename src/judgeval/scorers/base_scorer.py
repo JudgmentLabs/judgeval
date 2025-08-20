@@ -8,6 +8,7 @@ from typing import Dict, Optional
 from pydantic import BaseModel
 
 
+from judgeval.judges.base_judge import JudgevalJudge
 from judgeval.judges.utils import create_judge
 from typing import Any
 from pydantic import model_validator, Field
@@ -48,7 +49,7 @@ class BaseScorer(BaseModel):
     model: Optional[str] = None
 
     # The model used to evaluate the test case
-    model_client: Optional[Any] = Field(default=None, exclude=True)
+    model_client: Optional[JudgevalJudge] = Field(default=None, exclude=True)
 
     # Whether to run the scorer in strict mode
     strict_mode: bool = False
@@ -66,29 +67,28 @@ class BaseScorer(BaseModel):
     server_hosted: bool = False
 
     @model_validator(mode="after")
-    @classmethod
-    def enforce_strict_threshold(cls, data: "BaseScorer"):
-        if data.strict_mode:
-            data.threshold = 1.0
-        return data
+    def enforce_strict_threshold(self):
+        if self.strict_mode:
+            self.threshold = 1.0
+        return self
 
     @model_validator(mode="after")
-    @classmethod
-    def default_name(cls, m: "BaseScorer") -> "BaseScorer":
-        # Always set class_name to the string name of the class
-        m.class_name = m.__class__.__name__
-        if not m.name:
-            m.name = m.class_name
-        return m
+    def default_name(self):
+        self.class_name = self.__class__.__name__
+        if not self.name:
+            self.name = self.class_name
+        return self
 
-    def _add_model(self, model: str):
+    def _add_model(self, model: str | JudgevalJudge):
         """
         Adds the evaluation model to the BaseScorer instance
 
         This method is used at eval time
         """
         self.model_client, self.using_native_model = create_judge(model)
-        self.model = self.model_client.get_model_name() or model
+        self.model = (
+            model if isinstance(model, str) else self.model_client.get_model_name()
+        )
 
     def success_check(self) -> bool:
         """

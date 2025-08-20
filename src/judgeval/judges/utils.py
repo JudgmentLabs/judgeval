@@ -6,7 +6,7 @@ import litellm
 from typing import Optional, Union, Tuple, List
 
 from judgeval.exceptions import InvalidJudgeModelError
-from judgeval.judges import JudgevalJudge, LiteLLMJudge, TogetherJudge, MixtureOfJudges
+from judgeval.judges import JudgevalJudge, LiteLLMJudge, TogetherJudge
 from judgeval.env import JUDGMENT_DEFAULT_GPT_MODEL
 from judgeval.constants import (
     TOGETHER_SUPPORTED_MODELS,
@@ -18,7 +18,7 @@ LITELLM_SUPPORTED_MODELS = set(litellm.model_list)
 
 
 def create_judge(
-    model: Optional[Union[str, List[str], JudgevalJudge]] = None,
+    model: Optional[Union[str, JudgevalJudge]] = None,
 ) -> Tuple[JudgevalJudge, bool]:
     """
     Creates a judge model from string(s) or a judgeval judge object.
@@ -37,21 +37,9 @@ def create_judge(
             f"Model must be a string, list of strings, or a judgeval judge object. Got: {type(model)} instead."
         )
     # If model is already a valid judge type, return it and mark native
-    if isinstance(model, (JudgevalJudge, LiteLLMJudge, TogetherJudge, MixtureOfJudges)):
+    if isinstance(model, (JudgevalJudge, LiteLLMJudge, TogetherJudge)):
         return model, True
 
-    # Either string or List[str]
-    if isinstance(model, list):
-        for m in model:
-            if m in JUDGMENT_SUPPORTED_MODELS:
-                raise NotImplementedError(
-                    """Judgment models are not yet supported for local scoring.
-                    Please either set the `use_judgment` flag to True or use 
-                    non-Judgment models."""
-                )
-            if m not in ACCEPTABLE_MODELS:
-                raise InvalidJudgeModelError(f"Invalid judge model chosen: {m}")
-        return MixtureOfJudges(models=model), True
     if model in LITELLM_SUPPORTED_MODELS:
         return LiteLLMJudge(model=model), True
     if model in TOGETHER_SUPPORTED_MODELS:

@@ -125,7 +125,7 @@ class PromptScorer(APIScorerConfig):
         cls,
         name: str,
         prompt: str,
-        threshold: Optional[float] = 0.5,
+        threshold: float = 0.5,
         options: Optional[Dict[str, float]] = None,
         judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
         organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
