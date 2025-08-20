@@ -1,4 +1,4 @@
-import importlib
+import importlib.util
 import yaml
 import orjson
 from pathlib import Path
@@ -69,7 +69,6 @@ def get_examples_from_json(file_path: str) -> List[Example]:
 
 
 def extract_scorer_name(scorer_file_path: str) -> str:
-    """Extract scorer name from the scorer file by importing it."""
     try:
         spec = importlib.util.spec_from_file_location("scorer_module", scorer_file_path)
         if spec is None or spec.loader is None:

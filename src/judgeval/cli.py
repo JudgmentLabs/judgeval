@@ -61,5 +61,3 @@ def version():
 
 if __name__ == "__main__":
     app()
-
-# judgeval upload_scorer /Users/alanzhang/repo/JudgmentLabs/judgeval/src/demo/profile_match_scorer.py /Users/alanzhang/repo/JudgmentLabs/judgeval/src/demo/requirements.txt

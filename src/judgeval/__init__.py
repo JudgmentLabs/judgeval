@@ -14,6 +14,7 @@ from judgeval.utils.meta import SingletonMeta
 from judgeval.exceptions import JudgmentRuntimeError
 from judgeval.utils.file_utils import extract_scorer_name
 from judgeval.api import JudgmentSyncClient
+from judgeval.utils.guards import expect_api_key, expect_organization_id
 
 
 class JudgmentClient(metaclass=SingletonMeta):
@@ -27,18 +28,8 @@ class JudgmentClient(metaclass=SingletonMeta):
         _api_key = api_key or JUDGMENT_API_KEY
         _organization_id = organization_id or JUDGMENT_ORG_ID
 
-        if _api_key is None:
-            raise ValueError(
-                "API Key is not set, please set JUDGMENT_API_KEY in the environment variables or pass it as `api_key` "
-            )
-
-        if _organization_id is None:
-            raise ValueError(
-                "Organization ID is not set, please set JUDGMENT_ORG_ID in the environment variables or pass it as `organization_id`"
-            )
-
-        self.api_key = _api_key
-        self.organization_id = _organization_id
+        self.api_key = expect_api_key(_api_key)
+        self.organization_id = expect_organization_id(_organization_id)
 
     def run_evaluation(
         self,
@@ -113,7 +104,8 @@ class JudgmentClient(metaclass=SingletonMeta):
 
         try:
             client = JudgmentSyncClient(
-                api_key=JUDGMENT_API_KEY, organization_id=JUDGMENT_ORG_ID
+                api_key=self.api_key,
+                organization_id=self.organization_id,
             )
             response = client.upload_custom_scorer(
                 payload={

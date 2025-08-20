@@ -5,7 +5,6 @@ import concurrent.futures
 from typing import Awaitable, TypeVar
 
 
-# Generic type variable for coroutine return type
 T = TypeVar("T")
 
 
@@ -14,8 +13,8 @@ def safe_run_async(coro: Awaitable[T]) -> T:  # type: ignore[type-var]
 
     This helper handles two common situations:
 
-    1. **No running event loop** – Simply delegates to ``asyncio.run``.
-    2. **Existing running loop** – Executes the coroutine in a separate
+    1. **No running event loop** - Simply delegates to ``asyncio.run``.
+    2. **Existing running loop** - Executes the coroutine in a separate
        thread so that we don't attempt to nest event loops (which would raise
        ``RuntimeError``).
 
