@@ -259,29 +259,29 @@ class Tracer:
     def add_agent_attributes_to_span(self, span):
         """Add agent ID, class name, and instance name to span if they exist in context"""
         current_agent_context = self.agent_context.get()
-        if current_agent_context:
-            span.set_attribute(
-                AttributeKeys.JUDGMENT_AGENT_ID, current_agent_context["agent_id"]
-            )
-            span.set_attribute(
-                AttributeKeys.JUDGMENT_AGENT_CLASS_NAME,
-                current_agent_context["class_name"],
-            )
-            span.set_attribute(
-                AttributeKeys.JUDGMENT_AGENT_INSTANCE_NAME,
-                current_agent_context["instance_name"],
-            )
-            span.set_attribute(
-                AttributeKeys.JUDGMENT_PARENT_AGENT_ID,
-                current_agent_context["parent_agent_id"],
-            )
-            span.set_attribute(
-                AttributeKeys.JUDGMENT_IS_AGENT_ENTRY_POINT,
-                current_agent_context["is_agent_entry_point"],
-            )
-            current_agent_context["is_agent_entry_point"] = (
-                False  # only true for entry point to agent
-            )
+        if not current_agent_context:
+            return
+
+        span.set_attribute(
+            AttributeKeys.JUDGMENT_AGENT_ID, current_agent_context["agent_id"]
+        )
+        span.set_attribute(
+            AttributeKeys.JUDGMENT_AGENT_CLASS_NAME,
+            current_agent_context["class_name"],
+        )
+        span.set_attribute(
+            AttributeKeys.JUDGMENT_AGENT_INSTANCE_NAME,
+            current_agent_context["instance_name"],
+        )
+        span.set_attribute(
+            AttributeKeys.JUDGMENT_PARENT_AGENT_ID,
+            current_agent_context["parent_agent_id"],
+        )
+        span.set_attribute(
+            AttributeKeys.JUDGMENT_IS_AGENT_ENTRY_POINT,
+            current_agent_context["is_agent_entry_point"],
+        )
+        current_agent_context["is_agent_entry_point"] = False
 
     def record_instance_state(self, record_point: Literal["before", "after"], span):
         current_agent_context = self.agent_context.get()
@@ -303,9 +303,11 @@ class Tracer:
                     if not k.startswith("_")
                 }
             span.set_attribute(
-                AttributeKeys.JUDGMENT_STATE_BEFORE
-                if record_point == "before"
-                else AttributeKeys.JUDGMENT_STATE_AFTER,
+                (
+                    AttributeKeys.JUDGMENT_STATE_BEFORE
+                    if record_point == "before"
+                    else AttributeKeys.JUDGMENT_STATE_AFTER
+                ),
                 safe_serialize(attributes),
             )
 
