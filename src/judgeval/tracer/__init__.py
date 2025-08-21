@@ -69,10 +69,13 @@ ApiClient = TypeVar("ApiClient", bound=Any)
 class AgentContext(TypedDict):
     agent_id: str
     class_name: str | None
+    instance_name: str | None
     track_state: bool
     track_attributes: List[str] | None
     field_mappings: Dict[str, str]
     instance: Any
+    is_agent_entry_point: bool
+    parent_agent_id: str | None
 
 
 def resolve_project_id(
@@ -257,33 +260,28 @@ class Tracer:
         """Add agent ID, class name, and instance name to span if they exist in context"""
         current_agent_context = self.agent_context.get()
         if current_agent_context:
-            if "agent_id" in current_agent_context:
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_AGENT_ID, current_agent_context["agent_id"]
-                )
-            if "class_name" in current_agent_context:
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_AGENT_CLASS_NAME,
-                    current_agent_context["class_name"],
-                )
-            if "instance_name" in current_agent_context:
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_AGENT_INSTANCE_NAME,
-                    current_agent_context["instance_name"],
-                )
-            if "parent_agent_id" in current_agent_context:
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_PARENT_AGENT_ID,
-                    current_agent_context["parent_agent_id"],
-                )
-            if "is_agent_entry_point" in current_agent_context:
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_IS_AGENT_ENTRY_POINT,
-                    current_agent_context["is_agent_entry_point"],
-                )
-                current_agent_context["is_agent_entry_point"] = (
-                    False  # only true for entry point to agent
-                )
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_AGENT_ID, current_agent_context["agent_id"]
+            )
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_AGENT_CLASS_NAME,
+                current_agent_context["class_name"],
+            )
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_AGENT_INSTANCE_NAME,
+                current_agent_context["instance_name"],
+            )
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_PARENT_AGENT_ID,
+                current_agent_context["parent_agent_id"],
+            )
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_IS_AGENT_ENTRY_POINT,
+                current_agent_context["is_agent_entry_point"],
+            )
+            current_agent_context["is_agent_entry_point"] = (
+                False  # only true for entry point to agent
+            )
 
     def record_instance_state(self, record_point: Literal["before", "after"], span):
         current_agent_context = self.agent_context.get()
