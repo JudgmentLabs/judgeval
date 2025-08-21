@@ -658,8 +658,7 @@ class Tracer:
                 )
                 return False
 
-            for processor in self.processors:
-                processor.force_flush(timeout_millis=30000)
+            self.force_flush()
 
             judgeval_logger.debug("All evaluations and spans completed successfully")
             return True
