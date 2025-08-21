@@ -323,7 +323,6 @@ class Tracer:
             with sync_span_context(self, n, attributes) as span:
                 self.add_agent_attributes_to_span(span)
                 self.record_instance_state("before", span)
-                span.set_attribute(AttributeKeys.JUDGMENT_OFFLINE_MODE, False)
                 try:
                     span.set_attribute(
                         AttributeKeys.JUDGMENT_INPUT,
@@ -354,7 +353,6 @@ class Tracer:
             with sync_span_context(self, n, attributes) as span:
                 self.add_agent_attributes_to_span(span)
                 self.record_instance_state("before", span)
-                span.set_attribute(AttributeKeys.JUDGMENT_OFFLINE_MODE, False)
                 try:
                     span.set_attribute(
                         AttributeKeys.JUDGMENT_INPUT,
