@@ -12,6 +12,7 @@ class AttributeKeys(str, Enum):
     JUDGMENT_SPAN_KIND = "judgment.span_kind"
     JUDGMENT_INPUT = "judgment.input"
     JUDGMENT_OUTPUT = "judgment.output"
+    JUDGMENT_OFFLINE_MODE = "judgment.offline_mode"
 
     # Custom tracking attributes
     JUDGMENT_CUSTOMER_ID = "judgment.customer_id"

@@ -270,18 +270,21 @@ class Tracer:
         span.set_attribute(
             AttributeKeys.JUDGMENT_AGENT_ID, current_agent_context["agent_id"]
         )
-        span.set_attribute(
-            AttributeKeys.JUDGMENT_AGENT_CLASS_NAME,
-            current_agent_context["class_name"],
-        )
-        span.set_attribute(
-            AttributeKeys.JUDGMENT_AGENT_INSTANCE_NAME,
-            current_agent_context["instance_name"],
-        )
-        span.set_attribute(
-            AttributeKeys.JUDGMENT_PARENT_AGENT_ID,
-            current_agent_context["parent_agent_id"],
-        )
+        if current_agent_context["class_name"] is not None:
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_AGENT_CLASS_NAME,
+                current_agent_context["class_name"],
+            )
+        if current_agent_context["instance_name"] is not None:
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_AGENT_INSTANCE_NAME,
+                current_agent_context["instance_name"],
+            )
+        if current_agent_context["parent_agent_id"] is not None:
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_PARENT_AGENT_ID,
+                current_agent_context["parent_agent_id"],
+            )
         span.set_attribute(
             AttributeKeys.JUDGMENT_IS_AGENT_ENTRY_POINT,
             current_agent_context["is_agent_entry_point"],
