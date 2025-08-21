@@ -4,9 +4,10 @@ Identifiers used by Judgeval to store specific types of data in the spans.
 
 from opentelemetry.semconv.resource import ResourceAttributes
 from opentelemetry.semconv._incubating.attributes import gen_ai_attributes
+from enum import Enum
 
 
-class AttributeKeys:
+class AttributeKeys(str, Enum):
     # General function tracing attributes (custom namespace)
     JUDGMENT_SPAN_KIND = "judgment.span_kind"
     JUDGMENT_INPUT = "judgment.input"
@@ -39,6 +40,6 @@ class AttributeKeys:
     GEN_AI_USAGE_TOTAL_COST = "gen_ai.usage.total_cost"
 
 
-class ResourceKeys:
+class ResourceKeys(str, Enum):
     SERVICE_NAME = ResourceAttributes.SERVICE_NAME
     JUDGMENT_PROJECT_ID = "judgment.project_id"

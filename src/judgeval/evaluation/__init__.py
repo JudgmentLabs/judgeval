@@ -50,44 +50,6 @@ def safe_run_async(coro):
         return asyncio.run(coro)
 
 
-def execute_api_eval(evaluation_run: EvaluationRun) -> Dict:
-    """
-    Executes an evaluation of a list of `Example`s using one or more `JudgmentScorer`s via the Judgment API.
-
-    Args:
-        evaluation_run (EvaluationRun): The evaluation run object containing the examples, scorers, and metadata
-
-    Returns:
-        List[Dict]: The results of the evaluation. Each result is a dictionary containing the fields of a `ScoringResult`
-                    object.
-    """
-    # submit API request to execute evals
-    if not evaluation_run.judgment_api_key or not evaluation_run.organization_id:
-        raise ValueError("API key and organization ID are required")
-    api_client = JudgmentSyncClient(
-        evaluation_run.judgment_api_key, evaluation_run.organization_id
-    )
-    return api_client.evaluate(evaluation_run.model_dump())  # type: ignore
-
-
-def check_missing_scorer_data(results: List[ScoringResult]) -> List[ScoringResult]:
-    """
-    Checks if any `ScoringResult` objects are missing `scorers_data`.
-
-    If any are missing, logs an error and returns the results.
-    """
-    for i, result in enumerate(results):
-        if not result.scorers_data:
-            judgeval_logger.error(
-                f"Scorer data is missing for example {i}. "
-                "This is usually caused when the example does not contain "
-                "the fields required by the scorer. "
-                "Check that your example contains the fields required by the scorers. "
-                "TODO add docs link here for reference."
-            )
-    return results
-
-
 def log_evaluation_results(
     scoring_results: List[ScoringResult],
     run: Union[EvaluationRun, TraceRun],
