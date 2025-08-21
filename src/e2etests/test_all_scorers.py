@@ -8,10 +8,10 @@ from judgeval.scorers import (
     AnswerRelevancyScorer,
     FaithfulnessScorer,
     InstructionAdherenceScorer,
-    ExecutionOrderScorer,
 )
 from judgeval.data import Example
 from judgeval.env import JUDGMENT_DEFAULT_TOGETHER_MODEL
+from judgeval.scorers.base_scorer import BaseScorer
 
 
 def test_ac_scorer(client: JudgmentClient, project_name: str):
@@ -150,7 +150,7 @@ def test_execution_order_scorer(client: JudgmentClient, project_name: str):
 
     res = client.run_evaluation(
         examples=[example],
-        scorers=[ExecutionOrderScorer(threshold=1, should_consider_ordering=True)],
+        scorers=[BaseScorer(threshold=1, should_consider_ordering=True)],
         model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=EVAL_RUN_NAME,
