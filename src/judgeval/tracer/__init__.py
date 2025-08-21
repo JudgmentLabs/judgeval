@@ -265,18 +265,21 @@ class Tracer:
         span.set_attribute(
             AttributeKeys.JUDGMENT_AGENT_ID, current_agent_context["agent_id"]
         )
-        span.set_attribute(
-            AttributeKeys.JUDGMENT_AGENT_CLASS_NAME,
-            current_agent_context["class_name"],
-        )
-        span.set_attribute(
-            AttributeKeys.JUDGMENT_AGENT_INSTANCE_NAME,
-            current_agent_context["instance_name"],
-        )
-        span.set_attribute(
-            AttributeKeys.JUDGMENT_PARENT_AGENT_ID,
-            current_agent_context["parent_agent_id"],
-        )
+        if current_agent_context["class_name"] is not None:
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_AGENT_CLASS_NAME,
+                current_agent_context["class_name"],
+            )
+        if current_agent_context["instance_name"] is not None:
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_AGENT_INSTANCE_NAME,
+                current_agent_context["instance_name"],
+            )
+        if current_agent_context["parent_agent_id"] is not None:
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_PARENT_AGENT_ID,
+                current_agent_context["parent_agent_id"],
+            )
         span.set_attribute(
             AttributeKeys.JUDGMENT_IS_AGENT_ENTRY_POINT,
             current_agent_context["is_agent_entry_point"],
@@ -320,6 +323,7 @@ class Tracer:
             with sync_span_context(self, n, attributes) as span:
                 self.add_agent_attributes_to_span(span)
                 self.record_instance_state("before", span)
+                span.set_attribute(AttributeKeys.JUDGMENT_OFFLINE_MODE, False)
                 try:
                     span.set_attribute(
                         AttributeKeys.JUDGMENT_INPUT,
@@ -350,6 +354,7 @@ class Tracer:
             with sync_span_context(self, n, attributes) as span:
                 self.add_agent_attributes_to_span(span)
                 self.record_instance_state("before", span)
+                span.set_attribute(AttributeKeys.JUDGMENT_OFFLINE_MODE, False)
                 try:
                     span.set_attribute(
                         AttributeKeys.JUDGMENT_INPUT,
