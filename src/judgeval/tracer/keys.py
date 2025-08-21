@@ -40,7 +40,7 @@ class AttributeKeys(str, Enum):
     GEN_AI_RESPONSE_FINISH_REASONS = gen_ai_attributes.GEN_AI_RESPONSE_FINISH_REASONS
 
     # GenAI-specific attributes (custom namespace)
-    GEN_AI_USAGE_TOTAL_COST = "gen_ai.usage.total_cost"
+    GEN_AI_USAGE_TOTAL_COST = "gen_ai.usage.total_cost_usd"
 
 
 class ResourceKeys(str, Enum):
