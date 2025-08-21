@@ -13,6 +13,9 @@ class AttributeKeys(str, Enum):
     JUDGMENT_INPUT = "judgment.input"
     JUDGMENT_OUTPUT = "judgment.output"
 
+    # Custom tracking attributes
+    JUDGMENT_CUSTOMER_ID = "judgment.customer_id"
+
     # Agent specific attributes (custom namespace)
     JUDGMENT_AGENT_ID = "judgment.agent_id"
     JUDGMENT_PARENT_AGENT_ID = "judgment.parent_agent_id"

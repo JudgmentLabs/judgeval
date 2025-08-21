@@ -242,6 +242,11 @@ class Tracer:
     def get_current_cost_context(self):
         return self.cost_context
 
+    def set_customer_id(self, customer_id: str) -> None:
+        span = get_current_span()
+        if span and span.is_recording():
+            span.set_attribute(AttributeKeys.JUDGMENT_CUSTOMER_ID, customer_id)
+
     def add_cost_to_current_context(self, cost: float) -> None:
         """Add cost to the current cost context and update span attribute."""
         current_cost_context = self.cost_context.get()
