@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager, contextmanager
-from typing import TYPE_CHECKING, Dict, Optional, List, Any
+from typing import TYPE_CHECKING, Dict, Optional, List
 from judgeval.tracer.keys import AttributeKeys
 import uuid
 from judgeval.exceptions import JudgmentRuntimeError
@@ -76,10 +76,12 @@ def create_agent_context(
 ):
     """Create agent context and return token for cleanup"""
     agent_id = str(uuid.uuid4())
-    agent_context: Dict[str, str | bool | Dict | List | Any] = {"agent_id": agent_id}
+    agent_context: Dict = {"agent_id": agent_id}
 
     if class_name:
         agent_context["class_name"] = class_name
+    else:
+        agent_context["class_name"] = None
 
     agent_context["track_state"] = track_state
     agent_context["track_attributes"] = track_attributes or []
@@ -104,13 +106,17 @@ def create_agent_context(
             raise JudgmentRuntimeError(
                 f"Attribute {identifier} does not exist for {class_name}. Check your agent() decorator."
             )
+    else:
+        agent_context["instance_name"] = None
 
     current_agent_context = tracer.get_current_agent_context().get()
     if current_agent_context and "agent_id" in current_agent_context:
         agent_context["parent_agent_id"] = current_agent_context["agent_id"]
+    else:
+        agent_context["parent_agent_id"] = None
 
     agent_context["is_agent_entry_point"] = True
-    token = tracer.get_current_agent_context().set(agent_context)
+    token = tracer.get_current_agent_context().set("agent_context")
     return token
 
 
