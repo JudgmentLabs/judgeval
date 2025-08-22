@@ -87,6 +87,9 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
 
 
 class NoOpJudgmentSpanProcessor(JudgmentSpanProcessor):
+    def __init__(self):
+        super().__init__("", "", "")
+
     def on_start(self, span: Span, parent_context: Optional[Context] = None) -> None:
         pass
 

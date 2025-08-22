@@ -174,9 +174,7 @@ class Tracer:
         self.enable_monitoring = enable_monitoring
         self.enable_evaluation = enable_evaluation
 
-        self.judgment_processor = NoOpJudgmentSpanProcessor(
-            "https://example.com", "fake-key", "fake-org"
-        )
+        self.judgment_processor = NoOpJudgmentSpanProcessor()
         self.processors = processors
         self.provider = NoOpTracerProvider()
 
