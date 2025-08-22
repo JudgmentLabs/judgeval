@@ -61,7 +61,6 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
 
         attributes = dict(current_span.attributes or {})
         attributes[AttributeKeys.JUDGMENT_UPDATE_ID] = current_update_id
-
         partial_span = ReadableSpan(
             name=current_span.name,
             context=span_context,
@@ -82,8 +81,30 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
     def on_end(self, span: ReadableSpan) -> None:
         if span.end_time is not None and span.context:
             span_key = (span.context.trace_id, span.context.span_id)
+
+            # Create a new span with the final update_id set to 20
+            attributes = dict(span.attributes or {})
+            attributes[AttributeKeys.JUDGMENT_UPDATE_ID] = 20
+
+            final_span = ReadableSpan(
+                name=span.name,
+                context=span.context,
+                parent=span.parent,
+                resource=span.resource,
+                attributes=attributes,
+                events=span.events,
+                links=span.links,
+                status=span.status,
+                kind=span.kind,
+                start_time=span.start_time,
+                end_time=span.end_time,
+                instrumentation_scope=span.instrumentation_scope,
+            )
+
             self._span_update_ids.pop(span_key, None)
-        super().on_end(span)
+            super().on_end(final_span)
+        else:
+            super().on_end(span)
 
 
 class NoOpJudgmentSpanProcessor(JudgmentSpanProcessor):
