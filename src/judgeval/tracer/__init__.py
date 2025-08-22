@@ -250,6 +250,11 @@ class Tracer:
     def get_current_cost_context(self):
         return self.cost_context
 
+    def set_customer_id(self, customer_id: str) -> None:
+        span = get_current_span()
+        if span and span.is_recording():
+            span.set_attribute(AttributeKeys.JUDGMENT_CUSTOMER_ID, customer_id)
+
     def add_cost_to_current_context(self, cost: float) -> None:
         """Add cost to the current cost context and update span attribute."""
         current_cost_context = self.cost_context.get()
@@ -273,18 +278,21 @@ class Tracer:
         span.set_attribute(
             AttributeKeys.JUDGMENT_AGENT_ID, current_agent_context["agent_id"]
         )
-        span.set_attribute(
-            AttributeKeys.JUDGMENT_AGENT_CLASS_NAME,
-            current_agent_context["class_name"],
-        )
-        span.set_attribute(
-            AttributeKeys.JUDGMENT_AGENT_INSTANCE_NAME,
-            current_agent_context["instance_name"],
-        )
-        span.set_attribute(
-            AttributeKeys.JUDGMENT_PARENT_AGENT_ID,
-            current_agent_context["parent_agent_id"],
-        )
+        if current_agent_context["class_name"] is not None:
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_AGENT_CLASS_NAME,
+                current_agent_context["class_name"],
+            )
+        if current_agent_context["instance_name"] is not None:
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_AGENT_INSTANCE_NAME,
+                current_agent_context["instance_name"],
+            )
+        if current_agent_context["parent_agent_id"] is not None:
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_PARENT_AGENT_ID,
+                current_agent_context["parent_agent_id"],
+            )
         span.set_attribute(
             AttributeKeys.JUDGMENT_IS_AGENT_ENTRY_POINT,
             current_agent_context["is_agent_entry_point"],
@@ -666,8 +674,7 @@ class Tracer:
                 )
                 return False
 
-            for processor in self.processors:
-                processor.force_flush(timeout_millis=30000)
+            self.force_flush()
 
             judgeval_logger.debug("All evaluations and spans completed successfully")
             return True

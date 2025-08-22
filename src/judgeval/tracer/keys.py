@@ -12,6 +12,10 @@ class AttributeKeys(str, Enum):
     JUDGMENT_SPAN_KIND = "judgment.span_kind"
     JUDGMENT_INPUT = "judgment.input"
     JUDGMENT_OUTPUT = "judgment.output"
+    JUDGMENT_OFFLINE_MODE = "judgment.offline_mode"
+
+    # Custom tracking attributes
+    JUDGMENT_CUSTOMER_ID = "judgment.customer_id"
 
     # Agent specific attributes (custom namespace)
     JUDGMENT_AGENT_ID = "judgment.agent_id"
@@ -38,7 +42,7 @@ class AttributeKeys(str, Enum):
     GEN_AI_RESPONSE_FINISH_REASONS = gen_ai_attributes.GEN_AI_RESPONSE_FINISH_REASONS
 
     # GenAI-specific attributes (custom namespace)
-    GEN_AI_USAGE_TOTAL_COST = "gen_ai.usage.total_cost"
+    GEN_AI_USAGE_TOTAL_COST = "gen_ai.usage.total_cost_usd"
 
 
 class ResourceKeys(str, Enum):
