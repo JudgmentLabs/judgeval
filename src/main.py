@@ -1,49 +1,34 @@
 import os
+import time
 
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor
 from judgeval.tracer import Tracer
-from judgeval.tracer.exporters import S3Exporter
+from judgeval.tracer.exporters import InMemorySpanExporter
+from judgeval.tracer.exporters.store import SpanStore
 
+store = SpanStore()
 
 tracer = Tracer(
     project_name="errors",
+    processors=[SimpleSpanProcessor(InMemorySpanExporter(store=store))],
 )
 
 
 @tracer.observe
-def fib(n):
-    if n <= 1:
-        return n
-    return fib(n - 1) + fib(n - 2)
+def foo(a: int):
+    input("Continue foo?")
+    return bar(3 * a)
 
 
 @tracer.observe
-def error():
-    raise Exception("error")
-
-
-import textwrap
-
-
-@tracer.observe
-def xss():
-    return textwrap.dedent(
-        """
-        # markdown title
-        ### hi
-
-        ```py
-        def foo():
-            print("foo")
-        ```
-        """
-    )
+def bar(a: int):
+    input("Continue bar?")
+    return a + 1
 
 
 @tracer.observe
 def main():
-    fib(2)
-    xss()
+    foo(10)
 
 
 if __name__ == "__main__":

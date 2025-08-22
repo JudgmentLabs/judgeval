@@ -8,6 +8,7 @@ from typing import Sequence
 
 from judgeval.tracer.exporters.store import ABCSpanStore
 from judgeval.tracer.exporters.s3 import S3Exporter
+from judgeval.tracer.exporters.utils import deduplicate_spans
 
 
 class JudgmentSpanExporter(OTLPSpanExporter):
@@ -21,7 +22,7 @@ class JudgmentSpanExporter(OTLPSpanExporter):
         )
 
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
-        return super().export(spans)
+        return super().export(deduplicate_spans(spans))
 
 
 class InMemorySpanExporter(SpanExporter):

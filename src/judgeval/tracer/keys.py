@@ -22,6 +22,7 @@ class AttributeKeys(str, Enum):
     JUDGMENT_CUMULATIVE_LLM_COST = "judgment.cumulative_llm_cost"
     JUDGMENT_STATE_BEFORE = "judgment.state_before"
     JUDGMENT_STATE_AFTER = "judgment.state_after"
+    JUDGMENT_UPDATE_ID = "judgment.update_id"
 
     # GenAI-specific attributes (semantic conventions)
     GEN_AI_PROMPT = gen_ai_attributes.GEN_AI_PROMPT
@@ -42,4 +43,7 @@ class AttributeKeys(str, Enum):
 
 class ResourceKeys(str, Enum):
     SERVICE_NAME = ResourceAttributes.SERVICE_NAME
+    TELEMETRY_SDK_LANGUAGE = ResourceAttributes.TELEMETRY_SDK_LANGUAGE
+    TELEMETRY_SDK_NAME = ResourceAttributes.TELEMETRY_SDK_NAME
+    TELEMETRY_SDK_VERSION = ResourceAttributes.TELEMETRY_SDK_VERSION
     JUDGMENT_PROJECT_ID = "judgment.project_id"

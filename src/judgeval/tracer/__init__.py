@@ -22,7 +22,7 @@ from functools import partial
 from warnings import warn
 
 from opentelemetry.context import Context
-from opentelemetry.sdk.trace import SpanProcessor, TracerProvider
+from opentelemetry.sdk.trace import SpanProcessor, TracerProvider, ReadableSpan, Span
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace import (
@@ -60,6 +60,11 @@ from judgeval.api import JudgmentSyncClient
 from judgeval.tracer.llm import wrap_provider
 from judgeval.utils.url import url_for
 from judgeval.tracer.local_eval_queue import LocalEvaluationQueue
+from judgeval.tracer.processors import (
+    NoOpSpanProcessor,
+    JudgmentSpanProcessor,
+    NoOpJudgmentSpanProcessor,
+)
 
 C = TypeVar("C", bound=Callable)
 Cls = TypeVar("Cls", bound=Type)
@@ -105,6 +110,7 @@ class Tracer:
         "api_client",
         "local_eval_queue",
         # Otel
+        "judgment_processor",
         "processors",
         "provider",
         "tracer",
@@ -124,7 +130,7 @@ class Tracer:
     api_client: JudgmentSyncClient
     local_eval_queue: LocalEvaluationQueue
 
-    # Judgeval supports sending raw spans to through any otel compatible span processor.
+    judgment_processor: JudgmentSpanProcessor
     processors: List[SpanProcessor]
     provider: ABCTracerProvider
     tracer: ABCTracer
@@ -168,6 +174,9 @@ class Tracer:
         self.enable_monitoring = enable_monitoring
         self.enable_evaluation = enable_evaluation
 
+        self.judgment_processor = NoOpJudgmentSpanProcessor(
+            "https://example.com", "fake-key", "fake-org"
+        )
         self.processors = processors
         self.provider = NoOpTracerProvider()
 
@@ -186,6 +195,8 @@ class Tracer:
             resource_attributes.update(
                 {
                     ResourceKeys.SERVICE_NAME: self.project_name,
+                    ResourceKeys.TELEMETRY_SDK_NAME: "judgeval",
+                    ResourceKeys.TELEMETRY_SDK_VERSION: get_version(),
                 }
             )
 
@@ -197,18 +208,15 @@ class Tracer:
                 )
 
             resource = Resource.create(resource_attributes)
-            self.processors.append(
-                BatchSpanProcessor(
-                    JudgmentSpanExporter(
-                        endpoint=self.api_url,
-                        api_key=self.api_key,
-                        organization_id=self.organization_id,
-                    ),
-                    max_queue_size=2**18,
-                    export_timeout_millis=30000,
-                )
-            )
 
+            self.judgment_processor = JudgmentSpanProcessor(
+                self.api_url,
+                self.api_key,
+                self.organization_id,
+                max_queue_size=2**18,
+                export_timeout_millis=30000,
+            )
+            self.processors.append(self.judgment_processor)
             self.provider = TracerProvider(resource=resource)
             for processor in self.processors:
                 self.provider.add_span_processor(processor)
@@ -326,6 +334,8 @@ class Tracer:
                         safe_serialize(format_inputs(f, args, kwargs)),
                     )
 
+                    self.judgment_processor.emit_partial()
+
                     result = f(*args, **kwargs)
                 except Exception as user_exc:
                     span.record_exception(user_exc)
@@ -355,6 +365,9 @@ class Tracer:
                         AttributeKeys.JUDGMENT_INPUT,
                         safe_serialize(format_inputs(f, args, kwargs)),
                     )
+
+                    self.judgment_processor.emit_partial()
+
                     result = await f(*args, **kwargs)
                 except Exception as user_exc:
                     span.record_exception(user_exc)
@@ -388,7 +401,7 @@ class Tracer:
             return func
 
         name = func.__qualname__
-        attributes = {
+        attributes: Dict[str, Any] = {
             AttributeKeys.JUDGMENT_SPAN_KIND: span_type,
         }
 
@@ -609,7 +622,7 @@ class Tracer:
                 trace_id=trace_id,
             )
 
-            self.api_client.add_to_run_eval_queue(eval_run.model_dump(warnings=False))
+            self.api_client.add_to_run_eval_queue(eval_run.model_dump(warnings=False))  # type: ignore
         else:
             # Handle custom scorers using local evaluation queue
             eval_run = EvaluationRun(
