@@ -1,10 +1,10 @@
 from typing import List, Union
 from judgeval.data import ScorerData, Example
 from judgeval.data.trace import TraceSpan
-from judgeval.data.judgment_types import ScoringResultJudgmentType
+from judgeval.data.judgment_types import ScoringResult as JudgmentScoringResult
 
 
-class ScoringResult(ScoringResultJudgmentType):
+class ScoringResult(JudgmentScoringResult):
     """
     A ScoringResult contains the output of one or more scorers applied to a single example.
     Ie: One input, one actual_output, one expected_output, etc..., and 1+ scorer (Faithfulness, Hallucination, Summarization, etc...)
@@ -17,9 +17,8 @@ class ScoringResult(ScoringResultJudgmentType):
 
     """
 
-    data_object: (
-        Example  # Need to override this so that it uses this repo's Example class
-    )
+    # Need to override this so that it uses this repo's Example class
+    data_object: Example
 
     def model_dump(self, **kwargs):
         data = super().model_dump(**kwargs)

@@ -3,8 +3,8 @@
 import typer
 from pathlib import Path
 from dotenv import load_dotenv
-from judgeval.common.logger import judgeval_logger
-from judgeval.judgment_client import JudgmentClient
+from judgeval.logger import judgeval_logger
+from judgeval import JudgmentClient
 
 load_dotenv()
 
@@ -61,5 +61,3 @@ def version():
 
 if __name__ == "__main__":
     app()
-
-# judgeval upload_scorer /Users/alanzhang/repo/JudgmentLabs/judgeval/src/demo/profile_match_scorer.py /Users/alanzhang/repo/JudgmentLabs/judgeval/src/demo/requirements.txt

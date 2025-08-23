@@ -6,7 +6,7 @@ import uuid
 from judgeval.data import Example
 from judgeval.scorers import BaseScorer, APIScorerConfig
 from judgeval.constants import ACCEPTABLE_MODELS
-from judgeval.data.judgment_types import EvaluationRunJudgmentType
+from judgeval.data.judgment_types import EvaluationRun as EvaluationRunJudgmentType
 
 
 class EvaluationRun(EvaluationRunJudgmentType):

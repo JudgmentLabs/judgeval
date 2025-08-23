@@ -1,0 +1,1 @@
+JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME = "opentelemetry.instrumentation.judgeval"

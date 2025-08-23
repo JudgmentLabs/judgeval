@@ -15,9 +15,9 @@ from judgeval.data import (
 )
 from judgeval.scorers import BaseScorer
 from judgeval.scorers.utils import clone_scorers
-from judgeval.common.logger import judgeval_logger
+from judgeval.logger import judgeval_logger
 from judgeval.judges import JudgevalJudge
-from judgeval.constants import DEFAULT_GPT_MODEL
+from judgeval.env import JUDGMENT_DEFAULT_GPT_MODEL
 
 
 async def safe_a_score_example(
@@ -56,7 +56,7 @@ async def safe_a_score_example(
 async def a_execute_scoring(
     examples: List[Example],
     scorers: List[BaseScorer],
-    model: Optional[Union[str, List[str], JudgevalJudge]] = DEFAULT_GPT_MODEL,
+    model: Optional[Union[str, List[str], JudgevalJudge]] = JUDGMENT_DEFAULT_GPT_MODEL,
     ignore_errors: bool = False,
     throttle_value: int = 0,
     max_concurrent: int = 100,

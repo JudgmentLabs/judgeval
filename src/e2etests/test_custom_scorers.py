@@ -1,5 +1,5 @@
 from judgeval.scorers.example_scorer import ExampleScorer
-from judgeval.judgment_client import JudgmentClient
+from judgeval import JudgmentClient
 from judgeval.data import Example
 from typing import Dict, Any
 
