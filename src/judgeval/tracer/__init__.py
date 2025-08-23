@@ -1,5 +1,6 @@
 from __future__ import annotations
 from contextvars import ContextVar
+import atexit
 import functools
 import inspect
 import random
@@ -22,9 +23,8 @@ from functools import partial
 from warnings import warn
 
 from opentelemetry.context import Context
-from opentelemetry.sdk.trace import SpanProcessor, TracerProvider, ReadableSpan, Span
+from opentelemetry.sdk.trace import SpanProcessor, TracerProvider
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace import (
     Status,
     StatusCode,
@@ -54,14 +54,12 @@ from judgeval.utils.serialize import safe_serialize
 from judgeval.version import get_version
 from judgeval.warnings import JudgmentWarning
 
-from judgeval.tracer.exporters import JudgmentSpanExporter
 from judgeval.tracer.keys import AttributeKeys, ResourceKeys
 from judgeval.api import JudgmentSyncClient
 from judgeval.tracer.llm import wrap_provider
 from judgeval.utils.url import url_for
 from judgeval.tracer.local_eval_queue import LocalEvaluationQueue
 from judgeval.tracer.processors import (
-    NoOpSpanProcessor,
     JudgmentSpanProcessor,
     NoOpJudgmentSpanProcessor,
 )
@@ -233,6 +231,9 @@ class Tracer:
             self.local_eval_queue.start_workers()
 
         Tracer._active_tracers[self.project_name] = self
+
+        # Register atexit handler to flush on program exit
+        atexit.register(self._atexit_flush)
 
     def get_current_span(self):
         # TODO: review, need to maintain context var manually if we dont
@@ -564,9 +565,39 @@ class Tracer:
         return wrap_provider(self, client)
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
+        """Force flush all pending spans and block until completion.
+
+        Args:
+            timeout_millis: Maximum time to wait for flush completion in milliseconds
+
+        Returns:
+            True if all processors flushed successfully within timeout, False otherwise
+        """
+        success = True
         for processor in self.processors:
-            processor.force_flush(timeout_millis)
-        return True
+            try:
+                result = processor.force_flush(timeout_millis)
+                if not result:
+                    success = False
+            except Exception as e:
+                judgeval_logger.warning(f"Error flushing processor {processor}: {e}")
+                success = False
+        return success
+
+    def _atexit_flush(self) -> None:
+        """Internal method called on program exit to flush remaining spans.
+
+        This blocks until all spans are flushed or timeout is reached to ensure
+        proper cleanup before program termination.
+        """
+        try:
+            success = self.force_flush(timeout_millis=30000)
+            if not success:
+                judgeval_logger.warning(
+                    "Some spans may not have been exported before program exit"
+                )
+        except Exception as e:
+            judgeval_logger.warning(f"Error during atexit flush: {e}")
 
     def async_evaluate(
         self,
