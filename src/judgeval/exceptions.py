@@ -15,6 +15,9 @@ class JudgmentAPIError(HTTPError):
         super().__init__(f"{status_code}: {detail}")
 
 
+class JudgmentTestError(Exception): ...
+
+
 class JudgmentRuntimeError(RuntimeError): ...
 
 

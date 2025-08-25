@@ -11,10 +11,14 @@ from judgeval.data.example import Example
 from judgeval.logger import judgeval_logger
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_DEFAULT_GPT_MODEL, JUDGMENT_ORG_ID
 from judgeval.utils.meta import SingletonMeta
-from judgeval.exceptions import JudgmentRuntimeError
-from judgeval.utils.file_utils import extract_scorer_name
+from judgeval.exceptions import JudgmentRuntimeError, JudgmentTestError
 from judgeval.api import JudgmentSyncClient
+from judgeval.utils.file_utils import extract_scorer_name
 from judgeval.utils.guards import expect_api_key, expect_organization_id
+from judgeval.utils.version_check import check_latest_version
+from judgeval.utils.testing import assert_test_results
+
+check_latest_version()
 
 
 class JudgmentClient(metaclass=SingletonMeta):
@@ -38,6 +42,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         project_name: str,
         eval_run_name: str,
         model: str = JUDGMENT_DEFAULT_GPT_MODEL,
+        assert_test: bool = False,
     ) -> List[ScoringResult]:
         try:
             eval = EvaluationRun(
@@ -49,13 +54,18 @@ class JudgmentClient(metaclass=SingletonMeta):
                 organization_id=self.organization_id,
             )
 
-            return run_eval(eval, self.api_key)
+            results = run_eval(eval, self.api_key)
+            if assert_test:
+                assert_test_results(results)
 
+            return results
+
+        except JudgmentTestError as e:
+            raise JudgmentTestError(e)
         except ValueError as e:
             raise ValueError(
                 f"Please check your EvaluationRun object, one or more fields are invalid: \n{e}"
             )
-
         except Exception as e:
             raise JudgmentRuntimeError(
                 f"An unexpected error occured during evaluation: {e}"
