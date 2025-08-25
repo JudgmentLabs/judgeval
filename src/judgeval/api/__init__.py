@@ -1,4 +1,4 @@
-from typing import Dict, Any, Mapping, Literal, Optional
+from typing import List, Dict, Any, Mapping, Literal, Optional
 import httpx
 from httpx import Response
 from judgeval.exceptions import JudgmentAPIError
@@ -120,15 +120,6 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def datasets_fetch_stats_by_project(
-        self, payload: DatasetFetchStatsByProject
-    ) -> Any:
-        return self._request(
-            "POST",
-            url_for("/datasets/fetch_stats_by_project/"),
-            payload,
-        )
-
     def datasets_push(self, payload: DatasetPush) -> Any:
         return self._request(
             "POST",
@@ -178,13 +169,6 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def projects_delete(self, payload: ProjectDelete) -> ProjectDeleteResponse:
-        return self._request(
-            "DELETE",
-            url_for("/projects/delete_from_judgeval/"),
-            payload,
-        )
-
     def scorer_exists(self, payload: ScorerExistsRequest) -> ScorerExistsResponse:
         return self._request(
             "POST",
@@ -199,21 +183,21 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def upload_custom_scorer(
-        self, payload: UploadCustomScorerRequest
-    ) -> UploadCustomScorerResponse:
-        return self._request(
-            "POST",
-            url_for("/upload_custom_scorer/"),
-            payload,
-        )
-
     def fetch_scorer(
         self, payload: FetchPromptScorerRequest
     ) -> FetchPromptScorerResponse:
         return self._request(
             "POST",
             url_for("/fetch_scorer/"),
+            payload,
+        )
+
+    def upload_custom_scorer(
+        self, payload: CustomScorerUploadPayload
+    ) -> CustomScorerTemplateResponse:
+        return self._request(
+            "POST",
+            url_for("/upload_custom_scorer/"),
             payload,
         )
 
@@ -326,26 +310,10 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def datasets_fetch_stats_by_project(
-        self, payload: DatasetFetchStatsByProject
-    ) -> Any:
-        return await self._request(
-            "POST",
-            url_for("/datasets/fetch_stats_by_project/"),
-            payload,
-        )
-
     async def datasets_push(self, payload: DatasetPush) -> Any:
         return await self._request(
             "POST",
             url_for("/datasets/push/"),
-            payload,
-        )
-
-    async def datasets_delete(self, payload: DatasetDelete) -> Any:
-        return await self._request(
-            "POST",
-            url_for("/datasets/delete/"),
             payload,
         )
 
@@ -415,6 +383,15 @@ class JudgmentAsyncClient:
         return await self._request(
             "POST",
             url_for("/fetch_scorer/"),
+            payload,
+        )
+
+    async def upload_custom_scorer(
+        self, payload: CustomScorerUploadPayload
+    ) -> CustomScorerTemplateResponse:
+        return await self._request(
+            "POST",
+            url_for("/upload_custom_scorer/"),
             payload,
         )
 

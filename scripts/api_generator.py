@@ -32,6 +32,7 @@ JUDGEVAL_PATHS: List[str] = [
     "/save_scorer/",
     "/fetch_scorer/",
     "/scorer_exists/",
+    "/upload_custom_scorer/",
     "/datasets/push/",
     "/datasets/insert_examples/",
     "/datasets/pull_for_judgeval/",
@@ -41,9 +42,9 @@ JUDGEVAL_PATHS: List[str] = [
 
 
 def resolve_ref(ref: str) -> str:
-    assert ref.startswith("#/components/schemas/"), (
-        "Reference must start with #/components/schemas/"
-    )
+    assert ref.startswith(
+        "#/components/schemas/"
+    ), "Reference must start with #/components/schemas/"
     return ref.replace("#/components/schemas/", "")
 
 
