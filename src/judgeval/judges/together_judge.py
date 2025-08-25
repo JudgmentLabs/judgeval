@@ -4,9 +4,6 @@ Implementation of using TogetherAI inference for judges.
 
 from pydantic import BaseModel
 from typing import Dict, List, Union, Any, cast
-
-import pydantic
-
 from judgeval.judges import JudgevalJudge
 from judgeval.logger import judgeval_logger
 from judgeval.env import (
@@ -18,7 +15,7 @@ from judgeval.env import (
 together_api_key = TOGETHERAI_API_KEY or TOGETHER_API_KEY
 if together_api_key:
     try:
-        from together import Together, AsyncTogether
+        from together import Together, AsyncTogether  # type: ignore[import-untyped]
 
         together_client = Together(api_key=together_api_key)
         async_together_client = AsyncTogether(api_key=together_api_key)
