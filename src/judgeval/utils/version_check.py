@@ -1,5 +1,5 @@
 import importlib.metadata
-from judgeval.utils.requests import requests
+import requests
 import threading
 from judgeval.logger import judgeval_logger
 
