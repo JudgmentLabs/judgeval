@@ -1,4 +1,3 @@
-from judgeval.judges.litellm_judge import LiteLLMJudge
 from judgeval.tracer import Tracer
 
 

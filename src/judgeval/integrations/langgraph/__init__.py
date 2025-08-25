@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Optional, Sequence, Union, Set, Type, cast
+from typing import Any, Dict, List, Optional, Sequence, Set, Type
 from uuid import UUID
 
 try:

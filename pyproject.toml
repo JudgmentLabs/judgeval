@@ -88,4 +88,5 @@ exclude = ["docs"]
 ignore = [
     "F403",
     "F405",
+    "E402",
 ] # F403: star import, F405: undefined name from star import

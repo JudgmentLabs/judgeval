@@ -8,7 +8,6 @@ from typing import Dict, Optional
 from pydantic import BaseModel
 
 
-from judgeval.judges.base_judge import JudgevalJudge
 from judgeval.judges.utils import create_judge
 from typing import Any
 from pydantic import model_validator, Field

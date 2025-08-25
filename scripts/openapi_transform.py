@@ -40,9 +40,9 @@ JUDGEVAL_PATHS: List[str] = [
 
 
 def resolve_ref(ref: str) -> str:
-    assert ref.startswith(
-        "#/components/schemas/"
-    ), "Reference must start with #/components/schemas/"
+    assert ref.startswith("#/components/schemas/"), (
+        "Reference must start with #/components/schemas/"
+    )
     return ref.replace("#/components/schemas/", "")
 
 
@@ -80,9 +80,9 @@ def filter_schemas() -> Dict[str, Any]:
             if schema_name in processed_schema_names:
                 continue
 
-            assert (
-                schema_name in SPEC["components"]["schemas"]
-            ), f"Schema {schema_name} not found in components.schemas"
+            assert schema_name in SPEC["components"]["schemas"], (
+                f"Schema {schema_name} not found in components.schemas"
+            )
 
             schema = SPEC["components"]["schemas"][schema_name]
             to_commit[schema_name] = schema

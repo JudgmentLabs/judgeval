@@ -6,10 +6,10 @@ import time
 import orjson
 import sys
 import threading
-from typing import List, Dict, Union, Optional, Callable, Tuple, Any, TYPE_CHECKING
+from typing import List, Dict, Union, Tuple, TYPE_CHECKING
 from rich import print as rprint
 
-from judgeval.data import ScorerData, ScoringResult, Example, Trace
+from judgeval.data import ScorerData, ScoringResult, Example
 from judgeval.scorers import BaseScorer, APIScorerConfig
 from judgeval.scorers.score import a_execute_scoring
 from judgeval.api import JudgmentSyncClient
@@ -21,10 +21,8 @@ from judgeval.logger import judgeval_logger
 
 
 if TYPE_CHECKING:
-    from judgeval.tracer import Tracer
     from judgeval.data.trace_run import TraceRun
     from judgeval.data.evaluation_run import EvaluationRun
-    from judgeval.integrations.langgraph import JudgevalCallbackHandler
 
 
 def safe_run_async(coro):

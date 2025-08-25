@@ -41,9 +41,9 @@ JUDGEVAL_PATHS: List[str] = [
 
 
 def resolve_ref(ref: str) -> str:
-    assert ref.startswith(
-        "#/components/schemas/"
-    ), "Reference must start with #/components/schemas/"
+    assert ref.startswith("#/components/schemas/"), (
+        "Reference must start with #/components/schemas/"
+    )
     return ref.replace("#/components/schemas/", "")
 
 
