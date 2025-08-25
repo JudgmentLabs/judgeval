@@ -95,7 +95,7 @@ def resolve_project_id(
 
 
 class Tracer:
-    _active_tracers: MutableMapping[str, Tracer] = {}
+    _active_tracers: List[Tracer] = []
 
     __slots__ = (
         "api_key",
@@ -206,6 +206,7 @@ class Tracer:
             resource = Resource.create(resource_attributes)
 
             self.judgment_processor = JudgmentSpanProcessor(
+                self,
                 self.api_url,
                 self.api_key,
                 self.organization_id,
@@ -230,7 +231,7 @@ class Tracer:
         if self.enable_evaluation and self.enable_monitoring:
             self.local_eval_queue.start_workers()
 
-        Tracer._active_tracers[self.project_name] = self
+        Tracer._active_tracers.append(self)
 
         # Register atexit handler to flush on program exit
         atexit.register(self._atexit_flush)
@@ -724,7 +725,7 @@ def wrap(client: ApiClient) -> ApiClient:
         )
 
     wrapped_client = client
-    for tracer in Tracer._active_tracers.values():
+    for tracer in Tracer._active_tracers:
         wrapped_client = tracer.wrap(wrapped_client)
     return wrapped_client
 

@@ -1,4 +1,5 @@
-from typing import Optional
+from __future__ import annotations
+from typing import Optional, TYPE_CHECKING
 from opentelemetry.context import Context
 from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
 from opentelemetry.sdk.trace.export import (
@@ -7,6 +8,9 @@ from opentelemetry.sdk.trace.export import (
 from opentelemetry.trace import get_current_span
 from judgeval.tracer.exporters import JudgmentSpanExporter
 from judgeval.tracer.keys import AttributeKeys
+
+if TYPE_CHECKING:
+    from judgeval.tracer import Tracer
 
 
 class NoOpSpanProcessor(SpanProcessor):
@@ -26,6 +30,7 @@ class NoOpSpanProcessor(SpanProcessor):
 class JudgmentSpanProcessor(BatchSpanProcessor):
     def __init__(
         self,
+        tracer: Tracer,
         endpoint: str,
         api_key: str,
         organization_id: str,
@@ -34,6 +39,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
         max_queue_size: int = 2**18,
         export_timeout_millis: int = 30000,
     ):
+        self.tracer = tracer
         super().__init__(
             JudgmentSpanExporter(
                 endpoint=endpoint,
@@ -46,7 +52,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
         self._span_update_ids: dict[tuple[int, int], int] = {}
 
     def emit_partial(self) -> None:
-        current_span = get_current_span()
+        current_span = self.tracer.get_current_span()
         if not current_span or not current_span.is_recording():
             return
 
@@ -109,7 +115,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
 
 class NoOpJudgmentSpanProcessor(JudgmentSpanProcessor):
     def __init__(self):
-        super().__init__("", "", "")
+        super().__init__(None, "", "", "")  # type: ignore[arg-type]
 
     def on_start(self, span: Span, parent_context: Optional[Context] = None) -> None:
         pass

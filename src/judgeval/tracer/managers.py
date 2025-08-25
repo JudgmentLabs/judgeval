@@ -116,7 +116,7 @@ def create_agent_context(
         agent_context["parent_agent_id"] = None
 
     agent_context["is_agent_entry_point"] = True
-    token = tracer.get_current_agent_context().set(agent_context)
+    token = tracer.get_current_agent_context().set(agent_context)  # type: ignore
     return token
 
 

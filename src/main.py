@@ -2,29 +2,28 @@ from judgeval.judges.litellm_judge import LiteLLMJudge
 from judgeval.tracer import Tracer
 
 
-# Initialize the tracer with your project name
-judgment = Tracer(project_name="errors")
+tracer1 = Tracer(project_name="errors")
+tracer2 = Tracer(project_name="errors")
 
 
-# # Use the @judgment.observe decorator to trace the tool call
-# @judgment.observe(span_type="tool")
-# def my_tool():
-#     return "Hello world!"
+@tracer1.observe(span_type="function")
+def foo():
+    return "Hello world! - Foo"
 
 
-# # Use the @judgment.observe decorator to trace the function
-# @judgment.observe(span_type="function")
-# def sample_function():
-#     tool_called = my_tool()
-#     message = "Called my_tool() and got: " + tool_called
-#     return message
+@tracer2.observe(span_type="function")
+def bar():
+    return "Hello world! - Bar"
 
 
-# if __name__ == "__main__":
-#     res = sample_function()
-#     print(res)
+@tracer1.observe(span_type="function")
+@tracer2.observe(span_type="function")
+def both():
+    foo()
+    bar()
 
-judge = LiteLLMJudge(model="gpt-4o")
 
-res = judge.generate("Hello.")
-print(res)
+if __name__ == "__main__":
+    both()
+    tracer1.force_flush()
+    tracer2.force_flush()
