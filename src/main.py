@@ -1,28 +1,26 @@
 from judgeval.tracer import Tracer
+from judgeval.tracer.exporters import InMemorySpanExporter
+from judgeval.tracer.exporters.store import SpanStore
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
+span_store = SpanStore()
+tracer = Tracer(
+    project_name="errors",
+    processors=[SimpleSpanProcessor(InMemorySpanExporter(span_store))],
+)
 
 
-tracer1 = Tracer(project_name="errors")
-tracer2 = Tracer(project_name="errors")
+@tracer.observe(span_type="function")
+def fibonacci(n: int) -> int:
+    if n <= 0:
+        return 0
+    elif n == 1:
+        return 1
+    else:
+
+        return fibonacci(n - 1) + fibonacci(n - 2)
 
 
-@tracer1.observe(span_type="function")
-def foo():
-    return "Hello world! - Foo"
+print(fibonacci(10))
 
-
-@tracer2.observe(span_type="function")
-def bar():
-    return "Hello world! - Bar"
-
-
-@tracer1.observe(span_type="function")
-@tracer2.observe(span_type="function")
-def both():
-    foo()
-    bar()
-
-
-if __name__ == "__main__":
-    both()
-    tracer1.force_flush()
-    tracer2.force_flush()
+print(span_store.get_all())

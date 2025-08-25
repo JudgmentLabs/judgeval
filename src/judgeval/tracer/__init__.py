@@ -21,7 +21,6 @@ from typing import (
 from functools import partial
 from warnings import warn
 
-from opentelemetry.context import Context
 from opentelemetry.sdk.trace import SpanProcessor, TracerProvider
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.trace import (
@@ -111,7 +110,6 @@ class Tracer:
         "processors",
         "provider",
         "tracer",
-        "context",
         # Agent
         "agent_context",
         "cost_context",
@@ -131,7 +129,6 @@ class Tracer:
     processors: List[SpanProcessor]
     provider: ABCTracerProvider
     tracer: ABCTracer
-    context: ContextVar[Context]
 
     agent_context: ContextVar[Optional[AgentContext]]
     cost_context: ContextVar[Optional[Dict[str, float]]]
@@ -174,9 +171,6 @@ class Tracer:
         self.judgment_processor = NoOpJudgmentSpanProcessor()
         self.processors = processors
         self.provider = NoOpTracerProvider()
-
-        # TODO:
-        self.context = ContextVar(f"judgeval:tracer:{project_name}")
 
         self.agent_context = ContextVar("current_agent_context", default=None)
         self.cost_context = ContextVar("current_cost_context", default=None)
@@ -236,8 +230,6 @@ class Tracer:
         atexit.register(self._atexit_flush)
 
     def get_current_span(self):
-        # TODO: review, need to maintain context var manually if we dont
-        # want to override the default tracer provider
         return get_current_span()
 
     def get_tracer(self):
@@ -250,7 +242,7 @@ class Tracer:
         return self.cost_context
 
     def set_customer_id(self, customer_id: str) -> None:
-        span = get_current_span()
+        span = self.get_current_span()
         if span and span.is_recording():
             span.set_attribute(AttributeKeys.JUDGMENT_CUSTOMER_ID, customer_id)
 
@@ -262,7 +254,7 @@ class Tracer:
             new_cumulative_cost = float(current_cumulative_cost) + cost
             current_cost_context["cumulative_cost"] = new_cumulative_cost
 
-            span = get_current_span()
+            span = self.get_current_span()
             if span and span.is_recording():
                 span.set_attribute(
                     AttributeKeys.JUDGMENT_CUMULATIVE_LLM_COST, new_cumulative_cost

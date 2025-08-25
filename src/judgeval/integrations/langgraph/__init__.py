@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+import uuid
 from typing import Any, Dict, List, Optional, Sequence, Set, Type
 from uuid import UUID
 
@@ -67,7 +68,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
         if self.tracer is None:
             # Try to get an active tracer
             if Tracer._active_tracers:
-                self.tracer = next(iter(Tracer._active_tracers.values()))
+                self.tracer = next(iter(Tracer._active_tracers))
             else:
                 judgeval_logger.warning(
                     "No tracer provided and no active tracers found. "
@@ -75,9 +76,12 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                 )
                 return
 
-        # Track spans by run_id
+        # Track spans by run_id for proper hierarchy
         self.spans: Dict[UUID, Span] = {}
         self.span_start_times: Dict[UUID, float] = {}
+        self.run_id_to_span_id: Dict[UUID, str] = {}
+        self.span_id_to_depth: Dict[str, int] = {}
+        self.root_run_id: Optional[UUID] = None
 
         # Track execution for debugging
         self.executed_nodes: List[str] = []
@@ -177,36 +181,51 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
             return
 
         try:
+            # Determine if this is a root span
+            is_root = parent_run_id is None
+            if is_root:
+                self.root_run_id = run_id
+
+            # Calculate depth for proper hierarchy
+            current_depth = 0
+            if parent_run_id and parent_run_id in self.run_id_to_span_id:
+                parent_span_id = self.run_id_to_span_id[parent_run_id]
+                current_depth = self.span_id_to_depth.get(parent_span_id, 0) + 1
+
             # Create span attributes
             attributes = {
-                AttributeKeys.JUDGMENT_SPAN_KIND: span_type,
+                AttributeKeys.JUDGMENT_SPAN_KIND.value: span_type,
             }
 
             # Add metadata and tags
             combined_metadata = self._join_tags_and_metadata(tags, metadata)
             if combined_metadata:
-                attributes["metadata"] = safe_serialize(combined_metadata)
+                metadata_str = safe_serialize(combined_metadata)
+                attributes["metadata"] = metadata_str
 
             # Add extra attributes
             for key, value in extra_attributes.items():
                 if value is not None:
-                    attributes[key] = str(value)
+                    attributes[str(key)] = str(value)
 
-            # Use the tracer's context manager to create the span
+            # Create span using the tracer's context manager for proper hierarchy
             with sync_span_context(self.tracer, name, attributes) as span:
                 # Set input data if provided
                 if inputs is not None:
                     span.set_attribute(
-                        AttributeKeys.JUDGMENT_INPUT, safe_serialize(inputs)
+                        AttributeKeys.JUDGMENT_INPUT.value, safe_serialize(inputs)
                     )
 
-                # Store the span and start time
+                # Store span information for tracking
+                span_id = (
+                    str(span.get_span_context().span_id)
+                    if span.get_span_context()
+                    else str(uuid.uuid4())
+                )
                 self.spans[run_id] = span
                 self.span_start_times[run_id] = time.time()
-
-                # Keep the span alive by not exiting the context
-                # We'll manually end it in _end_span
-                self._active_span_context = span
+                self.run_id_to_span_id[run_id] = span_id
+                self.span_id_to_depth[span_id] = current_depth
 
         except Exception as e:
             judgeval_logger.exception(f"Error starting span for {name}: {e}")
@@ -228,13 +247,13 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
             # Set output data if provided
             if outputs is not None:
                 span.set_attribute(
-                    AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(outputs)
+                    AttributeKeys.JUDGMENT_OUTPUT.value, safe_serialize(outputs)
                 )
 
             # Set additional attributes
             for key, value in extra_attributes.items():
                 if value is not None:
-                    span.set_attribute(key, str(value))
+                    span.set_attribute(str(key), str(value))
 
             # Handle errors
             if error is not None:
@@ -249,17 +268,25 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
             else:
                 span.set_status(Status(StatusCode.OK))
 
-            # Note: We don't call span.end() here because the sync_span_context
-            # manager handles that automatically when the context exits
+            # Note: The span will be ended automatically by the context manager
 
         except Exception as e:
             judgeval_logger.exception(f"Error ending span for run_id {run_id}: {e}")
         finally:
-            # Cleanup
+            # Cleanup tracking data
             if run_id in self.spans:
                 del self.spans[run_id]
             if run_id in self.span_start_times:
                 del self.span_start_times[run_id]
+            if run_id in self.run_id_to_span_id:
+                span_id = self.run_id_to_span_id[run_id]
+                del self.run_id_to_span_id[run_id]
+                if span_id in self.span_id_to_depth:
+                    del self.span_id_to_depth[span_id]
+
+            # Check if this is the root run ending
+            if run_id == self.root_run_id:
+                self.root_run_id = None
 
     def _log_debug_event(
         self,
