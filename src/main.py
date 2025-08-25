@@ -1,35 +1,30 @@
-import os
-import time
-
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor
+from judgeval.judges.litellm_judge import LiteLLMJudge
 from judgeval.tracer import Tracer
-from judgeval.tracer.exporters import InMemorySpanExporter
-from judgeval.tracer.exporters.store import SpanStore
-
-store = SpanStore()
-
-tracer = Tracer(
-    project_name="errors",
-    processors=[SimpleSpanProcessor(InMemorySpanExporter(store=store))],
-)
 
 
-@tracer.observe
-def foo(a: int):
-    input("Continue foo?")
-    return bar(3 * a)
+# Initialize the tracer with your project name
+judgment = Tracer(project_name="errors")
 
 
-@tracer.observe
-def bar(a: int):
-    input("Continue bar?")
-    return a + 1
+# # Use the @judgment.observe decorator to trace the tool call
+# @judgment.observe(span_type="tool")
+# def my_tool():
+#     return "Hello world!"
 
 
-@tracer.observe
-def main():
-    foo(10)
+# # Use the @judgment.observe decorator to trace the function
+# @judgment.observe(span_type="function")
+# def sample_function():
+#     tool_called = my_tool()
+#     message = "Called my_tool() and got: " + tool_called
+#     return message
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     res = sample_function()
+#     print(res)
+
+judge = LiteLLMJudge(model="gpt-4o")
+
+res = judge.generate("Hello.")
+print(res)

@@ -1268,18 +1268,12 @@ dependencies = [
     { name = "click" },
     { name = "dotenv" },
     { name = "httpx" },
-    { name = "langchain-anthropic" },
-    { name = "langchain-core" },
-    { name = "langchain-huggingface" },
-    { name = "langchain-openai" },
     { name = "litellm" },
     { name = "nest-asyncio" },
     { name = "opentelemetry-exporter-otlp" },
     { name = "opentelemetry-sdk" },
     { name = "opentelemetry-semantic-conventions" },
     { name = "orjson" },
-    { name = "pre-commit" },
-    { name = "pytest" },
     { name = "typer" },
 ]
 
@@ -1306,10 +1300,12 @@ dev = [
     { name = "groq" },
     { name = "langchain-core" },
     { name = "langgraph" },
+    { name = "litellm" },
     { name = "mypy" },
     { name = "openai" },
     { name = "opentelemetry-instrumentation-openai" },
     { name = "pre-commit" },
+    { name = "pytest" },
     { name = "ruff" },
     { name = "together" },
     { name = "types-pyyaml" },
@@ -1323,22 +1319,16 @@ requires-dist = [
     { name = "dotenv" },
     { name = "fireworks-ai", marker = "extra == 'trainer'", specifier = ">=0.19.18" },
     { name = "httpx", specifier = ">=0.28.1" },
-    { name = "langchain-anthropic" },
     { name = "langchain-anthropic", marker = "extra == 'langchain'" },
-    { name = "langchain-core" },
     { name = "langchain-core", marker = "extra == 'langchain'" },
-    { name = "langchain-huggingface" },
     { name = "langchain-huggingface", marker = "extra == 'langchain'" },
-    { name = "langchain-openai" },
     { name = "langchain-openai", marker = "extra == 'langchain'" },
-    { name = "litellm", specifier = ">=1.61.15" },
+    { name = "litellm", specifier = "<1.75.0" },
     { name = "nest-asyncio", specifier = ">=1.6.0" },
     { name = "opentelemetry-exporter-otlp", specifier = ">=1.36.0" },
     { name = "opentelemetry-sdk", specifier = ">=1.36.0" },
     { name = "opentelemetry-semantic-conventions", specifier = ">=0.57b0" },
     { name = "orjson", specifier = ">=3.9.0" },
-    { name = "pre-commit", specifier = ">=4.3.0" },
-    { name = "pytest", specifier = ">=8.4.1" },
     { name = "typer", specifier = ">=0.9.0" },
 ]
 provides-extras = ["langchain", "s3", "trainer"]
@@ -1352,10 +1342,12 @@ dev = [
     { name = "groq", specifier = ">=0.30.0" },
     { name = "langchain-core", specifier = ">=0.3.72" },
     { name = "langgraph", specifier = ">=0.6.4" },
+    { name = "litellm", specifier = "<1.75.0" },
     { name = "mypy", specifier = ">=1.17.1" },
     { name = "openai", specifier = ">=1.78.1" },
     { name = "opentelemetry-instrumentation-openai", specifier = ">=0.44.1" },
     { name = "pre-commit", specifier = ">=4.2.0" },
+    { name = "pytest", specifier = ">=8.4.1" },
     { name = "ruff", specifier = ">=0.9.1,<0.10.0" },
     { name = "together", specifier = ">=1.5.21" },
     { name = "types-pyyaml", specifier = ">=6.0.12.20250516" },
@@ -1497,7 +1489,7 @@ wheels = [
 
 [[package]]
 name = "litellm"
-version = "1.75.3"
+version = "1.74.15.post2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -1512,10 +1504,7 @@ dependencies = [
     { name = "tiktoken" },
     { name = "tokenizers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/09/98/ea40c48fda5121af00e44c9c6d01a0cd8cb9987bb0ce91c6add917d9db9d/litellm-1.75.3.tar.gz", hash = "sha256:a6a0f33884f35a9391a9a4363043114d7f2513ab2e5c2e1fa54c56d695663764", size = 10104437, upload-time = "2025-08-08T14:58:09.423Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/dd/1e/8ef7e7ac7d33f900ae44e9e3a33d668783034e414aa4d7191ae3e4068ec5/litellm-1.75.3-py3-none-any.whl", hash = "sha256:0ff3752b1f1c07f8a4b9a364b1595e2147ae640f1e77cd8312e6f6a5ca0f34ec", size = 8870578, upload-time = "2025-08-08T14:58:06.766Z" },
-]
+sdist = { url = "https://files.pythonhosted.org/packages/8b/03/2a89d9280f595fe293c64adcc3bfbefe7a3677ec0210d293bfac63ae17dc/litellm-1.74.15.post2.tar.gz", hash = "sha256:8eddb1c8a6a5a7048f8ba16e652aba23d6ca996dd87cb853c874ba375aa32479", size = 9713752, upload-time = "2025-08-09T16:28:14.893Z" }
 
 [[package]]
 name = "markdown-it-py"
