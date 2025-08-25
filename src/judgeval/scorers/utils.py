@@ -2,11 +2,7 @@
 Util functions for Scorer objects
 """
 
-import asyncio
-import nest_asyncio
-import orjson
-import re
-from typing import List, Optional
+from typing import List
 
 from judgeval.scorers import BaseScorer
 from judgeval.data import Example, ExampleParams
@@ -21,72 +17,6 @@ def clone_scorers(scorers: List[BaseScorer]) -> List[BaseScorer]:
     for s in scorers:
         cloned_scorers.append(s.model_copy(deep=True))
     return cloned_scorers
-
-
-def parse_response_json(llm_response: str, scorer: Optional[BaseScorer] = None) -> dict:
-    """
-    Extracts JSON output from an LLM response and returns it as a dictionary.
-
-    If the JSON is invalid, the error is forwarded to the `scorer`, if provided.
-
-    Args:
-        llm_response (str): The response from an LLM.
-        scorer (BaseScorer, optional): The scorer object to forward errors to (if any).
-    """
-    start = llm_response.find("{")  # opening bracket
-    end = llm_response.rfind("}") + 1  # closing bracket
-
-    if end == 0 and start != -1:  # add the closing bracket if it's missing
-        llm_response = llm_response + "}"
-        end = len(llm_response)
-
-    json_str = (
-        llm_response[start:end] if start != -1 and end != 0 else ""
-    )  # extract the JSON string
-    json_str = re.sub(
-        r",\s*([\]}])", r"\1", json_str
-    )  # Remove trailing comma if present
-
-    try:
-        return orjson.loads(json_str)
-    except orjson.JSONDecodeError:
-        error_str = "Evaluation LLM outputted an invalid JSON. Please use a stronger evaluation model."
-        if scorer is not None:
-            scorer.error = error_str
-        raise ValueError(error_str)
-    except Exception as e:
-        raise Exception(f"An unexpected error occurred: {str(e)}")
-
-
-def get_or_create_event_loop() -> asyncio.AbstractEventLoop:
-    """
-    Get or create an asyncio event loop.
-
-    This function attempts to retrieve the current event loop using `asyncio.get_event_loop()`.
-    If the event loop is already running, it applies the `nest_asyncio` patch to allow nested
-    asynchronous execution. If the event loop is closed or not found, it creates a new event loop
-    and sets it as the current event loop.
-
-    Returns:
-        asyncio.AbstractEventLoop: The current or newly created event loop.
-
-    Raises:
-        RuntimeError: If the event loop is closed.
-    """
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            print(
-                "Event loop is already running. Applying nest_asyncio patch to allow async execution..."
-            )
-            nest_asyncio.apply()
-
-        if loop.is_closed():
-            raise RuntimeError
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    return loop
 
 
 def check_example_params(
