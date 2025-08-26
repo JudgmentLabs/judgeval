@@ -1,7 +1,7 @@
 import logging
-import os
 import sys
 
+from judgeval.env import JUDGMENT_NO_COLOR
 from judgeval.utils.cache import use_once
 
 RESET = "\033[0m"
@@ -39,7 +39,7 @@ class ColorFormatter(logging.Formatter):
 
 @use_once
 def _setup_judgeval_logger():
-    use_color = sys.stdout.isatty() and os.getenv("JUDGMMENT_NO_COLOR") is None
+    use_color = sys.stdout.isatty() and JUDGMENT_NO_COLOR is None
     handler = logging.StreamHandler(sys.stdout)
     handler.setLevel(logging.DEBUG)
     handler.setFormatter(

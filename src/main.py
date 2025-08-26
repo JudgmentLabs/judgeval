@@ -1,35 +1,26 @@
-import os
-import time
-
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor
 from judgeval.tracer import Tracer
 from judgeval.tracer.exporters import InMemorySpanExporter
 from judgeval.tracer.exporters.store import SpanStore
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
-store = SpanStore()
-
+span_store = SpanStore()
 tracer = Tracer(
     project_name="errors",
-    processors=[SimpleSpanProcessor(InMemorySpanExporter(store=store))],
+    processors=[SimpleSpanProcessor(InMemorySpanExporter(span_store))],
 )
 
 
-@tracer.observe
-def foo(a: int):
-    input("Continue foo?")
-    return bar(3 * a)
+@tracer.observe(span_type="function")
+def fibonacci(n: int) -> int:
+    if n <= 0:
+        return 0
+    elif n == 1:
+        return 1
+    else:
+
+        return fibonacci(n - 1) + fibonacci(n - 2)
 
 
-@tracer.observe
-def bar(a: int):
-    input("Continue bar?")
-    return a + 1
+print(fibonacci(10))
 
-
-@tracer.observe
-def main():
-    foo(10)
-
-
-if __name__ == "__main__":
-    main()
+print(span_store.get_all())

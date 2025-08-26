@@ -11,7 +11,7 @@ from judgeval.scorers import (
 )
 from judgeval.data import Example
 from judgeval.env import JUDGMENT_DEFAULT_TOGETHER_MODEL
-from judgeval.scorers.base_scorer import BaseScorer
+from judgeval.evaluation import ScoringResult
 
 
 def test_ac_scorer(client: JudgmentClient, project_name: str):
@@ -129,37 +129,7 @@ def test_instruction_adherence_scorer(client: JudgmentClient, project_name: str)
     assert res[0].success
 
 
-def test_execution_order_scorer(client: JudgmentClient, project_name: str):
-    EVAL_RUN_NAME = "test-run-execution-order"
-
-    example = Example(
-        input="What is the weather in New York and the stock price of AAPL?",
-        actual_output=[
-            "weather_forecast",
-            "stock_price",
-            "translate_text",
-            "news_headlines",
-        ],
-        expected_output=[
-            "weather_forecast",
-            "stock_price",
-            "news_headlines",
-            "translate_text",
-        ],
-    )
-
-    res = client.run_evaluation(
-        examples=[example],
-        scorers=[BaseScorer(threshold=1, should_consider_ordering=True)],
-        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
-        project_name=project_name,
-        eval_run_name=EVAL_RUN_NAME,
-    )
-
-    assert not res[0].success
-
-
-def print_debug_on_failure(result) -> bool:
+def print_debug_on_failure(result: ScoringResult) -> bool:
     """
     Helper function to print debug info only on test failure
 

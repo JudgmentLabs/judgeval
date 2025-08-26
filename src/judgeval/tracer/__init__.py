@@ -1,5 +1,6 @@
 from __future__ import annotations
 from contextvars import ContextVar
+import atexit
 import functools
 import inspect
 import random
@@ -9,7 +10,6 @@ from typing import (
     Callable,
     Dict,
     List,
-    MutableMapping,
     Optional,
     Tuple,
     Type,
@@ -21,7 +21,6 @@ from typing import (
 from functools import partial
 from warnings import warn
 
-from opentelemetry.context import Context
 from opentelemetry.sdk.trace import SpanProcessor, TracerProvider, Span
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.trace import (
@@ -100,7 +99,7 @@ def resolve_project_id(
 
 
 class Tracer:
-    _active_tracers: MutableMapping[str, Tracer] = {}
+    _active_tracers: List[Tracer] = []
 
     __slots__ = (
         "api_key",
@@ -117,7 +116,6 @@ class Tracer:
         "processors",
         "provider",
         "tracer",
-        "context",
         # Agent
         "agent_context",
         "cost_context",
@@ -137,7 +135,6 @@ class Tracer:
     processors: List[SpanProcessor]
     provider: ABCTracerProvider
     tracer: ABCTracer
-    context: ContextVar[Context]
 
     agent_context: ContextVar[Optional[AgentContext]]
     cost_context: ContextVar[Optional[Dict[str, float]]]
@@ -181,9 +178,6 @@ class Tracer:
         self.processors = processors
         self.provider = NoOpTracerProvider()
 
-        # TODO:
-        self.context = ContextVar(f"judgeval:tracer:{project_name}")
-
         self.agent_context = ContextVar("current_agent_context", default=None)
         self.cost_context = ContextVar("current_cost_context", default=None)
 
@@ -211,6 +205,7 @@ class Tracer:
             resource = Resource.create(resource_attributes)
 
             self.judgment_processor = JudgmentSpanProcessor(
+                self,
                 self.api_url,
                 self.api_key,
                 self.organization_id,
@@ -235,11 +230,12 @@ class Tracer:
         if self.enable_evaluation and self.enable_monitoring:
             self.local_eval_queue.start_workers()
 
-        Tracer._active_tracers[self.project_name] = self
+        Tracer._active_tracers.append(self)
+
+        # Register atexit handler to flush on program exit
+        atexit.register(self._atexit_flush)
 
     def get_current_span(self):
-        # TODO: review, need to maintain context var manually if we dont
-        # want to override the default tracer provider
         return get_current_span()
 
     def get_tracer(self):
@@ -252,7 +248,7 @@ class Tracer:
         return self.cost_context
 
     def set_customer_id(self, customer_id: str) -> None:
-        span = get_current_span()
+        span = self.get_current_span()
         if span and span.is_recording():
             span.set_attribute(AttributeKeys.JUDGMENT_CUSTOMER_ID, customer_id)
 
@@ -264,7 +260,7 @@ class Tracer:
             new_cumulative_cost = float(current_cumulative_cost) + cost
             current_cost_context["cumulative_cost"] = new_cumulative_cost
 
-            span = get_current_span()
+            span = self.get_current_span()
             if span and span.is_recording():
                 span.set_attribute(
                     AttributeKeys.JUDGMENT_CUMULATIVE_LLM_COST, new_cumulative_cost
@@ -620,9 +616,39 @@ class Tracer:
         return wrap_provider(self, client)
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
+        """Force flush all pending spans and block until completion.
+
+        Args:
+            timeout_millis: Maximum time to wait for flush completion in milliseconds
+
+        Returns:
+            True if all processors flushed successfully within timeout, False otherwise
+        """
+        success = True
         for processor in self.processors:
-            processor.force_flush(timeout_millis)
-        return True
+            try:
+                result = processor.force_flush(timeout_millis)
+                if not result:
+                    success = False
+            except Exception as e:
+                judgeval_logger.warning(f"Error flushing processor {processor}: {e}")
+                success = False
+        return success
+
+    def _atexit_flush(self) -> None:
+        """Internal method called on program exit to flush remaining spans.
+
+        This blocks until all spans are flushed or timeout is reached to ensure
+        proper cleanup before program termination.
+        """
+        try:
+            success = self.force_flush(timeout_millis=30000)
+            if not success:
+                judgeval_logger.warning(
+                    "Some spans may not have been exported before program exit"
+                )
+        except Exception as e:
+            judgeval_logger.warning(f"Error during atexit flush: {e}")
 
     def async_evaluate(
         self,
@@ -749,7 +775,7 @@ def wrap(client: ApiClient) -> ApiClient:
         )
 
     wrapped_client = client
-    for tracer in Tracer._active_tracers.values():
+    for tracer in Tracer._active_tracers:
         wrapped_client = tracer.wrap(wrapped_client)
     return wrapped_client
 

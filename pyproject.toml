@@ -19,21 +19,13 @@ license-files = ["LICENSE.md"]
 dependencies = [
     "dotenv",
     "httpx>=0.28.1",
-    "litellm>=1.61.15",
-    "nest-asyncio>=1.6.0",
+    "litellm<1.75.0",                             # https://github.com/BerriAI/litellm/issues/13081
     "opentelemetry-exporter-otlp>=1.36.0",
     "opentelemetry-sdk>=1.36.0",
     "opentelemetry-semantic-conventions>=0.57b0",
     "orjson>=3.9.0",
-    "nest-asyncio>=1.6.0",
-    "langchain-huggingface",
-    "langchain-openai",
-    "langchain-anthropic",
-    "langchain-core",
     "click<8.2.0",
     "typer>=0.9.0",
-    "pre-commit>=4.3.0",
-    "pytest>=8.4.1",
     "boto3>=1.40.11",
 ]
 
@@ -79,6 +71,9 @@ dev = [
     "together>=1.5.21",
     "types-pyyaml>=6.0.12.20250516",
     "pre-commit>=4.2.0",
+    "pytest>=8.4.1",
+    "types-tqdm>=4.67.0.20250809",
+    "pytest-asyncio>=1.1.0",
 ]
 
 
@@ -94,4 +89,5 @@ exclude = ["docs"]
 ignore = [
     "F403",
     "F405",
+    "E402",
 ] # F403: star import, F405: undefined name from star import

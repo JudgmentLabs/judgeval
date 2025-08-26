@@ -3,7 +3,7 @@ This module contains utility functions for judge models.
 """
 
 import litellm
-from typing import Optional, Union, Tuple, List
+from typing import Optional, Union, Tuple
 
 from judgeval.exceptions import InvalidJudgeModelError
 from judgeval.judges import JudgevalJudge, LiteLLMJudge, TogetherJudge
@@ -11,7 +11,6 @@ from judgeval.env import JUDGMENT_DEFAULT_GPT_MODEL
 from judgeval.constants import (
     TOGETHER_SUPPORTED_MODELS,
     JUDGMENT_SUPPORTED_MODELS,
-    ACCEPTABLE_MODELS,
 )
 
 LITELLM_SUPPORTED_MODELS = set(litellm.model_list)
