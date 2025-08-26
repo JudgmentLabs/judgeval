@@ -16,7 +16,6 @@ class TraceSpan(JudgmentTraceSpan):
         return {
             "span_id": self.span_id,
             "trace_id": self.trace_id,
-            "depth": self.depth,
             "created_at": datetime.fromtimestamp(
                 self.created_at, tz=timezone.utc
             ).isoformat(),
