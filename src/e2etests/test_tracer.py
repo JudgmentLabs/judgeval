@@ -1,0 +1,258 @@
+from judgeval.tracer import Tracer
+from judgeval.data import Example
+from judgeval.scorers import AnswerRelevancyScorer
+import time
+from openai import OpenAI, AsyncOpenAI
+from anthropic import Anthropic, AsyncAnthropic
+from groq import Groq, AsyncGroq
+from together import Together, AsyncTogether
+from google import genai
+from e2etests.utils import retrieve_trace, retrieve_score
+from judgeval.tracer import wrap
+import os
+import random
+import pytest
+
+judgment = Tracer(
+    project_name="e2e-tests-gkzqvtrbwnyl",
+)
+
+# Wrap clients
+openai_client = wrap(OpenAI())
+anthropic_client = wrap(Anthropic())
+groq_client = wrap(Groq(api_key=os.getenv("GROQ_API_KEY")))
+together_client = wrap(Together(api_key=os.getenv("TOGETHER_API_KEY")))
+google_client = wrap(genai.Client(api_key=os.getenv("GOOGLE_API_KEY")))
+
+# Async clients
+openai_client_async = wrap(AsyncOpenAI())
+anthropic_client_async = wrap(AsyncAnthropic())
+groq_client_async = wrap(AsyncGroq(api_key=os.getenv("GROQ_API_KEY")))
+together_client_async = wrap(AsyncTogether(api_key=os.getenv("TOGETHER_API_KEY")))
+
+QUERY_RETRY = 15
+PROMPT = "I need you to solve this math problem: 1 + 1 = ?"
+
+
+@judgment.observe(span_type="function")
+def scorer_span():
+    """Generate a travel itinerary using the researched data."""
+    judgment.async_evaluate(
+        example=Example(
+            input="Tell me the weather in Paris.",
+            actual_output="The weather in France is sunny and 72°F.",
+        ),
+        scorer=AnswerRelevancyScorer(),
+        model="gpt-4o-mini",
+        sampling_rate=1,
+    )
+
+    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+
+
+@judgment.observe(span_type="function")
+def recursive_function(number: int):
+    if number <= 1:
+        trace_id = format(
+            judgment.get_current_span().get_span_context().trace_id, "032x"
+        )
+        return trace_id
+    else:
+        return recursive_function(number - 1)
+
+
+@judgment.observe()
+def openai_llm_call():
+    openai_client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": PROMPT},
+        ],
+    )
+    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+
+
+@judgment.observe()
+def anthropic_llm_call():
+    anthropic_client.messages.create(
+        model="claude-3-haiku-20240307",
+        messages=[{"role": "user", "content": PROMPT}],
+        max_tokens=30,
+    )
+
+    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+
+
+@judgment.observe()
+def groq_llm_call():
+    groq_client.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": PROMPT},
+        ],
+    )
+    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+
+
+@judgment.observe()
+def together_llm_call():
+    together_client.chat.completions.create(
+        model="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": PROMPT},
+        ],
+    )
+    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+
+
+@judgment.observe()
+def google_llm_call():
+    google_client.models.generate_content(model="gemini-2.0-flash", contents=PROMPT)
+    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+
+
+@judgment.observe()
+async def openai_async_llm_call():
+    await openai_client_async.chat.completions.create(
+        model="gpt-4o-mini", messages=[{"role": "user", "content": PROMPT}]
+    )
+    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+
+
+@judgment.observe()
+async def anthropic_async_llm_call():
+    await anthropic_client_async.messages.create(
+        model="claude-3-haiku-20240307",
+        messages=[{"role": "user", "content": PROMPT}],
+        max_tokens=30,
+    )
+    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+
+
+@judgment.observe()
+async def groq_async_llm_call():
+    await groq_client_async.chat.completions.create(
+        model="llama-3.1-8b-instant", messages=[{"role": "user", "content": PROMPT}]
+    )
+    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+
+
+@judgment.observe()
+async def together_async_llm_call():
+    await together_client_async.chat.completions.create(
+        model="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+        messages=[{"role": "user", "content": PROMPT}],
+    )
+    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+
+
+def retrieve_trace_helper(trace_id, expected_span_amount):
+    query_count = 0
+    while query_count < QUERY_RETRY:
+        val = retrieve_trace(trace_id)
+        if len(val) == expected_span_amount:
+            break
+        query_count += 1
+        time.sleep(1)
+
+    if query_count == QUERY_RETRY:
+        assert False, f"Got {len(val)} spans, expected {expected_span_amount}"
+
+    return val
+
+
+def retrieve_llm_cost_helper(trace_id):
+    trace_spans = retrieve_trace_helper(trace_id, 2)
+
+    total_llm_cost = 0
+    for span in trace_spans:
+        llm_cost = span.get("span_attributes", {}).get(
+            "judgment.cumulative_llm_cost", 0
+        )
+        total_llm_cost += llm_cost
+
+    if total_llm_cost == 0:
+        assert False, "No LLM cost found"
+
+    return total_llm_cost
+
+
+def test_trace_spans():
+    random_number = random.randint(10, 50)
+    trace_id = recursive_function(random_number)
+    retrieve_trace_helper(trace_id, random_number)
+
+
+def test_openai_llm_cost():
+    trace_id = openai_llm_call()
+    retrieve_llm_cost_helper(trace_id)
+
+
+def test_anthropic_llm_cost():
+    trace_id = anthropic_llm_call()
+    retrieve_llm_cost_helper(trace_id)
+
+
+def test_groq_llm_cost():
+    trace_id = groq_llm_call()
+    retrieve_llm_cost_helper(trace_id)
+
+
+def test_together_llm_cost():
+    trace_id = together_llm_call()
+    retrieve_llm_cost_helper(trace_id)
+
+
+def test_google_llm_cost():
+    trace_id = google_llm_call()
+    retrieve_llm_cost_helper(trace_id)
+
+
+@pytest.mark.asyncio
+async def test_openai_async_llm_cost():
+    trace_id = await openai_async_llm_call()
+    retrieve_llm_cost_helper(trace_id)
+
+
+@pytest.mark.asyncio
+async def test_anthropic_async_llm_cost():
+    trace_id = await anthropic_async_llm_call()
+    retrieve_llm_cost_helper(trace_id)
+
+
+@pytest.mark.asyncio
+async def test_groq_async_llm_cost():
+    trace_id = await groq_async_llm_call()
+    retrieve_llm_cost_helper(trace_id)
+
+
+@pytest.mark.asyncio
+async def test_together_async_llm_cost():
+    trace_id = await together_async_llm_call()
+    retrieve_llm_cost_helper(trace_id)
+
+
+def test_trace_scoring():
+    trace_id = scorer_span()
+    trace_spans = retrieve_trace_helper(trace_id, 1)
+    span_id = trace_spans[0].get("span_id")
+
+    query_count = 0
+    while query_count < QUERY_RETRY:
+        scorer_data = retrieve_score(span_id, trace_id)
+        if scorer_data:
+            break
+        query_count += 1
+        time.sleep(1)
+
+    print(scorer_data)
+    if query_count == QUERY_RETRY:
+        assert False, "No score found"
+
+    score = scorer_data[0].get("scorer_data")
+    assert score[0].get("name") == "Answer Relevancy"
+    assert score[0].get("success")
+    assert score[0].get("score") == 1.0

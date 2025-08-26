@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Mapping, Literal, Optional
+from typing import Dict, Any, Mapping, Literal, Optional
 import httpx
 from httpx import Response
 from judgeval.exceptions import JudgmentAPIError
@@ -210,6 +210,20 @@ class JudgmentSyncClient:
             payload,
         )
 
+    def e2e_fetch_trace(self, payload: TraceIdRequest) -> Any:
+        return self._request(
+            "POST",
+            url_for("/e2e/fetch_trace/"),
+            payload,
+        )
+
+    def e2e_fetch_span_score(self, payload: SpanScoreRequest) -> Any:
+        return self._request(
+            "POST",
+            url_for("/e2e/fetch_span_score/"),
+            payload,
+        )
+
 
 class JudgmentAsyncClient:
     __slots__ = ("api_key", "organization_id", "client")
@@ -401,6 +415,20 @@ class JudgmentAsyncClient:
         return await self._request(
             "POST",
             url_for("/projects/resolve/"),
+            payload,
+        )
+
+    async def e2e_fetch_trace(self, payload: TraceIdRequest) -> Any:
+        return await self._request(
+            "POST",
+            url_for("/e2e/fetch_trace/"),
+            payload,
+        )
+
+    async def e2e_fetch_span_score(self, payload: SpanScoreRequest) -> Any:
+        return await self._request(
+            "POST",
+            url_for("/e2e/fetch_span_score/"),
             payload,
         )
 

@@ -73,6 +73,7 @@ dev = [
     "pre-commit>=4.2.0",
     "pytest>=8.4.1",
     "types-tqdm>=4.67.0.20250809",
+    "pytest-asyncio>=1.1.0",
 ]
 
 
