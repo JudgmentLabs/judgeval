@@ -19,7 +19,7 @@ license-files = ["LICENSE.md"]
 dependencies = [
     "dotenv",
     "httpx>=0.28.1",
-    "litellm<1.75.0",                             # https://github.com/BerriAI/litellm/issues/13081
+    "litellm<1.75.0", # https://github.com/BerriAI/litellm/issues/13081
     "opentelemetry-exporter-otlp>=1.36.0",
     "opentelemetry-sdk>=1.36.0",
     "opentelemetry-semantic-conventions>=0.57b0",
@@ -72,6 +72,7 @@ dev = [
     "types-pyyaml>=6.0.12.20250516",
     "pre-commit>=4.2.0",
     "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
     "types-tqdm>=4.67.0.20250809",
     "pytest-asyncio>=1.1.0",
 ]
