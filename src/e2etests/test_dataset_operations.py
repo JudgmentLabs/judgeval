@@ -100,6 +100,9 @@ def test_pull_dataset(client: JudgmentClient, project_name: str):
     dataset2 = Dataset.get(name=random_name2, project_name=project_name)
 
     assert dataset1, "Failed to pull dataset"
+    assert dataset1.name == random_name1, (
+        "Dataset name should be the same as the one used to create it"
+    )
     assert len(dataset1.examples) == 3, "Dataset should have 3 examples"
     for i, e in enumerate(dataset1.examples, start=1):
         assert e.input == f"input {i}", (
@@ -110,6 +113,9 @@ def test_pull_dataset(client: JudgmentClient, project_name: str):
         )
 
     assert dataset2, "Failed to pull dataset"
+    assert dataset2.name == random_name2, (
+        "Dataset name should be the same as the one used to create it"
+    )
     assert len(dataset2.examples) == 2, "Dataset should have 2 examples"
     for i, e in enumerate(dataset2.examples, start=4):
         assert e.input == f"input {i}", (

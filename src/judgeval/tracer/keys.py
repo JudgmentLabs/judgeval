@@ -13,6 +13,7 @@ class AttributeKeys(str, Enum):
     JUDGMENT_INPUT = "judgment.input"
     JUDGMENT_OUTPUT = "judgment.output"
     JUDGMENT_OFFLINE_MODE = "judgment.offline_mode"
+    JUDGMENT_UPDATE_ID = "judgment.update_id"
 
     # Custom tracking attributes
     JUDGMENT_CUSTOMER_ID = "judgment.customer_id"
@@ -26,7 +27,6 @@ class AttributeKeys(str, Enum):
     JUDGMENT_CUMULATIVE_LLM_COST = "judgment.cumulative_llm_cost"
     JUDGMENT_STATE_BEFORE = "judgment.state_before"
     JUDGMENT_STATE_AFTER = "judgment.state_after"
-    JUDGMENT_UPDATE_ID = "judgment.update_id"
 
     # GenAI-specific attributes (semantic conventions)
     GEN_AI_PROMPT = gen_ai_attributes.GEN_AI_PROMPT
