@@ -5,7 +5,7 @@ client = JudgmentSyncClient(api_key=JUDGMENT_API_KEY, organization_id=JUDGMENT_O
 
 
 def delete_project(project_name: str):
-    client.projects_delete(payload={"project_name": project_name})
+    client.projects_delete_from_judgeval(payload={"project_name": project_name})
 
 
 def create_project(project_name: str):
