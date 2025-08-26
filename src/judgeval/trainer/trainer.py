@@ -200,6 +200,9 @@ class JudgmentTrainer:
                     print(f"Warning: Failed to get message history from trace: {e}")
                     pass
 
+                finally:
+                    self.span_store.spans = []
+
                 example = Example(
                     input=prompt_input,
                     messages=messages,
