@@ -17,6 +17,7 @@ from judgeval.tracer.llm.providers import (
 from judgeval.tracer.managers import sync_span_context, async_span_context
 from judgeval.tracer.keys import AttributeKeys
 from judgeval.utils.serialize import safe_serialize
+from judgeval.tracer.utils import set_span_attribute
 
 if TYPE_CHECKING:
     from judgeval.tracer import Tracer
@@ -54,34 +55,36 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
                 tracer, span_name, {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
             ) as span:
                 tracer.add_agent_attributes_to_span(span)
-                span.set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
+                set_span_attribute(
+                    span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
+                )
                 try:
                     response = function(*args, **kwargs)
                     output, usage = _format_output_data(client, response)
-                    if output:
-                        span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, output)
+                    set_span_attribute(span, AttributeKeys.GEN_AI_COMPLETION, output)
                     if usage:
-                        if usage.prompt_tokens:
-                            span.set_attribute(
-                                AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
-                                usage.prompt_tokens,
-                            )
-                        if usage.completion_tokens:
-                            span.set_attribute(
-                                AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
-                                usage.completion_tokens,
-                            )
-                            span.set_attribute(
-                                AttributeKeys.GEN_AI_USAGE_COMPLETION_TOKENS,
-                                usage.completion_tokens,
-                            )
-                        if usage.total_cost_usd:
-                            span.set_attribute(
-                                AttributeKeys.GEN_AI_USAGE_TOTAL_COST,
-                                usage.total_cost_usd,
-                            )
-                            # Add cost to cumulative context tracking
-                            tracer.add_cost_to_current_context(usage.total_cost_usd)
+                        set_span_attribute(
+                            span,
+                            AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
+                            usage.prompt_tokens,
+                        )
+                        set_span_attribute(
+                            span,
+                            AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
+                            usage.completion_tokens,
+                        )
+                        set_span_attribute(
+                            span,
+                            AttributeKeys.GEN_AI_USAGE_COMPLETION_TOKENS,
+                            usage.completion_tokens,
+                        )
+
+                        set_span_attribute(
+                            span,
+                            AttributeKeys.GEN_AI_USAGE_TOTAL_COST,
+                            usage.total_cost_usd,
+                        )
+                        tracer.add_cost_to_current_context(usage.total_cost_usd)
                     return response
                 except Exception as e:
                     span.record_exception(e)
@@ -96,33 +99,35 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
                 tracer, span_name, {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
             ) as span:
                 tracer.add_agent_attributes_to_span(span)
-                span.set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
+                set_span_attribute(
+                    span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
+                )
                 try:
                     response = await function(*args, **kwargs)
                     output, usage = _format_output_data(client, response)
-                    if output:
-                        span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, output)
+                    set_span_attribute(span, AttributeKeys.GEN_AI_COMPLETION, output)
                     if usage:
-                        if usage.prompt_tokens:
-                            span.set_attribute(
-                                AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
-                                usage.prompt_tokens,
-                            )
-                        if usage.completion_tokens:
-                            span.set_attribute(
-                                AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
-                                usage.completion_tokens,
-                            )
-                            span.set_attribute(
-                                AttributeKeys.GEN_AI_USAGE_COMPLETION_TOKENS,
-                                usage.completion_tokens,
-                            )
-                        if usage.total_cost_usd:
-                            span.set_attribute(
-                                AttributeKeys.GEN_AI_USAGE_TOTAL_COST,
-                                usage.total_cost_usd,
-                            )
-                            tracer.add_cost_to_current_context(usage.total_cost_usd)
+                        set_span_attribute(
+                            span,
+                            AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
+                            usage.prompt_tokens,
+                        )
+                        set_span_attribute(
+                            span,
+                            AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
+                            usage.completion_tokens,
+                        )
+                        set_span_attribute(
+                            span,
+                            AttributeKeys.GEN_AI_USAGE_COMPLETION_TOKENS,
+                            usage.completion_tokens,
+                        )
+                        set_span_attribute(
+                            span,
+                            AttributeKeys.GEN_AI_USAGE_TOTAL_COST,
+                            usage.total_cost_usd,
+                        )
+                        tracer.add_cost_to_current_context(usage.total_cost_usd)
                     return response
                 except Exception as e:
                     span.record_exception(e)
@@ -216,9 +221,9 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
         )
 
         assert google_genai_Client is not None, "Google GenAI client not found"
-        assert google_genai_AsyncClient is not None, (
-            "Google GenAI async client not found"
-        )
+        assert (
+            google_genai_AsyncClient is not None
+        ), "Google GenAI async client not found"
         span_name = "GOOGLE_API_CALL"
         if isinstance(client, google_genai_Client):
             setattr(
@@ -278,9 +283,9 @@ def _format_output_data(
         assert openai_AsyncOpenAI is not None, "OpenAI async client not found"
         assert openai_ChatCompletion is not None, "OpenAI chat completion not found"
         assert openai_Response is not None, "OpenAI response not found"
-        assert openai_ParsedChatCompletion is not None, (
-            "OpenAI parsed chat completion not found"
-        )
+        assert (
+            openai_ParsedChatCompletion is not None
+        ), "OpenAI parsed chat completion not found"
 
         if isinstance(client, openai_OpenAI) or isinstance(client, openai_AsyncOpenAI):
             if isinstance(response, openai_ChatCompletion):
@@ -394,9 +399,9 @@ def _format_output_data(
         )
 
         assert google_genai_Client is not None, "Google GenAI client not found"
-        assert google_genai_AsyncClient is not None, (
-            "Google GenAI async client not found"
-        )
+        assert (
+            google_genai_AsyncClient is not None
+        ), "Google GenAI async client not found"
         if isinstance(client, google_genai_Client) or isinstance(
             client, google_genai_AsyncClient
         ):

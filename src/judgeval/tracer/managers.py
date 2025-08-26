@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Dict, Optional, List, Any
 from judgeval.tracer.keys import AttributeKeys
 import uuid
 from judgeval.exceptions import JudgmentRuntimeError
+from judgeval.tracer.utils import set_span_attribute
 
 if TYPE_CHECKING:
     from judgeval.tracer import Tracer
@@ -30,8 +31,7 @@ def sync_span_context(
             name=name,
             attributes=span_attributes,
         ) as span:
-            # Set initial cumulative cost attribute
-            span.set_attribute(AttributeKeys.JUDGMENT_CUMULATIVE_LLM_COST, 0.0)
+            set_span_attribute(span, AttributeKeys.JUDGMENT_CUMULATIVE_LLM_COST, 0.0)
             yield span
     finally:
         current_cost_context.reset(cost_token)
@@ -57,7 +57,7 @@ async def async_span_context(
             name=name,
             attributes=span_attributes,
         ) as span:
-            span.set_attribute(AttributeKeys.JUDGMENT_CUMULATIVE_LLM_COST, 0.0)
+            set_span_attribute(span, AttributeKeys.JUDGMENT_CUMULATIVE_LLM_COST, 0.0)
             yield span
     finally:
         current_cost_context.reset(cost_token)
