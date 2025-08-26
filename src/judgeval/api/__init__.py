@@ -120,15 +120,6 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def datasets_fetch_stats_by_project(
-        self, payload: DatasetFetchStatsByProject
-    ) -> Any:
-        return self._request(
-            "POST",
-            url_for("/datasets/fetch_stats_by_project/"),
-            payload,
-        )
-
     def datasets_push(self, payload: DatasetPush) -> Any:
         return self._request(
             "POST",
@@ -178,13 +169,6 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def projects_delete(self, payload: ProjectDelete) -> ProjectDeleteResponse:
-        return self._request(
-            "DELETE",
-            url_for("/projects/delete_from_judgeval/"),
-            payload,
-        )
-
     def scorer_exists(self, payload: ScorerExistsRequest) -> ScorerExistsResponse:
         return self._request(
             "POST",
@@ -196,15 +180,6 @@ class JudgmentSyncClient:
         return self._request(
             "POST",
             url_for("/save_scorer/"),
-            payload,
-        )
-
-    def upload_custom_scorer(
-        self, payload: UploadCustomScorerRequest
-    ) -> UploadCustomScorerResponse:
-        return self._request(
-            "POST",
-            url_for("/upload_custom_scorer/"),
             payload,
         )
 
@@ -326,26 +301,10 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def datasets_fetch_stats_by_project(
-        self, payload: DatasetFetchStatsByProject
-    ) -> Any:
-        return await self._request(
-            "POST",
-            url_for("/datasets/fetch_stats_by_project/"),
-            payload,
-        )
-
     async def datasets_push(self, payload: DatasetPush) -> Any:
         return await self._request(
             "POST",
             url_for("/datasets/push/"),
-            payload,
-        )
-
-    async def datasets_delete(self, payload: DatasetDelete) -> Any:
-        return await self._request(
-            "POST",
-            url_for("/datasets/delete/"),
             payload,
         )
 

@@ -21,6 +21,7 @@ class APIScorerType(str, Enum):
     EXECUTION_ORDER = "Execution Order"
     DERAILMENT = "Derailment"
     TOOL_ORDER = "Tool Order"
+    MOCK_TRACE_SCORER = "Mock Trace Scorer"
     CLASSIFIER = "Classifier"
     TOOL_DEPENDENCY = "Tool Dependency"
     CUSTOM = "Custom"

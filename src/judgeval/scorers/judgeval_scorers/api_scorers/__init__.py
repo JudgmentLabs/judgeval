@@ -20,6 +20,9 @@ from judgeval.scorers.judgeval_scorers.api_scorers.prompt_scorer import (
 from judgeval.scorers.judgeval_scorers.api_scorers.tool_dependency import (
     ToolDependencyScorer,
 )
+from judgeval.scorers.judgeval_scorers.api_scorers.mock_trace_scorer import (
+    MockTraceScorer,
+)
 
 __all__ = [
     "FaithfulnessScorer",
@@ -30,4 +33,5 @@ __all__ = [
     "ToolOrderScorer",
     "PromptScorer",
     "ToolDependencyScorer",
+    "MockTraceScorer",
 ]
