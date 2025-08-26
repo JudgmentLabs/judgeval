@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Mapping, Literal, Optional
+from typing import Dict, Any, Mapping, Literal, Optional
 import httpx
 from httpx import Response
 from judgeval.exceptions import JudgmentAPIError
@@ -169,6 +169,15 @@ class JudgmentSyncClient:
             payload,
         )
 
+    def projects_delete_from_judgeval(
+        self, payload: ProjectDeleteFromJudgevalResponse
+    ) -> ProjectDeleteResponse:
+        return self._request(
+            "DELETE",
+            url_for("/projects/delete_from_judgeval/"),
+            payload,
+        )
+
     def scorer_exists(self, payload: ScorerExistsRequest) -> ScorerExistsResponse:
         return self._request(
             "POST",
@@ -207,6 +216,20 @@ class JudgmentSyncClient:
         return self._request(
             "POST",
             url_for("/projects/resolve/"),
+            payload,
+        )
+
+    def e2e_fetch_trace(self, payload: TraceIdRequest) -> Any:
+        return self._request(
+            "POST",
+            url_for("/e2e_fetch_trace/"),
+            payload,
+        )
+
+    def e2e_fetch_span_score(self, payload: SpanScoreRequest) -> Any:
+        return self._request(
+            "POST",
+            url_for("/e2e_fetch_span_score/"),
             payload,
         )
 
@@ -361,6 +384,15 @@ class JudgmentAsyncClient:
             payload,
         )
 
+    async def projects_delete_from_judgeval(
+        self, payload: ProjectDeleteFromJudgevalResponse
+    ) -> ProjectDeleteResponse:
+        return await self._request(
+            "DELETE",
+            url_for("/projects/delete_from_judgeval/"),
+            payload,
+        )
+
     async def scorer_exists(self, payload: ScorerExistsRequest) -> ScorerExistsResponse:
         return await self._request(
             "POST",
@@ -401,6 +433,20 @@ class JudgmentAsyncClient:
         return await self._request(
             "POST",
             url_for("/projects/resolve/"),
+            payload,
+        )
+
+    async def e2e_fetch_trace(self, payload: TraceIdRequest) -> Any:
+        return await self._request(
+            "POST",
+            url_for("/e2e_fetch_trace/"),
+            payload,
+        )
+
+    async def e2e_fetch_span_score(self, payload: SpanScoreRequest) -> Any:
+        return await self._request(
+            "POST",
+            url_for("/e2e_fetch_span_score/"),
             payload,
         )
 
