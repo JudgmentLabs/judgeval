@@ -10,18 +10,6 @@ from judgeval.data.judgment_types import EvaluationRun as EvaluationRunJudgmentT
 
 
 class EvaluationRun(EvaluationRunJudgmentType):
-    """
-    Stores example and evaluation scorers together for running an eval task
-
-    Args:
-        project_name (str): The name of the project the evaluation results belong to
-        eval_name (str): A name for this evaluation run
-        examples (List[Example]): The examples to evaluate
-        scorers (List[Union[BaseScorer, APIScorerConfig]]): A list of scorers to use for evaluation
-        model (str): The model used as a judge when using LLM as a Judge
-        metadata (Optional[Dict[str, Any]]): Additional metadata to include for this evaluation run, e.g. comments, dataset name, purpose, etc.
-    """
-
     id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()))
     created_at: Optional[str] = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
@@ -57,18 +45,8 @@ class EvaluationRun(EvaluationRunJudgmentType):
         data = super().model_dump(**kwargs)
         data["custom_scorers"] = [s.model_dump() for s in self.custom_scorers]
         data["judgment_scorers"] = [s.model_dump() for s in self.judgment_scorers]
-        data["examples"] = [example.model_dump() for example in self.examples]
 
         return data
-
-    @field_validator("examples")
-    def validate_examples(cls, v):
-        if not v:
-            raise ValueError("Examples cannot be empty.")
-        for item in v:
-            if not isinstance(item, Example):
-                raise ValueError(f"Item of type {type(item)} is not a Example")
-        return v
 
     @model_validator(mode="after")
     @classmethod
@@ -102,3 +80,52 @@ class EvaluationRun(EvaluationRunJudgmentType):
                     f"Model name {v} not recognized. Please select a valid model name.)"
                 )
             return v
+
+
+class ExampleEvaluationRun(EvaluationRun):
+    """
+    Stores example and evaluation scorers together for running an eval task
+
+    Args:
+        project_name (str): The name of the project the evaluation results belong to
+        eval_name (str): A name for this evaluation run
+        examples (List[Example]): The examples to evaluate
+        scorers (List[Union[BaseScorer, APIScorerConfig]]): A list of scorers to use for evaluation
+        model (str): The model used as a judge when using LLM as a Judge
+    """
+
+    examples: List[Example]
+
+    @field_validator("examples")
+    def validate_examples(cls, v):
+        if not v:
+            raise ValueError("Examples cannot be empty.")
+        for item in v:
+            if not isinstance(item, Example):
+                raise ValueError(f"Item of type {type(item)} is not a Example")
+        return v
+
+    def model_dump(self, **kwargs):
+        data = super().model_dump(**kwargs)
+        data["examples"] = [example.model_dump() for example in self.examples]
+        return data
+
+
+class TraceEvaluationRun(EvaluationRun):
+    @field_validator("examples")
+    def validate_examples(cls, v):
+        if v:
+            raise ValueError("Examples are not supported for trace evaluations.")
+        return v
+
+    @field_validator("trace_id")
+    def validate_trace_id(cls, v):
+        if not v:
+            raise ValueError("Trace ID is required for trace evaluations.")
+        return v
+
+    @field_validator("trace_span_id")
+    def validate_trace_span_id(cls, v):
+        if not v:
+            raise ValueError("Trace span ID is required for trace evaluations.")
+        return v

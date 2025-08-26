@@ -3,12 +3,12 @@
 """
 
 # Internal imports
-from judgeval.scorers.api_scorer import APIScorerConfig
+from judgeval.scorers.trace_api_scorer import TraceAPIScorerConfig
 from judgeval.constants import APIScorerType
 from typing import Optional, Dict
 
 
-class ToolDependencyScorer(APIScorerConfig):
+class ToolDependencyScorer(TraceAPIScorerConfig):
     kwargs: Optional[Dict] = None
 
     def __init__(self, threshold: float = 1.0, enable_param_checking: bool = True):

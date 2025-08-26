@@ -227,7 +227,7 @@ class EvaluationRun(TypedDict):
     id: NotRequired[Optional[str]]
     project_name: NotRequired[Optional[str]]
     eval_name: NotRequired[Optional[str]]
-    examples: List[Example]
+    examples: NotRequired[Optional[List[Example]]]
     custom_scorers: NotRequired[List[BaseScorer]]
     judgment_scorers: NotRequired[List[ScorerConfig]]
     model: str

@@ -21,7 +21,7 @@ from typing import (
 from functools import partial
 from warnings import warn
 
-from opentelemetry.sdk.trace import SpanProcessor, TracerProvider
+from opentelemetry.sdk.trace import SpanProcessor, TracerProvider, Span
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.trace import (
     Status,
@@ -32,7 +32,7 @@ from opentelemetry.trace import (
     get_current_span,
 )
 
-from judgeval.data.evaluation_run import EvaluationRun
+from judgeval.data.evaluation_run import ExampleEvaluationRun, TraceEvaluationRun
 from judgeval.data.example import Example
 from judgeval.env import (
     JUDGMENT_API_KEY,
@@ -78,6 +78,12 @@ class AgentContext(TypedDict):
     instance: Any
     is_agent_entry_point: bool
     parent_agent_id: str | None
+
+
+class TraceScorerConfig(TypedDict):
+    scorer: BaseScorer
+    sampling_rate: float
+    model: str
 
 
 def resolve_project_id(
@@ -325,8 +331,32 @@ class Tracer:
                 safe_serialize(attributes),
             )
 
+    def _set_pending_trace_eval(self, span: Span, scorer_config: TraceScorerConfig):
+        span_context = span.get_span_context()
+        trace_id = format(span_context.trace_id, "032x")
+        span_id = format(span_context.span_id, "016x")
+        eval_run_name = f"async_trace_evaluate_{span_id}"
+        scorer = scorer_config.get("scorer")
+        model = scorer_config.get("model")
+        eval_run = TraceEvaluationRun(
+            organization_id=self.organization_id,
+            project_name=self.project_name,
+            eval_name=eval_run_name,
+            scorers=[scorer],
+            model=model,
+            trace_span_id=span_id,
+            trace_id=trace_id,
+        )
+        span.set_attribute(
+            "pending_trace_eval", safe_serialize(eval_run.model_dump(warnings=False))
+        )
+
     def _wrap_sync(
-        self, f: Callable, name: Optional[str], attributes: Optional[Dict[str, Any]]
+        self,
+        f: Callable,
+        name: Optional[str],
+        attributes: Optional[Dict[str, Any]],
+        scorer_config: TraceScorerConfig | None = None,
     ):
         @functools.wraps(f)
         def wrapper(*args, **kwargs):
@@ -340,6 +370,9 @@ class Tracer:
                         AttributeKeys.JUDGMENT_INPUT,
                         safe_serialize(format_inputs(f, args, kwargs)),
                     )
+
+                    if scorer_config:
+                        self._set_pending_trace_eval(span, scorer_config)
 
                     self.judgment_processor.emit_partial()
 
@@ -358,7 +391,11 @@ class Tracer:
         return wrapper
 
     def _wrap_async(
-        self, f: Callable, name: Optional[str], attributes: Optional[Dict[str, Any]]
+        self,
+        f: Callable,
+        name: Optional[str],
+        attributes: Optional[Dict[str, Any]],
+        scorer_config: TraceScorerConfig | None = None,
     ):
         @functools.wraps(f)
         async def wrapper(*args, **kwargs):
@@ -372,6 +409,9 @@ class Tracer:
                         AttributeKeys.JUDGMENT_INPUT,
                         safe_serialize(format_inputs(f, args, kwargs)),
                     )
+
+                    if scorer_config:
+                        self._set_pending_trace_eval(span, scorer_config)
 
                     self.judgment_processor.emit_partial()
 
@@ -389,18 +429,37 @@ class Tracer:
         return wrapper
 
     @overload
-    def observe(self, func: C, /, *, span_type: str | None = None) -> C: ...
+    def observe(
+        self,
+        func: C,
+        /,
+        *,
+        span_type: str | None = None,
+        scorer_config: TraceScorerConfig | None = None,
+    ) -> C: ...
 
     @overload
     def observe(
-        self, func: None = None, /, *, span_type: str | None = None
+        self,
+        func: None = None,
+        /,
+        *,
+        span_type: str | None = None,
+        scorer_config: TraceScorerConfig | None = None,
     ) -> Callable[[C], C]: ...
 
     def observe(
-        self, func: Callable | None = None, /, *, span_type: str | None = "span"
+        self,
+        func: Callable | None = None,
+        /,
+        *,
+        span_type: str | None = "span",
+        scorer_config: TraceScorerConfig | None = None,
     ) -> Callable | None:
         if func is None:
-            return partial(self.observe, span_type=span_type)
+            return partial(
+                self.observe, span_type=span_type, scorer_config=scorer_config
+            )
 
         if not self.enable_monitoring:
             return func
@@ -411,9 +470,9 @@ class Tracer:
         }
 
         if inspect.iscoroutinefunction(func):
-            return self._wrap_async(func, name, attributes)
+            return self._wrap_async(func, name, attributes, scorer_config)
         else:
-            return self._wrap_sync(func, name, attributes)
+            return self._wrap_sync(func, name, attributes, scorer_config)
 
     @overload
     def agent(
@@ -645,8 +704,19 @@ class Tracer:
             isinstance(scorer, BaseScorer) and scorer.server_hosted
         )
         eval_run_name = f"async_evaluate_{span_id}"  # note this name doesnt matter because we don't save the experiment only the example and scorer_data
+        # if isinstance(scorer, TraceAPIScorerConfig):
+        #     eval_run = TraceEvaluationRun(
+        #         organization_id=self.organization_id,
+        #         project_name=self.project_name,
+        #         eval_name=eval_run_name,
+        #         scorers=[scorer],
+        #         model=model,
+        #         trace_span_id=span_id,
+        #         trace_id=trace_id,
+        #     )
+        #     self.get_current_span().set_attribute("pending_trace_eval", eval_run.model_dump(warnings=False))
         if hosted_scoring:
-            eval_run = EvaluationRun(
+            eval_run = ExampleEvaluationRun(
                 organization_id=self.organization_id,
                 project_name=self.project_name,
                 eval_name=eval_run_name,
@@ -660,7 +730,7 @@ class Tracer:
             self.api_client.add_to_run_eval_queue(eval_run.model_dump(warnings=False))  # type: ignore
         else:
             # Handle custom scorers using local evaluation queue
-            eval_run = EvaluationRun(
+            eval_run = ExampleEvaluationRun(
                 organization_id=self.organization_id,
                 project_name=self.project_name,
                 eval_name=eval_run_name,
@@ -673,6 +743,54 @@ class Tracer:
 
             # Enqueue the evaluation run to the local evaluation queue
             self.local_eval_queue.enqueue(eval_run)
+
+    # def async_trace_evaluate(
+    #     self,
+    #     /,
+    #     *,
+    #     scorer: TraceAPIScorerConfig,
+    #     model: str = JUDGMENT_DEFAULT_GPT_MODEL,
+    #     sampling_rate: float = 1.0,
+    # ):
+    #     if not self.enable_evaluation or not self.enable_monitoring:
+    #         judgeval_logger.info("Evaluation is not enabled, skipping evaluation")
+    #         return
+
+    #     if not isinstance(scorer, TraceAPIScorerConfig):
+    #         judgeval_logger.error(
+    #             "Scorer must be an instance of TraceAPIScorerConfig, got %s, skipping evaluation."
+    #             % type(scorer)
+    #         )
+    #         return
+
+    #     if sampling_rate < 0 or sampling_rate > 1:
+    #         judgeval_logger.error(
+    #             "Sampling rate must be between 0 and 1, got %s, skipping evaluation."
+    #             % sampling_rate
+    #         )
+    #         return
+
+    #     percentage = random.uniform(0, 1)
+    #     if percentage > sampling_rate:
+    #         judgeval_logger.info(
+    #             "Sampling rate is %s, skipping evaluation." % sampling_rate
+    #         )
+    #         return
+
+    #     span_context = self.get_current_span().get_span_context()
+    #     trace_id = format(span_context.trace_id, "032x")
+    #     span_id = format(span_context.span_id, "016x")
+    #     eval_run_name = f"async_trace_evaluate_{span_id}"
+    #     eval_run = TraceEvaluationRun(
+    #         organization_id=self.organization_id,
+    #         project_name=self.project_name,
+    #         eval_name=eval_run_name,
+    #         scorers=[scorer],
+    #         model=model,
+    #         trace_id=trace_id,
+    #         trace_span_id=span_id,
+    #     )
+    #     self.get_current_span().set_attribute("pending_trace_eval", eval_run.model_dump(warnings=False))
 
     def wait_for_completion(self, timeout: Optional[float] = 30.0) -> bool:
         """Wait for all evaluations and span processing to complete.

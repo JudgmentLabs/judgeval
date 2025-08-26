@@ -260,7 +260,7 @@ class EvaluationRun(BaseModel):
     id: Annotated[Optional[str], Field(title="Id")] = None
     project_name: Annotated[Optional[str], Field(title="Project Name")] = None
     eval_name: Annotated[Optional[str], Field(title="Eval Name")] = None
-    examples: Annotated[List[Example], Field(title="Examples")]
+    examples: Annotated[Optional[List[Example]], Field(title="Examples")] = None
     custom_scorers: Annotated[
         Optional[List[BaseScorer]], Field(title="Custom Scorers")
     ] = []
