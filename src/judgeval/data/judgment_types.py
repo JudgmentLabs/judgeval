@@ -142,7 +142,6 @@ class SpanBatchItem(BaseModel):
     span_id: Annotated[str, Field(title="Span Id")]
     trace_id: Annotated[str, Field(title="Trace Id")]
     function: Annotated[str, Field(title="Function")]
-    depth: Annotated[int, Field(title="Depth")]
     created_at: Annotated[Any, Field(title="Created At")] = None
     parent_span_id: Annotated[Optional[str], Field(title="Parent Span Id")] = None
     span_type: Annotated[Optional[str], Field(title="Span Type")] = "span"
@@ -267,7 +266,6 @@ class TraceSpan(BaseModel):
     span_id: Annotated[str, Field(title="Span Id")]
     trace_id: Annotated[str, Field(title="Trace Id")]
     function: Annotated[str, Field(title="Function")]
-    depth: Annotated[int, Field(title="Depth")]
     created_at: Annotated[Any, Field(title="Created At")] = None
     parent_span_id: Annotated[Optional[str], Field(title="Parent Span Id")] = None
     span_type: Annotated[Optional[str], Field(title="Span Type")] = "span"

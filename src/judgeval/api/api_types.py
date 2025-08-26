@@ -131,7 +131,6 @@ class SpanBatchItem(TypedDict):
     span_id: str
     trace_id: str
     function: str
-    depth: int
     created_at: NotRequired[Any]
     parent_span_id: NotRequired[Optional[str]]
     span_type: NotRequired[Optional[str]]
@@ -230,7 +229,6 @@ class TraceSpan(TypedDict):
     span_id: str
     trace_id: str
     function: str
-    depth: int
     created_at: NotRequired[Any]
     parent_span_id: NotRequired[Optional[str]]
     span_type: NotRequired[Optional[str]]
