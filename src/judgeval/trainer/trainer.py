@@ -1,10 +1,14 @@
 import asyncio
+import json
 import time
-from typing import Optional, Callable, Any, List, Union
+from typing import Optional, Callable, Any, List, Union, Dict
 from fireworks import Dataset
 from .config import TrainerConfig, ModelConfig
 from .trainable_model import TrainableModel
 from judgeval.tracer import Tracer
+from judgeval.tracer.exporters.store import SpanStore
+from judgeval.tracer.exporters import InMemorySpanExporter
+from judgeval.tracer.keys import AttributeKeys
 from judgeval import JudgmentClient
 from judgeval.scorers import BaseScorer, APIScorerConfig
 from judgeval.data import Example
@@ -39,19 +43,113 @@ class JudgmentTrainer:
         try:
             self.config = config
             self.tracer = tracer
-            self.tracer.show_trace_urls = False
             self.project_name = project_name or "judgment_training"
-
-            if trainable_model is None:
-                self.trainable_model = TrainableModel(self.config)
-            else:
-                self.trainable_model = trainable_model
+            self.trainable_model = trainable_model
 
             self.judgment_client = JudgmentClient()
+            self.span_store = SpanStore()
+            self.span_exporter = InMemorySpanExporter(self.span_store)
         except Exception as e:
             raise JudgmentRuntimeError(
                 f"Failed to initialize JudgmentTrainer: {str(e)}"
             ) from e
+
+    def _extract_message_history_from_spans(self) -> List[Dict[str, str]]:
+        """
+        Extract message history from spans in the span store for training purposes.
+
+        This method processes trace spans to reconstruct the conversation flow,
+        extracting messages in chronological order from LLM, user, and tool spans.
+
+        Returns:
+            List of message dictionaries with 'role' and 'content' keys
+        """
+        spans = self.span_store.get_all()
+        if not spans:
+            return []
+
+        messages = []
+        first_found = False
+
+        for span in sorted(spans, key=lambda s: getattr(s, "start_time", 0)):
+            span_attributes = span.attributes or {}
+            span_type = span_attributes.get(AttributeKeys.JUDGMENT_SPAN_KIND, "span")
+
+            if (
+                not span_attributes.get(AttributeKeys.JUDGMENT_OUTPUT)
+                and span_type != "llm"
+            ):
+                continue
+
+            if span_type == "llm":
+                if not first_found and span_attributes.get(
+                    AttributeKeys.JUDGMENT_INPUT
+                ):
+                    input_data = span_attributes.get(AttributeKeys.JUDGMENT_INPUT, {})
+                    if isinstance(input_data, dict) and "messages" in input_data:
+                        input_messages = input_data["messages"]
+                        if input_messages:
+                            first_found = True
+                            for msg in input_messages:
+                                if (
+                                    isinstance(msg, dict)
+                                    and "role" in msg
+                                    and "content" in msg
+                                ):
+                                    messages.append(
+                                        {"role": msg["role"], "content": msg["content"]}
+                                    )
+
+                # Add assistant response from span output
+                output = span_attributes.get(AttributeKeys.JUDGMENT_OUTPUT)
+                if output is not None:
+                    content = str(output)
+                    try:
+                        parsed = json.loads(content)
+                        if isinstance(parsed, dict) and "messages" in parsed:
+                            # Extract the actual assistant message content
+                            for msg in parsed["messages"]:
+                                if (
+                                    isinstance(msg, dict)
+                                    and msg.get("role") == "assistant"
+                                ):
+                                    content = msg.get("content", content)
+                                    break
+                    except (json.JSONDecodeError, KeyError):
+                        pass
+                    messages.append({"role": "assistant", "content": content})
+
+            elif span_type == "user":
+                output = span_attributes.get(AttributeKeys.JUDGMENT_OUTPUT)
+                if output is not None:
+                    content = str(output)
+                    try:
+                        parsed = json.loads(content)
+                        if isinstance(parsed, dict) and "messages" in parsed:
+                            for msg in parsed["messages"]:
+                                if isinstance(msg, dict) and msg.get("role") == "user":
+                                    content = msg.get("content", content)
+                                    break
+                    except (json.JSONDecodeError, KeyError):
+                        pass
+                    messages.append({"role": "user", "content": content})
+
+            elif span_type == "tool":
+                output = span_attributes.get(AttributeKeys.JUDGMENT_OUTPUT)
+                if output is not None:
+                    content = str(output)
+                    try:
+                        parsed = json.loads(content)
+                        if isinstance(parsed, dict) and "messages" in parsed:
+                            for msg in parsed["messages"]:
+                                if isinstance(msg, dict) and msg.get("role") == "user":
+                                    content = msg.get("content", content)
+                                    break
+                    except (json.JSONDecodeError, KeyError):
+                        pass
+                    messages.append({"role": "user", "content": content})
+
+        return messages
 
     async def generate_rollouts_and_rewards(
         self,
@@ -95,7 +193,7 @@ class JudgmentTrainer:
                 messages = response_data.get("messages", [])
 
                 try:
-                    traced_messages = self.tracer.get_current_message_history()
+                    traced_messages = self._extract_message_history_from_spans()
                     if traced_messages:
                         messages = traced_messages
                 except Exception as e:
@@ -113,14 +211,15 @@ class JudgmentTrainer:
                     scorers=scorers,
                     project_name=self.project_name,
                     eval_run_name=f"training_step_{self.trainable_model.current_step}_prompt_{prompt_id}_gen_{generation_id}",
-                    show_url=False,
                 )
 
                 if scoring_results and scoring_results[0].scorers_data:
-                    reward = sum(
+                    scores = [
                         scorer_data.score
                         for scorer_data in scoring_results[0].scorers_data
-                    ) / len(scoring_results[0].scorers_data)
+                        if scorer_data.score is not None
+                    ]
+                    reward = sum(scores) / len(scores) if scores else 0.0
                 else:
                     reward = 0.0
 
