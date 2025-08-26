@@ -7,11 +7,25 @@ from anthropic import Anthropic, AsyncAnthropic
 from groq import Groq, AsyncGroq
 from together import Together, AsyncTogether
 from google import genai
-from e2etests.utils import retrieve_trace, retrieve_score
+from e2etests.utils import (
+    retrieve_trace,
+    retrieve_score,
+    create_project,
+    delete_project,
+)
 from judgeval.tracer import wrap
 import os
 import random
 import pytest
+
+
+delete_project(project_name="e2e-tests-gkzqvtrbwnyl")
+create_project(project_name="e2e-tests-gkzqvtrbwnyl")
+
+
+def teardown_module(module):
+    delete_project(project_name="e2e-tests-gkzqvtrbwnyl")
+
 
 judgment = Tracer(
     project_name="e2e-tests-gkzqvtrbwnyl",
