@@ -4,7 +4,7 @@ from typing import List, Optional
 from abc import abstractmethod
 
 
-class AgentScorer(BaseScorer):
+class TraceScorer(BaseScorer):
     @abstractmethod
     async def a_score_trace(
         self, trace: JudgmentTrace, tools: Optional[List] = None, *args, **kwargs
