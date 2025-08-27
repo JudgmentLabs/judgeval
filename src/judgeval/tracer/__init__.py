@@ -61,6 +61,7 @@ from judgeval.tracer.processors import (
     JudgmentSpanProcessor,
     NoOpJudgmentSpanProcessor,
 )
+from judgeval.tracer.utils import set_span_attribute
 
 C = TypeVar("C", bound=Callable)
 Cls = TypeVar("Cls", bound=Type)
@@ -250,10 +251,12 @@ class Tracer:
     def set_customer_id(self, customer_id: str) -> None:
         span = self.get_current_span()
         if span and span.is_recording():
-            span.set_attribute(AttributeKeys.JUDGMENT_CUSTOMER_ID, customer_id)
+            set_span_attribute(span, AttributeKeys.JUDGMENT_CUSTOMER_ID, customer_id)
 
-    def add_cost_to_current_context(self, cost: float) -> None:
+    def add_cost_to_current_context(self, cost: Optional[float]) -> None:
         """Add cost to the current cost context and update span attribute."""
+        if cost is None:
+            return
         current_cost_context = self.cost_context.get()
         if current_cost_context is not None:
             current_cumulative_cost = current_cost_context.get("cumulative_cost", 0.0)
@@ -262,8 +265,10 @@ class Tracer:
 
             span = self.get_current_span()
             if span and span.is_recording():
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_CUMULATIVE_LLM_COST, new_cumulative_cost
+                set_span_attribute(
+                    span,
+                    AttributeKeys.JUDGMENT_CUMULATIVE_LLM_COST,
+                    new_cumulative_cost,
                 )
 
     def add_agent_attributes_to_span(self, span):
@@ -272,25 +277,26 @@ class Tracer:
         if not current_agent_context:
             return
 
-        span.set_attribute(
-            AttributeKeys.JUDGMENT_AGENT_ID, current_agent_context["agent_id"]
+        set_span_attribute(
+            span, AttributeKeys.JUDGMENT_AGENT_ID, current_agent_context["agent_id"]
         )
-        if current_agent_context["class_name"] is not None:
-            span.set_attribute(
-                AttributeKeys.JUDGMENT_AGENT_CLASS_NAME,
-                current_agent_context["class_name"],
-            )
-        if current_agent_context["instance_name"] is not None:
-            span.set_attribute(
-                AttributeKeys.JUDGMENT_AGENT_INSTANCE_NAME,
-                current_agent_context["instance_name"],
-            )
-        if current_agent_context["parent_agent_id"] is not None:
-            span.set_attribute(
-                AttributeKeys.JUDGMENT_PARENT_AGENT_ID,
-                current_agent_context["parent_agent_id"],
-            )
-        span.set_attribute(
+        set_span_attribute(
+            span,
+            AttributeKeys.JUDGMENT_AGENT_CLASS_NAME,
+            current_agent_context["class_name"],
+        )
+        set_span_attribute(
+            span,
+            AttributeKeys.JUDGMENT_AGENT_INSTANCE_NAME,
+            current_agent_context["instance_name"],
+        )
+        set_span_attribute(
+            span,
+            AttributeKeys.JUDGMENT_PARENT_AGENT_ID,
+            current_agent_context["parent_agent_id"],
+        )
+        set_span_attribute(
+            span,
             AttributeKeys.JUDGMENT_IS_AGENT_ENTRY_POINT,
             current_agent_context["is_agent_entry_point"],
         )
@@ -315,7 +321,8 @@ class Tracer:
                     for k, v in instance.__dict__.items()
                     if not k.startswith("_")
                 }
-            span.set_attribute(
+            set_span_attribute(
+                span,
                 (
                     AttributeKeys.JUDGMENT_STATE_BEFORE
                     if record_point == "before"
@@ -340,8 +347,10 @@ class Tracer:
             trace_span_id=span_id,
             trace_id=trace_id,
         )
-        span.set_attribute(
-            "pending_trace_eval", safe_serialize(eval_run.model_dump(warnings=False))
+        set_span_attribute(
+            span,
+            "pending_trace_eval",
+            safe_serialize(eval_run.model_dump(warnings=False)),
         )
 
     def _wrap_sync(
@@ -358,7 +367,8 @@ class Tracer:
                 self.add_agent_attributes_to_span(span)
                 self.record_instance_state("before", span)
                 try:
-                    span.set_attribute(
+                    set_span_attribute(
+                        span,
                         AttributeKeys.JUDGMENT_INPUT,
                         safe_serialize(format_inputs(f, args, kwargs)),
                     )
@@ -373,11 +383,10 @@ class Tracer:
                     span.record_exception(user_exc)
                     span.set_status(Status(StatusCode.ERROR, str(user_exc)))
                     raise
-                if span is not None:
-                    span.set_attribute(
-                        AttributeKeys.JUDGMENT_OUTPUT,
-                        safe_serialize(result),
-                    )
+
+                set_span_attribute(
+                    span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(result)
+                )
                 self.record_instance_state("after", span)
                 return result
 
@@ -397,7 +406,8 @@ class Tracer:
                 self.add_agent_attributes_to_span(span)
                 self.record_instance_state("before", span)
                 try:
-                    span.set_attribute(
+                    set_span_attribute(
+                        span,
                         AttributeKeys.JUDGMENT_INPUT,
                         safe_serialize(format_inputs(f, args, kwargs)),
                     )
@@ -412,11 +422,9 @@ class Tracer:
                     span.record_exception(user_exc)
                     span.set_status(Status(StatusCode.ERROR, str(user_exc)))
                     raise
-                if span is not None:
-                    span.set_attribute(
-                        AttributeKeys.JUDGMENT_OUTPUT,
-                        safe_serialize(result),
-                    )
+                set_span_attribute(
+                    span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(result)
+                )
                 self.record_instance_state("after", span)
                 return result
 

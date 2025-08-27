@@ -19,12 +19,8 @@ if together_api_key:
 
         together_client = Together(api_key=together_api_key)
         async_together_client = AsyncTogether(api_key=together_api_key)
-    except ImportError:
-        raise ImportError(
-            "TogetherAI is not installed and required for the together judge. Please install it with `pip install togetherai`."
-        )
-    except Exception as e:
-        raise Exception(f"Error initializing TogetherAI client: {e}.")
+    except Exception:
+        pass
 
 
 def fetch_together_api_response(
