@@ -4,7 +4,7 @@ Tests for evaluation operations in the JudgmentClient.
 
 import pytest
 
-from judgeval.judgment_client import JudgmentClient
+from judgeval import JudgmentClient
 from judgeval.data import Example
 from judgeval.scorers import (
     FaithfulnessScorer,
@@ -12,7 +12,8 @@ from judgeval.scorers import (
 )
 from judgeval.scorers.example_scorer import ExampleScorer
 from judgeval.dataset import Dataset
-from judgeval.constants import DEFAULT_TOGETHER_MODEL
+from judgeval.env import JUDGMENT_DEFAULT_TOGETHER_MODEL
+from judgeval.exceptions import JudgmentTestError
 
 
 def run_eval_helper(client: JudgmentClient, project_name: str, eval_run_name: str):
@@ -44,7 +45,7 @@ def run_eval_helper(client: JudgmentClient, project_name: str, eval_run_name: st
     res = client.run_evaluation(
         examples=[example1, example2],
         scorers=[scorer, scorer2],
-        model=DEFAULT_TOGETHER_MODEL,
+        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=eval_run_name,
     )
@@ -61,8 +62,7 @@ def test_run_eval(client: JudgmentClient, project_name: str, random_name: str):
     assert res2, f"No evaluation results found for {random_name}"
 
 
-@pytest.mark.asyncio
-async def test_assert_test(client: JudgmentClient, project_name: str):
+def test_assert_test(client: JudgmentClient, project_name: str):
     """Test assertion functionality."""
     # Create examples and scorers as before
     example = Example(
@@ -82,13 +82,14 @@ async def test_assert_test(client: JudgmentClient, project_name: str):
 
     scorer = AnswerRelevancyScorer(threshold=0.5)
 
-    with pytest.raises(AssertionError):
-        await client.assert_test(
+    with pytest.raises(JudgmentTestError):
+        client.run_evaluation(
             eval_run_name="test_eval",
             project_name=project_name,
             examples=[example, example1, example2],
             scorers=[scorer],
-            model=DEFAULT_TOGETHER_MODEL,
+            model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
+            assert_test=True,
         )
 
 
@@ -114,13 +115,11 @@ def test_evaluate_dataset(client: JudgmentClient, project_name: str, random_name
     res = client.run_evaluation(
         examples=dataset.examples,
         scorers=[FaithfulnessScorer(threshold=0.5)],
-        model=DEFAULT_TOGETHER_MODEL,
+        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=random_name,
     )
     assert res, "Dataset evaluation failed"
-
-    dataset.delete()
 
 
 def test_evaluate_dataset_custom(
@@ -155,7 +154,7 @@ def test_evaluate_dataset_custom(
     res = client.run_evaluation(
         examples=dataset.examples,
         scorers=[CustomScorer()],
-        model=DEFAULT_TOGETHER_MODEL,
+        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=random_name,
     )
@@ -169,5 +168,3 @@ def test_evaluate_dataset_custom(
     assert res[1].scorers_data[0].score == 0.75
     assert res[2].scorers_data[0].score == 0.5
     assert res[3].scorers_data[0].score == 0
-
-    dataset.delete()

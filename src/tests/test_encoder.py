@@ -1,7 +1,7 @@
 from collections import defaultdict
 from pydantic import BaseModel
 
-from judgeval.common.api.json_encoder import json_encoder
+from judgeval.utils.serialize import json_encoder
 
 
 class SimpleModel(BaseModel):

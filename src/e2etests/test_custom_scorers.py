@@ -1,7 +1,7 @@
 from judgeval.scorers.example_scorer import ExampleScorer
-from judgeval.judgment_client import JudgmentClient
+from judgeval import JudgmentClient
 from judgeval.data import Example
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 
 def test_basic_custom_scorer(
@@ -23,7 +23,7 @@ def test_basic_custom_scorer(
     class CustomExample(Example):
         actual_output: str
 
-    examples = [
+    examples: List[CustomExample] = [
         CustomExample(actual_output="I'm happy"),
         CustomExample(actual_output="I'm sad"),
         CustomExample(actual_output="I dont know"),

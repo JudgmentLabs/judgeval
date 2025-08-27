@@ -1,10 +1,10 @@
-from judgeval.utils.requests import requests
+from httpx import post
 from dotenv import load_dotenv
 import os
 
 
 def test():
-    response = requests.post(
+    response = post(
         "http://localhost:8000/organization/fetch_all_organizations_for_user/",
         json={},
         headers={
@@ -16,7 +16,7 @@ def test():
 
 
 def test2():
-    response = requests.post(
+    response = post(
         "http://localhost:8000/organization/create/",
         json={"organization_name": "test_organization2"},
         headers={

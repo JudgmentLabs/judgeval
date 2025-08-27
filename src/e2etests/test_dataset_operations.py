@@ -5,18 +5,18 @@ Tests for dataset operations in the JudgmentClient.
 import random
 import string
 import pytest
-from judgeval.judgment_client import JudgmentClient
+from judgeval import JudgmentClient
 from judgeval.data import Example
 from judgeval.dataset import Dataset
+from e2etests.utils import create_project, delete_project
 
 
 def test_create_dataset(client: JudgmentClient, project_name: str, random_name: str):
     """Test dataset creation"""
-    dataset = Dataset.create(
+    Dataset.create(
         name=random_name,
         project_name=project_name,
     )
-    dataset.delete()
 
 
 def test_create_dataset_with_example(
@@ -29,14 +29,13 @@ def test_create_dataset_with_example(
         examples=[Example(input="input 1", actual_output="output 1")],
     )
     assert dataset, "Failed to push dataset"
-    dataset.delete()
 
 
 def test_create_dataset_across_projects(
     client: JudgmentClient, project_name: str, random_name: str
 ):
     """Test that the same name for a dataset can be used across projects."""
-    client.create_project(project_name=random_name)
+    create_project(project_name=random_name)
     dataset = Dataset.create(
         name=random_name,
         project_name=project_name,
@@ -52,10 +51,7 @@ def test_create_dataset_across_projects(
     )
 
     assert dataset2, "Failed to push dataset"
-
-    dataset.delete()
-    dataset2.delete()
-    client.delete_project(project_name=random_name)
+    delete_project(project_name=random_name)
 
 
 def test_create_dataset_error(
@@ -104,6 +100,9 @@ def test_pull_dataset(client: JudgmentClient, project_name: str):
     dataset2 = Dataset.get(name=random_name2, project_name=project_name)
 
     assert dataset1, "Failed to pull dataset"
+    assert dataset1.name == random_name1, (
+        "Dataset name should be the same as the one used to create it"
+    )
     assert len(dataset1.examples) == 3, "Dataset should have 3 examples"
     for i, e in enumerate(dataset1.examples, start=1):
         assert e.input == f"input {i}", (
@@ -114,6 +113,9 @@ def test_pull_dataset(client: JudgmentClient, project_name: str):
         )
 
     assert dataset2, "Failed to pull dataset"
+    assert dataset2.name == random_name2, (
+        "Dataset name should be the same as the one used to create it"
+    )
     assert len(dataset2.examples) == 2, "Dataset should have 2 examples"
     for i, e in enumerate(dataset2.examples, start=4):
         assert e.input == f"input {i}", (
@@ -122,9 +124,6 @@ def test_pull_dataset(client: JudgmentClient, project_name: str):
         assert e.actual_output == f"output {i}", (
             f"Example should have .actual_output be 'output {i}' but got '{e.actual_output}'"
         )
-
-    dataset1.delete()
-    dataset2.delete()
 
 
 def test_append_dataset(client: JudgmentClient, project_name: str, random_name: str):
@@ -151,8 +150,6 @@ def test_append_dataset(client: JudgmentClient, project_name: str, random_name: 
         f"Dataset should have {initial_example_count + 3} examples, but has {len(dataset.examples)}"
     )
 
-    dataset.delete()
-
 
 def test_overwrite_dataset(client: JudgmentClient, project_name: str, random_name: str):
     """Test dataset overwriting."""
@@ -176,5 +173,3 @@ def test_overwrite_dataset(client: JudgmentClient, project_name: str, random_nam
     dataset = Dataset.get(name=random_name, project_name=project_name)
     assert dataset, "Failed to pull dataset"
     assert len(dataset.examples) == 2, "Dataset should have 2 examples"
-
-    dataset.delete()

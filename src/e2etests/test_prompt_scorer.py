@@ -1,8 +1,8 @@
 from judgeval.scorers import PromptScorer
 from uuid import uuid4
-from judgeval.judgment_client import JudgmentClient
+from judgeval import JudgmentClient
 from judgeval.data import Example
-from judgeval.constants import DEFAULT_TOGETHER_MODEL
+from judgeval.env import JUDGMENT_DEFAULT_TOGETHER_MODEL
 
 
 def test_prompt_scorer_without_options(client: JudgmentClient, project_name: str):
@@ -27,7 +27,7 @@ def test_prompt_scorer_without_options(client: JudgmentClient, project_name: str
     res = client.run_evaluation(
         examples=[relevant_example, irrelevant_example],
         scorers=[prompt_scorer],
-        model=DEFAULT_TOGETHER_MODEL,
+        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name="test-run-prompt-scorer-without-options",
     )
@@ -72,7 +72,7 @@ def test_prompt_scorer_with_options(client: JudgmentClient, project_name: str):
     res = client.run_evaluation(
         examples=[helpful_example, unhelpful_example],
         scorers=[prompt_scorer],
-        model=DEFAULT_TOGETHER_MODEL,
+        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name="test-run-prompt-scorer-with-options",
     )
@@ -159,7 +159,7 @@ def test_custom_prompt_scorer(client: JudgmentClient, project_name: str):
     res = client.run_evaluation(
         examples=[example1, example2],
         scorers=[prompt_scorer],
-        model=DEFAULT_TOGETHER_MODEL,
+        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name="test-custom-prompt-scorer",
     )

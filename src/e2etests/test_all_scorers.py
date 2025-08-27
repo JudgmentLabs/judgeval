@@ -2,16 +2,16 @@
 base e2e tests for all default judgeval scorers
 """
 
-from judgeval.judgment_client import JudgmentClient
+from judgeval import JudgmentClient
 from judgeval.scorers import (
     AnswerCorrectnessScorer,
     AnswerRelevancyScorer,
     FaithfulnessScorer,
     InstructionAdherenceScorer,
-    ExecutionOrderScorer,
 )
 from judgeval.data import Example
-from judgeval.constants import DEFAULT_TOGETHER_MODEL
+from judgeval.env import JUDGMENT_DEFAULT_TOGETHER_MODEL
+from judgeval.evaluation import ScoringResult
 
 
 def test_ac_scorer(client: JudgmentClient, project_name: str):
@@ -27,7 +27,7 @@ def test_ac_scorer(client: JudgmentClient, project_name: str):
     res = client.run_evaluation(
         examples=[example],
         scorers=[scorer],
-        model=DEFAULT_TOGETHER_MODEL,
+        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=EVAL_RUN_NAME,
     )
@@ -52,7 +52,7 @@ def test_ar_scorer(client: JudgmentClient, project_name: str):
     res = client.run_evaluation(
         examples=[example_1, example_2],
         scorers=[scorer],
-        model=DEFAULT_TOGETHER_MODEL,
+        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=EVAL_RUN_NAME,
     )
@@ -94,7 +94,7 @@ def test_faithfulness_scorer(client: JudgmentClient, project_name: str):
     res = client.run_evaluation(
         examples=[faithful_example, contradictory_example],
         scorers=[scorer],
-        model=DEFAULT_TOGETHER_MODEL,
+        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=EVAL_RUN_NAME,
     )
@@ -119,7 +119,7 @@ def test_instruction_adherence_scorer(client: JudgmentClient, project_name: str)
     res = client.run_evaluation(
         examples=[example_1],
         scorers=[scorer],
-        model=DEFAULT_TOGETHER_MODEL,
+        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=EVAL_RUN_NAME,
     )
@@ -129,37 +129,7 @@ def test_instruction_adherence_scorer(client: JudgmentClient, project_name: str)
     assert res[0].success
 
 
-def test_execution_order_scorer(client: JudgmentClient, project_name: str):
-    EVAL_RUN_NAME = "test-run-execution-order"
-
-    example = Example(
-        input="What is the weather in New York and the stock price of AAPL?",
-        actual_output=[
-            "weather_forecast",
-            "stock_price",
-            "translate_text",
-            "news_headlines",
-        ],
-        expected_output=[
-            "weather_forecast",
-            "stock_price",
-            "news_headlines",
-            "translate_text",
-        ],
-    )
-
-    res = client.run_evaluation(
-        examples=[example],
-        scorers=[ExecutionOrderScorer(threshold=1, should_consider_ordering=True)],
-        model=DEFAULT_TOGETHER_MODEL,
-        project_name=project_name,
-        eval_run_name=EVAL_RUN_NAME,
-    )
-
-    assert not res[0].success
-
-
-def print_debug_on_failure(result) -> bool:
+def print_debug_on_failure(result: ScoringResult) -> bool:
     """
     Helper function to print debug info only on test failure
 
