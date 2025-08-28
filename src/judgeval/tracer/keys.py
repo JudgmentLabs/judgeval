@@ -28,6 +28,9 @@ class AttributeKeys(str, Enum):
     JUDGMENT_STATE_BEFORE = "judgment.state_before"
     JUDGMENT_STATE_AFTER = "judgment.state_after"
 
+    # Evaluation-specific attributes (custom namespace)
+    PENDING_TRACE_EVAL = "judgment.pending_trace_eval"
+
     # GenAI-specific attributes (semantic conventions)
     GEN_AI_PROMPT = gen_ai_attributes.GEN_AI_PROMPT
     GEN_AI_COMPLETION = gen_ai_attributes.GEN_AI_COMPLETION

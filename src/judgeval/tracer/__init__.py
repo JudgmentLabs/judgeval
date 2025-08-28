@@ -351,7 +351,8 @@ class Tracer:
             trace_id=trace_id,
         )
         span.set_attribute(
-            "pending_trace_eval", safe_serialize(eval_run.model_dump(warnings=False))
+            AttributeKeys.PENDING_TRACE_EVAL,
+            safe_serialize(eval_run.model_dump(warnings=False)),
         )
 
     def _wrap_sync(
