@@ -1,7 +1,7 @@
 from typing import Any
 from opentelemetry.trace import Span
 from pydantic import BaseModel
-from typing import Callable, NotRequired
+from typing import Callable, Optional
 from judgeval.scorers.base_scorer import BaseScorer
 
 
@@ -16,4 +16,4 @@ class TraceScorerConfig(BaseModel):
     scorer: BaseScorer
     sampling_rate: float
     model: str
-    run_condition: NotRequired[Callable[..., bool]]
+    run_condition: Optional[Callable[..., bool]]

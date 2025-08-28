@@ -473,6 +473,9 @@ class Tracer:
             AttributeKeys.JUDGMENT_SPAN_KIND: span_type,
         }
 
+        if not self.enable_evaluation:
+            scorer_config = None
+
         if inspect.iscoroutinefunction(func):
             return self._wrap_async(func, name, attributes, scorer_config)
         else:
