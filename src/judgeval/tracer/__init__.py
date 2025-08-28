@@ -61,7 +61,7 @@ from judgeval.tracer.processors import (
     JudgmentSpanProcessor,
     NoOpJudgmentSpanProcessor,
 )
-from judgeval.tracer.utils import set_span_attribute
+from judgeval.tracer.utils import set_span_attribute, TraceScorerConfig
 
 C = TypeVar("C", bound=Callable)
 Cls = TypeVar("Cls", bound=Type)
@@ -78,12 +78,6 @@ class AgentContext(TypedDict):
     instance: Any
     is_agent_entry_point: bool
     parent_agent_id: str | None
-
-
-class TraceScorerConfig(TypedDict):
-    scorer: BaseScorer
-    sampling_rate: float
-    model: str
 
 
 def resolve_project_id(
@@ -331,13 +325,22 @@ class Tracer:
                 safe_serialize(attributes),
             )
 
-    def _set_pending_trace_eval(self, span: Span, scorer_config: TraceScorerConfig):
+    def _set_pending_trace_eval(
+        self,
+        span: Span,
+        scorer_config: TraceScorerConfig,
+        args: Tuple[Any, ...],
+        kwargs: Dict[str, Any],
+    ):
         span_context = span.get_span_context()
         trace_id = format(span_context.trace_id, "032x")
         span_id = format(span_context.span_id, "016x")
         eval_run_name = f"async_trace_evaluate_{span_id}"
         scorer = scorer_config.get("scorer")
         model = scorer_config.get("model")
+        run_condition = scorer_config.get("run_condition")
+        if run_condition is not None and not run_condition(*args, **kwargs):
+            return
         eval_run = TraceEvaluationRun(
             organization_id=self.organization_id,
             project_name=self.project_name,
@@ -372,7 +375,7 @@ class Tracer:
                     )
 
                     if scorer_config:
-                        self._set_pending_trace_eval(span, scorer_config)
+                        self._set_pending_trace_eval(span, scorer_config, args, kwargs)
 
                     self.judgment_processor.emit_partial()
 
