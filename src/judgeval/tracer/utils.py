@@ -2,7 +2,7 @@ from typing import Any
 from opentelemetry.trace import Span
 from pydantic import BaseModel
 from typing import Callable, Optional
-from judgeval.scorers.base_scorer import BaseScorer
+from judgeval.scorers.trace_api_scorer import TraceAPIScorerConfig
 
 
 def set_span_attribute(span: Span, name: str, value: Any):
@@ -13,7 +13,7 @@ def set_span_attribute(span: Span, name: str, value: Any):
 
 
 class TraceScorerConfig(BaseModel):
-    scorer: BaseScorer
+    scorer: TraceAPIScorerConfig
     sampling_rate: float
     model: str
     run_condition: Optional[Callable[..., bool]]
