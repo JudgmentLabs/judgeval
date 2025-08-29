@@ -2,6 +2,7 @@ from __future__ import annotations
 import functools
 from typing import Tuple, Optional, Any, TYPE_CHECKING
 from functools import wraps
+from enum import Enum
 from judgeval.data.trace import TraceUsage
 from judgeval.logger import judgeval_logger
 from litellm.cost_calculator import cost_per_token as _original_cost_per_token
@@ -23,6 +24,17 @@ if TYPE_CHECKING:
     from judgeval.tracer import Tracer
 
 
+class ProviderType(Enum):
+    """Enum for different LLM provider types."""
+
+    OPENAI = "openai"
+    ANTHROPIC = "anthropic"
+    TOGETHER = "together"
+    GOOGLE = "google"
+    GROQ = "groq"
+    DEFAULT = "default"
+
+
 @wraps(_original_cost_per_token)
 def cost_per_token(
     *args: Any, **kwargs: Any
@@ -42,6 +54,473 @@ def cost_per_token(
         return None, None
 
 
+def _detect_provider(client: ApiClient) -> ProviderType:
+    """Detect the provider type of the client once to avoid repeated isinstance checks."""
+    if HAS_OPENAI:
+        from judgeval.tracer.llm.providers import openai_OpenAI, openai_AsyncOpenAI
+
+        if isinstance(client, (openai_OpenAI, openai_AsyncOpenAI)):
+            return ProviderType.OPENAI
+
+    if HAS_ANTHROPIC:
+        from judgeval.tracer.llm.providers import (
+            anthropic_Anthropic,
+            anthropic_AsyncAnthropic,
+        )
+
+        if isinstance(client, (anthropic_Anthropic, anthropic_AsyncAnthropic)):
+            return ProviderType.ANTHROPIC
+
+    if HAS_TOGETHER:
+        from judgeval.tracer.llm.providers import (
+            together_Together,
+            together_AsyncTogether,
+        )
+
+        if isinstance(client, (together_Together, together_AsyncTogether)):
+            return ProviderType.TOGETHER
+
+    if HAS_GOOGLE_GENAI:
+        from judgeval.tracer.llm.providers import (
+            google_genai_Client,
+            google_genai_AsyncClient,
+        )
+
+        if isinstance(client, (google_genai_Client, google_genai_AsyncClient)):
+            return ProviderType.GOOGLE
+
+    if HAS_GROQ:
+        from judgeval.tracer.llm.providers import groq_Groq, groq_AsyncGroq
+
+        if isinstance(client, (groq_Groq, groq_AsyncGroq)):
+            return ProviderType.GROQ
+
+    return ProviderType.DEFAULT
+
+
+# Provider-specific content extraction handlers
+def _extract_openai_content(chunk) -> str:
+    """Extract content from OpenAI streaming chunk."""
+    if (
+        hasattr(chunk, "choices")
+        and chunk.choices
+        and hasattr(chunk.choices[0], "delta")
+    ):
+        delta_content = getattr(chunk.choices[0].delta, "content", None)
+        if delta_content:
+            return delta_content
+    return ""
+
+
+def _extract_anthropic_content(chunk) -> str:
+    """Extract content from Anthropic streaming chunk."""
+    if hasattr(chunk, "type") and chunk.type == "content_block_delta":
+        if hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
+            return chunk.delta.text or ""
+    elif hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
+        return chunk.delta.text or ""
+    elif hasattr(chunk, "text"):
+        return chunk.text or ""
+    return ""
+
+
+def _extract_together_content(chunk) -> str:
+    """Extract content from Together streaming chunk."""
+    if hasattr(chunk, "choices") and chunk.choices:
+        choice = chunk.choices[0]
+        if hasattr(choice, "delta") and hasattr(choice.delta, "content"):
+            return choice.delta.content or ""
+    return ""
+
+
+def _extract_groq_content(chunk) -> str:
+    """Extract content from Groq streaming chunk."""
+    if hasattr(chunk, "choices") and chunk.choices:
+        choice = chunk.choices[0]
+        if hasattr(choice, "delta") and hasattr(choice.delta, "content"):
+            return choice.delta.content or ""
+    return ""
+
+
+# Provider-specific chunk usage extraction handlers
+def _extract_openai_chunk_usage(chunk) -> Any:
+    """Extract usage data from OpenAI streaming chunk."""
+    if hasattr(chunk, "usage") and chunk.usage:
+        return chunk.usage
+    return None
+
+
+def _extract_anthropic_chunk_usage(chunk) -> Any:
+    """Extract usage data from Anthropic streaming chunk."""
+    if hasattr(chunk, "type"):
+        if chunk.type == "message_start":
+            if hasattr(chunk, "message") and hasattr(chunk.message, "usage"):
+                return chunk.message.usage
+        elif chunk.type == "message_delta":
+            if hasattr(chunk, "usage"):
+                return chunk.usage
+        elif chunk.type == "message_stop":
+            if hasattr(chunk, "usage"):
+                return chunk.usage
+    return None
+
+
+def _extract_together_chunk_usage(chunk) -> Any:
+    """Extract usage data from Together streaming chunk."""
+    if hasattr(chunk, "usage") and chunk.usage:
+        return chunk.usage
+    return None
+
+
+def _extract_groq_chunk_usage(chunk) -> Any:
+    """Extract usage data from Groq streaming chunk."""
+    # Groq is OpenAI-compatible, so usage should be in the standard location
+    if hasattr(chunk, "usage") and chunk.usage:
+        return chunk.usage
+    return None
+
+
+# Provider-specific token extraction handlers
+def _extract_openai_tokens(usage_data) -> tuple[int, int, int, int]:
+    """Extract token counts from OpenAI usage data."""
+    prompt_tokens = (
+        usage_data.prompt_tokens
+        if hasattr(usage_data, "prompt_tokens") and usage_data.prompt_tokens is not None
+        else 0
+    )
+    completion_tokens = (
+        usage_data.completion_tokens
+        if hasattr(usage_data, "completion_tokens")
+        and usage_data.completion_tokens is not None
+        else 0
+    )
+    return prompt_tokens, completion_tokens, 0, 0
+
+
+def _extract_anthropic_tokens(usage_data) -> tuple[int, int, int, int]:
+    """Extract token counts from Anthropic usage data."""
+    prompt_tokens = (
+        usage_data.input_tokens
+        if hasattr(usage_data, "input_tokens") and usage_data.input_tokens is not None
+        else 0
+    )
+    completion_tokens = (
+        usage_data.output_tokens
+        if hasattr(usage_data, "output_tokens") and usage_data.output_tokens is not None
+        else 0
+    )
+    cache_read_input_tokens = (
+        usage_data.cache_read_input_tokens
+        if hasattr(usage_data, "cache_read_input_tokens")
+        and usage_data.cache_read_input_tokens is not None
+        else 0
+    )
+    cache_creation_input_tokens = (
+        usage_data.cache_creation_input_tokens
+        if hasattr(usage_data, "cache_creation_input_tokens")
+        and usage_data.cache_creation_input_tokens is not None
+        else 0
+    )
+    return (
+        prompt_tokens,
+        completion_tokens,
+        cache_read_input_tokens,
+        cache_creation_input_tokens,
+    )
+
+
+def _extract_together_tokens(usage_data) -> tuple[int, int, int, int]:
+    """Extract token counts from Together usage data."""
+    prompt_tokens = (
+        usage_data.prompt_tokens
+        if hasattr(usage_data, "prompt_tokens") and usage_data.prompt_tokens is not None
+        else 0
+    )
+    completion_tokens = (
+        usage_data.completion_tokens
+        if hasattr(usage_data, "completion_tokens")
+        and usage_data.completion_tokens is not None
+        else 0
+    )
+    return prompt_tokens, completion_tokens, 0, 0
+
+
+def _extract_groq_tokens(usage_data) -> tuple[int, int, int, int]:
+    """Extract token counts from Groq usage data."""
+    prompt_tokens = (
+        usage_data.prompt_tokens
+        if hasattr(usage_data, "prompt_tokens") and usage_data.prompt_tokens is not None
+        else 0
+    )
+    completion_tokens = (
+        usage_data.completion_tokens
+        if hasattr(usage_data, "completion_tokens")
+        and usage_data.completion_tokens is not None
+        else 0
+    )
+    # Extract cached tokens from prompt_tokens_details.cached_tokens
+    cache_read_input_tokens = 0
+    if (
+        hasattr(usage_data, "prompt_tokens_details")
+        and usage_data.prompt_tokens_details
+    ):
+        if (
+            hasattr(usage_data.prompt_tokens_details, "cached_tokens")
+            and usage_data.prompt_tokens_details.cached_tokens is not None
+        ):
+            cache_read_input_tokens = usage_data.prompt_tokens_details.cached_tokens
+
+    return prompt_tokens, completion_tokens, cache_read_input_tokens, 0
+
+
+# Provider-specific output formatting handlers
+def _format_openai_output(response: Any) -> tuple[Optional[str], Optional[TraceUsage]]:
+    """Format output data from OpenAI response."""
+    if HAS_OPENAI:
+        from judgeval.tracer.llm.providers import (
+            openai_ChatCompletion,
+            openai_Response,
+            openai_ParsedChatCompletion,
+        )
+
+        model_name = None
+        message_content = None
+        prompt_tokens = 0
+        completion_tokens = 0
+        cache_read_input_tokens = 0
+        cache_creation_input_tokens = 0
+
+        if isinstance(response, openai_ChatCompletion):
+            model_name = response.model or ""
+            prompt_tokens = (
+                response.usage.prompt_tokens
+                if response.usage and response.usage.prompt_tokens is not None
+                else 0
+            )
+            completion_tokens = (
+                response.usage.completion_tokens
+                if response.usage and response.usage.completion_tokens is not None
+                else 0
+            )
+            cache_read_input_tokens = (
+                response.usage.prompt_tokens_details.cached_tokens
+                if response.usage
+                and response.usage.prompt_tokens_details
+                and response.usage.prompt_tokens_details.cached_tokens is not None
+                else 0
+            )
+
+            if isinstance(response, openai_ParsedChatCompletion):
+                message_content = response.choices[0].message.parsed
+            else:
+                message_content = response.choices[0].message.content
+        elif isinstance(response, openai_Response):
+            model_name = response.model or ""
+            prompt_tokens = (
+                response.usage.input_tokens
+                if response.usage and response.usage.input_tokens is not None
+                else 0
+            )
+            completion_tokens = (
+                response.usage.output_tokens
+                if response.usage and response.usage.output_tokens is not None
+                else 0
+            )
+            cache_read_input_tokens = (
+                response.usage.input_tokens_details.cached_tokens
+                if response.usage
+                and response.usage.input_tokens_details
+                and response.usage.input_tokens_details.cached_tokens is not None
+                else 0
+            )
+            output0 = response.output[0]
+            if (
+                hasattr(output0, "content")
+                and output0.content
+                and hasattr(output0.content, "__iter__")
+            ):
+                message_content = "".join(
+                    seg.text
+                    for seg in output0.content
+                    if hasattr(seg, "text") and seg.text
+                )
+
+        if model_name:
+            return message_content, _create_usage(
+                model_name,
+                prompt_tokens,
+                completion_tokens,
+                cache_read_input_tokens,
+                cache_creation_input_tokens,
+            )
+
+    return None, None
+
+
+def _format_anthropic_output(
+    response: Any,
+) -> tuple[Optional[str], Optional[TraceUsage]]:
+    """Format output data from Anthropic response."""
+    model_name = getattr(response, "model", "") or ""
+    usage = getattr(response, "usage", None)
+    prompt_tokens = (
+        usage.input_tokens
+        if usage and hasattr(usage, "input_tokens") and usage.input_tokens is not None
+        else 0
+    )
+    completion_tokens = (
+        usage.output_tokens
+        if usage and hasattr(usage, "output_tokens") and usage.output_tokens is not None
+        else 0
+    )
+    cache_read_input_tokens = (
+        usage.cache_read_input_tokens
+        if usage
+        and hasattr(usage, "cache_read_input_tokens")
+        and usage.cache_read_input_tokens is not None
+        else 0
+    )
+    cache_creation_input_tokens = (
+        usage.cache_creation_input_tokens
+        if usage
+        and hasattr(usage, "cache_creation_input_tokens")
+        and usage.cache_creation_input_tokens is not None
+        else 0
+    )
+    message_content = response.content[0].text if hasattr(response, "content") else None
+
+    if model_name:
+        return message_content, _create_usage(
+            model_name,
+            prompt_tokens,
+            completion_tokens,
+            cache_read_input_tokens,
+            cache_creation_input_tokens,
+        )
+
+    return None, None
+
+
+def _format_together_output(
+    response: Any,
+) -> tuple[Optional[str], Optional[TraceUsage]]:
+    """Format output data from Together response."""
+    model_name = (response.model or "") if hasattr(response, "model") else ""
+    prompt_tokens = (
+        response.usage.prompt_tokens
+        if hasattr(response.usage, "prompt_tokens")
+        and response.usage.prompt_tokens is not None
+        else 0
+    )
+    completion_tokens = (
+        response.usage.completion_tokens
+        if hasattr(response.usage, "completion_tokens")
+        and response.usage.completion_tokens is not None
+        else 0
+    )
+    message_content = (
+        response.choices[0].message.content if hasattr(response, "choices") else None
+    )
+
+    if model_name:
+        model_name = "together_ai/" + model_name
+        return message_content, _create_usage(
+            model_name,
+            prompt_tokens,
+            completion_tokens,
+            0,
+            0,
+        )
+
+    return None, None
+
+
+def _format_google_output(response: Any) -> tuple[Optional[str], Optional[TraceUsage]]:
+    """Format output data from Google GenAI response."""
+    model_name = getattr(response, "model_version", "") or ""
+    usage_metadata = getattr(response, "usage_metadata", None)
+    prompt_tokens = (
+        usage_metadata.prompt_token_count
+        if usage_metadata
+        and hasattr(usage_metadata, "prompt_token_count")
+        and usage_metadata.prompt_token_count is not None
+        else 0
+    )
+    completion_tokens = (
+        usage_metadata.candidates_token_count
+        if usage_metadata
+        and hasattr(usage_metadata, "candidates_token_count")
+        and usage_metadata.candidates_token_count is not None
+        else 0
+    )
+    message_content = (
+        response.candidates[0].content.parts[0].text
+        if hasattr(response, "candidates")
+        else None
+    )
+
+    cache_read_input_tokens = 0
+    if usage_metadata and hasattr(usage_metadata, "cached_content_token_count"):
+        cache_read_input_tokens = usage_metadata.cached_content_token_count or 0
+
+    if model_name:
+        return message_content, _create_usage(
+            model_name,
+            prompt_tokens,
+            completion_tokens,
+            cache_read_input_tokens,
+            0,
+        )
+
+    return None, None
+
+
+def _format_groq_output(response: Any) -> tuple[Optional[str], Optional[TraceUsage]]:
+    """Format output data from Groq response."""
+    model_name = (response.model or "") if hasattr(response, "model") else ""
+    prompt_tokens = (
+        response.usage.prompt_tokens
+        if hasattr(response.usage, "prompt_tokens")
+        and response.usage.prompt_tokens is not None
+        else 0
+    )
+    completion_tokens = (
+        response.usage.completion_tokens
+        if hasattr(response.usage, "completion_tokens")
+        and response.usage.completion_tokens is not None
+        else 0
+    )
+    # Extract cached tokens from prompt_tokens_details.cached_tokens
+    cache_read_input_tokens = 0
+    if (
+        hasattr(response, "usage")
+        and response.usage
+        and hasattr(response.usage, "prompt_tokens_details")
+        and response.usage.prompt_tokens_details
+    ):
+        if (
+            hasattr(response.usage.prompt_tokens_details, "cached_tokens")
+            and response.usage.prompt_tokens_details.cached_tokens is not None
+        ):
+            cache_read_input_tokens = response.usage.prompt_tokens_details.cached_tokens
+
+    message_content = (
+        response.choices[0].message.content if hasattr(response, "choices") else None
+    )
+
+    if model_name:
+        model_name = "groq/" + model_name
+        return message_content, _create_usage(
+            model_name,
+            prompt_tokens,
+            completion_tokens,
+            cache_read_input_tokens,
+            0,
+        )
+
+    return None, None
+
+
 class _TracedGeneratorBase:
     """Base class with common logic for parsing stream chunks."""
 
@@ -51,6 +530,7 @@ class _TracedGeneratorBase:
         "span",
         "accumulated_content",
         "model_name",
+        "provider_type",
     )
 
     tracer: Tracer
@@ -58,6 +538,7 @@ class _TracedGeneratorBase:
     span: Any
     accumulated_content: str
     model_name: str
+    provider_type: ProviderType
 
     def __init__(self, tracer: Tracer, client: ApiClient, span, model_name: str):
         """Initialize the base traced generator.
@@ -73,69 +554,21 @@ class _TracedGeneratorBase:
         self.span = span
         self.accumulated_content = ""
         self.model_name = model_name
+        self.provider_type = _detect_provider(client)
 
     def _extract_content(self, chunk) -> str:
         """Extract content from streaming chunk based on provider."""
-        if HAS_OPENAI:
-            from judgeval.tracer.llm.providers import openai_OpenAI, openai_AsyncOpenAI
-
-            assert openai_OpenAI is not None, "OpenAI client not found"
-            assert openai_AsyncOpenAI is not None, "OpenAI async client not found"
-            if isinstance(self.client, (openai_OpenAI, openai_AsyncOpenAI)):
-                if (
-                    hasattr(chunk, "choices")
-                    and chunk.choices
-                    and hasattr(chunk.choices[0], "delta")
-                ):
-                    delta_content = getattr(chunk.choices[0].delta, "content", None)
-                    if delta_content:
-                        return delta_content
-
-        if HAS_ANTHROPIC:
-            from judgeval.tracer.llm.providers import (
-                anthropic_Anthropic,
-                anthropic_AsyncAnthropic,
-            )
-
-            assert anthropic_Anthropic is not None, "Anthropic client not found"
-            assert anthropic_AsyncAnthropic is not None, (
-                "Anthropic async client not found"
-            )
-            if isinstance(self.client, (anthropic_Anthropic, anthropic_AsyncAnthropic)):
-                if hasattr(chunk, "type") and chunk.type == "content_block_delta":
-                    if hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
-                        return chunk.delta.text or ""
-                elif hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
-                    return chunk.delta.text or ""
-                elif hasattr(chunk, "text"):
-                    return chunk.text or ""
-
-        if HAS_TOGETHER:
-            from judgeval.tracer.llm.providers import (
-                together_Together,
-                together_AsyncTogether,
-            )
-
-            assert together_Together is not None, "Together client not found"
-            assert together_AsyncTogether is not None, "Together async client not found"
-            if isinstance(self.client, (together_Together, together_AsyncTogether)):
-                if hasattr(chunk, "choices") and chunk.choices:
-                    choice = chunk.choices[0]
-                    if hasattr(choice, "delta") and hasattr(choice.delta, "content"):
-                        return choice.delta.content or ""
-
-        if HAS_GROQ:
-            from judgeval.tracer.llm.providers import groq_Groq, groq_AsyncGroq
-
-            assert groq_Groq is not None, "Groq client not found"
-            assert groq_AsyncGroq is not None, "Groq async client not found"
-            if isinstance(self.client, (groq_Groq, groq_AsyncGroq)):
-                if hasattr(chunk, "choices") and chunk.choices:
-                    choice = chunk.choices[0]
-                    if hasattr(choice, "delta") and hasattr(choice.delta, "content"):
-                        return choice.delta.content or ""
-
-        return ""
+        if self.provider_type == ProviderType.OPENAI:
+            return _extract_openai_content(chunk)
+        elif self.provider_type == ProviderType.ANTHROPIC:
+            return _extract_anthropic_content(chunk)
+        elif self.provider_type == ProviderType.TOGETHER:
+            return _extract_together_content(chunk)
+        elif self.provider_type == ProviderType.GROQ:
+            return _extract_groq_content(chunk)
+        else:
+            # Default case - assume OpenAI-compatible for unknown providers
+            return _extract_openai_content(chunk)
 
     def _process_chunk_usage(self, chunk):
         """Process usage data from streaming chunks based on provider."""
@@ -322,176 +755,36 @@ class TracedAsyncContextManager:
 
 def _extract_chunk_usage(client: ApiClient, chunk) -> Any:
     """Extract usage data from streaming chunks based on provider."""
-    if HAS_ANTHROPIC:
-        from judgeval.tracer.llm.providers import (
-            anthropic_Anthropic,
-            anthropic_AsyncAnthropic,
-        )
+    provider_type = _detect_provider(client)
 
-        assert anthropic_Anthropic is not None, "Anthropic client not found"
-        assert anthropic_AsyncAnthropic is not None, "Anthropic async client not found"
-        if isinstance(client, anthropic_Anthropic) or isinstance(
-            client, anthropic_AsyncAnthropic
-        ):
-            if hasattr(chunk, "type"):
-                if chunk.type == "message_start":
-                    if hasattr(chunk, "message") and hasattr(chunk.message, "usage"):
-                        return chunk.message.usage
-                elif chunk.type == "message_delta":
-                    if hasattr(chunk, "usage"):
-                        return chunk.usage
-                elif chunk.type == "message_stop":
-                    if hasattr(chunk, "usage"):
-                        return chunk.usage
-
-    if HAS_GROQ:
-        from judgeval.tracer.llm.providers import groq_Groq, groq_AsyncGroq
-
-        assert groq_Groq is not None, "Groq client not found"
-        assert groq_AsyncGroq is not None, "Groq async client not found"
-        if isinstance(client, groq_Groq) or isinstance(client, groq_AsyncGroq):
-            # Groq provides usage in x_groq.usage field
-            if hasattr(chunk, "x_groq") and chunk.x_groq:
-                if hasattr(chunk.x_groq, "usage"):
-                    return chunk.x_groq.usage
-
-    if HAS_OPENAI:
-        from judgeval.tracer.llm.providers import openai_OpenAI, openai_AsyncOpenAI
-
-        assert openai_OpenAI is not None, "OpenAI client not found"
-        assert openai_AsyncOpenAI is not None, "OpenAI async client not found"
-        if isinstance(client, openai_OpenAI) or isinstance(client, openai_AsyncOpenAI):
-            if hasattr(chunk, "usage") and chunk.usage:
-                return chunk.usage
-
-    if HAS_TOGETHER:
-        from judgeval.tracer.llm.providers import (
-            together_Together,
-            together_AsyncTogether,
-        )
-
-        assert together_Together is not None, "Together client not found"
-        assert together_AsyncTogether is not None, "Together async client not found"
-        if isinstance(client, together_Together) or isinstance(
-            client, together_AsyncTogether
-        ):
-            if hasattr(chunk, "usage") and chunk.usage:
-                return chunk.usage
-
-    return None
+    if provider_type == ProviderType.OPENAI:
+        return _extract_openai_chunk_usage(chunk)
+    elif provider_type == ProviderType.ANTHROPIC:
+        return _extract_anthropic_chunk_usage(chunk)
+    elif provider_type == ProviderType.TOGETHER:
+        return _extract_together_chunk_usage(chunk)
+    elif provider_type == ProviderType.GROQ:
+        return _extract_groq_chunk_usage(chunk)
+    else:
+        # Default case - assume OpenAI-compatible for unknown providers
+        return _extract_openai_chunk_usage(chunk)
 
 
 def _extract_usage_tokens(client: ApiClient, usage_data) -> tuple[int, int, int, int]:
     """Extract token counts from usage data based on provider."""
-    prompt_tokens = 0
-    completion_tokens = 0
-    cache_read_input_tokens = 0
-    cache_creation_input_tokens = 0
+    provider_type = _detect_provider(client)
 
-    if HAS_OPENAI:
-        from judgeval.tracer.llm.providers import openai_OpenAI, openai_AsyncOpenAI
-
-        assert openai_OpenAI is not None, "OpenAI client not found"
-        assert openai_AsyncOpenAI is not None, "OpenAI async client not found"
-        if isinstance(client, openai_OpenAI) or isinstance(client, openai_AsyncOpenAI):
-            prompt_tokens = (
-                usage_data.prompt_tokens
-                if hasattr(usage_data, "prompt_tokens")
-                and usage_data.prompt_tokens is not None
-                else 0
-            )
-            completion_tokens = (
-                usage_data.completion_tokens
-                if hasattr(usage_data, "completion_tokens")
-                and usage_data.completion_tokens is not None
-                else 0
-            )
-
-    if HAS_TOGETHER:
-        from judgeval.tracer.llm.providers import (
-            together_Together,
-            together_AsyncTogether,
-        )
-
-        assert together_Together is not None, "Together client not found"
-        assert together_AsyncTogether is not None, "Together async client not found"
-        if isinstance(client, together_Together) or isinstance(
-            client, together_AsyncTogether
-        ):
-            prompt_tokens = (
-                usage_data.prompt_tokens
-                if hasattr(usage_data, "prompt_tokens")
-                and usage_data.prompt_tokens is not None
-                else 0
-            )
-            completion_tokens = (
-                usage_data.completion_tokens
-                if hasattr(usage_data, "completion_tokens")
-                and usage_data.completion_tokens is not None
-                else 0
-            )
-
-    if HAS_ANTHROPIC:
-        from judgeval.tracer.llm.providers import (
-            anthropic_Anthropic,
-            anthropic_AsyncAnthropic,
-        )
-
-        assert anthropic_Anthropic is not None, "Anthropic client not found"
-        assert anthropic_AsyncAnthropic is not None, "Anthropic async client not found"
-        if isinstance(client, anthropic_Anthropic) or isinstance(
-            client, anthropic_AsyncAnthropic
-        ):
-            prompt_tokens = (
-                usage_data.input_tokens
-                if hasattr(usage_data, "input_tokens")
-                and usage_data.input_tokens is not None
-                else 0
-            )
-            completion_tokens = (
-                usage_data.output_tokens
-                if hasattr(usage_data, "output_tokens")
-                and usage_data.output_tokens is not None
-                else 0
-            )
-            cache_read_input_tokens = (
-                usage_data.cache_read_input_tokens
-                if hasattr(usage_data, "cache_read_input_tokens")
-                and usage_data.cache_read_input_tokens is not None
-                else 0
-            )
-            cache_creation_input_tokens = (
-                usage_data.cache_creation_input_tokens
-                if hasattr(usage_data, "cache_creation_input_tokens")
-                and usage_data.cache_creation_input_tokens is not None
-                else 0
-            )
-
-    if HAS_GROQ:
-        from judgeval.tracer.llm.providers import groq_Groq, groq_AsyncGroq
-
-        assert groq_Groq is not None, "Groq client not found"
-        assert groq_AsyncGroq is not None, "Groq async client not found"
-        if isinstance(client, groq_Groq) or isinstance(client, groq_AsyncGroq):
-            prompt_tokens = (
-                usage_data.prompt_tokens
-                if hasattr(usage_data, "prompt_tokens")
-                and usage_data.prompt_tokens is not None
-                else 0
-            )
-            completion_tokens = (
-                usage_data.completion_tokens
-                if hasattr(usage_data, "completion_tokens")
-                and usage_data.completion_tokens is not None
-                else 0
-            )
-
-    return (
-        prompt_tokens,
-        completion_tokens,
-        cache_read_input_tokens,
-        cache_creation_input_tokens,
-    )
+    if provider_type == ProviderType.OPENAI:
+        return _extract_openai_tokens(usage_data)
+    elif provider_type == ProviderType.ANTHROPIC:
+        return _extract_anthropic_tokens(usage_data)
+    elif provider_type == ProviderType.TOGETHER:
+        return _extract_together_tokens(usage_data)
+    elif provider_type == ProviderType.GROQ:
+        return _extract_groq_tokens(usage_data)
+    else:
+        # Default case - assume OpenAI-compatible for unknown providers
+        return _extract_openai_tokens(usage_data)
 
 
 def _process_usage_data(
@@ -843,273 +1136,25 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
 def _format_output_data(
     client: ApiClient, response: Any
 ) -> tuple[Optional[str], Optional[TraceUsage]]:
-    prompt_tokens = 0
-    completion_tokens = 0
-    cache_read_input_tokens = 0
-    cache_creation_input_tokens = 0
-    model_name = None
-    message_content = None
+    """Format output data from LLM response based on provider."""
+    provider_type = _detect_provider(client)
 
-    if HAS_OPENAI:
-        from judgeval.tracer.llm.providers import (
-            openai_OpenAI,
-            openai_AsyncOpenAI,
-            openai_ChatCompletion,
-            openai_Response,
-            openai_ParsedChatCompletion,
+    if provider_type == ProviderType.OPENAI:
+        return _format_openai_output(response)
+    elif provider_type == ProviderType.ANTHROPIC:
+        return _format_anthropic_output(response)
+    elif provider_type == ProviderType.TOGETHER:
+        return _format_together_output(response)
+    elif provider_type == ProviderType.GOOGLE:
+        return _format_google_output(response)
+    elif provider_type == ProviderType.GROQ:
+        return _format_groq_output(response)
+    else:
+        # Default case - assume OpenAI-compatible for unknown providers
+        judgeval_logger.info(
+            f"Unknown client type {type(client)}, assuming OpenAI-compatible"
         )
-
-        assert openai_OpenAI is not None, "OpenAI client not found"
-        assert openai_AsyncOpenAI is not None, "OpenAI async client not found"
-        assert openai_ChatCompletion is not None, "OpenAI chat completion not found"
-        assert openai_Response is not None, "OpenAI response not found"
-        assert openai_ParsedChatCompletion is not None, (
-            "OpenAI parsed chat completion not found"
-        )
-
-        if isinstance(client, openai_OpenAI) or isinstance(client, openai_AsyncOpenAI):
-            if isinstance(response, openai_ChatCompletion):
-                model_name = response.model or ""
-                prompt_tokens = (
-                    response.usage.prompt_tokens
-                    if response.usage and response.usage.prompt_tokens is not None
-                    else 0
-                )
-                completion_tokens = (
-                    response.usage.completion_tokens
-                    if response.usage and response.usage.completion_tokens is not None
-                    else 0
-                )
-                cache_read_input_tokens = (
-                    response.usage.prompt_tokens_details.cached_tokens
-                    if response.usage
-                    and response.usage.prompt_tokens_details
-                    and response.usage.prompt_tokens_details.cached_tokens is not None
-                    else 0
-                )
-
-                if isinstance(response, openai_ParsedChatCompletion):
-                    message_content = response.choices[0].message.parsed
-                else:
-                    message_content = response.choices[0].message.content
-            elif isinstance(response, openai_Response):
-                model_name = response.model or ""
-                prompt_tokens = (
-                    response.usage.input_tokens
-                    if response.usage and response.usage.input_tokens is not None
-                    else 0
-                )
-                completion_tokens = (
-                    response.usage.output_tokens
-                    if response.usage and response.usage.output_tokens is not None
-                    else 0
-                )
-                cache_read_input_tokens = (
-                    response.usage.input_tokens_details.cached_tokens
-                    if response.usage
-                    and response.usage.input_tokens_details
-                    and response.usage.input_tokens_details.cached_tokens is not None
-                    else 0
-                )
-                output0 = response.output[0]
-                if (
-                    hasattr(output0, "content")
-                    and output0.content
-                    and hasattr(output0.content, "__iter__")
-                ):  # type: ignore[attr-defined]
-                    message_content = "".join(
-                        seg.text  # type: ignore[attr-defined]
-                        for seg in output0.content  # type: ignore[attr-defined]
-                        if hasattr(seg, "text") and seg.text
-                    )
-
-            if model_name:
-                return message_content, _create_usage(
-                    model_name,
-                    prompt_tokens,
-                    completion_tokens,
-                    cache_read_input_tokens,
-                    cache_creation_input_tokens,
-                )
-
-    if HAS_TOGETHER:
-        from judgeval.tracer.llm.providers import (
-            together_Together,
-            together_AsyncTogether,
-        )
-
-        assert together_Together is not None, "Together client not found"
-        assert together_AsyncTogether is not None, "Together async client not found"
-        if isinstance(client, together_Together) or isinstance(
-            client, together_AsyncTogether
-        ):
-            model_name = (response.model or "") if hasattr(response, "model") else ""
-            prompt_tokens = (
-                response.usage.prompt_tokens
-                if hasattr(response.usage, "prompt_tokens")
-                and response.usage.prompt_tokens is not None
-                else 0
-            )  # type: ignore[attr-defined]
-            completion_tokens = (
-                response.usage.completion_tokens
-                if hasattr(response.usage, "completion_tokens")
-                and response.usage.completion_tokens is not None
-                else 0
-            )  # type: ignore[attr-defined]
-            message_content = (
-                response.choices[0].message.content
-                if hasattr(response, "choices")
-                else None
-            )  # type: ignore[attr-defined]
-
-            if model_name:
-                model_name = "together_ai/" + model_name
-                return message_content, _create_usage(
-                    model_name,
-                    prompt_tokens,
-                    completion_tokens,
-                    cache_read_input_tokens,
-                    cache_creation_input_tokens,
-                )
-
-    if HAS_GOOGLE_GENAI:
-        from judgeval.tracer.llm.providers import (
-            google_genai_Client,
-            google_genai_AsyncClient,
-        )
-
-        assert google_genai_Client is not None, "Google GenAI client not found"
-        assert google_genai_AsyncClient is not None, (
-            "Google GenAI async client not found"
-        )
-        if isinstance(client, google_genai_Client) or isinstance(
-            client, google_genai_AsyncClient
-        ):
-            model_name = getattr(response, "model_version", "") or ""
-            usage_metadata = getattr(response, "usage_metadata", None)
-            prompt_tokens = (
-                usage_metadata.prompt_token_count
-                if usage_metadata
-                and hasattr(usage_metadata, "prompt_token_count")
-                and usage_metadata.prompt_token_count is not None
-                else 0
-            )
-            completion_tokens = (
-                usage_metadata.candidates_token_count
-                if usage_metadata
-                and hasattr(usage_metadata, "candidates_token_count")
-                and usage_metadata.candidates_token_count is not None
-                else 0
-            )
-            message_content = (
-                response.candidates[0].content.parts[0].text
-                if hasattr(response, "candidates")
-                else None
-            )  # type: ignore[attr-defined]
-
-            if usage_metadata and hasattr(usage_metadata, "cached_content_token_count"):
-                cache_read_input_tokens = usage_metadata.cached_content_token_count or 0
-
-            if model_name:
-                return message_content, _create_usage(
-                    model_name,
-                    prompt_tokens,
-                    completion_tokens,
-                    cache_read_input_tokens,
-                    cache_creation_input_tokens,
-                )
-
-    if HAS_ANTHROPIC:
-        from judgeval.tracer.llm.providers import (
-            anthropic_Anthropic,
-            anthropic_AsyncAnthropic,
-        )
-
-        assert anthropic_Anthropic is not None, "Anthropic client not found"
-        assert anthropic_AsyncAnthropic is not None, "Anthropic async client not found"
-        if isinstance(client, anthropic_Anthropic) or isinstance(
-            client, anthropic_AsyncAnthropic
-        ):
-            model_name = getattr(response, "model", "") or ""
-            usage = getattr(response, "usage", None)
-            prompt_tokens = (
-                usage.input_tokens
-                if usage
-                and hasattr(usage, "input_tokens")
-                and usage.input_tokens is not None
-                else 0
-            )
-            completion_tokens = (
-                usage.output_tokens
-                if usage
-                and hasattr(usage, "output_tokens")
-                and usage.output_tokens is not None
-                else 0
-            )
-            cache_read_input_tokens = (
-                usage.cache_read_input_tokens
-                if usage
-                and hasattr(usage, "cache_read_input_tokens")
-                and usage.cache_read_input_tokens is not None
-                else 0
-            )
-            cache_creation_input_tokens = (
-                usage.cache_creation_input_tokens
-                if usage
-                and hasattr(usage, "cache_creation_input_tokens")
-                and usage.cache_creation_input_tokens is not None
-                else 0
-            )
-            message_content = (
-                response.content[0].text if hasattr(response, "content") else None
-            )  # type: ignore[attr-defined]
-
-            if model_name:
-                return message_content, _create_usage(
-                    model_name,
-                    prompt_tokens,
-                    completion_tokens,
-                    cache_read_input_tokens,
-                    cache_creation_input_tokens,
-                )
-
-    if HAS_GROQ:
-        from judgeval.tracer.llm.providers import groq_Groq, groq_AsyncGroq
-
-        assert groq_Groq is not None, "Groq client not found"
-        assert groq_AsyncGroq is not None, "Groq async client not found"
-        if isinstance(client, groq_Groq) or isinstance(client, groq_AsyncGroq):
-            model_name = (response.model or "") if hasattr(response, "model") else ""
-            prompt_tokens = (
-                response.usage.prompt_tokens
-                if hasattr(response.usage, "prompt_tokens")
-                and response.usage.prompt_tokens is not None
-                else 0
-            )  # type: ignore[attr-defined]
-            completion_tokens = (
-                response.usage.completion_tokens
-                if hasattr(response.usage, "completion_tokens")
-                and response.usage.completion_tokens is not None
-                else 0
-            )  # type: ignore[attr-defined]
-            message_content = (
-                response.choices[0].message.content
-                if hasattr(response, "choices")
-                else None
-            )  # type: ignore[attr-defined]
-
-            if model_name:
-                model_name = "groq/" + model_name
-                return message_content, _create_usage(
-                    model_name,
-                    prompt_tokens,
-                    completion_tokens,
-                    cache_read_input_tokens,
-                    cache_creation_input_tokens,
-                )
-
-    judgeval_logger.warning(f"Unsupported client type: {type(client)}")
-    return None, None
+        return _format_openai_output(response)
 
 
 def _create_usage(
