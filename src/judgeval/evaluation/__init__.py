@@ -21,7 +21,6 @@ from judgeval.logger import judgeval_logger
 
 
 if TYPE_CHECKING:
-    from judgeval.data.trace_run import TraceRun
     from judgeval.data.evaluation_run import EvaluationRun
 
 
@@ -50,7 +49,7 @@ def safe_run_async(coro):
 
 def log_evaluation_results(
     scoring_results: List[ScoringResult],
-    run: Union[EvaluationRun, TraceRun],
+    run: EvaluationRun,
     judgment_api_key: str,
 ) -> str:
     """
@@ -278,7 +277,7 @@ def run_eval(
             api_client = JudgmentSyncClient(
                 judgment_api_key, evaluation_run.organization_id
             )
-            response = api_client.add_to_run_eval_queue(
+            response = api_client.add_to_run_eval_queue_examples(
                 evaluation_run.model_dump(warnings=False)  # type: ignore
             )
 

@@ -1,4 +1,5 @@
 from typing import List, Optional, Union
+from litellm.files.main import BaseModel
 from pydantic import field_validator, model_validator, Field
 from datetime import datetime, timezone
 import uuid
@@ -6,17 +7,21 @@ import uuid
 from judgeval.data import Example
 from judgeval.scorers import BaseScorer, APIScorerConfig
 from judgeval.constants import ACCEPTABLE_MODELS
-from judgeval.data.judgment_types import EvaluationRun as EvaluationRunJudgmentType
+from judgeval.data.judgment_types import (
+    ExampleEvaluationRun as ExampleEvaluationRunJudgmentType,
+    TraceEvaluationRun as TraceEvaluationRunJudgmentType,
+)
 
 
-class EvaluationRun(EvaluationRunJudgmentType):
+class EvaluationRun(BaseModel):
     id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()))
     created_at: Optional[str] = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
+    organization_id: Optional[str] = None
     custom_scorers: Optional[List[BaseScorer]] = None
     judgment_scorers: Optional[List[APIScorerConfig]] = None
-    organization_id: Optional[str] = None
+    scorers: Optional[List[Union[BaseScorer, APIScorerConfig]]] = None
 
     def __init__(
         self,
@@ -68,7 +73,7 @@ class EvaluationRun(EvaluationRunJudgmentType):
 
         return values
 
-    @field_validator("model")
+    @field_validator("model", check_fields=False)
     def validate_model(cls, v, values):
         if not v:
             raise ValueError("Model cannot be empty.")
@@ -82,7 +87,7 @@ class EvaluationRun(EvaluationRunJudgmentType):
             return v
 
 
-class ExampleEvaluationRun(EvaluationRun):
+class ExampleEvaluationRun(EvaluationRun, ExampleEvaluationRunJudgmentType):  # type: ignore
     """
     Stores example and evaluation scorers together for running an eval task
 
@@ -93,8 +98,6 @@ class ExampleEvaluationRun(EvaluationRun):
         scorers (List[Union[BaseScorer, APIScorerConfig]]): A list of scorers to use for evaluation
         model (str): The model used as a judge when using LLM as a Judge
     """
-
-    examples: List[Example]
 
     @field_validator("examples")
     def validate_examples(cls, v):
@@ -111,21 +114,9 @@ class ExampleEvaluationRun(EvaluationRun):
         return data
 
 
-class TraceEvaluationRun(EvaluationRun):
-    @field_validator("examples")
-    def validate_examples(cls, v):
-        if v:
-            raise ValueError("Examples are not supported for trace evaluations.")
-        return v
-
-    @field_validator("trace_id")
-    def validate_trace_id(cls, v):
+class TraceEvaluationRun(EvaluationRun, TraceEvaluationRunJudgmentType):  # type: ignore
+    @field_validator("trace_and_span_ids")
+    def validate_trace_and_span_ids(cls, v):
         if not v:
-            raise ValueError("Trace ID is required for trace evaluations.")
-        return v
-
-    @field_validator("trace_span_id")
-    def validate_trace_span_id(cls, v):
-        if not v:
-            raise ValueError("Trace span ID is required for trace evaluations.")
+            raise ValueError("Trace and span IDs are required for trace evaluations.")
         return v

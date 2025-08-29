@@ -57,10 +57,17 @@ class JudgmentSyncClient:
             )
         return _handle_response(r)
 
-    def add_to_run_eval_queue(self, payload: EvaluationRun) -> Any:
+    def add_to_run_eval_queue_examples(self, payload: ExampleEvaluationRun) -> Any:
         return self._request(
             "POST",
-            url_for("/add_to_run_eval_queue/"),
+            url_for("/add_to_run_eval_queue/examples"),
+            payload,
+        )
+
+    def add_to_run_eval_queue_traces(self, payload: TraceEvaluationRun) -> Any:
+        return self._request(
+            "POST",
+            url_for("/add_to_run_eval_queue/traces"),
             payload,
         )
 
@@ -71,13 +78,28 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def evaluate(self, payload: EvaluationRun, stream: Optional[str] = None) -> Any:
+    def evaluate_examples(
+        self, payload: ExampleEvaluationRun, stream: Optional[str] = None
+    ) -> Any:
         query_params = {}
         if stream is not None:
             query_params["stream"] = stream
         return self._request(
             "POST",
-            url_for("/evaluate/"),
+            url_for("/evaluate/examples"),
+            payload,
+            params=query_params,
+        )
+
+    def evaluate_traces(
+        self, payload: TraceEvaluationRun, stream: Optional[str] = None
+    ) -> Any:
+        query_params = {}
+        if stream is not None:
+            query_params["stream"] = stream
+        return self._request(
+            "POST",
+            url_for("/evaluate/traces"),
             payload,
             params=query_params,
         )
@@ -266,10 +288,19 @@ class JudgmentAsyncClient:
             )
         return _handle_response(await r)
 
-    async def add_to_run_eval_queue(self, payload: EvaluationRun) -> Any:
+    async def add_to_run_eval_queue_examples(
+        self, payload: ExampleEvaluationRun
+    ) -> Any:
         return await self._request(
             "POST",
-            url_for("/add_to_run_eval_queue/"),
+            url_for("/add_to_run_eval_queue/examples"),
+            payload,
+        )
+
+    async def add_to_run_eval_queue_traces(self, payload: TraceEvaluationRun) -> Any:
+        return await self._request(
+            "POST",
+            url_for("/add_to_run_eval_queue/traces"),
             payload,
         )
 
@@ -280,15 +311,28 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def evaluate(
-        self, payload: EvaluationRun, stream: Optional[str] = None
+    async def evaluate_examples(
+        self, payload: ExampleEvaluationRun, stream: Optional[str] = None
     ) -> Any:
         query_params = {}
         if stream is not None:
             query_params["stream"] = stream
         return await self._request(
             "POST",
-            url_for("/evaluate/"),
+            url_for("/evaluate/examples"),
+            payload,
+            params=query_params,
+        )
+
+    async def evaluate_traces(
+        self, payload: TraceEvaluationRun, stream: Optional[str] = None
+    ) -> Any:
+        query_params = {}
+        if stream is not None:
+            query_params["stream"] = stream
+        return await self._request(
+            "POST",
+            url_for("/evaluate/traces"),
             payload,
             params=query_params,
         )

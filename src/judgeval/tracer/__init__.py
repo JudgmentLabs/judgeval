@@ -343,9 +343,9 @@ class Tracer:
         if not self.enable_evaluation:
             return
 
-        scorer = scorer_config.get("scorer")
-        model = scorer_config.get("model")
-        run_condition = scorer_config.get("run_condition")
+        scorer = scorer_config.scorer
+        model = scorer_config.model
+        run_condition = scorer_config.run_condition
         sampling_rate = scorer_config.sampling_rate
 
         if not isinstance(scorer, (TraceAPIScorerConfig)):
@@ -383,8 +383,7 @@ class Tracer:
             eval_name=eval_run_name,
             scorers=[scorer],
             model=model,
-            trace_span_id=span_id,
-            trace_id=trace_id,
+            trace_and_span_ids=[(trace_id, span_id)],
         )
         span.set_attribute(
             AttributeKeys.PENDING_TRACE_EVAL,
@@ -755,8 +754,9 @@ class Tracer:
                 trace_span_id=span_id,
                 trace_id=trace_id,
             )
-
-            self.api_client.add_to_run_eval_queue(eval_run.model_dump(warnings=False))  # type: ignore
+            self.api_client.add_to_run_eval_queue_examples(
+                eval_run.model_dump(warnings=False)
+            )  # type: ignore
         else:
             # Handle custom scorers using local evaluation queue
             eval_run = ExampleEvaluationRun(
