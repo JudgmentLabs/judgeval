@@ -129,6 +129,82 @@ def google_llm_call():
 
 
 @judgment.observe()
+def openai_streaming_llm_call():
+    stream = openai_client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": PROMPT},
+        ],
+        stream=True,
+        stream_options={"include_usage": True},
+    )
+
+    accumulated_content = ""
+    for chunk in stream:
+        if chunk.choices and chunk.choices[0].delta.content:
+            accumulated_content += chunk.choices[0].delta.content
+
+    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+
+
+@judgment.observe()
+def anthropic_streaming_llm_call():
+    stream = anthropic_client.messages.create(
+        model="claude-3-haiku-20240307",
+        messages=[{"role": "user", "content": PROMPT}],
+        max_tokens=30,
+        stream=True,
+    )
+
+    accumulated_content = ""
+    for chunk in stream:
+        if hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
+            accumulated_content += chunk.delta.text or ""
+
+    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+
+
+@judgment.observe()
+def groq_streaming_llm_call():
+    stream = groq_client.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": PROMPT},
+        ],
+        stream=True,
+    )
+
+    accumulated_content = ""
+    for chunk in stream:
+        if chunk.choices and chunk.choices[0].delta.content:
+            accumulated_content += chunk.choices[0].delta.content
+
+    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+
+
+@judgment.observe()
+def together_streaming_llm_call():
+    stream = together_client.chat.completions.create(
+        model="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": PROMPT},
+        ],
+        stream=True,
+        stream_options={"include_usage": True},
+    )
+
+    accumulated_content = ""
+    for chunk in stream:
+        if chunk.choices and chunk.choices[0].delta.content:
+            accumulated_content += chunk.choices[0].delta.content
+
+    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+
+
+@judgment.observe()
 async def openai_async_llm_call():
     await openai_client_async.chat.completions.create(
         model="gpt-4o-mini", messages=[{"role": "user", "content": PROMPT}]
@@ -163,6 +239,82 @@ async def together_async_llm_call():
     return format(judgment.get_current_span().get_span_context().trace_id, "032x")
 
 
+@judgment.observe()
+async def openai_async_streaming_llm_call():
+    stream = await openai_client_async.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": PROMPT},
+        ],
+        stream=True,
+        stream_options={"include_usage": True},
+    )
+
+    accumulated_content = ""
+    async for chunk in stream:
+        if chunk.choices and chunk.choices[0].delta.content:
+            accumulated_content += chunk.choices[0].delta.content
+
+    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+
+
+@judgment.observe()
+async def anthropic_async_streaming_llm_call():
+    stream = await anthropic_client_async.messages.create(
+        model="claude-3-haiku-20240307",
+        messages=[{"role": "user", "content": PROMPT}],
+        max_tokens=30,
+        stream=True,
+    )
+
+    accumulated_content = ""
+    async for chunk in stream:
+        if hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
+            accumulated_content += chunk.delta.text or ""
+
+    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+
+
+@judgment.observe()
+async def groq_async_streaming_llm_call():
+    stream = await groq_client_async.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": PROMPT},
+        ],
+        stream=True,
+    )
+
+    accumulated_content = ""
+    async for chunk in stream:
+        if chunk.choices and chunk.choices[0].delta.content:
+            accumulated_content += chunk.choices[0].delta.content
+
+    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+
+
+@judgment.observe()
+async def together_async_streaming_llm_call():
+    stream = await together_client_async.chat.completions.create(
+        model="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": PROMPT},
+        ],
+        stream=True,
+        stream_options={"include_usage": True},
+    )
+
+    accumulated_content = ""
+    async for chunk in stream:
+        if chunk.choices and chunk.choices[0].delta.content:
+            accumulated_content += chunk.choices[0].delta.content
+
+    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+
+
 def retrieve_trace_helper(trace_id, expected_span_amount):
     query_count = 0
     while query_count < QUERY_RETRY:
@@ -192,6 +344,43 @@ def retrieve_llm_cost_helper(trace_id):
         assert False, "No LLM cost found"
 
     return total_llm_cost
+
+
+def retrieve_streaming_trace_helper(trace_id):
+    """Helper to validate streaming traces have proper attributes."""
+    trace_spans = retrieve_trace_helper(trace_id, 2)
+
+    # Find the LLM span
+    llm_span = None
+    for span in trace_spans:
+        if span.get("span_attributes", {}).get("judgment.span_kind") == "llm":
+            llm_span = span
+            break
+
+    if not llm_span:
+        assert False, "No LLM span found in streaming trace"
+
+    # Verify streaming-specific attributes
+    span_attributes = llm_span.get("span_attributes", {})
+
+    # Should have completion content
+    completion = span_attributes.get("gen_ai.completion")
+    if not completion:
+        assert False, "No completion content found in streaming span"
+
+    # Should have usage information
+    input_tokens = span_attributes.get("gen_ai.usage.input_tokens")
+    output_tokens = span_attributes.get("gen_ai.usage.output_tokens")
+
+    if input_tokens is None or output_tokens is None:
+        assert False, "Missing usage tokens in streaming span"
+
+    # Should have cost information
+    total_cost = span_attributes.get("gen_ai.usage.total_cost_usd")
+    if total_cost is None:
+        assert False, "Missing cost information in streaming span"
+
+    return trace_spans
 
 
 def test_trace_spans():
@@ -247,6 +436,41 @@ async def test_groq_async_llm_cost():
 async def test_together_async_llm_cost():
     trace_id = await together_async_llm_call()
     retrieve_llm_cost_helper(trace_id)
+
+
+# Sync streaming tests
+def test_openai_streaming_llm_cost():
+    trace_id = openai_streaming_llm_call()
+    retrieve_streaming_trace_helper(trace_id)
+
+
+def test_anthropic_streaming_llm_cost():
+    trace_id = anthropic_streaming_llm_call()
+    retrieve_streaming_trace_helper(trace_id)
+
+
+def test_together_streaming_llm_cost():
+    trace_id = together_streaming_llm_call()
+    retrieve_streaming_trace_helper(trace_id)
+
+
+# Async streaming tests
+@pytest.mark.asyncio
+async def test_openai_async_streaming_llm_cost():
+    trace_id = await openai_async_streaming_llm_call()
+    retrieve_streaming_trace_helper(trace_id)
+
+
+@pytest.mark.asyncio
+async def test_anthropic_async_streaming_llm_cost():
+    trace_id = await anthropic_async_streaming_llm_call()
+    retrieve_streaming_trace_helper(trace_id)
+
+
+@pytest.mark.asyncio
+async def test_together_async_streaming_llm_cost():
+    trace_id = await together_async_streaming_llm_call()
+    retrieve_streaming_trace_helper(trace_id)
 
 
 def test_trace_scoring():

@@ -138,7 +138,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
             message_dict = {"role": "unknown", "content": str(message.content)}
 
         if hasattr(message, "additional_kwargs") and message.additional_kwargs:
-            message_dict["additional_kwargs"] = message.additional_kwargs
+            message_dict["additional_kwargs"] = str(message.additional_kwargs)
 
         return message_dict
 
