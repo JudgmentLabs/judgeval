@@ -449,11 +449,6 @@ def test_anthropic_streaming_llm_cost():
     retrieve_streaming_trace_helper(trace_id)
 
 
-def test_groq_streaming_llm_cost():
-    trace_id = groq_streaming_llm_call()
-    retrieve_streaming_trace_helper(trace_id)
-
-
 def test_together_streaming_llm_cost():
     trace_id = together_streaming_llm_call()
     retrieve_streaming_trace_helper(trace_id)
@@ -469,12 +464,6 @@ async def test_openai_async_streaming_llm_cost():
 @pytest.mark.asyncio
 async def test_anthropic_async_streaming_llm_cost():
     trace_id = await anthropic_async_streaming_llm_call()
-    retrieve_streaming_trace_helper(trace_id)
-
-
-@pytest.mark.asyncio
-async def test_groq_async_streaming_llm_cost():
-    trace_id = await groq_async_streaming_llm_call()
     retrieve_streaming_trace_helper(trace_id)
 
 

@@ -70,6 +70,8 @@ def _detect_provider(client: ApiClient) -> ProviderType:
     if HAS_OPENAI:
         from judgeval.tracer.llm.providers import openai_OpenAI, openai_AsyncOpenAI
 
+        assert openai_OpenAI is not None, "OpenAI client not found"
+        assert openai_AsyncOpenAI is not None, "OpenAI async client not found"
         if isinstance(client, (openai_OpenAI, openai_AsyncOpenAI)):
             return ProviderType.OPENAI
 
@@ -79,6 +81,8 @@ def _detect_provider(client: ApiClient) -> ProviderType:
             anthropic_AsyncAnthropic,
         )
 
+        assert anthropic_Anthropic is not None, "Anthropic client not found"
+        assert anthropic_AsyncAnthropic is not None, "Anthropic async client not found"
         if isinstance(client, (anthropic_Anthropic, anthropic_AsyncAnthropic)):
             return ProviderType.ANTHROPIC
 
@@ -88,6 +92,8 @@ def _detect_provider(client: ApiClient) -> ProviderType:
             together_AsyncTogether,
         )
 
+        assert together_Together is not None, "Together client not found"
+        assert together_AsyncTogether is not None, "Together async client not found"
         if isinstance(client, (together_Together, together_AsyncTogether)):
             return ProviderType.TOGETHER
 
@@ -97,12 +103,18 @@ def _detect_provider(client: ApiClient) -> ProviderType:
             google_genai_AsyncClient,
         )
 
+        assert google_genai_Client is not None, "Google GenAI client not found"
+        assert google_genai_AsyncClient is not None, (
+            "Google GenAI async client not found"
+        )
         if isinstance(client, (google_genai_Client, google_genai_AsyncClient)):
             return ProviderType.GOOGLE
 
     if HAS_GROQ:
         from judgeval.tracer.llm.providers import groq_Groq, groq_AsyncGroq
 
+        assert groq_Groq is not None, "Groq client not found"
+        assert groq_AsyncGroq is not None, "Groq async client not found"
         if isinstance(client, (groq_Groq, groq_AsyncGroq)):
             return ProviderType.GROQ
 
@@ -287,83 +299,82 @@ def _extract_groq_tokens(usage_data) -> tuple[int, int, int, int]:
 # Provider-specific output formatting handlers
 def _format_openai_output(response: Any) -> tuple[Optional[str], Optional[TraceUsage]]:
     """Format output data from OpenAI response."""
-    if HAS_OPENAI:
-        from judgeval.tracer.llm.providers import (
-            openai_ChatCompletion,
-            openai_Response,
-            openai_ParsedChatCompletion,
+    from judgeval.tracer.llm.providers import (
+        openai_ChatCompletion,
+        openai_Response,
+        openai_ParsedChatCompletion,
+    )
+
+    model_name = None
+    message_content = None
+    prompt_tokens = 0
+    completion_tokens = 0
+    cache_read_input_tokens = 0
+    cache_creation_input_tokens = 0
+
+    if openai_ChatCompletion and isinstance(response, openai_ChatCompletion):
+        model_name = response.model or ""
+        prompt_tokens = (
+            response.usage.prompt_tokens
+            if response.usage and response.usage.prompt_tokens is not None
+            else 0
+        )
+        completion_tokens = (
+            response.usage.completion_tokens
+            if response.usage and response.usage.completion_tokens is not None
+            else 0
+        )
+        cache_read_input_tokens = (
+            response.usage.prompt_tokens_details.cached_tokens
+            if response.usage
+            and response.usage.prompt_tokens_details
+            and response.usage.prompt_tokens_details.cached_tokens is not None
+            else 0
         )
 
-        model_name = None
-        message_content = None
-        prompt_tokens = 0
-        completion_tokens = 0
-        cache_read_input_tokens = 0
-        cache_creation_input_tokens = 0
+        if openai_ParsedChatCompletion and isinstance(
+            response, openai_ParsedChatCompletion
+        ):
+            message_content = response.choices[0].message.parsed
+        else:
+            message_content = response.choices[0].message.content
+    elif openai_Response and isinstance(response, openai_Response):
+        model_name = response.model or ""
+        prompt_tokens = (
+            response.usage.input_tokens
+            if response.usage and response.usage.input_tokens is not None
+            else 0
+        )
+        completion_tokens = (
+            response.usage.output_tokens
+            if response.usage and response.usage.output_tokens is not None
+            else 0
+        )
+        cache_read_input_tokens = (
+            response.usage.input_tokens_details.cached_tokens
+            if response.usage
+            and response.usage.input_tokens_details
+            and response.usage.input_tokens_details.cached_tokens is not None
+            else 0
+        )
+        output0 = response.output[0]
+        if (
+            hasattr(output0, "content")
+            and output0.content
+            and hasattr(output0.content, "__iter__")
+        ):
+            message_content = "".join(
+                seg.text for seg in output0.content if hasattr(seg, "text") and seg.text
+            )
 
-        if isinstance(response, openai_ChatCompletion):
-            model_name = response.model or ""
-            prompt_tokens = (
-                response.usage.prompt_tokens
-                if response.usage and response.usage.prompt_tokens is not None
-                else 0
-            )
-            completion_tokens = (
-                response.usage.completion_tokens
-                if response.usage and response.usage.completion_tokens is not None
-                else 0
-            )
-            cache_read_input_tokens = (
-                response.usage.prompt_tokens_details.cached_tokens
-                if response.usage
-                and response.usage.prompt_tokens_details
-                and response.usage.prompt_tokens_details.cached_tokens is not None
-                else 0
-            )
-
-            if isinstance(response, openai_ParsedChatCompletion):
-                message_content = response.choices[0].message.parsed
-            else:
-                message_content = response.choices[0].message.content
-        elif isinstance(response, openai_Response):
-            model_name = response.model or ""
-            prompt_tokens = (
-                response.usage.input_tokens
-                if response.usage and response.usage.input_tokens is not None
-                else 0
-            )
-            completion_tokens = (
-                response.usage.output_tokens
-                if response.usage and response.usage.output_tokens is not None
-                else 0
-            )
-            cache_read_input_tokens = (
-                response.usage.input_tokens_details.cached_tokens
-                if response.usage
-                and response.usage.input_tokens_details
-                and response.usage.input_tokens_details.cached_tokens is not None
-                else 0
-            )
-            output0 = response.output[0]
-            if (
-                hasattr(output0, "content")
-                and output0.content
-                and hasattr(output0.content, "__iter__")
-            ):
-                message_content = "".join(
-                    seg.text
-                    for seg in output0.content
-                    if hasattr(seg, "text") and seg.text
-                )
-
-        if model_name:
-            return message_content, _create_usage(
-                model_name,
-                prompt_tokens,
-                completion_tokens,
-                cache_read_input_tokens,
-                cache_creation_input_tokens,
-            )
+    if model_name:
+        return message_content, _create_usage(
+            model_name,
+            prompt_tokens,
+            completion_tokens,
+            cache_read_input_tokens,
+            cache_creation_input_tokens,
+        )
 
     return None, None
 
