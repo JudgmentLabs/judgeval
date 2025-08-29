@@ -45,7 +45,29 @@ def cost_per_token(
 class _TracedGeneratorBase:
     """Base class with common logic for parsing stream chunks."""
 
-    def __init__(self, tracer: "Tracer", client: ApiClient, span, model_name: str = ""):
+    __slots__ = (
+        "tracer",
+        "client",
+        "span",
+        "accumulated_content",
+        "model_name",
+    )
+
+    tracer: Tracer
+    client: ApiClient
+    span: Any
+    accumulated_content: str
+    model_name: str
+
+    def __init__(self, tracer: Tracer, client: ApiClient, span, model_name: str):
+        """Initialize the base traced generator.
+
+        Args:
+            tracer: The tracer instance
+            client: The API client
+            span: The OpenTelemetry span
+            model_name: The model name (empty string default allows fallback to usage_data.model)
+        """
         self.tracer = tracer
         self.client = client
         self.span = span
@@ -115,9 +137,12 @@ class _TracedGeneratorBase:
 
     def __del__(self):
         """
-        Fallback cleanup for unclosed spans. Note: __del__ is not guaranteed to be called
-        in all situations (e.g., reference cycles, program exit), so this should not be
-        relied upon as the primary cleanup mechanism.
+        Fallback cleanup for unclosed spans. This is a safety mechanism only - spans
+        should normally be finalized in StopIteration/StopAsyncIteration handlers.
+
+        Note: __del__ is not guaranteed to be called in all situations (e.g., reference
+        cycles, program exit), so this should not be relied upon as the primary cleanup
+        mechanism. The primary finalization happens in the iterator protocol methods.
         """
         if hasattr(self, "span") and self.span:
             try:
@@ -140,8 +165,12 @@ class _TracedGeneratorBase:
 class TracedGenerator(_TracedGeneratorBase):
     """Generator wrapper that adds OpenTelemetry tracing without consuming the stream."""
 
+    __slots__ = ("generator",)
+
+    generator: Any
+
     def __init__(
-        self, tracer: "Tracer", generator, client: ApiClient, span, model_name: str = ""
+        self, tracer: Tracer, generator, client: ApiClient, span, model_name: str = ""
     ):
         super().__init__(tracer, client, span, model_name)
         self.generator = generator
@@ -172,9 +201,13 @@ class TracedGenerator(_TracedGeneratorBase):
 class TracedAsyncGenerator(_TracedGeneratorBase):
     """Async generator wrapper that adds OpenTelemetry tracing without consuming the stream."""
 
+    __slots__ = ("async_generator",)
+
+    async_generator: Any
+
     def __init__(
         self,
-        tracer: "Tracer",
+        tracer: Tracer,
         async_generator,
         client: ApiClient,
         span,
@@ -212,7 +245,7 @@ class TracedSyncContextManager:
 
     def __init__(
         self,
-        tracer: "Tracer",
+        tracer: Tracer,
         context_manager,
         client: ApiClient,
         span,
@@ -247,7 +280,7 @@ class TracedAsyncContextManager:
 
     def __init__(
         self,
-        tracer: "Tracer",
+        tracer: Tracer,
         context_manager,
         client: ApiClient,
         span,
@@ -452,7 +485,7 @@ def _extract_usage_tokens(client: ApiClient, usage_data) -> tuple[int, int, int,
 
 
 def _process_usage_data(
-    span, usage_data, tracer: "Tracer", client: ApiClient, model_name: str = ""
+    span, usage_data, tracer: Tracer, client: ApiClient, model_name: str = ""
 ):
     """Process usage data and set span attributes."""
     (
@@ -475,7 +508,7 @@ def _process_usage_data(
         _set_usage_attributes(span, usage, tracer)
 
 
-def _set_usage_attributes(span, usage: TraceUsage, tracer: "Tracer"):
+def _set_usage_attributes(span, usage: TraceUsage, tracer: Tracer):
     """Set usage attributes on the span for non-streaming responses."""
 
     set_span_attribute(span, "gen_ai.response.model", usage.model_name)
