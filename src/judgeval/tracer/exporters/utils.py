@@ -1,6 +1,5 @@
 from typing import Sequence
 from opentelemetry.sdk.trace import ReadableSpan
-from opentelemetry.trace import Span
 
 from judgeval.tracer.keys import AttributeKeys
 

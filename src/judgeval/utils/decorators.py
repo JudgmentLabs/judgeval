@@ -18,7 +18,7 @@ def dont_throw(func: Callable[..., T]) -> Callable[..., T | None]:
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except Exception as e:
+        except Exception:
             pass
 
     return wrapper
