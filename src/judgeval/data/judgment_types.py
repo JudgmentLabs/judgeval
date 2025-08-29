@@ -21,36 +21,11 @@ class DatasetFetch(BaseModel):
     project_name: Annotated[str, Field(title="Project Name")]
 
 
-class TraceSave(BaseModel):
-    project_name: Annotated[str, Field(title="Project Name")]
-    trace_id: Annotated[str, Field(title="Trace Id")]
-    name: Annotated[str, Field(title="Name")]
-    created_at: Annotated[str, Field(title="Created At")]
-    duration: Annotated[float, Field(title="Duration")]
-    offline_mode: Annotated[Optional[bool], Field(title="Offline Mode")] = False
-    has_notification: Annotated[Optional[bool], Field(title="Has Notification")] = False
-    customer_id: Annotated[Optional[str], Field(title="Customer Id")] = None
-    tags: Annotated[Optional[List[str]], Field(title="Tags")] = None
-    metadata: Annotated[Optional[Dict[str, Any]], Field(title="Metadata")] = None
-    update_id: Annotated[Optional[int], Field(title="Update Id")] = 1
-
-
-class TraceFetch(BaseModel):
-    trace_id: Annotated[str, Field(title="Trace Id")]
-
-
 class TraceAddToDataset(BaseModel):
     trace_id: Annotated[str, Field(title="Trace Id")]
     trace_span_id: Annotated[str, Field(title="Trace Span Id")]
     dataset_alias: Annotated[str, Field(title="Dataset Alias")]
     project_name: Annotated[str, Field(title="Project Name")]
-
-
-class EvaluationRunsBatchRequest(BaseModel):
-    organization_id: Annotated[str, Field(title="Organization Id")]
-    evaluation_entries: Annotated[
-        List[Dict[str, Any]], Field(title="Evaluation Entries")
-    ]
 
 
 class ProjectAdd(BaseModel):
@@ -306,11 +281,6 @@ class DatasetInsertExamples(BaseModel):
     project_name: Annotated[str, Field(title="Project Name")]
 
 
-class SpansBatchRequest(BaseModel):
-    spans: Annotated[List[SpanBatchItem], Field(title="Spans")]
-    organization_id: Annotated[str, Field(title="Organization Id")]
-
-
 class FetchPromptScorerResponse(BaseModel):
     scorer: PromptScorer
 
@@ -343,21 +313,6 @@ class TraceSpan(BaseModel):
     update_id: Annotated[Optional[int], Field(title="Update Id")] = 1
 
 
-class Trace(BaseModel):
-    trace_id: Annotated[str, Field(title="Trace Id")]
-    name: Annotated[str, Field(title="Name")]
-    created_at: Annotated[str, Field(title="Created At")]
-    duration: Annotated[float, Field(title="Duration")]
-    trace_spans: Annotated[List[TraceSpan], Field(title="Trace Spans")]
-    offline_mode: Annotated[Optional[bool], Field(title="Offline Mode")] = False
-    rules: Annotated[Optional[Dict[str, Any]], Field(title="Rules")] = {}
-    has_notification: Annotated[Optional[bool], Field(title="Has Notification")] = False
-    customer_id: Annotated[Optional[str], Field(title="Customer Id")] = None
-    tags: Annotated[Optional[List[str]], Field(title="Tags")] = []
-    metadata: Annotated[Optional[Dict[str, Any]], Field(title="Metadata")] = {}
-    update_id: Annotated[Optional[int], Field(title="Update Id")] = 1
-
-
 class ScoringResult(BaseModel):
     success: Annotated[bool, Field(title="Success")]
     scorers_data: Annotated[Optional[List[ScorerData]], Field(title="Scorers Data")] = (
@@ -370,6 +325,31 @@ class ScoringResult(BaseModel):
     trace_id: Annotated[Optional[str], Field(title="Trace Id")] = None
     run_duration: Annotated[Optional[float], Field(title="Run Duration")] = None
     evaluation_cost: Annotated[Optional[float], Field(title="Evaluation Cost")] = None
+
+
+class Trace(BaseModel):
+    trace_id: Annotated[str, Field(title="Trace Id")]
+    name: Annotated[str, Field(title="Name")]
+    created_at: Annotated[str, Field(title="Created At")]
+    duration: Annotated[float, Field(title="Duration")]
+    trace_spans: Annotated[List[TraceSpan], Field(title="Trace Spans")]
+    rules: Annotated[Optional[Dict[str, Any]], Field(title="Rules")] = {}
+    has_notification: Annotated[Optional[bool], Field(title="Has Notification")] = False
+    customer_id: Annotated[Optional[str], Field(title="Customer Id")] = None
+    tags: Annotated[Optional[List[str]], Field(title="Tags")] = []
+    metadata: Annotated[Optional[Dict[str, Any]], Field(title="Metadata")] = {}
+    update_id: Annotated[Optional[int], Field(title="Update Id")] = 1
+
+
+class DatasetPush(BaseModel):
+    dataset_alias: Annotated[str, Field(title="Dataset Alias")]
+    comments: Annotated[Optional[str], Field(title="Comments")] = None
+    source_file: Annotated[Optional[str], Field(title="Source File")] = None
+    examples: Annotated[Optional[List[Example]], Field(title="Examples")] = None
+    traces: Annotated[Optional[List[Trace]], Field(title="Traces")] = None
+    is_trace: Annotated[Optional[bool], Field(title="Is Trace")] = False
+    project_name: Annotated[str, Field(title="Project Name")]
+    overwrite: Annotated[Optional[bool], Field(title="Overwrite")] = False
 
 
 class TraceRun(BaseModel):

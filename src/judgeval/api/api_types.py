@@ -20,34 +20,11 @@ class DatasetFetch(TypedDict):
     project_name: str
 
 
-class TraceSave(TypedDict):
-    project_name: str
-    trace_id: str
-    name: str
-    created_at: str
-    duration: float
-    offline_mode: NotRequired[bool]
-    has_notification: NotRequired[bool]
-    customer_id: NotRequired[Optional[str]]
-    tags: NotRequired[List[str]]
-    metadata: NotRequired[Dict[str, Any]]
-    update_id: NotRequired[int]
-
-
-class TraceFetch(TypedDict):
-    trace_id: str
-
-
 class TraceAddToDataset(TypedDict):
     trace_id: str
     trace_span_id: str
     dataset_alias: str
     project_name: str
-
-
-class EvaluationRunsBatchRequest(TypedDict):
-    organization_id: str
-    evaluation_entries: List[Dict[str, Any]]
 
 
 class ProjectAdd(TypedDict):
@@ -262,11 +239,6 @@ class DatasetInsertExamples(TypedDict):
     project_name: str
 
 
-class SpansBatchRequest(TypedDict):
-    spans: List[SpanBatchItem]
-    organization_id: str
-
-
 class FetchPromptScorerResponse(TypedDict):
     scorer: PromptScorer
 
@@ -293,21 +265,6 @@ class TraceSpan(TypedDict):
     update_id: NotRequired[int]
 
 
-class Trace(TypedDict):
-    trace_id: str
-    name: str
-    created_at: str
-    duration: float
-    trace_spans: List[TraceSpan]
-    offline_mode: NotRequired[bool]
-    rules: NotRequired[Dict[str, Any]]
-    has_notification: NotRequired[bool]
-    customer_id: NotRequired[Optional[str]]
-    tags: NotRequired[List[str]]
-    metadata: NotRequired[Dict[str, Any]]
-    update_id: NotRequired[int]
-
-
 class ScoringResult(TypedDict):
     success: bool
     scorers_data: Optional[List[ScorerData]]
@@ -316,6 +273,31 @@ class ScoringResult(TypedDict):
     trace_id: NotRequired[Optional[str]]
     run_duration: NotRequired[Optional[float]]
     evaluation_cost: NotRequired[Optional[float]]
+
+
+class Trace(TypedDict):
+    trace_id: str
+    name: str
+    created_at: str
+    duration: float
+    trace_spans: List[TraceSpan]
+    rules: NotRequired[Dict[str, Any]]
+    has_notification: NotRequired[bool]
+    customer_id: NotRequired[Optional[str]]
+    tags: NotRequired[List[str]]
+    metadata: NotRequired[Dict[str, Any]]
+    update_id: NotRequired[int]
+
+
+class DatasetPush(TypedDict):
+    dataset_alias: str
+    comments: NotRequired[Optional[str]]
+    source_file: NotRequired[Optional[str]]
+    examples: NotRequired[Optional[List[Example]]]
+    traces: NotRequired[Optional[List[Trace]]]
+    is_trace: NotRequired[bool]
+    project_name: str
+    overwrite: NotRequired[Optional[bool]]
 
 
 class TraceRun(TypedDict):
