@@ -170,7 +170,7 @@ class TracedGenerator(_TracedGeneratorBase):
     generator: Any
 
     def __init__(
-        self, tracer: Tracer, generator, client: ApiClient, span, model_name: str = ""
+        self, tracer: Tracer, generator, client: ApiClient, span, model_name: str
     ):
         super().__init__(tracer, client, span, model_name)
         self.generator = generator
@@ -211,7 +211,7 @@ class TracedAsyncGenerator(_TracedGeneratorBase):
         async_generator,
         client: ApiClient,
         span,
-        model_name: str = "",
+        model_name: str,
     ):
         super().__init__(tracer, client, span, model_name)
         self.async_generator = async_generator
@@ -249,7 +249,7 @@ class TracedSyncContextManager:
         context_manager,
         client: ApiClient,
         span,
-        model_name: str = "",
+        model_name: str,
     ):
         self.tracer = tracer
         self.context_manager = context_manager
@@ -284,7 +284,7 @@ class TracedAsyncContextManager:
         context_manager,
         client: ApiClient,
         span,
-        model_name: str = "",
+        model_name: str,
     ):
         self.tracer = tracer
         self.context_manager = context_manager
@@ -485,7 +485,7 @@ def _extract_usage_tokens(client: ApiClient, usage_data) -> tuple[int, int, int,
 
 
 def _process_usage_data(
-    span, usage_data, tracer: Tracer, client: ApiClient, model_name: str = ""
+    span, usage_data, tracer: Tracer, client: ApiClient, model_name: str
 ):
     """Process usage data and set span attributes."""
     (
