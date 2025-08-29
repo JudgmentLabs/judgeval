@@ -79,6 +79,8 @@ class _TracedGeneratorBase:
         if HAS_OPENAI:
             from judgeval.tracer.llm.providers import openai_OpenAI, openai_AsyncOpenAI
 
+            assert openai_OpenAI is not None, "OpenAI client not found"
+            assert openai_AsyncOpenAI is not None, "OpenAI async client not found"
             if isinstance(self.client, (openai_OpenAI, openai_AsyncOpenAI)):
                 if (
                     hasattr(chunk, "choices")
@@ -95,6 +97,10 @@ class _TracedGeneratorBase:
                 anthropic_AsyncAnthropic,
             )
 
+            assert anthropic_Anthropic is not None, "Anthropic client not found"
+            assert anthropic_AsyncAnthropic is not None, (
+                "Anthropic async client not found"
+            )
             if isinstance(self.client, (anthropic_Anthropic, anthropic_AsyncAnthropic)):
                 if hasattr(chunk, "type") and chunk.type == "content_block_delta":
                     if hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
@@ -110,6 +116,8 @@ class _TracedGeneratorBase:
                 together_AsyncTogether,
             )
 
+            assert together_Together is not None, "Together client not found"
+            assert together_AsyncTogether is not None, "Together async client not found"
             if isinstance(self.client, (together_Together, together_AsyncTogether)):
                 if hasattr(chunk, "choices") and chunk.choices:
                     choice = chunk.choices[0]
@@ -119,6 +127,8 @@ class _TracedGeneratorBase:
         if HAS_GROQ:
             from judgeval.tracer.llm.providers import groq_Groq, groq_AsyncGroq
 
+            assert groq_Groq is not None, "Groq client not found"
+            assert groq_AsyncGroq is not None, "Groq async client not found"
             if isinstance(self.client, (groq_Groq, groq_AsyncGroq)):
                 if hasattr(chunk, "choices") and chunk.choices:
                     choice = chunk.choices[0]
@@ -511,7 +521,7 @@ def _process_usage_data(
 def _set_usage_attributes(span, usage: TraceUsage, tracer: Tracer):
     """Set usage attributes on the span for non-streaming responses."""
 
-    set_span_attribute(span, "gen_ai.response.model", usage.model_name)
+    set_span_attribute(span, AttributeKeys.GEN_AI_RESPONSE_MODEL, usage.model_name)
     set_span_attribute(
         span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, usage.prompt_tokens
     )
