@@ -22,6 +22,7 @@ class EvaluationRun(BaseModel):
     custom_scorers: Optional[List[BaseScorer]] = None
     judgment_scorers: Optional[List[APIScorerConfig]] = None
     scorers: Optional[List[Union[BaseScorer, APIScorerConfig]]] = None
+    model: str
 
     def __init__(
         self,
@@ -73,7 +74,7 @@ class EvaluationRun(BaseModel):
 
         return values
 
-    @field_validator("model", check_fields=False)
+    @field_validator("model")
     def validate_model(cls, v, values):
         if not v:
             raise ValueError("Model cannot be empty.")
