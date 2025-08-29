@@ -221,9 +221,9 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
         )
 
         assert google_genai_Client is not None, "Google GenAI client not found"
-        assert (
-            google_genai_AsyncClient is not None
-        ), "Google GenAI async client not found"
+        assert google_genai_AsyncClient is not None, (
+            "Google GenAI async client not found"
+        )
         span_name = "GOOGLE_API_CALL"
         if isinstance(client, google_genai_Client):
             setattr(
@@ -283,9 +283,9 @@ def _format_output_data(
         assert openai_AsyncOpenAI is not None, "OpenAI async client not found"
         assert openai_ChatCompletion is not None, "OpenAI chat completion not found"
         assert openai_Response is not None, "OpenAI response not found"
-        assert (
-            openai_ParsedChatCompletion is not None
-        ), "OpenAI parsed chat completion not found"
+        assert openai_ParsedChatCompletion is not None, (
+            "OpenAI parsed chat completion not found"
+        )
 
         if isinstance(client, openai_OpenAI) or isinstance(client, openai_AsyncOpenAI):
             if isinstance(response, openai_ChatCompletion):
@@ -399,9 +399,9 @@ def _format_output_data(
         )
 
         assert google_genai_Client is not None, "Google GenAI client not found"
-        assert (
-            google_genai_AsyncClient is not None
-        ), "Google GenAI async client not found"
+        assert google_genai_AsyncClient is not None, (
+            "Google GenAI async client not found"
+        )
         if isinstance(client, google_genai_Client) or isinstance(
             client, google_genai_AsyncClient
         ):

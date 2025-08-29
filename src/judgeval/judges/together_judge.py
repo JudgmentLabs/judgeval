@@ -19,7 +19,7 @@ if together_api_key:
 
         together_client = Together(api_key=together_api_key)
         async_together_client = AsyncTogether(api_key=together_api_key)
-    except Exception as e:
+    except Exception:
         pass
 
 

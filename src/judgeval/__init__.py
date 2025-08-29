@@ -5,7 +5,7 @@ from judgeval.evaluation import run_eval
 from judgeval.data.evaluation_run import EvaluationRun
 
 
-from typing import List, Optional, Sequence, Union
+from typing import List, Optional, Union
 from judgeval.scorers import BaseScorer, APIScorerConfig
 from judgeval.data.example import Example
 from judgeval.logger import judgeval_logger
