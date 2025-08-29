@@ -14,19 +14,6 @@ from judgeval.tracer.llm.providers import (
     HAS_GROQ,
     ApiClient,
 )
-
-
-if HAS_OPENAI:
-    from judgeval.tracer.llm.providers import openai_OpenAI, openai_AsyncOpenAI
-if HAS_ANTHROPIC:
-    from judgeval.tracer.llm.providers import (
-        anthropic_Anthropic,
-        anthropic_AsyncAnthropic,
-    )
-if HAS_TOGETHER:
-    from judgeval.tracer.llm.providers import together_Together, together_AsyncTogether
-if HAS_GROQ:
-    from judgeval.tracer.llm.providers import groq_Groq, groq_AsyncGroq
 from judgeval.tracer.managers import sync_span_context, async_span_context
 from judgeval.tracer.keys import AttributeKeys
 from judgeval.utils.serialize import safe_serialize
@@ -67,35 +54,54 @@ class _TracedGeneratorBase:
 
     def _extract_content(self, chunk) -> str:
         """Extract content from streaming chunk based on provider."""
+        if HAS_OPENAI:
+            from judgeval.tracer.llm.providers import openai_OpenAI, openai_AsyncOpenAI
 
-        if isinstance(
-            self.client,
-            (
-                openai_OpenAI,
-                openai_AsyncOpenAI,
+            if isinstance(self.client, (openai_OpenAI, openai_AsyncOpenAI)):
+                if (
+                    hasattr(chunk, "choices")
+                    and chunk.choices
+                    and hasattr(chunk.choices[0], "delta")
+                ):
+                    delta_content = getattr(chunk.choices[0].delta, "content", None)
+                    if delta_content:
+                        return delta_content
+
+        if HAS_ANTHROPIC:
+            from judgeval.tracer.llm.providers import (
+                anthropic_Anthropic,
+                anthropic_AsyncAnthropic,
+            )
+
+            if isinstance(self.client, (anthropic_Anthropic, anthropic_AsyncAnthropic)):
+                if hasattr(chunk, "type") and chunk.type == "content_block_delta":
+                    if hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
+                        return chunk.delta.text or ""
+                elif hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
+                    return chunk.delta.text or ""
+                elif hasattr(chunk, "text"):
+                    return chunk.text or ""
+
+        if HAS_TOGETHER:
+            from judgeval.tracer.llm.providers import (
                 together_Together,
                 together_AsyncTogether,
-                groq_Groq,
-                groq_AsyncGroq,
-            ),
-        ):
-            if (
-                hasattr(chunk, "choices")
-                and chunk.choices
-                and hasattr(chunk.choices[0], "delta")
-            ):
-                delta_content = getattr(chunk.choices[0].delta, "content", None)
-                if delta_content:
-                    return delta_content
+            )
 
-        if isinstance(self.client, (anthropic_Anthropic, anthropic_AsyncAnthropic)):
-            if hasattr(chunk, "type") and chunk.type == "content_block_delta":
-                if hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
-                    return chunk.delta.text or ""
-            elif hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
-                return chunk.delta.text or ""
-            elif hasattr(chunk, "text"):
-                return chunk.text or ""
+            if isinstance(self.client, (together_Together, together_AsyncTogether)):
+                if hasattr(chunk, "choices") and chunk.choices:
+                    choice = chunk.choices[0]
+                    if hasattr(choice, "delta") and hasattr(choice.delta, "content"):
+                        return choice.delta.content or ""
+
+        if HAS_GROQ:
+            from judgeval.tracer.llm.providers import groq_Groq, groq_AsyncGroq
+
+            if isinstance(self.client, (groq_Groq, groq_AsyncGroq)):
+                if hasattr(chunk, "choices") and chunk.choices:
+                    choice = chunk.choices[0]
+                    if hasattr(choice, "delta") and hasattr(choice.delta, "content"):
+                        return choice.delta.content or ""
 
         return ""
 
@@ -103,17 +109,25 @@ class _TracedGeneratorBase:
         """Process usage data from streaming chunks based on provider."""
         usage_data = None
 
-        if isinstance(self.client, (anthropic_Anthropic, anthropic_AsyncAnthropic)):
-            if hasattr(chunk, "type"):
-                if chunk.type == "message_start":
-                    if hasattr(chunk, "message") and hasattr(chunk.message, "usage"):
-                        usage_data = chunk.message.usage
-                elif chunk.type == "message_delta":
-                    if hasattr(chunk, "usage"):
-                        usage_data = chunk.usage
-                elif chunk.type == "message_stop":
-                    if hasattr(chunk, "usage"):
-                        usage_data = chunk.usage
+        if HAS_ANTHROPIC:
+            from judgeval.tracer.llm.providers import (
+                anthropic_Anthropic,
+                anthropic_AsyncAnthropic,
+            )
+
+            if isinstance(self.client, (anthropic_Anthropic, anthropic_AsyncAnthropic)):
+                if hasattr(chunk, "type"):
+                    if chunk.type == "message_start":
+                        if hasattr(chunk, "message") and hasattr(
+                            chunk.message, "usage"
+                        ):
+                            usage_data = chunk.message.usage
+                    elif chunk.type == "message_delta":
+                        if hasattr(chunk, "usage"):
+                            usage_data = chunk.usage
+                    elif chunk.type == "message_stop":
+                        if hasattr(chunk, "usage"):
+                            usage_data = chunk.usage
 
         if not usage_data:
             if hasattr(chunk, "usage") and chunk.usage:
