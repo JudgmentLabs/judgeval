@@ -42,6 +42,425 @@ def cost_per_token(
         return None, None
 
 
+class TracedGenerator:
+    """Generator wrapper that adds OpenTelemetry tracing without consuming the stream."""
+
+    def __init__(
+        self, tracer: "Tracer", generator, client: ApiClient, span, model_name: str = ""
+    ):
+        self.tracer = tracer
+        self.generator = generator
+        self.client = client
+        self.span = span
+        self.accumulated_content = ""
+        self.model_name = model_name
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        try:
+            chunk = next(self.generator)
+
+            content = self._extract_content(chunk)
+            if content:
+                self.accumulated_content += content
+            self._process_chunk_usage(chunk)
+
+            return chunk
+
+        except StopIteration:
+            self._finalize_span()
+            raise
+        except Exception as e:
+            self.span.record_exception(e)
+            self.span.end()
+            raise
+
+    def _extract_content(self, chunk) -> str:
+        """Extract content from streaming chunk based on provider."""
+        if HAS_OPENAI:
+            from judgeval.tracer.llm.providers import openai_OpenAI, openai_AsyncOpenAI
+
+            if isinstance(self.client, (openai_OpenAI, openai_AsyncOpenAI)):
+                if (
+                    hasattr(chunk, "choices")
+                    and chunk.choices
+                    and hasattr(chunk.choices[0], "delta")
+                ):
+                    delta_content = getattr(chunk.choices[0].delta, "content", None)
+                    if delta_content:
+                        return delta_content
+
+        if HAS_ANTHROPIC:
+            from judgeval.tracer.llm.providers import (
+                anthropic_Anthropic,
+                anthropic_AsyncAnthropic,
+            )
+
+            if isinstance(self.client, (anthropic_Anthropic, anthropic_AsyncAnthropic)):
+                if hasattr(chunk, "type") and chunk.type == "content_block_delta":
+                    if hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
+                        return chunk.delta.text or ""
+                elif hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
+                    return chunk.delta.text or ""
+                elif hasattr(chunk, "text"):
+                    return chunk.text or ""
+
+        if HAS_TOGETHER:
+            from judgeval.tracer.llm.providers import (
+                together_Together,
+                together_AsyncTogether,
+            )
+
+            if isinstance(self.client, (together_Together, together_AsyncTogether)):
+                if hasattr(chunk, "choices") and chunk.choices:
+                    choice = chunk.choices[0]
+                    if hasattr(choice, "delta") and hasattr(choice.delta, "content"):
+                        return choice.delta.content or ""
+
+        if HAS_GROQ:
+            from judgeval.tracer.llm.providers import groq_Groq, groq_AsyncGroq
+
+            if isinstance(self.client, (groq_Groq, groq_AsyncGroq)):
+                if hasattr(chunk, "choices") and chunk.choices:
+                    choice = chunk.choices[0]
+                    if hasattr(choice, "delta") and hasattr(choice.delta, "content"):
+                        return choice.delta.content or ""
+
+        return ""
+
+    def _process_chunk_usage(self, chunk):
+        """Process usage data from streaming chunks based on provider."""
+        usage_data = None
+
+        if HAS_ANTHROPIC:
+            from judgeval.tracer.llm.providers import (
+                anthropic_Anthropic,
+                anthropic_AsyncAnthropic,
+            )
+
+            if isinstance(self.client, (anthropic_Anthropic, anthropic_AsyncAnthropic)):
+                if hasattr(chunk, "type"):
+                    if chunk.type == "message_start":
+                        if hasattr(chunk, "message") and hasattr(
+                            chunk.message, "usage"
+                        ):
+                            usage_data = chunk.message.usage
+                    elif chunk.type == "message_delta":
+                        if hasattr(chunk, "usage"):
+                            usage_data = chunk.usage
+                    elif chunk.type == "message_stop":
+                        if hasattr(chunk, "usage"):
+                            usage_data = chunk.usage
+
+        if not usage_data:
+            if hasattr(chunk, "usage") and chunk.usage:
+                usage_data = chunk.usage
+            elif hasattr(chunk, "message") and hasattr(chunk.message, "usage"):
+                usage_data = chunk.message.usage
+
+        if usage_data:
+            _process_usage_data(self.span, usage_data, self.tracer, self.model_name)
+
+    def __del__(self):
+        if hasattr(self, "span") and self.span:
+            try:
+                self._finalize_span()
+            except Exception:
+                pass
+
+    def _finalize_span(self):
+        if hasattr(self, "span") and self.span:
+            set_span_attribute(
+                self.span, AttributeKeys.GEN_AI_COMPLETION, self.accumulated_content
+            )
+            self.span.end()
+            self.span = None
+
+
+class TracedAsyncGenerator:
+    """Async generator wrapper that adds OpenTelemetry tracing without consuming the stream."""
+
+    def __init__(
+        self,
+        tracer: "Tracer",
+        async_generator,
+        client: ApiClient,
+        span,
+        model_name: str = "",
+    ):
+        self.tracer = tracer
+        self.async_generator = async_generator
+        self.client = client
+        self.span = span
+        self.accumulated_content = ""
+        self.model_name = model_name
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        try:
+            chunk = await self.async_generator.__anext__()
+
+            content = self._extract_content(chunk)
+            if content:
+                self.accumulated_content += content
+
+            # Handle usage data from various chunk types
+            self._process_chunk_usage(chunk)
+
+            return chunk
+
+        except StopAsyncIteration:
+            self._finalize_span()
+            raise
+        except Exception as e:
+            self.span.record_exception(e)
+            self.span.end()
+            raise
+
+    def _extract_content(self, chunk) -> str:
+        """Extract content from streaming chunk based on provider."""
+        if HAS_OPENAI:
+            from judgeval.tracer.llm.providers import openai_OpenAI, openai_AsyncOpenAI
+
+            if isinstance(self.client, (openai_OpenAI, openai_AsyncOpenAI)):
+                if (
+                    hasattr(chunk, "choices")
+                    and chunk.choices
+                    and hasattr(chunk.choices[0], "delta")
+                ):
+                    delta_content = getattr(chunk.choices[0].delta, "content", None)
+                    if delta_content:
+                        return delta_content
+
+        if HAS_ANTHROPIC:
+            from judgeval.tracer.llm.providers import (
+                anthropic_Anthropic,
+                anthropic_AsyncAnthropic,
+            )
+
+            if isinstance(self.client, (anthropic_Anthropic, anthropic_AsyncAnthropic)):
+                if hasattr(chunk, "type") and chunk.type == "content_block_delta":
+                    if hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
+                        return chunk.delta.text or ""
+                elif hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
+                    return chunk.delta.text or ""
+                elif hasattr(chunk, "text"):
+                    return chunk.text or ""
+
+        if HAS_TOGETHER:
+            from judgeval.tracer.llm.providers import (
+                together_Together,
+                together_AsyncTogether,
+            )
+
+            if isinstance(self.client, (together_Together, together_AsyncTogether)):
+                if hasattr(chunk, "choices") and chunk.choices:
+                    choice = chunk.choices[0]
+                    if hasattr(choice, "delta") and hasattr(choice.delta, "content"):
+                        return choice.delta.content or ""
+
+        if HAS_GROQ:
+            from judgeval.tracer.llm.providers import groq_Groq, groq_AsyncGroq
+
+            if isinstance(self.client, (groq_Groq, groq_AsyncGroq)):
+                if hasattr(chunk, "choices") and chunk.choices:
+                    choice = chunk.choices[0]
+                    if hasattr(choice, "delta") and hasattr(choice.delta, "content"):
+                        return choice.delta.content or ""
+
+        return ""
+
+    def _process_chunk_usage(self, chunk):
+        """Process usage data from streaming chunks based on provider."""
+        usage_data = None
+
+        if HAS_ANTHROPIC:
+            from judgeval.tracer.llm.providers import (
+                anthropic_Anthropic,
+                anthropic_AsyncAnthropic,
+            )
+
+            if isinstance(self.client, (anthropic_Anthropic, anthropic_AsyncAnthropic)):
+                if hasattr(chunk, "type"):
+                    if chunk.type == "message_start":
+                        if hasattr(chunk, "message") and hasattr(
+                            chunk.message, "usage"
+                        ):
+                            usage_data = chunk.message.usage
+                    elif chunk.type == "message_delta":
+                        if hasattr(chunk, "usage"):
+                            usage_data = chunk.usage
+                    elif chunk.type == "message_stop":
+                        if hasattr(chunk, "usage"):
+                            usage_data = chunk.usage
+
+        if not usage_data:
+            if hasattr(chunk, "usage") and chunk.usage:
+                usage_data = chunk.usage
+            elif hasattr(chunk, "message") and hasattr(chunk.message, "usage"):
+                usage_data = chunk.message.usage
+
+        if usage_data:
+            _process_usage_data(self.span, usage_data, self.tracer, self.model_name)
+
+    def __del__(self):
+        """Cleanup: ensure span is ended even if generator is not fully consumed."""
+        if hasattr(self, "span") and self.span:
+            try:
+                self._finalize_span()
+            except Exception:
+                # Ignore errors during cleanup
+                pass
+
+    def _finalize_span(self):
+        if hasattr(self, "span") and self.span:
+            set_span_attribute(
+                self.span, AttributeKeys.GEN_AI_COMPLETION, self.accumulated_content
+            )
+            self.span.end()
+            self.span = None  # Prevent double-ending
+
+
+class TracedSyncContextManager:
+    """Sync context manager wrapper for streaming methods."""
+
+    def __init__(
+        self,
+        tracer: "Tracer",
+        context_manager,
+        client: ApiClient,
+        span,
+        model_name: str = "",
+    ):
+        self.tracer = tracer
+        self.context_manager = context_manager
+        self.client = client
+        self.span = span
+        self.stream = None
+        self.model_name = model_name
+
+    def __enter__(self):
+        self.stream = self.context_manager.__enter__()
+        return TracedGenerator(
+            self.tracer, self.stream, self.client, self.span, self.model_name
+        )
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        return self.context_manager.__exit__(exc_type, exc_val, exc_tb)
+
+    def __del__(self):
+        if hasattr(self, "span") and self.span:
+            try:
+                self.span.end()
+            except Exception:
+                pass
+
+
+class TracedAsyncContextManager:
+    """Async context manager wrapper for streaming methods."""
+
+    def __init__(
+        self,
+        tracer: "Tracer",
+        context_manager,
+        client: ApiClient,
+        span,
+        model_name: str = "",
+    ):
+        self.tracer = tracer
+        self.context_manager = context_manager
+        self.client = client
+        self.span = span
+        self.stream = None
+        self.model_name = model_name
+
+    async def __aenter__(self):
+        self.stream = await self.context_manager.__aenter__()
+        return TracedAsyncGenerator(
+            self.tracer, self.stream, self.client, self.span, self.model_name
+        )
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        return await self.context_manager.__aexit__(exc_type, exc_val, exc_tb)
+
+    def __del__(self):
+        if hasattr(self, "span") and self.span:
+            try:
+                self.span.end()
+            except Exception:
+                pass
+
+
+def _process_usage_data(span, usage_data, tracer: "Tracer", model_name: str = ""):
+    """Process usage data and set span attributes."""
+    prompt_tokens = 0
+    completion_tokens = 0
+    cache_read_input_tokens = 0
+    cache_creation_input_tokens = 0
+
+    if hasattr(usage_data, "input_tokens"):
+        prompt_tokens = getattr(usage_data, "input_tokens", 0) or 0
+    if hasattr(usage_data, "output_tokens"):
+        completion_tokens = getattr(usage_data, "output_tokens", 0) or 0
+
+    if not prompt_tokens and hasattr(usage_data, "prompt_tokens"):
+        prompt_tokens = getattr(usage_data, "prompt_tokens", 0) or 0
+    if not completion_tokens and hasattr(usage_data, "completion_tokens"):
+        completion_tokens = getattr(usage_data, "completion_tokens", 0) or 0
+
+    if hasattr(usage_data, "cache_read_input_tokens"):
+        cache_read_input_tokens = getattr(usage_data, "cache_read_input_tokens", 0) or 0
+    if hasattr(usage_data, "cache_creation_input_tokens"):
+        cache_creation_input_tokens = (
+            getattr(usage_data, "cache_creation_input_tokens", 0) or 0
+        )
+
+    if prompt_tokens or completion_tokens:
+        final_model_name = getattr(usage_data, "model", None) or model_name
+
+        if final_model_name:
+            set_span_attribute(span, "gen_ai.response.model", final_model_name)
+            usage = _create_usage(
+                final_model_name,
+                prompt_tokens,
+                completion_tokens,
+                cache_read_input_tokens,
+                cache_creation_input_tokens,
+            )
+            _set_usage_attributes(span, usage, tracer)
+        else:
+            set_span_attribute(
+                span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+            )
+            set_span_attribute(
+                span, AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+            )
+            set_span_attribute(
+                span, AttributeKeys.GEN_AI_USAGE_COMPLETION_TOKENS, completion_tokens
+            )
+
+
+def _set_usage_attributes(span, usage: TraceUsage, tracer: "Tracer"):
+    """Set usage attributes on the span for non-streaming responses."""
+    set_span_attribute(
+        span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, usage.prompt_tokens
+    )
+    set_span_attribute(
+        span, AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, usage.completion_tokens
+    )
+    set_span_attribute(
+        span, AttributeKeys.GEN_AI_USAGE_COMPLETION_TOKENS, usage.completion_tokens
+    )
+    set_span_attribute(
+        span, AttributeKeys.GEN_AI_USAGE_TOTAL_COST, usage.total_cost_usd
+    )
+    tracer.add_cost_to_current_context(usage.total_cost_usd)
+
+
 def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
     """
     Wraps an API client to add tracing capabilities.
@@ -51,87 +470,102 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
     def wrapped(function, span_name):
         @functools.wraps(function)
         def wrapper(*args, **kwargs):
-            with sync_span_context(
-                tracer, span_name, {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
-            ) as span:
+            if kwargs.get("stream", False):
+                span = tracer.get_tracer().start_span(
+                    span_name, attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+                )
                 tracer.add_agent_attributes_to_span(span)
                 set_span_attribute(
                     span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
                 )
-                try:
+                model_name = kwargs.get("model", "")
+                response = function(*args, **kwargs)
+                return TracedGenerator(tracer, response, client, span, model_name)
+            else:
+                with sync_span_context(
+                    tracer, span_name, {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+                ) as span:
+                    tracer.add_agent_attributes_to_span(span)
+                    set_span_attribute(
+                        span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
+                    )
                     response = function(*args, **kwargs)
                     output, usage = _format_output_data(client, response)
                     set_span_attribute(span, AttributeKeys.GEN_AI_COMPLETION, output)
                     if usage:
-                        set_span_attribute(
-                            span,
-                            AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
-                            usage.prompt_tokens,
-                        )
-                        set_span_attribute(
-                            span,
-                            AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
-                            usage.completion_tokens,
-                        )
-                        set_span_attribute(
-                            span,
-                            AttributeKeys.GEN_AI_USAGE_COMPLETION_TOKENS,
-                            usage.completion_tokens,
-                        )
-
-                        set_span_attribute(
-                            span,
-                            AttributeKeys.GEN_AI_USAGE_TOTAL_COST,
-                            usage.total_cost_usd,
-                        )
-                        tracer.add_cost_to_current_context(usage.total_cost_usd)
+                        _set_usage_attributes(span, usage, tracer)
                     return response
-                except Exception as e:
-                    span.record_exception(e)
-                    raise
 
         return wrapper
 
     def wrapped_async(function, span_name):
         @functools.wraps(function)
         async def wrapper(*args, **kwargs):
-            async with async_span_context(
-                tracer, span_name, {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
-            ) as span:
+            if kwargs.get("stream", False):
+                span = tracer.get_tracer().start_span(
+                    span_name, attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+                )
                 tracer.add_agent_attributes_to_span(span)
                 set_span_attribute(
                     span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
                 )
-                try:
+                model_name = kwargs.get("model", "")
+                response = await function(*args, **kwargs)
+                return TracedAsyncGenerator(tracer, response, client, span, model_name)
+            else:
+                async with async_span_context(
+                    tracer, span_name, {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+                ) as span:
+                    tracer.add_agent_attributes_to_span(span)
+                    set_span_attribute(
+                        span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
+                    )
                     response = await function(*args, **kwargs)
                     output, usage = _format_output_data(client, response)
                     set_span_attribute(span, AttributeKeys.GEN_AI_COMPLETION, output)
                     if usage:
-                        set_span_attribute(
-                            span,
-                            AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
-                            usage.prompt_tokens,
-                        )
-                        set_span_attribute(
-                            span,
-                            AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
-                            usage.completion_tokens,
-                        )
-                        set_span_attribute(
-                            span,
-                            AttributeKeys.GEN_AI_USAGE_COMPLETION_TOKENS,
-                            usage.completion_tokens,
-                        )
-                        set_span_attribute(
-                            span,
-                            AttributeKeys.GEN_AI_USAGE_TOTAL_COST,
-                            usage.total_cost_usd,
-                        )
-                        tracer.add_cost_to_current_context(usage.total_cost_usd)
+                        _set_usage_attributes(span, usage, tracer)
                     return response
-                except Exception as e:
-                    span.record_exception(e)
-                    raise
+
+        return wrapper
+
+    def wrapped_sync_context_manager(function, span_name):
+        """Special wrapper for sync context manager methods."""
+
+        @functools.wraps(function)
+        def wrapper(*args, **kwargs):
+            span = tracer.get_tracer().start_span(
+                span_name, attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+            )
+            tracer.add_agent_attributes_to_span(span)
+            set_span_attribute(
+                span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
+            )
+            model_name = kwargs.get("model", "")
+            original_context_manager = function(*args, **kwargs)
+            return TracedSyncContextManager(
+                tracer, original_context_manager, client, span, model_name
+            )
+
+        return wrapper
+
+    def wrapped_async_context_manager(function, span_name):
+        """Special wrapper for async context manager methods."""
+
+        @functools.wraps(function)
+        def wrapper(*args, **kwargs):
+            span = tracer.get_tracer().start_span(
+                span_name, attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+            )
+            tracer.add_agent_attributes_to_span(span)
+            set_span_attribute(
+                span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
+            )
+            model_name = kwargs.get("model", "")
+            original_context_manager = function(*args, **kwargs)
+            return TracedAsyncContextManager(
+                tracer, original_context_manager, client, span, model_name
+            )
 
         return wrapper
 
@@ -207,11 +641,21 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
             setattr(
                 client.messages, "create", wrapped(client.messages.create, span_name)
             )
+            setattr(
+                client.messages,
+                "stream",
+                wrapped_sync_context_manager(client.messages.stream, span_name),
+            )
         elif isinstance(client, anthropic_AsyncAnthropic):
             setattr(
                 client.messages,
                 "create",
                 wrapped_async(client.messages.create, span_name),
+            )
+            setattr(
+                client.messages,
+                "stream",
+                wrapped_async_context_manager(client.messages.stream, span_name),
             )
 
     if HAS_GOOGLE_GENAI:
@@ -221,9 +665,9 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
         )
 
         assert google_genai_Client is not None, "Google GenAI client not found"
-        assert (
-            google_genai_AsyncClient is not None
-        ), "Google GenAI async client not found"
+        assert google_genai_AsyncClient is not None, (
+            "Google GenAI async client not found"
+        )
         span_name = "GOOGLE_API_CALL"
         if isinstance(client, google_genai_Client):
             setattr(
@@ -283,9 +727,9 @@ def _format_output_data(
         assert openai_AsyncOpenAI is not None, "OpenAI async client not found"
         assert openai_ChatCompletion is not None, "OpenAI chat completion not found"
         assert openai_Response is not None, "OpenAI response not found"
-        assert (
-            openai_ParsedChatCompletion is not None
-        ), "OpenAI parsed chat completion not found"
+        assert openai_ParsedChatCompletion is not None, (
+            "OpenAI parsed chat completion not found"
+        )
 
         if isinstance(client, openai_OpenAI) or isinstance(client, openai_AsyncOpenAI):
             if isinstance(response, openai_ChatCompletion):
@@ -399,9 +843,9 @@ def _format_output_data(
         )
 
         assert google_genai_Client is not None, "Google GenAI client not found"
-        assert (
-            google_genai_AsyncClient is not None
-        ), "Google GenAI async client not found"
+        assert google_genai_AsyncClient is not None, (
+            "Google GenAI async client not found"
+        )
         if isinstance(client, google_genai_Client) or isinstance(
             client, google_genai_AsyncClient
         ):
