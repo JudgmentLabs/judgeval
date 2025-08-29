@@ -107,36 +107,11 @@ class _TracedGeneratorBase:
 
     def _process_chunk_usage(self, chunk):
         """Process usage data from streaming chunks based on provider."""
-        usage_data = None
-
-        if HAS_ANTHROPIC:
-            from judgeval.tracer.llm.providers import (
-                anthropic_Anthropic,
-                anthropic_AsyncAnthropic,
-            )
-
-            if isinstance(self.client, (anthropic_Anthropic, anthropic_AsyncAnthropic)):
-                if hasattr(chunk, "type"):
-                    if chunk.type == "message_start":
-                        if hasattr(chunk, "message") and hasattr(
-                            chunk.message, "usage"
-                        ):
-                            usage_data = chunk.message.usage
-                    elif chunk.type == "message_delta":
-                        if hasattr(chunk, "usage"):
-                            usage_data = chunk.usage
-                    elif chunk.type == "message_stop":
-                        if hasattr(chunk, "usage"):
-                            usage_data = chunk.usage
-
-        if not usage_data:
-            if hasattr(chunk, "usage") and chunk.usage:
-                usage_data = chunk.usage
-            elif hasattr(chunk, "message") and hasattr(chunk.message, "usage"):
-                usage_data = chunk.message.usage
-
+        usage_data = _extract_chunk_usage(self.client, chunk)
         if usage_data:
-            _process_usage_data(self.span, usage_data, self.tracer, self.model_name)
+            _process_usage_data(
+                self.span, usage_data, self.tracer, self.client, self.model_name
+            )
 
     def __del__(self):
         """
@@ -302,29 +277,190 @@ class TracedAsyncContextManager:
                 pass
 
 
-def _process_usage_data(span, usage_data, tracer: "Tracer", model_name: str = ""):
-    """Process usage data and set span attributes."""
+def _extract_chunk_usage(client: ApiClient, chunk) -> Any:
+    """Extract usage data from streaming chunks based on provider."""
+    if HAS_ANTHROPIC:
+        from judgeval.tracer.llm.providers import (
+            anthropic_Anthropic,
+            anthropic_AsyncAnthropic,
+        )
+
+        assert anthropic_Anthropic is not None, "Anthropic client not found"
+        assert anthropic_AsyncAnthropic is not None, "Anthropic async client not found"
+        if isinstance(client, anthropic_Anthropic) or isinstance(
+            client, anthropic_AsyncAnthropic
+        ):
+            if hasattr(chunk, "type"):
+                if chunk.type == "message_start":
+                    if hasattr(chunk, "message") and hasattr(chunk.message, "usage"):
+                        return chunk.message.usage
+                elif chunk.type == "message_delta":
+                    if hasattr(chunk, "usage"):
+                        return chunk.usage
+                elif chunk.type == "message_stop":
+                    if hasattr(chunk, "usage"):
+                        return chunk.usage
+
+    if HAS_GROQ:
+        from judgeval.tracer.llm.providers import groq_Groq, groq_AsyncGroq
+
+        assert groq_Groq is not None, "Groq client not found"
+        assert groq_AsyncGroq is not None, "Groq async client not found"
+        if isinstance(client, groq_Groq) or isinstance(client, groq_AsyncGroq):
+            # Groq provides usage in x_groq.usage field
+            if hasattr(chunk, "x_groq") and chunk.x_groq:
+                if hasattr(chunk.x_groq, "usage"):
+                    return chunk.x_groq.usage
+
+    if HAS_OPENAI:
+        from judgeval.tracer.llm.providers import openai_OpenAI, openai_AsyncOpenAI
+
+        assert openai_OpenAI is not None, "OpenAI client not found"
+        assert openai_AsyncOpenAI is not None, "OpenAI async client not found"
+        if isinstance(client, openai_OpenAI) or isinstance(client, openai_AsyncOpenAI):
+            if hasattr(chunk, "usage") and chunk.usage:
+                return chunk.usage
+
+    if HAS_TOGETHER:
+        from judgeval.tracer.llm.providers import (
+            together_Together,
+            together_AsyncTogether,
+        )
+
+        assert together_Together is not None, "Together client not found"
+        assert together_AsyncTogether is not None, "Together async client not found"
+        if isinstance(client, together_Together) or isinstance(
+            client, together_AsyncTogether
+        ):
+            if hasattr(chunk, "usage") and chunk.usage:
+                return chunk.usage
+
+    return None
+
+
+def _extract_usage_tokens(client: ApiClient, usage_data) -> tuple[int, int, int, int]:
+    """Extract token counts from usage data based on provider."""
     prompt_tokens = 0
     completion_tokens = 0
     cache_read_input_tokens = 0
     cache_creation_input_tokens = 0
 
-    if hasattr(usage_data, "input_tokens"):
-        prompt_tokens = getattr(usage_data, "input_tokens", 0) or 0
-    if hasattr(usage_data, "output_tokens"):
-        completion_tokens = getattr(usage_data, "output_tokens", 0) or 0
+    if HAS_OPENAI:
+        from judgeval.tracer.llm.providers import openai_OpenAI, openai_AsyncOpenAI
 
-    if not prompt_tokens and hasattr(usage_data, "prompt_tokens"):
-        prompt_tokens = getattr(usage_data, "prompt_tokens", 0) or 0
-    if not completion_tokens and hasattr(usage_data, "completion_tokens"):
-        completion_tokens = getattr(usage_data, "completion_tokens", 0) or 0
+        assert openai_OpenAI is not None, "OpenAI client not found"
+        assert openai_AsyncOpenAI is not None, "OpenAI async client not found"
+        if isinstance(client, openai_OpenAI) or isinstance(client, openai_AsyncOpenAI):
+            prompt_tokens = (
+                usage_data.prompt_tokens
+                if hasattr(usage_data, "prompt_tokens")
+                and usage_data.prompt_tokens is not None
+                else 0
+            )
+            completion_tokens = (
+                usage_data.completion_tokens
+                if hasattr(usage_data, "completion_tokens")
+                and usage_data.completion_tokens is not None
+                else 0
+            )
 
-    if hasattr(usage_data, "cache_read_input_tokens"):
-        cache_read_input_tokens = getattr(usage_data, "cache_read_input_tokens", 0) or 0
-    if hasattr(usage_data, "cache_creation_input_tokens"):
-        cache_creation_input_tokens = (
-            getattr(usage_data, "cache_creation_input_tokens", 0) or 0
+    if HAS_TOGETHER:
+        from judgeval.tracer.llm.providers import (
+            together_Together,
+            together_AsyncTogether,
         )
+
+        assert together_Together is not None, "Together client not found"
+        assert together_AsyncTogether is not None, "Together async client not found"
+        if isinstance(client, together_Together) or isinstance(
+            client, together_AsyncTogether
+        ):
+            prompt_tokens = (
+                usage_data.prompt_tokens
+                if hasattr(usage_data, "prompt_tokens")
+                and usage_data.prompt_tokens is not None
+                else 0
+            )
+            completion_tokens = (
+                usage_data.completion_tokens
+                if hasattr(usage_data, "completion_tokens")
+                and usage_data.completion_tokens is not None
+                else 0
+            )
+
+    if HAS_ANTHROPIC:
+        from judgeval.tracer.llm.providers import (
+            anthropic_Anthropic,
+            anthropic_AsyncAnthropic,
+        )
+
+        assert anthropic_Anthropic is not None, "Anthropic client not found"
+        assert anthropic_AsyncAnthropic is not None, "Anthropic async client not found"
+        if isinstance(client, anthropic_Anthropic) or isinstance(
+            client, anthropic_AsyncAnthropic
+        ):
+            prompt_tokens = (
+                usage_data.input_tokens
+                if hasattr(usage_data, "input_tokens")
+                and usage_data.input_tokens is not None
+                else 0
+            )
+            completion_tokens = (
+                usage_data.output_tokens
+                if hasattr(usage_data, "output_tokens")
+                and usage_data.output_tokens is not None
+                else 0
+            )
+            cache_read_input_tokens = (
+                usage_data.cache_read_input_tokens
+                if hasattr(usage_data, "cache_read_input_tokens")
+                and usage_data.cache_read_input_tokens is not None
+                else 0
+            )
+            cache_creation_input_tokens = (
+                usage_data.cache_creation_input_tokens
+                if hasattr(usage_data, "cache_creation_input_tokens")
+                and usage_data.cache_creation_input_tokens is not None
+                else 0
+            )
+
+    if HAS_GROQ:
+        from judgeval.tracer.llm.providers import groq_Groq, groq_AsyncGroq
+
+        assert groq_Groq is not None, "Groq client not found"
+        assert groq_AsyncGroq is not None, "Groq async client not found"
+        if isinstance(client, groq_Groq) or isinstance(client, groq_AsyncGroq):
+            prompt_tokens = (
+                usage_data.prompt_tokens
+                if hasattr(usage_data, "prompt_tokens")
+                and usage_data.prompt_tokens is not None
+                else 0
+            )
+            completion_tokens = (
+                usage_data.completion_tokens
+                if hasattr(usage_data, "completion_tokens")
+                and usage_data.completion_tokens is not None
+                else 0
+            )
+
+    return (
+        prompt_tokens,
+        completion_tokens,
+        cache_read_input_tokens,
+        cache_creation_input_tokens,
+    )
+
+
+def _process_usage_data(
+    span, usage_data, tracer: "Tracer", client: ApiClient, model_name: str = ""
+):
+    """Process usage data and set span attributes."""
+    (
+        prompt_tokens,
+        completion_tokens,
+        cache_read_input_tokens,
+        cache_creation_input_tokens,
+    ) = _extract_usage_tokens(client, usage_data)
 
     if prompt_tokens or completion_tokens:
         final_model_name = getattr(usage_data, "model", None) or model_name
@@ -376,6 +512,18 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
                     span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
                 )
                 model_name = kwargs.get("model", "")
+
+                # Add provider prefix for Groq clients
+                if HAS_GROQ:
+                    from judgeval.tracer.llm.providers import groq_Groq, groq_AsyncGroq
+
+                    if (
+                        isinstance(client, (groq_Groq, groq_AsyncGroq))
+                        and model_name
+                        and not model_name.startswith("groq/")
+                    ):
+                        model_name = "groq/" + model_name
+
                 response = function(*args, **kwargs)
                 return TracedGenerator(tracer, response, client, span, model_name)
             else:
@@ -413,6 +561,18 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
                     span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
                 )
                 model_name = kwargs.get("model", "")
+
+                # Add provider prefix for Groq clients
+                if HAS_GROQ:
+                    from judgeval.tracer.llm.providers import groq_Groq, groq_AsyncGroq
+
+                    if (
+                        isinstance(client, (groq_Groq, groq_AsyncGroq))
+                        and model_name
+                        and not model_name.startswith("groq/")
+                    ):
+                        model_name = "groq/" + model_name
+
                 response = await function(*args, **kwargs)
                 return TracedAsyncGenerator(tracer, response, client, span, model_name)
             else:
@@ -451,6 +611,18 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
                 span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
             )
             model_name = kwargs.get("model", "")
+
+            # Add provider prefix for Groq clients
+            if HAS_GROQ:
+                from judgeval.tracer.llm.providers import groq_Groq, groq_AsyncGroq
+
+                if (
+                    isinstance(client, (groq_Groq, groq_AsyncGroq))
+                    and model_name
+                    and not model_name.startswith("groq/")
+                ):
+                    model_name = "groq/" + model_name
+
             original_context_manager = function(*args, **kwargs)
             return TracedSyncContextManager(
                 tracer, original_context_manager, client, span, model_name
@@ -471,6 +643,18 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
                 span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
             )
             model_name = kwargs.get("model", "")
+
+            # Add provider prefix for Groq clients
+            if HAS_GROQ:
+                from judgeval.tracer.llm.providers import groq_Groq, groq_AsyncGroq
+
+                if (
+                    isinstance(client, (groq_Groq, groq_AsyncGroq))
+                    and model_name
+                    and not model_name.startswith("groq/")
+                ):
+                    model_name = "groq/" + model_name
+
             original_context_manager = function(*args, **kwargs)
             return TracedAsyncContextManager(
                 tracer, original_context_manager, client, span, model_name
