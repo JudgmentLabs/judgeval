@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Tuple
 from litellm.files.main import BaseModel
 from pydantic import field_validator, model_validator, Field
 from datetime import datetime, timezone
@@ -100,6 +100,8 @@ class ExampleEvaluationRun(EvaluationRun, ExampleEvaluationRunJudgmentType):  # 
         model (str): The model used as a judge when using LLM as a Judge
     """
 
+    examples: List[Example]  # type: ignore
+
     @field_validator("examples")
     def validate_examples(cls, v):
         if not v:
@@ -116,6 +118,8 @@ class ExampleEvaluationRun(EvaluationRun, ExampleEvaluationRunJudgmentType):  # 
 
 
 class TraceEvaluationRun(EvaluationRun, TraceEvaluationRunJudgmentType):  # type: ignore
+    trace_and_span_ids: List[Tuple[str, str]]  # type: ignore
+
     @field_validator("trace_and_span_ids")
     def validate_trace_and_span_ids(cls, v):
         if not v:

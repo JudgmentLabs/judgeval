@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from judgeval.data.result import ScoringResult
 from judgeval.evaluation import run_eval
-from judgeval.data.evaluation_run import EvaluationRun
+from judgeval.data.evaluation_run import ExampleEvaluationRun
 
 
 from typing import List, Optional, Union
@@ -45,7 +45,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         assert_test: bool = False,
     ) -> List[ScoringResult]:
         try:
-            eval = EvaluationRun(
+            eval = ExampleEvaluationRun(
                 project_name=project_name,
                 eval_name=eval_run_name,
                 examples=examples,
