@@ -342,7 +342,7 @@ def _process_usage_data(span, usage_data, tracer: "Tracer", model_name: str = ""
 def _set_usage_attributes(span, usage: TraceUsage, tracer: "Tracer"):
     """Set usage attributes on the span for non-streaming responses."""
 
-    set_span_attribute(span, "gen_ai.response.model", usage.model)
+    set_span_attribute(span, "gen_ai.response.model", usage.model_name)
     set_span_attribute(
         span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, usage.prompt_tokens
     )
