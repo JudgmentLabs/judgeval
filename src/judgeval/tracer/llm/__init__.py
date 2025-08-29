@@ -1,11 +1,22 @@
 from __future__ import annotations
 import functools
-from typing import Tuple, Optional, Any, TYPE_CHECKING
+from typing import (
+    Tuple,
+    Optional,
+    Any,
+    TYPE_CHECKING,
+    Union,
+    AsyncGenerator,
+    Generator,
+    Iterator,
+    AsyncIterator,
+)
 from functools import wraps
 from enum import Enum
 from judgeval.data.trace import TraceUsage
 from judgeval.logger import judgeval_logger
 from litellm.cost_calculator import cost_per_token as _original_cost_per_token
+from opentelemetry.trace import Span
 
 from judgeval.tracer.llm.providers import (
     HAS_OPENAI,
@@ -174,7 +185,7 @@ def _extract_together_chunk_usage(chunk) -> Any:
 
 def _extract_groq_chunk_usage(chunk) -> Any:
     """Extract usage data from Groq streaming chunk."""
-    # Groq is OpenAI-compatible, so usage should be in the standard location
+    # Groq provides usage data in the last chunk when stream_options={"include_usage": True} is used
     if hasattr(chunk, "usage") and chunk.usage:
         return chunk.usage
     return None
@@ -535,12 +546,12 @@ class _TracedGeneratorBase:
 
     tracer: Tracer
     client: ApiClient
-    span: Any
+    span: Span
     accumulated_content: str
     model_name: str
     provider_type: ProviderType
 
-    def __init__(self, tracer: Tracer, client: ApiClient, span, model_name: str):
+    def __init__(self, tracer: Tracer, client: ApiClient, span: Span, model_name: str):
         """Initialize the base traced generator.
 
         Args:
@@ -587,7 +598,7 @@ class _TracedGeneratorBase:
         cycles, program exit), so this should not be relied upon as the primary cleanup
         mechanism. The primary finalization happens in the iterator protocol methods.
         """
-        if hasattr(self, "span") and self.span:
+        if self.span:
             try:
                 self._finalize_span()
             except Exception as e:
@@ -597,7 +608,7 @@ class _TracedGeneratorBase:
 
     def _finalize_span(self):
         """Finalize the span by setting completion content and ending it."""
-        if hasattr(self, "span") and self.span:
+        if self.span:
             set_span_attribute(
                 self.span, AttributeKeys.GEN_AI_COMPLETION, self.accumulated_content
             )
@@ -610,10 +621,15 @@ class TracedGenerator(_TracedGeneratorBase):
 
     __slots__ = ("generator",)
 
-    generator: Any
+    generator: Union[Generator[Any, None, None], Iterator[Any]]
 
     def __init__(
-        self, tracer: Tracer, generator, client: ApiClient, span, model_name: str
+        self,
+        tracer: Tracer,
+        generator: Union[Generator[Any, None, None], Iterator[Any]],
+        client: ApiClient,
+        span: Span,
+        model_name: str,
     ):
         super().__init__(tracer, client, span, model_name)
         self.generator = generator
@@ -636,8 +652,9 @@ class TracedGenerator(_TracedGeneratorBase):
             self._finalize_span()
             raise
         except Exception as e:
-            self.span.record_exception(e)
-            self.span.end()
+            if self.span:
+                self.span.record_exception(e)
+                self.span.end()
             raise
 
 
@@ -646,14 +663,14 @@ class TracedAsyncGenerator(_TracedGeneratorBase):
 
     __slots__ = ("async_generator",)
 
-    async_generator: Any
+    async_generator: Union[AsyncGenerator[Any, None], AsyncIterator[Any]]
 
     def __init__(
         self,
         tracer: Tracer,
-        async_generator,
+        async_generator: Union[AsyncGenerator[Any, None], AsyncIterator[Any]],
         client: ApiClient,
-        span,
+        span: Span,
         model_name: str,
     ):
         super().__init__(tracer, client, span, model_name)
@@ -678,8 +695,9 @@ class TracedAsyncGenerator(_TracedGeneratorBase):
             self._finalize_span()
             raise
         except Exception as e:
-            self.span.record_exception(e)
-            self.span.end()
+            if self.span:
+                self.span.record_exception(e)
+                self.span.end()
             raise
 
 
@@ -689,16 +707,16 @@ class TracedSyncContextManager:
     def __init__(
         self,
         tracer: Tracer,
-        context_manager,
+        context_manager: Any,
         client: ApiClient,
-        span,
+        span: Span,
         model_name: str,
     ):
         self.tracer = tracer
         self.context_manager = context_manager
         self.client = client
         self.span = span
-        self.stream = None
+        self.stream: Optional[Any] = None
         self.model_name = model_name
 
     def __enter__(self):
@@ -711,7 +729,8 @@ class TracedSyncContextManager:
         return self.context_manager.__exit__(exc_type, exc_val, exc_tb)
 
     def __del__(self):
-        if hasattr(self, "span") and self.span:
+        """Cleanup span if not properly closed."""
+        if self.span:
             try:
                 self.span.end()
             except Exception:
@@ -724,16 +743,16 @@ class TracedAsyncContextManager:
     def __init__(
         self,
         tracer: Tracer,
-        context_manager,
+        context_manager: Any,
         client: ApiClient,
-        span,
+        span: Span,
         model_name: str,
     ):
         self.tracer = tracer
         self.context_manager = context_manager
         self.client = client
         self.span = span
-        self.stream = None
+        self.stream: Optional[Any] = None
         self.model_name = model_name
 
     async def __aenter__(self):
@@ -746,7 +765,8 @@ class TracedAsyncContextManager:
         return await self.context_manager.__aexit__(exc_type, exc_val, exc_tb)
 
     def __del__(self):
-        if hasattr(self, "span") and self.span:
+        """Cleanup span if not properly closed."""
+        if self.span:
             try:
                 self.span.end()
             except Exception:
@@ -800,6 +820,21 @@ def _process_usage_data(
 
     if prompt_tokens or completion_tokens:
         final_model_name = getattr(usage_data, "model", None) or model_name
+
+        # Add provider prefixes for cost calculation
+        provider_type = _detect_provider(client)
+        if (
+            provider_type == ProviderType.TOGETHER
+            and final_model_name
+            and not final_model_name.startswith("together_ai/")
+        ):
+            final_model_name = "together_ai/" + final_model_name
+        elif (
+            provider_type == ProviderType.GROQ
+            and final_model_name
+            and not final_model_name.startswith("groq/")
+        ):
+            final_model_name = "groq/" + final_model_name
 
         usage = _create_usage(
             final_model_name,
