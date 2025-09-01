@@ -652,10 +652,10 @@ class Tracer:
         """Wrap an async generator function to trace nested function calls within each yield."""
 
         @functools.wraps(f)
-        async def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs):
             n = name or f.__qualname__
 
-            async with async_span_context(self, n, attributes) as main_span:
+            with sync_span_context(self, n, attributes) as main_span:
                 self.add_agent_attributes_to_span(main_span)
                 self.record_instance_state("before", main_span)
 
