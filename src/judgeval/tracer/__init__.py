@@ -793,7 +793,7 @@ class Tracer:
             **(attributes or {}),
         }
 
-        if inspect.iscoroutinefunction(func):
+        if inspect.iscoroutinefunction(func) or inspect.isasyncgenfunction(func):
             return self._wrap_async(func, name, func_attributes, scorer_config)
         else:
             return self._wrap_sync(func, name, func_attributes, scorer_config)
