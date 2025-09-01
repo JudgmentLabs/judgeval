@@ -731,7 +731,16 @@ class Tracer:
         span_name: str | None = None,
         attributes: Optional[Dict[str, Any]] = None,
         scorer_config: TraceScorerConfig | None = None,
-    ) -> Union[Callable, Generator[Any, None, None], AsyncGenerator[Any, None]] | None:
+    ) -> (
+        Union[
+            Callable,
+            Generator[Any, None, None],
+            AsyncGenerator[Any, None],
+            Iterator[Any],
+            AsyncIterator[Any],
+        ]
+        | None
+    ):
         if func is None:
             return partial(
                 self.observe,
@@ -743,8 +752,38 @@ class Tracer:
 
         if not self.enable_monitoring:
             return func
-        # Handle all functions uniformly - detect generators at runtime
-        name = span_name or getattr(func, "__qualname__", "iterator")
+
+        # Handle direct iterator/generator objects that are already instantiated
+        if inspect.isgenerator(func) or isinstance(func, Iterator):
+            name = span_name or "sync_iterator"
+            func_attributes: Dict[str, Any] = {
+                AttributeKeys.JUDGMENT_SPAN_KIND: span_type,
+                **(attributes or {}),
+            }
+            with sync_span_context(self, name, func_attributes) as span:
+                self.add_agent_attributes_to_span(span)
+                set_span_attribute(span, AttributeKeys.JUDGMENT_OUTPUT, "<iterator>")
+                return self._create_traced_sync_generator(
+                    func, span, name, func_attributes
+                )
+
+        if inspect.isasyncgen(func) or isinstance(func, AsyncIterator):
+            name = span_name or "async_iterator"
+            func_attributes: Dict[str, Any] = {
+                AttributeKeys.JUDGMENT_SPAN_KIND: span_type,
+                **(attributes or {}),
+            }
+            with sync_span_context(self, name, func_attributes) as span:
+                self.add_agent_attributes_to_span(span)
+                set_span_attribute(
+                    span, AttributeKeys.JUDGMENT_OUTPUT, "<async_iterator>"
+                )
+                return self._create_traced_async_generator(
+                    func, span, name, func_attributes
+                )
+
+        # Handle functions (including generator functions) - detect generators at runtime
+        name = span_name or getattr(func, "__qualname__", "function")
         func_attributes: Dict[str, Any] = {
             AttributeKeys.JUDGMENT_SPAN_KIND: span_type,
             **(attributes or {}),
