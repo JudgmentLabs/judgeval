@@ -16,6 +16,7 @@ def sync_span_context(
     tracer: Tracer,
     name: str,
     span_attributes: Optional[Dict[str, str]] = None,
+    disable_partial_emit: bool = False,
 ):
     if span_attributes is None:
         span_attributes = {}
@@ -32,6 +33,8 @@ def sync_span_context(
             attributes=span_attributes,
         ) as span:
             set_span_attribute(span, AttributeKeys.JUDGMENT_CUMULATIVE_LLM_COST, 0.0)
+            if disable_partial_emit:
+                span.set_attribute("judgment.span.disable_partial_emit", True)
             yield span
     finally:
         current_cost_context.reset(cost_token)
@@ -41,7 +44,10 @@ def sync_span_context(
 
 @asynccontextmanager
 async def async_span_context(
-    tracer: Tracer, name: str, span_attributes: Optional[Dict[str, str]] = None
+    tracer: Tracer,
+    name: str,
+    span_attributes: Optional[Dict[str, str]] = None,
+    disable_partial_emit: bool = False,
 ):
     if span_attributes is None:
         span_attributes = {}
@@ -58,6 +64,8 @@ async def async_span_context(
             attributes=span_attributes,
         ) as span:
             set_span_attribute(span, AttributeKeys.JUDGMENT_CUMULATIVE_LLM_COST, 0.0)
+            if disable_partial_emit:
+                span.set_attribute("judgment.span.disable_partial_emit", True)
             yield span
     finally:
         current_cost_context.reset(cost_token)

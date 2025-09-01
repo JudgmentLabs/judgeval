@@ -58,6 +58,11 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
         if not isinstance(current_span, ReadableSpan):
             return
 
+        # Check if partial emit is disabled for this span (e.g., generator yields)
+        attributes = current_span.attributes or {}
+        if attributes.get("judgment.span.disable_partial_emit"):
+            return
+
         span_context = current_span.get_span_context()
         span_key = (span_context.trace_id, span_context.span_id)
 
@@ -84,6 +89,15 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
         super().on_end(partial_span)
 
     def on_end(self, span: ReadableSpan) -> None:
+        # Check if span is marked as cancelled (due to StopIteration)
+        attributes = span.attributes or {}
+        if attributes.get("judgment.span.cancelled"):
+            # Don't export cancelled spans
+            if span.context:
+                span_key = (span.context.trace_id, span.context.span_id)
+                self._span_update_ids.pop(span_key, None)
+            return
+
         if span.end_time is not None and span.context:
             span_key = (span.context.trace_id, span.context.span_id)
 

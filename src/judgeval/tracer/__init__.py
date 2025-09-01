@@ -412,13 +412,15 @@ class Tracer:
                 }
 
                 with sync_span_context(
-                    self, yield_span_name, yield_attributes
+                    self, yield_span_name, yield_attributes, disable_partial_emit=True
                 ) as yield_span:
                     self.add_agent_attributes_to_span(yield_span)
 
                     try:
                         value = next(generator)
                     except StopIteration:
+                        # Mark span as cancelled so it won't be exported
+                        yield_span.set_attribute("judgment.span.cancelled", True)
                         break
 
                     set_span_attribute(
@@ -450,13 +452,15 @@ class Tracer:
                 }
 
                 async with async_span_context(
-                    self, yield_span_name, yield_attributes
+                    self, yield_span_name, yield_attributes, disable_partial_emit=True
                 ) as yield_span:
                     self.add_agent_attributes_to_span(yield_span)
 
                     try:
                         value = await async_generator.__anext__()
                     except StopAsyncIteration:
+                        # Mark span as cancelled so it won't be exported
+                        yield_span.set_attribute("judgment.span.cancelled", True)
                         break
 
                     set_span_attribute(
