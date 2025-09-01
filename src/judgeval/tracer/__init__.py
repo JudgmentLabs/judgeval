@@ -51,6 +51,7 @@ from judgeval.scorers.base_scorer import BaseScorer
 from judgeval.tracer.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
 from judgeval.tracer.managers import (
     sync_span_context,
+    async_span_context,
     sync_agent_context,
     async_agent_context,
 )
@@ -572,7 +573,7 @@ class Tracer:
         @functools.wraps(f)
         async def wrapper(*args, **kwargs):
             n = name or f.__qualname__
-            with sync_span_context(self, n, attributes) as span:
+            async with async_span_context(self, n, attributes) as span:
                 self.add_agent_attributes_to_span(span)
                 self.record_instance_state("before", span)
                 try:
@@ -605,7 +606,7 @@ class Tracer:
                                     **(attributes or {}),
                                 }
 
-                                with sync_span_context(
+                                async with async_span_context(
                                     self, yield_span_name, yield_attributes
                                 ) as yield_span:
                                     self.add_agent_attributes_to_span(yield_span)
@@ -654,7 +655,7 @@ class Tracer:
         async def wrapper(*args, **kwargs):
             n = name or f.__qualname__
 
-            with sync_span_context(self, n, attributes) as main_span:
+            async with async_span_context(self, n, attributes) as main_span:
                 self.add_agent_attributes_to_span(main_span)
                 self.record_instance_state("before", main_span)
 
@@ -682,7 +683,7 @@ class Tracer:
                                     **(attributes or {}),
                                 }
 
-                                with sync_span_context(
+                                async with async_span_context(
                                     self, yield_span_name, yield_attributes
                                 ) as yield_span:
                                     self.add_agent_attributes_to_span(yield_span)
