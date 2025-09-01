@@ -395,6 +395,82 @@ class Tracer:
             safe_serialize(eval_run.model_dump(warnings=False)),
         )
 
+    def _create_traced_sync_generator(
+        self,
+        generator: Iterator[Any],
+        main_span: Span,
+        base_name: str,
+        attributes: Optional[Dict[str, Any]],
+    ):
+        """Create a traced synchronous generator that wraps each yield in a span."""
+        try:
+            while True:
+                yield_span_name = f"{base_name}_yield"
+                yield_attributes = {
+                    AttributeKeys.JUDGMENT_SPAN_KIND: "generator_yield",
+                    **(attributes or {}),
+                }
+
+                with sync_span_context(
+                    self, yield_span_name, yield_attributes
+                ) as yield_span:
+                    self.add_agent_attributes_to_span(yield_span)
+
+                    try:
+                        value = next(generator)
+                    except StopIteration:
+                        break
+
+                    set_span_attribute(
+                        yield_span,
+                        AttributeKeys.JUDGMENT_OUTPUT,
+                        safe_serialize(value),
+                    )
+
+                yield value
+        except Exception as e:
+            main_span.record_exception(e)
+            main_span.set_status(Status(StatusCode.ERROR, str(e)))
+            raise
+
+    async def _create_traced_async_generator(
+        self,
+        async_generator: AsyncIterator[Any],
+        main_span: Span,
+        base_name: str,
+        attributes: Optional[Dict[str, Any]],
+    ):
+        """Create a traced asynchronous generator that wraps each yield in a span."""
+        try:
+            while True:
+                yield_span_name = f"{base_name}_yield"
+                yield_attributes = {
+                    AttributeKeys.JUDGMENT_SPAN_KIND: "async_generator_yield",
+                    **(attributes or {}),
+                }
+
+                async with async_span_context(
+                    self, yield_span_name, yield_attributes
+                ) as yield_span:
+                    self.add_agent_attributes_to_span(yield_span)
+
+                    try:
+                        value = await async_generator.__anext__()
+                    except StopAsyncIteration:
+                        break
+
+                    set_span_attribute(
+                        yield_span,
+                        AttributeKeys.JUDGMENT_OUTPUT,
+                        safe_serialize(value),
+                    )
+
+                yield value
+        except Exception as e:
+            main_span.record_exception(e)
+            main_span.set_status(Status(StatusCode.ERROR, str(e)))
+            raise
+
     def _wrap_sync(
         self,
         f: Callable,
@@ -433,44 +509,13 @@ class Tracer:
                     raise
 
                 if inspect.isgenerator(result):
-
-                    def traced_generator():
-                        generator = result
-                        try:
-                            while True:
-                                yield_span_name = f"{n}_yield"
-                                yield_attributes = {
-                                    AttributeKeys.JUDGMENT_SPAN_KIND: "generator_yield",
-                                    **(attributes or {}),
-                                }
-
-                                with sync_span_context(
-                                    self, yield_span_name, yield_attributes
-                                ) as yield_span:
-                                    self.add_agent_attributes_to_span(yield_span)
-
-                                    try:
-                                        value = next(generator)
-                                    except StopIteration:
-                                        break
-
-                                    set_span_attribute(
-                                        yield_span,
-                                        AttributeKeys.JUDGMENT_OUTPUT,
-                                        safe_serialize(value),
-                                    )
-
-                                yield value
-                        except Exception as e:
-                            span.record_exception(e)
-                            span.set_status(Status(StatusCode.ERROR, str(e)))
-                            raise
-
                     set_span_attribute(
                         span, AttributeKeys.JUDGMENT_OUTPUT, "<generator>"
                     )
                     self.record_instance_state("after", span)
-                    return traced_generator()
+                    return self._create_traced_sync_generator(
+                        result, span, n, attributes
+                    )
                 else:
                     set_span_attribute(
                         span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(result)
@@ -511,44 +556,15 @@ class Tracer:
 
                     self.judgment_processor.emit_partial()
 
-                    def traced_generator():
-                        generator = f(*args, **kwargs)
-                        try:
-                            while True:
-                                yield_span_name = f"{n}_yield"
-                                yield_attributes = {
-                                    AttributeKeys.JUDGMENT_SPAN_KIND: "generator_yield",
-                                    **(attributes or {}),
-                                }
-
-                                with sync_span_context(
-                                    self, yield_span_name, yield_attributes
-                                ) as yield_span:
-                                    self.add_agent_attributes_to_span(yield_span)
-
-                                    try:
-                                        value = next(generator)
-                                    except StopIteration:
-                                        break
-
-                                    set_span_attribute(
-                                        yield_span,
-                                        AttributeKeys.JUDGMENT_OUTPUT,
-                                        safe_serialize(value),
-                                    )
-
-                                yield value
-                        except Exception as e:
-                            main_span.record_exception(e)
-                            main_span.set_status(Status(StatusCode.ERROR, str(e)))
-                            raise
-
+                    generator = f(*args, **kwargs)
                     set_span_attribute(
                         main_span, AttributeKeys.JUDGMENT_OUTPUT, "<generator>"
                     )
                     self.record_instance_state("after", main_span)
 
-                    return traced_generator()
+                    return self._create_traced_sync_generator(
+                        generator, main_span, n, attributes
+                    )
 
                 except Exception as user_exc:
                     main_span.record_exception(user_exc)
@@ -584,7 +600,7 @@ class Tracer:
                     )
 
                     if scorer_config:
-                        self._set_pending_trace_eval(span, scorer_config)
+                        self._set_pending_trace_eval(span, scorer_config, args, kwargs)
 
                     self.judgment_processor.emit_partial()
 
@@ -595,44 +611,13 @@ class Tracer:
                     raise
 
                 if inspect.isasyncgen(result):
-
-                    async def traced_async_generator():
-                        async_generator = result
-                        try:
-                            while True:
-                                yield_span_name = f"{n}_yield"
-                                yield_attributes = {
-                                    AttributeKeys.JUDGMENT_SPAN_KIND: "async_generator_yield",
-                                    **(attributes or {}),
-                                }
-
-                                async with async_span_context(
-                                    self, yield_span_name, yield_attributes
-                                ) as yield_span:
-                                    self.add_agent_attributes_to_span(yield_span)
-
-                                    try:
-                                        value = await async_generator.__anext__()
-                                    except StopAsyncIteration:
-                                        break
-
-                                    set_span_attribute(
-                                        yield_span,
-                                        AttributeKeys.JUDGMENT_OUTPUT,
-                                        safe_serialize(value),
-                                    )
-
-                                yield value
-                        except Exception as e:
-                            span.record_exception(e)
-                            span.set_status(Status(StatusCode.ERROR, str(e)))
-                            raise
-
                     set_span_attribute(
                         span, AttributeKeys.JUDGMENT_OUTPUT, "<async_generator>"
                     )
                     self.record_instance_state("after", span)
-                    return traced_async_generator()
+                    return self._create_traced_async_generator(
+                        result, span, n, attributes
+                    )
                 else:
                     set_span_attribute(
                         span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(result)
@@ -673,44 +658,15 @@ class Tracer:
 
                     self.judgment_processor.emit_partial()
 
-                    async def traced_async_generator():
-                        async_generator = f(*args, **kwargs)
-                        try:
-                            while True:
-                                yield_span_name = f"{n}_yield"
-                                yield_attributes = {
-                                    AttributeKeys.JUDGMENT_SPAN_KIND: "async_generator_yield",
-                                    **(attributes or {}),
-                                }
-
-                                async with async_span_context(
-                                    self, yield_span_name, yield_attributes
-                                ) as yield_span:
-                                    self.add_agent_attributes_to_span(yield_span)
-
-                                    try:
-                                        value = await async_generator.__anext__()
-                                    except StopAsyncIteration:
-                                        break
-
-                                    set_span_attribute(
-                                        yield_span,
-                                        AttributeKeys.JUDGMENT_OUTPUT,
-                                        safe_serialize(value),
-                                    )
-
-                                yield value
-                        except Exception as e:
-                            main_span.record_exception(e)
-                            main_span.set_status(Status(StatusCode.ERROR, str(e)))
-                            raise
-
+                    async_generator = f(*args, **kwargs)
                     set_span_attribute(
                         main_span, AttributeKeys.JUDGMENT_OUTPUT, "<async_generator>"
                     )
                     self.record_instance_state("after", main_span)
 
-                    return traced_async_generator()
+                    return self._create_traced_async_generator(
+                        async_generator, main_span, n, attributes
+                    )
 
                 except Exception as user_exc:
                     main_span.record_exception(user_exc)
@@ -788,7 +744,7 @@ class Tracer:
         if not self.enable_monitoring:
             return func
         # Handle all functions uniformly - detect generators at runtime
-        name = span_name or func.__qualname__
+        name = span_name or getattr(func, "__qualname__", "iterator")
         func_attributes: Dict[str, Any] = {
             AttributeKeys.JUDGMENT_SPAN_KIND: span_type,
             **(attributes or {}),
