@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Optional, TYPE_CHECKING, Any
+from collections import defaultdict
 from opentelemetry.context import Context
 from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor, SpanContext
 from opentelemetry.sdk.trace.export import (
@@ -48,7 +49,9 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             max_queue_size=max_queue_size,
             export_timeout_millis=export_timeout_millis,
         )
-        self._internal_attributes: dict[tuple[int, int], dict[str, Any]] = {}
+        self._internal_attributes: defaultdict[tuple[int, int], dict[str, Any]] = (
+            defaultdict(dict)
+        )
 
     def _get_span_key(self, span_context: SpanContext) -> tuple[int, int]:
         return (span_context.trace_id, span_context.span_id)
@@ -57,15 +60,13 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
         self, span_context: SpanContext, key: str, value: Any
     ) -> None:
         span_key = self._get_span_key(span_context)
-        if span_key not in self._internal_attributes:
-            self._internal_attributes[span_key] = {}
         self._internal_attributes[span_key][key] = value
 
     def get_internal_attribute(
         self, span_context: SpanContext, key: str, default: Any = None
     ) -> Any:
         span_key = self._get_span_key(span_context)
-        return self._internal_attributes.get(span_key, {}).get(key, default)
+        return self._internal_attributes[span_key].get(key, default)
 
     def increment_update_id(self, span_context: SpanContext) -> int:
         current_id = self.get_internal_attribute(
