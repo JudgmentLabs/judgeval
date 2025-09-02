@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager, contextmanager
 from typing import TYPE_CHECKING, Dict, Optional, List, Any
-from judgeval.tracer.keys import AttributeKeys
+from judgeval.tracer.keys import AttributeKeys, InternalAttributeKeys
 import uuid
 from judgeval.exceptions import JudgmentRuntimeError
 from judgeval.tracer.utils import set_span_attribute
@@ -34,7 +34,11 @@ def sync_span_context(
         ) as span:
             set_span_attribute(span, AttributeKeys.JUDGMENT_CUMULATIVE_LLM_COST, 0.0)
             if disable_partial_emit:
-                span.set_attribute("judgment.span.disable_partial_emit", True)
+                tracer.judgment_processor.set_internal_attribute(
+                    span.get_span_context(),
+                    InternalAttributeKeys.DISABLE_PARTIAL_EMIT,
+                    True,
+                )
             yield span
     finally:
         current_cost_context.reset(cost_token)
@@ -65,7 +69,11 @@ async def async_span_context(
         ) as span:
             set_span_attribute(span, AttributeKeys.JUDGMENT_CUMULATIVE_LLM_COST, 0.0)
             if disable_partial_emit:
-                span.set_attribute("judgment.span.disable_partial_emit", True)
+                tracer.judgment_processor.set_internal_attribute(
+                    span.get_span_context(),
+                    InternalAttributeKeys.DISABLE_PARTIAL_EMIT,
+                    True,
+                )
             yield span
     finally:
         current_cost_context.reset(cost_token)

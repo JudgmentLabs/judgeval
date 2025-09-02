@@ -48,6 +48,17 @@ class AttributeKeys(str, Enum):
     GEN_AI_USAGE_TOTAL_COST = "gen_ai.usage.total_cost_usd"
 
 
+class InternalAttributeKeys(str, Enum):
+    """
+    Internal attribute keys used for temporary state management in span processors.
+    These are NOT exported and are used only for internal span lifecycle management.
+    """
+
+    # Span control attributes
+    DISABLE_PARTIAL_EMIT = "disable_partial_emit"
+    CANCELLED = "cancelled"
+
+
 class ResourceKeys(str, Enum):
     SERVICE_NAME = ResourceAttributes.SERVICE_NAME
     TELEMETRY_SDK_LANGUAGE = ResourceAttributes.TELEMETRY_SDK_LANGUAGE

@@ -57,7 +57,7 @@ from judgeval.utils.serialize import safe_serialize
 from judgeval.version import get_version
 from judgeval.warnings import JudgmentWarning
 
-from judgeval.tracer.keys import AttributeKeys, ResourceKeys
+from judgeval.tracer.keys import AttributeKeys, ResourceKeys, InternalAttributeKeys
 from judgeval.api import JudgmentSyncClient
 from judgeval.tracer.llm import wrap_provider
 from judgeval.utils.url import url_for
@@ -418,7 +418,11 @@ class Tracer:
                         value = next(generator)
                     except StopIteration:
                         # Mark span as cancelled so it won't be exported
-                        yield_span.set_attribute("judgment.span.cancelled", True)
+                        self.judgment_processor.set_internal_attribute(
+                            yield_span.get_span_context(),
+                            InternalAttributeKeys.CANCELLED,
+                            True,
+                        )
                         break
 
                     set_span_attribute(
@@ -458,7 +462,11 @@ class Tracer:
                         value = await async_generator.__anext__()
                     except StopAsyncIteration:
                         # Mark span as cancelled so it won't be exported
-                        yield_span.set_attribute("judgment.span.cancelled", True)
+                        self.judgment_processor.set_internal_attribute(
+                            yield_span.get_span_context(),
+                            InternalAttributeKeys.CANCELLED,
+                            True,
+                        )
                         break
 
                     set_span_attribute(

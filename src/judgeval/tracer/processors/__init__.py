@@ -6,7 +6,7 @@ from opentelemetry.sdk.trace.export import (
     BatchSpanProcessor,
 )
 from judgeval.tracer.exporters import JudgmentSpanExporter
-from judgeval.tracer.keys import AttributeKeys
+from judgeval.tracer.keys import AttributeKeys, InternalAttributeKeys
 
 if TYPE_CHECKING:
     from judgeval.tracer import Tracer
@@ -48,7 +48,33 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             max_queue_size=max_queue_size,
             export_timeout_millis=export_timeout_millis,
         )
-        self._span_update_ids: dict[tuple[int, int], int] = {}
+        self._internal_attributes: dict[tuple[int, int], dict[str, any]] = {}
+
+    def _get_span_key(self, span_context) -> tuple[int, int]:
+        return (span_context.trace_id, span_context.span_id)
+
+    def set_internal_attribute(self, span_context, key: str, value: any) -> None:
+        span_key = self._get_span_key(span_context)
+        if span_key not in self._internal_attributes:
+            self._internal_attributes[span_key] = {}
+        self._internal_attributes[span_key][key] = value
+
+    def get_internal_attribute(self, span_context, key: str, default=None):
+        span_key = self._get_span_key(span_context)
+        return self._internal_attributes.get(span_key, {}).get(key, default)
+
+    def increment_update_id(self, span_context) -> int:
+        current_id = self.get_internal_attribute(
+            span_context, AttributeKeys.JUDGMENT_UPDATE_ID, 0
+        )
+        new_id = current_id + 1
+        self.set_internal_attribute(
+            span_context, AttributeKeys.JUDGMENT_UPDATE_ID, new_id
+        )
+        return current_id
+
+    def _cleanup_span_state(self, span_key: tuple[int, int]) -> None:
+        self._internal_attributes.pop(span_key, None)
 
     def emit_partial(self) -> None:
         current_span = self.tracer.get_current_span()
@@ -58,16 +84,13 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
         if not isinstance(current_span, ReadableSpan):
             return
 
-        # Check if partial emit is disabled for this span (e.g., generator yields)
-        attributes = current_span.attributes or {}
-        if attributes.get("judgment.span.disable_partial_emit"):
+        span_context = current_span.get_span_context()
+        if self.get_internal_attribute(
+            span_context, InternalAttributeKeys.DISABLE_PARTIAL_EMIT, False
+        ):
             return
 
-        span_context = current_span.get_span_context()
-        span_key = (span_context.trace_id, span_context.span_id)
-
-        current_update_id = self._span_update_ids.get(span_key, 0)
-        self._span_update_ids[span_key] = current_update_id + 1
+        current_update_id = self.increment_update_id(span_context)
 
         attributes = dict(current_span.attributes or {})
         attributes[AttributeKeys.JUDGMENT_UPDATE_ID] = current_update_id
@@ -89,19 +112,19 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
         super().on_end(partial_span)
 
     def on_end(self, span: ReadableSpan) -> None:
-        # Check if span is marked as cancelled (due to StopIteration)
-        attributes = span.attributes or {}
-        if attributes.get("judgment.span.cancelled"):
-            # Don't export cancelled spans
-            if span.context:
-                span_key = (span.context.trace_id, span.context.span_id)
-                self._span_update_ids.pop(span_key, None)
+        if not span.context:
+            super().on_end(span)
             return
 
-        if span.end_time is not None and span.context:
-            span_key = (span.context.trace_id, span.context.span_id)
+        span_key = self._get_span_key(span.context)
 
-            # Create a new span with the final update_id set to 20
+        if self.get_internal_attribute(
+            span.context, InternalAttributeKeys.CANCELLED, False
+        ):
+            self._cleanup_span_state(span_key)
+            return
+
+        if span.end_time is not None:
             attributes = dict(span.attributes or {})
             attributes[AttributeKeys.JUDGMENT_UPDATE_ID] = 20
 
@@ -120,7 +143,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
                 instrumentation_scope=span.instrumentation_scope,
             )
 
-            self._span_update_ids.pop(span_key, None)
+            self._cleanup_span_state(span_key)
             super().on_end(final_span)
         else:
             super().on_end(span)
