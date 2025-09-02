@@ -35,9 +35,9 @@ def sync_span_context(
             set_span_attribute(span, AttributeKeys.JUDGMENT_CUMULATIVE_LLM_COST, 0.0)
             if disable_partial_emit:
                 tracer.judgment_processor.set_internal_attribute(
-                    span.get_span_context(),
-                    InternalAttributeKeys.DISABLE_PARTIAL_EMIT,
-                    True,
+                    span_context=span.get_span_context(),
+                    key=InternalAttributeKeys.DISABLE_PARTIAL_EMIT,
+                    value=True,
                 )
             yield span
     finally:
@@ -70,9 +70,9 @@ async def async_span_context(
             set_span_attribute(span, AttributeKeys.JUDGMENT_CUMULATIVE_LLM_COST, 0.0)
             if disable_partial_emit:
                 tracer.judgment_processor.set_internal_attribute(
-                    span.get_span_context(),
-                    InternalAttributeKeys.DISABLE_PARTIAL_EMIT,
-                    True,
+                    span_context=span.get_span_context(),
+                    key=InternalAttributeKeys.DISABLE_PARTIAL_EMIT,
+                    value=True,
                 )
             yield span
     finally:

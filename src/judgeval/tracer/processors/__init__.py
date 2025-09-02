@@ -1,7 +1,7 @@
 from __future__ import annotations
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, Any
 from opentelemetry.context import Context
-from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
+from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor, SpanContext
 from opentelemetry.sdk.trace.export import (
     BatchSpanProcessor,
 )
@@ -48,28 +48,34 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             max_queue_size=max_queue_size,
             export_timeout_millis=export_timeout_millis,
         )
-        self._internal_attributes: dict[tuple[int, int], dict[str, any]] = {}
+        self._internal_attributes: dict[tuple[int, int], dict[str, Any]] = {}
 
-    def _get_span_key(self, span_context) -> tuple[int, int]:
+    def _get_span_key(self, span_context: SpanContext) -> tuple[int, int]:
         return (span_context.trace_id, span_context.span_id)
 
-    def set_internal_attribute(self, span_context, key: str, value: any) -> None:
+    def set_internal_attribute(
+        self, span_context: SpanContext, key: str, value: Any
+    ) -> None:
         span_key = self._get_span_key(span_context)
         if span_key not in self._internal_attributes:
             self._internal_attributes[span_key] = {}
         self._internal_attributes[span_key][key] = value
 
-    def get_internal_attribute(self, span_context, key: str, default=None):
+    def get_internal_attribute(
+        self, span_context: SpanContext, key: str, default: Any = None
+    ) -> Any:
         span_key = self._get_span_key(span_context)
         return self._internal_attributes.get(span_key, {}).get(key, default)
 
-    def increment_update_id(self, span_context) -> int:
+    def increment_update_id(self, span_context: SpanContext) -> int:
         current_id = self.get_internal_attribute(
-            span_context, AttributeKeys.JUDGMENT_UPDATE_ID, 0
+            span_context=span_context, key=AttributeKeys.JUDGMENT_UPDATE_ID, default=0
         )
         new_id = current_id + 1
         self.set_internal_attribute(
-            span_context, AttributeKeys.JUDGMENT_UPDATE_ID, new_id
+            span_context=span_context,
+            key=AttributeKeys.JUDGMENT_UPDATE_ID,
+            value=new_id,
         )
         return current_id
 
@@ -86,11 +92,13 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
 
         span_context = current_span.get_span_context()
         if self.get_internal_attribute(
-            span_context, InternalAttributeKeys.DISABLE_PARTIAL_EMIT, False
+            span_context=span_context,
+            key=InternalAttributeKeys.DISABLE_PARTIAL_EMIT,
+            default=False,
         ):
             return
 
-        current_update_id = self.increment_update_id(span_context)
+        current_update_id = self.increment_update_id(span_context=span_context)
 
         attributes = dict(current_span.attributes or {})
         attributes[AttributeKeys.JUDGMENT_UPDATE_ID] = current_update_id

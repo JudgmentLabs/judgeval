@@ -419,9 +419,9 @@ class Tracer:
                     except StopIteration:
                         # Mark span as cancelled so it won't be exported
                         self.judgment_processor.set_internal_attribute(
-                            yield_span.get_span_context(),
-                            InternalAttributeKeys.CANCELLED,
-                            True,
+                            span_context=yield_span.get_span_context(),
+                            key=InternalAttributeKeys.CANCELLED,
+                            value=True,
                         )
                         break
 
@@ -463,9 +463,9 @@ class Tracer:
                     except StopAsyncIteration:
                         # Mark span as cancelled so it won't be exported
                         self.judgment_processor.set_internal_attribute(
-                            yield_span.get_span_context(),
-                            InternalAttributeKeys.CANCELLED,
-                            True,
+                            span_context=yield_span.get_span_context(),
+                            key=InternalAttributeKeys.CANCELLED,
+                            value=True,
                         )
                         break
 
