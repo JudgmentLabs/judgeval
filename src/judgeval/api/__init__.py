@@ -149,13 +149,6 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def traces_add_to_dataset(self, payload: TraceAddToDataset) -> Any:
-        return self._request(
-            "POST",
-            url_for("/traces/add_to_dataset/"),
-            payload,
-        )
-
     def projects_add(self, payload: ProjectAdd) -> ProjectAddResponse:
         return self._request(
             "POST",
@@ -353,13 +346,6 @@ class JudgmentAsyncClient:
         return await self._request(
             "POST",
             url_for("/datasets/push/"),
-            payload,
-        )
-
-    async def traces_add_to_dataset(self, payload: TraceAddToDataset) -> Any:
-        return await self._request(
-            "POST",
-            url_for("/traces/add_to_dataset/"),
             payload,
         )
 
