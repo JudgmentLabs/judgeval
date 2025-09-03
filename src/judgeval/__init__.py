@@ -39,8 +39,8 @@ class JudgmentClient(metaclass=SingletonMeta):
         self,
         examples: List[Example],
         scorers: List[Union[APIScorerConfig, BaseScorer]],
-        project_name: str,
-        eval_run_name: str,
+        project_name: str = "default_project",
+        eval_run_name: str = "default_eval_run",
         model: str = JUDGMENT_DEFAULT_GPT_MODEL,
         assert_test: bool = False,
     ) -> List[ScoringResult]:
