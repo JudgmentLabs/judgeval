@@ -1,4 +1,4 @@
-from typing import Dict, Any, Mapping, Literal, Optional
+from typing import List, Dict, Any, Mapping, Literal, Optional
 import httpx
 from httpx import Response
 from judgeval.exceptions import JudgmentAPIError
@@ -34,11 +34,7 @@ class JudgmentSyncClient:
         self.client = httpx.Client(timeout=30)
 
     def _request(
-        self,
-        method: Literal["POST", "PATCH", "GET", "DELETE"],
-        url: str,
-        payload: Any,
-        params: Optional[Dict[str, Any]] = None,
+        self, method: Literal["POST", "PATCH", "GET", "DELETE"], url: str, payload: Any, params: Optional[Dict[str, Any]] = None
     ) -> Any:
         if method == "GET":
             r = self.client.request(
@@ -71,12 +67,10 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def evaluate_examples(
-        self, payload: ExampleEvaluationRun, stream: Optional[str] = None
-    ) -> Any:
+    def evaluate_examples(self, payload: ExampleEvaluationRun, stream: Optional[str] = None) -> Any:
         query_params = {}
         if stream is not None:
-            query_params["stream"] = stream
+            query_params['stream'] = stream
         return self._request(
             "POST",
             url_for("/evaluate/examples"),
@@ -84,12 +78,10 @@ class JudgmentSyncClient:
             params=query_params,
         )
 
-    def evaluate_traces(
-        self, payload: TraceEvaluationRun, stream: Optional[str] = None
-    ) -> Any:
+    def evaluate_traces(self, payload: TraceEvaluationRun, stream: Optional[str] = None) -> Any:
         query_params = {}
         if stream is not None:
-            query_params["stream"] = stream
+            query_params['stream'] = stream
         return self._request(
             "POST",
             url_for("/evaluate/traces"),
@@ -113,32 +105,18 @@ class JudgmentSyncClient:
 
     def get_evaluation_status(self, experiment_run_id: str, project_name: str) -> Any:
         query_params = {}
-        query_params["experiment_run_id"] = experiment_run_id
-        query_params["project_name"] = project_name
+        query_params['experiment_run_id'] = experiment_run_id
+        query_params['project_name'] = project_name
         return self._request(
             "GET",
             url_for("/get_evaluation_status/"),
             query_params,
         )
 
-    def datasets_insert_examples(self, payload: DatasetInsertExamples) -> Any:
-        return self._request(
-            "POST",
-            url_for("/datasets/insert_examples/"),
-            payload,
-        )
-
-    def datasets_pull_for_judgeval(self, payload: DatasetFetch) -> Any:
+    def datasets_pull_for_judgeval(self, payload: DatasetFetch) -> DatasetReturn:
         return self._request(
             "POST",
             url_for("/datasets/pull_for_judgeval/"),
-            payload,
-        )
-
-    def datasets_push(self, payload: DatasetPush) -> Any:
-        return self._request(
-            "POST",
-            url_for("/datasets/push/"),
             payload,
         )
 
@@ -149,9 +127,7 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def projects_delete_from_judgeval(
-        self, payload: ProjectDeleteFromJudgevalResponse
-    ) -> ProjectDeleteResponse:
+    def projects_delete_from_judgeval(self, payload: ProjectDeleteFromJudgevalResponse) -> ProjectDeleteResponse:
         return self._request(
             "DELETE",
             url_for("/projects/delete_from_judgeval/"),
@@ -172,27 +148,21 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def fetch_scorer(
-        self, payload: FetchPromptScorerRequest
-    ) -> FetchPromptScorerResponse:
+    def fetch_scorer(self, payload: FetchPromptScorerRequest) -> FetchPromptScorerResponse:
         return self._request(
             "POST",
             url_for("/fetch_scorer/"),
             payload,
         )
 
-    def upload_custom_scorer(
-        self, payload: CustomScorerUploadPayload
-    ) -> CustomScorerTemplateResponse:
+    def upload_custom_scorer(self, payload: CustomScorerUploadPayload) -> CustomScorerTemplateResponse:
         return self._request(
             "POST",
             url_for("/upload_custom_scorer/"),
             payload,
         )
 
-    def projects_resolve(
-        self, payload: ResolveProjectNameRequest
-    ) -> ResolveProjectNameResponse:
+    def projects_resolve(self, payload: ResolveProjectNameRequest) -> ResolveProjectNameResponse:
         return self._request(
             "POST",
             url_for("/projects/resolve/"),
@@ -221,6 +191,7 @@ class JudgmentSyncClient:
         )
 
 
+
 class JudgmentAsyncClient:
     __slots__ = ("api_key", "organization_id", "client")
 
@@ -230,11 +201,7 @@ class JudgmentAsyncClient:
         self.client = httpx.AsyncClient(timeout=30)
 
     async def _request(
-        self,
-        method: Literal["POST", "PATCH", "GET", "DELETE"],
-        url: str,
-        payload: Any,
-        params: Optional[Dict[str, Any]] = None,
+        self, method: Literal["POST", "PATCH", "GET", "DELETE"], url: str, payload: Any, params: Optional[Dict[str, Any]] = None
     ) -> Any:
         if method == "GET":
             r = self.client.request(
@@ -253,9 +220,7 @@ class JudgmentAsyncClient:
             )
         return _handle_response(await r)
 
-    async def add_to_run_eval_queue_examples(
-        self, payload: ExampleEvaluationRun
-    ) -> Any:
+    async def add_to_run_eval_queue_examples(self, payload: ExampleEvaluationRun) -> Any:
         return await self._request(
             "POST",
             url_for("/add_to_run_eval_queue/examples"),
@@ -269,12 +234,10 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def evaluate_examples(
-        self, payload: ExampleEvaluationRun, stream: Optional[str] = None
-    ) -> Any:
+    async def evaluate_examples(self, payload: ExampleEvaluationRun, stream: Optional[str] = None) -> Any:
         query_params = {}
         if stream is not None:
-            query_params["stream"] = stream
+            query_params['stream'] = stream
         return await self._request(
             "POST",
             url_for("/evaluate/examples"),
@@ -282,12 +245,10 @@ class JudgmentAsyncClient:
             params=query_params,
         )
 
-    async def evaluate_traces(
-        self, payload: TraceEvaluationRun, stream: Optional[str] = None
-    ) -> Any:
+    async def evaluate_traces(self, payload: TraceEvaluationRun, stream: Optional[str] = None) -> Any:
         query_params = {}
         if stream is not None:
-            query_params["stream"] = stream
+            query_params['stream'] = stream
         return await self._request(
             "POST",
             url_for("/evaluate/traces"),
@@ -309,36 +270,20 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def get_evaluation_status(
-        self, experiment_run_id: str, project_name: str
-    ) -> Any:
+    async def get_evaluation_status(self, experiment_run_id: str, project_name: str) -> Any:
         query_params = {}
-        query_params["experiment_run_id"] = experiment_run_id
-        query_params["project_name"] = project_name
+        query_params['experiment_run_id'] = experiment_run_id
+        query_params['project_name'] = project_name
         return await self._request(
             "GET",
             url_for("/get_evaluation_status/"),
             query_params,
         )
 
-    async def datasets_insert_examples(self, payload: DatasetInsertExamples) -> Any:
-        return await self._request(
-            "POST",
-            url_for("/datasets/insert_examples/"),
-            payload,
-        )
-
-    async def datasets_pull_for_judgeval(self, payload: DatasetFetch) -> Any:
+    async def datasets_pull_for_judgeval(self, payload: DatasetFetch) -> DatasetReturn:
         return await self._request(
             "POST",
             url_for("/datasets/pull_for_judgeval/"),
-            payload,
-        )
-
-    async def datasets_push(self, payload: DatasetPush) -> Any:
-        return await self._request(
-            "POST",
-            url_for("/datasets/push/"),
             payload,
         )
 
@@ -349,9 +294,7 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def projects_delete_from_judgeval(
-        self, payload: ProjectDeleteFromJudgevalResponse
-    ) -> ProjectDeleteResponse:
+    async def projects_delete_from_judgeval(self, payload: ProjectDeleteFromJudgevalResponse) -> ProjectDeleteResponse:
         return await self._request(
             "DELETE",
             url_for("/projects/delete_from_judgeval/"),
@@ -365,36 +308,28 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def save_scorer(
-        self, payload: SavePromptScorerRequest
-    ) -> SavePromptScorerResponse:
+    async def save_scorer(self, payload: SavePromptScorerRequest) -> SavePromptScorerResponse:
         return await self._request(
             "POST",
             url_for("/save_scorer/"),
             payload,
         )
 
-    async def fetch_scorer(
-        self, payload: FetchPromptScorerRequest
-    ) -> FetchPromptScorerResponse:
+    async def fetch_scorer(self, payload: FetchPromptScorerRequest) -> FetchPromptScorerResponse:
         return await self._request(
             "POST",
             url_for("/fetch_scorer/"),
             payload,
         )
 
-    async def upload_custom_scorer(
-        self, payload: CustomScorerUploadPayload
-    ) -> CustomScorerTemplateResponse:
+    async def upload_custom_scorer(self, payload: CustomScorerUploadPayload) -> CustomScorerTemplateResponse:
         return await self._request(
             "POST",
             url_for("/upload_custom_scorer/"),
             payload,
         )
 
-    async def projects_resolve(
-        self, payload: ResolveProjectNameRequest
-    ) -> ResolveProjectNameResponse:
+    async def projects_resolve(self, payload: ResolveProjectNameRequest) -> ResolveProjectNameResponse:
         return await self._request(
             "POST",
             url_for("/projects/resolve/"),
@@ -421,6 +356,7 @@ class JudgmentAsyncClient:
             url_for("/e2e_fetch_trace_scorer_span_score/"),
             payload,
         )
+
 
 
 __all__ = [
