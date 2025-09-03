@@ -52,6 +52,37 @@ def run_eval_helper(client: JudgmentClient, project_name: str, eval_run_name: st
     return res
 
 
+def test_no_project_or_eval_run_name(client: JudgmentClient):
+    """Test basic evaluation workflow."""
+    res = client.run_evaluation(
+        examples=[
+            Example(
+                input="What's the capital of France?",
+                actual_output="The capital of France is Paris.",
+            )
+        ],
+        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
+    )
+
+    assert res, "No evaluation results found"
+
+
+def test_no_model(client: JudgmentClient):
+    """Test basic evaluation workflow."""
+    res = client.run_evaluation(
+        examples=[
+            Example(
+                input="What's the capital of France?",
+                actual_output="The capital of France is Paris.",
+            )
+        ],
+        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+    )
+
+    assert res, "No evaluation results found"
+
+
 def test_run_eval(client: JudgmentClient, project_name: str, random_name: str):
     """Test basic evaluation workflow."""
 
