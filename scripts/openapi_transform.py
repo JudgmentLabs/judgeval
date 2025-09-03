@@ -35,7 +35,7 @@ JUDGEVAL_PATHS: List[str] = [
     "/fetch_scorer/",
     "/scorer_exists/",
     "/upload_custom_scorer/",
-    "/datasets/push/",
+    "/datasets/create_for_judgeval/",
     "/datasets/insert_examples/",
     "/datasets/pull_for_judgeval/",
     "/datasets/fetch_stats_by_project/",
