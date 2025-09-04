@@ -113,6 +113,18 @@ class JudgmentSyncClient:
             query_params,
         )
 
+<<<<<<< HEAD
+=======
+    def datasets_insert_examples_for_judgeval(
+        self, payload: DatasetInsertExamples
+    ) -> Any:
+        return self._request(
+            "POST",
+            url_for("/datasets/insert_examples_for_judgeval/"),
+            payload,
+        )
+
+>>>>>>> 564cd66b (scripts)
     def datasets_pull_for_judgeval(self, payload: DatasetFetch) -> DatasetReturn:
         return self._request(
             "POST",
@@ -280,6 +292,18 @@ class JudgmentAsyncClient:
             query_params,
         )
 
+<<<<<<< HEAD
+=======
+    async def datasets_insert_examples_for_judgeval(
+        self, payload: DatasetInsertExamples
+    ) -> Any:
+        return await self._request(
+            "POST",
+            url_for("/datasets/insert_examples_for_judgeval/"),
+            payload,
+        )
+
+>>>>>>> 564cd66b (scripts)
     async def datasets_pull_for_judgeval(self, payload: DatasetFetch) -> DatasetReturn:
         return await self._request(
             "POST",
