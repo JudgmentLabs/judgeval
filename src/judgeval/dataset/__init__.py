@@ -117,7 +117,7 @@ class Dataset:
 
     def add_examples(self, examples: List[Example]) -> None:
         client = JudgmentSyncClient(self.judgment_api_key, self.organization_id)
-        client.datasets_insert_examples(
+        client.datasets_insert_examples_for_judgeval(
             {
                 "dataset_name": self.name,
                 "project_name": self.project_name,
