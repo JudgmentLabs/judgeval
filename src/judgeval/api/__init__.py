@@ -128,10 +128,12 @@ class JudgmentSyncClient:
             query_params,
         )
 
-    def datasets_insert_examples(self, payload: DatasetInsertExamples) -> Any:
+    def datasets_insert_examples_for_judgeval(
+        self, payload: DatasetInsertExamples
+    ) -> Any:
         return self._request(
             "POST",
-            url_for("/datasets/insert_examples/"),
+            url_for("/datasets/insert_examples_for_judgeval/"),
             payload,
         )
 
@@ -328,10 +330,12 @@ class JudgmentAsyncClient:
             query_params,
         )
 
-    async def datasets_insert_examples(self, payload: DatasetInsertExamples) -> Any:
+    async def datasets_insert_examples_for_judgeval(
+        self, payload: DatasetInsertExamples
+    ) -> Any:
         return await self._request(
             "POST",
-            url_for("/datasets/insert_examples/"),
+            url_for("/datasets/insert_examples_for_judgeval/"),
             payload,
         )
 
