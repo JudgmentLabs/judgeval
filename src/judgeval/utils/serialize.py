@@ -19,6 +19,8 @@ from pydantic import BaseModel
 from pydantic.types import SecretBytes, SecretStr
 import orjson
 
+from judgeval.logger import judgeval_logger
+
 
 """
 This module contains the encoders used by jsonable_encoder to convert Python objects to JSON serializable data types.
@@ -244,4 +246,8 @@ encoders_by_class_tuples = generate_encoders_by_class_tuples(ENCODERS_BY_TYPE)
 
 # Seralize arbitrary object to a json string
 def safe_serialize(obj: Any) -> str:
-    return orjson.dumps(json_encoder(obj)).decode()
+    try:
+        return orjson.dumps(json_encoder(obj)).decode()
+    except Exception as e:
+        judgeval_logger.warning(f"Error serializing object: {e}")
+        return orjson.dumps(repr(obj)).decode()
