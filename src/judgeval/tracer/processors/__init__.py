@@ -223,7 +223,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             super().on_end(span)
 
 
-class NoOpJudgmentSpanProcessor(SpanProcessor):
+class NoOpJudgmentSpanProcessor(JudgmentSpanProcessor):
     def __init__(self):
         pass
 
