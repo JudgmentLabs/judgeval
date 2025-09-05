@@ -250,4 +250,4 @@ def safe_serialize(obj: Any) -> str:
         return orjson.dumps(json_encoder(obj)).decode()
     except Exception as e:
         judgeval_logger.warning(f"Error serializing object: {e}")
-        return repr(obj)
+        return orjson.dumps(repr(obj)).decode()
