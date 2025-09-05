@@ -65,13 +65,6 @@ jobs:
     env:
       TEST_TIMEOUT_SECONDS: ${{ secrets.TEST_TIMEOUT_SECONDS }}
     steps:
-      - name: Wait for turn
-        uses: softprops/turnstyle@v2
-        with:
-          poll-interval-seconds: 10
-          same-branch-only: false
-          job-to-wait-for: "Staging E2E Tests"
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -131,13 +124,6 @@ jobs:
     env:
       TEST_TIMEOUT_SECONDS: ${{ secrets.TEST_TIMEOUT_SECONDS }}
     steps:
-      - name: Wait for turn
-        uses: softprops/turnstyle@v2
-        with:
-          poll-interval-seconds: 10
-          same-branch-only: false
-          job-to-wait-for: "Production E2E Tests"
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
