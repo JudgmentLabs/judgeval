@@ -1,6 +1,7 @@
 import asyncio
 import json
 import time
+import copy
 from typing import Optional, Callable, Any, List, Union, Dict
 from fireworks import Dataset
 from .config import TrainerConfig, ModelConfig
@@ -310,7 +311,7 @@ class JudgmentTrainer:
             self.trainable_model.advance_to_next_step(step)
 
             dataset_rows = await self.generate_rollouts_and_rewards(
-                agent_function, scorers, prompts
+                agent_function, scorers, copy.deepcopy(prompts)
             )
 
             with _spinner_progress(
