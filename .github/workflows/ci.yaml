@@ -50,7 +50,7 @@ jobs:
     needs: [validate-branch]
     if: "github.base_ref == 'staging' && !contains(github.actor, '[bot]') && (needs.validate-branch.result == 'success' || needs.validate-branch.result == 'skipped')"
     name: Staging E2E Tests
-    runs-on: ubuntu-latest
+    runs-on: test_runner
     env:
       TEST_TIMEOUT_SECONDS: ${{ secrets.TEST_TIMEOUT_SECONDS }}
     steps:
@@ -108,7 +108,7 @@ jobs:
     needs: [validate-branch]
     if: "github.base_ref == 'main' && !contains(github.actor, '[bot]') && needs.validate-branch.result == 'success'"
     name: Production E2E Tests
-    runs-on: ubuntu-latest
+    runs-on: test_runner
     env:
       TEST_TIMEOUT_SECONDS: ${{ secrets.TEST_TIMEOUT_SECONDS }}
     steps:
@@ -153,7 +153,7 @@ jobs:
         run: |      
           SECRET_VARS=$(aws secretsmanager get-secret-value --secret-id gh-actions-judgeval/api-keys/judgeval --query SecretString --output text)
           export $(echo "$SECRET_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
-          timeout ${TEST_TIMEOUT_SECONDS}s uv run pytest --durations=0 --cov=. --cov-config=.coveragerc --cov-report=html ./e2etests
+          timeout ${TEST_TIMEOUT_SECONDS}s uv run pytest -n auto --dist=loadfile --durations=0 --cov=. --cov-config=.coveragerc --cov-report=html ./e2etests
 
       - name: Upload coverage HTML report (production)
         if: always()
