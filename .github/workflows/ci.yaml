@@ -18,7 +18,10 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         python-version:
+          - "3.10"
           - "3.11"
+          - "3.12"
+          - "3.13"
     name: Unit Tests
     runs-on: ${{ matrix.os }}
     env:
@@ -49,6 +52,14 @@ jobs:
   run-e2e-tests-staging:
     needs: [validate-branch]
     if: "github.base_ref == 'staging' && !contains(github.actor, '[bot]') && (needs.validate-branch.result == 'success' || needs.validate-branch.result == 'skipped')"
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - "3.10"
+          - "3.11"
+          - "3.12"
+          - "3.13"
     name: Staging E2E Tests
     runs-on: ubuntu-latest
     env:
@@ -74,7 +85,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
          
       - name: Install judgeval dependencies
         run: |
