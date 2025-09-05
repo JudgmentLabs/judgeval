@@ -118,6 +118,14 @@ jobs:
   run-e2e-tests-main:
     needs: [validate-branch]
     if: "github.base_ref == 'main' && !contains(github.actor, '[bot]') && needs.validate-branch.result == 'success'"
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - "3.10"
+          - "3.11"
+          - "3.12"
+          - "3.13"
     name: Production E2E Tests
     runs-on: ubuntu-latest
     env:
@@ -143,7 +151,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
          
       - name: Install judgeval dependencies
         run: |
