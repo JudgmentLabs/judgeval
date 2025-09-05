@@ -50,7 +50,7 @@ jobs:
     needs: [validate-branch]
     if: "github.base_ref == 'staging' && !contains(github.actor, '[bot]') && (needs.validate-branch.result == 'success' || needs.validate-branch.result == 'skipped')"
     name: Staging E2E Tests
-    runs-on: test_runner
+    runs-on: ubuntu-latest
     env:
       TEST_TIMEOUT_SECONDS: ${{ secrets.TEST_TIMEOUT_SECONDS }}
     steps:
@@ -108,7 +108,7 @@ jobs:
     needs: [validate-branch]
     if: "github.base_ref == 'main' && !contains(github.actor, '[bot]') && needs.validate-branch.result == 'success'"
     name: Production E2E Tests
-    runs-on: test_runner
+    runs-on: ubuntu-latest
     env:
       TEST_TIMEOUT_SECONDS: ${{ secrets.TEST_TIMEOUT_SECONDS }}
     steps:
