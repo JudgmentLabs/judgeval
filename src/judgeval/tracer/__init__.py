@@ -25,6 +25,7 @@ from functools import partial
 from warnings import warn
 
 from opentelemetry.sdk.trace import SpanProcessor, TracerProvider, Span
+from opentelemetry import trace as otel_trace
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.trace import (
     Status,
@@ -220,6 +221,7 @@ class Tracer:
             )
             self.processors.append(self.judgment_processor)
             self.provider = TracerProvider(resource=resource)
+            otel_trace.set_tracer_provider(self.provider)
             for processor in self.processors:
                 self.provider.add_span_processor(processor)
 
