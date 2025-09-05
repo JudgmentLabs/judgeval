@@ -112,7 +112,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-html-staging
+          name: coverage-html-staging-${{ matrix.python-version }}
           path: src/htmlcov
 
   run-e2e-tests-main:
@@ -178,5 +178,5 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-html-production
+          name: coverage-html-production-${{ matrix.python-version }}
           path: src/htmlcov
