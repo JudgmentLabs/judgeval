@@ -10,7 +10,7 @@ from typing import List, Dict, Union, Tuple, TYPE_CHECKING
 from rich import print as rprint
 
 from judgeval.data import ScorerData, ScoringResult, Example
-from judgeval.scorers import BaseScorer, APIScorerConfig
+from judgeval.scorers import BaseScorer, ExampleAPIScorerConfig
 from judgeval.scorers.score import a_execute_scoring
 from judgeval.api import JudgmentSyncClient
 from judgeval.env import (
@@ -86,7 +86,7 @@ def log_evaluation_results(
 
 
 def check_examples(
-    examples: List[Example], scorers: List[Union[APIScorerConfig, BaseScorer]]
+    examples: List[Example], scorers: List[Union[ExampleAPIScorerConfig, BaseScorer]]
 ) -> None:
     """
     Checks if the example contains the necessary parameters for the scorer.

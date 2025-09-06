@@ -24,7 +24,7 @@ class LocalEvaluationQueue:
     """Lightweight in-memory queue for local evaluation runs.
 
     Only supports EvaluationRuns with local scorers (BaseScorer instances).
-    API scorers (APIScorerConfig) are not supported as they have their own queue.
+    API scorers (ExampleAPIScorerConfig) are not supported as they have their own queue.
     """
 
     def __init__(
@@ -54,7 +54,7 @@ class LocalEvaluationQueue:
         if not evaluation_run.custom_scorers:
             raise ValueError(
                 "LocalEvaluationQueue only supports runs with local scorers (BaseScorer). "
-                "Found only APIScorerConfig instances."
+                "Found only ExampleAPIScorerConfig instances."
             )
 
         return safe_run_async(

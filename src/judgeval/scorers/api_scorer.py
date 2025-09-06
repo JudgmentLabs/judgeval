@@ -63,3 +63,11 @@ class APIScorerConfig(BaseModel):
 
     def __str__(self):
         return f"JudgmentScorer(score_type={self.score_type.value}, threshold={self.threshold})"
+
+
+class ExampleAPIScorerConfig(APIScorerConfig):
+    pass
+
+
+class TraceAPIScorerConfig(APIScorerConfig):
+    pass
