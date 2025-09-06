@@ -57,7 +57,7 @@ from judgeval.utils.serialize import safe_serialize
 from judgeval.version import get_version
 from judgeval.warnings import JudgmentWarning
 
-from judgeval.tracer.keys import AttributeKeys, ResourceKeys, InternalAttributeKeys
+from judgeval.tracer.keys import AttributeKeys, InternalAttributeKeys
 from judgeval.api import JudgmentSyncClient
 from judgeval.tracer.llm import wrap_provider
 from judgeval.utils.url import url_for
@@ -65,6 +65,7 @@ from judgeval.tracer.local_eval_queue import LocalEvaluationQueue
 from judgeval.tracer.processors import (
     JudgmentSpanProcessor,
     NoOpJudgmentSpanProcessor,
+    NoOpSpanProcessor,
 )
 from judgeval.tracer.utils import set_span_attribute, TraceScorerConfig
 
@@ -83,19 +84,6 @@ class AgentContext(TypedDict):
     instance: Any
     is_agent_entry_point: bool
     parent_agent_id: str | None
-
-
-def resolve_project_id(
-    api_key: str, organization_id: str, project_name: str
-) -> str | None:
-    try:
-        client = JudgmentSyncClient(
-            api_key=api_key,
-            organization_id=organization_id,
-        )
-        return client.projects_resolve({"project_name": project_name})["project_id"]
-    except Exception:
-        return None
 
 
 class Tracer:
@@ -188,38 +176,20 @@ class Tracer:
         self.cost_context = ContextVar("current_cost_context", default=None)
 
         if self.enable_monitoring:
-            project_id = resolve_project_id(
-                self.api_key, self.organization_id, self.project_name
-            )
-
-            resource_attributes = resource_attributes or {}
-            resource_attributes.update(
-                {
-                    ResourceKeys.SERVICE_NAME: self.project_name,
-                    ResourceKeys.TELEMETRY_SDK_NAME: "judgeval",
-                    ResourceKeys.TELEMETRY_SDK_VERSION: get_version(),
-                }
-            )
-
-            if project_id is not None:
-                resource_attributes[ResourceKeys.JUDGMENT_PROJECT_ID] = project_id
-            else:
-                judgeval_logger.error(
-                    f"Failed to resolve project {self.project_name}, please create it first at https://app.judgmentlabs.ai/projects. Skipping Judgment export."
-                )
-
-            resource = Resource.create(resource_attributes)
-
             self.judgment_processor = JudgmentSpanProcessor(
                 self,
-                self.api_url,
+                self.project_name,
                 self.api_key,
                 self.organization_id,
                 max_queue_size=2**18,
                 export_timeout_millis=30000,
+                resource_attributes=resource_attributes,
             )
-            self.processors.append(self.judgment_processor)
+
+            resource = Resource.create(self.judgment_processor.resource_attributes)
             self.provider = TracerProvider(resource=resource)
+
+            self.processors.append(self.judgment_processor)
             for processor in self.processors:
                 self.provider.add_span_processor(processor)
 
@@ -252,6 +222,14 @@ class Tracer:
 
     def get_current_cost_context(self):
         return self.cost_context
+
+    def get_processor(self):
+        """Get the judgment span processor instance.
+
+        Returns:
+            The JudgmentSpanProcessor or NoOpJudgmentSpanProcessor instance used by this tracer.
+        """
+        return self.judgment_processor
 
     def set_customer_id(self, customer_id: str) -> None:
         span = self.get_current_span()
@@ -913,11 +891,7 @@ class Tracer:
         proper cleanup before program termination.
         """
         try:
-            success = self.force_flush(timeout_millis=30000)
-            if not success:
-                judgeval_logger.warning(
-                    "Some spans may not have been exported before program exit"
-                )
+            self.force_flush(timeout_millis=30000)
         except Exception as e:
             judgeval_logger.warning(f"Error during atexit flush: {e}")
 
@@ -1074,3 +1048,13 @@ def format_inputs(
         return inputs
     except Exception:
         return {}
+
+
+# Export processor classes for direct access
+__all__ = [
+    "Tracer",
+    "wrap",
+    "JudgmentSpanProcessor",
+    "NoOpJudgmentSpanProcessor",
+    "NoOpSpanProcessor",
+]
