@@ -10,6 +10,7 @@ from judgeval.exceptions import JudgmentAPIError
 import os
 from copy import copy
 from judgeval.logger import judgeval_logger
+from abc import ABC
 
 
 def push_prompt_scorer(
@@ -17,7 +18,7 @@ def push_prompt_scorer(
     prompt: str,
     threshold: float,
     options: Optional[Dict[str, float]] = None,
-    is_trace: bool = False,
+    is_trace: Optional[bool] = None,
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
 ) -> str:
@@ -94,7 +95,7 @@ def scorer_exists(
         )
 
 
-class BasePromptScorer(APIScorerConfig):
+class BasePromptScorer(ABC, APIScorerConfig):
     """
     In the Judgment backend, this scorer is implemented as a PromptScorer that takes
     1. a system role that may involve the Example object
@@ -103,11 +104,11 @@ class BasePromptScorer(APIScorerConfig):
     and uses a judge to execute the evaluation from the system role and classify into one of the options
     """
 
+    score_type: APIScorerType
     prompt: str
     options: Optional[Dict[str, float]] = None
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or ""
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or ""
-    is_trace: bool = False
 
     @classmethod
     def get(
@@ -117,18 +118,22 @@ class BasePromptScorer(APIScorerConfig):
         organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
     ):
         scorer_config = fetch_prompt_scorer(name, judgment_api_key, organization_id)
-        if scorer_config["is_trace"] != (cls.__name__ == "TracePromptScorer"):
+        if scorer_config["is_trace"] != issubclass(cls, TracePromptScorer):
             raise JudgmentAPIError(
                 status_code=400,
                 detail=f"Scorer with name {name} is not a {cls.__name__}",
                 response=None,  # type: ignore
             )
+        if cls.__name__ == "TracePromptScorer":
+            score_type = APIScorerType.TRACE_PROMPT_SCORER
+        else:
+            score_type = APIScorerType.PROMPT_SCORER
         return cls(
+            score_type=score_type,
             name=name,
             prompt=scorer_config["prompt"],
             threshold=scorer_config["threshold"],
             options=scorer_config.get("options"),
-            is_trace=scorer_config["is_trace"],
             judgment_api_key=judgment_api_key,
             organization_id=organization_id,
         )
@@ -144,10 +149,12 @@ class BasePromptScorer(APIScorerConfig):
         organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
     ):
         if not scorer_exists(name, judgment_api_key, organization_id):
-            if isinstance(cls, TracePromptScorer):
+            if issubclass(cls, TracePromptScorer):
                 is_trace = True
+                score_type = APIScorerType.TRACE_PROMPT_SCORER
             else:
                 is_trace = False
+                score_type = APIScorerType.PROMPT_SCORER
             push_prompt_scorer(
                 name,
                 prompt,
@@ -159,11 +166,11 @@ class BasePromptScorer(APIScorerConfig):
             )
             judgeval_logger.info(f"Successfully created PromptScorer: {name}")
             return cls(
+                score_type=score_type,
                 name=name,
                 prompt=prompt,
                 threshold=threshold,
                 options=options,
-                is_trace=is_trace,
                 judgment_api_key=judgment_api_key,
                 organization_id=organization_id,
             )
@@ -278,8 +285,8 @@ class BasePromptScorer(APIScorerConfig):
 
 
 class PromptScorer(BasePromptScorer, ExampleAPIScorerConfig):
-    score_type: APIScorerType = APIScorerType.PROMPT_SCORER
+    pass
 
 
 class TracePromptScorer(BasePromptScorer, TraceAPIScorerConfig):
-    score_type: APIScorerType = APIScorerType.TRACE_PROMPT_SCORER
+    pass
