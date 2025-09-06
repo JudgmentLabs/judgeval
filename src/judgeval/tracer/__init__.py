@@ -43,8 +43,7 @@ from judgeval.env import (
     JUDGMENT_ORG_ID,
 )
 from judgeval.logger import judgeval_logger
-from judgeval.scorers.api_scorer import APIScorerConfig
-from judgeval.scorers.trace_api_scorer import TraceAPIScorerConfig
+from judgeval.scorers.api_scorer import ExampleAPIScorerConfig, TraceAPIScorerConfig
 from judgeval.scorers.base_scorer import BaseScorer
 from judgeval.tracer.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
 from judgeval.tracer.managers import (
@@ -925,7 +924,7 @@ class Tracer:
         self,
         /,
         *,
-        scorer: Union[APIScorerConfig, BaseScorer],
+        scorer: Union[ExampleAPIScorerConfig, BaseScorer],
         example: Example,
         model: str = JUDGMENT_DEFAULT_GPT_MODEL,
         sampling_rate: float = 1.0,
@@ -934,9 +933,9 @@ class Tracer:
             judgeval_logger.info("Evaluation is not enabled, skipping evaluation")
             return
 
-        if not isinstance(scorer, (APIScorerConfig, BaseScorer)):
+        if not isinstance(scorer, (ExampleAPIScorerConfig, BaseScorer)):
             judgeval_logger.error(
-                "Scorer must be an instance of APIScorerConfig or BaseScorer, got %s, skipping evaluation."
+                "Scorer must be an instance of ExampleAPIScorerConfig or BaseScorer, got %s, skipping evaluation."
                 % type(scorer)
             )
             return
@@ -965,7 +964,7 @@ class Tracer:
         span_context = self.get_current_span().get_span_context()
         trace_id = format(span_context.trace_id, "032x")
         span_id = format(span_context.span_id, "016x")
-        hosted_scoring = isinstance(scorer, APIScorerConfig) or (
+        hosted_scoring = isinstance(scorer, ExampleAPIScorerConfig) or (
             isinstance(scorer, BaseScorer) and scorer.server_hosted
         )
         eval_run_name = f"async_evaluate_{span_id}"  # note this name doesnt matter because we don't save the experiment only the example and scorer_data
