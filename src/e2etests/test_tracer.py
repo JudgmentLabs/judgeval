@@ -17,20 +17,22 @@ from judgeval.tracer import wrap
 import os
 import random
 import pytest
-from uuid import uuid4
+import string
 
-TEST_PROJECT_NAME = f"e2e-tests-{uuid4()}"
+project_name = "e2e-tests-" + "".join(
+    random.choices(string.ascii_letters + string.digits, k=12)
+)
 
-delete_project(project_name=TEST_PROJECT_NAME)
-create_project(project_name=TEST_PROJECT_NAME)
+delete_project(project_name=project_name)
+create_project(project_name=project_name)
 
 
 def teardown_module(module):
-    delete_project(project_name=TEST_PROJECT_NAME)
+    delete_project(project_name=project_name)
 
 
 judgment = Tracer(
-    project_name=TEST_PROJECT_NAME,
+    project_name=project_name,
 )
 
 # Wrap clients
