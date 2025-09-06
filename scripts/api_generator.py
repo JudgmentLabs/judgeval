@@ -17,10 +17,6 @@ else:
         SPEC = orjson.loads(f.read())
 
 JUDGEVAL_PATHS: List[str] = [
-    "/traces/spans/batch/",
-    "/traces/evaluation_runs/batch/",
-    "/traces/fetch/",
-    "/traces/upsert/",
     "/traces/add_to_dataset/",
     "/projects/add/",
     "/projects/delete_from_judgeval/",
@@ -39,7 +35,6 @@ JUDGEVAL_PATHS: List[str] = [
     "/datasets/push/",
     "/datasets/insert_examples/",
     "/datasets/pull_for_judgeval/",
-    "/datasets/fetch_stats_by_project/",
     "/projects/resolve/",
     "/e2e_fetch_trace/",
     "/e2e_fetch_span_score/",

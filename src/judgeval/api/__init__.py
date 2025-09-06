@@ -149,41 +149,6 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def traces_upsert(self, payload: TraceSave) -> Any:
-        return self._request(
-            "POST",
-            url_for("/traces/upsert/"),
-            payload,
-        )
-
-    def traces_fetch(self, payload: TraceFetch) -> Any:
-        return self._request(
-            "POST",
-            url_for("/traces/fetch/"),
-            payload,
-        )
-
-    def traces_add_to_dataset(self, payload: TraceAddToDataset) -> Any:
-        return self._request(
-            "POST",
-            url_for("/traces/add_to_dataset/"),
-            payload,
-        )
-
-    def traces_spans_batch(self, payload: SpansBatchRequest) -> Any:
-        return self._request(
-            "POST",
-            url_for("/traces/spans/batch/"),
-            payload,
-        )
-
-    def traces_evaluation_runs_batch(self, payload: EvaluationRunsBatchRequest) -> Any:
-        return self._request(
-            "POST",
-            url_for("/traces/evaluation_runs/batch/"),
-            payload,
-        )
-
     def projects_add(self, payload: ProjectAdd) -> ProjectAddResponse:
         return self._request(
             "POST",
@@ -381,43 +346,6 @@ class JudgmentAsyncClient:
         return await self._request(
             "POST",
             url_for("/datasets/push/"),
-            payload,
-        )
-
-    async def traces_upsert(self, payload: TraceSave) -> Any:
-        return await self._request(
-            "POST",
-            url_for("/traces/upsert/"),
-            payload,
-        )
-
-    async def traces_fetch(self, payload: TraceFetch) -> Any:
-        return await self._request(
-            "POST",
-            url_for("/traces/fetch/"),
-            payload,
-        )
-
-    async def traces_add_to_dataset(self, payload: TraceAddToDataset) -> Any:
-        return await self._request(
-            "POST",
-            url_for("/traces/add_to_dataset/"),
-            payload,
-        )
-
-    async def traces_spans_batch(self, payload: SpansBatchRequest) -> Any:
-        return await self._request(
-            "POST",
-            url_for("/traces/spans/batch/"),
-            payload,
-        )
-
-    async def traces_evaluation_runs_batch(
-        self, payload: EvaluationRunsBatchRequest
-    ) -> Any:
-        return await self._request(
-            "POST",
-            url_for("/traces/evaluation_runs/batch/"),
             payload,
         )
 
