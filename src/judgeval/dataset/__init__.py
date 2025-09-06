@@ -30,7 +30,7 @@ class Dataset:
         client = JudgmentSyncClient(cls.judgment_api_key, cls.organization_id)
         dataset = client.datasets_pull_for_judgeval(
             {
-                "dataset_alias": name,
+                "dataset_name": name,
                 "project_name": project_name,
             },
         )
@@ -40,6 +40,9 @@ class Dataset:
         for e in examples:
             if isinstance(e, dict) and isinstance(e.get("data"), dict):
                 e.update(e.pop("data"))
+                e.pop(
+                    "example_id"
+                )  # TODO: remove once scorer data migraiton is complete
         judgeval_logger.info(f"Succesfully retrieved dataset {name}!")
         return cls(
             name=name,
@@ -54,25 +57,18 @@ class Dataset:
         name: str,
         project_name: str,
         examples: Optional[List[Example]] = None,
-        traces: Optional[List[Trace]] = None,
         overwrite: bool = False,
     ):
-        if examples and traces:
-            raise ValueError("Only one of examples or traces must be provided")
-
         if not examples:
             examples = []
 
-        if not traces:
-            traces = []
-
         client = JudgmentSyncClient(cls.judgment_api_key, cls.organization_id)
-        client.datasets_push(
+        client.datasets_create_for_judgeval(
             {
-                "dataset_alias": name,
+                "name": name,
                 "project_name": project_name,
-                "examples": [e.model_dump() for e in examples],  # type: ignore
-                "traces": [t.model_dump() for t in traces],  # type: ignore
+                "examples": [e.model_dump() for e in examples],
+                "dataset_kind": "example",
                 "overwrite": overwrite,
             }
         )
@@ -82,7 +78,7 @@ class Dataset:
             name=name,
             project_name=project_name,
             examples=examples,
-            traces=traces,
+            traces=[],
         )
 
     def add_from_json(self, file_path: str) -> None:
@@ -124,9 +120,9 @@ class Dataset:
 
     def add_examples(self, examples: List[Example]) -> None:
         client = JudgmentSyncClient(self.judgment_api_key, self.organization_id)
-        client.datasets_insert_examples(
+        client.datasets_insert_examples_for_judgeval(
             {
-                "dataset_alias": self.name,
+                "dataset_name": self.name,
                 "project_name": self.project_name,
                 "examples": [
                     {
@@ -136,16 +132,6 @@ class Dataset:
                     }
                     for e in examples
                 ],
-            }
-        )
-
-    def add_traces(self, traces: List[Trace]) -> None:
-        client = JudgmentSyncClient(self.judgment_api_key, self.organization_id)
-        client.traces_add_to_dataset(
-            {
-                "dataset_alias": self.name,
-                "project_name": self.project_name,
-                "traces": [t.model_dump() for t in traces],  # type: ignore
             }
         )
 

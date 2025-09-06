@@ -6,6 +6,7 @@ import random
 import string
 import pytest
 from judgeval import JudgmentClient
+from judgeval.exceptions import JudgmentAPIError
 from judgeval.data import Example
 from judgeval.dataset import Dataset
 from e2etests.utils import create_project, delete_project
@@ -77,7 +78,7 @@ def test_create_dataset_error(
 
 def test_get_dataset_error(client: JudgmentClient, project_name: str, random_name: str):
     """Test that the dataset is not found."""
-    with pytest.raises(ValueError):
+    with pytest.raises(JudgmentAPIError):
         Dataset.get(name=random_name, project_name=project_name)
 
 
