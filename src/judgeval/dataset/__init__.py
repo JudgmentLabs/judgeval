@@ -40,6 +40,9 @@ class Dataset:
         for e in examples:
             if isinstance(e, dict) and isinstance(e.get("data"), dict):
                 e.update(e.pop("data"))
+                e.pop(
+                    "example_id"
+                )  # TODO: remove once scorer data migraiton is complete
         judgeval_logger.info(f"Succesfully retrieved dataset {name}!")
         return cls(
             name=name,
