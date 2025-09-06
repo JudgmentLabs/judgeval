@@ -8,7 +8,7 @@ authors = [
 ]
 description = "Judgeval Package"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
@@ -75,6 +75,7 @@ dev = [
     "pytest-cov>=6.2.1",
     "types-tqdm>=4.67.0.20250809",
     "pytest-asyncio>=1.1.0",
+    "pytest-xdist>=3.8.0",
 ]
 
 

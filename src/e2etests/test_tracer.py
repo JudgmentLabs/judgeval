@@ -17,18 +17,22 @@ from judgeval.tracer import wrap
 import os
 import random
 import pytest
+import string
 
+project_name = "e2e-tests-" + "".join(
+    random.choices(string.ascii_letters + string.digits, k=12)
+)
 
-delete_project(project_name="e2e-tests-gkzqvtrbwnyl")
-create_project(project_name="e2e-tests-gkzqvtrbwnyl")
+delete_project(project_name=project_name)
+create_project(project_name=project_name)
 
 
 def teardown_module(module):
-    delete_project(project_name="e2e-tests-gkzqvtrbwnyl")
+    delete_project(project_name=project_name)
 
 
 judgment = Tracer(
-    project_name="e2e-tests-gkzqvtrbwnyl",
+    project_name=project_name,
 )
 
 # Wrap clients

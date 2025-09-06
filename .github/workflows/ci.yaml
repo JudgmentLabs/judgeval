@@ -18,7 +18,10 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         python-version:
+          - "3.10"
           - "3.11"
+          - "3.12"
+          - "3.13"
     name: Unit Tests
     runs-on: ${{ matrix.os }}
     env:
@@ -49,18 +52,19 @@ jobs:
   run-e2e-tests-staging:
     needs: [validate-branch]
     if: "github.base_ref == 'staging' && !contains(github.actor, '[bot]') && (needs.validate-branch.result == 'success' || needs.validate-branch.result == 'skipped')"
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - "3.10"
+          - "3.11"
+          - "3.12"
+          - "3.13"
     name: Staging E2E Tests
     runs-on: ubuntu-latest
     env:
       TEST_TIMEOUT_SECONDS: ${{ secrets.TEST_TIMEOUT_SECONDS }}
     steps:
-      - name: Wait for turn
-        uses: softprops/turnstyle@v2
-        with:
-          poll-interval-seconds: 10
-          same-branch-only: false
-          job-to-wait-for: "Staging E2E Tests"
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -74,7 +78,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
          
       - name: Install judgeval dependencies
         run: |
@@ -95,30 +99,31 @@ jobs:
         run: |      
           SECRET_VARS=$(aws secretsmanager get-secret-value --secret-id gh-actions-stg-judgeval/api-keys/judgeval --query SecretString --output text)
           export $(echo "$SECRET_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
-          timeout ${TEST_TIMEOUT_SECONDS}s uv run pytest --durations=0 --cov=. --cov-config=.coveragerc --cov-report=html ./e2etests
+          timeout ${TEST_TIMEOUT_SECONDS}s uv run pytest -n auto --dist=loadfile --durations=0 --cov=. --cov-config=.coveragerc --cov-report=html ./e2etests
 
       - name: Upload coverage HTML report (staging)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-html-staging
+          name: coverage-html-staging-${{ matrix.python-version }}
           path: src/htmlcov
 
   run-e2e-tests-main:
     needs: [validate-branch]
     if: "github.base_ref == 'main' && !contains(github.actor, '[bot]') && needs.validate-branch.result == 'success'"
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - "3.10"
+          - "3.11"
+          - "3.12"
+          - "3.13"
     name: Production E2E Tests
     runs-on: ubuntu-latest
     env:
       TEST_TIMEOUT_SECONDS: ${{ secrets.TEST_TIMEOUT_SECONDS }}
     steps:
-      - name: Wait for turn
-        uses: softprops/turnstyle@v2
-        with:
-          poll-interval-seconds: 10
-          same-branch-only: false
-          job-to-wait-for: "Production E2E Tests"
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -132,7 +137,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
          
       - name: Install judgeval dependencies
         run: |
@@ -153,11 +158,11 @@ jobs:
         run: |      
           SECRET_VARS=$(aws secretsmanager get-secret-value --secret-id gh-actions-judgeval/api-keys/judgeval --query SecretString --output text)
           export $(echo "$SECRET_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
-          timeout ${TEST_TIMEOUT_SECONDS}s uv run pytest --durations=0 --cov=. --cov-config=.coveragerc --cov-report=html ./e2etests
+          timeout ${TEST_TIMEOUT_SECONDS}s uv run pytest -n auto --dist=loadfile --durations=0 --cov=. --cov-config=.coveragerc --cov-report=html ./e2etests
 
       - name: Upload coverage HTML report (production)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-html-production
+          name: coverage-html-production-${{ matrix.python-version }}
           path: src/htmlcov
