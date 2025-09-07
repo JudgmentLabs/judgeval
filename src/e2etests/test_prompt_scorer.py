@@ -181,7 +181,6 @@ def test_custom_prompt_scorer(client: JudgmentClient, project_name: str):
 
 def test_trace_prompt_scorer(project_name: str):
     """Test trace prompt scorer functionality."""
-    # Retrieve the scorer
     judgment = Tracer(project_name=project_name)
     trace_scorer = TracePromptScorer.create(
         name=f"Test Trace Prompt Scorer {uuid4()}", prompt="Is this trace coherent?"
