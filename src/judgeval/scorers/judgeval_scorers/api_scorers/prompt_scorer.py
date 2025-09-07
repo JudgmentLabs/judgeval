@@ -18,9 +18,9 @@ def push_prompt_scorer(
     prompt: str,
     threshold: float,
     options: Optional[Dict[str, float]] = None,
-    is_trace: Optional[bool] = None,
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
+    is_trace: Optional[bool] = None,
 ) -> str:
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
@@ -160,9 +160,9 @@ class BasePromptScorer(ABC, APIScorerConfig):
                 prompt,
                 threshold,
                 options,
-                is_trace,
                 judgment_api_key,
                 organization_id,
+                is_trace,
             )
             judgeval_logger.info(f"Successfully created PromptScorer: {name}")
             return cls(
