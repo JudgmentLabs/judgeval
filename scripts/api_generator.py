@@ -43,6 +43,7 @@ JUDGEVAL_PATHS: List[str] = [
     "/projects/resolve/",
     "/e2e_fetch_trace/",
     "/e2e_fetch_span_score/",
+    "/e2e_fetch_trace_scorer_span_score/",
 ]
 
 
