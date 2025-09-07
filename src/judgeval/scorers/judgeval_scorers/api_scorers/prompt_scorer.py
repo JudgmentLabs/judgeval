@@ -124,7 +124,7 @@ class BasePromptScorer(ABC, APIScorerConfig):
                 detail=f"Scorer with name {name} is not a {cls.__name__}",
                 response=None,  # type: ignore
             )
-        if cls.__name__ == "TracePromptScorer":
+        if issubclass(cls, TracePromptScorer):
             score_type = APIScorerType.TRACE_PROMPT_SCORER
         else:
             score_type = APIScorerType.PROMPT_SCORER
