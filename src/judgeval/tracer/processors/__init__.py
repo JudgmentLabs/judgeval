@@ -97,7 +97,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             resource_attributes[ResourceKeys.JUDGMENT_PROJECT_ID] = self.project_id
         else:
             judgeval_logger.error(
-                f"Failed to resolve project {self.project_name}, please create it first at https://app.judgmentlabs.ai/projects. Skipping Judgment export."
+                f"Failed to resolve project {self.project_name}, please create it first at https://app.judgmentlabs.ai/org/{self.organization_id}/projects. Skipping Judgment export."
             )
 
         self.resource_attributes = resource_attributes
