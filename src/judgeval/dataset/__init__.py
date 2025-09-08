@@ -121,14 +121,7 @@ class Dataset:
             {
                 "dataset_name": self.name,
                 "project_name": self.project_name,
-                "examples": [
-                    {
-                        "name": e.name,
-                        "created_at": e.created_at,
-                        "example_id": e.example_id,
-                    }
-                    for e in examples
-                ],
+                "examples": [e.model_dump() for e in examples],
             }
         )
 
