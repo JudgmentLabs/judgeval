@@ -97,8 +97,11 @@ jobs:
       - name: Run E2E tests
         working-directory: src
         run: |      
-          SECRET_VARS=$(aws secretsmanager get-secret-value --secret-id gh-actions-stg-judgeval/api-keys/judgeval --query SecretString --output text)
+          SECRET_VARS=$(aws secretsmanager get-secret-value --secret-id stg/api-keys/e2e-tests --query SecretString --output text)
           export $(echo "$SECRET_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
+          export JUDGMENT_API_KEY="$JUDGEVAL_GH_JUDGMENT_API_KEY"
+          export JUDGMENT_ORG_ID="$JUDGEVAL_GH_JUDGMENT_ORG_ID"
+          export JUDGMENT_API_URL=https://staging.api.judgmentlabs.ai
           timeout ${TEST_TIMEOUT_SECONDS}s uv run pytest -n auto --dist=loadfile --durations=0 --cov=. --cov-config=.coveragerc --cov-report=html ./e2etests
 
       - name: Upload coverage HTML report (staging)
@@ -156,8 +159,11 @@ jobs:
       - name: Run E2E tests
         working-directory: src
         run: |      
-          SECRET_VARS=$(aws secretsmanager get-secret-value --secret-id gh-actions-judgeval/api-keys/judgeval --query SecretString --output text)
+          SECRET_VARS=$(aws secretsmanager get-secret-value --secret-id prod/api-keys/e2e-tests --query SecretString --output text)
           export $(echo "$SECRET_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
+          export JUDGMENT_API_KEY="$JUDGEVAL_GH_JUDGMENT_API_KEY"
+          export JUDGMENT_ORG_ID="$JUDGEVAL_GH_JUDGMENT_ORG_ID"
+          export JUDGMENT_API_URL=https://api.judgmentlabs.ai
           timeout ${TEST_TIMEOUT_SECONDS}s uv run pytest -n auto --dist=loadfile --durations=0 --cov=. --cov-config=.coveragerc --cov-report=html ./e2etests
 
       - name: Upload coverage HTML report (production)
