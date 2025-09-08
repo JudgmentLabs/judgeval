@@ -6,6 +6,8 @@ from enum import Enum
 from datetime import datetime
 from typing import Dict, Any, Optional
 from judgeval.data.judgment_types import Example as JudgmentExample
+from uuid import uuid4
+from pydantic import Field
 
 
 class ExampleParams(str, Enum):
@@ -20,7 +22,7 @@ class ExampleParams(str, Enum):
 
 
 class Example(JudgmentExample):
-    example_id: str = ""
+    example_id: str = Field(default_factory=lambda: str(uuid4()))
     created_at: str = datetime.now().isoformat()
     name: Optional[str] = None
 

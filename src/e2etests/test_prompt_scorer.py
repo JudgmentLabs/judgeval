@@ -1,8 +1,14 @@
-from judgeval.scorers import PromptScorer
+from judgeval.scorers import PromptScorer, TracePromptScorer
 from uuid import uuid4
 from judgeval import JudgmentClient
 from judgeval.data import Example
 from judgeval.env import JUDGMENT_DEFAULT_TOGETHER_MODEL
+from judgeval.tracer import Tracer, TraceScorerConfig
+from e2etests.utils import retrieve_trace_score
+import time
+
+
+QUERY_RETRY = 25
 
 
 def test_prompt_scorer_without_options(client: JudgmentClient, project_name: str):
@@ -171,6 +177,43 @@ def test_custom_prompt_scorer(client: JudgmentClient, project_name: str):
     # Print debug info if any test fails
     print_debug_on_failure(res[0])
     print_debug_on_failure(res[1])
+
+
+def test_trace_prompt_scorer(project_name: str):
+    """Test trace prompt scorer functionality."""
+    judgment = Tracer(project_name=project_name)
+    trace_scorer = TracePromptScorer.create(
+        name=f"Test Trace Prompt Scorer {uuid4()}", prompt="Is this trace coherent?"
+    )
+    trace_scorer.set_threshold(0.5)
+    trace_scorer.set_prompt("this is a new prompt")
+
+    @judgment.observe(span_type="function")
+    def sample_trace_span(sample_arg):
+        print(f"This is a sample trace span with sample arg {sample_arg}")
+
+    @judgment.observe(
+        span_type="function",
+        scorer_config=TraceScorerConfig(scorer=trace_scorer, model="gpt-5"),
+    )
+    def main():
+        sample_trace_span("test")
+        return (
+            format(judgment.get_current_span().get_span_context().trace_id, "032x"),
+            format(judgment.get_current_span().get_span_context().span_id, "016x"),
+        )
+
+    trace_id, span_id = main()
+
+    query_count = 0
+    while query_count < QUERY_RETRY:
+        scorer_data = retrieve_trace_score(span_id, trace_id)
+        if scorer_data:
+            break
+        query_count += 1
+        time.sleep(1)
+
+    assert scorer_data[0].get("success")
 
 
 def print_debug_on_failure(result) -> bool:

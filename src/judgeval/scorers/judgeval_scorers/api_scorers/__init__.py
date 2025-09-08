@@ -10,15 +10,9 @@ from judgeval.scorers.judgeval_scorers.api_scorers.answer_correctness import (
 from judgeval.scorers.judgeval_scorers.api_scorers.instruction_adherence import (
     InstructionAdherenceScorer,
 )
-from judgeval.scorers.judgeval_scorers.api_scorers.derailment_scorer import (
-    DerailmentScorer,
-)
-from judgeval.scorers.judgeval_scorers.api_scorers.tool_order import ToolOrderScorer
 from judgeval.scorers.judgeval_scorers.api_scorers.prompt_scorer import (
+    TracePromptScorer,
     PromptScorer,
-)
-from judgeval.scorers.judgeval_scorers.api_scorers.tool_dependency import (
-    ToolDependencyScorer,
 )
 
 __all__ = [
@@ -26,8 +20,6 @@ __all__ = [
     "AnswerRelevancyScorer",
     "AnswerCorrectnessScorer",
     "InstructionAdherenceScorer",
-    "DerailmentScorer",
-    "ToolOrderScorer",
+    "TracePromptScorer",
     "PromptScorer",
-    "ToolDependencyScorer",
 ]
