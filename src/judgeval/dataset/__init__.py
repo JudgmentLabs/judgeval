@@ -5,7 +5,7 @@ import yaml
 from dataclasses import dataclass
 from typing import List, Literal, Optional
 
-from judgeval.data import Example, Trace
+from judgeval.data import Example
 from judgeval.utils.file_utils import get_examples_from_yaml, get_examples_from_json
 from judgeval.api import JudgmentSyncClient
 from judgeval.logger import judgeval_logger
@@ -15,7 +15,6 @@ from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_ORG_ID
 @dataclass
 class Dataset:
     examples: List[Example]
-    traces: List[Trace]
     name: str
     project_name: str
     judgment_api_key: str = JUDGMENT_API_KEY or ""
@@ -48,7 +47,6 @@ class Dataset:
             name=name,
             project_name=project_name,
             examples=[Example(**e) for e in examples],
-            traces=[Trace(**t) for t in dataset.get("traces", [])],
         )
 
     @classmethod
@@ -78,7 +76,6 @@ class Dataset:
             name=name,
             project_name=project_name,
             examples=examples,
-            traces=[],
         )
 
     def add_from_json(self, file_path: str) -> None:
@@ -186,10 +183,4 @@ class Dataset:
         return len(self.examples)
 
     def __str__(self):
-        return (
-            f"{self.__class__.__name__}("
-            f"examples={self.examples}, "
-            f"traces={self.traces}, "
-            f"name={self.name}"
-            f")"
-        )
+        return f"{self.__class__.__name__}(examples={self.examples}, name={self.name})"
