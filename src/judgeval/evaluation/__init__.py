@@ -162,9 +162,6 @@ def _poll_evaluation_until_complete(
             example_scorer_pairings = status_response.get("results", [])
             if len(example_scorer_pairings) != expected_scorer_data_count:
                 time.sleep(poll_interval_seconds)
-                print(
-                    f"Expected {expected_scorer_data_count} scorer data, got {len(example_scorer_pairings)}"
-                )
                 continue
 
             results_response = api_client.fetch_experiment_run(
@@ -177,7 +174,7 @@ def _poll_evaluation_until_complete(
 
             scoring_result_list = []
             for res in results_response.get("results", []):
-                example = res.get("data").copy()
+                example = res.get("data", {}).copy()
                 example["example_id"] = res.get("example_id")
                 scoring_result = ScoringResult(
                     scorers_data=res.get("scorers", []),
