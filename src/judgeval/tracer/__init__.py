@@ -884,7 +884,10 @@ class Tracer:
                     span_name=f"{cls.__name__}.{attr_name}",
                 )
                 setattr(cls, attr_name, wrapped_method)
-            except Exception:
+            except Exception as e:
+                judgeval_logger.warning(
+                    f"Failed to observe method '{attr_name}' on class '{cls.__name__}': {e}"
+                )
                 continue
 
         return cls
