@@ -477,14 +477,18 @@ async def test_together_async_streaming_llm_cost():
     retrieve_streaming_trace_helper(trace_id)
 
 
-def test_trace_scoring():
+def test_online_span_scoring():
     trace_id = scorer_span()
     trace_spans = retrieve_trace_helper(trace_id, 1)
     span_id = trace_spans[0].get("span_id")
 
     query_count = 0
     while query_count < QUERY_RETRY:
-        scorer_data = retrieve_score(span_id, trace_id)
+        try:
+            scorer_data = retrieve_score(span_id, trace_id)
+        except Exception:
+            pass
+
         if scorer_data:
             break
         query_count += 1
@@ -494,7 +498,7 @@ def test_trace_scoring():
     if query_count == QUERY_RETRY:
         assert False, "No score found"
 
-    score = scorer_data[0].get("scorer_data")
-    assert score[0].get("name") == "Answer Relevancy"
-    assert score[0].get("success")
-    assert score[0].get("score") == 1.0
+    score = scorer_data[0]
+    assert score.get("name") == "Answer Relevancy"
+    assert score.get("success")
+    assert score.get("score") == 1.0
