@@ -824,42 +824,6 @@ class Tracer:
 
             return sync_wrapper
 
-    @overload
-    def observe_tools(
-        self,
-        cls: Cls,
-        /,
-        *,
-        exclude_methods: List[str] = [],
-        include_private: bool = False,
-    ) -> Cls: ...
-
-    @overload
-    def observe_tools(
-        self,
-        cls: None = None,
-        /,
-        *,
-        exclude_methods: List[str] = [],
-        include_private: bool = False,
-    ) -> Callable[[Cls], Cls]: ...
-
-    def observe_tools(
-        self,
-        cls: Cls | None = None,
-        /,
-        *,
-        exclude_methods: List[str] = [],
-        include_private: bool = False,
-    ) -> Cls | Callable[[Cls], Cls]:
-        if cls is None:
-            return partial(
-                self.observe_tools,
-                exclude_methods=exclude_methods,
-                include_private=include_private,
-            )
-        return cls
-
     def wrap(self, client: ApiClient) -> ApiClient:
         return wrap_provider(self, client)
 
