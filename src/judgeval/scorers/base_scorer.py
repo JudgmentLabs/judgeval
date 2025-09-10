@@ -85,7 +85,6 @@ class BaseScorer(BaseModel):
         This method is used at eval time
         """
         self.model_client, self.using_native_model = create_judge(model)
-        self.model = self.model_client.get_model_name() or model
 
     def success_check(self) -> bool:
         """
