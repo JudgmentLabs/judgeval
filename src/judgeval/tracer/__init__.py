@@ -484,10 +484,10 @@ class Tracer:
                         safe_serialize(format_inputs(f, args, kwargs)),
                     )
 
+                    self.judgment_processor.emit_partial()
+
                     if scorer_config:
                         self._set_pending_trace_eval(span, scorer_config, args, kwargs)
-
-                    self.judgment_processor.emit_partial()
 
                     result = f(*args, **kwargs)
                 except Exception as user_exc:
@@ -536,12 +536,12 @@ class Tracer:
                         safe_serialize(format_inputs(f, args, kwargs)),
                     )
 
+                    self.judgment_processor.emit_partial()
+
                     if scorer_config:
                         self._set_pending_trace_eval(
                             main_span, scorer_config, args, kwargs
                         )
-
-                    self.judgment_processor.emit_partial()
 
                     generator = f(*args, **kwargs)
                     set_span_attribute(
@@ -586,10 +586,10 @@ class Tracer:
                         safe_serialize(format_inputs(f, args, kwargs)),
                     )
 
+                    self.judgment_processor.emit_partial()
+
                     if scorer_config:
                         self._set_pending_trace_eval(span, scorer_config, args, kwargs)
-
-                    self.judgment_processor.emit_partial()
 
                     result = await f(*args, **kwargs)
                 except Exception as user_exc:
@@ -638,12 +638,12 @@ class Tracer:
                         safe_serialize(format_inputs(f, args, kwargs)),
                     )
 
+                    self.judgment_processor.emit_partial()
+
                     if scorer_config:
                         self._set_pending_trace_eval(
                             main_span, scorer_config, args, kwargs
                         )
-
-                    self.judgment_processor.emit_partial()
 
                     async_generator = f(*args, **kwargs)
                     set_span_attribute(
