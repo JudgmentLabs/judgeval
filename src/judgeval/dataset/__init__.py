@@ -116,6 +116,9 @@ class Dataset:
         self.add_examples(examples)
 
     def add_examples(self, examples: List[Example]) -> None:
+        if not isinstance(examples, list):
+            raise TypeError("examples must be a list")
+
         client = JudgmentSyncClient(self.judgment_api_key, self.organization_id)
         client.datasets_insert_examples_for_judgeval(
             {
