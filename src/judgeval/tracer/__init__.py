@@ -858,6 +858,35 @@ class Tracer:
                 exclude_methods=exclude_methods,
                 include_private=include_private,
             )
+
+        if not self.enable_monitoring:
+            return cls
+
+        for attr_name in dir(cls):
+            if not include_private and attr_name.startswith("_"):
+                continue
+
+            if attr_name in exclude_methods:
+                continue
+
+            attr = getattr(cls, attr_name)
+
+            if not callable(attr):
+                continue
+
+            if hasattr(attr, "__wrapped__"):
+                continue
+
+            try:
+                wrapped_method = self.observe(
+                    attr,
+                    span_type="tool",
+                    span_name=f"{cls.__name__}.{attr_name}",
+                )
+                setattr(cls, attr_name, wrapped_method)
+            except Exception:
+                continue
+
         return cls
 
     def wrap(self, client: ApiClient) -> ApiClient:
