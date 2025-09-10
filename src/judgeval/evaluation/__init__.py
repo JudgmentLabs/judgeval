@@ -118,10 +118,8 @@ def check_examples(
 
 
 def _poll_evaluation_until_complete(
-    experiment_run_id: str,
-    project_name: str,
+    evaluation_run: EvaluationRun,
     judgment_api_key: str,
-    organization_id: str,
     expected_scorer_data_count: int,
     poll_interval_seconds: float = 5,
     max_failures: int = 5,
@@ -142,6 +140,10 @@ def _poll_evaluation_until_complete(
     Returns:
         List[ScoringResult]: The evaluation results
     """
+    organization_id = evaluation_run.organization_id
+    project_name = evaluation_run.project_name
+    experiment_run_id = evaluation_run.id
+
     poll_count = 0
     exception_count = 0
     api_client = JudgmentSyncClient(judgment_api_key, organization_id)
@@ -157,6 +159,11 @@ def _poll_evaluation_until_complete(
                 time.sleep(poll_interval_seconds)
                 continue
 
+            example_scorer_pairings = status_response.get("results", [])
+            if len(example_scorer_pairings) != expected_scorer_data_count:
+                time.sleep(poll_interval_seconds)
+                continue
+
             results_response = api_client.fetch_experiment_run(
                 {
                     "experiment_run_id": experiment_run_id,
@@ -165,36 +172,20 @@ def _poll_evaluation_until_complete(
             )
             url = results_response.get("ui_results_url")
 
-            if results_response.get("examples") is None:
-                time.sleep(poll_interval_seconds)
-                continue
-
-            examples_data = results_response.get("examples", [])
-            scoring_results = []
-            scorer_data_count = 0
-
-            for example_data in examples_data:
-                scorer_data_list = []
-                for raw_scorer_data in example_data.get("scorer_data", []):
-                    scorer_data = ScorerData(**raw_scorer_data)
-                    scorer_data_list.append(scorer_data)
-                    scorer_data_count += 1
-
-                example = Example(**example_data)
-
-                success = all(scorer_data.success for scorer_data in scorer_data_list)
+            scoring_result_list = []
+            for res in results_response.get("results", []):
+                example = res.get("data", {}).copy()
+                example["example_id"] = res.get("example_id")
                 scoring_result = ScoringResult(
-                    success=success,
-                    scorers_data=scorer_data_list,
+                    scorers_data=res.get("scorers", []),
+                    success=all(
+                        t.get("success", False) for t in res.get("scorers", [])
+                    ),
                     data_object=example,
                 )
-                scoring_results.append(scoring_result)
+                scoring_result_list.append(scoring_result)
 
-            if scorer_data_count != expected_scorer_data_count:
-                time.sleep(poll_interval_seconds)
-                continue
-
-            return scoring_results, url
+            return scoring_result_list, url
         except Exception as e:
             exception_count += 1
             if isinstance(e, JudgmentAPIError):
@@ -294,10 +285,8 @@ def run_eval(
                 else sum(1 for cs in evaluation_run.custom_scorers if cs.server_hosted)
             )
             results, url = _poll_evaluation_until_complete(
-                experiment_run_id=evaluation_run.id,
-                project_name=evaluation_run.project_name,
+                evaluation_run=evaluation_run,
                 judgment_api_key=judgment_api_key,
-                organization_id=evaluation_run.organization_id,
                 expected_scorer_data_count=(num_scorers * len(evaluation_run.examples)),
             )
         finally:

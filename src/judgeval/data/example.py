@@ -23,7 +23,7 @@ class ExampleParams(str, Enum):
 
 class Example(JudgmentExample):
     example_id: str = Field(default_factory=lambda: str(uuid4()))
-    created_at: str = datetime.now().isoformat()
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     name: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:

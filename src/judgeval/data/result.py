@@ -1,6 +1,5 @@
 from typing import List, Union
 from judgeval.data import ScorerData, Example
-from judgeval.data.trace import TraceSpan
 from judgeval.data.judgment_types import ScoringResult as JudgmentScoringResult
 
 
@@ -34,7 +33,7 @@ class ScoringResult(JudgmentScoringResult):
 
 
 def generate_scoring_result(
-    data_object: Union[Example, TraceSpan],
+    data_object: Union[Example],
     scorers_data: List[ScorerData],
     run_duration: float,
     success: bool,

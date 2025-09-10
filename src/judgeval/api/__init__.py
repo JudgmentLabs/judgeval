@@ -121,24 +121,26 @@ class JudgmentSyncClient:
             query_params,
         )
 
-    def datasets_insert_examples(self, payload: DatasetInsertExamples) -> Any:
+    def datasets_insert_examples_for_judgeval(
+        self, payload: DatasetInsertExamples
+    ) -> Any:
         return self._request(
             "POST",
-            url_for("/datasets/insert_examples/"),
+            url_for("/datasets/insert_examples_for_judgeval/"),
             payload,
         )
 
-    def datasets_pull_for_judgeval(self, payload: DatasetFetch) -> Any:
+    def datasets_pull_for_judgeval(self, payload: DatasetFetch) -> DatasetReturn:
         return self._request(
             "POST",
             url_for("/datasets/pull_for_judgeval/"),
             payload,
         )
 
-    def datasets_push(self, payload: DatasetPush) -> Any:
+    def datasets_create_for_judgeval(self, payload: DatasetCreate) -> Any:
         return self._request(
             "POST",
-            url_for("/datasets/push/"),
+            url_for("/datasets/create_for_judgeval/"),
             payload,
         )
 
@@ -321,24 +323,26 @@ class JudgmentAsyncClient:
             query_params,
         )
 
-    async def datasets_insert_examples(self, payload: DatasetInsertExamples) -> Any:
+    async def datasets_insert_examples_for_judgeval(
+        self, payload: DatasetInsertExamples
+    ) -> Any:
         return await self._request(
             "POST",
-            url_for("/datasets/insert_examples/"),
+            url_for("/datasets/insert_examples_for_judgeval/"),
             payload,
         )
 
-    async def datasets_pull_for_judgeval(self, payload: DatasetFetch) -> Any:
+    async def datasets_pull_for_judgeval(self, payload: DatasetFetch) -> DatasetReturn:
         return await self._request(
             "POST",
             url_for("/datasets/pull_for_judgeval/"),
             payload,
         )
 
-    async def datasets_push(self, payload: DatasetPush) -> Any:
+    async def datasets_create_for_judgeval(self, payload: DatasetCreate) -> Any:
         return await self._request(
             "POST",
-            url_for("/datasets/push/"),
+            url_for("/datasets/create_for_judgeval/"),
             payload,
         )
 
