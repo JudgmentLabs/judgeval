@@ -4,7 +4,7 @@ from judgeval import JudgmentClient
 from judgeval.data import Example
 from judgeval.env import JUDGMENT_DEFAULT_TOGETHER_MODEL
 from judgeval.tracer import Tracer, TraceScorerConfig
-from e2etests.utils import retrieve_trace_score
+from e2etests.utils import retrieve_score
 import time
 
 
@@ -207,7 +207,7 @@ def test_trace_prompt_scorer(project_name: str):
 
     query_count = 0
     while query_count < QUERY_RETRY:
-        scorer_data = retrieve_trace_score(span_id, trace_id)
+        scorer_data = retrieve_score(span_id, trace_id)
         if scorer_data:
             break
         query_count += 1
