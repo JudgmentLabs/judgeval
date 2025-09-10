@@ -159,6 +159,16 @@ def test_append_dataset(client: JudgmentClient, project_name: str, random_name: 
         )
 
 
+def test_add_examples_error(
+    client: JudgmentClient, project_name: str, random_name: str
+):
+    """Test that the examples are not added to the dataset."""
+    dataset = Dataset.create(name=random_name, project_name=project_name)
+    with pytest.raises(TypeError):
+        ex = Example(input="input 1", actual_output="output 1")
+        dataset.add_examples(ex)
+
+
 def test_overwrite_dataset(client: JudgmentClient, project_name: str, random_name: str):
     """Test dataset overwriting."""
     examples = [
