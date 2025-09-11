@@ -601,24 +601,17 @@ def _format_fireworks_output(
     response: Any,
 ) -> tuple[Optional[str], Optional[TraceUsage]]:
     """Format output data from Fireworks response."""
-    model_name = (response.model or "") if hasattr(response, "model") else ""
-    prompt_tokens = (
-        response.usage.prompt_tokens
-        if hasattr(response, "usage")
-        and hasattr(response.usage, "prompt_tokens")
-        and response.usage.prompt_tokens is not None
-        else 0
-    )
-    completion_tokens = (
-        response.usage.completion_tokens
-        if hasattr(response, "usage")
-        and hasattr(response.usage, "completion_tokens")
-        and response.usage.completion_tokens is not None
-        else 0
-    )
-    message_content = (
-        response.choices[0].message.content if hasattr(response, "choices") else None
-    )
+    model_name = getattr(response, "model", "") or ""
+    usage = getattr(response, "usage", None)
+    prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
+    completion_tokens = getattr(usage, "completion_tokens", 0) or 0
+
+    message_content = None
+    choices = getattr(response, "choices", None)
+    if choices:
+        message = getattr(choices[0], "message", None)
+        if message:
+            message_content = getattr(message, "content", None)
 
     if model_name:
         model_name = "fireworks_ai/" + model_name

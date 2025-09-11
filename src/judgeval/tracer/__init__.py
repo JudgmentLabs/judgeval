@@ -1008,20 +1008,6 @@ def wrap(client: ApiClient) -> ApiClient:
         # TrainableModel not available, continue with normal wrapping
         pass
 
-    # Check if the client is a Fireworks LLM instance directly
-    try:
-        from fireworks import LLM as FireworksLLM
-
-        if isinstance(client, FireworksLLM):
-            # This is a direct Fireworks LLM instance, wrap it normally
-            wrapped_client = client
-            for tracer in Tracer._active_tracers:
-                wrapped_client = wrap_provider(tracer, wrapped_client)
-            return wrapped_client
-    except ImportError:
-        # Fireworks LLM not available, continue with normal wrapping
-        pass
-
     wrapped_client = client
     for tracer in Tracer._active_tracers:
         wrapped_client = tracer.wrap(wrapped_client)
