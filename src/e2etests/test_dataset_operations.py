@@ -6,6 +6,7 @@ import random
 import string
 import pytest
 from judgeval import JudgmentClient
+from judgeval.exceptions import JudgmentAPIError
 from judgeval.data import Example
 from judgeval.dataset import Dataset
 from e2etests.utils import create_project, delete_project
@@ -77,7 +78,7 @@ def test_create_dataset_error(
 
 def test_get_dataset_error(client: JudgmentClient, project_name: str, random_name: str):
     """Test that the dataset is not found."""
-    with pytest.raises(ValueError):
+    with pytest.raises(JudgmentAPIError):
         Dataset.get(name=random_name, project_name=project_name)
 
 
@@ -149,6 +150,23 @@ def test_append_dataset(client: JudgmentClient, project_name: str, random_name: 
     assert len(dataset.examples) == initial_example_count + 3, (
         f"Dataset should have {initial_example_count + 3} examples, but has {len(dataset.examples)}"
     )
+    for i, e in enumerate(dataset.examples, start=1):
+        assert e.input == f"input {i}", (
+            f"Example should have .input be 'input {i}' but got '{e.input}'"
+        )
+        assert e.actual_output == f"output {i}", (
+            f"Example should have .actual_output be 'output {i}' but got '{e.actual_output}'"
+        )
+
+
+def test_add_examples_error(
+    client: JudgmentClient, project_name: str, random_name: str
+):
+    """Test that the examples are not added to the dataset."""
+    dataset = Dataset.create(name=random_name, project_name=project_name)
+    with pytest.raises(TypeError):
+        ex = Example(input="input 1", actual_output="output 1")
+        dataset.add_examples(ex)
 
 
 def test_overwrite_dataset(client: JudgmentClient, project_name: str, random_name: str):

@@ -1,4 +1,8 @@
-from judgeval.scorers.api_scorer import APIScorerConfig
+from judgeval.scorers.api_scorer import (
+    APIScorerConfig,
+    ExampleAPIScorerConfig,
+    TraceAPIScorerConfig,
+)
 from judgeval.constants import APIScorerType
 from typing import Dict, Any, Optional
 from judgeval.api import JudgmentSyncClient
@@ -6,6 +10,7 @@ from judgeval.exceptions import JudgmentAPIError
 import os
 from copy import copy
 from judgeval.logger import judgeval_logger
+from abc import ABC
 
 
 def push_prompt_scorer(
@@ -15,6 +20,7 @@ def push_prompt_scorer(
     options: Optional[Dict[str, float]] = None,
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
+    is_trace: Optional[bool] = None,
 ) -> str:
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
@@ -24,6 +30,7 @@ def push_prompt_scorer(
                 "prompt": prompt,
                 "threshold": threshold,
                 "options": options,
+                "is_trace": is_trace,
             }
         )
     except JudgmentAPIError as e:
@@ -88,7 +95,7 @@ def scorer_exists(
         )
 
 
-class PromptScorer(APIScorerConfig):
+class BasePromptScorer(ABC, APIScorerConfig):
     """
     In the Judgment backend, this scorer is implemented as a PromptScorer that takes
     1. a system role that may involve the Example object
@@ -97,9 +104,9 @@ class PromptScorer(APIScorerConfig):
     and uses a judge to execute the evaluation from the system role and classify into one of the options
     """
 
+    score_type: APIScorerType
     prompt: str
     options: Optional[Dict[str, float]] = None
-    score_type: APIScorerType = APIScorerType.PROMPT_SCORER
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or ""
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or ""
 
@@ -111,7 +118,18 @@ class PromptScorer(APIScorerConfig):
         organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
     ):
         scorer_config = fetch_prompt_scorer(name, judgment_api_key, organization_id)
+        if scorer_config["is_trace"] != issubclass(cls, TracePromptScorer):
+            raise JudgmentAPIError(
+                status_code=400,
+                detail=f"Scorer with name {name} is not a {cls.__name__}",
+                response=None,  # type: ignore
+            )
+        if issubclass(cls, TracePromptScorer):
+            score_type = APIScorerType.TRACE_PROMPT_SCORER
+        else:
+            score_type = APIScorerType.PROMPT_SCORER
         return cls(
+            score_type=score_type,
             name=name,
             prompt=scorer_config["prompt"],
             threshold=scorer_config["threshold"],
@@ -131,11 +149,24 @@ class PromptScorer(APIScorerConfig):
         organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
     ):
         if not scorer_exists(name, judgment_api_key, organization_id):
+            if issubclass(cls, TracePromptScorer):
+                is_trace = True
+                score_type = APIScorerType.TRACE_PROMPT_SCORER
+            else:
+                is_trace = False
+                score_type = APIScorerType.PROMPT_SCORER
             push_prompt_scorer(
-                name, prompt, threshold, options, judgment_api_key, organization_id
+                name,
+                prompt,
+                threshold,
+                options,
+                judgment_api_key,
+                organization_id,
+                is_trace,
             )
             judgeval_logger.info(f"Successfully created PromptScorer: {name}")
             return cls(
+                score_type=score_type,
                 name=name,
                 prompt=prompt,
                 threshold=threshold,
@@ -251,3 +282,11 @@ class PromptScorer(APIScorerConfig):
             k: getattr(self, k) for k in extra_fields if getattr(self, k) is not None
         }
         return base
+
+
+class PromptScorer(BasePromptScorer, ExampleAPIScorerConfig):
+    pass
+
+
+class TracePromptScorer(BasePromptScorer, TraceAPIScorerConfig):
+    pass

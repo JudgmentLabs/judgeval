@@ -36,13 +36,13 @@ JUDGEVAL_PATHS: List[str] = [
     "/fetch_scorer/",
     "/scorer_exists/",
     "/upload_custom_scorer/",
-    "/datasets/push/",
-    "/datasets/insert_examples/",
+    "/datasets/create_for_judgeval/",
+    "/datasets/insert_examples_for_judgeval/",
     "/datasets/pull_for_judgeval/",
-    "/datasets/fetch_stats_by_project/",
     "/projects/resolve/",
     "/e2e_fetch_trace/",
     "/e2e_fetch_span_score/",
+    "/e2e_fetch_trace_scorer_span_score/",
 ]
 
 
@@ -253,7 +253,7 @@ def generate_client_class(
 
 def generate_api_file() -> str:
     lines = [
-        "from typing import List, Dict, Any, Mapping, Literal, Optional",
+        "from typing import Dict, Any, Mapping, Literal, Optional",
         "import httpx",
         "from httpx import Response",
         "from judgeval.exceptions import JudgmentAPIError",

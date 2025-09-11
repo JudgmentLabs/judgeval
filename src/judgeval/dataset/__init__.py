@@ -5,7 +5,7 @@ import yaml
 from dataclasses import dataclass
 from typing import List, Literal, Optional
 
-from judgeval.data import Example, Trace
+from judgeval.data import Example
 from judgeval.utils.file_utils import get_examples_from_yaml, get_examples_from_json
 from judgeval.api import JudgmentSyncClient
 from judgeval.logger import judgeval_logger
@@ -15,7 +15,6 @@ from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_ORG_ID
 @dataclass
 class Dataset:
     examples: List[Example]
-    traces: List[Trace]
     name: str
     project_name: str
     judgment_api_key: str = JUDGMENT_API_KEY or ""
@@ -30,7 +29,7 @@ class Dataset:
         client = JudgmentSyncClient(cls.judgment_api_key, cls.organization_id)
         dataset = client.datasets_pull_for_judgeval(
             {
-                "dataset_alias": name,
+                "dataset_name": name,
                 "project_name": project_name,
             },
         )
@@ -40,12 +39,14 @@ class Dataset:
         for e in examples:
             if isinstance(e, dict) and isinstance(e.get("data"), dict):
                 e.update(e.pop("data"))
+                e.pop(
+                    "example_id"
+                )  # TODO: remove once scorer data migraiton is complete
         judgeval_logger.info(f"Succesfully retrieved dataset {name}!")
         return cls(
             name=name,
             project_name=project_name,
             examples=[Example(**e) for e in examples],
-            traces=[Trace(**t) for t in dataset.get("traces", [])],
         )
 
     @classmethod
@@ -54,25 +55,18 @@ class Dataset:
         name: str,
         project_name: str,
         examples: Optional[List[Example]] = None,
-        traces: Optional[List[Trace]] = None,
         overwrite: bool = False,
     ):
-        if examples and traces:
-            raise ValueError("Only one of examples or traces must be provided")
-
         if not examples:
             examples = []
 
-        if not traces:
-            traces = []
-
         client = JudgmentSyncClient(cls.judgment_api_key, cls.organization_id)
-        client.datasets_push(
+        client.datasets_create_for_judgeval(
             {
-                "dataset_alias": name,
+                "name": name,
                 "project_name": project_name,
-                "examples": [e.model_dump() for e in examples],  # type: ignore
-                "traces": [t.model_dump() for t in traces],  # type: ignore
+                "examples": [e.model_dump() for e in examples],
+                "dataset_kind": "example",
                 "overwrite": overwrite,
             }
         )
@@ -82,7 +76,6 @@ class Dataset:
             name=name,
             project_name=project_name,
             examples=examples,
-            traces=traces,
         )
 
     def add_from_json(self, file_path: str) -> None:
@@ -123,29 +116,15 @@ class Dataset:
         self.add_examples(examples)
 
     def add_examples(self, examples: List[Example]) -> None:
-        client = JudgmentSyncClient(self.judgment_api_key, self.organization_id)
-        client.datasets_insert_examples(
-            {
-                "dataset_alias": self.name,
-                "project_name": self.project_name,
-                "examples": [
-                    {
-                        "name": e.name,
-                        "created_at": e.created_at,
-                        "example_id": e.example_id,
-                    }
-                    for e in examples
-                ],
-            }
-        )
+        if not isinstance(examples, list):
+            raise TypeError("examples must be a list")
 
-    def add_traces(self, traces: List[Trace]) -> None:
         client = JudgmentSyncClient(self.judgment_api_key, self.organization_id)
-        client.traces_add_to_dataset(
+        client.datasets_insert_examples_for_judgeval(
             {
-                "dataset_alias": self.name,
+                "dataset_name": self.name,
                 "project_name": self.project_name,
-                "traces": [t.model_dump() for t in traces],  # type: ignore
+                "examples": [e.model_dump() for e in examples],
             }
         )
 
@@ -200,10 +179,4 @@ class Dataset:
         return len(self.examples)
 
     def __str__(self):
-        return (
-            f"{self.__class__.__name__}("
-            f"examples={self.examples}, "
-            f"traces={self.traces}, "
-            f"name={self.name}"
-            f")"
-        )
+        return f"{self.__class__.__name__}(examples={self.examples}, name={self.name})"

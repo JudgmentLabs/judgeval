@@ -11,7 +11,7 @@ from judgeval.tracer.exporters.store import SpanStore
 from judgeval.tracer.exporters import InMemorySpanExporter
 from judgeval.tracer.keys import AttributeKeys
 from judgeval import JudgmentClient
-from judgeval.scorers import BaseScorer, APIScorerConfig
+from judgeval.scorers import BaseScorer, ExampleAPIScorerConfig
 from judgeval.data import Example
 from .console import _spinner_progress, _print_progress, _print_progress_update
 from judgeval.exceptions import JudgmentRuntimeError
@@ -155,7 +155,7 @@ class JudgmentTrainer:
     async def generate_rollouts_and_rewards(
         self,
         agent_function: Callable[[Any], Any],
-        scorers: List[Union[APIScorerConfig, BaseScorer]],
+        scorers: List[Union[ExampleAPIScorerConfig, BaseScorer]],
         prompts: List[Any],
         num_prompts_per_step: Optional[int] = None,
         num_generations_per_prompt: Optional[int] = None,
@@ -265,7 +265,7 @@ class JudgmentTrainer:
     async def run_reinforcement_learning(
         self,
         agent_function: Callable[[Any], Any],
-        scorers: List[Union[APIScorerConfig, BaseScorer]],
+        scorers: List[Union[ExampleAPIScorerConfig, BaseScorer]],
         prompts: List[Any],
     ) -> ModelConfig:
         """
@@ -371,7 +371,7 @@ class JudgmentTrainer:
     async def train(
         self,
         agent_function: Callable[[Any], Any],
-        scorers: List[Union[APIScorerConfig, BaseScorer]],
+        scorers: List[Union[ExampleAPIScorerConfig, BaseScorer]],
         prompts: List[Any],
         rft_provider: Optional[str] = None,
     ) -> ModelConfig:
