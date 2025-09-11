@@ -5,10 +5,10 @@
 
 <br>
 <div style="font-size: 1.5em;">
-    Track and attach evals on your agent trajectories. Easy sentry-style monitoring and RL for agents!
+    Monitor Agent Behavior.
 </div>
 
-## [Docs](https://docs.judgmentlabs.ai/)  •  [Cloud](https://app.judgmentlabs.ai/register)  • [Self-Host](https://docs.judgmentlabs.ai/documentation/self-hosting/get-started)
+## [Docs](https://docs.judgmentlabs.ai/)  •  [Judgment Cloud](https://app.judgmentlabs.ai/register)  • [Self-Host](https://docs.judgmentlabs.ai/documentation/self-hosting/get-started)
 
 <!-- 
 [Bug Reports](https://github.com/JudgmentLabs/judgeval/issues) • [Changelog](https://docs.judgmentlabs.ai/changelog/2025-04-21)
@@ -18,12 +18,10 @@
 [![LinkedIn](https://custom-icon-badges.demolab.com/badge/LinkedIn%20-0A66C2?logo=linkedin-white&logoColor=fff)](https://www.linkedin.com/company/judgmentlabs)
 [![Discord](https://img.shields.io/badge/-Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/tGVFf8UBUY)
 
-<img src="assets/product_shot.png" alt="Judgment Platform" width="800" />
-
 </div>
 
-Judgeval offers **open-source tooling** for evaluating autonomous, stateful agents. It **provides runtime data from agent-environment interactions** for continuous learning and self-improvement.
 
+<!-- 
 ## 🎬 See Judgeval in Action
 
 **[Multi-Agent System](https://github.com/JudgmentLabs/judgment-cookbook/tree/main/cookbooks/agents/multi-agent) with complete observability:** (1) A multi-agent system spawns agents to research topics on the internet. (2) With just **3 lines of code**, Judgeval captures all environment responses across all agent tool calls for monitoring. (3) After completion, (4) export all interaction data to enable further environment-specific learning and optimization.
@@ -49,9 +47,11 @@ Judgeval offers **open-source tooling** for evaluating autonomous, stateful agen
   <br><strong>📤 Exporting Agent Environment Data</strong>
 </td>
 </tr>
+-->
 
 </table>
 
+<!-- 
 ## 📋 Table of Contents
 - [🛠️ Installation](#️-installation)
 - [🏁 Quickstarts](#-quickstarts)
@@ -59,8 +59,9 @@ Judgeval offers **open-source tooling** for evaluating autonomous, stateful agen
 - [🏢 Self-Hosting](#-self-hosting)
 - [📚 Cookbooks](#-cookbooks)
 - [💻 Development with Cursor](#-development-with-cursor)
+-->
 
-## 🛠️ Installation
+## 🛠️ Quickstart
 
 Get started with Judgeval by installing our SDK using pip:
 
@@ -77,8 +78,173 @@ export JUDGMENT_ORG_ID=...
 
 **If you don't have keys, [create an account](https://app.judgmentlabs.ai/register) on the platform!**
 
+## 📊 Monitor Your Agent
+
+Add monitoring to your agent with just a few lines of code. Here's a complete example of a customer support agent that uses LLM-based decision making and gets evaluated by an LLM judge.
+
+### 1. Define Your Custom Scorer
+
+First, create a custom scorer that evaluates whether your agent made the right decision:
+
+```python
+from judgeval.common.tracer import Tracer, wrap
+from judgeval.scorers import ExampleScorer
+from judgeval.data import Example
+from openai import OpenAI
+
+import json
+import re
+
+
+# Example: Defines the data structure for your evaluation inputs
+class CustomerExample(Example):
+    # Customer support specific fields
+    customer_message: str  # The customer's original message
+    plan: str  # The agent's reasoning/plan
+    result: str  # The system's response
+
+
+# ExampleScorer: Base class for creating custom evaluation logic
+class SupportAgentScorer(ExampleScorer):
+    name: str = "Support Agent Decision Quality"
+
+    async def a_score_example(self, example: CustomerExample):
+        try:
+            response = OpenAI().client.chat.completions.create(
+                
+                messages=[
+                    {"role": "system", "content": """You are an expert at evaluating customer support agents. 
+                    
+                    Evaluate if the agent made the RIGHT DECISION based on:
+                    1. The customer's message and situation
+                    2. The agent's plan/reasoning
+                    3. The final result/action taken
+                    
+                    Score 1.0 if the agent made the correct decision, 0.0 if wrong.
+                    
+                    Consider:
+                    - Did the agent correctly understand the customer's issue?
+                    - Was their reasoning logical and appropriate?
+                    - Did the final action match their plan and solve the customer's problem?
+                    - Was the tool choice (approve_refund vs deny_refund) appropriate for the situation?"""},
+
+                    {"role": "user", "content": f"""Customer Message: {example.customer_message}
+                    
+                    Agent's Plan: {example.plan}
+                    Agent's Result: {example.result}
+
+                    Did the agent make the right decision? 
+
+                    Please respond in this exact format:
+                    Score: [0.0-1.0]
+                    Reason: [Your explanation here]"""}
+                ]
+                model="gpt-4.1",
+            ).choices[0].messages.content
+            
+            # Extract score using the structured format
+            score_match = re.search(r'Score:\s*(\d+\.?\d*)', response)
+            score = float(score_match.group(1)) if score_match else 0.0
+            
+            # Extract reason
+            reason_match = re.search(r'Reason:\s*(.*)', response, re.DOTALL)
+            reason = reason_match.group(1).strip() if reason_match else "No reason provided"
+            
+            self.reason = reason
+            
+            return score
+        except Exception as e:
+            self.error = str(e)
+            return 0.0
+
+```
+
+### 2. Set Up Your Agent with Tools
+
+Next, wrap your LLM client and define the tools your agent can use:
+
+```python
+judgment = Tracer(project_name="customer_support_agent")
+client = wrap(OpenAI())
+
+@judgment.observe(span_type="tool")
+def approve_refund(customer_id: str, amount: int) -> str:
+    # Agent decided to approve the refund
+    return f"Refund of ${amount} approved for customer {customer_id}. Will be processed within 3-5 business days"
+
+@judgment.observe(span_type="tool")
+def deny_refund(customer_id: str) -> str:
+    # Agent decided to deny the refund
+    return f"Refund denied for customer {customer_id}. Does not qualify for refund policy"
+
+# ... other tools ...
+
+@judgment.observe(span_type="function")
+def support_agent(customer_message: str) -> str:
+    # Step 1: Use LLM to analyze the customer's message and plan response
+    response = client.chat.completions.create(
+        messages=[
+            {"role": "system", "content": """You are a customer support agent. Analyze the customer message and create a plan to help them.
+
+            Available tools:
+            - approve_refund(customer_id, amount): Approve refund for customer
+            - deny_refund(customer_id): Deny refund for customer
+
+            Format your response as:
+            <plan>Your analysis of the customer's issue and reasoning for your tool choice</plan>
+            <tool>
+            {"name": "tool_name", "args": {"parameter": "value"}}
+            </tool>
+
+            Explain your reasoning for choosing the tool based on the customer's request."""},
+            {"role": "user", "content": customer_message}
+        ],
+        model="gpt-4.1"
+
+    ).choices[0].message.content
+
+    # Step 2: Parse the <plan> and <tool> tags from LLM response
+    plan_match = re.search(r'<plan>\s*(.*?)\s*</plan>', response, re.DOTALL)
+    plan = plan_match.group(1) if plan_match else "No plan found"
+    
+    tool_match = re.search(r'<tool>\s*(\{.*?\})\s*</tool>', response, re.DOTALL)
+    tool_json = tool_match.group(1)
+
+    params = json.loads(tool_json)
+    tool_name = params["name"]
+    args = params["args"]
+    
+    # Step 3: Execute the function based on tool name
+    if tool_name == "approve_refund":
+        result = approve_refund(args["customer_id"], args["amount"])
+    elif tool_name == "deny_refund":
+        result = deny_refund(args["customer_id"])
+    else:
+        result = "Unknown tool requested"
+    
+    # Step 4: Check if the agent's behavior was reasonable
+    judgment.async_evaluate(
+        scorer=SupportAgentScorer(),
+        example=CustomerExample(
+            customer_message=customer_message,
+            plan=plan,
+            result=result
+        ),
+        sampling_rate=0.25 # evaluating online 25% of agent behaviors
+    )
+    return response
+if __name__ == "__main__":
+    # Example customer message
+    customer_message = "Hi, I received a defective product and would like a refund. My order ID is #12345 and the item arrived broken."
+    result = support_agent(customer_message)
+```
+
+**That's it!** Your agent is now being monitored. Check your [Judgment Dashboard](https://app.judgmentlabs.ai/) to see the results. 
 
 ## ✨ Features
+
+<img src="assets/product_shot.png" alt="Judgment Platform" width="800" />
+
 
 |  |  |
 |:---|:---:|
