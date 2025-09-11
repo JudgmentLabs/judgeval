@@ -33,7 +33,7 @@ JUDGEVAL_PATHS: List[str] = [
     "/add_to_run_eval_queue/traces",
     "/get_evaluation_status/",
     "/save_scorer/",
-    "/fetch_scorer/",
+    "/fetch_scorers/",
     "/scorer_exists/",
     "/upload_custom_scorer/",
     "/datasets/create_for_judgeval/",

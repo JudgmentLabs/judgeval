@@ -55,7 +55,7 @@ def fetch_prompt_scorer(
 ):
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
-        scorer_config = client.fetch_scorer({"name": name})["scorer"]
+        scorer_config = client.fetch_scorers({"names": [name]})["scorers"][0]
         scorer_config.pop("created_at")
         scorer_config.pop("updated_at")
         return scorer_config
