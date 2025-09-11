@@ -983,6 +983,45 @@ def wrap(client: ApiClient) -> ApiClient:
             stacklevel=2,
         )
 
+    # Check if the client is a TrainableModel instance
+    try:
+        from judgeval.trainer.trainable_model import TrainableModel
+
+        if isinstance(client, TrainableModel):
+            # Register wrapper functions for all active tracers
+            def wrapper_func(model_instance):
+                wrapped_instance = model_instance
+                for tracer in Tracer._active_tracers:
+                    wrapped_instance = wrap_provider(tracer, wrapped_instance)
+                return wrapped_instance
+
+            client._register_tracer_wrapper(wrapper_func)
+
+            # Wrap the current model instance with all active tracers
+            current_model = client.get_current_model()
+            if current_model:
+                for tracer in Tracer._active_tracers:
+                    wrap_provider(tracer, current_model)
+
+            return client
+    except ImportError:
+        # TrainableModel not available, continue with normal wrapping
+        pass
+
+    # Check if the client is a Fireworks LLM instance directly
+    try:
+        from fireworks import LLM as FireworksLLM
+
+        if isinstance(client, FireworksLLM):
+            # This is a direct Fireworks LLM instance, wrap it normally
+            wrapped_client = client
+            for tracer in Tracer._active_tracers:
+                wrapped_client = wrap_provider(tracer, wrapped_client)
+            return wrapped_client
+    except ImportError:
+        # Fireworks LLM not available, continue with normal wrapping
+        pass
+
     wrapped_client = client
     for tracer in Tracer._active_tracers:
         wrapped_client = tracer.wrap(wrapped_client)
