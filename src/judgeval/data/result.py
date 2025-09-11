@@ -18,6 +18,7 @@ class ScoringResult(JudgmentScoringResult):
 
     # Need to override this so that it uses this repo's Example class
     data_object: Example
+    scorers_data: List[ScorerData]
 
     def model_dump(self, **kwargs):
         data = super().model_dump(**kwargs)

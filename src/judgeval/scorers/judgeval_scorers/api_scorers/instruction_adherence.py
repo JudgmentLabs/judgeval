@@ -6,12 +6,12 @@ TODO add link to docs page for this scorer
 """
 
 # Internal imports
-from judgeval.scorers.api_scorer import ExampleAPIScorerConfig
+from judgeval.scorers.api_scorer import APIScorerConfig
 from judgeval.constants import APIScorerType
 from judgeval.data import ExampleParams
 
 
-class InstructionAdherenceScorer(ExampleAPIScorerConfig):
+class InstructionAdherenceScorer(APIScorerConfig):
     def __init__(self, threshold: float):
         super().__init__(
             threshold=threshold,

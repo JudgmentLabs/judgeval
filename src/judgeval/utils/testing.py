@@ -26,10 +26,6 @@ def assert_test_results(scoring_results: List[ScoringResult]) -> None:
                 # If the result was not successful, check each scorer_data
                 for scorer_data in result.scorers_data:
                     if not scorer_data.success:
-                        if scorer_data.name == "Tool Order":
-                            # Remove threshold, evaluation model for Tool Order scorer
-                            scorer_data.threshold = None
-                            scorer_data.evaluation_model = None
                         test_case.append(scorer_data)
             failed_cases.append(test_case)
 

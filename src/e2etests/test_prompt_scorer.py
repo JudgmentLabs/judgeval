@@ -169,6 +169,7 @@ def test_custom_prompt_scorer(client: JudgmentClient, project_name: str):
         project_name=project_name,
         eval_run_name="test-custom-prompt-scorer",
     )
+    print(res)
 
     # Verify results
     assert res[0].success, "Example 1 should pass classification"

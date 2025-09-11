@@ -27,7 +27,7 @@ class BaseScorer(BaseModel):
     threshold: float = 0.5
 
     # name of your scorer (Faithfulness, PromptScorer-randomslug)
-    name: Optional[str] = None
+    name: str = ""
 
     # The name of the class of the scorer
     class_name: Optional[str] = None
@@ -42,7 +42,7 @@ class BaseScorer(BaseModel):
     using_native_model: Optional[bool] = None
 
     # Whether the test case passed or failed
-    success: Optional[bool] = None
+    success: bool = False
 
     # The name of the model used to evaluate the test case
     model: Optional[str] = None

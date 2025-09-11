@@ -507,6 +507,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
             )
 
             # Extract response content
+            output: Any
             if response.generations:
                 last_generation = response.generations[-1][-1]
                 if (
@@ -547,7 +548,7 @@ class JudgevalCallbackHandler(BaseCallbackHandler):
                 for key, value in usage_attrs.items():
                     span.set_attribute(key, value)
 
-            self._end_span(run_id=run_id, outputs=output, **usage_attrs)
+            self._end_span(run_id=run_id, outputs=output, **usage_attrs)  # type: ignore
 
         except Exception as e:
             judgeval_logger.exception(f"Error in on_llm_end: {e}")

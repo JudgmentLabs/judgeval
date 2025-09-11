@@ -19,8 +19,17 @@ def optional_env_var(var_name: str, default: str | None = None) -> str | None:
     return os.getenv(var_name, default)
 
 
-JUDGMENT_API_KEY = optional_env_var("JUDGMENT_API_KEY")
-JUDGMENT_ORG_ID = optional_env_var("JUDGMENT_ORG_ID")
+def required_env_var(var_name: str) -> str:
+    value = os.getenv(var_name)
+    if value is None:
+        raise EnvironmentError(
+            f"Environment variable '{var_name}' is required but not set."
+        )
+    return value
+
+
+JUDGMENT_API_KEY = required_env_var("JUDGMENT_API_KEY")
+JUDGMENT_ORG_ID = required_env_var("JUDGMENT_ORG_ID")
 JUDGMENT_API_URL = optional_env_var("JUDGMENT_API_URL", "https://api.judgmentlabs.ai")
 
 JUDGMENT_DEFAULT_GPT_MODEL = optional_env_var("JUDGMENT_DEFAULT_GPT_MODEL", "gpt-4.1")

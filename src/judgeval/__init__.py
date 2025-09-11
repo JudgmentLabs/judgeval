@@ -6,7 +6,8 @@ from judgeval.data.evaluation_run import ExampleEvaluationRun
 
 
 from typing import List, Optional, Union
-from judgeval.scorers import BaseScorer, ExampleAPIScorerConfig
+from judgeval.scorers import APIScorerConfig
+from judgeval.scorers.example_scorer import ExampleScorer
 from judgeval.data.example import Example
 from judgeval.logger import judgeval_logger
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_DEFAULT_GPT_MODEL, JUDGMENT_ORG_ID
@@ -38,7 +39,7 @@ class JudgmentClient(metaclass=SingletonMeta):
     def run_evaluation(
         self,
         examples: List[Example],
-        scorers: List[Union[ExampleAPIScorerConfig, BaseScorer]],
+        scorers: List[Union[APIScorerConfig, ExampleScorer]],
         project_name: str = "default_project",
         eval_run_name: str = "default_eval_run",
         model: str = JUDGMENT_DEFAULT_GPT_MODEL,
@@ -51,10 +52,9 @@ class JudgmentClient(metaclass=SingletonMeta):
                 examples=examples,
                 scorers=scorers,
                 model=model,
-                organization_id=self.organization_id,
             )
 
-            results = run_eval(eval, self.api_key)
+            results = run_eval(eval)
             if assert_test:
                 assert_test_results(results)
 

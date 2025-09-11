@@ -3,7 +3,7 @@ import orjson
 import os
 import yaml
 from dataclasses import dataclass
-from typing import List, Literal, Optional
+from typing import List, Literal
 
 from judgeval.data import Example
 from judgeval.utils.file_utils import get_examples_from_yaml, get_examples_from_json
@@ -48,9 +48,12 @@ class Dataset:
         if not dataset:
             raise ValueError(f"Dataset {name} not found in project {project_name}")
         examples = dataset.get("examples", [])
+        if examples is None:
+            examples = []
+
         for e in examples:
-            if isinstance(e, dict) and isinstance(e.get("data"), dict):
-                e.update(e.pop("data"))
+            if isinstance(e, dict) and isinstance(e.get("data", {}), dict):
+                e.update(e.pop("data"))  # type: ignore
                 e.pop(
                     "example_id"
                 )  # TODO: remove once scorer data migraiton is complete
@@ -66,7 +69,7 @@ class Dataset:
         cls,
         name: str,
         project_name: str,
-        examples: Optional[List[Example]] = None,
+        examples: List[Example] = [],
         overwrite: bool = False,
     ):
         if not examples:
@@ -77,7 +80,7 @@ class Dataset:
             {
                 "name": name,
                 "project_name": project_name,
-                "examples": [e.model_dump() for e in examples],
+                "examples": examples,  # type: ignore
                 "dataset_kind": "example",
                 "overwrite": overwrite,
             }
@@ -145,7 +148,7 @@ class Dataset:
             {
                 "dataset_name": self.name,
                 "project_name": self.project_name,
-                "examples": [e.model_dump() for e in examples],
+                "examples": examples,  # type: ignore
             }
         )
 

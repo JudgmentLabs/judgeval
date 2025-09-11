@@ -2,7 +2,7 @@ import asyncio
 import json
 import time
 from typing import Optional, Callable, Any, List, Union, Dict
-from fireworks import Dataset
+from fireworks import Dataset  # type: ignore[import-not-found]
 from .config import TrainerConfig, ModelConfig
 from .trainable_model import TrainableModel
 from judgeval.tracer import Tracer
@@ -10,7 +10,7 @@ from judgeval.tracer.exporters.store import SpanStore
 from judgeval.tracer.exporters import InMemorySpanExporter
 from judgeval.tracer.keys import AttributeKeys
 from judgeval import JudgmentClient
-from judgeval.scorers import BaseScorer, ExampleAPIScorerConfig
+from judgeval.scorers import BaseScorer, APIScorerConfig
 from judgeval.data import Example
 from .console import _spinner_progress, _print_progress, _print_progress_update
 from judgeval.exceptions import JudgmentRuntimeError
@@ -85,7 +85,9 @@ class JudgmentTrainer:
                 if not first_found and span_attributes.get(
                     AttributeKeys.JUDGMENT_INPUT
                 ):
-                    input_data = span_attributes.get(AttributeKeys.JUDGMENT_INPUT, {})
+                    input_data: Any = span_attributes.get(
+                        AttributeKeys.JUDGMENT_INPUT, {}
+                    )
                     if isinstance(input_data, dict) and "messages" in input_data:
                         input_messages = input_data["messages"]
                         if input_messages:
@@ -154,7 +156,7 @@ class JudgmentTrainer:
     async def generate_rollouts_and_rewards(
         self,
         agent_function: Callable[[Any], Any],
-        scorers: List[Union[ExampleAPIScorerConfig, BaseScorer]],
+        scorers: List[Union[APIScorerConfig, BaseScorer]],
         prompts: List[Any],
         num_prompts_per_step: Optional[int] = None,
         num_generations_per_prompt: Optional[int] = None,
@@ -264,7 +266,7 @@ class JudgmentTrainer:
     async def run_reinforcement_learning(
         self,
         agent_function: Callable[[Any], Any],
-        scorers: List[Union[ExampleAPIScorerConfig, BaseScorer]],
+        scorers: List[Union[APIScorerConfig, BaseScorer]],
         prompts: List[Any],
     ) -> ModelConfig:
         """
@@ -370,7 +372,7 @@ class JudgmentTrainer:
     async def train(
         self,
         agent_function: Callable[[Any], Any],
-        scorers: List[Union[ExampleAPIScorerConfig, BaseScorer]],
+        scorers: List[Union[APIScorerConfig, BaseScorer]],
         prompts: List[Any],
         rft_provider: Optional[str] = None,
     ) -> ModelConfig:

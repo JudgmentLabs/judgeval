@@ -1,7 +1,5 @@
 from judgeval.scorers.api_scorer import (
     APIScorerConfig,
-    ExampleAPIScorerConfig,
-    TraceAPIScorerConfig,
 )
 from judgeval.constants import APIScorerType
 from typing import Dict, Any, Optional
@@ -284,9 +282,9 @@ class BasePromptScorer(ABC, APIScorerConfig):
         return base
 
 
-class PromptScorer(BasePromptScorer, ExampleAPIScorerConfig):
+class PromptScorer(BasePromptScorer, APIScorerConfig):
     pass
 
 
-class TracePromptScorer(BasePromptScorer, TraceAPIScorerConfig):
+class TracePromptScorer(BasePromptScorer, APIScorerConfig):
     pass
