@@ -1,18 +1,18 @@
 <div align="center">
 
-<img src="assets/new_lightmode.svg#gh-light-mode-only" alt="Judgment Logo" width="400" />
-<img src="assets/new_darkmode.svg#gh-dark-mode-only" alt="Judgment Logo" width="400" />
+<a href="https://judgmentlabs.ai/"><img src="assets/new_lightmode.svg#gh-light-mode-only" alt="Judgment Logo" width="400" /></a>
+<a href="https://judgmentlabs.ai/"><img src="assets/new_darkmode.svg#gh-dark-mode-only" alt="Judgment Logo" width="400" /></a>
 
 <br>
 <div style="font-size: 1.5em;">
-    Enable self-learning agents with environment data and evals.
+    Track and attach evals on your agent trajectories. Easy sentry-style monitoring and RL for agents!
 </div>
 
-## [Docs](https://docs.judgmentlabs.ai/)  •  [Judgment Cloud](https://app.judgmentlabs.ai/register)  • [Self-Host](https://docs.judgmentlabs.ai/documentation/self-hosting/get-started)  • [Landing Page](https://judgmentlabs.ai/)
+## [Docs](https://docs.judgmentlabs.ai/)  •  [Cloud](https://app.judgmentlabs.ai/register)  • [Self-Host](https://docs.judgmentlabs.ai/documentation/self-hosting/get-started)
 
- [Demo](https://www.youtube.com/watch?v=1S4LixpVbcc) • [Bug Reports](https://github.com/JudgmentLabs/judgeval/issues) • [Changelog](https://docs.judgmentlabs.ai/changelog/2025-04-21)
-
-We're hiring! Join us in our mission to enable self-learning agents by providing the data and signals needed for monitoring and post-training.
+<!-- 
+[Bug Reports](https://github.com/JudgmentLabs/judgeval/issues) • [Changelog](https://docs.judgmentlabs.ai/changelog/2025-04-21)
+-->
 
 [![X](https://img.shields.io/badge/-X/Twitter-000?logo=x&logoColor=white)](https://x.com/JudgmentLabs)
 [![LinkedIn](https://custom-icon-badges.demolab.com/badge/LinkedIn%20-0A66C2?logo=linkedin-white&logoColor=fff)](https://www.linkedin.com/company/judgmentlabs)
