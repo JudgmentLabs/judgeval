@@ -11,6 +11,16 @@ from judgeval.api import JudgmentSyncClient
 from judgeval.logger import judgeval_logger
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_ORG_ID
 
+from judgeval.api.api_types import DatasetKind
+
+@dataclass
+class DatasetInfo:
+    dataset_id: str
+    name: str 
+    created_at: str
+    dataset_kind: DatasetKind
+    entries: int
+    creator: str
 
 @dataclass
 class Dataset:
@@ -42,7 +52,7 @@ class Dataset:
                 e.pop(
                     "example_id"
                 )  # TODO: remove once scorer data migraiton is complete
-        judgeval_logger.info(f"Succesfully retrieved dataset {name}!")
+        judgeval_logger.info(f"Successfully retrieved dataset {name}!")
         return cls(
             name=name,
             project_name=project_name,
@@ -71,12 +81,25 @@ class Dataset:
             }
         )
 
-        judgeval_logger.info(f"Succesfull created dataset {name}!")
+        judgeval_logger.info(f"Successfully created dataset {name}!")
         return cls(
             name=name,
             project_name=project_name,
             examples=examples,
         )
+    @classmethod
+    def list(
+        cls,
+        project_name: str
+    ):
+        client = JudgmentSyncClient(cls.judgment_api_key, cls.organization_id)
+        datasets = client.datasets_pull_all_for_judgeval(
+            {"project_name": project_name}
+        )
+        
+        judgeval_logger.info(f"Fetched all datasets for project {project_name}!")
+                             
+        return [DatasetInfo(**dataset_info) for dataset_info in datasets]
 
     def add_from_json(self, file_path: str) -> None:
         """
