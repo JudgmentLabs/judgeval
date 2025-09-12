@@ -5,7 +5,7 @@
 
 <br>
 <div style="font-size: 1.5em;">
-    Monitor Agent Behavior.
+    Agent Behavior Monitoring (ABM).
 </div>
 
 ## [Docs](https://docs.judgmentlabs.ai/)  •  [Judgment Cloud](https://app.judgmentlabs.ai/register)  • [Self-Host](https://docs.judgmentlabs.ai/documentation/self-hosting/get-started)
