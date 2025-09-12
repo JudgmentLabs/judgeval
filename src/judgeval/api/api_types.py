@@ -19,6 +19,7 @@ class DatasetFetch(TypedDict):
     dataset_name: str
     project_name: str
 
+
 class DatasetsFetch(TypedDict):
     project_name: str
 
@@ -228,13 +229,14 @@ class DatasetReturn(TypedDict):
     project_name: str
     examples: NotRequired[Optional[List[Example]]]
 
+
 class DatasetInfo(TypedDict):
     dataset_id: str
     name: str
     created_at: str
     dataset_kind: DatasetKind
     entries: int
-    creator: str 
+    creator: str
 
 
 class DatasetCreate(TypedDict):
