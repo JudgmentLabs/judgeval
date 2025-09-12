@@ -39,6 +39,7 @@ JUDGEVAL_PATHS: List[str] = [
     "/datasets/create_for_judgeval/",
     "/datasets/insert_examples_for_judgeval/",
     "/datasets/pull_for_judgeval/",
+    "/datasets/pull_all_for_judgeval/",
     "/projects/resolve/",
     "/e2e_fetch_trace/",
     "/e2e_fetch_span_score/",
