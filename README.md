@@ -1,6 +1,6 @@
 <div align="center">
-<img src="assets/new_lightmode.svg#gh-light-mode-only" alt="Judgment Logo" width="400" />
-<img src="assets/new_darkmode.svg#gh-dark-mode-only" alt="Judgment Logo" width="400" />
+<a href="https://judgmentlabs.ai/"><img src="assets/new_lightmode.svg#gh-light-mode-only" alt="Judgment Logo" width="400" /></a>
+<a href="https://judgmentlabs.ai/"><img src="assets/new_darkmode.svg#gh-dark-mode-only" alt="Judgment Logo" width="400" /></a>
 
 <br>
 <div style="font-size: 1.5em;">
