@@ -3,7 +3,9 @@ import pytest
 
 
 def test_get_examples_from_yaml():
-    examples = get_examples_from_yaml("src/tests/utils/file_utils/example.yaml")
+    examples = get_examples_from_yaml(
+        "judgeval/src/tests/utils/file_utils/example.yaml"
+    )
     assert len(examples) == 3
 
     assert examples[0].key_01 == "value_01"
@@ -21,16 +23,20 @@ def test_get_examples_from_yaml():
 
 def test_get_examples_from_yaml_with_empty_file():
     with pytest.raises(ValueError):
-        get_examples_from_yaml("src/tests/utils/file_utils/example_empty.yaml")
+        get_examples_from_yaml("judgeval/src/tests/utils/file_utils/example_empty.yaml")
 
 
 def test_get_examples_from_non_existent_yaml():
     with pytest.raises(FileNotFoundError):
-        get_examples_from_yaml("src/tests/utils/file_utils/non_existent_file.yaml")
+        get_examples_from_yaml(
+            "judgeval/src/tests/utils/file_utils/non_existent_file.yaml"
+        )
 
 
 def test_get_examples_from_json():
-    examples = get_examples_from_json("src/tests/utils/file_utils/example.json")
+    examples = get_examples_from_json(
+        "judgeval/src/tests/utils/file_utils/example.json"
+    )
     assert len(examples) == 3
 
     assert examples[0].key_01 == "value_01"
@@ -48,9 +54,11 @@ def test_get_examples_from_json():
 
 def test_get_examples_from_json_with_empty_file():
     with pytest.raises(ValueError):
-        get_examples_from_json("src/tests/utils/file_utils/example_empty.json")
+        get_examples_from_json("judgeval/src/tests/utils/file_utils/example_empty.json")
 
 
 def test_get_examples_from_non_existent_json():
     with pytest.raises(FileNotFoundError):
-        get_examples_from_json("src/tests/utils/file_utils/non_existent_file.json")
+        get_examples_from_json(
+            "judgeval/src/tests/utils/file_utils/non_existent_file.json"
+        )
