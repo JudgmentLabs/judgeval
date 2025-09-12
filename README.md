@@ -8,14 +8,15 @@
 </a>
 
 <br>
-<div style="font-size: 1.5em;">
-    Agent Behavior Monitoring (ABM).
-</div>
 
-## [Docs](https://docs.judgmentlabs.ai/)  •  [Judgment Cloud](https://app.judgmentlabs.ai/register)  • [Self-Host](https://docs.judgmentlabs.ai/documentation/self-hosting/get-started)
+## Agent Behavior Monitoring (ABM)
+
+Run online monitoring on agent behavior using any scorer. Set up sentry-style alerts and run RL jobs easily!
 
 
-[Bug Reports](https://github.com/JudgmentLabs/judgeval/issues) • [Changelog](https://docs.judgmentlabs.ai/changelog/2025-04-21)
+[![Docs](https://img.shields.io/badge/Documentation-blue)](https://docs.judgmentlabs.ai/documentation)
+[![Judgment Cloud](https://img.shields.io/badge/Judgment%20Cloud-brightgreen)](https://app.judgmentlabs.ai/register)
+[![Self-Host](https://img.shields.io/badge/Self--Host-orange)](https://docs.judgmentlabs.ai/documentation/self-hosting/get-started)
 
 
 [![X](https://img.shields.io/badge/-X/Twitter-000?logo=x&logoColor=white)](https://x.com/JudgmentLabs)
@@ -25,45 +26,7 @@
 </div>
 
 
-<!-- 
-## 🎬 See Judgeval in Action
-
-**[Multi-Agent System](https://github.com/JudgmentLabs/judgment-cookbook/tree/main/cookbooks/agents/multi-agent) with complete observability:** (1) A multi-agent system spawns agents to research topics on the internet. (2) With just **3 lines of code**, Judgeval captures all environment responses across all agent tool calls for monitoring. (3) After completion, (4) export all interaction data to enable further environment-specific learning and optimization.
-
-<table style="width: 100%; max-width: 800px; table-layout: fixed;">
-<tr>
-<td align="center" style="padding: 8px; width: 50%;">
-  <img src="assets/agent.gif" alt="Agent Demo" style="width: 100%; max-width: 350px; height: auto;" />
-  <br><strong>🤖 Agents Running</strong>
-</td>
-<td align="center" style="padding: 8px; width: 50%;">
-  <img src="assets/trace.gif" alt="Capturing Environment Data Demo" style="width: 100%; max-width: 350px; height: auto;" />
-  <br><strong>📊 Capturing Environment Data </strong>
-</td>
-</tr>
-<tr>
-<td align="center" style="padding: 8px; width: 50%;">
-  <img src="assets/document.gif" alt="Agent Completed Demo" style="width: 100%; max-width: 350px; height: auto;" />
-  <br><strong>✅ Agents Completed Running</strong>
-</td>
-<td align="center" style="padding: 8px; width: 50%;">
-  <img src="assets/data.gif" alt="Data Export Demo" style="width: 100%; max-width: 350px; height: auto;" />
-  <br><strong>📤 Exporting Agent Environment Data</strong>
-</td>
-</tr>
--->
-
 </table>
-
-<!-- 
-## 📋 Table of Contents
-- [🛠️ Installation](#️-installation)
-- [🏁 Quickstarts](#-quickstarts)
-- [✨ Features](#-features)
-- [🏢 Self-Hosting](#-self-hosting)
-- [📚 Cookbooks](#-cookbooks)
-- [💻 Development with Cursor](#-development-with-cursor)
--->
 
 ## 🛠️ Quickstart
 
@@ -81,176 +44,6 @@ export JUDGMENT_ORG_ID=...
 ```
 
 **If you don't have keys, [create an account](https://app.judgmentlabs.ai/register) on the platform!**
-
-## 📊 Monitor Your Agent
-
-Add monitoring to your agent with just a few lines of code. Here's a complete example of a customer support agent that uses LLM-based decision making and gets evaluated by an LLM judge.
-
-### 1. Define Your Custom Scorer
-
-First, create a custom scorer that evaluates whether your agent made the right decision:
-
-```python
-from judgeval.common.tracer import Tracer, wrap
-from judgeval.scorers import ExampleScorer
-from judgeval.data import Example
-from openai import OpenAI
-
-import json
-import re
-
-
-# Example: Defines the data structure for your evaluation inputs
-class CustomerExample(Example):
-    # Customer support specific fields
-    customer_message: str  # The customer's original message
-    plan: str  # The agent's reasoning/plan
-    result: str  # The system's response
-
-
-# ExampleScorer: Base class for creating custom evaluation logic
-class SupportAgentScorer(ExampleScorer):
-    name: str = "Support Agent Decision Quality"
-
-    async def a_score_example(self, example: CustomerExample):
-        try:
-            response = OpenAI().client.chat.completions.create(
-                
-                messages=[
-                    {"role": "system", "content": """You are an expert at evaluating customer support agents. 
-                    
-                    Evaluate if the agent made the RIGHT DECISION based on:
-                    1. The customer's message and situation
-                    2. The agent's plan/reasoning
-                    3. The final result/action taken
-                    
-                    Score 1.0 if the agent made the correct decision, 0.0 if wrong.
-                    
-                    Consider:
-                    - Did the agent correctly understand the customer's issue?
-                    - Was their reasoning logical and appropriate?
-                    - Did the final action match their plan and solve the customer's problem?
-                    - Was the tool choice (approve_refund vs deny_refund) appropriate for the situation?"""},
-
-                    {"role": "user", "content": f"""Customer Message: {example.customer_message}
-                    
-                    Agent's Plan: {example.plan}
-                    Agent's Result: {example.result}
-
-                    Did the agent make the right decision? 
-
-                    Please respond in this exact format:
-                    Score: [0.0-1.0]
-                    Reason: [Your explanation here]"""}
-                ]
-                model="gpt-4.1",
-            ).choices[0].messages.content
-            
-            # Extract score using the structured format
-            score_match = re.search(r'Score:\s*(\d+\.?\d*)', response)
-            score = float(score_match.group(1)) if score_match else 0.0
-            
-            # Extract reason
-            reason_match = re.search(r'Reason:\s*(.*)', response, re.DOTALL)
-            reason = reason_match.group(1).strip() if reason_match else "No reason provided"
-            
-            self.reason = reason
-            
-            return score
-        except Exception as e:
-            self.error = str(e)
-            return 0.0
-
-```
-
-### 2. Set Up Your Agent with Tools
-
-Next, wrap your LLM client and define the tools your agent can use:
-
-```python
-judgment = Tracer(project_name="customer_support_agent")
-client = wrap(OpenAI())
-
-@judgment.observe(span_type="tool")
-def approve_refund(customer_id: str, amount: int) -> str:
-    # Agent decided to approve the refund
-    return f"Refund of ${amount} approved for customer {customer_id}. Will be processed within 3-5 business days"
-
-@judgment.observe(span_type="tool")
-def deny_refund(customer_id: str) -> str:
-    # Agent decided to deny the refund
-    return f"Refund denied for customer {customer_id}. Does not qualify for refund policy"
-
-# ... other tools ...
-
-@judgment.observe(span_type="function")
-def support_agent(customer_message: str) -> str:
-    # Step 1: Use LLM to analyze the customer's message and plan response
-    response = client.chat.completions.create(
-        messages=[
-            {"role": "system", "content": """You are a customer support agent. Analyze the customer message and create a plan to help them.
-
-            Available tools:
-            - approve_refund(customer_id, amount): Approve refund for customer
-            - deny_refund(customer_id): Deny refund for customer
-
-            Format your response as:
-            <plan>Your analysis of the customer's issue and reasoning for your tool choice</plan>
-            <tool>
-            {"name": "tool_name", "args": {"parameter": "value"}}
-            </tool>
-
-            Explain your reasoning for choosing the tool based on the customer's request."""},
-            {"role": "user", "content": customer_message}
-        ],
-        model="gpt-4.1"
-
-    ).choices[0].message.content
-
-    # Step 2: Parse the <plan> and <tool> tags from LLM response
-    plan_match = re.search(r'<plan>\s*(.*?)\s*</plan>', response, re.DOTALL)
-    plan = plan_match.group(1) if plan_match else "No plan found"
-    
-    tool_match = re.search(r'<tool>\s*(\{.*?\})\s*</tool>', response, re.DOTALL)
-    tool_json = tool_match.group(1)
-
-    params = json.loads(tool_json)
-    tool_name = params["name"]
-    args = params["args"]
-    
-    # Step 3: Execute the function based on tool name
-    if tool_name == "approve_refund":
-        result = approve_refund(args["customer_id"], args["amount"])
-    elif tool_name == "deny_refund":
-        result = deny_refund(args["customer_id"])
-    else:
-        result = "Unknown tool requested"
-    
-    # Step 4: Check if the agent's behavior was reasonable
-    judgment.async_evaluate(
-        scorer=SupportAgentScorer(),
-        example=CustomerExample(
-            customer_message=customer_message,
-            plan=plan,
-            result=result
-        ),
-        sampling_rate=0.25 # evaluating online 25% of agent behaviors
-    )
-    return response
-if __name__ == "__main__":
-    # Example customer message
-    customer_message = "Hi, I received a defective product and would like a refund. My order ID is #12345 and the item arrived broken."
-    result = support_agent(customer_message)
-```
-
-
-**That's it!** Your agent is now being monitored. Check your [Judgment Dashboard](https://app.judgmentlabs.ai/) to see the results. 
-
-## 🚀 Run RL Jobs on Your Agents
-
-Train your agents with reinforcement learning using [Fireworks AI](https://fireworks.ai/docs/fine-tuning/reinforcement-fine-tuning-models). Here's how to set up RL training with custom reward functions:
-
-Ensure you have your `FIREWORKS_API_KEY` environment variable set from [Fireworks AI](https://fireworks.ai/):
 
 ```bash
 export FIREWORKS_API_KEY=...
