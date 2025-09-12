@@ -1,9 +1,7 @@
 <div align="center">
 
-<a href="https://judgmentlabs.ai/">
-<img src="assets/new_lightmode.svg#gh-light-mode-only" alt="Judgment Logo" width="400" />
-<img src="assets/new_darkmode.svg#gh-dark-mode-only" alt="Judgment Logo" width="400" />
-</a>
+<a href="https://judgmentlabs.ai/"><img src="assets/new_lightmode.svg#gh-light-mode-only" alt="Judgment Logo" width="400" /></a>
+<a href="https://judgmentlabs.ai/"><img src="assets/new_darkmode.svg#gh-dark-mode-only" alt="Judgment Logo" width="400" /></a>
 
 <br>
 <div style="font-size: 1.5em;">
@@ -247,6 +245,12 @@ if __name__ == "__main__":
 ## 🚀 Run RL Jobs on Your Agents
 
 Train your agents with reinforcement learning using [Fireworks AI](https://fireworks.ai/docs/fine-tuning/reinforcement-fine-tuning-models). Here's how to set up RL training with custom reward functions:
+
+Ensure you have your `FIREWORKS_API_KEY` environment variable set from [Fireworks AI](https://fireworks.ai/):
+
+```bash
+export FIREWORKS_API_KEY=...
+```
 
 ### 1. Set Up Training Configuration
 
