@@ -47,6 +47,8 @@ jobs:
       - name: Run tests
         run: |
           cd src
+          export JUDGMENT_API_KEY="$JUDGEVAL_GH_JUDGMENT_API_KEY"
+          export JUDGMENT_ORG_ID="$JUDGEVAL_GH_JUDGMENT_ORG_ID"
           uv run pytest tests
 
   run-e2e-tests-staging:
