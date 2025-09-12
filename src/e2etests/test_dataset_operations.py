@@ -9,6 +9,7 @@ from judgeval import JudgmentClient
 from judgeval.exceptions import JudgmentAPIError
 from judgeval.data import Example
 from judgeval.dataset import Dataset
+from judgeval.dataset import DatasetInfo
 from e2etests.utils import create_project, delete_project
 
 
@@ -232,7 +233,6 @@ def test_dataset_list_after_creation(client: JudgmentClient, project_name: str, 
     assert dataset_name1 in dataset_names, f"Dataset {dataset_name1} should be in the list"
     assert dataset_name2 in dataset_names, f"Dataset {dataset_name2} should be in the list"
     
-    from judgeval.dataset import DatasetInfo
     for dataset_info in updated_datasets:
         assert isinstance(dataset_info, DatasetInfo), f"Expected DatasetInfo instance, got {type(dataset_info)}"
         assert dataset_info.dataset_kind == "example", "Dataset kind should be 'example'"
