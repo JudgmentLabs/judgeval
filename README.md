@@ -10,9 +10,9 @@
 
 ## [Docs](https://docs.judgmentlabs.ai/)  •  [Judgment Cloud](https://app.judgmentlabs.ai/register)  • [Self-Host](https://docs.judgmentlabs.ai/documentation/self-hosting/get-started)
 
-<!-- 
+
 [Bug Reports](https://github.com/JudgmentLabs/judgeval/issues) • [Changelog](https://docs.judgmentlabs.ai/changelog/2025-04-21)
--->
+
 
 [![X](https://img.shields.io/badge/-X/Twitter-000?logo=x&logoColor=white)](https://x.com/JudgmentLabs)
 [![LinkedIn](https://custom-icon-badges.demolab.com/badge/LinkedIn%20-0A66C2?logo=linkedin-white&logoColor=fff)](https://www.linkedin.com/company/judgmentlabs)
@@ -240,12 +240,11 @@ if __name__ == "__main__":
 ```
 
 
-
 **That's it!** Your agent is now being monitored. Check your [Judgment Dashboard](https://app.judgmentlabs.ai/) to see the results. 
 
 ## 🚀 Run RL Jobs on Your Agents
 
-Train your agents with reinforcement learning using Fireworks AI. Here's how to set up RL training with custom reward functions:
+Train your agents with reinforcement learning using [Fireworks AI](https://fireworks.ai/docs/fine-tuning/reinforcement-fine-tuning-models). Here's how to set up RL training with custom reward functions:
 
 ### 1. Set Up Training Configuration
 
