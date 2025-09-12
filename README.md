@@ -239,7 +239,139 @@ if __name__ == "__main__":
     result = support_agent(customer_message)
 ```
 
+
+
 **That's it!** Your agent is now being monitored. Check your [Judgment Dashboard](https://app.judgmentlabs.ai/) to see the results. 
+
+## 🚀 Run RL Jobs on Your Agents
+
+Train your agents with reinforcement learning using Fireworks AI. Here's how to set up RL training with custom reward functions:
+
+### 1. Set Up Training Configuration
+
+First, configure your training environment and model:
+
+```python
+from judgeval.trainer import JudgmentTrainer, TrainerConfig
+from judgeval.trainer.trainable_model import TrainableModel
+
+# Set up your judgment tracer first
+judgment = Tracer(
+    project_name="your-rl-project",
+    api_key=os.getenv("JUDGMENT_API_KEY")
+)
+
+# Set up your model configuration
+model = wrap(TrainableModel(
+    TrainerConfig(
+        base_model_name="your-base-model",
+        model_id="",  # Your fine-tuned model ID
+        user_id="",   # Your Fireworks user ID
+        deployment_id=""  # Your Fireworks deployment ID
+    )
+))
+
+# Create training prompts
+training_prompts = [
+    {"input": "your training data here"},
+    # Add more training examples...
+]
+
+# Initialize trainer
+trainer = JudgmentTrainer(
+    tracer=judgment,
+    project_name="your-rl-project",
+    trainable_model=model,
+    config=TrainerConfig(
+        base_model_name="your-base-model",
+        model_id="",
+        user_id="",
+        deployment_id="",
+        num_steps=32,
+        num_prompts_per_step=16,
+        num_generations_per_prompt=16
+    )
+)
+```
+
+### 2. Define Your Reward Scorer
+
+Create a custom scorer that defines what "good" behavior looks like for your agent:
+
+```python
+from judgeval.scorers import ExampleScorer
+from judgeval.data import Example
+
+class RewardScorer(ExampleScorer):
+    """
+    Custom reward function for your agent's performance.
+    """
+    score_type: str = "CustomReward"
+
+    async def a_score_example(self, example: Example, *args, **kwargs) -> float:
+        # Implement your reward logic here
+        # Return a score between 0 and 1 (or higher for bonuses)
+        
+        # Example: Simple reward based on task completion
+        if self.task_completed_successfully(example):
+            return 1.0
+        elif self.partial_success(example):
+            return 0.5
+        else:
+            return 0.0
+    
+    def task_completed_successfully(self, example):
+        # Your implementation here
+        pass
+    
+    def partial_success(self, example):
+        # Your implementation here
+        pass
+```
+
+### 3. Create Your Agent Function
+
+Define your agent with the `@judgment.observe` decorator:
+
+```python
+@judgment.observe(span_type="function")
+async def your_agent_function(input_data):
+    """
+    Your agent implementation.
+    
+    Args:
+        input_data: Input data for your agent
+        
+    Returns:
+        Agent's response/output
+    """
+    # Your agent logic here
+    # Use LLM calls, tool usage, etc.
+    
+    # Example structure:
+    # 1. Process input
+    # 2. Make decisions using LLM
+    # 3. Execute actions
+    # 4. Return results
+    
+    return agent_output
+```
+
+### 4. Start Training
+
+Run your RL training job:
+
+```python
+# Start the training process
+await trainer.train(
+    agent_function=your_agent_function,
+    scorers=[RewardScorer()],
+    prompts=training_prompts,
+    rft_provider="fireworks"
+)
+```
+
+**That's it!** Your agent will now learn from the reward signals and improve over time. Check your [Judgment Dashboard](https://app.judgmentlabs.ai/) to monitor training progress.
 
 ## ✨ Features
 
