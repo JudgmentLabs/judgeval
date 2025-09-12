@@ -1,7 +1,11 @@
 <div align="center">
 
-<a href="https://judgmentlabs.ai/"><img src="assets/new_lightmode.svg#gh-light-mode-only" alt="Judgment Logo" width="400" /></a>
-<a href="https://judgmentlabs.ai/"><img src="assets/new_darkmode.svg#gh-dark-mode-only" alt="Judgment Logo" width="400" /></a>
+<a href="https://judgmentlabs.ai/">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/new_darkmode.svg">
+    <img src="assets/new_lightmode.svg" alt="Judgment Logo" width="400" />
+  </picture>
+</a>
 
 <br>
 <div style="font-size: 1.5em;">
