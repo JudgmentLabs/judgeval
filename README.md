@@ -28,6 +28,57 @@ Run online monitoring on agent behavior using any scorer. Set up sentry-style al
 
 </table>
 
+## Agent Reinforcement Learning
+
+Train your agents with reinforcement learning using [Fireworks AI](https://fireworks.ai/)! Judgeval integrates seamlessly with Fireworks' Reinforcement Fine-Tuning (RFT) to help your agents learn from reward signals and improve their behavior over time.
+
+```python
+# Start the training process
+await trainer.train(
+    agent_function=your_agent_function,
+    scorers=[RewardScorer()],
+    prompts=training_prompts,
+    rft_provider="fireworks"
+)
+```
+
+**That's it!** Your agent will now learn from the reward signals and improve over time. Check your [Judgment Dashboard](https://app.judgmentlabs.ai/) to monitor training progress.
+
+## Judgeval Overview
+
+Judgeval is an open-source framework for custom scoring and online monitoring of agent behavior. We believe the true signals lie in agent behavior and production data - which is why Judgeval enables you to run RL jobs directly on high-quality signals from your production environment. This creates a data flywheel from monitoring to improvement, helping your agents continuously learn and adapt.
+
+## 📚 Cookbooks
+
+| Use Case | Link |
+|:---------|:-----|
+| Custom Scorers | [Link to custom scorers cookbook] |
+| Online Monitoring | [Link to monitoring cookbook] |
+| RL | [Link to RL cookbook] |
+
+You can access our repo of cookbooks [here](https://github.com/JudgmentLabs/judgeval-cookbook).
+
+
+## Why Judgeval?
+
+• **Custom Evaluators**: Build custom evaluators on top of your agents with LLM-as-a-judge, manual labeling, and code-based evaluators that connect to our metric-tracking infrastructure. [Learn more](https://docs.judgmentlabs.ai/documentation/evaluation/scorers/custom-scorers)
+
+• **Production Monitoring**: Get Slack alerts for agent failures in production with online monitoring. Add custom hooks to address production regressions before they impact users. [Learn more](https://docs.judgmentlabs.ai/documentation/performance/online-evals)
+
+• **Data-Driven Optimization**: Analyze production data and run further optimizations from that data, including reinforcement learning integrations that improve agent performance over time.
+
+<!--
+<img src="assets/product_shot.png" alt="Judgment Platform" width="800" />
+
+
+|  |  |
+|:---|:---:|
+| <h3>🧪 Evals</h3>Build custom evaluators on top of your agents. Judgeval supports LLM-as-a-judge, manual labeling, and code-based evaluators that connect with our metric-tracking infrastructure. <br><br>**Useful for:**<br>• ⚠️ Unit-testing <br>• 🔬 A/B testing <br>• 🛡️ Online guardrails | <p align="center"><img src="assets/test.png" alt="Evaluation metrics" width="800"/></p> |
+| <h3>📡 Monitoring</h3>Get Slack alerts for agent failures in production. Add custom hooks to address production regressions.<br><br> **Useful for:** <br>• 📉 Identifying degradation early <br>• 📈 Visualizing performance trends across agent versions and time | <p align="center"><img src="assets/errors.png" alt="Monitoring Dashboard" width="1200"/></p> |
+| <h3>📊 Datasets</h3>Export environment interactions and test cases to datasets for scaled analysis and optimization. Move datasets to/from Parquet, S3, etc. <br><br>Run evals on datasets as unit tests or to A/B test different agent configurations, enabling continuous learning from production interactions. <br><br> **Useful for:**<br>• 🗃️ Agent environment interaction data for optimization<br>• 🔄 Scaled analysis for A/B tests | <p align="center"><img src="assets/datasets_preview_screenshot.png" alt="Dataset management" width="1200"/></p> |
+
+-->
+
 ## 🛠️ Quickstart
 
 Get started with Judgeval by installing our SDK using pip:
@@ -45,146 +96,6 @@ export JUDGMENT_ORG_ID=...
 
 **If you don't have keys, [create an account](https://app.judgmentlabs.ai/register) on the platform!**
 
-```bash
-export FIREWORKS_API_KEY=...
-```
-
-### 1. Set Up Training Configuration
-
-First, configure your training environment and model:
-
-```python
-from judgeval.trainer import JudgmentTrainer, TrainerConfig
-from judgeval.trainer.trainable_model import TrainableModel
-
-# Set up your judgment tracer first
-judgment = Tracer(
-    project_name="your-rl-project",
-    api_key=os.getenv("JUDGMENT_API_KEY")
-)
-
-# Set up your model configuration
-model = wrap(TrainableModel(
-    TrainerConfig(
-        base_model_name="your-base-model",
-        model_id="",  # Your fine-tuned model ID
-        user_id="",   # Your Fireworks user ID
-        deployment_id=""  # Your Fireworks deployment ID
-    )
-))
-
-# Create training prompts
-training_prompts = [
-    {"input": "your training data here"},
-    # Add more training examples...
-]
-
-# Initialize trainer
-trainer = JudgmentTrainer(
-    tracer=judgment,
-    project_name="your-rl-project",
-    trainable_model=model,
-    config=TrainerConfig(
-        base_model_name="your-base-model",
-        model_id="",
-        user_id="",
-        deployment_id="",
-        num_steps=32,
-        num_prompts_per_step=16,
-        num_generations_per_prompt=16
-    )
-)
-```
-
-### 2. Define Your Reward Scorer
-
-Create a custom scorer that defines what "good" behavior looks like for your agent:
-
-```python
-from judgeval.scorers import ExampleScorer
-from judgeval.data import Example
-
-class RewardScorer(ExampleScorer):
-    """
-    Custom reward function for your agent's performance.
-    """
-    score_type: str = "CustomReward"
-
-    async def a_score_example(self, example: Example, *args, **kwargs) -> float:
-        # Implement your reward logic here
-        # Return a score between 0 and 1 (or higher for bonuses)
-        
-        # Example: Simple reward based on task completion
-        if self.task_completed_successfully(example):
-            return 1.0
-        elif self.partial_success(example):
-            return 0.5
-        else:
-            return 0.0
-    
-    def task_completed_successfully(self, example):
-        # Your implementation here
-        pass
-    
-    def partial_success(self, example):
-        # Your implementation here
-        pass
-```
-
-### 3. Create Your Agent Function
-
-Define your agent with the `@judgment.observe` decorator:
-
-```python
-@judgment.observe(span_type="function")
-async def your_agent_function(input_data):
-    """
-    Your agent implementation.
-    
-    Args:
-        input_data: Input data for your agent
-        
-    Returns:
-        Agent's response/output
-    """
-    # Your agent logic here
-    # Use LLM calls, tool usage, etc.
-    
-    # Example structure:
-    # 1. Process input
-    # 2. Make decisions using LLM
-    # 3. Execute actions
-    # 4. Return results
-    
-    return agent_output
-```
-
-### 4. Start Training
-
-Run your RL training job:
-
-```python
-# Start the training process
-await trainer.train(
-    agent_function=your_agent_function,
-    scorers=[RewardScorer()],
-    prompts=training_prompts,
-    rft_provider="fireworks"
-)
-```
-
-**That's it!** Your agent will now learn from the reward signals and improve over time. Check your [Judgment Dashboard](https://app.judgmentlabs.ai/) to monitor training progress.
-
-## ✨ Features
-
-<img src="assets/product_shot.png" alt="Judgment Platform" width="800" />
-
-
-|  |  |
-|:---|:---:|
-| <h3>🧪 Evals</h3>Build custom evaluators on top of your agents. Judgeval supports LLM-as-a-judge, manual labeling, and code-based evaluators that connect with our metric-tracking infrastructure. <br><br>**Useful for:**<br>• ⚠️ Unit-testing <br>• 🔬 A/B testing <br>• 🛡️ Online guardrails | <p align="center"><img src="assets/test.png" alt="Evaluation metrics" width="800"/></p> |
-| <h3>📡 Monitoring</h3>Get Slack alerts for agent failures in production. Add custom hooks to address production regressions.<br><br> **Useful for:** <br>• 📉 Identifying degradation early <br>• 📈 Visualizing performance trends across agent versions and time | <p align="center"><img src="assets/errors.png" alt="Monitoring Dashboard" width="1200"/></p> |
-| <h3>📊 Datasets</h3>Export environment interactions and test cases to datasets for scaled analysis and optimization. Move datasets to/from Parquet, S3, etc. <br><br>Run evals on datasets as unit tests or to A/B test different agent configurations, enabling continuous learning from production interactions. <br><br> **Useful for:**<br>• 🗃️ Agent environment interaction data for optimization<br>• 🔄 Scaled analysis for A/B tests | <p align="center"><img src="assets/datasets_preview_screenshot.png" alt="Dataset management" width="1200"/></p> |
 
 ## 🏢 Self-Hosting
 
@@ -199,12 +110,6 @@ Run Judgment on your own infrastructure: we provide comprehensive self-hosting c
 1. Check out our [self-hosting documentation](https://docs.judgmentlabs.ai/documentation/self-hosting/get-started) for detailed setup instructions, along with how your self-hosted instance can be accessed
 2. Use the [Judgment CLI](https://docs.judgmentlabs.ai/documentation/developer-tools/judgment-cli/installation) to deploy your self-hosted environment
 3. After your self-hosted instance is setup, make sure the `JUDGMENT_API_URL` environmental variable is set to your self-hosted backend endpoint
-
-## 📚 Cookbooks
-
-Have your own? We're happy to feature it if you create a PR or message us on [Discord](https://discord.gg/tGVFf8UBUY).
-
-You can access our repo of cookbooks [here](https://github.com/JudgmentLabs/judgment-cookbook).
 
 ## 💻 Development with Cursor
 Building agents and LLM workflows in Cursor works best when your coding assistant has the proper context about Judgment integration. The Cursor rules file contains the key information needed for your assistant to implement Judgment features effectively.
