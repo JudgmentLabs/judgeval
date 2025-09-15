@@ -33,7 +33,7 @@ Run online monitoring on agent behavior using any scorer. Set up sentry-style al
 Train your agents with reinforcement learning using [Fireworks AI](https://fireworks.ai/)! Judgeval integrates seamlessly with Fireworks' Reinforcement Fine-Tuning (RFT) to help your agents learn from reward signals and improve their behavior over time.
 
 ```python
-# Start the training process
+# RewardScorer is a custom scorer you define based on your agent's success criteria
 await trainer.train(
     agent_function=your_agent_function,
     scorers=[RewardScorer()],
@@ -42,11 +42,11 @@ await trainer.train(
 )
 ```
 
-**That's it!** Your agent will now learn from the reward signals and improve over time. Check your [Judgment Dashboard](https://app.judgmentlabs.ai/) to monitor training progress.
+**That's it!** Judgeval automatically manages trajectory collection and reward tagging - your agent learns from production data without any additional infrastructure. Check your [Judgment Dashboard](https://app.judgmentlabs.ai/) to monitor training progress.
 
 ## Judgeval Overview
 
-Judgeval is an open-source framework for custom scoring and online monitoring of agent behavior. We believe the true signals lie in agent behavior and production data - which is why Judgeval enables you to run RL jobs directly on high-quality signals from your production environment. This creates a data flywheel from monitoring to improvement, helping your agents continuously learn and adapt.
+Judgeval is an open-source framework for custom scoring and online monitoring of agent behavior. We believe the true signals of agent performance lie in production interactions - which is why Judgeval enables you to run RL jobs directly on high-quality signals from your production environment. Judgeval creates a data flywheel from monitoring to improvement, helping your agents continuously learn and adapt.
 
 ## 📚 Cookbooks
 
@@ -61,11 +61,11 @@ You can access our repo of cookbooks [here](https://github.com/JudgmentLabs/judg
 
 ## Why Judgeval?
 
-• **Custom Evaluators**: Build custom evaluators on top of your agents with LLM-as-a-judge, manual labeling, and code-based evaluators that connect to our metric-tracking infrastructure. [Learn more](https://docs.judgmentlabs.ai/documentation/evaluation/scorers/custom-scorers)
+• **Custom Evaluators**: Build custom evaluators on top of your agents with LLM-as-a-judge and code-based evaluators that connect to our metric-tracking infrastructure. [Learn more](https://docs.judgmentlabs.ai/documentation/evaluation/scorers/custom-scorers)
 
-• **Production Monitoring**: Get Slack alerts for agent failures in production with online monitoring. Add custom hooks to address production regressions before they impact users. [Learn more](https://docs.judgmentlabs.ai/documentation/performance/online-evals)
+• **Production Monitoring**: Run any custom scorer online in production. Get Slack alerts for failures and add custom hooks to address regressions before they impact users. [Learn more](https://docs.judgmentlabs.ai/documentation/performance/online-evals)
 
-• **Data-Driven Optimization**: Analyze production data and run further optimizations from that data, including reinforcement learning integrations that improve agent performance over time.
+• **Data-Driven Optimization**: Data-Driven Optimization: Easily run optimization jobs on top of production data without managing compute infrastructure or data pipelines.
 
 <!--
 <img src="assets/product_shot.png" alt="Judgment Platform" width="800" />
@@ -79,7 +79,7 @@ You can access our repo of cookbooks [here](https://github.com/JudgmentLabs/judg
 
 -->
 
-## 🛠️ Quickstart
+## 🛠️ [Quickstart](https://docs.judgmentlabs.ai/documentation)
 
 Get started with Judgeval by installing our SDK using pip:
 
@@ -116,9 +116,9 @@ Building agents and LLM workflows in Cursor works best when your coding assistan
 
 Refer to the official [documentation](https://docs.judgmentlabs.ai/documentation/developer-tools/cursor/cursor-rules) for access to the rules file and more information on integrating this rules file with your codebase.
 
-## ⭐ Star Us on GitHub
+## ⭐ Star Us
 
-If you find Judgeval useful, please consider giving us a star on GitHub! Your support helps us grow our community and continue improving the repository.
+If you find Judgeval useful, please consider giving us a star! Your support helps us grow our community and continue improving the repository.
 
 ## ❤️ Contributors
 
