@@ -11,8 +11,7 @@
 
 ## Agent Behavior Monitoring (ABM)
 
-Run online monitoring on agent behavior using any scorer. Set up sentry-style alerts and run RL jobs easily!
-
+Track and judge any agent behavior in online and offline setups. Set up Sentry-style alerts and run RL easily! 
 
 [![Docs](https://img.shields.io/badge/Documentation-blue)](https://docs.judgmentlabs.ai/documentation)
 [![Judgment Cloud](https://img.shields.io/badge/Judgment%20Cloud-brightgreen)](https://app.judgmentlabs.ai/register)
@@ -28,25 +27,25 @@ Run online monitoring on agent behavior using any scorer. Set up sentry-style al
 
 </table>
 
-## Agent Reinforcement Learning
+## [NEW] 🎆 Agent Reinforcement Learning
 
-Train your agents with reinforcement learning using [Fireworks AI](https://fireworks.ai/)! Judgeval integrates seamlessly with Fireworks' Reinforcement Fine-Tuning (RFT) to help your agents learn from reward signals and improve their behavior over time.
+Train your agents with reinforcement learning using [Fireworks AI](https://fireworks.ai/)! Judgeval now integrates with Fireworks' Reinforcement Fine-Tuning (RFT) endpoint. 
+Judgeval provides a simple harness for integrating GRPO into any Python agent, giving builders a quick method to **try RL with minimal code changes**!
 
 ```python
-# RewardScorer is a custom scorer you define based on your agent's success criteria
 await trainer.train(
     agent_function=your_agent_function,
-    scorers=[RewardScorer()],
-    prompts=training_prompts,
+    scorers=[RewardScorer()],  # Custom scorer you define based on your agent's success criteria
+    prompts=training_prompts,  # Tasks
     rft_provider="fireworks"
 )
 ```
 
-**That's it!** Judgeval automatically manages trajectory collection and reward tagging - your agent learns from production data without any additional infrastructure. Check your [Judgment Dashboard](https://app.judgmentlabs.ai/) to monitor training progress.
+**That's it!** Judgeval automatically manages trajectory collection and reward tagging - your agent can learn from production data with minimal code changes. You can view and monitor training progress for free via the [Judgment Dashboard](https://app.judgmentlabs.ai/).
 
 ## Judgeval Overview
 
-Judgeval is an open-source framework for custom scoring and online monitoring of agent behavior. We believe the true signals of agent performance lie in production interactions - which is why Judgeval enables you to run RL jobs directly on high-quality signals from your production environment. Judgeval creates a data flywheel from monitoring to improvement, helping your agents continuously learn and adapt.
+Judgeval is an open-source framework for agent behavior monitoring. Judgeval provides an ergonomic toolkit to track and judge agent behavior in online and offline setups, enabling you to convert high-signal interaction data from production/test environments into more reliable agents. For a quick, interactive demo, run one of the notebooks below depending on your use case. You can also dive deeper in our [docs](https://docs.judgmentlabs.ai/documentation).
 
 ## 📚 Cookbooks
 
@@ -61,11 +60,11 @@ You can access our repo of cookbooks [here](https://github.com/JudgmentLabs/judg
 
 ## Why Judgeval?
 
-• **Custom Evaluators**: Build custom evaluators on top of your agents with LLM-as-a-judge and code-based evaluators that connect to our metric-tracking infrastructure. [Learn more](https://docs.judgmentlabs.ai/documentation/evaluation/scorers/custom-scorers)
+• **Custom Evaluators**: Judgeval provides simple abstractions for custom evaluators and their applications to your agents, supporting LLM-as-a-judge and code-based evaluators that connect to our metric-tracking infrastructure. [Learn more](https://docs.judgmentlabs.ai/documentation/evaluation/scorers/custom-scorers)
 
 • **Production Monitoring**: Run any custom scorer online in production. Get Slack alerts for failures and add custom hooks to address regressions before they impact users. [Learn more](https://docs.judgmentlabs.ai/documentation/performance/online-evals)
 
-• **Data-Driven Optimization**: Data-Driven Optimization: Easily run optimization jobs on top of production data without managing compute infrastructure or data pipelines.
+• **Simple to run RL**: Go from agent code to optimization via RL easily without managing compute infrastructure or data pipelines. Simply plug onto your agents in production and train!
 
 <!--
 <img src="assets/product_shot.png" alt="Judgment Platform" width="800" />
@@ -96,7 +95,7 @@ export JUDGMENT_ORG_ID=...
 
 **If you don't have keys, [create an account](https://app.judgmentlabs.ai/register) on the platform!**
 
-
+<!--
 ## 🏢 Self-Hosting
 
 Run Judgment on your own infrastructure: we provide comprehensive self-hosting capabilities that give you full control over the backend and data plane that Judgeval interfaces with.
@@ -110,6 +109,7 @@ Run Judgment on your own infrastructure: we provide comprehensive self-hosting c
 1. Check out our [self-hosting documentation](https://docs.judgmentlabs.ai/documentation/self-hosting/get-started) for detailed setup instructions, along with how your self-hosted instance can be accessed
 2. Use the [Judgment CLI](https://docs.judgmentlabs.ai/documentation/developer-tools/judgment-cli/installation) to deploy your self-hosted environment
 3. After your self-hosted instance is setup, make sure the `JUDGMENT_API_URL` environmental variable is set to your self-hosted backend endpoint
+-->
 
 ## 💻 Development with Cursor
 Building agents and LLM workflows in Cursor works best when your coding assistant has the proper context about Judgment integration. The Cursor rules file contains the key information needed for your assistant to implement Judgment features effectively.
