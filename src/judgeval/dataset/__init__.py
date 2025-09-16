@@ -3,15 +3,16 @@ import orjson
 import os
 import yaml
 from dataclasses import dataclass
-from typing import List, Literal
+from typing import List, Literal, Optional, Union
 
 from judgeval.data import Example
+from judgeval.data.trace import Trace, TraceSpan, TraceScore, TraceRule
 from judgeval.utils.file_utils import get_examples_from_yaml, get_examples_from_json
 from judgeval.api import JudgmentSyncClient
 from judgeval.logger import judgeval_logger
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_ORG_ID
 
-from judgeval.api.api_types import DatasetKind
+from judgeval.data.judgment_types import DatasetKind
 
 
 @dataclass
@@ -26,9 +27,11 @@ class DatasetInfo:
 
 @dataclass
 class Dataset:
-    examples: List[Example]
     name: str
     project_name: str
+    dataset_kind: DatasetKind
+    examples: Optional[List[Example]] = None
+    traces: Optional[List[Trace]] = None
     judgment_api_key: str = JUDGMENT_API_KEY or ""
     organization_id: str = JUDGMENT_ORG_ID or ""
 
@@ -47,22 +50,77 @@ class Dataset:
         )
         if not dataset:
             raise ValueError(f"Dataset {name} not found in project {project_name}")
-        examples = dataset.get("examples", [])
-        if examples is None:
-            examples = []
 
-        for e in examples:
-            if isinstance(e, dict) and isinstance(e.get("data", {}), dict):
-                e.update(e.pop("data"))  # type: ignore
-                e.pop(
-                    "example_id"
-                )  # TODO: remove once scorer data migraiton is complete
-        judgeval_logger.info(f"Successfully retrieved dataset {name}!")
-        return cls(
-            name=name,
-            project_name=project_name,
-            examples=[Example(**e) for e in examples],
-        )
+        dataset_kind = DatasetKind(dataset.get("dataset_kind", "example"))
+
+        if dataset_kind == DatasetKind.example:
+            examples = dataset.get("examples", [])
+            if examples is None:
+                examples = []
+
+            for e in examples:
+                if isinstance(e, dict) and isinstance(e.get("data", {}), dict):
+                    e.update(e.pop("data"))  # type: ignore
+                    e.pop(
+                        "example_id"
+                    )  # TODO: remove once scorer data migration is complete
+            judgeval_logger.info(f"Successfully retrieved example dataset {name}!")
+            return cls(
+                name=name,
+                project_name=project_name,
+                dataset_kind=dataset_kind,
+                examples=[Example(**e) for e in examples],
+            )
+
+        elif dataset_kind == DatasetKind.trace:
+            trace_data = dataset.get("traces", [])
+            if trace_data is None:
+                trace_data = []
+
+            traces = []
+            for trace_item in trace_data:
+                if isinstance(trace_item, dict):
+                    # Extract trace detail and spans
+                    trace_detail = trace_item.get("trace_detail", {})
+                    spans_data = trace_item.get("spans", [])
+
+                    # Convert spans
+                    spans = []
+                    for span_data in spans_data:
+                        if isinstance(span_data, dict):
+                            # Convert scores if present
+                            if "scores" in span_data and span_data["scores"]:
+                                span_data["scores"] = [
+                                    TraceScore(**score) for score in span_data["scores"]
+                                ]
+                            spans.append(TraceSpan(**span_data))
+
+                    # Convert trace-level data
+                    if isinstance(trace_detail, dict):
+                        # Convert scores and rules if present
+                        if "scores" in trace_detail and trace_detail["scores"]:
+                            trace_detail["scores"] = [
+                                TraceScore(**score) for score in trace_detail["scores"]
+                            ]
+                        if "rules" in trace_detail and trace_detail["rules"]:
+                            trace_detail["rules"] = [
+                                TraceRule(**rule) for rule in trace_detail["rules"]
+                            ]
+
+                        # Create trace with spans
+                        trace = Trace(**trace_detail, spans=spans)
+                        traces.append(trace)
+
+            judgeval_logger.info(f"Successfully retrieved trace dataset {name}!")
+            return cls(
+                name=name,
+                project_name=project_name,
+                dataset_kind=dataset_kind,
+                traces=traces,
+            )
+
+        else:
+            raise ValueError(f"Unsupported dataset kind: {dataset_kind}")
 
     @classmethod
     def create(
@@ -197,10 +255,23 @@ class Dataset:
             )
 
     def __iter__(self):
-        return iter(self.examples)
+        if self.dataset_kind == DatasetKind.example and self.examples:
+            return iter(self.examples)
+        elif self.dataset_kind == DatasetKind.trace and self.traces:
+            return iter(self.traces)
+        else:
+            return iter([])
 
     def __len__(self):
-        return len(self.examples)
+        if self.dataset_kind == DatasetKind.example and self.examples:
+            return len(self.examples)
+        elif self.dataset_kind == DatasetKind.trace and self.traces:
+            return len(self.traces)
+        else:
+            return 0
 
     def __str__(self):
-        return f"{self.__class__.__name__}(examples={self.examples}, name={self.name})"
+        if self.dataset_kind == DatasetKind.example:
+            return f"{self.__class__.__name__}(examples={self.examples}, name={self.name})"
+        else:
+            return f"{self.__class__.__name__}(traces={self.traces}, name={self.name})"
