@@ -35,7 +35,7 @@ Judgeval provides a simple harness for integrating GRPO into any Python agent, g
 ```python
 await trainer.train(
     agent_function=your_agent_function,
-    scorers=[RewardScorer()],  # Custom scorer you define based on your agent's success criteria
+    scorers=[RewardScorer()],  # Custom scorer you define based on task criteria
     prompts=training_prompts,  # Tasks
     rft_provider="fireworks"
 )
