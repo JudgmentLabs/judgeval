@@ -2,8 +2,8 @@
 
 <a href="https://judgmentlabs.ai/">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/new_darkmode.svg">
-    <img src="assets/new_lightmode.svg" alt="Judgment Logo" width="400" />
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo_darkmode.svg">
+    <img src="assets/logo_lightmode.svg" alt="Judgment Logo" width="400" />
   </picture>
 </a>
 
