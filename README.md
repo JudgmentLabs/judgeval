@@ -30,7 +30,7 @@ Track and judge any agent behavior in online and offline setups. Set up Sentry-s
 ## [NEW] 🎆 Agent Reinforcement Learning
 
 Train your agents with reinforcement learning using [Fireworks AI](https://fireworks.ai/)! Judgeval now integrates with Fireworks' Reinforcement Fine-Tuning (RFT) endpoint. 
-Judgeval provides a simple harness for integrating GRPO into any Python agent, giving builders a quick method to **try RL with minimal code changes**!
+Judgeval provides a simple harness for integrating GRPO into any Python agent, giving builders a quick method to **try RL with minimal code changes** to their existing agents!
 
 ```python
 await trainer.train(
@@ -47,6 +47,8 @@ await trainer.train(
 
 Judgeval is an open-source framework for agent behavior monitoring. Judgeval provides an ergonomic toolkit to track and judge agent behavior in online and offline setups, enabling you to convert high-signal interaction data from production/test environments into more reliable agents. For a quick, interactive demo, run one of the notebooks below depending on your use case. You can also dive deeper in our [docs](https://docs.judgmentlabs.ai/documentation).
 
+Our mission is to unlock the power of production data for agent development, enabling teams to improve their apps by catching real-time failures and optimizing over their users' preferences.
+
 ## 📚 Cookbooks
 
 | Use Case | Link |
@@ -60,11 +62,13 @@ You can access our repo of cookbooks [here](https://github.com/JudgmentLabs/judg
 
 ## Why Judgeval?
 
-• **Custom Evaluators**: Judgeval provides simple abstractions for custom evaluators and their applications to your agents, supporting LLM-as-a-judge and code-based evaluators that connect to our metric-tracking infrastructure. [Learn more](https://docs.judgmentlabs.ai/documentation/evaluation/scorers/custom-scorers)
+• **Custom Evaluators**: Judgeval provides simple abstractions for custom evaluators and their applications to your agents, supporting LLM-as-a-judge and code-based evaluators that connect to datasets our and metric-tracking infrastructure. [Learn more](https://docs.judgmentlabs.ai/documentation/evaluation/scorers/custom-scorers)
 
 • **Production Monitoring**: Run any custom scorer online in production. Get Slack alerts for failures and add custom hooks to address regressions before they impact users. [Learn more](https://docs.judgmentlabs.ai/documentation/performance/online-evals)
 
 • **Simple to run RL**: Go from agent code to optimization via RL easily without managing compute infrastructure or data pipelines. Simply plug onto your agents in production and train!
+
+• **Experiment with evals**: Test out different prompts, models, or changes to your agent by running tests using any evaluator. Visualize and compare results over time! [Learn more](https://docs.judgmentlabs.ai/documentation/evaluation/introduction)
 
 <!--
 <img src="assets/product_shot.png" alt="Judgment Platform" width="800" />
@@ -109,12 +113,13 @@ Run Judgment on your own infrastructure: we provide comprehensive self-hosting c
 1. Check out our [self-hosting documentation](https://docs.judgmentlabs.ai/documentation/self-hosting/get-started) for detailed setup instructions, along with how your self-hosted instance can be accessed
 2. Use the [Judgment CLI](https://docs.judgmentlabs.ai/documentation/developer-tools/judgment-cli/installation) to deploy your self-hosted environment
 3. After your self-hosted instance is setup, make sure the `JUDGMENT_API_URL` environmental variable is set to your self-hosted backend endpoint
--->
 
 ## 💻 Development with Cursor
 Building agents and LLM workflows in Cursor works best when your coding assistant has the proper context about Judgment integration. The Cursor rules file contains the key information needed for your assistant to implement Judgment features effectively.
 
 Refer to the official [documentation](https://docs.judgmentlabs.ai/documentation/developer-tools/cursor/cursor-rules) for access to the rules file and more information on integrating this rules file with your codebase.
+-->
+
 
 ## ⭐ Star Us
 
