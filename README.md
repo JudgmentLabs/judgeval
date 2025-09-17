@@ -11,7 +11,7 @@
 
 ## Agent Behavior Monitoring (ABM)
 
-Track and judge any agent behavior in online and offline setups. Set up Sentry-style alerts and run RL easily! 
+Track and judge any agent behavior in online and offline setups. Set up Sentry-style alerts and run RL on Qwen, LLama, and gpt-oss easily! 
 
 [![Docs](https://img.shields.io/badge/Documentation-blue)](https://docs.judgmentlabs.ai/documentation)
 [![Judgment Cloud](https://img.shields.io/badge/Judgment%20Cloud-brightgreen)](https://app.judgmentlabs.ai/register)
@@ -29,7 +29,8 @@ Track and judge any agent behavior in online and offline setups. Set up Sentry-s
 
 ## [NEW] 🎆 Agent Reinforcement Learning
 
-Train your agents with multi-turn reinforcement learning using [Fireworks AI](https://fireworks.ai/)! Judgeval now integrates with Fireworks' Reinforcement Fine-Tuning (RFT) endpoint. 
+Train your agents with multi-turn reinforcement learning using [Fireworks AI](https://fireworks.ai/)! Judgeval now integrates with Fireworks' Reinforcement Fine-Tuning (RFT) endpoint, supporting gpt-oss, qwen3, Kimi2, DeepSeek, and more.
+
 Judgeval provides a simple harness for integrating GRPO into any Python agent, giving builders a quick method to **try RL with minimal code changes** to their existing agents!
 
 ```python
@@ -51,11 +52,11 @@ Our mission is to unlock the power of production data for agent development, ena
 
 ## 📚 Cookbooks
 
-| Use Case | Link |
-|:---------|:-----|
-| Custom Scorers | [Link to custom scorers cookbook] |
-| Online Monitoring | [Link to monitoring cookbook] |
-| RL | [Link to RL cookbook] |
+| Try Out | Notebook | Description |
+|:---------|:-----|:------------|
+| Custom Scorers | [Get Started For Free] | Build custom evaluators for your agents |
+| Online Monitoring | [Get Started For Free] | Monitor agent behavior in production |
+| RL | [Get Started For Free] | Train agents with reinforcement learning |
 
 You can access our repo of cookbooks [here](https://github.com/JudgmentLabs/judgeval-cookbook).
 
@@ -127,7 +128,7 @@ def run_agent(prompt: str) -> str:
     judgment.async_evaluate(  # trigger online monitoring
         scorer=AnswerRelevancyScorer(threshold=0.5),  # swap with your scorers
         example=Example(input=task, actual_output=response),  # customize to your data
-        model="gpt-4.1",
+        model="gpt-5",
     )
     return response.choices[0].message.content
 
