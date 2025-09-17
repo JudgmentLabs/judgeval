@@ -1,4 +1,4 @@
-from typing import List, Optional, Union, Tuple
+from typing import List, Optional, Union, Tuple, Sequence
 from pydantic import field_validator, model_validator, Field, BaseModel
 from datetime import datetime, timezone
 import uuid
@@ -19,8 +19,10 @@ class EvaluationRun(BaseModel):
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
     custom_scorers: List[ExampleScorer] = Field(default_factory=list)
-    judgment_scorers: List[APIScorerConfig] = Field(default_factory=list)
-    scorers: List[Union[ExampleScorer, APIScorerConfig]] = Field(default_factory=list)
+    judgment_scorers: Sequence[APIScorerConfig] = Field(default_factory=list)
+    scorers: Sequence[Union[ExampleScorer, APIScorerConfig]] = Field(
+        default_factory=list
+    )
     model: str
 
     def __init__(

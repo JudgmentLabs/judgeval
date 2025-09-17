@@ -43,7 +43,7 @@ from judgeval.env import (
     JUDGMENT_ORG_ID,
 )
 from judgeval.logger import judgeval_logger
-from judgeval.scorers.api_scorer import APIScorerConfig
+from judgeval.scorers.api_scorer import TraceAPIScorerConfig, ExampleAPIScorerConfig
 from judgeval.scorers.example_scorer import ExampleScorer
 from judgeval.tracer.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
 from judgeval.tracer.managers import (
@@ -328,7 +328,7 @@ class Tracer:
         run_condition = scorer_config.run_condition
         sampling_rate = scorer_config.sampling_rate
 
-        if not isinstance(scorer, (APIScorerConfig)):
+        if not isinstance(scorer, (TraceAPIScorerConfig)):
             judgeval_logger.error(
                 "Scorer must be an instance of TraceAPIScorerConfig, got %s, skipping evaluation."
                 % type(scorer)
@@ -861,7 +861,7 @@ class Tracer:
         self,
         /,
         *,
-        scorer: Union[APIScorerConfig, ExampleScorer],
+        scorer: Union[ExampleAPIScorerConfig, ExampleScorer],
         example: Example,
         model: str = JUDGMENT_DEFAULT_GPT_MODEL,
         sampling_rate: float = 1.0,
@@ -870,7 +870,7 @@ class Tracer:
             judgeval_logger.info("Evaluation is not enabled, skipping evaluation")
             return
 
-        if not isinstance(scorer, (APIScorerConfig, ExampleScorer)):
+        if not isinstance(scorer, (ExampleAPIScorerConfig, ExampleScorer)):
             judgeval_logger.error(
                 "Scorer must be an instance of ExampleAPIScorerConfig or BaseScorer, got %s, skipping evaluation."
                 % type(scorer)
@@ -901,7 +901,7 @@ class Tracer:
         span_context = self.get_current_span().get_span_context()
         trace_id = format(span_context.trace_id, "032x")
         span_id = format(span_context.span_id, "016x")
-        hosted_scoring = isinstance(scorer, APIScorerConfig) or (
+        hosted_scoring = isinstance(scorer, ExampleAPIScorerConfig) or (
             isinstance(scorer, ExampleScorer) and scorer.server_hosted
         )
         eval_run_name = f"async_evaluate_{span_id}"  # note this name doesnt matter because we don't save the experiment only the example and scorer_data

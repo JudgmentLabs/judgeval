@@ -1,5 +1,7 @@
 from judgeval.scorers.api_scorer import (
     APIScorerConfig,
+    ExampleAPIScorerConfig,
+    TraceAPIScorerConfig,
 )
 from judgeval.scorers.base_scorer import BaseScorer
 from judgeval.scorers.judgeval_scorers.api_scorers import (
@@ -13,6 +15,8 @@ from judgeval.scorers.judgeval_scorers.api_scorers import (
 
 __all__ = [
     "APIScorerConfig",
+    "ExampleAPIScorerConfig",
+    "TraceAPIScorerConfig",
     "BaseScorer",
     "TracePromptScorer",
     "PromptScorer",
