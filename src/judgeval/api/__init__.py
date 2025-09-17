@@ -199,6 +199,28 @@ class JudgmentSyncClient:
             payload,
         )
 
+    def prompts_insert(self, payload: PromptInsertRequest) -> PromptInsertResponse:
+        return self._request(
+            "POST",
+            url_for("/prompts/insert/"),
+            payload,
+        )
+
+    def prompts_fetch(
+        self, name: str, commit_id: Optional[str] = None, tag: Optional[str] = None
+    ) -> PromptFetchResponse:
+        query_params = {}
+        query_params["name"] = name
+        if commit_id is not None:
+            query_params["commit_id"] = commit_id
+        if tag is not None:
+            query_params["tag"] = tag
+        return self._request(
+            "GET",
+            url_for("/prompts/fetch/"),
+            query_params,
+        )
+
     def projects_resolve(
         self, payload: ResolveProjectNameRequest
     ) -> ResolveProjectNameResponse:
@@ -408,6 +430,30 @@ class JudgmentAsyncClient:
             "POST",
             url_for("/upload_custom_scorer/"),
             payload,
+        )
+
+    async def prompts_insert(
+        self, payload: PromptInsertRequest
+    ) -> PromptInsertResponse:
+        return await self._request(
+            "POST",
+            url_for("/prompts/insert/"),
+            payload,
+        )
+
+    async def prompts_fetch(
+        self, name: str, commit_id: Optional[str] = None, tag: Optional[str] = None
+    ) -> PromptFetchResponse:
+        query_params = {}
+        query_params["name"] = name
+        if commit_id is not None:
+            query_params["commit_id"] = commit_id
+        if tag is not None:
+            query_params["tag"] = tag
+        return await self._request(
+            "GET",
+            url_for("/prompts/fetch/"),
+            query_params,
         )
 
     async def projects_resolve(
