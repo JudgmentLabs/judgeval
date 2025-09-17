@@ -45,7 +45,7 @@ await trainer.train(
 
 ## Judgeval Overview
 
-Judgeval is an open-source framework for agent behavior monitoring. Judgeval provides an ergonomic toolkit to track and judge agent behavior in online and offline setups, enabling you to convert high-signal interaction data from production/test environments into more reliable agents. For a quick, interactive demo, run one of the notebooks below depending on your use case. You can also dive deeper in our [docs](https://docs.judgmentlabs.ai/documentation).
+Judgeval is an open-source framework for agent behavior monitoring. Judgeval offers a toolkit to track and judge agent behavior in online and offline setups, enabling you to convert interaction data from production/test environments into improved agents. To get started, try running one of the notebooks below depending on your use case or diving deeper in our [docs](https://docs.judgmentlabs.ai/documentation).
 
 Our mission is to unlock the power of production data for agent development, enabling teams to improve their apps by catching real-time failures and optimizing over their users' preferences.
 
