@@ -872,7 +872,7 @@ class Tracer:
 
         if not isinstance(scorer, (ExampleAPIScorerConfig, ExampleScorer)):
             judgeval_logger.error(
-                "Scorer must be an instance of ExampleAPIScorerConfig or BaseScorer, got %s, skipping evaluation."
+                "Scorer must be an instance of ExampleAPIScorerConfig or ExampleScorer, got %s, skipping evaluation."
                 % type(scorer)
             )
             return
