@@ -99,14 +99,17 @@ export JUDGMENT_ORG_ID=...
 
 **If you don't have keys, [create an account](https://app.judgmentlabs.ai/register) on the platform!**
 
-```
+### Start monitoring with Judgeval
+
+```python
 from judgeval.tracer import Tracer, wrap
 from judgeval.data import Example
 from judgeval.scorers import AnswerRelevancyScorer
 from openai import OpenAI
 
-client = wrap(OpenAI())  # tracks all LLM calls
+
 judgment = Tracer(project_name="default_project")
+client = wrap(OpenAI())  # tracks all LLM calls
 
 @judgment.observe(span_type="tool")
 def format_question(question: str) -> str:
@@ -121,9 +124,9 @@ def run_agent(prompt: str) -> str:
         messages=[{"role": "user", "content": task}]
     )
 
-    judgment.async_evaluate(
-        scorer=AnswerRelevancyScorer(threshold=0.5),
-        example=Example(input=task, actual_output=response),
+    judgment.async_evaluate(  # trigger online monitoring
+        scorer=AnswerRelevancyScorer(threshold=0.5),  # swap with your scorers
+        example=Example(input=task, actual_output=response),  # customize to your data
         model="gpt-4.1",
     )
     return response.choices[0].message.content
