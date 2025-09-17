@@ -82,7 +82,7 @@ You can access our repo of cookbooks [here](https://github.com/JudgmentLabs/judg
 
 -->
 
-## 🛠️ [Quickstart](https://docs.judgmentlabs.ai/documentation)
+## 🛠️ Quickstart
 
 Get started with Judgeval by installing our SDK using pip:
 
@@ -98,6 +98,39 @@ export JUDGMENT_ORG_ID=...
 ```
 
 **If you don't have keys, [create an account](https://app.judgmentlabs.ai/register) on the platform!**
+
+```
+from judgeval.tracer import Tracer, wrap
+from judgeval.data import Example
+from judgeval.scorers import AnswerRelevancyScorer
+from openai import OpenAI
+
+client = wrap(OpenAI())  # tracks all LLM calls
+judgment = Tracer(project_name="default_project")
+
+@judgment.observe(span_type="tool")
+def format_question(question: str) -> str:
+    # dummy tool
+    return f"Question : {question}"
+
+@judgment.observe(span_type="function")
+def run_agent(prompt: str) -> str:
+    task = format_question(prompt)
+    response = client.chat.completions.create(
+        model="gpt-4.1",
+        messages=[{"role": "user", "content": task}]
+    )
+
+    judgment.async_evaluate(
+        scorer=AnswerRelevancyScorer(threshold=0.5),
+        example=Example(input=task, actual_output=response),
+        model="gpt-4.1",
+    )
+    return response.choices[0].message.content
+
+run_agent("What is the capital of the United States?")
+```
+
 
 <!--
 ## 🏢 Self-Hosting
