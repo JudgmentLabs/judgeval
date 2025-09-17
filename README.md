@@ -29,7 +29,7 @@ Track and judge any agent behavior in online and offline setups. Set up Sentry-s
 
 ## [NEW] 🎆 Agent Reinforcement Learning
 
-Train your agents with reinforcement learning using [Fireworks AI](https://fireworks.ai/)! Judgeval now integrates with Fireworks' Reinforcement Fine-Tuning (RFT) endpoint. 
+Train your agents with multi-turn reinforcement learning using [Fireworks AI](https://fireworks.ai/)! Judgeval now integrates with Fireworks' Reinforcement Fine-Tuning (RFT) endpoint. 
 Judgeval provides a simple harness for integrating GRPO into any Python agent, giving builders a quick method to **try RL with minimal code changes** to their existing agents!
 
 ```python
@@ -66,7 +66,7 @@ You can access our repo of cookbooks [here](https://github.com/JudgmentLabs/judg
 
 • **Production Monitoring**: Run any custom scorer online in production. Get Slack alerts for failures and add custom hooks to address regressions before they impact users. [Learn more](https://docs.judgmentlabs.ai/documentation/performance/online-evals)
 
-• **Simple to run RL**: Go from agent code to optimization via RL easily without managing compute infrastructure or data pipelines. Simply plug onto your agents in production and train!
+• **Simple to run multi-turn RL**: Go from agent code to optimization via RL (supports multi-turn) easily without managing compute infrastructure or data pipelines. Simply plug onto your agents in production and train!
 
 • **Experiment with evals**: Test out different prompts, models, or changes to your agent by running tests using any evaluator. Visualize and compare results over time! [Learn more](https://docs.judgmentlabs.ai/documentation/evaluation/introduction)
 
