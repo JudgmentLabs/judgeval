@@ -134,6 +134,10 @@ def run_agent(prompt: str) -> str:
 run_agent("What is the capital of the United States?")
 ```
 
+Running this code will deliver monitoring results to your [platform account](https://app.judgmentlabs.ai/register) and should look like this:
+
+![Judgment Platform Trajectory View](assets/quickstart_trajectory_ss.png)
+
 
 <!--
 ## 🏢 Self-Hosting
