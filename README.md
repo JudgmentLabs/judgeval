@@ -35,8 +35,8 @@ Judgeval provides a simple harness for integrating GRPO into any Python agent, g
 
 ```python
 await trainer.train(
-    agent_function=your_agent_function,
-    scorers=[RewardScorer()],  # Custom scorer you define based on task criteria
+    agent_function=your_agent_function,  # entry point to your agent
+    scorers=[RewardScorer()],  # Custom scorer you define based on task criteria, acts as reward
     prompts=training_prompts,  # Tasks
     rft_provider="fireworks"
 )
@@ -63,13 +63,16 @@ You can access our repo of cookbooks [here](https://github.com/JudgmentLabs/judg
 
 ## Why Judgeval?
 
-• **Custom Evaluators**: Judgeval provides simple abstractions for custom evaluators and their applications to your agents, supporting LLM-as-a-judge and code-based evaluators that connect to datasets our and metric-tracking infrastructure. [Learn more](https://docs.judgmentlabs.ai/documentation/evaluation/scorers/custom-scorers)
+• **Custom Evaluators**: No restriction to only monitoring with prefab scorers. Judgeval provides simple abstractions for custom python evaluators and their applications, supporting any LLM-as-a-judge rubrics and code-based scorers that integrate to our live agent-tracking infrastructure. [Learn more](https://docs.judgmentlabs.ai/documentation/evaluation/scorers/custom-scorers)
 
-• **Production Monitoring**: Run any custom scorer online in production. Get Slack alerts for failures and add custom hooks to address regressions before they impact users. [Learn more](https://docs.judgmentlabs.ai/documentation/performance/online-evals)
+• **Production Monitoring**: Run any custom scorer to flag agent behaviors online in production. Group agent runs by behavior type into buckets for deeper analysis. Get Slack alerts for failures and add custom hooks to address regressions before they impact users. [Learn more](https://docs.judgmentlabs.ai/documentation/performance/online-evals)
 
-• **Simple to run multi-turn RL**: Go from agent code to optimization via RL (supports multi-turn) easily without managing compute infrastructure or data pipelines. Simply plug onto your agents in production and train!
+• **Simple to run multi-turn RL**: Optimize your agents with multi-turn RL without managing compute infrastructure or data pipelines. Just add a few lines of code to your existing agent code and train!
+<!-- 
+TODO: Once we have trainer code docs, plug in here
+-->
 
-• **Experiment with evals**: Test out different prompts, models, or changes to your agent by running tests using any evaluator. Visualize and compare results over time! [Learn more](https://docs.judgmentlabs.ai/documentation/evaluation/introduction)
+• **Experiment with evals**: Try out different prompts, models, or agent configs, then test for improvement with any agent behavior evaluator. Visualize and compare results over time! [Learn more](https://docs.judgmentlabs.ai/documentation/evaluation/introduction)
 
 <!--
 <img src="assets/product_shot.png" alt="Judgment Platform" width="800" />
@@ -139,6 +142,56 @@ Running this code will deliver monitoring results to your [platform account](htt
 
 ![Judgment Platform Trajectory View](assets/quickstart_trajectory_ss.png)
 
+
+### Customizable Scorers Over Agent Behavior
+
+Judgeval's strongest suit is the full customization over the types of scorers you can run online monitoring with. No restrictions to only single-prompt LLM judges or prefab scorers - if you can express your scorer
+in python code, judgeval can monitor it!
+
+```python
+from judgeval.tracer import Tracer, wrap
+from judgeval.data import Example
+from judgeval.scorers.example_scorer import ExampleScorer
+from openai import OpenAI
+
+judgment = Tracer(project_name="default_project")
+client = wrap(OpenAI())
+
+class CustomerRequest(Example):  # Define a custom example class
+    request: str
+    response: str
+
+class ResolutionScorer(ExampleScorer):  # Define a agent-specific custom scorer
+    name: str = "Resolution Scorer"
+    server_hosted: bool = True  # Executes scorer in a virtualized secure container
+
+    async def a_score_example(self, example: CustomerRequest):
+      # Custom scoring logic for agent behavior. Import dependencies, combine LLM judge with logic, and more
+        if "package" in example.response.lower():  
+            self.reason = "The response addresses the package inquiry"
+            return 1.0
+        else:
+            self.reason = "The response does not address the package inquiry"
+            return 0.0
+
+
+@judgment.observe(span_type="function")
+def run_agent():
+    customer_request = "When is my package coming?" # fill in with actual customer request
+    response = "Your pizza is coming in 10 days!" # fill in with actual agent invocation
+
+    # Run online evaluation with custom scorer
+    judgment.async_evaluate(
+        scorer=ResolutionScorer(threshold=0.8),
+        example=CustomerRequest(
+            request=customer_request,
+            response=response
+        )
+    )
+    return response
+
+run_agent()
+```
 
 <!--
 ## 🏢 Self-Hosting
