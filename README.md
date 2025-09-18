@@ -146,7 +146,7 @@ Running this code will deliver monitoring results to your [free platform account
 ### Customizable Scorers Over Agent Behavior
 
 Judgeval's strongest suit is the full customization over the types of scorers you can run online monitoring with. No restrictions to only single-prompt LLM judges or prefab scorers - if you can express your scorer
-in python code, judgeval can monitor it!
+in python code, judgeval can monitor it! Under the hood, judgeval hosts your scorer in a virtualized secure container, enabling online monitoring for any scorer.
 
 ```python
 from judgeval.tracer import Tracer, wrap
