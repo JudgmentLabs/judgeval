@@ -668,6 +668,8 @@ class Tracer:
         /,
         *,
         span_type: str | None = None,
+        span_name: str | None = None,
+        attributes: Optional[Dict[str, Any]] = None,
         scorer_config: TraceScorerConfig | None = None,
     ) -> C: ...
 
@@ -678,6 +680,8 @@ class Tracer:
         /,
         *,
         span_type: str | None = None,
+        span_name: str | None = None,
+        attributes: Optional[Dict[str, Any]] = None,
         scorer_config: TraceScorerConfig | None = None,
     ) -> Callable[[C], C]: ...
 
