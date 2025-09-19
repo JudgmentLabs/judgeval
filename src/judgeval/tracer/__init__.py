@@ -33,6 +33,7 @@ from opentelemetry.trace import (
     NoOpTracerProvider,
     Tracer as ABCTracer,
     get_current_span,
+    INVALID_SPAN_CONTEXT,
 )
 
 from judgeval.data.evaluation_run import ExampleEvaluationRun, TraceEvaluationRun
@@ -903,6 +904,12 @@ class Tracer:
             return
 
         span_context = self.get_current_span().get_span_context()
+        if span_context == INVALID_SPAN_CONTEXT:
+            judgeval_logger.warning(
+                "No span context was found for async_evaluate, skipping evaluation. Please make sure to use the @observe decorator on the function you are evaluating."
+            )
+            return
+
         trace_id = format(span_context.trace_id, "032x")
         span_id = format(span_context.span_id, "016x")
         hosted_scoring = isinstance(scorer, ExampleAPIScorerConfig) or (
