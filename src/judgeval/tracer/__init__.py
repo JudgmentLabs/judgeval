@@ -906,7 +906,7 @@ class Tracer:
         span_context = self.get_current_span().get_span_context()
         if span_context == INVALID_SPAN_CONTEXT:
             judgeval_logger.warning(
-                "No span context found was found for async_evaluate, skiing evaluation. Please make sure to use the @observe decorator on the function you are evaluating."
+                "No span context was found for async_evaluate, skipping evaluation. Please make sure to use the @observe decorator on the function you are evaluating."
             )
             return
 
