@@ -212,6 +212,7 @@ class JudgmentSyncClient:
         )
 
 
+
 class JudgmentAsyncClient:
     __slots__ = ("api_key", "organization_id", "client")
 
@@ -397,6 +398,7 @@ class JudgmentAsyncClient:
             url_for("/e2e_fetch_trace_scorer_span_score/"),
             payload,
         )
+
 
 
 __all__ = [

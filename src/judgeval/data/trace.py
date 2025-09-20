@@ -1,5 +1,10 @@
-from typing import Optional, List, Dict, Any, Union
-from pydantic import BaseModel, ConfigDict
+from typing import Optional, List, Dict, Any
+from pydantic import BaseModel
+from .judgment_types import (
+    OtelSpanDetailScores,
+    OtelSpanDetail,
+    OtelTraceListItem
+)
 
 
 class TraceUsage(BaseModel):
@@ -14,13 +19,9 @@ class TraceUsage(BaseModel):
     model_name: Optional[str] = None
 
 
-class TraceScore(BaseModel):
+class TraceScore(OtelSpanDetailScores):
     """Score information for a trace or span."""
-    success: bool
-    score: float
-    reason: Optional[str] = None
-    name: str
-    data: Optional[Dict[str, Any]] = None
+    pass
 
 
 class TraceRule(BaseModel):
@@ -29,61 +30,19 @@ class TraceRule(BaseModel):
     rule_name: str
 
 
-class TraceSpan(BaseModel):
+class TraceSpan(OtelSpanDetail):
     """Individual span within a trace with complete telemetry data."""
-    model_config = ConfigDict(extra="allow")
-
-    organization_id: str
-    project_id: str
-    timestamp: str
-    trace_id: str
-    span_id: str
-    parent_span_id: Optional[str] = None
-    trace_state: Optional[str] = None
-    span_name: Optional[str] = None
-    span_kind: Optional[str] = None
-    service_name: Optional[str] = None
-    resource_attributes: Optional[Dict[str, Any]] = None
-    span_attributes: Optional[Dict[str, Any]] = None
-    duration: Optional[int] = None
-    status_code: Optional[str] = None
-    status_message: Optional[str] = None
-    events: Optional[Union[List[Dict[str, Any]], Dict[str, Any]]] = None
-    links: Optional[Union[List[Dict[str, Any]], Dict[str, Any]]] = None
-    llm_cost: Optional[float] = None
-    prompt_tokens: Optional[int] = None
-    completion_tokens: Optional[int] = None
-    scores: Optional[List[TraceScore]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert TraceSpan to dictionary."""
         return self.model_dump(exclude_none=True)
 
 
-class Trace(BaseModel):
+class Trace(OtelTraceListItem):
     """Complete trace with metadata and all associated spans."""
-    model_config = ConfigDict(extra="allow")
 
-    # Trace-level metadata
-    organization_id: str
-    project_id: str
-    trace_id: str
-    timestamp: str
-    duration: Optional[int] = None
-    has_notification: Optional[bool] = None
-    tags: Optional[List[str]] = None
-    experiment_run_id: Optional[str] = None
-    span_name: Optional[str] = None  # Root span name
-    cumulative_llm_cost: Optional[float] = None
-    error: Optional[Dict[str, Any]] = None
-    scores: Optional[List[TraceScore]] = None
-    customer_id: Optional[str] = None
-    input_preview: Optional[str] = None
-    output_preview: Optional[str] = None
-    annotation_count: Optional[int] = 0
-    span_id: str  # Root span ID
-    rules: Optional[List[TraceRule]] = None
-
+    # Override scores to use TraceScore (which has data field) instead of OtelSpanListItemScores
+    scores: Optional[List["TraceScore"]] = []
     # All spans in the trace
     spans: List[TraceSpan] = []
 
