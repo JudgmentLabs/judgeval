@@ -3,7 +3,7 @@ import orjson
 import os
 import yaml
 from dataclasses import dataclass
-from typing import List, Literal, Optional, Union
+from typing import List, Literal, Optional
 
 from judgeval.data import Example
 from judgeval.data.trace import Trace, TraceSpan, TraceScore, TraceRule
@@ -272,6 +272,8 @@ class Dataset:
 
     def __str__(self):
         if self.dataset_kind == DatasetKind.example:
-            return f"{self.__class__.__name__}(examples={self.examples}, name={self.name})"
+            return (
+                f"{self.__class__.__name__}(examples={self.examples}, name={self.name})"
+            )
         else:
             return f"{self.__class__.__name__}(traces={self.traces}, name={self.name})"

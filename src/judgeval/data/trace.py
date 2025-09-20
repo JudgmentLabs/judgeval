@@ -1,10 +1,6 @@
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
-from .judgment_types import (
-    OtelSpanDetailScores,
-    OtelSpanDetail,
-    OtelTraceListItem
-)
+from .judgment_types import OtelSpanDetailScores, OtelSpanDetail, OtelTraceListItem
 
 
 class TraceUsage(BaseModel):
@@ -21,11 +17,13 @@ class TraceUsage(BaseModel):
 
 class TraceScore(OtelSpanDetailScores):
     """Score information for a trace or span."""
+
     pass
 
 
 class TraceRule(BaseModel):
     """Rule that was triggered for a trace."""
+
     rule_id: str
     rule_name: str
 
