@@ -91,7 +91,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Bump pyproject.toml version
+      - name: Bump pyproject.toml and version.py version
         run: |
           python update_version.py ${{ steps.bump_tag.outputs.new_version }}
 
