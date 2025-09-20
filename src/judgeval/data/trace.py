@@ -45,7 +45,7 @@ class Trace(OtelTraceListItem):
     def to_dict(self) -> Dict[str, Any]:
         """Convert Trace to dictionary."""
         return self.model_dump(exclude_none=True)
-    
+
     def __len__(self) -> int:
         """Return the number of spans in the trace."""
         return len(self.spans)
