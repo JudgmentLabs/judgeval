@@ -74,7 +74,7 @@ class Trace(BaseModel):
     tags: Optional[List[str]] = None
     experiment_run_id: Optional[str] = None
     span_name: Optional[str] = None  # Root span name
-    llm_cost: Optional[float] = None
+    cumulative_llm_cost: Optional[float] = None
     error: Optional[Dict[str, Any]] = None
     scores: Optional[List[TraceScore]] = None
     customer_id: Optional[str] = None
