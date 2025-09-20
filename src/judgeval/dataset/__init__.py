@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import List, Literal, Optional
 
 from judgeval.data import Example
-from judgeval.data.trace import Trace, TraceSpan, TraceScore, TraceRule
+from judgeval.data.trace import Trace
 from judgeval.utils.file_utils import get_examples_from_yaml, get_examples_from_json
 from judgeval.api import JudgmentSyncClient
 from judgeval.logger import judgeval_logger
@@ -80,36 +80,8 @@ class Dataset:
             traces = []
             for trace_item in trace_data:
                 if isinstance(trace_item, dict):
-                    # Extract trace detail and spans
-                    trace_detail = trace_item.get("trace_detail", {})
-                    spans_data = trace_item.get("spans", [])
-
-                    # Convert spans
-                    spans = []
-                    for span_data in spans_data:
-                        if isinstance(span_data, dict):
-                            # Convert scores if present
-                            if "scores" in span_data and span_data["scores"]:
-                                span_data["scores"] = [
-                                    TraceScore(**score) for score in span_data["scores"]
-                                ]
-                            spans.append(TraceSpan(**span_data))
-
-                    # Convert trace-level data
-                    if isinstance(trace_detail, dict):
-                        # Convert scores and rules if present
-                        if "scores" in trace_detail and trace_detail["scores"]:
-                            trace_detail["scores"] = [
-                                TraceScore(**score) for score in trace_detail["scores"]
-                            ]
-                        if "rules" in trace_detail and trace_detail["rules"]:
-                            trace_detail["rules"] = [
-                                TraceRule(**rule) for rule in trace_detail["rules"]
-                            ]
-
-                        # Create trace with spans
-                        trace = Trace(**trace_detail, spans=spans)
-                        traces.append(trace)
+                    trace = Trace.from_dataset_trace_with_spans(trace_item)
+                    traces.append(trace)
 
             judgeval_logger.info(f"Successfully retrieved trace dataset {name}!")
             return cls(
@@ -237,7 +209,9 @@ class Dataset:
                 file.write(
                     orjson.dumps(
                         {
-                            "examples": [e.to_dict() for e in self.examples],
+                            "examples": [e.to_dict() for e in self.examples]
+                            if self.examples
+                            else [],
                         },
                         option=orjson.OPT_INDENT_2,
                     )
@@ -245,7 +219,9 @@ class Dataset:
         elif file_type == "yaml":
             with open(complete_path, "w") as file:
                 yaml_data = {
-                    "examples": [e.to_dict() for e in self.examples],
+                    "examples": [e.to_dict() for e in self.examples]
+                    if self.examples
+                    else [],
                 }
                 yaml.dump(yaml_data, file, default_flow_style=False)
         else:
