@@ -39,33 +39,13 @@ class TraceSpan(OtelSpanDetail):
 class Trace(OtelTraceListItem):
     """Complete trace with metadata and all associated spans."""
 
-    # Override scores to use TraceScore (which has data field) instead of OtelSpanListItemScores
     scores: Optional[List["TraceScore"]] = []
-    # All spans in the trace
     spans: List[TraceSpan] = []
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert Trace to dictionary."""
         return self.model_dump(exclude_none=True)
-
-    def get_root_span(self) -> Optional[TraceSpan]:
-        """Get the root span (span with no parent)."""
-        for span in self.spans:
-            if span.parent_span_id is None:
-                return span
-        return None
-
-    def get_spans_by_parent(self, parent_span_id: Optional[str]) -> List[TraceSpan]:
-        """Get all spans that have the specified parent span ID."""
-        return [span for span in self.spans if span.parent_span_id == parent_span_id]
-
-    def get_span_by_id(self, span_id: str) -> Optional[TraceSpan]:
-        """Get a specific span by its ID."""
-        for span in self.spans:
-            if span.span_id == span_id:
-                return span
-        return None
-
+    
     def __len__(self) -> int:
         """Return the number of spans in the trace."""
         return len(self.spans)
