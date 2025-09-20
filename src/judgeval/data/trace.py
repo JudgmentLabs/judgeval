@@ -99,9 +99,8 @@ class Trace(OtelTraceListItem):
                 )
             ]
 
-
-        trace_data.pop("scores", [])  
-        trace_data.pop("rule_id", None) 
+        trace_data.pop("scores", [])
+        trace_data.pop("rule_id", None)
         trace = cls(**trace_data)
 
         trace.spans = spans
