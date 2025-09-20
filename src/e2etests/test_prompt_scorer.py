@@ -216,7 +216,6 @@ def test_trace_prompt_scorer(project_name: str):
             break
         query_count += 1
         time.sleep(1)
-    print(scorer_data)
     assert scorer_data[0].get("success")
 
 
