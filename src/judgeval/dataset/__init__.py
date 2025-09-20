@@ -29,7 +29,7 @@ class DatasetInfo:
 class Dataset:
     name: str
     project_name: str
-    dataset_kind: DatasetKind
+    dataset_kind: DatasetKind = DatasetKind.example
     examples: Optional[List[Example]] = None
     traces: Optional[List[Trace]] = None
     judgment_api_key: str = JUDGMENT_API_KEY or ""
