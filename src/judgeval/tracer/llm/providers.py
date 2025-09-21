@@ -82,6 +82,30 @@ except ImportError:
     pass
 
 
+HAS_FIREWORKS = False
+fireworks_Client = None
+fireworks_AsyncClient = None
+fireworks_LLM = None
+
+try:
+    from fireworks.client import Fireworks, AsyncFireworks  # type: ignore[import-untyped]
+
+    fireworks_Client = Fireworks
+    fireworks_AsyncClient = AsyncFireworks
+    HAS_FIREWORKS = True
+except ImportError:
+    pass
+
+# Also support the LLM class used by TrainableModel
+try:
+    from fireworks import LLM  # type: ignore[import-untyped]
+
+    fireworks_LLM = LLM
+    HAS_FIREWORKS = True
+except ImportError:
+    pass
+
+
 # TODO: if we support dependency groups we can have this better type, but during runtime, we do
 # not know which clients an end user might have installed.
 ApiClient: TypeAlias = Any
@@ -111,4 +135,9 @@ __all__ = [
     "HAS_GROQ",
     "groq_Groq",
     "groq_AsyncGroq",
+    # Fireworks
+    "HAS_FIREWORKS",
+    "fireworks_Client",
+    "fireworks_AsyncClient",
+    "fireworks_LLM",
 ]
