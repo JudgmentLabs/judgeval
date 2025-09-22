@@ -29,6 +29,7 @@ class APIScorerConfig(BaseModel):
     name: str = ""
     threshold: float = 0.5
     strict_mode: bool = False
+    model: str = "gpt-5"
 
     # This is used to check if the example has the required parameters before running the scorer
     required_params: List[ExampleParams] = []
