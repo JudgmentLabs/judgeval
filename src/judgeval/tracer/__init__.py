@@ -24,15 +24,16 @@ from typing import (
 from functools import partial
 from warnings import warn
 
-from opentelemetry.sdk.trace import SpanProcessor, TracerProvider, Span
+from opentelemetry.sdk.trace import TracerProvider, Span as SDKSpan
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.trace import (
     Status,
     StatusCode,
-    TracerProvider as ABCTracerProvider,
-    NoOpTracerProvider,
     Tracer as ABCTracer,
+    Span,
     get_current_span,
+    get_tracer_provider,
+    set_tracer_provider,
     INVALID_SPAN_CONTEXT,
 )
 
@@ -53,7 +54,9 @@ from judgeval.tracer.managers import (
     sync_agent_context,
     async_agent_context,
 )
+from judgeval.utils.decorators import dont_throw, cache_success_only
 from judgeval.utils.serialize import safe_serialize
+from judgeval.utils.meta import SingletonMeta
 from judgeval.version import get_version
 from judgeval.warnings import JudgmentWarning
 
@@ -65,7 +68,6 @@ from judgeval.tracer.local_eval_queue import LocalEvaluationQueue
 from judgeval.tracer.processors import (
     JudgmentSpanProcessor,
     NoOpJudgmentSpanProcessor,
-    NoOpSpanProcessor,
 )
 from judgeval.tracer.utils import set_span_attribute, TraceScorerConfig
 
@@ -86,55 +88,48 @@ class AgentContext(TypedDict):
     parent_agent_id: str | None
 
 
-class Tracer:
-    _active_tracers: List[Tracer] = []
-
+class Tracer(metaclass=SingletonMeta):
     __slots__ = (
         "api_key",
         "organization_id",
         "project_name",
-        "api_url",
-        "deep_tracing",
         "enable_monitoring",
         "enable_evaluation",
         "api_client",
         "local_eval_queue",
-        # Otel
         "judgment_processor",
-        "processors",
-        "provider",
         "tracer",
-        # Agent
         "agent_context",
         "cost_context",
+        "_initialized",
     )
 
     api_key: str
     organization_id: str
     project_name: str
-    api_url: str
-    deep_tracing: bool
     enable_monitoring: bool
     enable_evaluation: bool
     api_client: JudgmentSyncClient
     local_eval_queue: LocalEvaluationQueue
-
-    judgment_processor: JudgmentSpanProcessor
-    processors: List[SpanProcessor]
-    provider: ABCTracerProvider
+    judgment_processor: Union[JudgmentSpanProcessor, NoOpJudgmentSpanProcessor]
     tracer: ABCTracer
-
     agent_context: ContextVar[Optional[AgentContext]]
     cost_context: ContextVar[Optional[Dict[str, float]]]
+    _initialized: bool
 
-    def __init__(
-        self,
+    def __init__(self):
+        self._initialized = False
+        self.agent_context = ContextVar("current_agent_context", default=None)
+        self.cost_context = ContextVar("current_cost_context", default=None)
+
+    @classmethod
+    def initialize(
+        cls,
         /,
         *,
         project_name: str,
         api_key: Optional[str] = None,
         organization_id: Optional[str] = None,
-        deep_tracing: bool = False,
         enable_monitoring: bool = os.getenv(
             "JUDGMENT_ENABLE_MONITORING", "true"
         ).lower()
@@ -143,9 +138,17 @@ class Tracer:
             "JUDGMENT_ENABLE_EVALUATIONS", "true"
         ).lower()
         != "false",
-        processors: List[SpanProcessor] = [],
         resource_attributes: Optional[Dict[str, Any]] = None,
-    ):
+    ) -> "Tracer":
+        """Initialize the global Tracer singleton with configuration."""
+        instance = cls()
+
+        if instance._initialized:
+            judgeval_logger.warning(
+                "Tracer already initialized, skipping re-initialization"
+            )
+            return instance
+
         _api_key = api_key or JUDGMENT_API_KEY
         _organization_id = organization_id or JUDGMENT_ORG_ID
 
@@ -159,57 +162,79 @@ class Tracer:
                 "Organization ID is not set, please set it in the environment variables or pass it as `organization_id`"
             )
 
-        self.api_key = _api_key
-        self.organization_id = _organization_id
-        self.project_name = project_name
-        self.api_url = url_for("/otel/v1/traces")
+        instance.api_key = _api_key
+        instance.organization_id = _organization_id
+        instance.project_name = project_name
+        instance.enable_monitoring = enable_monitoring
+        instance.enable_evaluation = enable_evaluation
 
-        self.deep_tracing = deep_tracing
-        self.enable_monitoring = enable_monitoring
-        self.enable_evaluation = enable_evaluation
-
-        self.judgment_processor = NoOpJudgmentSpanProcessor()
-        self.processors = processors
-        self.provider = NoOpTracerProvider()
-
-        self.agent_context = ContextVar("current_agent_context", default=None)
-        self.cost_context = ContextVar("current_cost_context", default=None)
-
-        if self.enable_monitoring:
-            self.judgment_processor = JudgmentSpanProcessor(
-                self,
-                self.project_name,
-                self.api_key,
-                self.organization_id,
-                max_queue_size=2**18,
-                export_timeout_millis=30000,
-                resource_attributes=resource_attributes,
+        # Initialize processor
+        if enable_monitoring:
+            # Resolve project_id
+            project_id = cls._resolve_project_id(
+                project_name, _api_key, _organization_id
             )
+            if project_id is None:
+                judgeval_logger.error(
+                    f"Failed to resolve project {project_name}, please create it first at https://app.judgmentlabs.ai/org/{_organization_id}/projects. Skipping Judgment export."
+                )
+                instance.judgment_processor = NoOpJudgmentSpanProcessor()
+            else:
+                instance.judgment_processor = JudgmentSpanProcessor(
+                    instance,
+                    project_name,
+                    project_id,
+                    _api_key,
+                    _organization_id,
+                    max_queue_size=2**18,
+                    export_timeout_millis=30000,
+                    resource_attributes=resource_attributes,
+                )
 
-            resource = Resource.create(self.judgment_processor.resource_attributes)
-            self.provider = TracerProvider(resource=resource)
+                # Setup global tracer provider
+                resource = Resource.create(
+                    instance.judgment_processor.resource_attributes
+                )
+                provider = TracerProvider(resource=resource)
+                provider.add_span_processor(instance.judgment_processor)
+                set_tracer_provider(provider)
+        else:
+            instance.judgment_processor = NoOpJudgmentSpanProcessor()  # type: ignore
 
-            self.processors.append(self.judgment_processor)
-            for processor in self.processors:
-                self.provider.add_span_processor(processor)
-
-        self.tracer = self.provider.get_tracer(
+        # Get tracer from global provider
+        instance.tracer = get_tracer_provider().get_tracer(
             JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME,
             get_version(),
         )
-        self.api_client = JudgmentSyncClient(
-            api_key=self.api_key,
-            organization_id=self.organization_id,
+
+        instance.api_client = JudgmentSyncClient(
+            api_key=_api_key,
+            organization_id=_organization_id,
         )
-        self.local_eval_queue = LocalEvaluationQueue()
+        instance.local_eval_queue = LocalEvaluationQueue()
 
-        if self.enable_evaluation and self.enable_monitoring:
-            self.local_eval_queue.start_workers()
+        if enable_evaluation and enable_monitoring:
+            instance.local_eval_queue.start_workers()
 
-        Tracer._active_tracers.append(self)
+        instance._initialized = True
 
         # Register atexit handler to flush on program exit
-        atexit.register(self._atexit_flush)
+        atexit.register(instance._atexit_flush)
+
+        return instance
+
+    @dont_throw
+    @functools.lru_cache(maxsize=64)
+    @staticmethod
+    def _resolve_project_id(
+        project_name: str, api_key: str, organization_id: str
+    ) -> str | None:
+        """Resolve project_id from project_name using the API."""
+        client = JudgmentSyncClient(
+            api_key=api_key,
+            organization_id=organization_id,
+        )
+        return client.projects_resolve({"project_name": project_name})["project_id"]
 
     def get_current_span(self):
         return get_current_span()
@@ -354,6 +379,8 @@ class Tracer:
             return
 
         span_context = span.get_span_context()
+        if span_context == INVALID_SPAN_CONTEXT:
+            return
         trace_id = format(span_context.trace_id, "032x")
         span_id = format(span_context.span_id, "016x")
         eval_run_name = f"async_trace_evaluate_{span_id}"
@@ -838,18 +865,13 @@ class Tracer:
             timeout_millis: Maximum time to wait for flush completion in milliseconds
 
         Returns:
-            True if all processors flushed successfully within timeout, False otherwise
+            True if processor flushed successfully within timeout, False otherwise
         """
-        success = True
-        for processor in self.processors:
-            try:
-                result = processor.force_flush(timeout_millis)
-                if not result:
-                    success = False
-            except Exception as e:
-                judgeval_logger.warning(f"Error flushing processor {processor}: {e}")
-                success = False
-        return success
+        try:
+            return self.judgment_processor.force_flush(timeout_millis)
+        except Exception as e:
+            judgeval_logger.warning(f"Error flushing processor: {e}")
+            return False
 
     def _atexit_flush(self) -> None:
         """Internal method called on program exit to flush remaining spans.
@@ -927,8 +949,8 @@ class Tracer:
                 trace_id=trace_id,
             )
             self.api_client.add_to_run_eval_queue_examples(
-                eval_run.model_dump(warnings=False)
-            )  # type: ignore
+                eval_run.model_dump(warnings=False)  # type: ignore
+            )
         else:
             # Handle custom scorers using local evaluation queue
             eval_run = ExampleEvaluationRun(
@@ -982,19 +1004,24 @@ class Tracer:
 
 
 def wrap(client: ApiClient) -> ApiClient:
-    if not Tracer._active_tracers:
+    try:
+        tracer = Tracer()
+        if not tracer._initialized:
+            warn(
+                "Tracer not initialized, client will not be wrapped. "
+                "Call Tracer.initialize() first to setup the tracer.",
+                JudgmentWarning,
+                stacklevel=2,
+            )
+            return client
+        return tracer.wrap(client)
+    except Exception:
         warn(
-            "No active tracers found, client will not be wrapped. "
-            "You can use the global `wrap` function after creating a tracer instance. "
-            "Or you can use the `wrap` method on the tracer instance to directly wrap the client. ",
+            "Error accessing tracer singleton, client will not be wrapped.",
             JudgmentWarning,
             stacklevel=2,
         )
-
-    wrapped_client = client
-    for tracer in Tracer._active_tracers:
-        wrapped_client = tracer.wrap(wrapped_client)
-    return wrapped_client
+        return client
 
 
 def format_inputs(
@@ -1021,11 +1048,7 @@ def format_inputs(
         return {}
 
 
-# Export processor classes for direct access
 __all__ = [
     "Tracer",
     "wrap",
-    "JudgmentSpanProcessor",
-    "NoOpJudgmentSpanProcessor",
-    "NoOpSpanProcessor",
 ]

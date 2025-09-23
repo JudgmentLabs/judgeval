@@ -10,8 +10,6 @@ from opentelemetry.sdk.trace.export import (
 from opentelemetry.sdk.resources import Resource
 from judgeval.tracer.exporters import JudgmentSpanExporter
 from judgeval.tracer.keys import AttributeKeys, InternalAttributeKeys, ResourceKeys
-from judgeval.api import JudgmentSyncClient
-from judgeval.logger import judgeval_logger
 from judgeval.utils.url import url_for
 from judgeval.version import get_version
 
@@ -38,6 +36,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
         self,
         tracer: Tracer,
         project_name: str,
+        project_id: str,
         api_key: str,
         organization_id: str,
         /,
@@ -48,13 +47,8 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
     ):
         self.tracer = tracer
         self.project_name = project_name
-        self.api_key = api_key
-        self.organization_id = organization_id
+        self.project_id = project_id
 
-        # Resolve project_id
-        self.project_id = self._resolve_project_id()
-
-        # Set up resource attributes with project_id
         self._setup_resource_attributes(resource_attributes or {})
 
         endpoint = url_for("/otel/v1/traces")
@@ -63,6 +57,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
                 endpoint=endpoint,
                 api_key=api_key,
                 organization_id=organization_id,
+                project_id=project_id,
             ),
             max_queue_size=max_queue_size,
             export_timeout_millis=export_timeout_millis,
@@ -71,19 +66,6 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             defaultdict(dict)
         )
 
-    def _resolve_project_id(self) -> str | None:
-        """Resolve project_id from project_name using the API."""
-        try:
-            client = JudgmentSyncClient(
-                api_key=self.api_key,
-                organization_id=self.organization_id,
-            )
-            return client.projects_resolve({"project_name": self.project_name})[
-                "project_id"
-            ]
-        except Exception:
-            return None
-
     def _setup_resource_attributes(self, resource_attributes: dict[str, Any]) -> None:
         """Set up resource attributes including project_id."""
         resource_attributes.update(
@@ -91,15 +73,9 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
                 ResourceKeys.SERVICE_NAME: self.project_name,
                 ResourceKeys.TELEMETRY_SDK_NAME: "judgeval",
                 ResourceKeys.TELEMETRY_SDK_VERSION: get_version(),
+                ResourceKeys.JUDGMENT_PROJECT_ID: self.project_id,
             }
         )
-
-        if self.project_id is not None:
-            resource_attributes[ResourceKeys.JUDGMENT_PROJECT_ID] = self.project_id
-        else:
-            judgeval_logger.error(
-                f"Failed to resolve project {self.project_name}, please create it first at https://app.judgmentlabs.ai/org/{self.organization_id}/projects. Skipping Judgment export."
-            )
 
         self.resource_attributes = resource_attributes
 
@@ -224,9 +200,9 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             super().on_end(span)
 
 
-class NoOpJudgmentSpanProcessor(JudgmentSpanProcessor):
+class NoOpJudgmentSpanProcessor:
     def __init__(self):
-        pass
+        self.resource_attributes = {}
 
     def on_start(self, span: Span, parent_context: Optional[Context] = None) -> None:
         pass
