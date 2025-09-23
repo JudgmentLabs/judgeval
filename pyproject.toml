@@ -76,6 +76,9 @@ dev = [
     "pytest-asyncio>=1.1.0",
     "pytest-xdist>=3.8.0",
     "langchain-openai>=0.3.23",
+    "langchain-tavily>=0.2.11",
+    "streamlit>=1.49.1",
+    "langchain-community>=0.3.29",
 ]
 
 

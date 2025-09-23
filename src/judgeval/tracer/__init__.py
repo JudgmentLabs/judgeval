@@ -116,12 +116,10 @@ class Tracer(metaclass=SingletonMeta):
     agent_context: ContextVar[Optional[AgentContext]]
     _initialized: bool
 
-    def __init__(self, project_name: Optional[str] = None):
-        self._initialized = False
-        self.agent_context = ContextVar("current_agent_context", default=None)
-
-        if project_name:
-            self.initialize(project_name=project_name)
+    def __init__(self):
+        if not hasattr(self, "_initialized"):
+            self._initialized = False
+            self.agent_context = ContextVar("current_agent_context", default=None)
 
     @classmethod
     def initialize(
@@ -138,9 +136,6 @@ class Tracer(metaclass=SingletonMeta):
         instance = cls()
 
         if instance._initialized:
-            judgeval_logger.warning(
-                "Tracer already initialized, skipping re-initialization"
-            )
             return instance
 
         _api_key = api_key or JUDGMENT_API_KEY
