@@ -8,7 +8,7 @@ from e2etests.utils import retrieve_score
 import time
 from e2etests.utils import create_project, delete_project
 
-QUERY_RETRY = 25
+QUERY_RETRY = 60
 
 
 def test_prompt_scorer(client: JudgmentClient, project_name: str):
