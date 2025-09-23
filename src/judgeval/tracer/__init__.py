@@ -40,6 +40,7 @@ from judgeval.data.evaluation_run import ExampleEvaluationRun, TraceEvaluationRu
 from judgeval.data.example import Example
 from judgeval.env import (
     JUDGMENT_API_KEY,
+    JUDGMENT_API_URL,
     JUDGMENT_DEFAULT_GPT_MODEL,
     JUDGMENT_ORG_ID,
     JUDGMENT_ENABLE_MONITORING,
@@ -56,6 +57,7 @@ from judgeval.tracer.managers import (
     async_agent_context,
 )
 from judgeval.utils.decorators import dont_throw, use_once
+from judgeval.utils.guards import expect_api_key, expect_organization_id
 from judgeval.utils.serialize import safe_serialize
 from judgeval.utils.meta import SingletonMeta
 from judgeval.version import get_version
@@ -124,13 +126,15 @@ class Tracer(metaclass=SingletonMeta):
 
     def __init__(
         self,
-        project_name: Optional[str] = None,
+        /,
+        *,
+        project_name: str,
         api_key: Optional[str] = None,
         organization_id: Optional[str] = None,
-        initialize: bool = True,
         enable_monitoring: bool = JUDGMENT_ENABLE_MONITORING.lower() == "true",
         enable_evaluation: bool = JUDGMENT_ENABLE_EVALUATIONS.lower() == "true",
         resource_attributes: Optional[Dict[str, Any]] = None,
+        initialize: bool = True,
     ):
         if not hasattr(self, "_initialized"):
             self._initialized = False
@@ -157,15 +161,8 @@ class Tracer(metaclass=SingletonMeta):
         _api_key = self._api_key or JUDGMENT_API_KEY
         _organization_id = self._organization_id or JUDGMENT_ORG_ID
 
-        if _api_key is None:
-            raise ValueError(
-                "API Key is not set, please set it in the environment variables or pass it as `api_key`"
-            )
-
-        if _organization_id is None:
-            raise ValueError(
-                "Organization ID is not set, please set it in the environment variables or pass it as `organization_id`"
-            )
+        self.api_key = expect_api_key(_api_key)
+        self.organization_id = expect_organization_id(_organization_id)
 
         self.api_key = _api_key
         self.organization_id = _organization_id
@@ -175,7 +172,7 @@ class Tracer(metaclass=SingletonMeta):
 
         self.judgment_processor = NoOpJudgmentSpanProcessor()
         if self.enable_monitoring:
-            project_id = self._resolve_project_id(
+            project_id = Tracer._resolve_project_id(
                 self.project_name, _api_key, _organization_id
             )
 
@@ -269,7 +266,8 @@ class Tracer(metaclass=SingletonMeta):
             api_key=api_key,
             organization_id=organization_id,
         )
-        return client.projects_resolve({"project_name": project_name})["project_id"]
+        response = client.projects_resolve({"project_name": project_name})
+        return response["project_id"]
 
     def get_current_span(self):
         return get_current_span()
@@ -946,7 +944,8 @@ class Tracer(metaclass=SingletonMeta):
         )
         eval_run = ExampleEvaluationRun(
             project_name=self.project_name,
-            eval_name=f"async_evaluate_{span_id}",  # note this name doesnt matter because we don't save the experiment only the example and scorer_data
+            # note this name doesnt matter because we don't save the experiment only the example and scorer_data
+            eval_name=f"async_evaluate_{span_id}",
             examples=[example],
             scorers=[scorer],
             model=model,
@@ -1000,7 +999,15 @@ class Tracer(metaclass=SingletonMeta):
 
 def wrap(client: ApiClient) -> ApiClient:
     try:
-        tracer = Tracer()
+        tracer = Tracer.get_instance()
+        if tracer is None or not isinstance(tracer, Tracer):
+            warn(
+                "No Tracer instance found, client will not be wrapped. "
+                "Create a Tracer instance first.",
+                JudgmentWarning,
+                stacklevel=2,
+            )
+            return client
         if not tracer._initialized:
             warn(
                 "Tracer not initialized, client will not be wrapped. "

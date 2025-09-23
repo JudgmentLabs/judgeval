@@ -44,12 +44,6 @@ packages = ["src/judgeval"]
 include = ["/src/judgeval", "/src/judgeval/**/*.py"]
 
 [project.optional-dependencies]
-langchain = [
-    "langchain-huggingface",
-    "langchain-openai",
-    "langchain-anthropic",
-    "langchain-core",
-]
 s3 = ["boto3>=1.40.11"]
 trainer = ["fireworks-ai>=0.19.18"]
 
