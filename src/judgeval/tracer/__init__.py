@@ -97,18 +97,13 @@ class Tracer(metaclass=SingletonMeta):
         "project_name",
         "enable_monitoring",
         "enable_evaluation",
+        "resource_attributes",
         "api_client",
         "local_eval_queue",
         "judgment_processor",
         "tracer",
         "agent_context",
         "_initialized",
-        "_project_name",
-        "_api_key",
-        "_organization_id",
-        "_enable_monitoring",
-        "_enable_evaluation",
-        "_resource_attributes",
     )
 
     api_key: str
@@ -116,6 +111,7 @@ class Tracer(metaclass=SingletonMeta):
     project_name: str
     enable_monitoring: bool
     enable_evaluation: bool
+    resource_attributes: Optional[Dict[str, Any]]
     api_client: JudgmentSyncClient
     local_eval_queue: LocalEvaluationQueue
     judgment_processor: JudgmentSpanProcessor
@@ -139,39 +135,32 @@ class Tracer(metaclass=SingletonMeta):
             self._initialized = False
             self.agent_context = ContextVar("current_agent_context", default=None)
 
-            self._project_name = project_name
-            self._api_key = api_key
-            self._organization_id = organization_id
-            self._enable_monitoring = enable_monitoring
-            self._enable_evaluation = enable_evaluation
-            self._resource_attributes = resource_attributes
+            self.project_name = project_name
+            self.api_key = expect_api_key(api_key or JUDGMENT_API_KEY)
+            self.organization_id = expect_organization_id(
+                organization_id or JUDGMENT_ORG_ID
+            )
+            self.enable_monitoring = enable_monitoring
+            self.enable_evaluation = enable_evaluation
+            self.resource_attributes = resource_attributes
 
-            if initialize and project_name:
+            self.api_client = JudgmentSyncClient(
+                api_key=self.api_key,
+                organization_id=self.organization_id,
+            )
+            self.local_eval_queue = LocalEvaluationQueue()
+
+            if initialize:
                 self.initialize()
 
     def initialize(self) -> Tracer:
         if self._initialized:
             return self
 
-        if self._project_name is None:
-            raise ValueError("project_name is required for initialization")
-
-        _api_key = self._api_key or JUDGMENT_API_KEY
-        _organization_id = self._organization_id or JUDGMENT_ORG_ID
-
-        self.api_key = expect_api_key(_api_key)
-        self.organization_id = expect_organization_id(_organization_id)
-
-        self.api_key = _api_key
-        self.organization_id = _organization_id
-        self.project_name = self._project_name
-        self.enable_monitoring = self._enable_monitoring
-        self.enable_evaluation = self._enable_evaluation
-
         self.judgment_processor = NoOpJudgmentSpanProcessor()
         if self.enable_monitoring:
             project_id = Tracer._resolve_project_id(
-                self.project_name, _api_key, _organization_id
+                self.project_name, self.api_key, self.organization_id
             )
 
             if project_id:
@@ -179,9 +168,9 @@ class Tracer(metaclass=SingletonMeta):
                     tracer=self,
                     project_name=self.project_name,
                     project_id=project_id,
-                    api_key=_api_key,
-                    organization_id=_organization_id,
-                    resource_attributes=self._resource_attributes,
+                    api_key=self.api_key,
+                    organization_id=self.organization_id,
+                    resource_attributes=self.resource_attributes,
                 )
 
                 resource = Resource.create(self.judgment_processor.resource_attributes)
@@ -190,19 +179,13 @@ class Tracer(metaclass=SingletonMeta):
                 set_tracer_provider(provider)
             else:
                 judgeval_logger.error(
-                    f"Failed to resolve project {self.project_name}, please create it first at https://app.judgmentlabs.ai/org/{_organization_id}/projects. Skipping Judgment export."
+                    f"Failed to resolve project {self.project_name}, please create it first at https://app.judgmentlabs.ai/org/{self.organization_id}/projects. Skipping Judgment export."
                 )
 
         self.tracer = get_tracer_provider().get_tracer(
             JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME,
             get_version(),
         )
-
-        self.api_client = JudgmentSyncClient(
-            api_key=_api_key,
-            organization_id=_organization_id,
-        )
-        self.local_eval_queue = LocalEvaluationQueue()
 
         if self.enable_evaluation and self.enable_monitoring:
             self.local_eval_queue.start_workers()
