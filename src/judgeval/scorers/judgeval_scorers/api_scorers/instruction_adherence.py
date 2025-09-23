@@ -1,11 +1,3 @@
-"""
-`judgeval` instruction adherence scorer
-
-TODO add link to docs page for this scorer
-
-"""
-
-# Internal imports
 from judgeval.scorers.api_scorer import ExampleAPIScorerConfig
 from judgeval.constants import APIScorerType
 from judgeval.data import ExampleParams
@@ -21,7 +13,3 @@ class InstructionAdherenceScorer(ExampleAPIScorerConfig):
                 ExampleParams.ACTUAL_OUTPUT,
             ],
         )
-
-    @property
-    def __name__(self):
-        return "Instruction Adherence"

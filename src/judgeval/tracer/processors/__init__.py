@@ -2,7 +2,8 @@ from __future__ import annotations
 from typing import Optional, TYPE_CHECKING, Any
 from collections import defaultdict
 from opentelemetry.context import Context
-from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor, SpanContext
+from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
+from opentelemetry.trace.span import SpanContext
 from opentelemetry.sdk.trace.export import (
     BatchSpanProcessor,
 )
