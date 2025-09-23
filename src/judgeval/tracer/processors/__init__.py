@@ -7,7 +7,6 @@ from opentelemetry.trace.span import SpanContext
 from opentelemetry.sdk.trace.export import (
     BatchSpanProcessor,
 )
-from opentelemetry.sdk.resources import Resource
 from judgeval.tracer.exporters import JudgmentSpanExporter
 from judgeval.tracer.keys import AttributeKeys, InternalAttributeKeys, ResourceKeys
 from judgeval.utils.url import url_for
