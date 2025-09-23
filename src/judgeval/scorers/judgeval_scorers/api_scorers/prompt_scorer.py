@@ -10,13 +10,14 @@ from judgeval.exceptions import JudgmentAPIError
 import os
 from judgeval.logger import judgeval_logger
 from abc import ABC
+from judgeval.env import JUDGMENT_DEFAULT_GPT_MODEL
 
 
 def push_prompt_scorer(
     name: str,
     prompt: str,
     threshold: float,
-    model: str = "gpt-5",
+    model: str = JUDGMENT_DEFAULT_GPT_MODEL,
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
     is_trace: bool = False,
@@ -141,7 +142,7 @@ class BasePromptScorer(ABC, APIScorerConfig):
         name: str,
         prompt: str,
         threshold: float = 0.5,
-        model: str = "gpt-5",
+        model: str = JUDGMENT_DEFAULT_GPT_MODEL,
         judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
         organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
     ):
