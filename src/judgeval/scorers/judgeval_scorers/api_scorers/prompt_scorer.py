@@ -100,6 +100,13 @@ class BasePromptScorer(ABC, APIScorerConfig):
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or ""
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or ""
 
+    def __init__(self, *args, **kwargs):
+        raise JudgmentAPIError(
+            status_code=400,
+            detail="Please use the create() class method to instantiate a new PromptScorer or the get() class method to retrieve an existing PromptScorer",
+            response=None,
+        )
+
     @classmethod
     def get(
         cls,
