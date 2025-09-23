@@ -31,8 +31,6 @@ class APIScorerType(str, Enum):
         raise ValueError(f"Invalid scorer type: {value}")
 
 
-# scorers whose scores are not bounded between 0-1
-UNBOUNDED_SCORERS: Set[APIScorerType] = set()
 LITELLM_SUPPORTED_MODELS: Set[str] = set(litellm.model_list)
 
 

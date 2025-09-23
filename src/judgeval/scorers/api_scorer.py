@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, field_validator
 from typing import List
-from judgeval.constants import UNBOUNDED_SCORERS, APIScorerType
+from judgeval.constants import APIScorerType
 from judgeval.data.example import ExampleParams
 
 
@@ -30,7 +30,6 @@ class APIScorerConfig(BaseModel):
     threshold: float = 0.5
     strict_mode: bool = False
 
-    # This is used to check if the example has the required parameters before running the scorer
     required_params: List[ExampleParams] = []
 
     kwargs: dict = {}
@@ -42,16 +41,10 @@ class APIScorerConfig(BaseModel):
         Validates that the threshold is between 0 and 1 inclusive.
         """
         score_type = info.data.get("score_type")
-        if score_type in UNBOUNDED_SCORERS:
-            if v < 0:
-                raise ValueError(
-                    f"Threshold for {score_type} must be greater than 0, got: {v}"
-                )
-        else:
-            if not 0 <= v <= 1:
-                raise ValueError(
-                    f"Threshold for {score_type} must be between 0 and 1, got: {v}"
-                )
+        if not 0 <= v <= 1:
+            raise ValueError(
+                f"Threshold for {score_type} must be between 0 and 1, got: {v}"
+            )
         return v
 
     @field_validator("name", mode="after")

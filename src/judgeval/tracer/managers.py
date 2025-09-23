@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager, contextmanager
 from typing import TYPE_CHECKING, Dict, Optional, List, Any
-from judgeval.tracer.keys import AttributeKeys, InternalAttributeKeys
+from judgeval.tracer.keys import InternalAttributeKeys
 import uuid
 from judgeval.exceptions import JudgmentRuntimeError
-from judgeval.tracer.utils import set_span_attribute
 
 if TYPE_CHECKING:
     from judgeval.tracer import Tracer
