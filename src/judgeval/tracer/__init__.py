@@ -54,7 +54,7 @@ from judgeval.tracer.managers import (
     sync_agent_context,
     async_agent_context,
 )
-from judgeval.utils.decorators import dont_throw, cache_success_only
+from judgeval.utils.decorators import dont_throw 
 from judgeval.utils.serialize import safe_serialize
 from judgeval.utils.meta import SingletonMeta
 from judgeval.version import get_version

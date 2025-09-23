@@ -20,10 +20,8 @@ def assert_test_results(scoring_results: List[ScoringResult]) -> None:
 
     for result in scoring_results:
         if not result.success:
-            # Create a test case context with all relevant fields
             test_case = []
             if result.scorers_data:
-                # If the result was not successful, check each scorer_data
                 for scorer_data in result.scorers_data:
                     if not scorer_data.success:
                         test_case.append(scorer_data)

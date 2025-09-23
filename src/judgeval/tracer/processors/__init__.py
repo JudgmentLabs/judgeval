@@ -11,6 +11,7 @@ from opentelemetry.sdk.resources import Resource
 from judgeval.tracer.exporters import JudgmentSpanExporter
 from judgeval.tracer.keys import AttributeKeys, InternalAttributeKeys, ResourceKeys
 from judgeval.utils.url import url_for
+from judgeval.utils.decorators import dont_throw
 from judgeval.version import get_version
 
 if TYPE_CHECKING:
@@ -32,6 +33,8 @@ class NoOpSpanProcessor(SpanProcessor):
 
 
 class JudgmentSpanProcessor(BatchSpanProcessor):
+    __slots__ = ("tracer", "resource_attributes", "_internal_attributes")
+
     def __init__(
         self,
         tracer: Tracer,
@@ -46,18 +49,22 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
         resource_attributes: Optional[dict[str, Any]] = None,
     ):
         self.tracer = tracer
-        self.project_name = project_name
-        self.project_id = project_id
 
-        self._setup_resource_attributes(resource_attributes or {})
+        attrs = {
+            ResourceKeys.SERVICE_NAME: project_name,
+            ResourceKeys.TELEMETRY_SDK_NAME: "judgeval",
+            ResourceKeys.TELEMETRY_SDK_VERSION: get_version(),
+            ResourceKeys.JUDGMENT_PROJECT_ID: project_id,
+            **(resource_attributes or {}),
+        }
+        self.resource_attributes = attrs
 
-        endpoint = url_for("/otel/v1/traces")
         super().__init__(
             JudgmentSpanExporter(
-                endpoint=endpoint,
+                endpoint=url_for("/otel/v1/traces"),
                 api_key=api_key,
                 organization_id=organization_id,
-                project_id=project_id,
+            project_id=project_id,
             ),
             max_queue_size=max_queue_size,
             export_timeout_millis=export_timeout_millis,
@@ -65,19 +72,6 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
         self._internal_attributes: defaultdict[tuple[int, int], dict[str, Any]] = (
             defaultdict(dict)
         )
-
-    def _setup_resource_attributes(self, resource_attributes: dict[str, Any]) -> None:
-        """Set up resource attributes including project_id."""
-        resource_attributes.update(
-            {
-                ResourceKeys.SERVICE_NAME: self.project_name,
-                ResourceKeys.TELEMETRY_SDK_NAME: "judgeval",
-                ResourceKeys.TELEMETRY_SDK_VERSION: get_version(),
-                ResourceKeys.JUDGMENT_PROJECT_ID: self.project_id,
-            }
-        )
-
-        self.resource_attributes = resource_attributes
 
     def _get_span_key(self, span_context: SpanContext) -> tuple[int, int]:
         return (span_context.trace_id, span_context.span_id)
@@ -109,38 +103,32 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
     def _cleanup_span_state(self, span_key: tuple[int, int]) -> None:
         self._internal_attributes.pop(span_key, None)
 
+    @dont_throw
     def emit_partial(self) -> None:
         current_span = self.tracer.get_current_span()
-        if not current_span or not current_span.is_recording():
-            return
-
-        if not isinstance(current_span, ReadableSpan):
+        if (
+            not current_span
+            or not current_span.is_recording()
+            or not isinstance(current_span, ReadableSpan)
+        ):
             return
 
         span_context = current_span.get_span_context()
         if self.get_internal_attribute(
-            span_context=span_context,
-            key=InternalAttributeKeys.DISABLE_PARTIAL_EMIT,
-            default=False,
+            span_context, InternalAttributeKeys.DISABLE_PARTIAL_EMIT, False
         ):
             return
 
-        current_update_id = self.increment_update_id(span_context=span_context)
-
         attributes = dict(current_span.attributes or {})
-        attributes[AttributeKeys.JUDGMENT_UPDATE_ID] = current_update_id
-
-        existing_resource_attrs = (
-            dict(current_span.resource.attributes) if current_span.resource else {}
+        attributes[AttributeKeys.JUDGMENT_UPDATE_ID] = self.increment_update_id(
+            span_context
         )
-        merged_resource_attrs = {**existing_resource_attrs, **self.resource_attributes}
-        merged_resource = Resource.create(merged_resource_attrs)
 
         partial_span = ReadableSpan(
             name=current_span.name,
             context=span_context,
             parent=current_span.parent,
-            resource=merged_resource,
+            resource=current_span.resource,
             attributes=attributes,
             events=current_span.events,
             links=current_span.links,
@@ -170,20 +158,11 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             attributes = dict(span.attributes or {})
             attributes[AttributeKeys.JUDGMENT_UPDATE_ID] = 20
 
-            existing_resource_attrs = (
-                dict(span.resource.attributes) if span.resource else {}
-            )
-            merged_resource_attrs = {
-                **existing_resource_attrs,
-                **self.resource_attributes,
-            }
-            merged_resource = Resource.create(merged_resource_attrs)
-
             final_span = ReadableSpan(
                 name=span.name,
                 context=span.context,
                 parent=span.parent,
-                resource=merged_resource,
+                resource=span.resource,
                 attributes=attributes,
                 events=span.events,
                 links=span.links,
@@ -201,6 +180,8 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
 
 
 class NoOpJudgmentSpanProcessor:
+    __slots__ = ("resource_attributes",)
+
     def __init__(self):
         self.resource_attributes = {}
 

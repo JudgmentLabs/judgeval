@@ -75,6 +75,7 @@ dev = [
     "types-tqdm>=4.67.0.20250809",
     "pytest-asyncio>=1.1.0",
     "pytest-xdist>=3.8.0",
+    "langchain-openai>=0.3.23",
 ]
 
 
