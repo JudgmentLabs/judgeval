@@ -23,7 +23,7 @@ from typing import (
 from functools import partial
 from warnings import warn
 
-from opentelemetry.sdk.trace import TracerProvider, Span as SDKSpan
+from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.trace import (
     Status,
@@ -40,7 +40,6 @@ from judgeval.data.evaluation_run import ExampleEvaluationRun, TraceEvaluationRu
 from judgeval.data.example import Example
 from judgeval.env import (
     JUDGMENT_API_KEY,
-    JUDGMENT_API_URL,
     JUDGMENT_DEFAULT_GPT_MODEL,
     JUDGMENT_ORG_ID,
     JUDGMENT_ENABLE_MONITORING,
@@ -56,7 +55,7 @@ from judgeval.tracer.managers import (
     sync_agent_context,
     async_agent_context,
 )
-from judgeval.utils.decorators import dont_throw, use_once
+from judgeval.utils.decorators import dont_throw
 from judgeval.utils.guards import expect_api_key, expect_organization_id
 from judgeval.utils.serialize import safe_serialize
 from judgeval.utils.meta import SingletonMeta
@@ -140,7 +139,6 @@ class Tracer(metaclass=SingletonMeta):
             self._initialized = False
             self.agent_context = ContextVar("current_agent_context", default=None)
 
-            # Save all parameters for later initialization
             self._project_name = project_name
             self._api_key = api_key
             self._organization_id = organization_id
@@ -210,21 +208,17 @@ class Tracer(metaclass=SingletonMeta):
             self.local_eval_queue.start_workers()
 
         self._initialized = True
-
         atexit.register(self._atexit_flush)
-
         return self
 
     @staticmethod
     def get_exporter(
+        project_id: str,
         api_key: Optional[str] = None,
         organization_id: Optional[str] = None,
-        project_id: str = "",
     ):
         from judgeval.tracer.exporters import JudgmentSpanExporter
 
-        if not project_id:
-            raise ValueError("project_id is required")
         return JudgmentSpanExporter(
             endpoint=url_for("/otel/v1/traces"),
             api_key=api_key or JUDGMENT_API_KEY,
