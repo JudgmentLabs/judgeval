@@ -21,29 +21,17 @@ def sync_span_context(
     if span_attributes is None:
         span_attributes = {}
 
-    current_cost_context = tracer.get_current_cost_context()
-
-    cost_context = {"cumulative_cost": 0.0}
-
-    cost_token = current_cost_context.set(cost_context)
-
-    try:
-        with tracer.get_tracer().start_as_current_span(
-            name=name,
-            attributes=span_attributes,
-        ) as span:
-            set_span_attribute(span, AttributeKeys.JUDGMENT_CUMULATIVE_LLM_COST, 0.0)
-            if disable_partial_emit:
-                tracer.judgment_processor.set_internal_attribute(
-                    span_context=span.get_span_context(),
-                    key=InternalAttributeKeys.DISABLE_PARTIAL_EMIT,
-                    value=True,
-                )
-            yield span
-    finally:
-        current_cost_context.reset(cost_token)
-        child_cost = float(cost_context.get("cumulative_cost", 0.0))
-        tracer.add_cost_to_current_context(child_cost)
+    with tracer.get_tracer().start_as_current_span(
+        name=name,
+        attributes=span_attributes,
+    ) as span:
+        if disable_partial_emit:
+            tracer.judgment_processor.set_internal_attribute(
+                span_context=span.get_span_context(),
+                key=InternalAttributeKeys.DISABLE_PARTIAL_EMIT,
+                value=True,
+            )
+        yield span
 
 
 @asynccontextmanager
@@ -56,29 +44,17 @@ async def async_span_context(
     if span_attributes is None:
         span_attributes = {}
 
-    current_cost_context = tracer.get_current_cost_context()
-
-    cost_context = {"cumulative_cost": 0.0}
-
-    cost_token = current_cost_context.set(cost_context)
-
-    try:
-        with tracer.get_tracer().start_as_current_span(
-            name=name,
-            attributes=span_attributes,
-        ) as span:
-            set_span_attribute(span, AttributeKeys.JUDGMENT_CUMULATIVE_LLM_COST, 0.0)
-            if disable_partial_emit:
-                tracer.judgment_processor.set_internal_attribute(
-                    span_context=span.get_span_context(),
-                    key=InternalAttributeKeys.DISABLE_PARTIAL_EMIT,
-                    value=True,
-                )
-            yield span
-    finally:
-        current_cost_context.reset(cost_token)
-        child_cost = float(cost_context.get("cumulative_cost", 0.0))
-        tracer.add_cost_to_current_context(child_cost)
+    with tracer.get_tracer().start_as_current_span(
+        name=name,
+        attributes=span_attributes,
+    ) as span:
+        if disable_partial_emit:
+            tracer.judgment_processor.set_internal_attribute(
+                span_context=span.get_span_context(),
+                key=InternalAttributeKeys.DISABLE_PARTIAL_EMIT,
+                value=True,
+            )
+        yield span
 
 
 def create_agent_context(

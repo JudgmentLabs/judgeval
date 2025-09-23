@@ -19,7 +19,6 @@ class AttributeKeys(str, Enum):
     JUDGMENT_AGENT_CLASS_NAME = "judgment.agent_class_name"
     JUDGMENT_AGENT_INSTANCE_NAME = "judgment.agent_instance_name"
     JUDGMENT_IS_AGENT_ENTRY_POINT = "judgment.is_agent_entry_point"
-    JUDGMENT_CUMULATIVE_LLM_COST = "judgment.cumulative_llm_cost"
     JUDGMENT_STATE_BEFORE = "judgment.state_before"
     JUDGMENT_STATE_AFTER = "judgment.state_after"
 

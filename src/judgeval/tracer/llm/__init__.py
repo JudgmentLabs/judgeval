@@ -104,9 +104,9 @@ def _detect_provider(client: ApiClient) -> ProviderType:
         )
 
         assert google_genai_Client is not None, "Google GenAI client not found"
-        assert google_genai_AsyncClient is not None, (
-            "Google GenAI async client not found"
-        )
+        assert (
+            google_genai_AsyncClient is not None
+        ), "Google GenAI async client not found"
         if isinstance(client, (google_genai_Client, google_genai_AsyncClient)):
             return ProviderType.GOOGLE
 
@@ -873,7 +873,6 @@ def _set_usage_attributes(span, usage: TraceUsage, tracer: Tracer):
     set_span_attribute(
         span, AttributeKeys.GEN_AI_USAGE_TOTAL_COST, usage.total_cost_usd
     )
-    tracer.add_cost_to_current_context(usage.total_cost_usd)
 
 
 def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
@@ -1140,9 +1139,9 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
         )
 
         assert google_genai_Client is not None, "Google GenAI client not found"
-        assert google_genai_AsyncClient is not None, (
-            "Google GenAI async client not found"
-        )
+        assert (
+            google_genai_AsyncClient is not None
+        ), "Google GenAI async client not found"
         span_name = "GOOGLE_API_CALL"
         if isinstance(client, google_genai_Client):
             setattr(

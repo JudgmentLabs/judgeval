@@ -102,6 +102,12 @@ class Tracer(metaclass=SingletonMeta):
         "tracer",
         "agent_context",
         "_initialized",
+        "_project_name",
+        "_api_key",
+        "_organization_id",
+        "_enable_monitoring",
+        "_enable_evaluation",
+        "_resource_attributes",
     )
 
     api_key: str
@@ -116,30 +122,40 @@ class Tracer(metaclass=SingletonMeta):
     agent_context: ContextVar[Optional[AgentContext]]
     _initialized: bool
 
-    def __init__(self):
+    def __init__(
+        self,
+        project_name: Optional[str] = None,
+        api_key: Optional[str] = None,
+        organization_id: Optional[str] = None,
+        initialize: bool = True,
+        enable_monitoring: bool = JUDGMENT_ENABLE_MONITORING.lower() == "true",
+        enable_evaluation: bool = JUDGMENT_ENABLE_EVALUATIONS.lower() == "true",
+        resource_attributes: Optional[Dict[str, Any]] = None,
+    ):
         if not hasattr(self, "_initialized"):
             self._initialized = False
             self.agent_context = ContextVar("current_agent_context", default=None)
 
-    @classmethod
-    def initialize(
-        cls,
-        /,
-        *,
-        project_name: str,
-        api_key: Optional[str] = None,
-        organization_id: Optional[str] = None,
-        enable_monitoring: bool = JUDGMENT_ENABLE_MONITORING.lower() == "true",
-        enable_evaluation: bool = JUDGMENT_ENABLE_EVALUATIONS.lower() == "true",
-        resource_attributes: Optional[Dict[str, Any]] = None,
-    ) -> Tracer:
-        instance = cls()
+            # Save all parameters for later initialization
+            self._project_name = project_name
+            self._api_key = api_key
+            self._organization_id = organization_id
+            self._enable_monitoring = enable_monitoring
+            self._enable_evaluation = enable_evaluation
+            self._resource_attributes = resource_attributes
 
-        if instance._initialized:
-            return instance
+            if initialize and project_name:
+                self.initialize()
 
-        _api_key = api_key or JUDGMENT_API_KEY
-        _organization_id = organization_id or JUDGMENT_ORG_ID
+    def initialize(self) -> Tracer:
+        if self._initialized:
+            return self
+
+        if self._project_name is None:
+            raise ValueError("project_name is required for initialization")
+
+        _api_key = self._api_key or JUDGMENT_API_KEY
+        _organization_id = self._organization_id or JUDGMENT_ORG_ID
 
         if _api_key is None:
             raise ValueError(
@@ -151,63 +167,57 @@ class Tracer(metaclass=SingletonMeta):
                 "Organization ID is not set, please set it in the environment variables or pass it as `organization_id`"
             )
 
-        instance.api_key = _api_key
-        instance.organization_id = _organization_id
-        instance.project_name = project_name
-        instance.enable_monitoring = enable_monitoring
-        instance.enable_evaluation = enable_evaluation
+        self.api_key = _api_key
+        self.organization_id = _organization_id
+        self.project_name = self._project_name
+        self.enable_monitoring = self._enable_monitoring
+        self.enable_evaluation = self._enable_evaluation
 
-        instance.judgment_processor = NoOpJudgmentSpanProcessor()
-        if enable_monitoring:
-            project_id = cls._resolve_project_id(
-                project_name, _api_key, _organization_id
+        self.judgment_processor = NoOpJudgmentSpanProcessor()
+        if self.enable_monitoring:
+            project_id = self._resolve_project_id(
+                self.project_name, _api_key, _organization_id
             )
 
             if project_id:
-                instance.judgment_processor = JudgmentSpanProcessor(
-                    instance,
-                    project_name,
-                    project_id,
-                    _api_key,
-                    _organization_id,
-                    max_queue_size=2**18,
-                    export_timeout_millis=30000,
-                    resource_attributes=resource_attributes,
+                self.judgment_processor = self.get_processor(
+                    tracer=self,
+                    project_name=self.project_name,
+                    project_id=project_id,
+                    api_key=_api_key,
+                    organization_id=_organization_id,
+                    resource_attributes=self._resource_attributes,
                 )
 
-                resource = Resource.create(
-                    instance.judgment_processor.resource_attributes
-                )
+                resource = Resource.create(self.judgment_processor.resource_attributes)
                 provider = TracerProvider(resource=resource)
-                provider.add_span_processor(instance.judgment_processor)
+                provider.add_span_processor(self.judgment_processor)
                 set_tracer_provider(provider)
             else:
                 judgeval_logger.error(
-                    f"Failed to resolve project {project_name}, please create it first at https://app.judgmentlabs.ai/org/{_organization_id}/projects. Skipping Judgment export."
+                    f"Failed to resolve project {self.project_name}, please create it first at https://app.judgmentlabs.ai/org/{_organization_id}/projects. Skipping Judgment export."
                 )
-                instance.judgment_processor = NoOpJudgmentSpanProcessor()
 
-        instance.tracer = get_tracer_provider().get_tracer(
+        self.tracer = get_tracer_provider().get_tracer(
             JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME,
             get_version(),
         )
 
-        instance.api_client = JudgmentSyncClient(
+        self.api_client = JudgmentSyncClient(
             api_key=_api_key,
             organization_id=_organization_id,
         )
-        instance.local_eval_queue = LocalEvaluationQueue()
+        self.local_eval_queue = LocalEvaluationQueue()
 
-        if enable_evaluation and enable_monitoring:
-            instance.local_eval_queue.start_workers()
+        if self.enable_evaluation and self.enable_monitoring:
+            self.local_eval_queue.start_workers()
 
-        instance._initialized = True
+        self._initialized = True
 
-        atexit.register(instance._atexit_flush)
+        atexit.register(self._atexit_flush)
 
-        return instance
+        return self
 
-    @use_once
     @staticmethod
     def get_exporter(
         api_key: Optional[str] = None,
@@ -223,6 +233,29 @@ class Tracer(metaclass=SingletonMeta):
             api_key=api_key or JUDGMENT_API_KEY,
             organization_id=organization_id or JUDGMENT_ORG_ID,
             project_id=project_id,
+        )
+
+    @staticmethod
+    def get_processor(
+        tracer: Tracer,
+        project_name: str,
+        project_id: str,
+        api_key: Optional[str] = None,
+        organization_id: Optional[str] = None,
+        max_queue_size: int = 2**18,
+        export_timeout_millis: int = 30000,
+        resource_attributes: Optional[Dict[str, Any]] = None,
+    ) -> JudgmentSpanProcessor:
+        """Create a JudgmentSpanProcessor using the correct constructor."""
+        return JudgmentSpanProcessor(
+            tracer,
+            project_name,
+            project_id,
+            api_key or JUDGMENT_API_KEY,
+            organization_id or JUDGMENT_ORG_ID,
+            max_queue_size=max_queue_size,
+            export_timeout_millis=export_timeout_millis,
+            resource_attributes=resource_attributes,
         )
 
     @dont_throw
@@ -246,10 +279,6 @@ class Tracer(metaclass=SingletonMeta):
 
     def get_current_agent_context(self):
         return self.agent_context
-
-    def get_processor(self):
-        """Get the judgment span processor instance."""
-        return self.judgment_processor
 
     def set_customer_id(self, customer_id: str) -> None:
         span = self.get_current_span()
