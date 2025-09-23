@@ -44,8 +44,10 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
         organization_id: str,
         /,
         *,
-        max_queue_size: int = 2**18,
-        export_timeout_millis: int = 30000,
+        max_queue_size: int | None = None,
+        schedule_delay_millis: float | None = None,
+        max_export_batch_size: int | None = None,
+        export_timeout_millis: float | None = None,
         resource_attributes: Optional[dict[str, Any]] = None,
     ):
         self.tracer = tracer
@@ -64,9 +66,11 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
                 endpoint=url_for("/otel/v1/traces"),
                 api_key=api_key,
                 organization_id=organization_id,
-            project_id=project_id,
+                project_id=project_id,
             ),
             max_queue_size=max_queue_size,
+            schedule_delay_millis=schedule_delay_millis,
+            max_export_batch_size=max_export_batch_size,
             export_timeout_millis=export_timeout_millis,
         )
         self._internal_attributes: defaultdict[tuple[int, int], dict[str, Any]] = (
@@ -179,7 +183,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             super().on_end(span)
 
 
-class NoOpJudgmentSpanProcessor:
+class NoOpJudgmentSpanProcessor(JudgmentSpanProcessor):
     __slots__ = ("resource_attributes",)
 
     def __init__(self):
