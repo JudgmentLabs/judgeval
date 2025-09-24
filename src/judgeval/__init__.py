@@ -10,7 +10,7 @@ from judgeval.scorers import ExampleAPIScorerConfig
 from judgeval.scorers.example_scorer import ExampleScorer
 from judgeval.data.example import Example
 from judgeval.logger import judgeval_logger
-from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_DEFAULT_GPT_MODEL, JUDGMENT_ORG_ID
+from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_ORG_ID
 from judgeval.utils.meta import SingletonMeta
 from judgeval.exceptions import JudgmentRuntimeError, JudgmentTestError
 from judgeval.api import JudgmentSyncClient
@@ -42,7 +42,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         scorers: Sequence[Union[ExampleAPIScorerConfig, ExampleScorer]],
         project_name: str = "default_project",
         eval_run_name: str = "default_eval_run",
-        model: str = JUDGMENT_DEFAULT_GPT_MODEL,
+        model: Optional[str] = None,
         assert_test: bool = False,
     ) -> List[ScoringResult]:
         try:

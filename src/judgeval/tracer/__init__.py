@@ -868,7 +868,7 @@ class Tracer:
         *,
         scorer: Union[ExampleAPIScorerConfig, ExampleScorer],
         example: Example,
-        model: str = JUDGMENT_DEFAULT_GPT_MODEL,
+        model: Optional[str] = None,
         sampling_rate: float = 1.0,
     ):
         if not self.enable_evaluation or not self.enable_monitoring:
@@ -888,6 +888,12 @@ class Tracer:
                 % type(example)
             )
             return
+
+        if model is None:
+            if scorer.model is None:
+                model = JUDGMENT_DEFAULT_GPT_MODEL
+            else:
+                model = scorer.model
 
         if sampling_rate < 0 or sampling_rate > 1:
             judgeval_logger.error(

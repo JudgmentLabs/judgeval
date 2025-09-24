@@ -23,7 +23,7 @@ class EvaluationRun(BaseModel):
     scorers: Sequence[Union[ExampleScorer, APIScorerConfig]] = Field(
         default_factory=list
     )
-    model: str
+    model: Optional[str] = None
 
     def __init__(
         self,
