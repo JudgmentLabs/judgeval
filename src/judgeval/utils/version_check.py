@@ -4,6 +4,7 @@ import threading
 from judgeval.logger import judgeval_logger
 from judgeval.utils.decorators import use_once
 
+
 @use_once
 def check_latest_version(package_name: str = "judgeval"):
     def _check():
