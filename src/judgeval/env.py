@@ -32,7 +32,7 @@ JUDGMENT_API_KEY = required_env_var("JUDGMENT_API_KEY")
 JUDGMENT_ORG_ID = required_env_var("JUDGMENT_ORG_ID")
 JUDGMENT_API_URL = optional_env_var("JUDGMENT_API_URL", "https://api.judgmentlabs.ai")
 
-JUDGMENT_DEFAULT_GPT_MODEL = optional_env_var("JUDGMENT_DEFAULT_GPT_MODEL", "gpt-4.1")
+JUDGMENT_DEFAULT_GPT_MODEL = optional_env_var("JUDGMENT_DEFAULT_GPT_MODEL", "gpt-5")
 JUDGMENT_DEFAULT_TOGETHER_MODEL = optional_env_var(
     "JUDGMENT_DEFAULT_TOGETHER_MODEL", "meta-llama/Meta-Llama-3-8B-Instruct-Lite"
 )

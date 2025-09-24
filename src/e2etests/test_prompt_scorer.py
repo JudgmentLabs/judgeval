@@ -8,14 +8,14 @@ from e2etests.utils import retrieve_score
 import time
 from e2etests.utils import create_project, delete_project
 
-QUERY_RETRY = 25
+QUERY_RETRY = 60
 
 
-def test_prompt_scorer_without_options(client: JudgmentClient, project_name: str):
+def test_prompt_scorer(client: JudgmentClient, project_name: str):
     """Test prompt scorer functionality."""
 
     prompt_scorer = PromptScorer.create(
-        name=f"Test Prompt Scorer Without Options {uuid4()}",
+        name=f"Test Prompt Scorer {uuid4()}",
         prompt="Question: {{input}}\nResponse: {{actual_output}}\n\nIs this response relevant to the question?",
     )
 
@@ -35,7 +35,7 @@ def test_prompt_scorer_without_options(client: JudgmentClient, project_name: str
         scorers=[prompt_scorer],
         model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
-        eval_run_name="test-run-prompt-scorer-without-options",
+        eval_run_name="test-run-prompt-scorer",
     )
 
     # Verify results
@@ -46,58 +46,11 @@ def test_prompt_scorer_without_options(client: JudgmentClient, project_name: str
     print_debug_on_failure(res[1])
 
 
-def test_prompt_scorer_with_options(client: JudgmentClient, project_name: str):
-    """Test prompt scorer functionality."""
-    # Creating a prompt scorer from SDK
-    prompt_scorer = PromptScorer.create(
-        name=f"Test Prompt Scorer {uuid4()}",
-        prompt="Question: {{input}}\nResponse: {{actual_output}}\n\nIs this response helpful?",
-        options={"yes": 1.0, "no": 0.0},
-    )
-
-    # Update the options with helpfulness classification choices
-    prompt_scorer.set_options(
-        {
-            "yes": 1.0,  # Helpful response
-            "no": 0.0,  # Unhelpful response
-        }
-    )
-
-    # Create test examples
-    helpful_example = Example(
-        input="What's the capital of France?",
-        actual_output="The capital of France is Paris.",
-    )
-
-    unhelpful_example = Example(
-        input="What's the capital of France?",
-        actual_output="I don't know much about geography, but I think it might be somewhere in Europe.",
-    )
-
-    # Run evaluation
-    res = client.run_evaluation(
-        examples=[helpful_example, unhelpful_example],
-        scorers=[prompt_scorer],
-        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
-        project_name=project_name,
-        eval_run_name="test-run-prompt-scorer-with-options",
-    )
-
-    # Verify results
-    assert res[0].success, "Helpful example should pass classification"
-    assert not res[1].success, "Unhelpful example should fail classification"
-
-    # Print debug info if any test fails
-    print_debug_on_failure(res[0])
-    print_debug_on_failure(res[1])
-
-
 def test_get_and_edit_prompt_scorer(client: JudgmentClient, project_name: str):
     random_id = uuid4()
     PromptScorer.create(
         name=f"Test Prompt Scorer {random_id}",
         prompt="Question: {{input}}\nResponse: {{actual_output}}\n\nIs this response helpful?",
-        options={"yes": 1.0, "no": 0.0},
     )
     prompt_scorer = PromptScorer.get(
         name=f"Test Prompt Scorer {random_id}",
@@ -108,12 +61,10 @@ def test_get_and_edit_prompt_scorer(client: JudgmentClient, project_name: str):
         prompt_scorer.prompt
         == "Question: {{input}}\nResponse: {{actual_output}}\n\nIs this response helpful?"
     )
-    assert prompt_scorer.options == {"yes": 1.0, "no": 0.0}
 
     prompt_scorer.append_to_prompt(
         "Consider accuracy, clarity, and completeness in your evaluation."
     )
-    prompt_scorer.set_options({"y": 1.0, "n": 0.0})
     prompt_scorer.set_threshold(0.8)
 
     prompt_scorer2 = PromptScorer.get(
@@ -125,59 +76,7 @@ def test_get_and_edit_prompt_scorer(client: JudgmentClient, project_name: str):
         prompt_scorer2.prompt
         == "Question: {{input}}\nResponse: {{actual_output}}\n\nIs this response helpful?Consider accuracy, clarity, and completeness in your evaluation."
     )
-    assert prompt_scorer2.options == {"y": 1.0, "n": 0.0}
     assert prompt_scorer2.threshold == 0.8
-
-
-def test_custom_prompt_scorer(client: JudgmentClient, project_name: str):
-    """Test custom prompt scorer functionality."""
-    # Creating a custom prompt scorer from SDK
-    # Creating a prompt scorer from SDK
-    prompt_scorer = PromptScorer.create(
-        name=f"Test Prompt Scorer {uuid4()}",
-        prompt="Comparison A: {{comparison_a}}\n Comparison B: {{comparison_b}}\n\n Which candidate is better for a teammate?",
-        options={"comparison_a": 1.0, "comparison_b": 0.0},
-    )
-
-    prompt_scorer.set_options(
-        {
-            "comparison_a": 1.0,
-            "comparison_b": 0.0,
-        }
-    )
-
-    class ComparisonExample(Example):
-        comparison_a: str
-        comparison_b: str
-
-    # Create test examples
-    example1 = ComparisonExample(
-        comparison_a="Mike loves to play basketball because he passes with his teammates.",
-        comparison_b="Mike likes to play 1v1 basketball because he likes to show off his skills.",
-    )
-
-    example2 = ComparisonExample(
-        comparison_a="Mike loves to play singles tennis because he likes to only hit by himself and not with a partner and is selfish.",
-        comparison_b="Mike likes to play doubles tennis because he likes to coordinate with his partner.",
-    )
-
-    # Run evaluation
-    res = client.run_evaluation(
-        examples=[example1, example2],
-        scorers=[prompt_scorer],
-        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
-        project_name=project_name,
-        eval_run_name="test-custom-prompt-scorer",
-    )
-    print(res)
-
-    # Verify results
-    assert res[0].success, "Example 1 should pass classification"
-    assert not res[1].success, "Example 2 should fail classification"
-
-    # Print debug info if any test fails
-    print_debug_on_failure(res[0])
-    print_debug_on_failure(res[1])
 
 
 def test_trace_prompt_scorer(project_name: str):

@@ -10,6 +10,7 @@ from pydantic import BaseModel, field_validator
 from typing import List
 from judgeval.constants import APIScorerType
 from judgeval.data.example import ExampleParams
+from judgeval.env import JUDGMENT_DEFAULT_GPT_MODEL
 
 
 class APIScorerConfig(BaseModel):
@@ -29,6 +30,7 @@ class APIScorerConfig(BaseModel):
     name: str = ""
     threshold: float = 0.5
     strict_mode: bool = False
+    model: str = JUDGMENT_DEFAULT_GPT_MODEL
 
     required_params: List[ExampleParams] = []
 
