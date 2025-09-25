@@ -20,7 +20,7 @@ class DatasetInfo:
     dataset_id: str
     name: str
     created_at: str
-    dataset_kind: DatasetKind
+    kind: DatasetKind
     entries: int
     creator: str
 

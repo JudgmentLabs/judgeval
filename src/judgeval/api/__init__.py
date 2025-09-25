@@ -111,16 +111,6 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def get_evaluation_status(self, experiment_run_id: str, project_name: str) -> Any:
-        query_params = {}
-        query_params["experiment_run_id"] = experiment_run_id
-        query_params["project_name"] = project_name
-        return self._request(
-            "GET",
-            url_for("/get_evaluation_status/"),
-            query_params,
-        )
-
     def datasets_insert_examples_for_judgeval(
         self, payload: DatasetInsertExamples
     ) -> Any:
@@ -316,18 +306,6 @@ class JudgmentAsyncClient:
             "POST",
             url_for("/fetch_experiment_run/"),
             payload,
-        )
-
-    async def get_evaluation_status(
-        self, experiment_run_id: str, project_name: str
-    ) -> Any:
-        query_params = {}
-        query_params["experiment_run_id"] = experiment_run_id
-        query_params["project_name"] = project_name
-        return await self._request(
-            "GET",
-            url_for("/get_evaluation_status/"),
-            query_params,
         )
 
     async def datasets_insert_examples_for_judgeval(
