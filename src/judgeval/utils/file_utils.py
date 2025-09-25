@@ -85,12 +85,10 @@ def extract_scorer_name(scorer_file_path: str) -> str:
                 and attr.__module__ == "scorer_module"
             ):
                 try:
-                    # Instantiate the scorer and get its name
                     scorer_instance = attr()
                     if hasattr(scorer_instance, "name"):
                         return scorer_instance.name
                 except Exception:
-                    # Skip if instantiation fails
                     continue
 
         raise AttributeError("No scorer class found or could be instantiated")
