@@ -21,7 +21,7 @@ from judgeval.env import JUDGMENT_DEFAULT_GPT_MODEL
 
 
 async def safe_a_score_example(
-    scorer: Union[ExampleScorer],
+    scorer: ExampleScorer,
     example: Example,
 ):
     """

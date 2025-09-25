@@ -1,85 +1,34 @@
 from __future__ import annotations
 from typing import Any, TypeAlias
 
-
-HAS_OPENAI = False
-openai_OpenAI = None
-openai_AsyncOpenAI = None
-openai_ChatCompletion = None
-openai_Response = None
-openai_ParsedChatCompletion = None
-
-try:
-    from openai import OpenAI, AsyncOpenAI
-    from openai.types.chat.chat_completion import ChatCompletion
-    from openai.types.responses.response import Response
-    from openai.types.chat import ParsedChatCompletion
-
-    openai_OpenAI = OpenAI
-    openai_AsyncOpenAI = AsyncOpenAI
-    openai_ChatCompletion = ChatCompletion
-    openai_Response = Response
-    openai_ParsedChatCompletion = ParsedChatCompletion
-    HAS_OPENAI = True
-except ImportError:
-    pass
-
-
-HAS_TOGETHER = False
-together_Together = None
-together_AsyncTogether = None
-
-try:
-    from together import Together, AsyncTogether  # type: ignore[import-untyped]
-
-    together_Together = Together
-    together_AsyncTogether = AsyncTogether
-    HAS_TOGETHER = True
-except ImportError:
-    pass
-
-
-HAS_ANTHROPIC = False
-anthropic_Anthropic = None
-anthropic_AsyncAnthropic = None
-
-try:
-    from anthropic import Anthropic, AsyncAnthropic  # type: ignore[import-untyped]
-
-    anthropic_Anthropic = Anthropic
-    anthropic_AsyncAnthropic = AsyncAnthropic
-    HAS_ANTHROPIC = True
-except ImportError:
-    pass
-
-
-HAS_GOOGLE_GENAI = False
-google_genai_Client = None
-google_genai_cleint_AsyncClient = None
-
-try:
-    from google.genai import Client  # type: ignore[import-untyped]
-    from google.genai.client import AsyncClient  # type: ignore[import-untyped]
-
-    google_genai_Client = Client
-    google_genai_AsyncClient = AsyncClient
-    HAS_GOOGLE_GENAI = True
-except ImportError:
-    pass
-
-
-HAS_GROQ = False
-groq_Groq = None
-groq_AsyncGroq = None
-
-try:
-    from groq import Groq, AsyncGroq  # type: ignore[import-untyped]
-
-    groq_Groq = Groq
-    groq_AsyncGroq = AsyncGroq
-    HAS_GROQ = True
-except ImportError:
-    pass
+from judgeval.tracer.llm.openai import (
+    HAS_OPENAI,
+    openai_OpenAI,
+    openai_AsyncOpenAI,
+    openai_ChatCompletion,
+    openai_Response,
+    openai_ParsedChatCompletion,
+)
+from judgeval.tracer.llm.together import (
+    HAS_TOGETHER,
+    together_Together,
+    together_AsyncTogether,
+)
+from judgeval.tracer.llm.anthropic import (
+    HAS_ANTHROPIC,
+    anthropic_Anthropic,
+    anthropic_AsyncAnthropic,
+)
+from judgeval.tracer.llm.google import (
+    HAS_GOOGLE_GENAI,
+    google_genai_Client,
+    google_genai_AsyncClient,
+)
+from judgeval.tracer.llm.groq import (
+    HAS_GROQ,
+    groq_Groq,
+    groq_AsyncGroq,
+)
 
 
 # TODO: if we support dependency groups we can have this better type, but during runtime, we do

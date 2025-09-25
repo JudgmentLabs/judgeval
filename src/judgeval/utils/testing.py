@@ -7,23 +7,11 @@ from judgeval.exceptions import JudgmentTestError
 
 
 def assert_test_results(scoring_results: List[ScoringResult]) -> None:
-    """
-    Collects all failed scorers from the scoring results.
-
-    Args:
-        ScoringResults (List[ScoringResult]): List of scoring results to check
-
-    Returns:
-        None. Raises exceptions for any failed test cases.
-    """
     failed_cases: List[List[ScorerData]] = []
-
     for result in scoring_results:
         if not result.success:
-            # Create a test case context with all relevant fields
             test_case = []
             if result.scorers_data:
-                # If the result was not successful, check each scorer_data
                 for scorer_data in result.scorers_data:
                     if not scorer_data.success:
                         test_case.append(scorer_data)
@@ -50,7 +38,6 @@ def assert_test_results(scoring_results: List[ScoringResult]) -> None:
         failed_tests = len(failed_cases)
         passed_tests = total_tests - failed_tests
 
-        # Print summary with colors
         rprint("\n" + "=" * 80)
         if failed_tests == 0:
             rprint(
@@ -62,7 +49,6 @@ def assert_test_results(scoring_results: List[ScoringResult]) -> None:
             )
         rprint("=" * 80 + "\n")
 
-        # Print individual test cases
         for i, result in enumerate(scoring_results):
             test_num = i + 1
             if result.success:
