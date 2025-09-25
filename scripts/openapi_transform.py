@@ -30,7 +30,6 @@ JUDGEVAL_PATHS: List[str] = [
     "/fetch_experiment_run/",
     "/add_to_run_eval_queue/examples",
     "/add_to_run_eval_queue/traces",
-    "/get_evaluation_status/",
     "/save_scorer/",
     "/fetch_scorers/",
     "/scorer_exists/",

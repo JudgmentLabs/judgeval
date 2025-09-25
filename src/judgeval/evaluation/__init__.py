@@ -84,7 +84,7 @@ def log_evaluation_results(
 
 def _poll_evaluation_until_complete(
     evaluation_run: ExampleEvaluationRun,
-    expected_scorer_data_count: int,
+    expected_examples_count: int,
     poll_interval_seconds: float = 5,
     max_failures: int = 5,
     max_poll_count: int = 60,  # This should be equivalent to 5 minutes
@@ -117,29 +117,22 @@ def _poll_evaluation_until_complete(
         poll_count += 1
         try:
             # Check status
-            status_response = api_client.get_evaluation_status(
-                experiment_run_id, project_name
-            )
-
-            if status_response.get("status") != "completed":
-                time.sleep(poll_interval_seconds)
-                continue
-
-            example_scorer_pairings = status_response.get("results", [])
-            if len(example_scorer_pairings) != expected_scorer_data_count:
-                time.sleep(poll_interval_seconds)
-                continue
-
             results_response = api_client.fetch_experiment_run(
                 {
                     "experiment_run_id": experiment_run_id,
                     "project_name": project_name,
                 }
             )
+
+            example_scorer_pairings = results_response.get("results", [])
+            if len(example_scorer_pairings) != expected_examples_count:
+                time.sleep(poll_interval_seconds)
+                continue
+
             url = results_response.get("ui_results_url")
 
             scoring_result_list = []
-            for res in results_response.get("results", []):
+            for res in example_scorer_pairings:
                 example = res.get("data", {}).copy()
                 example["example_id"] = res.get("example_id")
                 scoring_result = ScoringResult(
@@ -241,14 +234,9 @@ def run_eval(
                 )
                 raise JudgmentRuntimeError(error_message)
 
-            num_scorers = (
-                len(evaluation_run.judgment_scorers)
-                if evaluation_run.judgment_scorers
-                else sum(1 for cs in evaluation_run.custom_scorers if cs.server_hosted)
-            )
             results, url = _poll_evaluation_until_complete(
                 evaluation_run=evaluation_run,
-                expected_scorer_data_count=(num_scorers * len(evaluation_run.examples)),
+                expected_examples_count=len(evaluation_run.examples),
             )
         finally:
             stop_event.set()
