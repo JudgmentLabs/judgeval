@@ -73,6 +73,16 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-1
+
+      - name: Restore uv cache
+        uses: actions/cache/restore@v4
+        id: restore-uv-cache
+        with:
+          path: ~/.cache/uv/
+          key: ${{ runner.os }}-uv-judgment-${{ hashFiles('./**/uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-judgment-
+            ${{ runner.os }}-uv-
           
       - name: Checkout code
         uses: actions/checkout@v4
@@ -113,6 +123,13 @@ jobs:
           name: coverage-html-staging-${{ matrix.python-version }}
           path: src/htmlcov
 
+      - name: Save uv cache
+        uses: actions/cache/save@v4
+        if: always() && steps.restore-uv-cache.outputs.cache-hit != 'true'
+        with:
+          path: ~/.cache/uv/
+          key: ${{ runner.os }}-uv-judgment-${{ hashFiles('./**/uv.lock') }}
+
   run-e2e-tests-main:
     needs: [validate-branch]
     if: "github.base_ref == 'main' && !contains(github.actor, '[bot]') && needs.validate-branch.result == 'success'"
@@ -135,6 +152,25 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-1
+
+      - name: Restore uv cache
+        uses: actions/cache/restore@v4
+        id: restore-uv-cache
+        with:
+          path: ~/.cache/uv/
+          key: ${{ runner.os }}-uv-judgment-${{ hashFiles('./**/uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-judgment-
+            ${{ runner.os }}-uv-
+
+      - name: Cache or restore judgeval dependencies
+        uses: actions/cache@v4
+        with:
+          path: ./.venv/
+          key: ${{ runner.os }}-uv-judgeval-main-${{ hashFiles('**/uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-judgeval-main-
+            ${{ runner.os }}-uv-
           
       - name: Checkout code
         uses: actions/checkout@v4
@@ -174,3 +210,10 @@ jobs:
         with:
           name: coverage-html-production-${{ matrix.python-version }}
           path: src/htmlcov
+
+      - name: Save uv cache
+        uses: actions/cache/save@v4
+        if: always() && steps.restore-uv-cache.outputs.cache-hit != 'true'
+        with:
+          path: ~/.cache/uv/
+          key: ${{ runner.os }}-uv-judgment-${{ hashFiles('./**/uv.lock') }}
