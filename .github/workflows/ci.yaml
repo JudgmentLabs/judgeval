@@ -3,6 +3,9 @@ name: CI
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - justin/gh-actions-cache
 
 permissions: read-all
 
@@ -53,7 +56,7 @@ jobs:
 
   run-e2e-tests-staging:
     needs: [validate-branch]
-    if: "github.base_ref == 'staging' && !contains(github.actor, '[bot]') && (needs.validate-branch.result == 'success' || needs.validate-branch.result == 'skipped')"
+    if: "!contains(github.actor, '[bot]') && (needs.validate-branch.result == 'success' || needs.validate-branch.result == 'skipped')"
     strategy:
       fail-fast: false
       matrix:
@@ -163,6 +166,9 @@ jobs:
             ${{ runner.os }}-uv-judgment-
             ${{ runner.os }}-uv-
 
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Cache or restore judgeval dependencies
         uses: actions/cache@v4
         with:
@@ -172,9 +178,6 @@ jobs:
             ${{ runner.os }}-uv-judgeval-main-
             ${{ runner.os }}-uv-
           
-      - name: Checkout code
-        uses: actions/checkout@v4
-        
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
