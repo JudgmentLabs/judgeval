@@ -89,6 +89,9 @@ AnthropicStreamType = Union[
 
 
 def _extract_anthropic_content(chunk: AnthropicStreamEvent) -> str:
+    if hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
+        return chunk.delta.text or ""
+
     if isinstance(chunk, AnthropicStreamEvent) and chunk.type == "content_block_delta":
         if chunk.delta and chunk.delta.text:
             return chunk.delta.text
@@ -112,6 +115,9 @@ def _extract_anthropic_tokens(usage_data: AnthropicUsage) -> Tuple[int, int, int
 def _extract_anthropic_chunk_usage(
     chunk: AnthropicStreamEvent,
 ) -> Optional[AnthropicUsage]:
+    if hasattr(chunk, "usage") and chunk.usage:
+        return chunk.usage
+
     if isinstance(chunk, AnthropicStreamEvent):
         if chunk.type == "message_start" and chunk.message:
             return chunk.message.usage
