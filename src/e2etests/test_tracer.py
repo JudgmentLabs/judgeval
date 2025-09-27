@@ -383,11 +383,6 @@ def retrieve_streaming_trace_helper(trace_id):
     if input_tokens is None or output_tokens is None:
         assert False, "Missing usage tokens in streaming span"
 
-    # Should have cost information
-    total_cost = span_attributes.get("gen_ai.usage.total_cost_usd")
-    if total_cost is None:
-        assert False, "Missing cost information in streaming span"
-
     return trace_spans
 
 

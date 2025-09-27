@@ -84,22 +84,27 @@ def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
     provider_type = _detect_provider(client)
 
     if provider_type == ProviderType.OPENAI:
-        from .openai.wrapper import wrap_openai_client
+        from .llm_openai.wrapper import wrap_openai_client
 
         return wrap_openai_client(tracer, client)
     elif provider_type == ProviderType.ANTHROPIC:
-        from .anthropic.wrapper import wrap_anthropic_client
+        from .llm_anthropic.wrapper import wrap_anthropic_client
 
         return wrap_anthropic_client(tracer, client)
     elif provider_type == ProviderType.TOGETHER:
-        from .together.wrapper import wrap_together_client
+        from .llm_together.wrapper import wrap_together_client
 
         return wrap_together_client(tracer, client)
     elif provider_type == ProviderType.GOOGLE:
-        from .google.wrapper import wrap_google_client
+        from .llm_google.wrapper import wrap_google_client
 
         return wrap_google_client(tracer, client)
     elif provider_type == ProviderType.GROQ:
-        from .groq.wrapper import wrap_groq_client
+        from .llm_groq.wrapper import wrap_groq_client
 
         return wrap_groq_client(tracer, client)
+    else:
+        # Default to OpenAI-compatible wrapping for unknown clients
+        from .llm_openai.wrapper import wrap_openai_client
+
+        return wrap_openai_client(tracer, client)

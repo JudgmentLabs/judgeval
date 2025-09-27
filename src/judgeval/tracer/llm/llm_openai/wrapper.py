@@ -30,10 +30,16 @@ if TYPE_CHECKING:
 
 
 @runtime_checkable
+class OpenAIPromptTokensDetails(Protocol):
+    cached_tokens: Optional[int]
+
+
+@runtime_checkable
 class OpenAIUsage(Protocol):
     prompt_tokens: Optional[int]
     completion_tokens: Optional[int]
     total_tokens: Optional[int]
+    prompt_tokens_details: Optional[OpenAIPromptTokensDetails]
 
 
 @runtime_checkable
@@ -52,6 +58,7 @@ class OpenAIUnifiedUsage(Protocol):
     output_tokens: Optional[int]
 
     total_tokens: Optional[int]
+    prompt_tokens_details: Optional[OpenAIPromptTokensDetails]
 
 
 @runtime_checkable
@@ -154,7 +161,7 @@ def _extract_openai_content(chunk: OpenAIStreamChunk) -> str:
     return ""
 
 
-def _extract_openai_tokens(usage_data: OpenAIUnifiedUsage) -> Tuple[int, int]:
+def _extract_openai_tokens(usage_data: OpenAIUnifiedUsage) -> Tuple[int, int, int, int]:
     if hasattr(usage_data, "prompt_tokens") and usage_data.prompt_tokens is not None:
         prompt_tokens = usage_data.prompt_tokens
         completion_tokens = usage_data.completion_tokens or 0
@@ -166,7 +173,22 @@ def _extract_openai_tokens(usage_data: OpenAIUnifiedUsage) -> Tuple[int, int]:
         prompt_tokens = 0
         completion_tokens = 0
 
-    return prompt_tokens, completion_tokens
+    # Extract cached tokens
+    cache_read_input_tokens = 0
+    if (
+        usage_data.prompt_tokens_details
+        and usage_data.prompt_tokens_details.cached_tokens
+    ):
+        cache_read_input_tokens = usage_data.prompt_tokens_details.cached_tokens
+
+    cache_creation_input_tokens = 0  # OpenAI doesn't have cache creation tokens
+
+    return (
+        prompt_tokens,
+        completion_tokens,
+        cache_read_input_tokens,
+        cache_creation_input_tokens,
+    )
 
 
 def _format_openai_output(
