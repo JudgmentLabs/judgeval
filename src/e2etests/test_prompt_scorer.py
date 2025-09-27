@@ -98,7 +98,7 @@ def test_trace_prompt_scorer(project_name: str):
 
     @judgment.observe(
         span_type="function",
-        scorer_config=TraceScorerConfig(scorer=trace_scorer, model="gpt-5"),
+        scorer_config=TraceScorerConfig(scorer=trace_scorer, model="gpt-4o-mini"),
     )
     def main():
         sample_trace_span("test")
