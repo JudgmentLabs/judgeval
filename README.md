@@ -11,7 +11,7 @@
 
 ## Agent Behavior Monitoring (ABM)
 
-Track and judge any agent behavior in online and offline setups. Set up Sentry-style alerts and run RL on Qwen, LLama, and gpt-oss easily! 
+Track and judge any agent behavior in online and offline setups. Set up Sentry-style alerts and analyze any agent topics/behaviors! 
 
 [![Docs](https://img.shields.io/badge/Documentation-blue)](https://docs.judgmentlabs.ai/documentation)
 [![Judgment Cloud](https://img.shields.io/badge/Judgment%20Cloud-brightgreen)](https://app.judgmentlabs.ai/register)
@@ -26,23 +26,6 @@ Track and judge any agent behavior in online and offline setups. Set up Sentry-s
 
 </table>
 
-## [NEW] 🎆 Agent Reinforcement Learning
-
-Train your agents with multi-turn reinforcement learning using [Fireworks AI](https://fireworks.ai/)! Judgeval now integrates with Fireworks' Reinforcement Fine-Tuning (RFT) endpoint, supporting gpt-oss, qwen3, Kimi2, DeepSeek, and more.
-
-Judgeval provides a simple harness for integrating GRPO into any Python agent, giving builders a quick method to **try RL with minimal code changes** to their existing agents!
-
-```python
-await trainer.train(
-    agent_function=your_agent_function,  # entry point to your agent
-    scorers=[RewardScorer()],  # Custom scorer you define based on task criteria, acts as reward
-    prompts=training_prompts,  # Tasks
-    rft_provider="fireworks"
-)
-```
-
-**That's it!** Judgeval automatically manages trajectory collection and reward tagging - your agent can learn from production data with minimal code changes. You can view and monitor training progress for free via the [Judgment Dashboard](https://app.judgmentlabs.ai/).
-
 ## Judgeval Overview
 
 Judgeval is an open-source framework for agent behavior monitoring. Judgeval offers a toolkit to track and judge agent behavior in online and offline setups, enabling you to convert interaction data from production/test environments into improved agents. To get started, try running one of the notebooks below depending on your use case or diving deeper in our [docs](https://docs.judgmentlabs.ai/documentation).
@@ -54,19 +37,20 @@ Our mission is to unlock the power of production data for agent development, ena
 | Try Out | Notebook | Description |
 |:---------|:-----|:------------|
 | Custom Scorers | [Get Started For Free] | Build custom evaluators for your agents |
-| Online Monitoring | [Get Started For Free] | Monitor agent behavior in production |
-| RL | [Get Started For Free] | Train agents with reinforcement learning |
+| Online ABM | [Get Started For Free] | Monitor agent behavior in production |
+| Offline Testing | [Get Started For Free] | Compare how different prompts, models, or agent configs affect performance across ANY metric |
+
 
 You can access our repo of cookbooks [here](https://github.com/JudgmentLabs/judgeval-cookbook).
 
 
 ## Why Judgeval?
 
-• **Custom Evaluators**: No restriction to only monitoring with prefab scorers. Judgeval provides simple abstractions for custom python evaluators and their applications, supporting any LLM-as-a-judge rubrics and code-based scorers that integrate to our live agent-tracking infrastructure. [Learn more](https://docs.judgmentlabs.ai/documentation/evaluation/scorers/custom-scorers)
+• **Custom Evaluators**: No restriction to only monitoring with prefab scorers. Judgeval provides simple abstractions for custom python evaluators and their applications, supporting any LLM-as-a-judge rubrics/models and code-based scorers that integrate to our live agent-tracking infrastructure. [Learn more](https://docs.judgmentlabs.ai/documentation/evaluation/scorers/custom-scorers)
 
-• **Production Monitoring**: Run any custom scorer to flag agent behaviors online in production. Group agent runs by behavior type into buckets for deeper analysis. Get Slack alerts for failures and add custom hooks to address regressions before they impact users. [Learn more](https://docs.judgmentlabs.ai/documentation/performance/online-evals)
+• **Production Monitoring**: Run any custom scorer in a hosted, virtualized secure container to flag agent behaviors online in production. Get Slack alerts for failures and add custom hooks to address regressions before they impact users. [Learn more](https://docs.judgmentlabs.ai/documentation/performance/online-evals)
 
-• **Simple to run multi-turn RL**: Optimize your agents with multi-turn RL without managing compute infrastructure or data pipelines. Just add a few lines of code to your existing agent code and train!
+• **Behavior/Topic Grouping**: Group agent runs by behavior type or topic for deeper analysis. Drill down into subsets of users, agents, or use cases to reveal patterns of agent behavior.
 <!-- 
 TODO: Once we have trainer code docs, plug in here
 -->
@@ -128,7 +112,7 @@ def run_agent(prompt: str) -> str:
     )
 
     judgment.async_evaluate(  # trigger online monitoring
-        scorer=AnswerRelevancyScorer(threshold=0.5),  # swap with your scorers
+        scorer=AnswerRelevancyScorer(threshold=0.5),  # swap with any scorer
         example=Example(input=task, actual_output=response),  # customize to your data
         model="gpt-5",
     )
