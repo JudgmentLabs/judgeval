@@ -20,48 +20,6 @@ import pytest
 import string
 from typing import cast
 
-# Optional imports
-HAS_OPENAI = False
-HAS_ANTHROPIC = False
-HAS_GROQ = False
-HAS_TOGETHER = False
-HAS_GOOGLE = False
-
-try:
-    from openai import OpenAI, AsyncOpenAI
-
-    HAS_OPENAI = True
-except ImportError:
-    OpenAI = AsyncOpenAI = None
-
-try:
-    from anthropic import Anthropic, AsyncAnthropic
-
-    HAS_ANTHROPIC = True
-except ImportError:
-    Anthropic = AsyncAnthropic = None
-
-try:
-    from groq import Groq, AsyncGroq
-
-    HAS_GROQ = True
-except ImportError:
-    Groq = AsyncGroq = None
-
-try:
-    from together import Together, AsyncTogether
-
-    HAS_TOGETHER = True
-except ImportError:
-    Together = AsyncTogether = None
-
-try:
-    from google import genai
-
-    HAS_GOOGLE = True
-except ImportError:
-    genai = None
-
 project_name = "e2e-tests-" + "".join(
     random.choices(string.ascii_letters + string.digits, k=12)
 )
@@ -81,38 +39,18 @@ judgment: Tracer = cast(
     ),
 )
 
-# Wrap clients (only if available and API keys are set)
-openai_client = wrap(OpenAI()) if HAS_OPENAI else None
-anthropic_client = wrap(Anthropic()) if HAS_ANTHROPIC else None
-groq_client = (
-    wrap(Groq(api_key=os.getenv("GROQ_API_KEY")))
-    if HAS_GROQ and os.getenv("GROQ_API_KEY")
-    else None
-)
-together_client = (
-    wrap(Together(api_key=os.getenv("TOGETHER_API_KEY")))
-    if HAS_TOGETHER and os.getenv("TOGETHER_API_KEY")
-    else None
-)
-google_client = (
-    wrap(genai.Client(api_key=os.getenv("GOOGLE_API_KEY")))
-    if HAS_GOOGLE and os.getenv("GOOGLE_API_KEY")
-    else None
-)
+# Wrap clients
+openai_client = wrap(OpenAI())
+anthropic_client = wrap(Anthropic())
+groq_client = wrap(Groq(api_key=os.getenv("GROQ_API_KEY")))
+together_client = wrap(Together(api_key=os.getenv("TOGETHER_API_KEY")))
+google_client = wrap(genai.Client(api_key=os.getenv("GOOGLE_API_KEY")))
 
-# Async clients (only if available and API keys are set)
-openai_client_async = wrap(AsyncOpenAI()) if HAS_OPENAI else None
-anthropic_client_async = wrap(AsyncAnthropic()) if HAS_ANTHROPIC else None
-groq_client_async = (
-    wrap(AsyncGroq(api_key=os.getenv("GROQ_API_KEY")))
-    if HAS_GROQ and os.getenv("GROQ_API_KEY")
-    else None
-)
-together_client_async = (
-    wrap(AsyncTogether(api_key=os.getenv("TOGETHER_API_KEY")))
-    if HAS_TOGETHER and os.getenv("TOGETHER_API_KEY")
-    else None
-)
+# Async clients
+openai_client_async = wrap(AsyncOpenAI())
+anthropic_client_async = wrap(AsyncAnthropic())
+groq_client_async = wrap(AsyncGroq(api_key=os.getenv("GROQ_API_KEY")))
+together_client_async = wrap(AsyncTogether(api_key=os.getenv("TOGETHER_API_KEY")))
 
 QUERY_RETRY = 15
 PROMPT = "I need you to solve this math problem: 1 + 1 = ?"
