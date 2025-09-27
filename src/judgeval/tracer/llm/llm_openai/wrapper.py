@@ -251,7 +251,9 @@ class TracedOpenAIGenerator:
             if content:
                 self.accumulated_content += content
             if chunk.usage:
-                prompt_tokens, completion_tokens = _extract_openai_tokens(chunk.usage)
+                prompt_tokens, completion_tokens, cache_read, cache_creation = (
+                    _extract_openai_tokens(chunk.usage)
+                )
                 set_span_attribute(
                     self.span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
                 )
@@ -259,6 +261,16 @@ class TracedOpenAIGenerator:
                     self.span,
                     AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
                     completion_tokens,
+                )
+                set_span_attribute(
+                    self.span,
+                    AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+                    cache_read,
+                )
+                set_span_attribute(
+                    self.span,
+                    AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+                    cache_creation,
                 )
                 set_span_attribute(
                     self.span,
@@ -305,7 +317,9 @@ class TracedOpenAIAsyncGenerator:
             if content:
                 self.accumulated_content += content
             if chunk.usage:
-                prompt_tokens, completion_tokens = _extract_openai_tokens(chunk.usage)
+                prompt_tokens, completion_tokens, cache_read, cache_creation = (
+                    _extract_openai_tokens(chunk.usage)
+                )
                 set_span_attribute(
                     self.span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
                 )
@@ -313,6 +327,16 @@ class TracedOpenAIAsyncGenerator:
                     self.span,
                     AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
                     completion_tokens,
+                )
+                set_span_attribute(
+                    self.span,
+                    AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+                    cache_read,
+                )
+                set_span_attribute(
+                    self.span,
+                    AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+                    cache_creation,
                 )
 
                 set_span_attribute(
@@ -381,9 +405,12 @@ def wrap_openai_client(tracer: Tracer, client: TClient) -> TClient:
                             span, AttributeKeys.GEN_AI_COMPLETION, output
                         )
                         if usage_data:
-                            prompt_tokens, completion_tokens = _extract_openai_tokens(
-                                usage_data
-                            )
+                            (
+                                prompt_tokens,
+                                completion_tokens,
+                                cache_read,
+                                cache_creation,
+                            ) = _extract_openai_tokens(usage_data)
                             set_span_attribute(
                                 span,
                                 AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
@@ -393,6 +420,16 @@ def wrap_openai_client(tracer: Tracer, client: TClient) -> TClient:
                                 span,
                                 AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
                                 completion_tokens,
+                            )
+                            set_span_attribute(
+                                span,
+                                AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+                                cache_read,
+                            )
+                            set_span_attribute(
+                                span,
+                                AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+                                cache_creation,
                             )
                             set_span_attribute(
                                 span,
@@ -445,9 +482,12 @@ def wrap_openai_client(tracer: Tracer, client: TClient) -> TClient:
                             span, AttributeKeys.GEN_AI_COMPLETION, output
                         )
                         if usage_data:
-                            prompt_tokens, completion_tokens = _extract_openai_tokens(
-                                usage_data
-                            )
+                            (
+                                prompt_tokens,
+                                completion_tokens,
+                                cache_read,
+                                cache_creation,
+                            ) = _extract_openai_tokens(usage_data)
                             set_span_attribute(
                                 span,
                                 AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
@@ -457,6 +497,16 @@ def wrap_openai_client(tracer: Tracer, client: TClient) -> TClient:
                                 span,
                                 AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
                                 completion_tokens,
+                            )
+                            set_span_attribute(
+                                span,
+                                AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+                                cache_read,
+                            )
+                            set_span_attribute(
+                                span,
+                                AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+                                cache_creation,
                             )
                             set_span_attribute(
                                 span,
