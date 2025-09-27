@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Any, TypeAlias
 
-from judgeval.tracer.llm.openai import (
+from judgeval.tracer.llm.llm_openai.config import (
     HAS_OPENAI,
     openai_OpenAI,
     openai_AsyncOpenAI,
@@ -9,22 +9,22 @@ from judgeval.tracer.llm.openai import (
     openai_Response,
     openai_ParsedChatCompletion,
 )
-from judgeval.tracer.llm.together import (
+from judgeval.tracer.llm.llm_together.config import (
     HAS_TOGETHER,
     together_Together,
     together_AsyncTogether,
 )
-from judgeval.tracer.llm.anthropic import (
+from judgeval.tracer.llm.llm_anthropic.config import (
     HAS_ANTHROPIC,
     anthropic_Anthropic,
     anthropic_AsyncAnthropic,
 )
-from judgeval.tracer.llm.google import (
+from judgeval.tracer.llm.llm_google.config import (
     HAS_GOOGLE_GENAI,
     google_genai_Client,
     google_genai_AsyncClient,
 )
-from judgeval.tracer.llm.groq import (
+from judgeval.tracer.llm.llm_groq.config import (
     HAS_GROQ,
     groq_Groq,
     groq_AsyncGroq,

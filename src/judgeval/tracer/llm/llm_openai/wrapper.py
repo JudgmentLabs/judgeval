@@ -1,0 +1,483 @@
+from __future__ import annotations
+import functools
+from typing import (
+    TYPE_CHECKING,
+    Optional,
+    Tuple,
+    Protocol,
+    TypeVar,
+    Union,
+    Sequence,
+    Callable,
+    Iterator,
+    AsyncIterator,
+    runtime_checkable,
+)
+
+from judgeval.tracer.llm.llm_openai.config import (
+    HAS_OPENAI,
+    openai_OpenAI,
+    openai_AsyncOpenAI,
+)
+from judgeval.tracer.managers import sync_span_context, async_span_context
+from judgeval.tracer.keys import AttributeKeys
+from judgeval.tracer.utils import set_span_attribute
+from judgeval.utils.serialize import safe_serialize
+
+if TYPE_CHECKING:
+    from judgeval.tracer import Tracer
+    from opentelemetry.trace import Span
+
+
+@runtime_checkable
+class OpenAIUsage(Protocol):
+    prompt_tokens: Optional[int]
+    completion_tokens: Optional[int]
+    total_tokens: Optional[int]
+
+
+@runtime_checkable
+class OpenAIResponseUsage(Protocol):
+    input_tokens: Optional[int]
+    output_tokens: Optional[int]
+    total_tokens: Optional[int]
+
+
+@runtime_checkable
+class OpenAIUnifiedUsage(Protocol):
+    prompt_tokens: Optional[int]
+    completion_tokens: Optional[int]
+
+    input_tokens: Optional[int]
+    output_tokens: Optional[int]
+
+    total_tokens: Optional[int]
+
+
+@runtime_checkable
+class OpenAIMessage(Protocol):
+    content: Optional[str]
+    role: str
+
+
+@runtime_checkable
+class OpenAIParsedMessage(Protocol):
+    parsed: Optional[str]
+    content: Optional[str]
+    role: str
+
+
+@runtime_checkable
+class OpenAIChoice(Protocol):
+    index: int
+    message: OpenAIMessage
+    finish_reason: Optional[str]
+
+
+@runtime_checkable
+class OpenAIParsedChoice(Protocol):
+    index: int
+    message: OpenAIParsedMessage
+    finish_reason: Optional[str]
+
+
+@runtime_checkable
+class OpenAIResponseContent(Protocol):
+    text: str
+
+
+@runtime_checkable
+class OpenAIResponseOutput(Protocol):
+    content: Sequence[OpenAIResponseContent]
+
+
+@runtime_checkable
+class OpenAIChatCompletionBase(Protocol):
+    id: str
+    object: str
+    created: int
+    model: str
+    choices: Sequence[Union[OpenAIChoice, OpenAIParsedChoice]]
+    usage: Optional[OpenAIUnifiedUsage]
+
+
+OpenAIChatCompletion = OpenAIChatCompletionBase
+OpenAIParsedChatCompletion = OpenAIChatCompletionBase
+
+
+@runtime_checkable
+class OpenAIResponse(Protocol):
+    id: str
+    object: str
+    created: int
+    model: str
+    output: Sequence[OpenAIResponseOutput]
+    usage: Optional[OpenAIUnifiedUsage]
+
+
+@runtime_checkable
+class OpenAIStreamDelta(Protocol):
+    content: Optional[str]
+
+
+@runtime_checkable
+class OpenAIStreamChoice(Protocol):
+    index: int
+    delta: OpenAIStreamDelta
+
+
+@runtime_checkable
+class OpenAIStreamChunk(Protocol):
+    choices: Sequence[OpenAIStreamChoice]
+    usage: Optional[OpenAIUnifiedUsage]
+
+
+@runtime_checkable
+class OpenAIClient(Protocol):
+    pass
+
+
+@runtime_checkable
+class OpenAIAsyncClient(Protocol):
+    pass
+
+
+OpenAIResponseType = Union[OpenAIChatCompletionBase, OpenAIResponse]
+OpenAIStreamType = Union[Iterator[OpenAIStreamChunk], AsyncIterator[OpenAIStreamChunk]]
+
+
+def _extract_openai_content(chunk: OpenAIStreamChunk) -> str:
+    if chunk.choices and len(chunk.choices) > 0:
+        delta_content = chunk.choices[0].delta.content
+        if delta_content:
+            return delta_content
+    return ""
+
+
+def _extract_openai_tokens(usage_data: OpenAIUnifiedUsage) -> Tuple[int, int]:
+    if hasattr(usage_data, "prompt_tokens") and usage_data.prompt_tokens is not None:
+        prompt_tokens = usage_data.prompt_tokens
+        completion_tokens = usage_data.completion_tokens or 0
+
+    elif hasattr(usage_data, "input_tokens") and usage_data.input_tokens is not None:
+        prompt_tokens = usage_data.input_tokens
+        completion_tokens = usage_data.output_tokens or 0
+    else:
+        prompt_tokens = 0
+        completion_tokens = 0
+
+    return prompt_tokens, completion_tokens
+
+
+def _format_openai_output(
+    response: OpenAIResponseType,
+) -> Tuple[Optional[str], Optional[OpenAIUnifiedUsage]]:
+    message_content: Optional[str] = None
+    usage_data: Optional[OpenAIUnifiedUsage] = None
+
+    try:
+        if isinstance(response, OpenAIResponse):
+            usage_data = response.usage
+            if response.output and len(response.output) > 0:
+                output0 = response.output[0]
+                if output0.content and len(output0.content) > 0:
+                    try:
+                        message_content = "".join(seg.text for seg in output0.content)
+                    except (TypeError, AttributeError):
+                        message_content = str(output0.content)
+        elif isinstance(response, OpenAIChatCompletionBase):
+            usage_data = response.usage
+            if response.choices and len(response.choices) > 0:
+                message = response.choices[0].message
+
+                if (
+                    hasattr(message, "parsed")
+                    and getattr(message, "parsed", None) is not None
+                ):
+                    message_content = str(getattr(message, "parsed"))
+                else:
+                    message_content = getattr(message, "content", None)
+    except (AttributeError, IndexError, TypeError):
+        pass
+
+    return message_content, usage_data
+
+
+class TracedOpenAIGenerator:
+    def __init__(
+        self,
+        tracer: Tracer,
+        generator: Iterator[OpenAIStreamChunk],
+        client: OpenAIClient,
+        span: Span,
+        model_name: str,
+    ):
+        self.tracer = tracer
+        self.generator = generator
+        self.client = client
+        self.span = span
+        self.model_name = model_name
+        self.accumulated_content = ""
+
+    def __iter__(self) -> Iterator[OpenAIStreamChunk]:
+        return self
+
+    def __next__(self) -> OpenAIStreamChunk:
+        try:
+            chunk = next(self.generator)
+            content = _extract_openai_content(chunk)
+            if content:
+                self.accumulated_content += content
+            if chunk.usage:
+                prompt_tokens, completion_tokens = _extract_openai_tokens(chunk.usage)
+                set_span_attribute(
+                    self.span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+                )
+                set_span_attribute(
+                    self.span,
+                    AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
+                    completion_tokens,
+                )
+                set_span_attribute(
+                    self.span,
+                    AttributeKeys.JUDGMENT_USAGE_METADATA,
+                    safe_serialize(chunk.usage),
+                )
+            return chunk
+        except StopIteration:
+            set_span_attribute(
+                self.span, AttributeKeys.GEN_AI_COMPLETION, self.accumulated_content
+            )
+            self.span.end()
+            raise
+        except Exception as e:
+            if self.span:
+                self.span.record_exception(e)
+                self.span.end()
+            raise
+
+
+class TracedOpenAIAsyncGenerator:
+    def __init__(
+        self,
+        tracer: Tracer,
+        async_generator: AsyncIterator[OpenAIStreamChunk],
+        client: OpenAIAsyncClient,
+        span: Span,
+        model_name: str,
+    ):
+        self.tracer = tracer
+        self.async_generator = async_generator
+        self.client = client
+        self.span = span
+        self.model_name = model_name
+        self.accumulated_content = ""
+
+    def __aiter__(self) -> AsyncIterator[OpenAIStreamChunk]:
+        return self
+
+    async def __anext__(self) -> OpenAIStreamChunk:
+        try:
+            chunk = await self.async_generator.__anext__()
+            content = _extract_openai_content(chunk)
+            if content:
+                self.accumulated_content += content
+            if chunk.usage:
+                prompt_tokens, completion_tokens = _extract_openai_tokens(chunk.usage)
+                set_span_attribute(
+                    self.span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+                )
+                set_span_attribute(
+                    self.span,
+                    AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
+                    completion_tokens,
+                )
+
+                set_span_attribute(
+                    self.span,
+                    AttributeKeys.JUDGMENT_USAGE_METADATA,
+                    safe_serialize(chunk.usage),
+                )
+            return chunk
+        except StopAsyncIteration:
+            set_span_attribute(
+                self.span, AttributeKeys.GEN_AI_COMPLETION, self.accumulated_content
+            )
+            self.span.end()
+            raise
+        except Exception as e:
+            if self.span:
+                self.span.record_exception(e)
+                self.span.end()
+            raise
+
+
+TClient = TypeVar("TClient", bound=OpenAIClient)
+
+
+def wrap_openai_client(tracer: Tracer, client: TClient) -> TClient:
+    if not HAS_OPENAI:
+        return client
+
+    assert openai_OpenAI is not None
+    assert openai_AsyncOpenAI is not None
+
+    def wrapped(function: Callable, span_name: str):
+        @functools.wraps(function)
+        def wrapper(*args, **kwargs):
+            if kwargs.get("stream", False):
+                span = tracer.get_tracer().start_span(
+                    span_name, attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+                )
+                tracer.add_agent_attributes_to_span(span)
+                set_span_attribute(
+                    span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
+                )
+                model_name = kwargs.get("model", "")
+                set_span_attribute(span, AttributeKeys.GEN_AI_REQUEST_MODEL, model_name)
+                stream_response = function(*args, **kwargs)
+                return TracedOpenAIGenerator(
+                    tracer, stream_response, client, span, model_name
+                )
+            else:
+                with sync_span_context(
+                    tracer, span_name, {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+                ) as span:
+                    tracer.add_agent_attributes_to_span(span)
+                    set_span_attribute(
+                        span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
+                    )
+                    model_name = kwargs.get("model", "")
+                    set_span_attribute(
+                        span, AttributeKeys.GEN_AI_REQUEST_MODEL, model_name
+                    )
+                    response = function(*args, **kwargs)
+
+                    if isinstance(response, (OpenAIChatCompletionBase, OpenAIResponse)):
+                        output, usage_data = _format_openai_output(response)
+                        set_span_attribute(
+                            span, AttributeKeys.GEN_AI_COMPLETION, output
+                        )
+                        if usage_data:
+                            prompt_tokens, completion_tokens = _extract_openai_tokens(
+                                usage_data
+                            )
+                            set_span_attribute(
+                                span,
+                                AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
+                                prompt_tokens,
+                            )
+                            set_span_attribute(
+                                span,
+                                AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
+                                completion_tokens,
+                            )
+                            set_span_attribute(
+                                span,
+                                AttributeKeys.JUDGMENT_USAGE_METADATA,
+                                safe_serialize(usage_data),
+                            )
+                        set_span_attribute(
+                            span,
+                            AttributeKeys.GEN_AI_RESPONSE_MODEL,
+                            getattr(response, "model", model_name),
+                        )
+                    return response
+
+        return wrapper
+
+    def wrapped_async(function: Callable, span_name: str):
+        @functools.wraps(function)
+        async def wrapper(*args, **kwargs):
+            if kwargs.get("stream", False):
+                span = tracer.get_tracer().start_span(
+                    span_name, attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+                )
+                tracer.add_agent_attributes_to_span(span)
+                set_span_attribute(
+                    span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
+                )
+                model_name = kwargs.get("model", "")
+                set_span_attribute(span, AttributeKeys.GEN_AI_REQUEST_MODEL, model_name)
+                stream_response = await function(*args, **kwargs)
+                return TracedOpenAIAsyncGenerator(
+                    tracer, stream_response, client, span, model_name
+                )
+            else:
+                async with async_span_context(
+                    tracer, span_name, {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+                ) as span:
+                    tracer.add_agent_attributes_to_span(span)
+                    set_span_attribute(
+                        span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
+                    )
+                    model_name = kwargs.get("model", "")
+                    set_span_attribute(
+                        span, AttributeKeys.GEN_AI_REQUEST_MODEL, model_name
+                    )
+                    response = await function(*args, **kwargs)
+
+                    if isinstance(response, (OpenAIChatCompletionBase, OpenAIResponse)):
+                        output, usage_data = _format_openai_output(response)
+                        set_span_attribute(
+                            span, AttributeKeys.GEN_AI_COMPLETION, output
+                        )
+                        if usage_data:
+                            prompt_tokens, completion_tokens = _extract_openai_tokens(
+                                usage_data
+                            )
+                            set_span_attribute(
+                                span,
+                                AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
+                                prompt_tokens,
+                            )
+                            set_span_attribute(
+                                span,
+                                AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
+                                completion_tokens,
+                            )
+                            set_span_attribute(
+                                span,
+                                AttributeKeys.JUDGMENT_USAGE_METADATA,
+                                safe_serialize(usage_data),
+                            )
+                        set_span_attribute(
+                            span,
+                            AttributeKeys.GEN_AI_RESPONSE_MODEL,
+                            getattr(response, "model", model_name),
+                        )
+                    return response
+
+        return wrapper
+
+    span_name = "OPENAI_API_CALL"
+    if isinstance(client, openai_OpenAI):
+        setattr(
+            client.chat.completions,
+            "create",
+            wrapped(client.chat.completions.create, span_name),
+        )
+        setattr(client.responses, "create", wrapped(client.responses.create, span_name))
+        setattr(
+            client.beta.chat.completions,
+            "parse",
+            wrapped(client.beta.chat.completions.parse, span_name),
+        )
+    elif isinstance(client, openai_AsyncOpenAI):
+        setattr(
+            client.chat.completions,
+            "create",
+            wrapped_async(client.chat.completions.create, span_name),
+        )
+        setattr(
+            client.responses,
+            "create",
+            wrapped_async(client.responses.create, span_name),
+        )
+        setattr(
+            client.beta.chat.completions,
+            "parse",
+            wrapped_async(client.beta.chat.completions.parse, span_name),
+        )
+
+    return client

@@ -18,6 +18,7 @@ import os
 import random
 import pytest
 import string
+from typing import cast
 
 project_name = "e2e-tests-" + "".join(
     random.choices(string.ascii_letters + string.digits, k=12)
@@ -31,8 +32,11 @@ def teardown_module(module):
     delete_project(project_name=project_name)
 
 
-judgment = Tracer(
-    project_name=project_name,
+judgment: Tracer = cast(
+    Tracer,
+    Tracer(
+        project_name=project_name,
+    ),
 )
 
 # Wrap clients
