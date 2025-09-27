@@ -3,14 +3,11 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import time
-import orjson
-import sys
 import threading
-from typing import List, Dict, Union, Tuple, TYPE_CHECKING
+from typing import List, Tuple, TYPE_CHECKING
 from rich import print as rprint
 
-from judgeval.data import ScorerData, ScoringResult, Example
-from judgeval.scorers import BaseScorer, ExampleAPIScorerConfig
+from judgeval.data import ScorerData, ScoringResult
 from judgeval.scorers.score import a_execute_scoring
 from judgeval.api import JudgmentSyncClient
 from judgeval.env import (
@@ -19,9 +16,10 @@ from judgeval.env import (
 from judgeval.exceptions import JudgmentAPIError, JudgmentRuntimeError
 from judgeval.logger import judgeval_logger
 
+from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_ORG_ID
 
 if TYPE_CHECKING:
-    from judgeval.data.evaluation_run import EvaluationRun
+    from judgeval.data.evaluation_run import ExampleEvaluationRun
 
 
 def safe_run_async(coro):
@@ -49,8 +47,7 @@ def safe_run_async(coro):
 
 def log_evaluation_results(
     scoring_results: List[ScoringResult],
-    run: EvaluationRun,
-    judgment_api_key: str,
+    run: ExampleEvaluationRun,
 ) -> str:
     """
     Logs evaluation results to the Judgment API database.
@@ -65,10 +62,10 @@ def log_evaluation_results(
         ValueError: If there's a validation error with the results
     """
     try:
-        if not judgment_api_key or not run.organization_id:
+        if not JUDGMENT_API_KEY or not JUDGMENT_ORG_ID:
             raise ValueError("API key and organization ID are required")
 
-        api_client = JudgmentSyncClient(judgment_api_key, run.organization_id)
+        api_client = JudgmentSyncClient(JUDGMENT_API_KEY, JUDGMENT_ORG_ID)
         response = api_client.log_eval_results(
             {
                 "results": scoring_results,  # type: ignore
@@ -85,41 +82,8 @@ def log_evaluation_results(
         )
 
 
-def check_examples(
-    examples: List[Example], scorers: List[Union[ExampleAPIScorerConfig, BaseScorer]]
-) -> None:
-    """
-    Checks if the example contains the necessary parameters for the scorer.
-    """
-    prompt_user = False
-    for scorer in scorers:
-        for example in examples:
-            missing_params = []
-            for param in scorer.required_params:
-                if getattr(example, param.value) is None:
-                    missing_params.append(f"{param.value}")
-            if missing_params:
-                rprint(
-                    f"[yellow]⚠️  WARNING:[/yellow] Example is missing required parameters for scorer [bold]{scorer.score_type.value}[/bold]"
-                )
-                rprint(f"Missing parameters: {', '.join(missing_params)}")
-                rprint(
-                    f"Example: {orjson.dumps(example.model_dump(), option=orjson.OPT_INDENT_2).decode('utf-8')}"
-                )
-                rprint("-" * 40)
-                prompt_user = True
-
-    if prompt_user:
-        user_input = input("Do you want to continue? (y/n)")
-        if user_input.lower() != "y":
-            sys.exit(0)
-        else:
-            rprint("[green]Continuing...[/green]")
-
-
 def _poll_evaluation_until_complete(
-    evaluation_run: EvaluationRun,
-    judgment_api_key: str,
+    evaluation_run: ExampleEvaluationRun,
     expected_scorer_data_count: int,
     poll_interval_seconds: float = 5,
     max_failures: int = 5,
@@ -140,13 +104,15 @@ def _poll_evaluation_until_complete(
     Returns:
         List[ScoringResult]: The evaluation results
     """
-    organization_id = evaluation_run.organization_id
     project_name = evaluation_run.project_name
     experiment_run_id = evaluation_run.id
 
+    if not project_name or not experiment_run_id:
+        raise ValueError("Project name and experiment run ID are required")
+
     poll_count = 0
     exception_count = 0
-    api_client = JudgmentSyncClient(judgment_api_key, organization_id)
+    api_client = JudgmentSyncClient(JUDGMENT_API_KEY, JUDGMENT_ORG_ID)
     while poll_count < max_poll_count:
         poll_count += 1
         try:
@@ -213,14 +179,13 @@ def progress_logger(stop_event, msg="Working...", interval=5):
 
 
 def run_eval(
-    evaluation_run: EvaluationRun,
-    judgment_api_key: str,
+    evaluation_run: ExampleEvaluationRun,
 ) -> List[ScoringResult]:
     """
     Executes an evaluation of `Example`s using one or more `Scorer`s
 
     Args:
-        evaluation_run (EvaluationRun): Stores example and evaluation together for running
+        evaluation_run (ExampleEvaluationRun): Stores example and evaluation together for running
 
     Returns:
         List[ScoringResult]: A list of ScoringResult objects
@@ -258,16 +223,13 @@ def run_eval(
             judgeval_logger.error(error_msg)
             raise ValueError(error_msg)
 
-        check_examples(evaluation_run.examples, evaluation_run.judgment_scorers)
         stop_event = threading.Event()
         t = threading.Thread(
             target=progress_logger, args=(stop_event, "Running evaluation...")
         )
         t.start()
         try:
-            api_client = JudgmentSyncClient(
-                judgment_api_key, evaluation_run.organization_id
-            )
+            api_client = JudgmentSyncClient(JUDGMENT_API_KEY, JUDGMENT_ORG_ID)
             response = api_client.add_to_run_eval_queue_examples(
                 evaluation_run.model_dump(warnings=False)  # type: ignore
             )
@@ -286,7 +248,6 @@ def run_eval(
             )
             results, url = _poll_evaluation_until_complete(
                 evaluation_run=evaluation_run,
-                judgment_api_key=judgment_api_key,
                 expected_scorer_data_count=(num_scorers * len(evaluation_run.examples)),
             )
         finally:
@@ -306,7 +267,7 @@ def run_eval(
         send_results = [
             scoring_result.model_dump(warnings=False) for scoring_result in results
         ]
-        url = log_evaluation_results(send_results, evaluation_run, judgment_api_key)
+        url = log_evaluation_results(send_results, evaluation_run)
     rprint(
         f"\n🔍 You can view your evaluation results here: [rgb(106,0,255)][link={url}]View Results[/link]\n"
     )
@@ -323,27 +284,23 @@ def assert_test(scoring_results: List[ScoringResult]) -> None:
     Returns:
         None. Raises exceptions for any failed test cases.
     """
-    failed_cases: List[ScorerData] = []
+    failed_cases: List[List[ScorerData]] = []
 
     for result in scoring_results:
         if not result.success:
             # Create a test case context with all relevant fields
-            test_case: Dict = {"failed_scorers": []}
+            test_case: List[ScorerData] = []
             if result.scorers_data:
                 # If the result was not successful, check each scorer_data
                 for scorer_data in result.scorers_data:
                     if not scorer_data.success:
-                        if scorer_data.name == "Tool Order":
-                            # Remove threshold, evaluation model for Tool Order scorer
-                            scorer_data.threshold = None
-                            scorer_data.evaluation_model = None
-                        test_case["failed_scorers"].append(scorer_data)
+                        test_case.append(scorer_data)
             failed_cases.append(test_case)
 
     if failed_cases:
         error_msg = "The following test cases failed: \n"
         for fail_case in failed_cases:
-            for fail_scorer in fail_case["failed_scorers"]:
+            for fail_scorer in fail_case:
                 error_msg += (
                     f"\nScorer Name: {fail_scorer.name}\n"
                     f"Threshold: {fail_scorer.threshold}\n"

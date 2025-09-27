@@ -2,13 +2,13 @@
 
 import asyncio
 import concurrent.futures
-from typing import Awaitable, TypeVar
+from typing import Awaitable, TypeVar, Coroutine
 
 
 T = TypeVar("T")
 
 
-def safe_run_async(coro: Awaitable[T]) -> T:  # type: ignore[type-var]
+def safe_run_async(coro: Awaitable[T]) -> T:
     """Safely execute an async *coro* from synchronous code.
 
     This helper handles two common situations:
@@ -24,6 +24,8 @@ def safe_run_async(coro: Awaitable[T]) -> T:  # type: ignore[type-var]
     Returns:
         The result returned by *coro*.
     """
+    if not isinstance(coro, Coroutine):
+        raise TypeError("The provided awaitable must be a coroutine.")
 
     try:
         asyncio.get_running_loop()
@@ -31,5 +33,7 @@ def safe_run_async(coro: Awaitable[T]) -> T:  # type: ignore[type-var]
         return asyncio.run(coro)
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        future = executor.submit(lambda: asyncio.run(coro))
+        future: concurrent.futures.Future[T] = executor.submit(
+            lambda: asyncio.run(coro)
+        )
         return future.result()

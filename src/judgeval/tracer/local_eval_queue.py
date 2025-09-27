@@ -13,7 +13,7 @@ import time
 from judgeval.logger import judgeval_logger
 from judgeval.env import JUDGMENT_MAX_CONCURRENT_EVALUATIONS
 from judgeval.data import ScoringResult
-from judgeval.data.evaluation_run import EvaluationRun
+from judgeval.data.evaluation_run import ExampleEvaluationRun
 from judgeval.utils.async_utils import safe_run_async
 from judgeval.scorers.score import a_execute_scoring
 from judgeval.api import JudgmentSyncClient
@@ -34,7 +34,7 @@ class LocalEvaluationQueue:
     ):
         if num_workers <= 0:
             raise ValueError("num_workers must be a positive integer.")
-        self._queue: queue.Queue[Optional[EvaluationRun]] = queue.Queue()
+        self._queue: queue.Queue[Optional[ExampleEvaluationRun]] = queue.Queue()
         self._max_concurrent = max_concurrent
         self._num_workers = num_workers  # Number of worker threads
         self._worker_threads: List[threading.Thread] = []
@@ -44,11 +44,11 @@ class LocalEvaluationQueue:
             organization_id=JUDGMENT_ORG_ID,
         )
 
-    def enqueue(self, evaluation_run: EvaluationRun) -> None:
+    def enqueue(self, evaluation_run: ExampleEvaluationRun) -> None:
         """Add evaluation run to the queue."""
         self._queue.put(evaluation_run)
 
-    def _process_run(self, evaluation_run: EvaluationRun) -> List[ScoringResult]:
+    def _process_run(self, evaluation_run: ExampleEvaluationRun) -> List[ScoringResult]:
         """Execute evaluation run locally and return results."""
 
         if not evaluation_run.custom_scorers:
@@ -70,7 +70,9 @@ class LocalEvaluationQueue:
 
     def run_all(
         self,
-        callback: Optional[Callable[[EvaluationRun, List[ScoringResult]], None]] = None,
+        callback: Optional[
+            Callable[[ExampleEvaluationRun, List[ScoringResult]], None]
+        ] = None,
     ) -> None:
         """Process all queued runs synchronously.
 
@@ -134,7 +136,9 @@ class LocalEvaluationQueue:
 
     def start_worker(
         self,
-        callback: Optional[Callable[[EvaluationRun, List[ScoringResult]], None]] = None,
+        callback: Optional[
+            Callable[[ExampleEvaluationRun, List[ScoringResult]], None]
+        ] = None,
     ) -> Optional[threading.Thread]:
         """Start a single background thread to process runs (backward compatibility).
 
@@ -144,7 +148,7 @@ class LocalEvaluationQueue:
         Returns:
             The started thread, or None if no threads were started.
         """
-        threads = self.start_workers(callback)
+        threads = self.start_workers()
         return threads[0] if threads else None
 
     def wait_for_completion(self, timeout: Optional[float] = None) -> bool:

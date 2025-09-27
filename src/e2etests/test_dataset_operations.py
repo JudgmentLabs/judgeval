@@ -9,6 +9,7 @@ from judgeval import JudgmentClient
 from judgeval.exceptions import JudgmentAPIError
 from judgeval.data import Example
 from judgeval.dataset import Dataset
+from judgeval.dataset import DatasetInfo
 from e2etests.utils import create_project, delete_project
 
 
@@ -191,3 +192,100 @@ def test_overwrite_dataset(client: JudgmentClient, project_name: str, random_nam
     dataset = Dataset.get(name=random_name, project_name=project_name)
     assert dataset, "Failed to pull dataset"
     assert len(dataset.examples) == 2, "Dataset should have 2 examples"
+
+
+def test_dataset_list_empty(client: JudgmentClient, random_name: str):
+    """Test listing datasets when project has no datasets."""
+    create_project(project_name=random_name)
+
+    try:
+        datasets = Dataset.list(project_name=random_name)
+        assert datasets == [], "Empty project should return empty list of datasets"
+    finally:
+        delete_project(project_name=random_name)
+
+
+def test_dataset_list_nonexistent_project(client: JudgmentClient, random_name: str):
+    """Test listing datasets for a project that doesn't exist."""
+    with pytest.raises(JudgmentAPIError):
+        Dataset.list(project_name=random_name)
+
+
+def test_dataset_list_after_creation(
+    client: JudgmentClient, project_name: str, random_name: str
+):
+    """Test that created datasets appear in the list."""
+    initial_datasets = Dataset.list(project_name=project_name)
+    initial_count = len(initial_datasets)
+
+    dataset_name1 = random_name + "_1"
+    dataset_name2 = random_name + "_2"
+
+    examples1 = [Example(input="input 1", actual_output="output 1")]
+    examples2 = [Example(input="input 2", actual_output="output 2")]
+
+    Dataset.create(name=dataset_name1, project_name=project_name, examples=examples1)
+    Dataset.create(name=dataset_name2, project_name=project_name, examples=examples2)
+
+    updated_datasets = Dataset.list(project_name=project_name)
+
+    assert len(updated_datasets) == initial_count + 2, (
+        f"Expected {initial_count + 2} datasets, got {len(updated_datasets)}"
+    )
+
+    dataset_names = [d.name for d in updated_datasets]
+    assert dataset_name1 in dataset_names, (
+        f"Dataset {dataset_name1} should be in the list"
+    )
+    assert dataset_name2 in dataset_names, (
+        f"Dataset {dataset_name2} should be in the list"
+    )
+
+    for dataset_info in updated_datasets:
+        assert isinstance(dataset_info, DatasetInfo), (
+            f"Expected DatasetInfo instance, got {type(dataset_info)}"
+        )
+        assert dataset_info.dataset_kind == "example", (
+            "Dataset kind should be 'example'"
+        )
+        assert dataset_info.entries >= 0, "Entries count should be non-negative"
+
+
+def test_dataset_list_reflects_changes(
+    client: JudgmentClient, project_name: str, random_name: str
+):
+    """Test that dataset list reflects changes after overwrite."""
+    examples = [
+        Example(input="input 1", actual_output="output 1"),
+        Example(input="input 2", actual_output="output 2"),
+    ]
+    Dataset.create(name=random_name, project_name=project_name, examples=examples)
+
+    datasets = Dataset.list(project_name=project_name)
+    dataset_names = [d.name for d in datasets]
+    assert random_name in dataset_names, (
+        f"Dataset {random_name} should be in the list after creation"
+    )
+
+    created_dataset_info = next(d for d in datasets if d.name == random_name)
+    assert created_dataset_info.entries == 2, "Dataset should have 2 entries"
+
+    Dataset.create(
+        name=random_name,
+        project_name=project_name,
+        examples=[],
+        overwrite=True,
+    )
+
+    updated_datasets = Dataset.list(project_name=project_name)
+    updated_dataset_names = [d.name for d in updated_datasets]
+    assert random_name in updated_dataset_names, (
+        f"Dataset {random_name} should still be in the list after overwrite"
+    )
+
+    overwritten_dataset_info = next(
+        d for d in updated_datasets if d.name == random_name
+    )
+    assert overwritten_dataset_info.entries == 0, (
+        "Dataset should have 0 entries after overwriting with empty list"
+    )

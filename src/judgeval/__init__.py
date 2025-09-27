@@ -5,11 +5,12 @@ from judgeval.evaluation import run_eval
 from judgeval.data.evaluation_run import ExampleEvaluationRun
 
 
-from typing import List, Optional, Union
-from judgeval.scorers import BaseScorer, ExampleAPIScorerConfig
+from typing import List, Optional, Union, Sequence
+from judgeval.scorers import ExampleAPIScorerConfig
+from judgeval.scorers.example_scorer import ExampleScorer
 from judgeval.data.example import Example
 from judgeval.logger import judgeval_logger
-from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_DEFAULT_GPT_MODEL, JUDGMENT_ORG_ID
+from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_ORG_ID
 from judgeval.utils.meta import SingletonMeta
 from judgeval.exceptions import JudgmentRuntimeError, JudgmentTestError
 from judgeval.api import JudgmentSyncClient
@@ -38,10 +39,10 @@ class JudgmentClient(metaclass=SingletonMeta):
     def run_evaluation(
         self,
         examples: List[Example],
-        scorers: List[Union[ExampleAPIScorerConfig, BaseScorer]],
+        scorers: Sequence[Union[ExampleAPIScorerConfig, ExampleScorer]],
         project_name: str = "default_project",
         eval_run_name: str = "default_eval_run",
-        model: str = JUDGMENT_DEFAULT_GPT_MODEL,
+        model: Optional[str] = None,
         assert_test: bool = False,
     ) -> List[ScoringResult]:
         try:
@@ -51,10 +52,9 @@ class JudgmentClient(metaclass=SingletonMeta):
                 examples=examples,
                 scorers=scorers,
                 model=model,
-                organization_id=self.organization_id,
             )
 
-            results = run_eval(eval, self.api_key)
+            results = run_eval(eval)
             if assert_test:
                 assert_test_results(results)
 

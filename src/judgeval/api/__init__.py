@@ -137,6 +137,13 @@ class JudgmentSyncClient:
             payload,
         )
 
+    def datasets_pull_all_for_judgeval(self, payload: DatasetsFetch) -> Any:
+        return self._request(
+            "POST",
+            url_for("/datasets/pull_all_for_judgeval/"),
+            payload,
+        )
+
     def datasets_create_for_judgeval(self, payload: DatasetCreate) -> Any:
         return self._request(
             "POST",
@@ -174,12 +181,12 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def fetch_scorer(
-        self, payload: FetchPromptScorerRequest
-    ) -> FetchPromptScorerResponse:
+    def fetch_scorers(
+        self, payload: FetchPromptScorersRequest
+    ) -> FetchPromptScorersResponse:
         return self._request(
             "POST",
-            url_for("/fetch_scorer/"),
+            url_for("/fetch_scorers/"),
             payload,
         )
 
@@ -339,6 +346,13 @@ class JudgmentAsyncClient:
             payload,
         )
 
+    async def datasets_pull_all_for_judgeval(self, payload: DatasetsFetch) -> Any:
+        return await self._request(
+            "POST",
+            url_for("/datasets/pull_all_for_judgeval/"),
+            payload,
+        )
+
     async def datasets_create_for_judgeval(self, payload: DatasetCreate) -> Any:
         return await self._request(
             "POST",
@@ -378,12 +392,12 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def fetch_scorer(
-        self, payload: FetchPromptScorerRequest
-    ) -> FetchPromptScorerResponse:
+    async def fetch_scorers(
+        self, payload: FetchPromptScorersRequest
+    ) -> FetchPromptScorersResponse:
         return await self._request(
             "POST",
-            url_for("/fetch_scorer/"),
+            url_for("/fetch_scorers/"),
             payload,
         )
 

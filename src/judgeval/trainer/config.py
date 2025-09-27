@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any, TYPE_CHECKING
 import json
 
 if TYPE_CHECKING:
-    from fireworks.llm.llm_reinforcement_step import ReinforcementAcceleratorTypeLiteral
+    from fireworks.llm.llm_reinforcement_step import ReinforcementAcceleratorTypeLiteral  # type: ignore[import-not-found]
 
 
 @dataclass

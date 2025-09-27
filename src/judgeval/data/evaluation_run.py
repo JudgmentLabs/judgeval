@@ -1,11 +1,11 @@
-from typing import List, Optional, Union, Tuple
-from litellm.files.main import BaseModel
-from pydantic import field_validator, model_validator, Field
+from typing import List, Optional, Union, Tuple, Sequence
+from pydantic import field_validator, model_validator, Field, BaseModel
 from datetime import datetime, timezone
 import uuid
 
 from judgeval.data import Example
-from judgeval.scorers import BaseScorer, APIScorerConfig
+from judgeval.scorers import APIScorerConfig
+from judgeval.scorers.example_scorer import ExampleScorer
 from judgeval.constants import ACCEPTABLE_MODELS
 from judgeval.data.judgment_types import (
     ExampleEvaluationRun as ExampleEvaluationRunJudgmentType,
@@ -14,19 +14,20 @@ from judgeval.data.judgment_types import (
 
 
 class EvaluationRun(BaseModel):
-    id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()))
-    created_at: Optional[str] = Field(
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    created_at: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
-    organization_id: Optional[str] = None
-    custom_scorers: Optional[List[BaseScorer]] = None
-    judgment_scorers: Optional[List[APIScorerConfig]] = None
-    scorers: Optional[List[Union[BaseScorer, APIScorerConfig]]] = None
-    model: str
+    custom_scorers: List[ExampleScorer] = Field(default_factory=list)
+    judgment_scorers: Sequence[APIScorerConfig] = Field(default_factory=list)
+    scorers: Sequence[Union[ExampleScorer, APIScorerConfig]] = Field(
+        default_factory=list
+    )
+    model: Optional[str] = None
 
     def __init__(
         self,
-        scorers: Optional[List[Union[BaseScorer, APIScorerConfig]]] = None,
+        scorers: Optional[List[Union[ExampleScorer, APIScorerConfig]]] = None,
         **kwargs,
     ):
         """
@@ -38,7 +39,7 @@ class EvaluationRun(BaseModel):
         """
         if scorers is not None:
             # Automatically sort scorers into appropriate fields
-            custom_scorers = [s for s in scorers if isinstance(s, BaseScorer)]
+            custom_scorers = [s for s in scorers if isinstance(s, ExampleScorer)]
             judgment_scorers = [s for s in scorers if isinstance(s, APIScorerConfig)]
 
             # Always set both fields as lists (even if empty) to satisfy validation
@@ -76,11 +77,8 @@ class EvaluationRun(BaseModel):
 
     @field_validator("model")
     def validate_model(cls, v, values):
-        if not v:
-            raise ValueError("Model cannot be empty.")
-
         # Check if model is string or list of strings
-        if isinstance(v, str):
+        if v is not None and isinstance(v, str):
             if v not in ACCEPTABLE_MODELS:
                 raise ValueError(
                     f"Model name {v} not recognized. Please select a valid model name.)"

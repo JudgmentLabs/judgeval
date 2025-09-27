@@ -12,12 +12,15 @@ from judgeval.tracer.exporters.utils import deduplicate_spans
 
 
 class JudgmentSpanExporter(OTLPSpanExporter):
-    def __init__(self, endpoint: str, api_key: str, organization_id: str):
+    def __init__(
+        self, endpoint: str, api_key: str, organization_id: str, project_id: str
+    ):
         super().__init__(
             endpoint=endpoint,
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "X-Organization-Id": organization_id,
+                "X-Project-Id": project_id,
             },
         )
 

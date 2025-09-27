@@ -873,7 +873,6 @@ def _set_usage_attributes(span, usage: TraceUsage, tracer: Tracer):
     set_span_attribute(
         span, AttributeKeys.GEN_AI_USAGE_TOTAL_COST, usage.total_cost_usd
     )
-    tracer.add_cost_to_current_context(usage.total_cost_usd)
 
 
 def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:

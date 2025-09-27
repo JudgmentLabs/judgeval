@@ -6,17 +6,32 @@ from dataclasses import dataclass
 from typing import List, Literal, Optional
 
 from judgeval.data import Example
+from judgeval.data.trace import Trace
 from judgeval.utils.file_utils import get_examples_from_yaml, get_examples_from_json
 from judgeval.api import JudgmentSyncClient
 from judgeval.logger import judgeval_logger
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_ORG_ID
 
+from judgeval.data.judgment_types import DatasetKind
+
+
+@dataclass
+class DatasetInfo:
+    dataset_id: str
+    name: str
+    created_at: str
+    dataset_kind: DatasetKind
+    entries: int
+    creator: str
+
 
 @dataclass
 class Dataset:
-    examples: List[Example]
     name: str
     project_name: str
+    dataset_kind: DatasetKind = DatasetKind.example
+    examples: Optional[List[Example]] = None
+    traces: Optional[List[Trace]] = None
     judgment_api_key: str = JUDGMENT_API_KEY or ""
     organization_id: str = JUDGMENT_ORG_ID or ""
 
@@ -35,26 +50,56 @@ class Dataset:
         )
         if not dataset:
             raise ValueError(f"Dataset {name} not found in project {project_name}")
-        examples = dataset.get("examples", [])
-        for e in examples:
-            if isinstance(e, dict) and isinstance(e.get("data"), dict):
-                e.update(e.pop("data"))
-                e.pop(
-                    "example_id"
-                )  # TODO: remove once scorer data migraiton is complete
-        judgeval_logger.info(f"Succesfully retrieved dataset {name}!")
-        return cls(
-            name=name,
-            project_name=project_name,
-            examples=[Example(**e) for e in examples],
-        )
+
+        dataset_kind = DatasetKind(dataset.get("dataset_kind", "example"))
+
+        if dataset_kind == DatasetKind.example:
+            examples = dataset.get("examples", [])
+            if examples is None:
+                examples = []
+
+            for e in examples:
+                if isinstance(e, dict) and isinstance(e.get("data", {}), dict):
+                    e.update(e.pop("data"))  # type: ignore
+                    e.pop(
+                        "example_id"
+                    )  # TODO: remove once scorer data migration is complete
+            judgeval_logger.info(f"Successfully retrieved example dataset {name}!")
+            return cls(
+                name=name,
+                project_name=project_name,
+                dataset_kind=dataset_kind,
+                examples=[Example(**e) for e in examples],
+            )
+
+        elif dataset_kind == DatasetKind.trace:
+            trace_data = dataset.get("traces", [])
+            if trace_data is None:
+                trace_data = []
+
+            traces = []
+            for trace_item in trace_data:
+                if isinstance(trace_item, dict):
+                    trace = Trace.from_dataset_trace_with_spans(trace_item)
+                    traces.append(trace)
+
+            judgeval_logger.info(f"Successfully retrieved trace dataset {name}!")
+            return cls(
+                name=name,
+                project_name=project_name,
+                dataset_kind=dataset_kind,
+                traces=traces,
+            )
+
+        else:
+            raise ValueError(f"Unsupported dataset kind: {dataset_kind}")
 
     @classmethod
     def create(
         cls,
         name: str,
         project_name: str,
-        examples: Optional[List[Example]] = None,
+        examples: List[Example] = [],
         overwrite: bool = False,
     ):
         if not examples:
@@ -65,18 +110,27 @@ class Dataset:
             {
                 "name": name,
                 "project_name": project_name,
-                "examples": [e.model_dump() for e in examples],
+                "examples": examples,  # type: ignore
                 "dataset_kind": "example",
                 "overwrite": overwrite,
             }
         )
 
-        judgeval_logger.info(f"Succesfull created dataset {name}!")
+        judgeval_logger.info(f"Successfully created dataset {name}!")
         return cls(
             name=name,
             project_name=project_name,
             examples=examples,
         )
+
+    @classmethod
+    def list(cls, project_name: str):
+        client = JudgmentSyncClient(cls.judgment_api_key, cls.organization_id)
+        datasets = client.datasets_pull_all_for_judgeval({"project_name": project_name})
+
+        judgeval_logger.info(f"Fetched all datasets for project {project_name}!")
+
+        return [DatasetInfo(**dataset_info) for dataset_info in datasets]
 
     def add_from_json(self, file_path: str) -> None:
         """
@@ -124,7 +178,7 @@ class Dataset:
             {
                 "dataset_name": self.name,
                 "project_name": self.project_name,
-                "examples": [e.model_dump() for e in examples],
+                "examples": examples,  # type: ignore
             }
         )
 
@@ -155,7 +209,9 @@ class Dataset:
                 file.write(
                     orjson.dumps(
                         {
-                            "examples": [e.to_dict() for e in self.examples],
+                            "examples": [e.to_dict() for e in self.examples]
+                            if self.examples
+                            else [],
                         },
                         option=orjson.OPT_INDENT_2,
                     )
@@ -163,7 +219,9 @@ class Dataset:
         elif file_type == "yaml":
             with open(complete_path, "w") as file:
                 yaml_data = {
-                    "examples": [e.to_dict() for e in self.examples],
+                    "examples": [e.to_dict() for e in self.examples]
+                    if self.examples
+                    else [],
                 }
                 yaml.dump(yaml_data, file, default_flow_style=False)
         else:
@@ -173,10 +231,25 @@ class Dataset:
             )
 
     def __iter__(self):
-        return iter(self.examples)
+        if self.dataset_kind == DatasetKind.example and self.examples:
+            return iter(self.examples)
+        elif self.dataset_kind == DatasetKind.trace and self.traces:
+            return iter(self.traces)
+        else:
+            return iter([])
 
     def __len__(self):
-        return len(self.examples)
+        if self.dataset_kind == DatasetKind.example and self.examples:
+            return len(self.examples)
+        elif self.dataset_kind == DatasetKind.trace and self.traces:
+            return len(self.traces)
+        else:
+            return 0
 
     def __str__(self):
-        return f"{self.__class__.__name__}(examples={self.examples}, name={self.name})"
+        if self.dataset_kind == DatasetKind.example:
+            return (
+                f"{self.__class__.__name__}(examples={self.examples}, name={self.name})"
+            )
+        else:
+            return f"{self.__class__.__name__}(traces={self.traces}, name={self.name})"

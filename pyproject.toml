@@ -19,10 +19,9 @@ license-files = ["LICENSE.md"]
 dependencies = [
     "dotenv",
     "httpx>=0.28.1",
-    "litellm<1.75.0", # https://github.com/BerriAI/litellm/issues/13081
+    "litellm<1.75.0",                      # https://github.com/BerriAI/litellm/issues/13081
     "opentelemetry-exporter-otlp>=1.36.0",
     "opentelemetry-sdk>=1.36.0",
-    "opentelemetry-semantic-conventions>=0.57b0",
     "orjson>=3.9.0",
     "click<8.2.0",
     "typer>=0.9.0",
@@ -45,12 +44,6 @@ packages = ["src/judgeval"]
 include = ["/src/judgeval", "/src/judgeval/**/*.py"]
 
 [project.optional-dependencies]
-langchain = [
-    "langchain-huggingface",
-    "langchain-openai",
-    "langchain-anthropic",
-    "langchain-core",
-]
 s3 = ["boto3>=1.40.11"]
 trainer = ["fireworks-ai>=0.19.18"]
 
@@ -76,6 +69,10 @@ dev = [
     "types-tqdm>=4.67.0.20250809",
     "pytest-asyncio>=1.1.0",
     "pytest-xdist>=3.8.0",
+    "langchain-openai>=0.3.23",
+    "langchain-tavily>=0.2.11",
+    "streamlit>=1.49.1",
+    "langchain-community>=0.3.29",
 ]
 
 
