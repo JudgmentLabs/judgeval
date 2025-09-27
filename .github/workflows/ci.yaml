@@ -51,18 +51,14 @@ jobs:
           export JUDGMENT_ORG_ID="$JUDGEVAL_GH_JUDGMENT_ORG_ID"
           uv run pytest tests
 
-  run-e2e-tests-staging:
+  run-e2e-tests:
     needs: [validate-branch]
-    if: "github.base_ref == 'staging' && !contains(github.actor, '[bot]') && (needs.validate-branch.result == 'success' || needs.validate-branch.result == 'skipped')"
+    if: "(github.base_ref == 'staging' || github.base_ref == 'main') && !contains(github.actor, '[bot]') && (needs.validate-branch.result == 'success' || needs.validate-branch.result == 'skipped')"
     strategy:
       fail-fast: false
       matrix:
-        python-version:
-          - "3.10"
-          - "3.11"
-          - "3.12"
-          - "3.13"
-    name: Staging E2E Tests
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    name: E2E Tests
     runs-on: ubuntu-latest
     env:
       TEST_TIMEOUT_SECONDS: ${{ secrets.TEST_TIMEOUT_SECONDS }}
@@ -73,15 +69,39 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-1
-          
+
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
+      - name: Set env based on branch
+        run: |
+          if [ "${{ github.base_ref }}" = "main" ]; then
+            echo "TARGET_ENV=main" >> "$GITHUB_ENV"
+            echo "BASE_URL=https://api.judgmentlabs.ai" >> "$GITHUB_ENV"
+            echo "SECRETS_PATH=prod/api-keys/e2e-tests" >> "$GITHUB_ENV"
+            echo "COVERAGE_ARTIFACT=coverage-html-production-${{ matrix.python-version }}" >> "$GITHUB_ENV"
+          else
+            echo "TARGET_ENV=staging" >> "$GITHUB_ENV"
+            echo "BASE_URL=https://staging.api.judgmentlabs.ai" >> "$GITHUB_ENV"
+            echo "SECRETS_PATH=stg/api-keys/e2e-tests" >> "$GITHUB_ENV"
+            echo "COVERAGE_ARTIFACT=coverage-html-staging-${{ matrix.python-version }}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Restore uv cache
+        uses: actions/cache/restore@v4
+        id: restore-uv-cache
+        with:
+          path: ~/.cache/uv/
+          key: ${{ runner.os }}-uv-judgment-${{ hashFiles('./**/uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-judgment-
+            ${{ runner.os }}-uv-
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-         
+
       - name: Install judgeval dependencies
         run: |
           pip install uv
@@ -89,88 +109,33 @@ jobs:
 
       - name: Check if server is running
         run: |
-          if ! curl -s https://staging.api.judgmentlabs.ai/health > /dev/null; then
-            echo "Staging Judgment server is not running properly. Check logs on AWS CloudWatch for more details."
+          if ! curl -s "$BASE_URL/health" > /dev/null; then
+            echo "Judgment server ($BASE_URL) is not running properly. Check CloudWatch logs."
             exit 1
           else
-            echo "Staging server is running."
+            echo "Server is running."
           fi
         
       - name: Run E2E tests
         working-directory: src
-        run: |      
-          SECRET_VARS=$(aws secretsmanager get-secret-value --secret-id stg/api-keys/e2e-tests --query SecretString --output text)
+        run: |
+          SECRET_VARS=$(aws secretsmanager get-secret-value --secret-id "$SECRETS_PATH" --query SecretString --output text)
           export $(echo "$SECRET_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
           export JUDGMENT_API_KEY="$JUDGEVAL_GH_JUDGMENT_API_KEY"
           export JUDGMENT_ORG_ID="$JUDGEVAL_GH_JUDGMENT_ORG_ID"
-          export JUDGMENT_API_URL=https://staging.api.judgmentlabs.ai
+          export JUDGMENT_API_URL="$BASE_URL"
           timeout ${TEST_TIMEOUT_SECONDS}s uv run pytest -n auto --dist=loadfile --durations=0 --cov=. --cov-config=.coveragerc --cov-report=html ./e2etests
 
-      - name: Upload coverage HTML report (staging)
+      - name: Upload coverage HTML report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-html-staging-${{ matrix.python-version }}
+          name: ${{ env.COVERAGE_ARTIFACT }}
           path: src/htmlcov
 
-  run-e2e-tests-main:
-    needs: [validate-branch]
-    if: "github.base_ref == 'main' && !contains(github.actor, '[bot]') && needs.validate-branch.result == 'success'"
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version:
-          - "3.10"
-          - "3.11"
-          - "3.12"
-          - "3.13"
-    name: Production E2E Tests
-    runs-on: ubuntu-latest
-    env:
-      TEST_TIMEOUT_SECONDS: ${{ secrets.TEST_TIMEOUT_SECONDS }}
-    steps:
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Save uv cache
+        uses: actions/cache/save@v4
+        if: always() && steps.restore-uv-cache.outputs.cache-hit != 'true'
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-west-1
-          
-      - name: Checkout code
-        uses: actions/checkout@v4
-        
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-         
-      - name: Install judgeval dependencies
-        run: |
-          pip install uv
-          uv sync --dev
-
-      - name: Check if server is running
-        run: |
-          if ! curl -s https://api.judgmentlabs.ai/health > /dev/null; then
-            echo "Production Judgment server is not running properly. Check logs on AWS CloudWatch for more details."
-            exit 1
-          else
-            echo "Production server is running."
-          fi
-        
-      - name: Run E2E tests
-        working-directory: src
-        run: |      
-          SECRET_VARS=$(aws secretsmanager get-secret-value --secret-id prod/api-keys/e2e-tests --query SecretString --output text)
-          export $(echo "$SECRET_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
-          export JUDGMENT_API_KEY="$JUDGEVAL_GH_JUDGMENT_API_KEY"
-          export JUDGMENT_ORG_ID="$JUDGEVAL_GH_JUDGMENT_ORG_ID"
-          export JUDGMENT_API_URL=https://api.judgmentlabs.ai
-          timeout ${TEST_TIMEOUT_SECONDS}s uv run pytest -n auto --dist=loadfile --durations=0 --cov=. --cov-config=.coveragerc --cov-report=html ./e2etests
-
-      - name: Upload coverage HTML report (production)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-html-production-${{ matrix.python-version }}
-          path: src/htmlcov
+          path: ~/.cache/uv/
+          key: ${{ runner.os }}-uv-judgment-${{ hashFiles('./**/uv.lock') }}
