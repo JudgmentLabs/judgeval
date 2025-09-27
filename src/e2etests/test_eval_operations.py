@@ -199,3 +199,72 @@ def test_evaluate_dataset_custom(
     assert res[1].scorers_data[0].score == 0.75
     assert res[2].scorers_data[0].score == 0.5
     assert res[3].scorers_data[0].score == 0
+
+
+def test_dataset_and_evaluation(
+    client: JudgmentClient, project_name: str, random_name: str
+):
+    """Test that dataset and evaluation work together."""
+    examples = [
+        Example(input="input 1", actual_output="output 1"),
+        Example(input="input 2", actual_output="output 2"),
+    ]
+    Dataset.create(name=random_name, project_name=project_name, examples=examples)
+    dataset = Dataset.get(name=random_name, project_name=project_name)
+    assert dataset, "Failed to pull dataset"
+    assert len(dataset.examples) == 2, "Dataset should have 2 examples"
+    for i, e in enumerate(dataset.examples, start=1):
+        assert e.input == f"input {i}", (
+            f"Example should have .input be 'input {i}' but got '{e.input}'"
+        )
+        assert e.actual_output == f"output {i}", (
+            f"Example should have .actual_output be 'output {i}' but got '{e.actual_output}'"
+        )
+
+    res = client.run_evaluation(
+        examples=examples,
+        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
+        project_name=project_name,
+        eval_run_name=random_name,
+    )
+    assert res, "Dataset evaluation failed"
+
+
+def test_dataset_and_double_evaluation(
+    client: JudgmentClient, project_name: str, random_name: str
+):
+    """Test that dataset and evaluation work together."""
+    examples = [
+        Example(input="input 1", actual_output="output 1"),
+        Example(input="input 2", actual_output="output 2"),
+    ]
+    Dataset.create(name=random_name, project_name=project_name, examples=examples)
+    dataset = Dataset.get(name=random_name, project_name=project_name)
+    assert dataset, "Failed to pull dataset"
+    assert len(dataset.examples) == 2, "Dataset should have 2 examples"
+    for i, e in enumerate(dataset.examples, start=1):
+        assert e.input == f"input {i}", (
+            f"Example should have .input be 'input {i}' but got '{e.input}'"
+        )
+        assert e.actual_output == f"output {i}", (
+            f"Example should have .actual_output be 'output {i}' but got '{e.actual_output}'"
+        )
+
+    res = client.run_evaluation(
+        examples=dataset.examples,
+        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
+        project_name=project_name,
+        eval_run_name=random_name,
+    )
+    assert res, "Dataset evaluation failed"
+
+    res2 = client.run_evaluation(
+        examples=dataset.examples,
+        scorers=[AnswerRelevancyScorer(threshold=0.5)],
+        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
+        project_name=project_name,
+        eval_run_name=random_name,
+    )
+    assert res2, "Dataset evaluation failed"

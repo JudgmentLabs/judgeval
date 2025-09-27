@@ -23,7 +23,7 @@ class EvaluationRun(BaseModel):
     scorers: Sequence[Union[ExampleScorer, APIScorerConfig]] = Field(
         default_factory=list
     )
-    model: str
+    model: Optional[str] = None
 
     def __init__(
         self,
@@ -77,11 +77,8 @@ class EvaluationRun(BaseModel):
 
     @field_validator("model")
     def validate_model(cls, v, values):
-        if not v:
-            raise ValueError("Model cannot be empty.")
-
         # Check if model is string or list of strings
-        if isinstance(v, str):
+        if v is not None and isinstance(v, str):
             if v not in ACCEPTABLE_MODELS:
                 raise ValueError(
                     f"Model name {v} not recognized. Please select a valid model name.)"
