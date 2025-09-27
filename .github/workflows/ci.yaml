@@ -70,16 +70,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-1
 
-      - name: Restore uv cache
-        uses: actions/cache/restore@v4
-        id: restore-uv-cache
-        with:
-          path: ~/.cache/uv/
-          key: ${{ runner.os }}-uv-judgment-${{ hashFiles('./**/uv.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-uv-judgment-
-            ${{ runner.os }}-uv-
-
       - name: Checkout code
         uses: actions/checkout@v4
 
