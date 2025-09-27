@@ -254,7 +254,7 @@ class Tracer(metaclass=SingletonMeta):
     def _create_project(
         project_name: str, api_key: str, organization_id: str
     ) -> str | None:
-        """Resolve project_id from project_name using the API."""
+        """Create a new project with the given name."""
         try:
             client = JudgmentSyncClient(
                 api_key=api_key,
