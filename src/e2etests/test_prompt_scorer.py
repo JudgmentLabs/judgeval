@@ -112,11 +112,9 @@ def test_trace_prompt_scorer(project_name: str):
     while query_count < QUERY_RETRY:
         scorer_data = retrieve_score(span_id, trace_id)
         if scorer_data:
-            print("query_count:", query_count)
             break
         query_count += 1
         time.sleep(1)
-    print("scorer_data:", scorer_data)
     assert scorer_data[0].get("success")
 
 
