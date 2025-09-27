@@ -43,6 +43,8 @@ Our mission is to unlock the power of production data for agent development, ena
 
 You can access our repo of cookbooks [here](https://github.com/JudgmentLabs/judgeval-cookbook).
 
+You can find a list of video tutorials for Judgeval use cases [here]((https://img.shields.io/badge/Documentation-blue)).
+
 
 ## Why Judgeval?
 
