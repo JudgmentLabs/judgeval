@@ -1,18 +1,21 @@
 from __future__ import annotations
+from typing import TYPE_CHECKING
 
-HAS_GOOGLE_GENAI = False
-google_genai_Client = None
-google_genai_AsyncClient = None
+if TYPE_CHECKING:
+    from google.genai import Client
+    from google.genai.client import AsyncClient
 
 try:
-    from google.genai import Client  # type: ignore[import-untyped]
-    from google.genai.client import AsyncClient  # type: ignore[import-untyped]
+    from google.genai import Client
+    from google.genai.client import AsyncClient
 
-    google_genai_Client = Client
-    google_genai_AsyncClient = AsyncClient
     HAS_GOOGLE_GENAI = True
 except ImportError:
-    pass
+    HAS_GOOGLE_GENAI = False
+    Client = AsyncClient = None  # type: ignore[misc,assignment]
+
+google_genai_Client = Client
+google_genai_AsyncClient = AsyncClient
 
 __all__ = [
     "HAS_GOOGLE_GENAI",

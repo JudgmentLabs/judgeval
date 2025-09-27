@@ -1,17 +1,20 @@
 from __future__ import annotations
+from typing import TYPE_CHECKING
 
-HAS_GROQ = False
-groq_Groq = None
-groq_AsyncGroq = None
+if TYPE_CHECKING:
+    from groq import Groq, AsyncGroq
 
 try:
-    from groq import Groq, AsyncGroq  # type: ignore[import-untyped]
+    from groq import Groq, AsyncGroq
 
-    groq_Groq = Groq
-    groq_AsyncGroq = AsyncGroq
     HAS_GROQ = True
 except ImportError:
-    pass
+    HAS_GROQ = False
+    Groq = AsyncGroq = None  # type: ignore[misc,assignment]
+
+# Export the classes for runtime use
+groq_Groq = Groq
+groq_AsyncGroq = AsyncGroq
 
 __all__ = [
     "HAS_GROQ",

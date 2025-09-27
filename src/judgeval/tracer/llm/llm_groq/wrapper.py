@@ -413,17 +413,21 @@ def wrap_groq_client(tracer: Tracer, client: GroqClientType) -> GroqClientType:
         return wrapper
 
     span_name = "GROQ_API_CALL"
-    if groq_Groq and isinstance(client, groq_Groq):
+    if groq_Groq is not None and isinstance(client, groq_Groq):
+        # Type narrowing for mypy
+        groq_client = client  # type: ignore[assignment]
         setattr(
-            client.chat.completions,
+            groq_client.chat.completions,
             "create",
-            wrapped(client.chat.completions.create, span_name),
+            wrapped(groq_client.chat.completions.create, span_name),
         )
-    elif groq_AsyncGroq and isinstance(client, groq_AsyncGroq):
+    elif groq_AsyncGroq is not None and isinstance(client, groq_AsyncGroq):
+        # Type narrowing for mypy
+        async_groq_client = client  # type: ignore[assignment]
         setattr(
-            client.chat.completions,
+            async_groq_client.chat.completions,
             "create",
-            wrapped_async(client.chat.completions.create, span_name),
+            wrapped_async(async_groq_client.chat.completions.create, span_name),
         )
 
     return client

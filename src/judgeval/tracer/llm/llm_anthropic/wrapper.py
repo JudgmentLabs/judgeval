@@ -89,7 +89,7 @@ AnthropicStreamType = Union[
 
 
 def _extract_anthropic_content(chunk: AnthropicStreamEvent) -> str:
-    if hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
+    if hasattr(chunk, "delta") and chunk.delta and hasattr(chunk.delta, "text"):
         return chunk.delta.text or ""
 
     if isinstance(chunk, AnthropicStreamEvent) and chunk.type == "content_block_delta":

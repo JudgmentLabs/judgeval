@@ -404,17 +404,23 @@ def wrap_google_client(tracer: Tracer, client: GoogleClientType) -> GoogleClient
         return wrapper
 
     span_name = "GOOGLE_API_CALL"
-    if google_genai_Client and isinstance(client, google_genai_Client):
+    if google_genai_Client is not None and isinstance(client, google_genai_Client):
+        # Type narrowing for mypy
+        google_client = client  # type: ignore[assignment]
         setattr(
-            client.models,
+            google_client.models,
             "generate_content",
-            wrapped(client.models.generate_content, span_name),
+            wrapped(google_client.models.generate_content, span_name),
         )
-    elif google_genai_AsyncClient and isinstance(client, google_genai_AsyncClient):
+    elif google_genai_AsyncClient is not None and isinstance(
+        client, google_genai_AsyncClient
+    ):
+        # Type narrowing for mypy
+        async_google_client = client  # type: ignore[assignment]
         setattr(
-            client.models,
+            async_google_client.models,
             "generate_content",
-            wrapped_async(client.models.generate_content, span_name),
+            wrapped_async(async_google_client.models.generate_content, span_name),
         )
 
     return client
