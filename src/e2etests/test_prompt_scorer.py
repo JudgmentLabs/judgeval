@@ -79,8 +79,9 @@ def test_get_and_edit_prompt_scorer(client: JudgmentClient, project_name: str):
     assert prompt_scorer2.threshold == 0.8
 
 
-def test_trace_prompt_scorer(project_name: str):
+def test_trace_prompt_scorer():
     """Test trace prompt scorer functionality."""
+    project_name = f"test-trace-prompt-scorer-{uuid4()}"
     delete_project(project_name=project_name)
     create_project(project_name=project_name)
     judgment = Tracer(project_name=project_name)
@@ -115,6 +116,7 @@ def test_trace_prompt_scorer(project_name: str):
             break
         query_count += 1
         time.sleep(1)
+    delete_project(project_name=project_name)
     assert scorer_data[0].get("success")
 
 
