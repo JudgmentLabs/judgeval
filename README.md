@@ -11,7 +11,7 @@
 
 ## Agent Behavior Monitoring (ABM)
 
-Track and judge any agent behavior in online and offline setups. Set up Sentry-style alerts and analyze any agent topics/behaviors! 
+Track and judge any agent behavior in online and offline setups. Set up Sentry-style alerts and analyze agent behaviors / topic patterns at scale! 
 
 [![Docs](https://img.shields.io/badge/Documentation-blue)](https://docs.judgmentlabs.ai/documentation)
 [![Judgment Cloud](https://img.shields.io/badge/Judgment%20Cloud-brightgreen)](https://app.judgmentlabs.ai/register)
@@ -28,7 +28,7 @@ Track and judge any agent behavior in online and offline setups. Set up Sentry-s
 
 ## Judgeval Overview
 
-Judgeval is an open-source framework for agent behavior monitoring. Judgeval offers a toolkit to track and judge agent behavior in online and offline setups, enabling you to convert interaction data from production/test environments into improved agents. To get started, try running one of the notebooks below depending on your use case or diving deeper in our [docs](https://docs.judgmentlabs.ai/documentation).
+Judgeval is an open-source framework for agent behavior monitoring. Judgeval offers a toolkit to track and judge agent behavior in online and offline setups, enabling you to convert interaction data from production/test environments into improved agents. To get started, try running one of the notebooks below or dive deeper in our [docs](https://docs.judgmentlabs.ai/documentation).
 
 Our mission is to unlock the power of production data for agent development, enabling teams to improve their apps by catching real-time failures and optimizing over their users' preferences.
 
@@ -133,6 +133,88 @@ Running this code will deliver monitoring results to your [free platform account
 Judgeval's strongest suit is the full customization over the types of scorers you can run online monitoring with. No restrictions to only single-prompt LLM judges or prefab scorers - if you can express your scorer
 in python code, judgeval can monitor it! Under the hood, judgeval hosts your scorer in a virtualized secure container, enabling online monitoring for any scorer.
 
+
+First, create a behavior scorer in a file called `helpfulness_scorer.py`:
+
+```python
+from judgeval.data import Example
+from judgeval.scorers.example_scorer import ExampleScorer
+
+# Define custom example class
+class QuestionAnswer(Example):
+    question: str
+    answer: str
+
+# Define a server-hosted custom scorer
+class HelpfulnessScorer(ExampleScorer):
+    name: str = "Helpfulness Scorer"
+    server_hosted: bool = True  # Enable server hosting
+    async def a_score_example(self, example: QuestionAnswer):
+        # Custom scoring logic for agent behavior
+        # Can be an arbitrary combination of code and LLM calls
+        if len(example.answer) > 10 and "?" not in example.answer:
+            self.reason = "Answer is detailed and provides helpful information"
+            return 1.0
+        else:
+            self.reason = "Answer is too brief or unclear"
+            return 0.0
+```
+
+Then deploy your scorer to Judgment's infrastructure:
+
+```bash
+echo "pydantic" > requirements.txt
+judgeval upload_scorer helpfulness_scorer.py requirements.txt
+```
+
+Now you can instrument your agent with monitoring and online evaluation:
+
+```python
+from judgeval.tracer import Tracer, wrap
+from helpfulness_scorer import HelpfulnessScorer, QuestionAnswer
+from openai import OpenAI
+
+judgment = Tracer(project_name="default_project")
+client = wrap(OpenAI())  # tracks all LLM calls
+
+@judgment.observe(span_type="tool")
+def format_task(question: str) -> str:  # replace with your prompt engineering
+    return f"Please answer the following question: {question}"
+
+@judgment.observe(span_type="tool")
+def answer_question(prompt: str) -> str:  # replace with your LLM system calls
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.choices[0].message.content
+
+@judgment.observe(span_type="function")
+def run_agent(question: str) -> str:
+    task = format_task(question)
+    answer = answer_question(task)
+
+    # Add online evaluation with server-hosted scorer
+    judgment.async_evaluate(
+        scorer=HelpfulnessScorer(),
+        example=QuestionAnswer(question=question, answer=answer),
+        sampling_rate=0.9  # Evaluate 90% of agent runs
+    )
+
+    return answer
+
+if __name__ == "__main__":
+    result = run_agent("What is the capital of the United States?")
+    print(result)
+```
+
+Congratulations! Your online eval result should look like this:
+
+![Custom Scorer Online ABM](assets/custom_scorer_online_abm.png)
+
+You can now run any online scorer in a virtualized container with no latency impact on your applications.
+
+<!--
 ```python
 from judgeval.tracer import Tracer, wrap
 from judgeval.data import Example
@@ -178,7 +260,6 @@ def run_agent():
 run_agent()
 ```
 
-<!--
 ## 🏢 Self-Hosting
 
 Run Judgment on your own infrastructure: we provide comprehensive self-hosting capabilities that give you full control over the backend and data plane that Judgeval interfaces with.
