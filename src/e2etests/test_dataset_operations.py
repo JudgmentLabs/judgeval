@@ -245,9 +245,7 @@ def test_dataset_list_after_creation(
         assert isinstance(dataset_info, DatasetInfo), (
             f"Expected DatasetInfo instance, got {type(dataset_info)}"
         )
-        assert dataset_info.dataset_kind == "example", (
-            "Dataset kind should be 'example'"
-        )
+        assert dataset_info.kind == "example", "Dataset kind should be 'example'"
         assert dataset_info.entries >= 0, "Entries count should be non-negative"
 
 
