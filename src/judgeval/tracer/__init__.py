@@ -64,6 +64,7 @@ from judgeval.warnings import JudgmentWarning
 
 from judgeval.tracer.keys import AttributeKeys, InternalAttributeKeys
 from judgeval.api import JudgmentSyncClient
+from judgeval.exceptions import JudgmentAPIError
 from judgeval.tracer.llm import wrap_provider
 from judgeval.utils.url import url_for
 from judgeval.tracer.local_eval_queue import LocalEvaluationQueue
@@ -72,6 +73,7 @@ from judgeval.tracer.processors import (
     NoOpJudgmentSpanProcessor,
 )
 from judgeval.tracer.utils import set_span_attribute, TraceScorerConfig
+from httpx import RequestError
 
 C = TypeVar("C", bound=Callable)
 Cls = TypeVar("Cls", bound=Type)
@@ -261,7 +263,7 @@ class Tracer(metaclass=SingletonMeta):
                 organization_id=organization_id,
             )
             response = client.projects_add({"project_name": project_name})
-        except Exception as e:
+        except (JudgmentAPIError, RequestError) as e:
             judgeval_logger.error(
                 f"Failed to create project with name {project_name}: {e} ... Skipping Judgment export."
             )
