@@ -46,21 +46,22 @@ You can find a list of [video tutorials for Judgeval use cases](https://www.yout
 
 ## Why Judgeval?
 
-• **Custom Evaluators**: No restriction to only monitoring with prefab scorers. Judgeval provides simple abstractions for custom Python scorers, supporting any LLM-as-a-judge rubrics/models and code-based scorers that integrate to our live agent-tracking infrastructure. [Learn more](https://docs.judgmentlabs.ai/documentation/evaluation/scorers/custom-scorers)
+**Custom Evaluators**: No restriction to only monitoring with prefab scorers. Judgeval provides simple abstractions for custom Python scorers, supporting any LLM-as-a-judge rubrics/models and code-based scorers that integrate to our live agent-tracking infrastructure. [Learn more](https://docs.judgmentlabs.ai/documentation/evaluation/scorers/custom-scorers)
 
-• **Production Monitoring**: Run any custom scorer in a hosted, virtualized secure container to flag agent behaviors online in production. Get Slack alerts for failures and add custom hooks to address regressions before they impact users. [Learn more](https://docs.judgmentlabs.ai/documentation/performance/online-evals)
+**Production Monitoring**: Run any custom scorer in a hosted, virtualized secure container to flag agent behaviors online in production. Get Slack alerts for failures and add custom hooks to address regressions before they impact users. [Learn more](https://docs.judgmentlabs.ai/documentation/performance/online-evals)
 
-• **Behavior/Topic Grouping**: Group agent runs by behavior type or topic for deeper analysis. Drill down into subsets of users, agents, or use cases to reveal patterns of agent behavior.
+**Behavior/Topic Grouping**: Group agent runs by behavior type or topic for deeper analysis. Drill down into subsets of users, agents, or use cases to reveal patterns of agent behavior.
 <!-- Add link to Bucketing docs once we have it -->
 <!-- 
 TODO: Once we have trainer code docs, plug in here
 -->
 
-• **Experiment with evals**: Try out different prompts, models, or agent configs, then test for improvement with any agent behavior evaluator. Visualize and compare results over time! [Learn more](https://docs.judgmentlabs.ai/documentation/evaluation/introduction)
+**Run experiments on your agents**: A/B test different prompts, models, or agent configs across customer segments. Measure which changes improve agent performance and decrease bad agent behaviors.
+
 <!-- 
 Use this once we have AI PM features:
 
-• **Run experiments on your agents**: A/B test different prompts, models, or agent configs across customer segments. Measure which changes improve agent performance and decrease bad agent behaviors. [Learn more]
+**Run experiments on your agents**: A/B test different prompts, models, or agent configs across customer segments. Measure which changes improve agent performance and decrease bad agent behaviors. [Learn more]
 
 -->
 
@@ -69,7 +70,7 @@ Use this once we have AI PM features:
 Get started with Judgeval by installing our SDK using pip:
 
 ```bash
-pip install judgeval
+uv add judgeval
 ```
 
 Ensure you have your `JUDGMENT_API_KEY` and `JUDGMENT_ORG_ID` environment variables set to connect to the [Judgment Platform](https://app.judgmentlabs.ai/).
