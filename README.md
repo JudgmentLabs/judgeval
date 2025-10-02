@@ -102,7 +102,7 @@ def format_question(question: str) -> str:
 def run_agent(prompt: str) -> str:
     task = format_question(prompt)
     response = client.chat.completions.create(
-        model="gpt-4.1",
+        model="gpt-5-mini",
         messages=[{"role": "user", "content": task}]
     )
 
@@ -157,7 +157,7 @@ Then deploy your scorer to Judgment's infrastructure:
 
 ```bash
 echo "pydantic" > requirements.txt
-judgeval upload_scorer helpfulness_scorer.py requirements.txt
+uv run judgeval upload_scorer helpfulness_scorer.py requirements.txt
 ```
 
 Now you can instrument your agent with monitoring and online evaluation:
@@ -177,7 +177,7 @@ def format_task(question: str) -> str:  # replace with your prompt engineering
 @judgment.observe(span_type="tool")
 def answer_question(prompt: str) -> str:  # replace with your LLM system calls
     response = client.chat.completions.create(
-        model="gpt-4",
+        model="gpt-5-mini",
         messages=[{"role": "user", "content": prompt}]
     )
     return response.choices[0].message.content
@@ -205,89 +205,7 @@ Congratulations! Your online eval result should look like this:
 
 ![Custom Scorer Online ABM](assets/custom_scorer_online_abm.png)
 
-You can now run any online scorer in a virtualized container with no latency impact on your applications.
-
-<!--
-```python
-from judgeval.tracer import Tracer, wrap
-from judgeval.data import Example
-from judgeval.scorers.example_scorer import ExampleScorer
-from openai import OpenAI
-
-judgment = Tracer(project_name="default_project")
-client = wrap(OpenAI())
-
-class CustomerRequest(Example):  # Define a custom example class
-    request: str
-    response: str
-
-class ResolutionScorer(ExampleScorer):  # Define a agent-specific custom scorer
-    name: str = "Resolution Scorer"
-    server_hosted: bool = True  # Executes scorer in a virtualized secure container
-
-    async def a_score_example(self, example: CustomerRequest):
-      # Custom scoring logic for agent behavior. Import dependencies, combine LLM judge with logic, and more
-        if "package" in example.response.lower():  
-            self.reason = "The response addresses the package inquiry"
-            return 1.0
-        else:
-            self.reason = "The response does not address the package inquiry"
-            return 0.0
-
-
-@judgment.observe(span_type="function")
-def run_agent():
-    customer_request = "When is my package coming?" # fill in with actual customer request
-    response = "Your pizza is coming in 10 days!" # fill in with actual agent invocation
-
-    # Run online evaluation with custom scorer
-    judgment.async_evaluate(
-        scorer=ResolutionScorer(threshold=0.8),
-        example=CustomerRequest(
-            request=customer_request,
-            response=response
-        )
-    )
-    return response
-
-run_agent()
-```
-
-## 🏢 Self-Hosting
-
-Run Judgment on your own infrastructure: we provide comprehensive self-hosting capabilities that give you full control over the backend and data plane that Judgeval interfaces with.
-
-### Key Features
-* Deploy Judgment on your own AWS account
-* Store data in your own Supabase instance
-* Access Judgment through your own custom domain
-
-### Getting Started
-1. Check out our [self-hosting documentation](https://docs.judgmentlabs.ai/documentation/self-hosting/get-started) for detailed setup instructions, along with how your self-hosted instance can be accessed
-2. Use the [Judgment CLI](https://docs.judgmentlabs.ai/documentation/developer-tools/judgment-cli/installation) to deploy your self-hosted environment
-3. After your self-hosted instance is setup, make sure the `JUDGMENT_API_URL` environmental variable is set to your self-hosted backend endpoint
-
-## 💻 Development with Cursor
-Building agents and LLM workflows in Cursor works best when your coding assistant has the proper context about Judgment integration. The Cursor rules file contains the key information needed for your assistant to implement Judgment features effectively.
-
-Refer to the official [documentation](https://docs.judgmentlabs.ai/documentation/developer-tools/cursor/cursor-rules) for access to the rules file and more information on integrating this rules file with your codebase.
--->
-
-
-## ⭐ Star Us
-
-If you find Judgeval useful, please consider giving us a star! Your support helps us grow our community and continue improving the repository.
-
-## ❤️ Contributors
-
-There are many ways to contribute to Judgeval:
-
-- Submit [bug reports](https://github.com/JudgmentLabs/judgeval/issues) and [feature requests](https://github.com/JudgmentLabs/judgeval/issues)
-- Review the documentation and submit [Pull Requests](https://github.com/JudgmentLabs/judgeval/pulls) to improve it
-- Speaking or writing about Judgment and letting us know!
-
-<!-- Contributors collage -->
-[![Contributors](https://contributors-img.web.app/image?repo=JudgmentLabs/judgeval)](https://github.com/JudgmentLabs/judgeval/graphs/contributors)
+You can now run any online scorer in a secure Firecracker microVMs with no latency impact on your applications.
 
 ---
 
