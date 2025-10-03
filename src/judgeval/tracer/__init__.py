@@ -64,6 +64,7 @@ from judgeval.warnings import JudgmentWarning
 
 from judgeval.tracer.keys import AttributeKeys, InternalAttributeKeys
 from judgeval.api import JudgmentSyncClient
+from judgeval.exceptions import JudgmentAPIError
 from judgeval.tracer.llm import wrap_provider
 from judgeval.utils.url import url_for
 from judgeval.tracer.local_eval_queue import LocalEvaluationQueue
@@ -72,6 +73,7 @@ from judgeval.tracer.processors import (
     NoOpJudgmentSpanProcessor,
 )
 from judgeval.tracer.utils import set_span_attribute, TraceScorerConfig
+from httpx import RequestError
 
 C = TypeVar("C", bound=Callable)
 Cls = TypeVar("Cls", bound=Type)
@@ -163,6 +165,14 @@ class Tracer(metaclass=SingletonMeta):
                 self.project_name, self.api_key, self.organization_id
             )
 
+            if not project_id:
+                judgeval_logger.warning(
+                    f"Failed to resolve project '{self.project_name}'. Project will be created automatically."
+                )
+                project_id = Tracer._create_project(
+                    self.project_name, self.api_key, self.organization_id
+                )
+
             if project_id:
                 self.judgment_processor = self.get_processor(
                     tracer=self,
@@ -177,10 +187,6 @@ class Tracer(metaclass=SingletonMeta):
                 provider = TracerProvider(resource=resource)
                 provider.add_span_processor(self.judgment_processor)
                 set_tracer_provider(provider)
-            else:
-                judgeval_logger.error(
-                    f"Failed to resolve project {self.project_name}, please create it first at https://app.judgmentlabs.ai/org/{self.organization_id}/projects. Skipping Judgment export."
-                )
 
         self.tracer = get_tracer_provider().get_tracer(
             JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME,
@@ -244,6 +250,24 @@ class Tracer(metaclass=SingletonMeta):
             organization_id=organization_id,
         )
         response = client.projects_resolve({"project_name": project_name})
+        return response["project_id"]
+
+    @staticmethod
+    def _create_project(
+        project_name: str, api_key: str, organization_id: str
+    ) -> str | None:
+        """Create a new project with the given name."""
+        try:
+            client = JudgmentSyncClient(
+                api_key=api_key,
+                organization_id=organization_id,
+            )
+            response = client.projects_add({"project_name": project_name})
+        except (JudgmentAPIError, RequestError) as e:
+            judgeval_logger.error(
+                f"Failed to create project with name {project_name}: {e} ... Skipping Judgment export."
+            )
+            return None
         return response["project_id"]
 
     def get_current_span(self):
