@@ -26,9 +26,9 @@ class Openlit(ABC):
         **kwargs,
     ):
         tracer = Tracer.get_instance()
-        if tracer and tracer._initialized:
+        if not tracer or not tracer._initialized:
             raise ValueError(
-                "Openlit cannot be initialized after the tracer has been initialized. When using the Openlit integration, pass initialize=False to the Tracer constructor."
+                "Openlit must be initialized after the tracer has been initialized. Please create the Tracer instance first before initializing Openlit."
             )
 
         api_key = expect_api_key(api_key or JUDGMENT_API_KEY)
@@ -49,6 +49,7 @@ class Openlit(ABC):
                 "X-Organization-Id": organization_id,
                 "X-Project-Id": project_id,
             },
+            tracer=tracer.get_tracer(),
             **kwargs,
         )
 
