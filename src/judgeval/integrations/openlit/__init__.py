@@ -1,10 +1,6 @@
 from abc import ABC
-from typing import Optional
-
-from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_ORG_ID
 from judgeval.tracer import Tracer
 from judgeval.logger import judgeval_logger
-from judgeval.utils.guards import expect_api_key, expect_organization_id
 from judgeval.utils.url import url_for
 
 
@@ -19,20 +15,17 @@ except ImportError:
 class Openlit(ABC):
     @staticmethod
     def initialize(
-        project_name: str,
-        api_key: Optional[str] = None,
-        organization_id: Optional[str] = None,
-        /,
         **kwargs,
     ):
         tracer = Tracer.get_instance()
-        if tracer and tracer._initialized:
+        if not tracer or not tracer._initialized:
             raise ValueError(
-                "Openlit cannot be initialized after the tracer has been initialized. When using the Openlit integration, pass initialize=False to the Tracer constructor."
+                "Openlit must be initialized after the tracer has been initialized. Please create the Tracer instance first before initializing Openlit."
             )
 
-        api_key = expect_api_key(api_key or JUDGMENT_API_KEY)
-        organization_id = expect_organization_id(organization_id or JUDGMENT_ORG_ID)
+        api_key = tracer.api_key
+        organization_id = tracer.organization_id
+        project_name = tracer.project_name
 
         project_id = Tracer._resolve_project_id(project_name, api_key, organization_id)
         if not project_id:
@@ -49,6 +42,7 @@ class Openlit(ABC):
                 "X-Organization-Id": organization_id,
                 "X-Project-Id": project_id,
             },
+            tracer=tracer.get_tracer(),
             **kwargs,
         )
 
