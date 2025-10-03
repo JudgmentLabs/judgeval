@@ -2,7 +2,7 @@ import logging
 import sys
 
 from judgeval.env import JUDGMENT_NO_COLOR
-from judgeval.utils.decorators import use_once
+from judgeval.utils.decorators.use_once import use_once
 
 RESET = "\033[0m"
 RED = "\033[31m"

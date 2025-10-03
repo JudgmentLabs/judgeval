@@ -2,7 +2,7 @@ import importlib.metadata
 import httpx
 import threading
 from judgeval.logger import judgeval_logger
-from judgeval.utils.decorators import use_once
+from judgeval.utils.decorators.use_once import use_once
 
 
 @use_once

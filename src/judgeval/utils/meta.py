@@ -11,7 +11,7 @@ class SingletonMeta(type):
 
     _instances: Dict[type, object] = {}
 
-    def __call__(cls, *args, **kwargs) -> object:
+    def __call__(cls, *args, **kwargs):
         if cls not in SingletonMeta._instances:
             SingletonMeta._instances[cls] = super(SingletonMeta, cls).__call__(
                 *args, **kwargs
