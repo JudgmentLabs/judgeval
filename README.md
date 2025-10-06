@@ -61,13 +61,13 @@ Our mission is to unlock the power of production data for agent development, ena
 
 You can access our [repo of cookbooks](https://github.com/JudgmentLabs/judgment-cookbook).
 
-You can find a list of [video tutorials for Judgeval use cases](https://www.youtube.com/@judgmentlabs).
+You can find a list of [video tutorials for Judgeval use cases](https://www.youtube.com/@Alexshander-JL).
 
 ## Why Judgeval?
 
 🤖 **Simple to run multi-turn RL**: Optimize your agents with multi-turn RL without managing compute infrastructure or data pipelines. Just add a few lines of code to your existing agent code and train!
 
-⚙️ **Custom Evaluators**: No restriction to only monitoring with prefab scorers. Judgeval provides simple abstractions for custom Python scorers, supporting any LLM-as-a-judge rubrics/models and code-based scorers that integrate to our live agent-tracking infrastructure. [Learn more](https://docs.judgmentlabs.ai/documentation/evaluation/scorers/custom-scorers)
+⚙️ **Custom Evaluators**: No restriction to only monitoring with prefab scorers. Judgeval provides simple abstractions for custom Python scorers, supporting any LLM-as-a-judge rubrics/models and code-based scorers that integrate to our live agent-tracking infrastructure. [Learn more](https://docs.judgmentlabs.ai/documentation/evaluation/custom-scorers)
 
 🚨 **Production Monitoring**: Run any custom scorer in a hosted, virtualized secure container to flag agent behaviors online in production. Get Slack alerts for failures and add custom hooks to address regressions before they impact users. [Learn more](https://docs.judgmentlabs.ai/documentation/performance/online-evals)
 
