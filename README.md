@@ -26,6 +26,24 @@ Track and judge any agent behavior in online and offline setups. Set up Sentry-s
 
 </table>
 
+## [NEW] 🎆 Agent Reinforcement Learning
+
+Train your agents with multi-turn reinforcement learning using judgeval and [Fireworks AI](https://fireworks.ai/)! Judgeval's ABM now integrates with Fireworks' Reinforcement Fine-Tuning (RFT) endpoint, supporting gpt-oss, qwen3, Kimi2, DeepSeek, and more.
+
+Judgeval's agent monitoring infra provides a simple harness for integrating GRPO into any Python agent, giving builders a quick method to **try RL with minimal code changes** to their existing agents!
+
+```python
+await trainer.train(
+    agent_function=your_agent_function,  # entry point to your agent
+    scorers=[RewardScorer()],  # Custom scorer you define based on task criteria, acts as reward
+    prompts=training_prompts,  # Tasks
+    rft_provider="fireworks"
+)
+```
+
+**That's it!** Judgeval automatically manages trajectory collection and reward tagging - your agent can learn from production data with minimal code changes. You can view and monitor training progress for free via the [Judgment Dashboard](https://app.judgmentlabs.ai/).
+
+
 ## Judgeval Overview
 
 Judgeval is an open-source framework for agent behavior monitoring. Judgeval offers a toolkit to track and judge agent behavior in online and offline setups, enabling you to convert interaction data from production/test environments into improved agents. To get started, try running one of the notebooks below or dive deeper in our [docs](https://docs.judgmentlabs.ai/documentation).
@@ -36,15 +54,18 @@ Our mission is to unlock the power of production data for agent development, ena
 
 | Try Out | Notebook | Description |
 |:---------|:-----|:------------|
+| RL | [Get Started For Free] | Train agents with reinforcement learning |
 | Custom Scorers | [Get Started For Free] | Build custom evaluators for your agents |
 | Online ABM | [Get Started For Free] | Monitor agent behavior in production |
 | Offline Testing | [Get Started For Free] | Compare how different prompts, models, or agent configs affect performance across ANY metric |
 
-You can access our [repo of cookbooks](https://github.com/JudgmentLabs/judgeval-cookbook).
+You can access our [repo of cookbooks](https://github.com/JudgmentLabs/judgment-cookbook).
 
 You can find a list of [video tutorials for Judgeval use cases](https://www.youtube.com/@judgmentlabs).
 
 ## Why Judgeval?
+
+🤖 **Simple to run multi-turn RL**: Optimize your agents with multi-turn RL without managing compute infrastructure or data pipelines. Just add a few lines of code to your existing agent code and train!
 
 ⚙️ **Custom Evaluators**: No restriction to only monitoring with prefab scorers. Judgeval provides simple abstractions for custom Python scorers, supporting any LLM-as-a-judge rubrics/models and code-based scorers that integrate to our live agent-tracking infrastructure. [Learn more](https://docs.judgmentlabs.ai/documentation/evaluation/scorers/custom-scorers)
 
@@ -70,7 +91,7 @@ Use this once we have AI PM features:
 Get started with Judgeval by installing our SDK using pip:
 
 ```bash
-uv add judgeval
+pip install judgeval
 ```
 
 Ensure you have your `JUDGMENT_API_KEY` and `JUDGMENT_ORG_ID` environment variables set to connect to the [Judgment Platform](https://app.judgmentlabs.ai/).
