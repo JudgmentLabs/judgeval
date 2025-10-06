@@ -54,9 +54,9 @@ Our mission is to unlock the power of production data for agent development, ena
 
 | Try Out | Notebook | Description |
 |:---------|:-----|:------------|
-| RL | [Get Started For Free] | Train agents with reinforcement learning |
-| Custom Scorers | [Get Started For Free] | Build custom evaluators for your agents |
-| Online ABM | [Get Started For Free] | Monitor agent behavior in production |
+| RL | [Wikipedia Racer](https://colab.research.google.com/github/JudgmentLabs/judgment-cookbook/blob/main/rl/WikiRacingAgent_RL.ipynb) | Train agents with reinforcement learning |
+| Online ABM | [Research Agent](https://colab.research.google.com/github/JudgmentLabs/judgment-cookbook/blob/main/monitoring/Research_Agent_Online_Monitoring.ipynb) | Monitor agent behavior in production |
+| Custom Scorers | [HumanEval](https://colab.research.google.com/github/JudgmentLabs/judgment-cookbook/blob/main/custom_scorers/HumanEval_Custom_Scorer.ipynb) | Build custom evaluators for your agents |
 | Offline Testing | [Get Started For Free] | Compare how different prompts, models, or agent configs affect performance across ANY metric |
 
 You can access our [repo of cookbooks](https://github.com/JudgmentLabs/judgment-cookbook).
