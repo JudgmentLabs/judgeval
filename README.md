@@ -43,7 +43,8 @@ await trainer.train(
 
 **That's it!** Judgeval automatically manages trajectory collection and reward tagging - your agent can learn from production data with minimal code changes. 
 
-👉 Check out a [Wikipedia Racer](https://colab.research.google.com/github/JudgmentLabs/judgment-cookbook/blob/main/rl/WikiRacingAgent_RL.ipynb) to see RL in action with Judgeval.
+👉 Check out the [Wikipedia Racer notebook](https://colab.research.google.com/github/JudgmentLabs/judgment-cookbook/blob/main/rl/WikiRacingAgent_RL.ipynb), where an agent learns to navigate Wikipedia using RL, to see Judgeval in action.
+
 
 You can view and monitor training progress for free via the [Judgment Dashboard](https://app.judgmentlabs.ai/).
 
