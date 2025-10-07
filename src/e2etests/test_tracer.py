@@ -18,6 +18,7 @@ import os
 import random
 import pytest
 import string
+import orjson
 
 project_name = "e2e-tests-" + "".join(
     random.choices(string.ascii_letters + string.digits, k=12)
@@ -339,9 +340,10 @@ def retrieve_llm_cost_helper(trace_id):
 
     total_llm_cost = 0
     for span in trace_spans:
-        llm_cost = span.get("span_attributes", {}).get(
-            "judgment.cumulative_llm_cost", 0
-        )
+        span_attrs = span.get("span_attributes", {})
+        if isinstance(span_attrs, str):
+            span_attrs = orjson.loads(span_attrs)
+        llm_cost = span_attrs.get("gen_ai.usage.total_cost_usd", 0)
         total_llm_cost += llm_cost
 
     if total_llm_cost == 0:
@@ -357,7 +359,12 @@ def retrieve_streaming_trace_helper(trace_id):
     # Find the LLM span
     llm_span = None
     for span in trace_spans:
-        if span.get("span_attributes", {}).get("judgment.span_kind") == "llm":
+        # Parse span_attributes if it's a JSON string
+        span_attrs = span.get("span_attributes", {})
+        if isinstance(span_attrs, str):
+            span_attrs = orjson.loads(span_attrs)
+
+        if span_attrs.get("judgment.span_kind") == "llm":
             llm_span = span
             break
 
@@ -366,6 +373,8 @@ def retrieve_streaming_trace_helper(trace_id):
 
     # Verify streaming-specific attributes
     span_attributes = llm_span.get("span_attributes", {})
+    if isinstance(span_attributes, str):
+        span_attributes = orjson.loads(span_attributes)
 
     # Should have completion content
     completion = span_attributes.get("gen_ai.completion")
@@ -393,58 +402,49 @@ def test_trace_spans():
     retrieve_trace_helper(trace_id, random_number)
 
 
-@pytest.mark.skip(reason="Cost refactoring in progress")
 def test_openai_llm_cost():
     trace_id = openai_llm_call()
     retrieve_llm_cost_helper(trace_id)
 
 
-@pytest.mark.skip(reason="Cost refactoring in progress")
 def test_anthropic_llm_cost():
     trace_id = anthropic_llm_call()
     retrieve_llm_cost_helper(trace_id)
 
 
-@pytest.mark.skip(reason="Cost refactoring in progress")
 def test_groq_llm_cost():
     trace_id = groq_llm_call()
     retrieve_llm_cost_helper(trace_id)
 
 
-@pytest.mark.skip(reason="Cost refactoring in progress")
 def test_together_llm_cost():
     trace_id = together_llm_call()
     retrieve_llm_cost_helper(trace_id)
 
 
-@pytest.mark.skip(reason="Cost refactoring in progress")
 def test_google_llm_cost():
     trace_id = google_llm_call()
     retrieve_llm_cost_helper(trace_id)
 
 
-@pytest.mark.skip(reason="Cost refactoring in progress")
 @pytest.mark.asyncio
 async def test_openai_async_llm_cost():
     trace_id = await openai_async_llm_call()
     retrieve_llm_cost_helper(trace_id)
 
 
-@pytest.mark.skip(reason="Cost refactoring in progress")
 @pytest.mark.asyncio
 async def test_anthropic_async_llm_cost():
     trace_id = await anthropic_async_llm_call()
     retrieve_llm_cost_helper(trace_id)
 
 
-@pytest.mark.skip(reason="Cost refactoring in progress")
 @pytest.mark.asyncio
 async def test_groq_async_llm_cost():
     trace_id = await groq_async_llm_call()
     retrieve_llm_cost_helper(trace_id)
 
 
-@pytest.mark.skip(reason="Cost refactoring in progress")
 @pytest.mark.asyncio
 async def test_together_async_llm_cost():
     trace_id = await together_async_llm_call()
@@ -508,6 +508,6 @@ def test_online_span_scoring():
         assert False, "No score found"
 
     score = scorer_data[0]
-    assert score.get("name") == "Answer Relevancy"
-    assert score.get("success")
-    assert score.get("score") == 1.0
+    assert score.get("scorer_name") == "Answer Relevancy"
+    assert score.get("scorer_success")
+    assert score.get("scorer_score") == 1.0

@@ -20,9 +20,3 @@ def retrieve_score(span_id: str, trace_id: str):
     return client.e2e_fetch_span_score(
         payload={"span_id": span_id, "trace_id": trace_id}
     )
-
-
-def retrieve_trace_score(span_id: str, trace_id: str):
-    return client.e2e_fetch_trace_scorer_span_score(
-        payload={"span_id": span_id, "trace_id": trace_id}
-    )
