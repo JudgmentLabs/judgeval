@@ -137,9 +137,23 @@ def _extract_openai_content(chunk) -> str:
 
 def _extract_anthropic_content(chunk) -> str:
     """Extract content from Anthropic streaming chunk."""
-    if hasattr(chunk, "type") and chunk.type == "content_block_delta":
-        if hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
-            return chunk.delta.text or ""
+    if hasattr(chunk, "type"):
+        if chunk.type == "content_block_delta":
+            if hasattr(chunk, "delta"):
+                if hasattr(chunk.delta, "text"):
+                    return chunk.delta.text or ""
+                elif hasattr(chunk.delta, "partial_json"):
+                    # Tool use input streaming - return raw JSON to accumulate properly
+                    return chunk.delta.partial_json or ""
+        elif chunk.type == "content_block_start":
+            if hasattr(chunk, "content_block") and hasattr(chunk.content_block, "type"):
+                if chunk.content_block.type == "tool_use":
+                    tool_info = {
+                        "type": "tool_use",
+                        "id": getattr(chunk.content_block, "id", None),
+                        "name": getattr(chunk.content_block, "name", None),
+                    }
+                    return f"[TOOL_USE_START: {tool_info}]"
     elif hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
         return chunk.delta.text or ""
     elif hasattr(chunk, "text"):
@@ -409,7 +423,24 @@ def _format_anthropic_output(
         and usage.cache_creation_input_tokens is not None
         else 0
     )
-    message_content = response.content[0].text if hasattr(response, "content") else None
+    # Extract content from Anthropic response, handling both text and tool use blocks
+    message_content = None
+    if hasattr(response, "content") and response.content:
+        content_parts = []
+        for content_block in response.content:
+            if hasattr(content_block, "text"):
+                # Text content block
+                content_parts.append(content_block.text)
+            elif hasattr(content_block, "type") and content_block.type == "tool_use":
+                # Tool use block - serialize the tool call information
+                tool_info = {
+                    "type": "tool_use",
+                    "id": getattr(content_block, "id", None),
+                    "name": getattr(content_block, "name", None),
+                    "input": getattr(content_block, "input", None),
+                }
+                content_parts.append(f"[TOOL_USE: {tool_info}]")
+        message_content = "\n".join(content_parts) if content_parts else None
 
     if model_name:
         return message_content, _create_usage(
