@@ -58,7 +58,7 @@ dev = [
     "langchain-core>=0.3.72",
     "langgraph>=0.6.4",
     "mypy>=1.17.1",
-    "openai>=1.78.1",
+    "openai>=1.92.0",
     "opentelemetry-instrumentation-openai>=0.44.1",
     "ruff>=0.9.1,<0.10.0",
     "together>=1.5.21",
@@ -73,6 +73,7 @@ dev = [
     "langchain-tavily>=0.2.11",
     "streamlit>=1.49.1",
     "langchain-community>=0.3.29",
+    "openlit>=1.35.5",
 ]
 
 
