@@ -204,7 +204,31 @@ def _format_openai_output(
                 output0 = response.output[0]
                 if output0.content and len(output0.content) > 0:
                     try:
-                        message_content = "".join(seg.text for seg in output0.content)
+                        content_parts = []
+                        for seg in output0.content:
+                            if hasattr(seg, "text") and seg.text:
+                                content_parts.append(seg.text)
+                            elif hasattr(seg, "type"):
+                                # Handle different content types safely
+                                if seg.type == "text" and hasattr(seg, "text"):
+                                    content_parts.append(seg.text)
+                                elif seg.type == "function_call":
+                                    # Handle function calls
+                                    func_info = {
+                                        "type": "function_call",
+                                        "name": getattr(seg, "name", None),
+                                        "call_id": getattr(seg, "call_id", None),
+                                        "arguments": getattr(seg, "arguments", None),
+                                    }
+                                    content_parts.append(
+                                        f"[FUNCTION_CALL: {func_info}]"
+                                    )
+                                # Add other content type handling as needed
+                        message_content = (
+                            "\n".join(content_parts)
+                            if content_parts
+                            else str(output0.content)
+                        )
                     except (TypeError, AttributeError):
                         message_content = str(output0.content)
         elif isinstance(response, OpenAIChatCompletionBase):
@@ -218,7 +242,34 @@ def _format_openai_output(
                 ):
                     message_content = str(getattr(message, "parsed"))
                 else:
-                    message_content = getattr(message, "content", None)
+                    content_parts = []
+
+                    # Handle regular content
+                    if hasattr(message, "content") and message.content:
+                        content_parts.append(str(message.content))
+
+                    # Handle tool calls (standard Chat Completions API)
+                    if hasattr(message, "tool_calls") and message.tool_calls:
+                        for tool_call in message.tool_calls:
+                            tool_info = {
+                                "type": "tool_call",
+                                "id": getattr(tool_call, "id", None),
+                                "function": {
+                                    "name": getattr(tool_call.function, "name", None)
+                                    if hasattr(tool_call, "function")
+                                    else None,
+                                    "arguments": getattr(
+                                        tool_call.function, "arguments", None
+                                    )
+                                    if hasattr(tool_call, "function")
+                                    else None,
+                                },
+                            }
+                            content_parts.append(f"[TOOL_CALL: {tool_info}]")
+
+                    message_content = (
+                        "\n".join(content_parts) if content_parts else None
+                    )
     except (AttributeError, IndexError, TypeError):
         pass
 

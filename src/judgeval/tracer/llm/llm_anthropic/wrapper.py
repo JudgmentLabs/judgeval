@@ -136,10 +136,21 @@ def _format_anthropic_output(
         if isinstance(response, AnthropicMessage):
             usage_data = response.usage
             if response.content:
+                content_parts = []
                 for block in response.content:
-                    if isinstance(block, AnthropicContentBlock) and block.text:
-                        message_content = block.text
-                        break
+                    if isinstance(block, AnthropicContentBlock):
+                        block_type = getattr(block, "type", None)
+                        if block_type == "text":
+                            content_parts.append(getattr(block, "text", ""))
+                        elif block_type == "tool_use":
+                            tool_info = {
+                                "type": "tool_use",
+                                "id": getattr(block, "id", None),
+                                "name": getattr(block, "name", None),
+                                "input": getattr(block, "input", None),
+                            }
+                            content_parts.append(f"[TOOL_USE: {tool_info}]")
+                message_content = "\n".join(content_parts) if content_parts else None
     except (AttributeError, IndexError, TypeError):
         pass
 
