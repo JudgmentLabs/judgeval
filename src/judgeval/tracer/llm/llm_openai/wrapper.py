@@ -3,6 +3,7 @@ import functools
 import orjson
 from typing import (
     TYPE_CHECKING,
+    Any,
     Optional,
     Tuple,
     Protocol,
@@ -194,8 +195,8 @@ def _extract_openai_tokens(usage_data: OpenAIUnifiedUsage) -> Tuple[int, int, in
 
 def _format_openai_output(
     response: OpenAIResponseType,
-) -> Tuple[Optional[Union[str, list]], Optional[OpenAIUnifiedUsage]]:
-    message_content: Optional[Union[str, list]] = None
+) -> Tuple[Optional[Union[str, list[dict[str, Any]]]], Optional[OpenAIUnifiedUsage]]:
+    message_content: Optional[Union[str, list[dict[str, Any]]]] = None
     usage_data: Optional[OpenAIUnifiedUsage] = None
 
     try:

@@ -2,6 +2,7 @@ from __future__ import annotations
 import functools
 from typing import (
     TYPE_CHECKING,
+    Any,
     Callable,
     Optional,
     Protocol,
@@ -121,15 +122,18 @@ def _extract_together_tokens(usage_data: TogetherUsage) -> Tuple[int, int, int, 
 
 def _format_together_output(
     response: TogetherChatCompletion,
-) -> Tuple[Optional[str], Optional[TogetherUsage]]:
-    message_content: Optional[str] = None
+) -> Tuple[Optional[Union[str, list[dict[str, Any]]]], Optional[TogetherUsage]]:
+    message_content: Optional[Union[str, list[dict[str, Any]]]] = None
     usage_data: Optional[TogetherUsage] = None
 
     try:
         if isinstance(response, TogetherChatCompletion):
             usage_data = response.usage
             if response.choices and len(response.choices) > 0:
-                message_content = response.choices[0].message.content
+                content = response.choices[0].message.content
+                if content:
+                    # Return structured data for consistency with other providers
+                    message_content = [{"type": "text", "text": str(content)}]
     except (AttributeError, IndexError, TypeError):
         pass
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 import functools
 from typing import (
     TYPE_CHECKING,
+    Any,
     Callable,
     Optional,
     Protocol,
@@ -132,15 +133,18 @@ def _extract_groq_tokens(usage_data: GroqUsage) -> Tuple[int, int, int, int]:
 
 def _format_groq_output(
     response: GroqChatCompletion,
-) -> Tuple[Optional[str], Optional[GroqUsage]]:
-    message_content: Optional[str] = None
+) -> Tuple[Optional[Union[str, list[dict[str, Any]]]], Optional[GroqUsage]]:
+    message_content: Optional[Union[str, list[dict[str, Any]]]] = None
     usage_data: Optional[GroqUsage] = None
 
     try:
         if isinstance(response, GroqChatCompletion):
             usage_data = response.usage
             if response.choices and len(response.choices) > 0:
-                message_content = response.choices[0].message.content
+                content = response.choices[0].message.content
+                if content:
+                    # Return structured data for consistency with other providers
+                    message_content = [{"type": "text", "text": str(content)}]
     except (AttributeError, IndexError, TypeError):
         pass
 

@@ -129,8 +129,8 @@ def _extract_anthropic_chunk_usage(
 
 def _format_anthropic_output(
     response: AnthropicMessage,
-) -> Tuple[Optional[str], Optional[AnthropicUsage]]:
-    message_content: Optional[str] = None
+) -> Tuple[Optional[Union[str, list]], Optional[AnthropicUsage]]:
+    message_content: Optional[Union[str, list]] = None
     usage_data: Optional[AnthropicUsage] = None
 
     try:
