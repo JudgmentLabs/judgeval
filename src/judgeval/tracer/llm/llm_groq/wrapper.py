@@ -115,8 +115,10 @@ def _extract_groq_tokens(usage_data: GroqUsage) -> Tuple[int, int, int, int]:
     completion_tokens = usage_data.completion_tokens or 0
     cache_read_input_tokens = 0
     if (
-        usage_data.prompt_tokens_details
-        and usage_data.prompt_tokens_details.cached_tokens
+        hasattr(usage_data, "prompt_tokens_details")
+        and usage_data.prompt_tokens_details
+        and hasattr(usage_data.prompt_tokens_details, "cached_tokens")
+        and usage_data.prompt_tokens_details.cached_tokens is not None
     ):
         cache_read_input_tokens = usage_data.prompt_tokens_details.cached_tokens
     cache_creation_input_tokens = 0  # Groq doesn't have cache creation tokens

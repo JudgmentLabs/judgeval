@@ -106,10 +106,17 @@ def _extract_together_content(chunk: TogetherStreamChunk) -> str:
     return ""
 
 
-def _extract_together_tokens(usage_data: TogetherUsage) -> Tuple[int, int]:
+def _extract_together_tokens(usage_data: TogetherUsage) -> Tuple[int, int, int, int]:
     prompt_tokens = usage_data.prompt_tokens or 0
     completion_tokens = usage_data.completion_tokens or 0
-    return prompt_tokens, completion_tokens
+    cache_read_input_tokens = 0  # Together doesn't support cache tokens
+    cache_creation_input_tokens = 0  # Together doesn't support cache tokens
+    return (
+        prompt_tokens,
+        completion_tokens,
+        cache_read_input_tokens,
+        cache_creation_input_tokens,
+    )
 
 
 def _format_together_output(
@@ -155,7 +162,12 @@ class TracedTogetherGenerator:
             if content:
                 self.accumulated_content += content
             if chunk.usage:
-                prompt_tokens, completion_tokens = _extract_together_tokens(chunk.usage)
+                (
+                    prompt_tokens,
+                    completion_tokens,
+                    cache_read,
+                    cache_creation,
+                ) = _extract_together_tokens(chunk.usage)
                 set_span_attribute(
                     self.span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
                 )
@@ -163,6 +175,11 @@ class TracedTogetherGenerator:
                     self.span,
                     AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
                     completion_tokens,
+                )
+                set_span_attribute(
+                    self.span,
+                    AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+                    cache_read,
                 )
                 set_span_attribute(
                     self.span,
@@ -209,7 +226,12 @@ class TracedTogetherAsyncGenerator:
             if content:
                 self.accumulated_content += content
             if chunk.usage:
-                prompt_tokens, completion_tokens = _extract_together_tokens(chunk.usage)
+                (
+                    prompt_tokens,
+                    completion_tokens,
+                    cache_read,
+                    cache_creation,
+                ) = _extract_together_tokens(chunk.usage)
                 set_span_attribute(
                     self.span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
                 )
@@ -217,6 +239,11 @@ class TracedTogetherAsyncGenerator:
                     self.span,
                     AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
                     completion_tokens,
+                )
+                set_span_attribute(
+                    self.span,
+                    AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+                    cache_read,
                 )
                 set_span_attribute(
                     self.span,
@@ -277,9 +304,12 @@ def wrap_together_client(
                             span, AttributeKeys.GEN_AI_COMPLETION, output
                         )
                         if usage_data:
-                            prompt_tokens, completion_tokens = _extract_together_tokens(
-                                usage_data
-                            )
+                            (
+                                prompt_tokens,
+                                completion_tokens,
+                                cache_read,
+                                cache_creation,
+                            ) = _extract_together_tokens(usage_data)
                             set_span_attribute(
                                 span,
                                 AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
@@ -289,6 +319,11 @@ def wrap_together_client(
                                 span,
                                 AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
                                 completion_tokens,
+                            )
+                            set_span_attribute(
+                                span,
+                                AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+                                cache_read,
                             )
                             set_span_attribute(
                                 span,
@@ -341,9 +376,12 @@ def wrap_together_client(
                             span, AttributeKeys.GEN_AI_COMPLETION, output
                         )
                         if usage_data:
-                            prompt_tokens, completion_tokens = _extract_together_tokens(
-                                usage_data
-                            )
+                            (
+                                prompt_tokens,
+                                completion_tokens,
+                                cache_read,
+                                cache_creation,
+                            ) = _extract_together_tokens(usage_data)
                             set_span_attribute(
                                 span,
                                 AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
@@ -353,6 +391,11 @@ def wrap_together_client(
                                 span,
                                 AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
                                 completion_tokens,
+                            )
+                            set_span_attribute(
+                                span,
+                                AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+                                cache_read,
                             )
                             set_span_attribute(
                                 span,
