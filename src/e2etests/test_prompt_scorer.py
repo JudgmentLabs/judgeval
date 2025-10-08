@@ -220,7 +220,7 @@ def test_trace_prompt_scorer():
         query_count += 1
         time.sleep(1)
     delete_project(project_name=project_name)
-    assert scorer_data[0].get("success")
+    assert scorer_data[0].get("scorer_success")
 
 
 def print_debug_on_failure(result) -> bool:

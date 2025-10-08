@@ -255,6 +255,10 @@ class Tracer(metaclass=SingletonMeta):
     def get_current_agent_context(self):
         return self.agent_context
 
+    def get_span_processor(self) -> JudgmentSpanProcessor:
+        """Get the internal span processor of this tracer instance."""
+        return self.judgment_processor
+
     def set_customer_id(self, customer_id: str) -> None:
         span = self.get_current_span()
         if span and span.is_recording():

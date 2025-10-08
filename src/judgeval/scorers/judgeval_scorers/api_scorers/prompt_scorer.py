@@ -20,6 +20,7 @@ def push_prompt_scorer(
     threshold: float,
     options: Optional[Dict[str, float]] = None,
     model: str = JUDGMENT_DEFAULT_GPT_MODEL,
+    description: Optional[str] = None,
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
     is_trace: bool = False,
@@ -33,6 +34,7 @@ def push_prompt_scorer(
                 "threshold": threshold,
                 "options": options,
                 "model": model,
+                "description": description,
                 "is_trace": is_trace,
             }
         )
@@ -102,6 +104,7 @@ class BasePromptScorer(ABC, APIScorerConfig):
     score_type: APIScorerType
     prompt: str
     options: Optional[Dict[str, float]] = None
+    description: Optional[str] = None
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or ""
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or ""
 
@@ -130,6 +133,7 @@ class BasePromptScorer(ABC, APIScorerConfig):
             threshold=scorer_config["threshold"],
             options=scorer_config.get("options"),
             model=scorer_config.get("model"),
+            description=scorer_config.get("description"),
             judgment_api_key=judgment_api_key,
             organization_id=organization_id,
         )
@@ -142,6 +146,7 @@ class BasePromptScorer(ABC, APIScorerConfig):
         threshold: float = 0.5,
         options: Optional[Dict[str, float]] = None,
         model: str = JUDGMENT_DEFAULT_GPT_MODEL,
+        description: Optional[str] = None,
         judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
         organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
     ):
@@ -158,6 +163,7 @@ class BasePromptScorer(ABC, APIScorerConfig):
                 threshold,
                 options,
                 model,
+                description,
                 judgment_api_key,
                 organization_id,
                 is_trace,
@@ -170,6 +176,7 @@ class BasePromptScorer(ABC, APIScorerConfig):
                 threshold=threshold,
                 options=options,
                 model=model,
+                description=description,
                 judgment_api_key=judgment_api_key,
                 organization_id=organization_id,
             )
@@ -215,6 +222,14 @@ class BasePromptScorer(ABC, APIScorerConfig):
         self.push_prompt_scorer()
         judgeval_logger.info(f"Successfully updated options for {self.name}")
 
+    def set_description(self, description: Optional[str]):
+        """
+        Updates the description of the scorer.
+        """
+        self.description = description
+        self.push_prompt_scorer()
+        judgeval_logger.info(f"Successfully updated description for {self.name}")
+
     def append_to_prompt(self, prompt_addition: str):
         """
         Appends a string to the prompt.
@@ -248,7 +263,13 @@ class BasePromptScorer(ABC, APIScorerConfig):
         """
         return copy(self.options) if self.options is not None else None
 
-    def get_name(self) -> str | None:
+    def get_description(self) -> str | None:
+        """
+        Returns the description of the scorer.
+        """
+        return self.description
+
+    def get_name(self) -> str:
         """
         Returns the name of the scorer.
         """
@@ -264,6 +285,7 @@ class BasePromptScorer(ABC, APIScorerConfig):
             "prompt": self.prompt,
             "threshold": self.threshold,
             "options": self.options,
+            "description": self.description,
         }
 
     def push_prompt_scorer(self):
@@ -276,13 +298,14 @@ class BasePromptScorer(ABC, APIScorerConfig):
             self.threshold,
             self.options,
             self.model,
+            self.description,
             self.judgment_api_key,
             self.organization_id,
             isinstance(self, TracePromptScorer),
         )
 
     def __str__(self):
-        return f"PromptScorer(name={self.name}, model={self.model}, prompt={self.prompt}, threshold={self.threshold}, options={self.options})"
+        return f"PromptScorer(name={self.name}, model={self.model}, prompt={self.prompt}, threshold={self.threshold}, options={self.options}, description={self.description})"
 
     def model_dump(self, *args, **kwargs) -> Dict[str, Any]:
         base = super().model_dump(*args, **kwargs)
