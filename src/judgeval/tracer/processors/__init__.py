@@ -10,7 +10,7 @@ from opentelemetry.sdk.trace.export import (
 from judgeval.tracer.exporters import JudgmentSpanExporter
 from judgeval.tracer.keys import AttributeKeys, InternalAttributeKeys, ResourceKeys
 from judgeval.utils.url import url_for
-from judgeval.utils.decorators import dont_throw
+from judgeval.utils.decorators.dont_throw import dont_throw
 from judgeval.version import get_version
 
 if TYPE_CHECKING:

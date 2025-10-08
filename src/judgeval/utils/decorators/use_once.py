@@ -11,14 +11,3 @@ def use_once(func: Callable[..., T]) -> Callable[..., T]:
         return func(*args, **kwargs)
 
     return wrapper
-
-
-def dont_throw(func: Callable[..., T]) -> Callable[..., T | None]:
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except Exception:
-            pass
-
-    return wrapper
