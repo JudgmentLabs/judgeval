@@ -1,5 +1,6 @@
 from __future__ import annotations
 import functools
+import orjson
 from typing import (
     TYPE_CHECKING,
     Optional,
@@ -193,8 +194,8 @@ def _extract_openai_tokens(usage_data: OpenAIUnifiedUsage) -> Tuple[int, int, in
 
 def _format_openai_output(
     response: OpenAIResponseType,
-) -> Tuple[Optional[str], Optional[OpenAIUnifiedUsage]]:
-    message_content: Optional[str] = None
+) -> Tuple[Optional[Union[str, list]], Optional[OpenAIUnifiedUsage]]:
+    message_content: Optional[Union[str, list]] = None
     usage_data: Optional[OpenAIUnifiedUsage] = None
 
     try:
@@ -204,30 +205,43 @@ def _format_openai_output(
                 output0 = response.output[0]
                 if output0.content and len(output0.content) > 0:
                     try:
-                        content_parts = []
+                        content_blocks = []
                         for seg in output0.content:
-                            if hasattr(seg, "text") and seg.text:
-                                content_parts.append(seg.text)
-                            elif hasattr(seg, "type"):
-                                # Handle different content types safely
-                                if seg.type == "text" and hasattr(seg, "text"):
-                                    content_parts.append(seg.text)
-                                elif seg.type == "function_call":
-                                    # Handle function calls
-                                    func_info = {
+                            if hasattr(seg, "type"):
+                                seg_type = getattr(seg, "type", None)
+                                if seg_type == "text" and hasattr(seg, "text"):
+                                    block_data = {
+                                        "type": "text",
+                                        "text": getattr(seg, "text", ""),
+                                    }
+                                elif seg_type == "function_call":
+                                    block_data = {
                                         "type": "function_call",
                                         "name": getattr(seg, "name", None),
                                         "call_id": getattr(seg, "call_id", None),
                                         "arguments": getattr(seg, "arguments", None),
                                     }
-                                    content_parts.append(
-                                        f"[FUNCTION_CALL: {func_info}]"
-                                    )
-                                # Add other content type handling as needed
+                                else:
+                                    # Handle unknown types
+                                    block_data = {"type": seg_type}
+                                    for attr in [
+                                        "text",
+                                        "name",
+                                        "call_id",
+                                        "arguments",
+                                        "content",
+                                    ]:
+                                        if hasattr(seg, attr):
+                                            block_data[attr] = getattr(seg, attr)
+                                content_blocks.append(block_data)
+                            elif hasattr(seg, "text") and seg.text:
+                                # Fallback for segments without type
+                                content_blocks.append(
+                                    {"type": "text", "text": seg.text}
+                                )
+
                         message_content = (
-                            "\n".join(content_parts)
-                            if content_parts
-                            else str(output0.content)
+                            content_blocks if content_blocks else str(output0.content)
                         )
                     except (TypeError, AttributeError):
                         message_content = str(output0.content)
@@ -240,18 +254,22 @@ def _format_openai_output(
                     hasattr(message, "parsed")
                     and getattr(message, "parsed", None) is not None
                 ):
-                    message_content = str(getattr(message, "parsed"))
+                    # For parsed responses, return as structured data
+                    parsed_data = getattr(message, "parsed")
+                    message_content = [{"type": "parsed", "content": parsed_data}]
                 else:
-                    content_parts = []
+                    content_blocks = []
 
                     # Handle regular content
                     if hasattr(message, "content") and message.content:
-                        content_parts.append(str(message.content))
+                        content_blocks.append(
+                            {"type": "text", "text": str(message.content)}
+                        )
 
                     # Handle tool calls (standard Chat Completions API)
                     if hasattr(message, "tool_calls") and message.tool_calls:
                         for tool_call in message.tool_calls:
-                            tool_info = {
+                            tool_call_data = {
                                 "type": "tool_call",
                                 "id": getattr(tool_call, "id", None),
                                 "function": {
@@ -265,11 +283,9 @@ def _format_openai_output(
                                     else None,
                                 },
                             }
-                            content_parts.append(f"[TOOL_CALL: {tool_info}]")
+                            content_blocks.append(tool_call_data)
 
-                    message_content = (
-                        "\n".join(content_parts) if content_parts else None
-                    )
+                    message_content = content_blocks if content_blocks else None
     except (AttributeError, IndexError, TypeError):
         pass
 
@@ -452,8 +468,15 @@ def wrap_openai_client(tracer: Tracer, client: TClient) -> TClient:
 
                     if isinstance(response, (OpenAIChatCompletionBase, OpenAIResponse)):
                         output, usage_data = _format_openai_output(response)
+                        # Serialize structured data to JSON for span attribute
+                        if isinstance(output, list):
+                            output_str = orjson.dumps(
+                                output, option=orjson.OPT_INDENT_2
+                            ).decode()
+                        else:
+                            output_str = str(output) if output is not None else None
                         set_span_attribute(
-                            span, AttributeKeys.GEN_AI_COMPLETION, output
+                            span, AttributeKeys.GEN_AI_COMPLETION, output_str
                         )
                         if usage_data:
                             (
@@ -529,8 +552,15 @@ def wrap_openai_client(tracer: Tracer, client: TClient) -> TClient:
 
                     if isinstance(response, (OpenAIChatCompletionBase, OpenAIResponse)):
                         output, usage_data = _format_openai_output(response)
+                        # Serialize structured data to JSON for span attribute
+                        if isinstance(output, list):
+                            output_str = orjson.dumps(
+                                output, option=orjson.OPT_INDENT_2
+                            ).decode()
+                        else:
+                            output_str = str(output) if output is not None else None
                         set_span_attribute(
-                            span, AttributeKeys.GEN_AI_COMPLETION, output
+                            span, AttributeKeys.GEN_AI_COMPLETION, output_str
                         )
                         if usage_data:
                             (

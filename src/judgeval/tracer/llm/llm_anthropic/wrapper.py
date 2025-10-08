@@ -1,5 +1,6 @@
 from __future__ import annotations
 import functools
+import orjson
 from typing import (
     TYPE_CHECKING,
     Callable,
@@ -136,21 +137,52 @@ def _format_anthropic_output(
         if isinstance(response, AnthropicMessage):
             usage_data = response.usage
             if response.content:
-                content_parts = []
+                content_blocks = []
                 for block in response.content:
                     if isinstance(block, AnthropicContentBlock):
                         block_type = getattr(block, "type", None)
                         if block_type == "text":
-                            content_parts.append(getattr(block, "text", ""))
+                            block_data = {
+                                "type": "text",
+                                "text": getattr(block, "text", ""),
+                            }
+                            # Add citations if present
+                            if hasattr(block, "citations"):
+                                block_data["citations"] = getattr(
+                                    block, "citations", None
+                                )
                         elif block_type == "tool_use":
-                            tool_info = {
+                            block_data = {
                                 "type": "tool_use",
                                 "id": getattr(block, "id", None),
                                 "name": getattr(block, "name", None),
                                 "input": getattr(block, "input", None),
                             }
-                            content_parts.append(f"[TOOL_USE: {tool_info}]")
-                message_content = "\n".join(content_parts) if content_parts else None
+                        elif block_type == "tool_result":
+                            block_data = {
+                                "type": "tool_result",
+                                "tool_use_id": getattr(block, "tool_use_id", None),
+                                "content": getattr(block, "content", None),
+                            }
+                        else:
+                            # Handle unknown block types
+                            block_data = {"type": block_type}
+                            for attr in [
+                                "id",
+                                "text",
+                                "name",
+                                "input",
+                                "content",
+                                "tool_use_id",
+                                "citations",
+                            ]:
+                                if hasattr(block, attr):
+                                    block_data[attr] = getattr(block, attr)
+
+                        content_blocks.append(block_data)
+
+                # Return structured data instead of string
+                message_content = content_blocks if content_blocks else None
     except (AttributeError, IndexError, TypeError):
         pass
 
@@ -380,8 +412,15 @@ def wrap_anthropic_client(
 
                     if isinstance(response, AnthropicMessage):
                         output, usage_data = _format_anthropic_output(response)
+                        # Serialize structured data to JSON for span attribute
+                        if isinstance(output, list):
+                            output_str = orjson.dumps(
+                                output, option=orjson.OPT_INDENT_2
+                            ).decode()
+                        else:
+                            output_str = str(output) if output is not None else None
                         set_span_attribute(
-                            span, AttributeKeys.GEN_AI_COMPLETION, output
+                            span, AttributeKeys.GEN_AI_COMPLETION, output_str
                         )
 
                         if usage_data:
@@ -459,8 +498,15 @@ def wrap_anthropic_client(
 
                     if isinstance(response, AnthropicMessage):
                         output, usage_data = _format_anthropic_output(response)
+                        # Serialize structured data to JSON for span attribute
+                        if isinstance(output, list):
+                            output_str = orjson.dumps(
+                                output, option=orjson.OPT_INDENT_2
+                            ).decode()
+                        else:
+                            output_str = str(output) if output is not None else None
                         set_span_attribute(
-                            span, AttributeKeys.GEN_AI_COMPLETION, output
+                            span, AttributeKeys.GEN_AI_COMPLETION, output_str
                         )
 
                         if usage_data:
