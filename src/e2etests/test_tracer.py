@@ -347,7 +347,6 @@ def retrieve_llm_cost_helper(trace_id):
         span_attrs = span.get("span_attributes", {})
         if isinstance(span_attrs, str):
             span_attrs = orjson.loads(span_attrs)
-        print(span_attrs)
         llm_cost = span_attrs.get("gen_ai.usage.total_cost_usd", 0)
         total_llm_cost += llm_cost
 
@@ -503,7 +502,6 @@ def test_online_span_scoring():
         query_count += 1
         time.sleep(1)
 
-    print(scorer_data)
     if query_count == QUERY_RETRY:
         assert False, "No score found"
 

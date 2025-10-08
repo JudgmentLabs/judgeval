@@ -300,16 +300,28 @@ def wrap_groq_client(tracer: Tracer, client: GroqClientType) -> GroqClientType:
                         span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
                     )
                     model_name = kwargs.get("model", "")
+                    # Add groq/ prefix for server-side cost calculation
+                    prefixed_model_name = f"groq/{model_name}" if model_name else ""
                     set_span_attribute(
-                        span, AttributeKeys.GEN_AI_REQUEST_MODEL, model_name
+                        span, AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
                     )
                     response = function(*args, **kwargs)
 
                     if isinstance(response, GroqChatCompletion):
                         output, usage_data = _format_groq_output(response)
-                        set_span_attribute(
-                            span, AttributeKeys.GEN_AI_COMPLETION, output
-                        )
+                        # Serialize structured data to JSON for span attribute
+                        if output:
+                            if isinstance(output, list):
+                                import orjson
+
+                                output_str = orjson.dumps(
+                                    output, option=orjson.OPT_INDENT_2
+                                ).decode()
+                            else:
+                                output_str = str(output)
+                            set_span_attribute(
+                                span, AttributeKeys.GEN_AI_COMPLETION, output_str
+                            )
                         if usage_data:
                             (
                                 prompt_tokens,
@@ -337,10 +349,15 @@ def wrap_groq_client(tracer: Tracer, client: GroqClientType) -> GroqClientType:
                                 AttributeKeys.JUDGMENT_USAGE_METADATA,
                                 safe_serialize(usage_data),
                             )
+                        # Add groq/ prefix to response model for server-side cost calculation
+                        response_model = getattr(response, "model", model_name)
+                        prefixed_response_model = (
+                            f"groq/{response_model}" if response_model else ""
+                        )
                         set_span_attribute(
                             span,
                             AttributeKeys.GEN_AI_RESPONSE_MODEL,
-                            getattr(response, "model", model_name),
+                            prefixed_response_model,
                         )
                     return response
 
@@ -358,7 +375,11 @@ def wrap_groq_client(tracer: Tracer, client: GroqClientType) -> GroqClientType:
                     span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
                 )
                 model_name = kwargs.get("model", "")
-                set_span_attribute(span, AttributeKeys.GEN_AI_REQUEST_MODEL, model_name)
+                # Add groq/ prefix for server-side cost calculation
+                prefixed_model_name = f"groq/{model_name}" if model_name else ""
+                set_span_attribute(
+                    span, AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
+                )
                 stream_response = await function(*args, **kwargs)
                 return TracedGroqAsyncGenerator(
                     tracer, stream_response, client, span, model_name
@@ -372,16 +393,28 @@ def wrap_groq_client(tracer: Tracer, client: GroqClientType) -> GroqClientType:
                         span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
                     )
                     model_name = kwargs.get("model", "")
+                    # Add groq/ prefix for server-side cost calculation
+                    prefixed_model_name = f"groq/{model_name}" if model_name else ""
                     set_span_attribute(
-                        span, AttributeKeys.GEN_AI_REQUEST_MODEL, model_name
+                        span, AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
                     )
                     response = await function(*args, **kwargs)
 
                     if isinstance(response, GroqChatCompletion):
                         output, usage_data = _format_groq_output(response)
-                        set_span_attribute(
-                            span, AttributeKeys.GEN_AI_COMPLETION, output
-                        )
+                        # Serialize structured data to JSON for span attribute
+                        if output:
+                            if isinstance(output, list):
+                                import orjson
+
+                                output_str = orjson.dumps(
+                                    output, option=orjson.OPT_INDENT_2
+                                ).decode()
+                            else:
+                                output_str = str(output)
+                            set_span_attribute(
+                                span, AttributeKeys.GEN_AI_COMPLETION, output_str
+                            )
                         if usage_data:
                             (
                                 prompt_tokens,
@@ -409,10 +442,15 @@ def wrap_groq_client(tracer: Tracer, client: GroqClientType) -> GroqClientType:
                                 AttributeKeys.JUDGMENT_USAGE_METADATA,
                                 safe_serialize(usage_data),
                             )
+                        # Add groq/ prefix to response model for server-side cost calculation
+                        response_model = getattr(response, "model", model_name)
+                        prefixed_response_model = (
+                            f"groq/{response_model}" if response_model else ""
+                        )
                         set_span_attribute(
                             span,
                             AttributeKeys.GEN_AI_RESPONSE_MODEL,
-                            getattr(response, "model", model_name),
+                            prefixed_response_model,
                         )
                     return response
 
