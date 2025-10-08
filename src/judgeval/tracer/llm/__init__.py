@@ -428,10 +428,11 @@ def _format_anthropic_output(
     if hasattr(response, "content") and response.content:
         content_parts = []
         for content_block in response.content:
-            if hasattr(content_block, "text"):
+            block_type = getattr(content_block, "type", None)
+            if block_type == "text":
                 # Text content block
-                content_parts.append(content_block.text)
-            elif hasattr(content_block, "type") and content_block.type == "tool_use":
+                content_parts.append(getattr(content_block, "text", ""))
+            elif block_type == "tool_use":
                 # Tool use block - serialize the tool call information
                 tool_info = {
                     "type": "tool_use",
