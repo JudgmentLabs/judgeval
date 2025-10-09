@@ -27,10 +27,9 @@ if TYPE_CHECKING:
     from judgeval.tracer import Tracer
     from opentelemetry.trace import Span
 
-from anthropic import Anthropic, AsyncAnthropic
 
 # Keep the original client type for runtime compatibility
-AnthropicClientType = Union[Anthropic, AsyncAnthropic]
+AnthropicClientType = Union[anthropic_Anthropic, anthropic_AsyncAnthropic]
 
 
 # Content block protocols
