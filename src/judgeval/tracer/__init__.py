@@ -159,10 +159,9 @@ class Tracer(metaclass=SingletonMeta):
 
         self.judgment_processor = NoOpJudgmentSpanProcessor()
         if self.enable_monitoring:
-            results = Tracer._resolve_project_id(
+            project_id, project_created = Tracer._resolve_project_id(
                 self.project_name, self.api_key, self.organization_id
-            )
-            project_id, project_created = results if results else (None, False)
+            ) or (None, False)
             if project_id:
                 if project_created:
                     judgeval_logger.info(
@@ -241,7 +240,7 @@ class Tracer(metaclass=SingletonMeta):
     @staticmethod
     def _resolve_project_id(
         project_name: str, api_key: str, organization_id: str
-    ) -> Tuple[str | None, bool]:
+    ) -> Tuple[str, bool]:
         """Resolve project_id from project_name using the API."""
         client = JudgmentSyncClient(
             api_key=api_key,
