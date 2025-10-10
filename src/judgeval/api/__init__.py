@@ -73,7 +73,7 @@ class JudgmentSyncClient:
 
     def evaluate_examples(
         self, payload: ExampleEvaluationRun, stream: Optional[str] = None
-    ) -> Any:
+    ) -> EvaluateResponse:
         query_params = {}
         if stream is not None:
             query_params["stream"] = stream
@@ -86,7 +86,7 @@ class JudgmentSyncClient:
 
     def evaluate_traces(
         self, payload: TraceEvaluationRun, stream: Optional[str] = None
-    ) -> Any:
+    ) -> EvaluateResponse:
         query_params = {}
         if stream is not None:
             query_params["stream"] = stream
@@ -212,13 +212,6 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def e2e_fetch_trace_scorer_span_score(self, payload: SpanScoreRequest) -> Any:
-        return self._request(
-            "POST",
-            url_for("/e2e_fetch_trace_scorer_span_score/"),
-            payload,
-        )
-
 
 class JudgmentAsyncClient:
     __slots__ = ("api_key", "organization_id", "client")
@@ -270,7 +263,7 @@ class JudgmentAsyncClient:
 
     async def evaluate_examples(
         self, payload: ExampleEvaluationRun, stream: Optional[str] = None
-    ) -> Any:
+    ) -> EvaluateResponse:
         query_params = {}
         if stream is not None:
             query_params["stream"] = stream
@@ -283,7 +276,7 @@ class JudgmentAsyncClient:
 
     async def evaluate_traces(
         self, payload: TraceEvaluationRun, stream: Optional[str] = None
-    ) -> Any:
+    ) -> EvaluateResponse:
         query_params = {}
         if stream is not None:
             query_params["stream"] = stream
@@ -408,13 +401,6 @@ class JudgmentAsyncClient:
         return await self._request(
             "POST",
             url_for("/e2e_fetch_span_score/"),
-            payload,
-        )
-
-    async def e2e_fetch_trace_scorer_span_score(self, payload: SpanScoreRequest) -> Any:
-        return await self._request(
-            "POST",
-            url_for("/e2e_fetch_trace_scorer_span_score/"),
             payload,
         )
 

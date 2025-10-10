@@ -55,7 +55,7 @@ from judgeval.tracer.managers import (
     sync_agent_context,
     async_agent_context,
 )
-from judgeval.utils.decorators import dont_throw
+from judgeval.utils.decorators.dont_throw import dont_throw
 from judgeval.utils.guards import expect_api_key, expect_organization_id
 from judgeval.utils.serialize import safe_serialize
 from judgeval.utils.meta import SingletonMeta
@@ -159,11 +159,14 @@ class Tracer(metaclass=SingletonMeta):
 
         self.judgment_processor = NoOpJudgmentSpanProcessor()
         if self.enable_monitoring:
-            project_id = Tracer._resolve_project_id(
+            project_id, project_created = Tracer._resolve_project_id(
                 self.project_name, self.api_key, self.organization_id
-            )
-
+            ) or (None, False)
             if project_id:
+                if project_created:
+                    judgeval_logger.info(
+                        f"Project {self.project_name} was autocreated successfully."
+                    )
                 self.judgment_processor = self.get_processor(
                     tracer=self,
                     project_name=self.project_name,
@@ -179,7 +182,7 @@ class Tracer(metaclass=SingletonMeta):
                 set_tracer_provider(provider)
             else:
                 judgeval_logger.error(
-                    f"Failed to resolve project {self.project_name}, please create it first at https://app.judgmentlabs.ai/org/{self.organization_id}/projects. Skipping Judgment export."
+                    f"Failed to resolve or autocreate project {self.project_name}, please create it first at https://app.judgmentlabs.ai/org/{self.organization_id}/projects. Skipping Judgment export."
                 )
 
         self.tracer = get_tracer_provider().get_tracer(
@@ -237,14 +240,14 @@ class Tracer(metaclass=SingletonMeta):
     @staticmethod
     def _resolve_project_id(
         project_name: str, api_key: str, organization_id: str
-    ) -> str | None:
+    ) -> Tuple[str, bool]:
         """Resolve project_id from project_name using the API."""
         client = JudgmentSyncClient(
             api_key=api_key,
             organization_id=organization_id,
         )
         response = client.projects_resolve({"project_name": project_name})
-        return response["project_id"]
+        return response["project_id"], response["project_created"]
 
     def get_current_span(self):
         return get_current_span()
