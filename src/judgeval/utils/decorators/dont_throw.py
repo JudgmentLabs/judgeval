@@ -13,7 +13,7 @@ def dont_throw(func: Callable[..., T]) -> Callable[..., T | None]:
         try:
             return func(*args, **kwargs)
         except Exception as e:
-            judgeval_logger.debug(
+            judgeval_logger.warning(
                 f"An exception was raised in {func.__name__}", exc_info=e
             )
             pass
