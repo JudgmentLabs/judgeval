@@ -11,7 +11,6 @@ try:
     anthropic_AsyncAnthropic = AsyncAnthropic
     HAS_ANTHROPIC = True
 except ImportError:
-    Anthropic = AsyncAnthropic = None  # type: ignore[misc,assignment]
     pass
 
 __all__ = [
