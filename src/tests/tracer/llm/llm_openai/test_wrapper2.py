@@ -7,11 +7,11 @@ pytest.importorskip("openai")
 from openai import OpenAI, AsyncOpenAI
 from opentelemetry.context import Context
 from opentelemetry.sdk.trace import ReadableSpan, Span
-from judgeval.tracer.llm.llm_openai.wrapper2 import (
+from judgeval.tracer.llm.llm_openai.wrapper2 import (  # type: ignore
     wrap_openai_client_sync,
     wrap_openai_client_async,
 )
-from judgeval.tracer.keys import AttributeKeys
+from judgeval.tracer.keys import AttributeKeys  # type: ignore
 
 
 class MockSpanProcessor:
@@ -65,8 +65,8 @@ def tracer(mock_processor):
     """Minimal tracer with local OpenTelemetry only - no API, no project creation"""
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.trace import set_tracer_provider
-    from judgeval.tracer.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
-    from judgeval.version import get_version
+    from judgeval.tracer.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME  # type: ignore
+    from judgeval.version import get_version  # type: ignore
 
     # Set up minimal TracerProvider with mock processor
     provider = TracerProvider()
@@ -121,7 +121,7 @@ class TestSyncWrapper:
         response = wrapped_sync_client.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Say 'test' and nothing else"}],
-            max_completion_tokens=512,
+            max_completion_tokens=1000,
         )
 
         assert response is not None
@@ -157,7 +157,7 @@ class TestSyncWrapper:
                 {"role": "user", "content": "Say the word 'test' in JSON format"}
             ],
             response_format=TestResponse,
-            max_completion_tokens=512,
+            max_completion_tokens=1000,
         )
 
         assert response is not None
@@ -172,13 +172,13 @@ class TestSyncWrapper:
         response1 = wrapped_sync_client.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Say 'first'"}],
-            max_completion_tokens=512,
+            max_completion_tokens=1000,
         )
 
         response2 = wrapped_sync_client.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Say 'second'"}],
-            max_completion_tokens=512,
+            max_completion_tokens=1000,
         )
 
         assert response1 is not None
@@ -193,7 +193,7 @@ class TestAsyncWrapper:
         response = await wrapped_async_client.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Say 'test' and nothing else"}],
-            max_completion_tokens=512,
+            max_completion_tokens=1000,
         )
 
         assert response is not None
@@ -231,7 +231,7 @@ class TestAsyncWrapper:
                 {"role": "user", "content": "Say the word 'test' in JSON format"}
             ],
             response_format=TestResponse,
-            max_completion_tokens=512,
+            max_completion_tokens=1000,
         )
 
         assert response is not None
@@ -247,13 +247,13 @@ class TestAsyncWrapper:
         response1 = await wrapped_async_client.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Say 'first'"}],
-            max_completion_tokens=512,
+            max_completion_tokens=1000,
         )
 
         response2 = await wrapped_async_client.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Say 'second'"}],
-            max_completion_tokens=512,
+            max_completion_tokens=1000,
         )
 
         assert response1 is not None
@@ -267,7 +267,7 @@ class TestTracingIntegration:
         response = wrapped_sync_client.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Test"}],
-            max_completion_tokens=512,
+            max_completion_tokens=1000,
         )
 
         assert response is not None
@@ -278,7 +278,7 @@ class TestTracingIntegration:
         response = await wrapped_async_client.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Test"}],
-            max_completion_tokens=512,
+            max_completion_tokens=1000,
         )
 
         assert response is not None
@@ -313,7 +313,7 @@ class TestSpanAttributes:
         response = wrapped_client.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Say 'test'"}],
-            max_completion_tokens=512,
+            max_completion_tokens=1000,
         )
 
         assert response is not None
@@ -361,7 +361,7 @@ class TestSpanAttributes:
         response = await wrapped_client.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Say 'test'"}],
-            max_completion_tokens=512,
+            max_completion_tokens=1000,
         )
 
         assert response is not None
@@ -415,7 +415,7 @@ class TestSpanAttributes:
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Say 'test' in JSON"}],
             response_format=TestResponse,
-            max_completion_tokens=512,
+            max_completion_tokens=1000,
         )
 
         assert response is not None
@@ -465,13 +465,13 @@ class TestSpanAttributes:
         wrapped_client.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "First"}],
-            max_completion_tokens=512,
+            max_completion_tokens=1000,
         )
 
         wrapped_client.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Second"}],
-            max_completion_tokens=512,
+            max_completion_tokens=1000,
         )
 
         # Should have 2 new spans
