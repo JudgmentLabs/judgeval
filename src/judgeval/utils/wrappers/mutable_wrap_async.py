@@ -26,6 +26,10 @@ def _void_post_hook(ctx: Ctx, result: Any) -> None:
     pass
 
 
+def _identity_mutate_hook(ctx: Ctx, result: R) -> R:
+    return result
+
+
 def _void_error_hook(ctx: Ctx, error: Exception) -> None:
     pass
 
@@ -34,24 +38,26 @@ def _void_finally_hook(ctx: Ctx) -> None:
     pass
 
 
-def immutable_wrap_async(
+def mutable_wrap_async(
     func: Callable[P, Awaitable[R]],
     /,
     *,
     pre_hook: Callable[Concatenate[Ctx, P], None] = _void_pre_hook,
     post_hook: Callable[[Ctx, R], None] = _void_post_hook,
+    mutate_hook: Callable[[Ctx, R], R] = _identity_mutate_hook,
     error_hook: Callable[[Ctx, Exception], None] = _void_error_hook,
     finally_hook: Callable[[Ctx], None] = _void_finally_hook,
 ) -> Callable[P, Awaitable[R]]:
     """
-    Wraps an async function with lifecycle hooks.
+    Wraps an async function with lifecycle hooks that can mutate the result.
 
     - pre_hook: called before func with (ctx, *args, **kwargs) matching func's signature
     - post_hook: called after successful func execution with (ctx, result)
+    - mutate_hook: called after post_hook with (ctx, result), returns potentially modified result
     - error_hook: called if func raises an exception with (ctx, error)
     - finally_hook: called in finally block with (ctx)
 
-    The wrapped function's result is returned unchanged, and exceptions are re-raised.
+    The mutate_hook can transform the result before it's returned. Exceptions are re-raised.
     """
 
     pre_hook = dont_throw(pre_hook)
@@ -66,7 +72,10 @@ def immutable_wrap_async(
         try:
             result = await func(*args, **kwargs)
             post_hook(ctx, result)
-            return result
+            try:
+                return mutate_hook(ctx, result)
+            except Exception:
+                return result
         except Exception as e:
             error_hook(ctx, e)
             raise

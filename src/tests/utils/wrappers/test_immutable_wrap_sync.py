@@ -19,7 +19,7 @@ def test_pre_hook_populates_context():
     """Test that pre_hook can populate context dict."""
     captured_ctx = {}
 
-    def pre(ctx: Dict[str, Any]) -> None:
+    def pre(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
         ctx["called"] = True
         ctx["value"] = 42
 
@@ -56,7 +56,7 @@ def test_post_hook_receives_result():
 def test_post_hook_reads_pre_hook_context():
     """Test that post_hook can read what pre_hook set in context."""
 
-    def pre(ctx: Dict[str, Any]) -> None:
+    def pre(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
         ctx["start"] = "beginning"
 
     captured_start = None
@@ -152,7 +152,7 @@ def test_multiple_calls_isolated_contexts():
     """Test that each call gets its own isolated context."""
     call_count = []
 
-    def pre(ctx: Dict[str, Any]) -> None:
+    def pre(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
         ctx["id"] = len(call_count)
         call_count.append(ctx["id"])
 
@@ -187,7 +187,7 @@ def test_with_args_and_kwargs():
 def test_context_immutability_in_post_hook():
     """Test that post_hook receives context as Mapping (readonly interface)."""
 
-    def pre(ctx: Dict[str, Any]) -> None:
+    def pre(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
         ctx["value"] = 10
 
     def post(ctx: Mapping[str, Any], result: Any) -> None:
@@ -252,7 +252,7 @@ def test_finally_hook_always_called():
 def test_error_hook_receives_context_from_pre_hook():
     """Test that error_hook can access context set by pre_hook."""
 
-    def pre(ctx: Dict[str, Any]) -> None:
+    def pre(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
         ctx["request_id"] = "12345"
 
     captured_ctx = {}
@@ -274,7 +274,7 @@ def test_error_hook_receives_context_from_pre_hook():
 def test_finally_hook_receives_context():
     """Test that finally_hook receives context from pre_hook."""
 
-    def pre(ctx: Dict[str, Any]) -> None:
+    def pre(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
         ctx["setup"] = True
 
     captured_ctx = {}
@@ -313,7 +313,7 @@ def test_complete_lifecycle_success():
     """Test all hooks are called in correct order on success."""
     lifecycle = []
 
-    def pre(ctx: Dict[str, Any]) -> None:
+    def pre(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
         lifecycle.append("pre")
         ctx["value"] = 1
 
@@ -347,7 +347,7 @@ def test_complete_lifecycle_error():
     """Test all hooks are called in correct order on error."""
     lifecycle = []
 
-    def pre(ctx: Dict[str, Any]) -> None:
+    def pre(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
         lifecycle.append("pre")
 
     def post(ctx: Mapping[str, Any], result: Any) -> None:

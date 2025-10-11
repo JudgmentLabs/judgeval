@@ -7,9 +7,9 @@ from typing import (
     Dict,
     Mapping,
     ParamSpec,
-    TypeAlias,
     Generator,
     cast,
+    Concatenate,
 )
 
 from judgeval.utils.decorators.dont_throw import dont_throw
@@ -18,27 +18,27 @@ P = ParamSpec("P")
 Y = TypeVar("Y")
 S = TypeVar("S")
 R = TypeVar("R")
-Ctx: TypeAlias = Dict[str, Any]
-ImmCtx: TypeAlias = Mapping[str, Any]
+Ctx = Dict[str, Any]
+ImmCtx = Mapping[str, Any]
 
 
-def _void_pre_hook(ctx: Ctx) -> None:
+def _void_pre_hook(ctx: Ctx, *args: Any, **kwargs: Any) -> None:
     pass
 
 
-def _void_yield_hook(ctx: ImmCtx, value: Any) -> None:
+def _void_yield_hook(ctx: Ctx, value: Any) -> None:
     pass
 
 
-def _void_post_hook(ctx: ImmCtx, result: Any) -> None:
+def _void_post_hook(ctx: Ctx, result: Any) -> None:
     pass
 
 
-def _void_error_hook(ctx: ImmCtx, error: Exception) -> None:
+def _void_error_hook(ctx: Ctx, error: Exception) -> None:
     pass
 
 
-def _void_finally_hook(ctx: ImmCtx) -> None:
+def _void_finally_hook(ctx: Ctx) -> None:
     pass
 
 
@@ -46,20 +46,20 @@ def immutable_wrap_sync_generator(
     func: Callable[P, Generator[Y, S, R]],
     /,
     *,
-    pre_hook: Callable[[Ctx], None] = _void_pre_hook,
-    yield_hook: Callable[[ImmCtx, Y], None] = _void_yield_hook,
-    post_hook: Callable[[ImmCtx, R], None] = _void_post_hook,
-    error_hook: Callable[[ImmCtx, Exception], None] = _void_error_hook,
-    finally_hook: Callable[[ImmCtx], None] = _void_finally_hook,
+    pre_hook: Callable[Concatenate[Ctx, P], None] = _void_pre_hook,
+    yield_hook: Callable[[Ctx, Y], None] = _void_yield_hook,
+    post_hook: Callable[[Ctx, R], None] = _void_post_hook,
+    error_hook: Callable[[Ctx, Exception], None] = _void_error_hook,
+    finally_hook: Callable[[Ctx], None] = _void_finally_hook,
 ) -> Callable[P, Generator[Y, S, R]]:
     """
-    Wraps a generator function with lifecycle hooks. Hooks MUST NOT mutate yielded values.
+    Wraps a generator function with lifecycle hooks.
 
-    - pre_hook: called when generator function is invoked (before first yield)
-    - yield_hook: called after each yield with readonly context and yielded value
-    - post_hook: called when generator completes successfully with readonly context and return value
-    - error_hook: called if generator raises an exception with readonly context and error
-    - finally_hook: called when generator closes, always executes
+    - pre_hook: called when generator function is invoked with (ctx, *args, **kwargs) matching func's signature
+    - yield_hook: called after each yield with (ctx, yielded_value)
+    - post_hook: called when generator completes successfully with (ctx, return_value)
+    - error_hook: called if generator raises an exception with (ctx, error)
+    - finally_hook: called when generator closes with (ctx)
 
     The wrapped generator yields values unchanged, and exceptions are re-raised.
     """
@@ -73,7 +73,7 @@ def immutable_wrap_sync_generator(
     @wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> Generator[Y, S, R]:
         ctx: Ctx = {}
-        pre_hook(ctx)
+        pre_hook(ctx, *args, **kwargs)
         try:
             gen = func(*args, **kwargs)
             sent_value = cast(S, None)

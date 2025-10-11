@@ -204,7 +204,7 @@ async def test_multiple_calls_isolated_contexts():
     """Test that each async generator call gets its own isolated context."""
     call_count = []
 
-    def pre(ctx: Dict[str, Any]) -> None:
+    def pre(ctx: Dict[str, Any], i: int) -> None:
         ctx["id"] = len(call_count)
         call_count.append(ctx["id"])
 
