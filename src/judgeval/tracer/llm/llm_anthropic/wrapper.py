@@ -78,8 +78,8 @@ class AnthropicAsyncClient(Protocol):
     pass
 
 
-# Generic client type bound to AnthropicClient protocol
-TClient = TypeVar("TClient", bound=AnthropicClient)
+# Generic client type bound to both sync and async client protocols
+TClient = TypeVar("TClient", bound=Union[AnthropicClient, AnthropicAsyncClient])
 
 
 # Union types

@@ -426,7 +426,7 @@ class TracedOpenAIAsyncGenerator:
             raise
 
 
-TClient = TypeVar("TClient", bound=OpenAIClient)
+TClient = TypeVar("TClient", bound=Union[OpenAIClient, OpenAIAsyncClient])
 
 
 def wrap_openai_client(tracer: Tracer, client: TClient) -> TClient:
