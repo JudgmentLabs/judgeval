@@ -6,6 +6,7 @@ from typing import (
     Callable,
     Optional,
     Protocol,
+    TypeVar,
     Tuple,
     Union,
     Iterator,
@@ -26,10 +27,6 @@ from judgeval.utils.serialize import safe_serialize
 if TYPE_CHECKING:
     from judgeval.tracer import Tracer
     from opentelemetry.trace import Span
-
-
-# Keep the original client type for runtime compatibility
-AnthropicClientType = Union[anthropic_Anthropic, anthropic_AsyncAnthropic]
 
 
 # Content block protocols
@@ -79,6 +76,10 @@ class AnthropicClient(Protocol):
 @runtime_checkable
 class AnthropicAsyncClient(Protocol):
     pass
+
+
+# Generic client type bound to AnthropicClient protocol
+TClient = TypeVar("TClient", bound=AnthropicClient)
 
 
 # Union types
@@ -193,7 +194,7 @@ class TracedAnthropicGenerator:
         self,
         tracer: Tracer,
         generator: Iterator[AnthropicStreamEvent],
-        client: AnthropicClientType,
+        client: AnthropicClient,
         span: Span,
         model_name: str,
     ):
@@ -261,7 +262,7 @@ class TracedAnthropicAsyncGenerator:
         self,
         tracer: Tracer,
         async_generator: AsyncIterator[AnthropicStreamEvent],
-        client: AnthropicClientType,
+        client: AnthropicAsyncClient,
         span: Span,
         model_name: str,
     ):
@@ -329,7 +330,7 @@ class TracedAnthropicSyncContextManager:
         self,
         tracer: Tracer,
         context_manager,
-        client: AnthropicClientType,
+        client: AnthropicClient,
         span: Span,
         model_name: str,
     ):
@@ -354,7 +355,7 @@ class TracedAnthropicAsyncContextManager:
         self,
         tracer: Tracer,
         context_manager,
-        client: AnthropicClientType,
+        client: AnthropicAsyncClient,
         span: Span,
         model_name: str,
     ):
@@ -374,9 +375,7 @@ class TracedAnthropicAsyncContextManager:
         return await self.context_manager.__aexit__(exc_type, exc_val, exc_tb)
 
 
-def wrap_anthropic_client(
-    tracer: Tracer, client: AnthropicClientType
-) -> AnthropicClientType:
+def wrap_anthropic_client(tracer: Tracer, client: TClient) -> TClient:
     def wrapped(function: Callable, span_name: str):
         @functools.wraps(function)
         def wrapper(*args, **kwargs):
@@ -590,14 +589,16 @@ def wrap_anthropic_client(
         return wrapper
 
     span_name = "ANTHROPIC_API_CALL"
-    if anthropic_Anthropic and isinstance(client, anthropic_Anthropic):
+    if anthropic_Anthropic is not None and isinstance(client, anthropic_Anthropic):
         setattr(client.messages, "create", wrapped(client.messages.create, span_name))
         setattr(
             client.messages,
             "stream",
             wrapped_sync_context_manager(client.messages.stream, span_name),
         )
-    elif anthropic_AsyncAnthropic and isinstance(client, anthropic_AsyncAnthropic):
+    elif anthropic_AsyncAnthropic is not None and isinstance(
+        client, anthropic_AsyncAnthropic
+    ):
         setattr(
             client.messages, "create", wrapped_async(client.messages.create, span_name)
         )
