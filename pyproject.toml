@@ -19,7 +19,7 @@ license-files = ["LICENSE.md"]
 dependencies = [
     "dotenv",
     "httpx>=0.28.1",
-    "litellm>=1.75.0",      
+    "litellm>=1.75.0",
     "opentelemetry-exporter-otlp>=1.36.0",
     "opentelemetry-sdk>=1.36.0",
     "orjson>=3.9.0",
