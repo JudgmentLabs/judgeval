@@ -73,7 +73,7 @@ class JudgmentSyncClient:
 
     def evaluate_examples(
         self, payload: ExampleEvaluationRun, stream: Optional[str] = None
-    ) -> Any:
+    ) -> EvaluateResponse:
         query_params = {}
         if stream is not None:
             query_params["stream"] = stream
@@ -86,7 +86,7 @@ class JudgmentSyncClient:
 
     def evaluate_traces(
         self, payload: TraceEvaluationRun, stream: Optional[str] = None
-    ) -> Any:
+    ) -> EvaluateResponse:
         query_params = {}
         if stream is not None:
             query_params["stream"] = stream
@@ -109,16 +109,6 @@ class JudgmentSyncClient:
             "POST",
             url_for("/fetch_experiment_run/"),
             payload,
-        )
-
-    def get_evaluation_status(self, experiment_run_id: str, project_name: str) -> Any:
-        query_params = {}
-        query_params["experiment_run_id"] = experiment_run_id
-        query_params["project_name"] = project_name
-        return self._request(
-            "GET",
-            url_for("/get_evaluation_status/"),
-            query_params,
         )
 
     def datasets_insert_examples_for_judgeval(
@@ -206,10 +196,33 @@ class JudgmentSyncClient:
             payload,
         )
 
+    def prompts_tag(self, payload: PromptTagRequest) -> PromptTagResponse:
+        return self._request(
+            "POST",
+            url_for("/prompts/tag/"),
+            payload,
+        )
+
+    def prompts_untag(self, payload: PromptUntagRequest) -> PromptUntagResponse:
+        return self._request(
+            "POST",
+            url_for("/prompts/untag/"),
+            payload,
+        )
+
     def prompts_fetch(
-        self, name: str, commit_id: Optional[str] = None, tag: Optional[str] = None
+        self,
+        name: str,
+        project_name: Optional[str] = None,
+        project_id: Optional[str] = None,
+        commit_id: Optional[str] = None,
+        tag: Optional[str] = None,
     ) -> PromptFetchResponse:
         query_params = {}
+        if project_name is not None:
+            query_params["project_name"] = project_name
+        if project_id is not None:
+            query_params["project_id"] = project_id
         query_params["name"] = name
         if commit_id is not None:
             query_params["commit_id"] = commit_id
@@ -218,6 +231,24 @@ class JudgmentSyncClient:
         return self._request(
             "GET",
             url_for("/prompts/fetch/"),
+            query_params,
+        )
+
+    def prompts_get_prompt_versions(
+        self,
+        name: str,
+        project_id: Optional[str] = None,
+        project_name: Optional[str] = None,
+    ) -> PromptVersionsResponse:
+        query_params = {}
+        if project_id is not None:
+            query_params["project_id"] = project_id
+        if project_name is not None:
+            query_params["project_name"] = project_name
+        query_params["name"] = name
+        return self._request(
+            "GET",
+            url_for("/prompts/get_prompt_versions/"),
             query_params,
         )
 
@@ -241,13 +272,6 @@ class JudgmentSyncClient:
         return self._request(
             "POST",
             url_for("/e2e_fetch_span_score/"),
-            payload,
-        )
-
-    def e2e_fetch_trace_scorer_span_score(self, payload: SpanScoreRequest) -> Any:
-        return self._request(
-            "POST",
-            url_for("/e2e_fetch_trace_scorer_span_score/"),
             payload,
         )
 
@@ -302,7 +326,7 @@ class JudgmentAsyncClient:
 
     async def evaluate_examples(
         self, payload: ExampleEvaluationRun, stream: Optional[str] = None
-    ) -> Any:
+    ) -> EvaluateResponse:
         query_params = {}
         if stream is not None:
             query_params["stream"] = stream
@@ -315,7 +339,7 @@ class JudgmentAsyncClient:
 
     async def evaluate_traces(
         self, payload: TraceEvaluationRun, stream: Optional[str] = None
-    ) -> Any:
+    ) -> EvaluateResponse:
         query_params = {}
         if stream is not None:
             query_params["stream"] = stream
@@ -338,18 +362,6 @@ class JudgmentAsyncClient:
             "POST",
             url_for("/fetch_experiment_run/"),
             payload,
-        )
-
-    async def get_evaluation_status(
-        self, experiment_run_id: str, project_name: str
-    ) -> Any:
-        query_params = {}
-        query_params["experiment_run_id"] = experiment_run_id
-        query_params["project_name"] = project_name
-        return await self._request(
-            "GET",
-            url_for("/get_evaluation_status/"),
-            query_params,
         )
 
     async def datasets_insert_examples_for_judgeval(
@@ -441,10 +453,33 @@ class JudgmentAsyncClient:
             payload,
         )
 
+    async def prompts_tag(self, payload: PromptTagRequest) -> PromptTagResponse:
+        return await self._request(
+            "POST",
+            url_for("/prompts/tag/"),
+            payload,
+        )
+
+    async def prompts_untag(self, payload: PromptUntagRequest) -> PromptUntagResponse:
+        return await self._request(
+            "POST",
+            url_for("/prompts/untag/"),
+            payload,
+        )
+
     async def prompts_fetch(
-        self, name: str, commit_id: Optional[str] = None, tag: Optional[str] = None
+        self,
+        name: str,
+        project_name: Optional[str] = None,
+        project_id: Optional[str] = None,
+        commit_id: Optional[str] = None,
+        tag: Optional[str] = None,
     ) -> PromptFetchResponse:
         query_params = {}
+        if project_name is not None:
+            query_params["project_name"] = project_name
+        if project_id is not None:
+            query_params["project_id"] = project_id
         query_params["name"] = name
         if commit_id is not None:
             query_params["commit_id"] = commit_id
@@ -453,6 +488,24 @@ class JudgmentAsyncClient:
         return await self._request(
             "GET",
             url_for("/prompts/fetch/"),
+            query_params,
+        )
+
+    async def prompts_get_prompt_versions(
+        self,
+        name: str,
+        project_id: Optional[str] = None,
+        project_name: Optional[str] = None,
+    ) -> PromptVersionsResponse:
+        query_params = {}
+        if project_id is not None:
+            query_params["project_id"] = project_id
+        if project_name is not None:
+            query_params["project_name"] = project_name
+        query_params["name"] = name
+        return await self._request(
+            "GET",
+            url_for("/prompts/get_prompt_versions/"),
             query_params,
         )
 
@@ -476,13 +529,6 @@ class JudgmentAsyncClient:
         return await self._request(
             "POST",
             url_for("/e2e_fetch_span_score/"),
-            payload,
-        )
-
-    async def e2e_fetch_trace_scorer_span_score(self, payload: SpanScoreRequest) -> Any:
-        return await self._request(
-            "POST",
-            url_for("/e2e_fetch_trace_scorer_span_score/"),
             payload,
         )
 
