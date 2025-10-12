@@ -267,6 +267,7 @@ class Tracer(metaclass=SingletonMeta):
         if span and span.is_recording():
             set_span_attribute(span, AttributeKeys.JUDGMENT_CUSTOMER_ID, customer_id)
 
+    @dont_throw
     def add_agent_attributes_to_span(self, span):
         """Add agent ID, class name, and instance name to span if they exist in context"""
         current_agent_context = self.agent_context.get()

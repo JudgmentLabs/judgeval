@@ -389,22 +389,15 @@ def wrap_anthropic_client(tracer: Tracer, client: TClient) -> TClient:
         @functools.wraps(function)
         def wrapper(*args, **kwargs):
             if kwargs.get("stream", False):
-                try:
-                    span = tracer.get_tracer().start_span(
-                        span_name, attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
-                    )
-                    tracer.add_agent_attributes_to_span(span)
-                    set_span_attribute(
-                        span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
-                    )
-                    model_name = kwargs.get("model", "")
-                    set_span_attribute(
-                        span, AttributeKeys.GEN_AI_REQUEST_MODEL, model_name
-                    )
-                except Exception as e:
-                    judgeval_logger.error(
-                        f"[anthropic wrapped] Error adding span metadata: {e}"
-                    )
+                span = tracer.get_tracer().start_span(
+                    span_name, attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+                )
+                tracer.add_agent_attributes_to_span(span)
+                set_span_attribute(
+                    span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
+                )
+                model_name = kwargs.get("model", "")
+                set_span_attribute(span, AttributeKeys.GEN_AI_REQUEST_MODEL, model_name)
                 stream_response = function(*args, **kwargs)
                 return TracedAnthropicGenerator(
                     tracer, stream_response, client, span, model_name
@@ -491,23 +484,16 @@ def wrap_anthropic_client(tracer: Tracer, client: TClient) -> TClient:
         @functools.wraps(function)
         async def wrapper(*args, **kwargs):
             if kwargs.get("stream", False):
-                try:
-                    span = tracer.get_tracer().start_span(
-                        span_name, attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
-                    )
-                    tracer.add_agent_attributes_to_span(span)
-                    set_span_attribute(
-                        span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
-                    )
-                    model_name = kwargs.get("model", "")
-                    set_span_attribute(
-                        span, AttributeKeys.GEN_AI_REQUEST_MODEL, model_name
-                    )
-                    stream_response = await function(*args, **kwargs)
-                except Exception as e:
-                    judgeval_logger.error(
-                        f"[anthropic wrapped_async] Error adding span metadata: {e}"
-                    )
+                span = tracer.get_tracer().start_span(
+                    span_name, attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+                )
+                tracer.add_agent_attributes_to_span(span)
+                set_span_attribute(
+                    span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
+                )
+                model_name = kwargs.get("model", "")
+                set_span_attribute(span, AttributeKeys.GEN_AI_REQUEST_MODEL, model_name)
+                stream_response = await function(*args, **kwargs)
                 return TracedAnthropicAsyncGenerator(
                     tracer, stream_response, client, span, model_name
                 )
