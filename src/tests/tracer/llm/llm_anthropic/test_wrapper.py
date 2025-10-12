@@ -537,8 +537,10 @@ class TestStreamingSpanAttributes:
 
         accumulated = ""
         for chunk in stream:
-            if chunk.type == "content_block_delta" and hasattr(chunk.delta, "text"):
-                accumulated += chunk.delta.text
+            if chunk.type == "content_block_delta":
+                text = getattr(chunk.delta, "text", None)
+                if text:
+                    accumulated += text
 
         assert len(mock_processor.ended_spans) > 0
         span = mock_processor.get_last_ended_span()
@@ -670,7 +672,7 @@ class TestSafetyGuarantees:
         self, monkeypatch, tracer, sync_client, anthropic_api_key
     ):
         """Test that if safe_serialize throws, user code still works"""
-        from judgeval.utils import serialize
+        from judgeval.utils import serialize  # type: ignore
 
         def broken_serialize(obj):
             raise RuntimeError("Serialization failed!")
@@ -754,7 +756,7 @@ class TestSafetyGuarantees:
         self, monkeypatch, tracer, sync_client, anthropic_api_key
     ):
         """Test that span attribute errors don't break user code"""
-        from judgeval.tracer import utils
+        from judgeval.tracer import utils  # type: ignore
 
         original_set = utils.set_span_attribute
 

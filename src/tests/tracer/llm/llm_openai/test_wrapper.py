@@ -776,7 +776,7 @@ class TestSafetyGuarantees:
         self, monkeypatch, tracer, sync_client, openai_api_key
     ):
         """Test that if safe_serialize throws, user code still works"""
-        from judgeval.utils import serialize
+        from judgeval.utils import serialize  # type: ignore
 
         def broken_serialize(obj):
             raise RuntimeError("Serialization failed!")
@@ -856,7 +856,7 @@ class TestSafetyGuarantees:
         self, monkeypatch, tracer, sync_client, openai_api_key
     ):
         """Test that span attribute errors don't break user code"""
-        from judgeval.tracer import utils
+        from judgeval.tracer import utils  # type: ignore
 
         original_set = utils.set_span_attribute
 
