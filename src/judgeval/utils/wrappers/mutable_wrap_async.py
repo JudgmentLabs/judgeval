@@ -1,67 +1,24 @@
 from functools import wraps
-from typing import (
-    Awaitable,
-    Callable,
-    TypeVar,
-    Any,
-    Dict,
-    Mapping,
-    ParamSpec,
-    Concatenate,
-)
+from typing import Awaitable, Callable, TypeVar, Any, Dict, ParamSpec, Concatenate
 
 from judgeval.utils.decorators.dont_throw import dont_throw
-from judgeval.logger import judgeval_logger
 
 P = ParamSpec("P")
 R = TypeVar("R")
 Ctx = Dict[str, Any]
-ImmCtx = Mapping[str, Any]
-
-
-def _void_pre_hook(ctx: Ctx, *args: Any, **kwargs: Any) -> None:
-    pass
-
-
-def _identity_args(ctx: Ctx, args: tuple[Any, ...]) -> tuple[Any, ...]:
-    return args
-
-
-def _identity_kwargs(ctx: Ctx, kwargs: dict[str, Any]) -> dict[str, Any]:
-    return kwargs
-
-
-def _void_post_hook(ctx: Ctx, result: Any) -> None:
-    pass
-
-
-def _identity_mutate_hook(ctx: Ctx, result: R) -> R:
-    return result
-
-
-def _void_error_hook(ctx: Ctx, error: Exception) -> None:
-    pass
-
-
-def _void_finally_hook(ctx: Ctx) -> None:
-    pass
 
 
 def mutable_wrap_async(
     func: Callable[P, Awaitable[R]],
     /,
     *,
-    pre_hook: Callable[Concatenate[Ctx, P], None] = _void_pre_hook,
-    mutate_args_hook: Callable[
-        [Ctx, tuple[Any, ...]], tuple[Any, ...]
-    ] = _identity_args,
-    mutate_kwargs_hook: Callable[
-        [Ctx, dict[str, Any]], dict[str, Any]
-    ] = _identity_kwargs,
-    post_hook: Callable[[Ctx, R], None] = _void_post_hook,
-    mutate_hook: Callable[[Ctx, R], R] = _identity_mutate_hook,
-    error_hook: Callable[[Ctx, Exception], None] = _void_error_hook,
-    finally_hook: Callable[[Ctx], None] = _void_finally_hook,
+    pre_hook: Callable[Concatenate[Ctx, P], None] | None = None,
+    mutate_args_hook: Callable[[Ctx, tuple[Any, ...]], tuple[Any, ...]] | None = None,
+    mutate_kwargs_hook: Callable[[Ctx, dict[str, Any]], dict[str, Any]] | None = None,
+    post_hook: Callable[[Ctx, R], None] | None = None,
+    mutate_hook: Callable[[Ctx, R], R] | None = None,
+    error_hook: Callable[[Ctx, Exception], None] | None = None,
+    finally_hook: Callable[[Ctx], None] | None = None,
 ) -> Callable[P, Awaitable[R]]:
     """
     Wraps an async function with lifecycle hooks that can mutate args, kwargs, and result.
@@ -77,50 +34,29 @@ def mutable_wrap_async(
     The mutate hooks can transform args/kwargs/result. Exceptions are re-raised.
     """
 
-    pre_hook = dont_throw(pre_hook)
-    post_hook = dont_throw(post_hook)
-    error_hook = dont_throw(error_hook)
-    finally_hook = dont_throw(finally_hook)
-
-    def safe_mutate_args_hook(ctx: Ctx, args: tuple[Any, ...]) -> tuple[Any, ...]:
-        try:
-            return mutate_args_hook(ctx, args)
-        except Exception as e:
-            judgeval_logger.debug(
-                f"[Caught] An exception was raised in {mutate_args_hook.__name__}",
-                exc_info=e,
-            )
-            return _identity_args(ctx, args)
-
-    def safe_mutate_kwargs_hook(ctx: Ctx, kwargs: dict[str, Any]) -> dict[str, Any]:
-        try:
-            return mutate_kwargs_hook(ctx, kwargs)
-        except Exception as e:
-            judgeval_logger.debug(
-                f"[Caught] An exception was raised in {mutate_kwargs_hook.__name__}",
-                exc_info=e,
-            )
-            return _identity_kwargs(ctx, kwargs)
+    safe_pre_hook = dont_throw(pre_hook) if pre_hook else (lambda ctx, *a, **kw: None)
+    safe_post_hook = dont_throw(post_hook) if post_hook else (lambda ctx, r: None)
+    safe_error_hook = dont_throw(error_hook) if error_hook else (lambda ctx, e: None)
+    safe_finally_hook = dont_throw(finally_hook) if finally_hook else (lambda ctx: None)
 
     @wraps(func)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         ctx: Ctx = {}
-        pre_hook(ctx, *args, **kwargs)
+        safe_pre_hook(ctx, *args, **kwargs)
 
-        final_args = safe_mutate_args_hook(ctx, args)
-        final_kwargs = safe_mutate_kwargs_hook(ctx, kwargs)
+        final_args = args if not mutate_args_hook else mutate_args_hook(ctx, args)
+        final_kwargs = (
+            kwargs if not mutate_kwargs_hook else mutate_kwargs_hook(ctx, kwargs)
+        )
 
         try:
             result = await func(*final_args, **final_kwargs)
-            post_hook(ctx, result)
-            try:
-                return mutate_hook(ctx, result)
-            except Exception:
-                return result
+            safe_post_hook(ctx, result)
+            return result if not mutate_hook else mutate_hook(ctx, result)
         except Exception as e:
-            error_hook(ctx, e)
+            safe_error_hook(ctx, e)
             raise
         finally:
-            finally_hook(ctx)
+            safe_finally_hook(ctx)
 
     return wrapper
