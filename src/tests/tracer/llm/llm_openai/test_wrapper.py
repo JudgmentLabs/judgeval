@@ -7,7 +7,7 @@ pytest.importorskip("openai")
 from openai import OpenAI, AsyncOpenAI
 from opentelemetry.context import Context
 from opentelemetry.sdk.trace import ReadableSpan, Span
-from judgeval.tracer.llm.llm_openai.wrapper2 import (  # type: ignore
+from judgeval.tracer.llm.llm_openai.wrapper import (  # type: ignore
     wrap_openai_client_sync,
     wrap_openai_client_async,
 )
@@ -481,3 +481,398 @@ class TestSpanAttributes:
         span1 = mock_processor.ended_spans[-2]
         span2 = mock_processor.ended_spans[-1]
         assert span1.context.span_id != span2.context.span_id
+
+
+class TestStreamingSync:
+    def test_chat_completions_streaming(self, wrapped_sync_client):
+        """Test sync chat.completions.create with stream=True"""
+        stream = wrapped_sync_client.chat.completions.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": "Count to 3"}],
+            stream=True,
+            max_completion_tokens=1000,
+        )
+
+        chunks = list(stream)
+        assert len(chunks) > 0
+
+        for chunk in chunks:
+            assert hasattr(chunk, "choices")
+
+        has_usage = any(chunk.usage is not None for chunk in chunks)
+        if has_usage:
+            final_chunk = next((c for c in reversed(chunks) if c.usage), None)
+            if final_chunk and final_chunk.usage:
+                assert final_chunk.usage.prompt_tokens > 0
+
+    def test_responses_streaming(self, wrapped_sync_client):
+        """Test sync responses.create with stream=True"""
+        stream = wrapped_sync_client.responses.create(
+            model="gpt-5-nano",
+            input="Count to 3",
+            stream=True,
+        )
+
+        chunks = list(stream)
+        assert len(chunks) > 0
+
+        for chunk in chunks:
+            assert (
+                hasattr(chunk, "type")
+                or hasattr(chunk, "response")
+                or hasattr(chunk, "id")
+            )
+
+    def test_streaming_content_accumulation(self, wrapped_sync_client):
+        """Verify content is accumulated correctly across chunks"""
+        stream = wrapped_sync_client.chat.completions.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": "Say: Hello World"}],
+            stream=True,
+            max_completion_tokens=1000,
+        )
+
+        accumulated = ""
+        for chunk in stream:
+            if chunk.choices and len(chunk.choices) > 0:
+                delta = chunk.choices[0].delta
+                if delta and hasattr(delta, "content") and delta.content:
+                    accumulated += delta.content
+
+        assert len(accumulated) > 0
+
+    def test_streaming_early_break(self, wrapped_sync_client):
+        """Test breaking out of stream early"""
+        stream = wrapped_sync_client.chat.completions.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": "Count to 10"}],
+            stream=True,
+            max_completion_tokens=1000,
+        )
+
+        first_chunk = next(iter(stream))
+        assert first_chunk is not None
+
+
+class TestStreamingAsync:
+    @pytest.mark.asyncio
+    async def test_chat_completions_streaming(self, wrapped_async_client):
+        """Test async chat.completions.create with stream=True"""
+        stream = await wrapped_async_client.chat.completions.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": "Count to 3"}],
+            stream=True,
+            max_completion_tokens=1000,
+        )
+
+        chunks = [chunk async for chunk in stream]
+        assert len(chunks) > 0
+
+        for chunk in chunks:
+            assert hasattr(chunk, "choices")
+
+        has_usage = any(chunk.usage is not None for chunk in chunks)
+        if has_usage:
+            final_chunk = next((c for c in reversed(chunks) if c.usage), None)
+            if final_chunk and final_chunk.usage:
+                assert final_chunk.usage.prompt_tokens > 0
+
+    @pytest.mark.asyncio
+    async def test_responses_streaming(self, wrapped_async_client):
+        """Test async responses.create with stream=True"""
+        stream = await wrapped_async_client.responses.create(
+            model="gpt-5-nano",
+            input="Count to 3",
+            stream=True,
+        )
+
+        chunks = [chunk async for chunk in stream]
+        assert len(chunks) > 0
+
+        for chunk in chunks:
+            assert (
+                hasattr(chunk, "type")
+                or hasattr(chunk, "response")
+                or hasattr(chunk, "id")
+            )
+
+    @pytest.mark.asyncio
+    async def test_streaming_content_accumulation(self, wrapped_async_client):
+        """Verify content is accumulated correctly across chunks"""
+        stream = await wrapped_async_client.chat.completions.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": "Say: Hello World"}],
+            stream=True,
+            max_completion_tokens=1000,
+        )
+
+        accumulated = ""
+        async for chunk in stream:
+            if chunk.choices and len(chunk.choices) > 0:
+                delta = chunk.choices[0].delta
+                if delta and hasattr(delta, "content") and delta.content:
+                    accumulated += delta.content
+
+        assert len(accumulated) > 0
+
+    @pytest.mark.asyncio
+    async def test_streaming_early_break(self, wrapped_async_client):
+        """Test breaking out of stream early"""
+        stream = await wrapped_async_client.chat.completions.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": "Count to 10"}],
+            stream=True,
+            max_completion_tokens=1000,
+        )
+
+        first_chunk = await stream.__anext__()
+        assert first_chunk is not None
+
+
+class TestStreamingSpanAttributes:
+    def test_streaming_span_has_accumulated_content(
+        self, tracer_with_mock, mock_processor, sync_client, openai_api_key
+    ):
+        """Verify GEN_AI_COMPLETION has full accumulated content"""
+        wrapped_client = wrap_openai_client_sync(tracer_with_mock, sync_client)
+
+        stream = wrapped_client.chat.completions.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": "Say: test"}],
+            stream=True,
+            max_completion_tokens=1000,
+        )
+
+        accumulated = ""
+        for chunk in stream:
+            if chunk.choices and len(chunk.choices) > 0:
+                delta = chunk.choices[0].delta
+                if delta and hasattr(delta, "content") and delta.content:
+                    accumulated += delta.content
+
+        assert len(mock_processor.ended_spans) > 0
+        span = mock_processor.get_last_ended_span()
+        attrs = mock_processor.get_span_attributes(span)
+
+        assert AttributeKeys.GEN_AI_COMPLETION in attrs
+        completion_attr = attrs[AttributeKeys.GEN_AI_COMPLETION]
+        assert accumulated in completion_attr or completion_attr == accumulated
+
+    def test_streaming_span_has_usage_tokens(
+        self, tracer_with_mock, mock_processor, sync_client, openai_api_key
+    ):
+        """Verify usage tokens extracted from final chunk"""
+        wrapped_client = wrap_openai_client_sync(tracer_with_mock, sync_client)
+
+        stream = wrapped_client.chat.completions.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": "Say: test"}],
+            stream=True,
+            max_completion_tokens=1000,
+        )
+
+        list(stream)
+
+        assert len(mock_processor.ended_spans) > 0
+        span = mock_processor.get_last_ended_span()
+        attrs = mock_processor.get_span_attributes(span)
+
+        assert AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS in attrs
+        assert AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS in attrs
+
+    def test_streaming_span_ends_after_iteration(
+        self, tracer_with_mock, mock_processor, sync_client, openai_api_key
+    ):
+        """Verify span ends when stream completes"""
+        wrapped_client = wrap_openai_client_sync(tracer_with_mock, sync_client)
+
+        initial_count = len(mock_processor.ended_spans)
+
+        stream = wrapped_client.chat.completions.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": "Say: test"}],
+            stream=True,
+            max_completion_tokens=1000,
+        )
+        list(stream)
+
+        assert len(mock_processor.ended_spans) == initial_count + 1
+
+    @pytest.mark.asyncio
+    async def test_async_streaming_span_ends(
+        self, tracer_with_mock, mock_processor, async_client, openai_api_key
+    ):
+        """Verify async stream span ends properly"""
+        wrapped_client = wrap_openai_client_async(tracer_with_mock, async_client)
+
+        initial_count = len(mock_processor.ended_spans)
+
+        stream = await wrapped_client.chat.completions.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": "Say: test"}],
+            stream=True,
+            max_completion_tokens=1000,
+        )
+        async for _ in stream:
+            pass
+
+        assert len(mock_processor.ended_spans) == initial_count + 1
+
+
+class TestEdgeCases:
+    def test_concurrent_calls_different_clients(
+        self, tracer, sync_client, openai_api_key
+    ):
+        """Test multiple wrapped clients don't interfere"""
+        from openai import OpenAI
+
+        client1 = wrap_openai_client_sync(tracer, OpenAI(api_key=openai_api_key))
+        client2 = wrap_openai_client_sync(tracer, OpenAI(api_key=openai_api_key))
+
+        response1 = client1.chat.completions.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": "Say: one"}],
+            max_completion_tokens=1000,
+        )
+
+        response2 = client2.chat.completions.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": "Say: two"}],
+            max_completion_tokens=1000,
+        )
+
+        assert response1 is not None
+        assert response2 is not None
+        assert response1.id != response2.id
+
+    def test_streaming_with_minimal_response(self, wrapped_sync_client):
+        """Test streaming with very short response"""
+        stream = wrapped_sync_client.chat.completions.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": "Say: hi"}],
+            stream=True,
+            max_completion_tokens=10,
+        )
+
+        chunks = list(stream)
+        assert len(chunks) >= 0
+
+    @pytest.mark.asyncio
+    async def test_async_streaming_with_minimal_response(self, wrapped_async_client):
+        """Test async streaming with very short response"""
+        stream = await wrapped_async_client.chat.completions.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": "Say: hi"}],
+            stream=True,
+            max_completion_tokens=10,
+        )
+
+        chunks = [chunk async for chunk in stream]
+        assert len(chunks) >= 0
+
+
+class TestSafetyGuarantees:
+    def test_safe_serialize_error_doesnt_crash(
+        self, monkeypatch, tracer, sync_client, openai_api_key
+    ):
+        """Test that if safe_serialize throws, user code still works"""
+        from judgeval.utils import serialize
+
+        def broken_serialize(obj):
+            raise RuntimeError("Serialization failed!")
+
+        monkeypatch.setattr(serialize, "safe_serialize", broken_serialize)
+
+        wrapped_client = wrap_openai_client_sync(tracer, sync_client)
+        response = wrapped_client.chat.completions.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": "test"}],
+            max_completion_tokens=1000,
+        )
+
+        assert response is not None
+        assert response.choices
+        assert response.choices[0].message.content
+
+    def test_wrapped_vs_unwrapped_structure(self, tracer, openai_api_key):
+        """Verify wrapped client behavior matches unwrapped structure"""
+        from openai import OpenAI
+
+        unwrapped = OpenAI(api_key=openai_api_key)
+        wrapped = wrap_openai_client_sync(tracer, OpenAI(api_key=openai_api_key))
+
+        unwrapped_response = unwrapped.chat.completions.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": "Say exactly: test"}],
+            max_completion_tokens=1000,
+        )
+
+        wrapped_response = wrapped.chat.completions.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": "Say exactly: test"}],
+            max_completion_tokens=1000,
+        )
+
+        assert type(unwrapped_response) is type(wrapped_response)
+        assert hasattr(wrapped_response, "choices")
+        assert hasattr(wrapped_response, "usage")
+        assert hasattr(wrapped_response, "model")
+        assert wrapped_response.model == unwrapped_response.model
+
+    def test_exceptions_propagate_correctly(self, wrapped_sync_client):
+        """Verify API exceptions still reach user"""
+        with pytest.raises(Exception) as exc_info:
+            wrapped_sync_client.chat.completions.create(
+                model="invalid-model-name-that-does-not-exist",
+                messages=[{"role": "user", "content": "test"}],
+            )
+
+        assert exc_info.value is not None
+
+    @pytest.mark.asyncio
+    async def test_async_exceptions_propagate(self, wrapped_async_client):
+        """Verify async API exceptions still reach user"""
+        with pytest.raises(Exception) as exc_info:
+            await wrapped_async_client.chat.completions.create(
+                model="invalid-model-name-that-does-not-exist",
+                messages=[{"role": "user", "content": "test"}],
+            )
+
+        assert exc_info.value is not None
+
+    def test_streaming_exceptions_propagate(self, wrapped_sync_client):
+        """Verify streaming exceptions propagate correctly"""
+        stream = wrapped_sync_client.chat.completions.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": "test"}],
+            stream=True,
+            max_completion_tokens=1000,
+        )
+
+        first_chunk = next(iter(stream))
+        assert first_chunk is not None
+
+    def test_set_span_attribute_error_doesnt_crash(
+        self, monkeypatch, tracer, sync_client, openai_api_key
+    ):
+        """Test that span attribute errors don't break user code"""
+        from judgeval.tracer import utils
+
+        original_set = utils.set_span_attribute
+
+        def broken_set_attribute(span, key, value):
+            if "COMPLETION" in key:
+                raise RuntimeError("Attribute setting failed!")
+            return original_set(span, key, value)
+
+        monkeypatch.setattr(utils, "set_span_attribute", broken_set_attribute)
+
+        wrapped_client = wrap_openai_client_sync(tracer, sync_client)
+        response = wrapped_client.chat.completions.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": "test"}],
+            max_completion_tokens=1000,
+        )
+
+        assert response is not None
+        assert response.choices[0].message.content

@@ -609,3 +609,24 @@ def wrap_anthropic_client(tracer: Tracer, client: TClient) -> TClient:
         )
 
     return client
+
+
+if __name__ == "__main__":
+    from judgeval.tracer import Tracer
+    from judgeval.tracer.llm.llm_anthropic.config import anthropic_Anthropic
+    from anthropic import Anthropic
+
+    tracer = Tracer(project_name="test")
+    client = Anthropic()
+    # client = wrap_anthropic_client(tracer, Anthropic())
+
+    with client.messages.stream(
+        model="claude-3-5-sonnet-20241022",
+        messages=[{"role": "user", "content": "Hello"}],
+        max_tokens=100,
+    ) as stream:
+        for event in stream:
+            print(event)
+
+        print(">")
+        print(stream.get_final_message())
