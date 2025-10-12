@@ -1,6 +1,5 @@
 from __future__ import annotations
 import functools
-import orjson
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -22,6 +21,7 @@ from judgeval.tracer.llm.llm_openai.config import (
     openai_AsyncOpenAI,
 )
 from judgeval.tracer.managers import sync_span_context, async_span_context
+from judgeval.logger import judgeval_logger
 from judgeval.tracer.keys import AttributeKeys
 from judgeval.tracer.utils import set_span_attribute
 from judgeval.utils.serialize import safe_serialize
@@ -457,66 +457,78 @@ def wrap_openai_client(tracer: Tracer, client: TClient) -> TClient:
                 with sync_span_context(
                     tracer, span_name, {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
                 ) as span:
-                    tracer.add_agent_attributes_to_span(span)
-                    set_span_attribute(
-                        span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
-                    )
-                    model_name = kwargs.get("model", "")
-                    set_span_attribute(
-                        span, AttributeKeys.GEN_AI_REQUEST_MODEL, model_name
-                    )
+                    try:
+                        tracer.add_agent_attributes_to_span(span)
+                        set_span_attribute(
+                            span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
+                        )
+                        model_name = kwargs.get("model", "")
+                        set_span_attribute(
+                            span, AttributeKeys.GEN_AI_REQUEST_MODEL, model_name
+                        )
+                    except Exception as e:
+                        judgeval_logger.error(
+                            f"[openai wrapped] Error adding span metadata: {e}"
+                        )
+
                     response = function(*args, **kwargs)
 
-                    if isinstance(response, (OpenAIChatCompletionBase, OpenAIResponse)):
-                        output, usage_data = _format_openai_output(response)
-                        # Serialize structured data to JSON for span attribute
-                        if isinstance(output, list):
-                            output_str = orjson.dumps(
-                                output, option=orjson.OPT_INDENT_2
-                            ).decode()
-                        else:
-                            output_str = str(output) if output is not None else None
-                        set_span_attribute(
-                            span, AttributeKeys.GEN_AI_COMPLETION, output_str
+                    try:
+                        if isinstance(
+                            response, (OpenAIChatCompletionBase, OpenAIResponse)
+                        ):
+                            output, usage_data = _format_openai_output(response)
+                            # Serialize structured data to JSON for span attribute
+                            if isinstance(output, list):
+                                output_str = safe_serialize(output)
+                            else:
+                                output_str = str(output) if output is not None else None
+                            set_span_attribute(
+                                span, AttributeKeys.GEN_AI_COMPLETION, output_str
+                            )
+                            if usage_data:
+                                (
+                                    prompt_tokens,
+                                    completion_tokens,
+                                    cache_read,
+                                    cache_creation,
+                                ) = _extract_openai_tokens(usage_data)
+                                set_span_attribute(
+                                    span,
+                                    AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
+                                    prompt_tokens,
+                                )
+                                set_span_attribute(
+                                    span,
+                                    AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
+                                    completion_tokens,
+                                )
+                                set_span_attribute(
+                                    span,
+                                    AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+                                    cache_read,
+                                )
+                                set_span_attribute(
+                                    span,
+                                    AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+                                    cache_creation,
+                                )
+                                set_span_attribute(
+                                    span,
+                                    AttributeKeys.JUDGMENT_USAGE_METADATA,
+                                    safe_serialize(usage_data),
+                                )
+                            set_span_attribute(
+                                span,
+                                AttributeKeys.GEN_AI_RESPONSE_MODEL,
+                                getattr(response, "model", model_name),
+                            )
+                    except Exception as e:
+                        judgeval_logger.error(
+                            f"[openai wrapped] Error adding span metadata: {e}"
                         )
-                        if usage_data:
-                            (
-                                prompt_tokens,
-                                completion_tokens,
-                                cache_read,
-                                cache_creation,
-                            ) = _extract_openai_tokens(usage_data)
-                            set_span_attribute(
-                                span,
-                                AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
-                                prompt_tokens,
-                            )
-                            set_span_attribute(
-                                span,
-                                AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
-                                completion_tokens,
-                            )
-                            set_span_attribute(
-                                span,
-                                AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
-                                cache_read,
-                            )
-                            set_span_attribute(
-                                span,
-                                AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
-                                cache_creation,
-                            )
-                            set_span_attribute(
-                                span,
-                                AttributeKeys.JUDGMENT_USAGE_METADATA,
-                                safe_serialize(usage_data),
-                            )
-                        set_span_attribute(
-                            span,
-                            AttributeKeys.GEN_AI_RESPONSE_MODEL,
-                            getattr(response, "model", model_name),
-                        )
-                    return response
+                    finally:
+                        return response
 
         return wrapper
 
@@ -541,66 +553,78 @@ def wrap_openai_client(tracer: Tracer, client: TClient) -> TClient:
                 async with async_span_context(
                     tracer, span_name, {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
                 ) as span:
-                    tracer.add_agent_attributes_to_span(span)
-                    set_span_attribute(
-                        span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
-                    )
-                    model_name = kwargs.get("model", "")
-                    set_span_attribute(
-                        span, AttributeKeys.GEN_AI_REQUEST_MODEL, model_name
-                    )
+                    try:
+                        tracer.add_agent_attributes_to_span(span)
+                        set_span_attribute(
+                            span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
+                        )
+                        model_name = kwargs.get("model", "")
+                        set_span_attribute(
+                            span, AttributeKeys.GEN_AI_REQUEST_MODEL, model_name
+                        )
+                    except Exception as e:
+                        judgeval_logger.error(
+                            f"[openai wrapped_async] Error adding span metadata: {e}"
+                        )
+
                     response = await function(*args, **kwargs)
 
-                    if isinstance(response, (OpenAIChatCompletionBase, OpenAIResponse)):
-                        output, usage_data = _format_openai_output(response)
-                        # Serialize structured data to JSON for span attribute
-                        if isinstance(output, list):
-                            output_str = orjson.dumps(
-                                output, option=orjson.OPT_INDENT_2
-                            ).decode()
-                        else:
-                            output_str = str(output) if output is not None else None
-                        set_span_attribute(
-                            span, AttributeKeys.GEN_AI_COMPLETION, output_str
+                    try:
+                        if isinstance(
+                            response, (OpenAIChatCompletionBase, OpenAIResponse)
+                        ):
+                            output, usage_data = _format_openai_output(response)
+                            # Serialize structured data to JSON for span attribute
+                            if isinstance(output, list):
+                                output_str = safe_serialize(output)
+                            else:
+                                output_str = str(output) if output is not None else None
+                            set_span_attribute(
+                                span, AttributeKeys.GEN_AI_COMPLETION, output_str
+                            )
+                            if usage_data:
+                                (
+                                    prompt_tokens,
+                                    completion_tokens,
+                                    cache_read,
+                                    cache_creation,
+                                ) = _extract_openai_tokens(usage_data)
+                                set_span_attribute(
+                                    span,
+                                    AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
+                                    prompt_tokens,
+                                )
+                                set_span_attribute(
+                                    span,
+                                    AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
+                                    completion_tokens,
+                                )
+                                set_span_attribute(
+                                    span,
+                                    AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+                                    cache_read,
+                                )
+                                set_span_attribute(
+                                    span,
+                                    AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+                                    cache_creation,
+                                )
+                                set_span_attribute(
+                                    span,
+                                    AttributeKeys.JUDGMENT_USAGE_METADATA,
+                                    safe_serialize(usage_data),
+                                )
+                            set_span_attribute(
+                                span,
+                                AttributeKeys.GEN_AI_RESPONSE_MODEL,
+                                getattr(response, "model", model_name),
+                            )
+                    except Exception as e:
+                        judgeval_logger.error(
+                            f"[openai wrapped_async] Error adding span metadata: {e}"
                         )
-                        if usage_data:
-                            (
-                                prompt_tokens,
-                                completion_tokens,
-                                cache_read,
-                                cache_creation,
-                            ) = _extract_openai_tokens(usage_data)
-                            set_span_attribute(
-                                span,
-                                AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
-                                prompt_tokens,
-                            )
-                            set_span_attribute(
-                                span,
-                                AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
-                                completion_tokens,
-                            )
-                            set_span_attribute(
-                                span,
-                                AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
-                                cache_read,
-                            )
-                            set_span_attribute(
-                                span,
-                                AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
-                                cache_creation,
-                            )
-                            set_span_attribute(
-                                span,
-                                AttributeKeys.JUDGMENT_USAGE_METADATA,
-                                safe_serialize(usage_data),
-                            )
-                        set_span_attribute(
-                            span,
-                            AttributeKeys.GEN_AI_RESPONSE_MODEL,
-                            getattr(response, "model", model_name),
-                        )
-                    return response
+                    finally:
+                        return response
 
         return wrapper
 

@@ -19,6 +19,7 @@ from judgeval.tracer.llm.llm_together.config import (
     together_AsyncTogether,
 )
 from judgeval.tracer.managers import sync_span_context, async_span_context
+from judgeval.logger import judgeval_logger
 from judgeval.tracer.keys import AttributeKeys
 from judgeval.tracer.utils import set_span_attribute
 from judgeval.utils.serialize import safe_serialize
@@ -296,73 +297,85 @@ def wrap_together_client(
                 with sync_span_context(
                     tracer, span_name, {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
                 ) as span:
-                    tracer.add_agent_attributes_to_span(span)
-                    set_span_attribute(
-                        span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
-                    )
-                    model_name = kwargs.get("model", "")
-                    # Add together_ai/ prefix for server-side cost calculation
-                    prefixed_model_name = (
-                        f"together_ai/{model_name}" if model_name else ""
-                    )
-                    set_span_attribute(
-                        span, AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
-                    )
-                    response = function(*args, **kwargs)
-
-                    if isinstance(response, TogetherChatCompletion):
-                        output, usage_data = _format_together_output(response)
-                        # Serialize structured data to JSON for span attribute
-                        if output:
-                            if isinstance(output, list):
-                                import orjson
-
-                                output_str = orjson.dumps(
-                                    output, option=orjson.OPT_INDENT_2
-                                ).decode()
-                            else:
-                                output_str = str(output)
-                            set_span_attribute(
-                                span, AttributeKeys.GEN_AI_COMPLETION, output_str
-                            )
-                        if usage_data:
-                            (
-                                prompt_tokens,
-                                completion_tokens,
-                                cache_read,
-                                cache_creation,
-                            ) = _extract_together_tokens(usage_data)
-                            set_span_attribute(
-                                span,
-                                AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
-                                prompt_tokens,
-                            )
-                            set_span_attribute(
-                                span,
-                                AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
-                                completion_tokens,
-                            )
-                            set_span_attribute(
-                                span,
-                                AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
-                                cache_read,
-                            )
-                            set_span_attribute(
-                                span,
-                                AttributeKeys.JUDGMENT_USAGE_METADATA,
-                                safe_serialize(usage_data),
-                            )
-                        # Add together_ai/ prefix to response model for server-side cost calculation
-                        response_model = getattr(response, "model", model_name)
-                        prefixed_response_model = (
-                            f"together_ai/{response_model}" if response_model else ""
+                    try:
+                        tracer.add_agent_attributes_to_span(span)
+                        set_span_attribute(
+                            span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
+                        )
+                        model_name = kwargs.get("model", "")
+                        # Add together_ai/ prefix for server-side cost calculation
+                        prefixed_model_name = (
+                            f"together_ai/{model_name}" if model_name else ""
                         )
                         set_span_attribute(
                             span,
-                            AttributeKeys.GEN_AI_RESPONSE_MODEL,
-                            prefixed_response_model,
+                            AttributeKeys.GEN_AI_REQUEST_MODEL,
+                            prefixed_model_name,
                         )
-                    return response
+                    except Exception as e:
+                        judgeval_logger.error(
+                            f"[together wrapped] Error adding span metadata: {e}"
+                        )
+
+                    response = function(*args, **kwargs)
+
+                    try:
+                        if isinstance(response, TogetherChatCompletion):
+                            output, usage_data = _format_together_output(response)
+                            # Serialize structured data to JSON for span attribute
+                            if output:
+                                if isinstance(output, list):
+                                    output_str = safe_serialize(output)
+                                else:
+                                    output_str = str(output)
+                                set_span_attribute(
+                                    span, AttributeKeys.GEN_AI_COMPLETION, output_str
+                                )
+                            if usage_data:
+                                (
+                                    prompt_tokens,
+                                    completion_tokens,
+                                    cache_read,
+                                    cache_creation,
+                                ) = _extract_together_tokens(usage_data)
+                                set_span_attribute(
+                                    span,
+                                    AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
+                                    prompt_tokens,
+                                )
+                                set_span_attribute(
+                                    span,
+                                    AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
+                                    completion_tokens,
+                                )
+                                set_span_attribute(
+                                    span,
+                                    AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+                                    cache_read,
+                                )
+                                set_span_attribute(
+                                    span,
+                                    AttributeKeys.JUDGMENT_USAGE_METADATA,
+                                    safe_serialize(usage_data),
+                                )
+                            # Add together_ai/ prefix to response model for server-side cost calculation
+                            response_model = getattr(response, "model", model_name)
+                            prefixed_response_model = (
+                                f"together_ai/{response_model}"
+                                if response_model
+                                else ""
+                            )
+                            set_span_attribute(
+                                span,
+                                AttributeKeys.GEN_AI_RESPONSE_MODEL,
+                                prefixed_response_model,
+                            )
+                    except Exception as e:
+                        judgeval_logger.error(
+                            f"[together wrapped] Error adding span metadata: {e}"
+                        )
+                    finally:
+                        return response
 
         return wrapper
 
@@ -391,73 +404,85 @@ def wrap_together_client(
                 async with async_span_context(
                     tracer, span_name, {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
                 ) as span:
-                    tracer.add_agent_attributes_to_span(span)
-                    set_span_attribute(
-                        span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
-                    )
-                    model_name = kwargs.get("model", "")
-                    # Add together_ai/ prefix for server-side cost calculation
-                    prefixed_model_name = (
-                        f"together_ai/{model_name}" if model_name else ""
-                    )
-                    set_span_attribute(
-                        span, AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
-                    )
-                    response = await function(*args, **kwargs)
-
-                    if isinstance(response, TogetherChatCompletion):
-                        output, usage_data = _format_together_output(response)
-                        # Serialize structured data to JSON for span attribute
-                        if output:
-                            if isinstance(output, list):
-                                import orjson
-
-                                output_str = orjson.dumps(
-                                    output, option=orjson.OPT_INDENT_2
-                                ).decode()
-                            else:
-                                output_str = str(output)
-                            set_span_attribute(
-                                span, AttributeKeys.GEN_AI_COMPLETION, output_str
-                            )
-                        if usage_data:
-                            (
-                                prompt_tokens,
-                                completion_tokens,
-                                cache_read,
-                                cache_creation,
-                            ) = _extract_together_tokens(usage_data)
-                            set_span_attribute(
-                                span,
-                                AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
-                                prompt_tokens,
-                            )
-                            set_span_attribute(
-                                span,
-                                AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
-                                completion_tokens,
-                            )
-                            set_span_attribute(
-                                span,
-                                AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
-                                cache_read,
-                            )
-                            set_span_attribute(
-                                span,
-                                AttributeKeys.JUDGMENT_USAGE_METADATA,
-                                safe_serialize(usage_data),
-                            )
-                        # Add together_ai/ prefix to response model for server-side cost calculation
-                        response_model = getattr(response, "model", model_name)
-                        prefixed_response_model = (
-                            f"together_ai/{response_model}" if response_model else ""
+                    try:
+                        tracer.add_agent_attributes_to_span(span)
+                        set_span_attribute(
+                            span, AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
+                        )
+                        model_name = kwargs.get("model", "")
+                        # Add together_ai/ prefix for server-side cost calculation
+                        prefixed_model_name = (
+                            f"together_ai/{model_name}" if model_name else ""
                         )
                         set_span_attribute(
                             span,
-                            AttributeKeys.GEN_AI_RESPONSE_MODEL,
-                            prefixed_response_model,
+                            AttributeKeys.GEN_AI_REQUEST_MODEL,
+                            prefixed_model_name,
                         )
-                    return response
+                    except Exception as e:
+                        judgeval_logger.error(
+                            f"[together wrapped_async] Error adding span metadata: {e}"
+                        )
+
+                    response = await function(*args, **kwargs)
+
+                    try:
+                        if isinstance(response, TogetherChatCompletion):
+                            output, usage_data = _format_together_output(response)
+                            # Serialize structured data to JSON for span attribute
+                            if output:
+                                if isinstance(output, list):
+                                    output_str = safe_serialize(output)
+                                else:
+                                    output_str = str(output)
+                                set_span_attribute(
+                                    span, AttributeKeys.GEN_AI_COMPLETION, output_str
+                                )
+                            if usage_data:
+                                (
+                                    prompt_tokens,
+                                    completion_tokens,
+                                    cache_read,
+                                    cache_creation,
+                                ) = _extract_together_tokens(usage_data)
+                                set_span_attribute(
+                                    span,
+                                    AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
+                                    prompt_tokens,
+                                )
+                                set_span_attribute(
+                                    span,
+                                    AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
+                                    completion_tokens,
+                                )
+                                set_span_attribute(
+                                    span,
+                                    AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+                                    cache_read,
+                                )
+                                set_span_attribute(
+                                    span,
+                                    AttributeKeys.JUDGMENT_USAGE_METADATA,
+                                    safe_serialize(usage_data),
+                                )
+                            # Add together_ai/ prefix to response model for server-side cost calculation
+                            response_model = getattr(response, "model", model_name)
+                            prefixed_response_model = (
+                                f"together_ai/{response_model}"
+                                if response_model
+                                else ""
+                            )
+                            set_span_attribute(
+                                span,
+                                AttributeKeys.GEN_AI_RESPONSE_MODEL,
+                                prefixed_response_model,
+                            )
+                    except Exception as e:
+                        judgeval_logger.error(
+                            f"[together wrapped_async] Error adding span metadata: {e}"
+                        )
+                    finally:
+                        return response
 
         return wrapper
 
