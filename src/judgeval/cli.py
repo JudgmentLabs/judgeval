@@ -5,6 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from judgeval.logger import judgeval_logger
 from judgeval import JudgmentClient
+from judgeval.version import get_version
 
 load_dotenv()
 
@@ -56,7 +57,7 @@ def upload_scorer(
 @app.command()
 def version():
     """Show version info"""
-    judgeval_logger.info("JudgEval CLI v0.0.0")
+    judgeval_logger.info(f"Judgeval CLI v{get_version()}")
 
 
 if __name__ == "__main__":

@@ -1,14 +1,18 @@
 from judgeval.scorers.api_scorer import (
     APIScorerConfig,
+    ExampleAPIScorerConfig,
+    TraceAPIScorerConfig,
 )
 from judgeval.constants import APIScorerType
 from typing import Dict, Any, Optional
 from judgeval.api import JudgmentSyncClient
 from judgeval.exceptions import JudgmentAPIError
 import os
-from copy import copy
 from judgeval.logger import judgeval_logger
 from abc import ABC
+from judgeval.env import JUDGMENT_DEFAULT_GPT_MODEL
+from copy import copy
+from judgeval.utils.decorators.dont_throw import dont_throw
 
 
 def push_prompt_scorer(
@@ -16,9 +20,11 @@ def push_prompt_scorer(
     prompt: str,
     threshold: float,
     options: Optional[Dict[str, float]] = None,
+    model: str = JUDGMENT_DEFAULT_GPT_MODEL,
+    description: Optional[str] = None,
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
-    is_trace: Optional[bool] = None,
+    is_trace: bool = False,
 ) -> str:
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
@@ -28,6 +34,8 @@ def push_prompt_scorer(
                 "prompt": prompt,
                 "threshold": threshold,
                 "options": options,
+                "model": model,
+                "description": description,
                 "is_trace": is_trace,
             }
         )
@@ -47,10 +55,19 @@ def fetch_prompt_scorer(
 ):
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
-        scorer_config = client.fetch_scorers({"names": [name]})["scorers"][0]
-        scorer_config.pop("created_at")
-        scorer_config.pop("updated_at")
-        return scorer_config
+        fetched_scorers = client.fetch_scorers({"names": [name]})
+        if len(fetched_scorers["scorers"]) == 0:
+            judgeval_logger.error(f"Prompt scorer '{name}' not found")
+            raise JudgmentAPIError(
+                status_code=404,
+                detail=f"Prompt scorer '{name}' not found",
+                response=None,  # type: ignore
+            )
+        else:
+            scorer_config = fetched_scorers["scorers"][0]
+            scorer_config.pop("created_at")
+            scorer_config.pop("updated_at")
+            return scorer_config
     except JudgmentAPIError as e:
         raise JudgmentAPIError(
             status_code=e.status_code,
@@ -82,21 +99,15 @@ def scorer_exists(
 
 
 class BasePromptScorer(ABC, APIScorerConfig):
-    """
-    In the Judgment backend, this scorer is implemented as a PromptScorer that takes
-    1. a system role that may involve the Example object
-    2. options for scores on the example
-
-    and uses a judge to execute the evaluation from the system role and classify into one of the options
-    """
-
     score_type: APIScorerType
     prompt: str
     options: Optional[Dict[str, float]] = None
+    description: Optional[str] = None
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or ""
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or ""
 
     @classmethod
+    @dont_throw
     def get(
         cls,
         name: str,
@@ -120,6 +131,8 @@ class BasePromptScorer(ABC, APIScorerConfig):
             prompt=scorer_config["prompt"],
             threshold=scorer_config["threshold"],
             options=scorer_config.get("options"),
+            model=scorer_config.get("model"),
+            description=scorer_config.get("description"),
             judgment_api_key=judgment_api_key,
             organization_id=organization_id,
         )
@@ -131,6 +144,8 @@ class BasePromptScorer(ABC, APIScorerConfig):
         prompt: str,
         threshold: float = 0.5,
         options: Optional[Dict[str, float]] = None,
+        model: str = JUDGMENT_DEFAULT_GPT_MODEL,
+        description: Optional[str] = None,
         judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
         organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
     ):
@@ -146,6 +161,8 @@ class BasePromptScorer(ABC, APIScorerConfig):
                 prompt,
                 threshold,
                 options,
+                model,
+                description,
                 judgment_api_key,
                 organization_id,
                 is_trace,
@@ -157,6 +174,8 @@ class BasePromptScorer(ABC, APIScorerConfig):
                 prompt=prompt,
                 threshold=threshold,
                 options=options,
+                model=model,
+                description=description,
                 judgment_api_key=judgment_api_key,
                 organization_id=organization_id,
             )
@@ -186,16 +205,29 @@ class BasePromptScorer(ABC, APIScorerConfig):
         self.push_prompt_scorer()
         judgeval_logger.info(f"Successfully updated prompt for {self.name}")
 
-    def set_options(self, options: Dict[str, float]):
+    def set_model(self, model: str):
         """
-        Updates the options with the new options.
+        Updates the model of the scorer.
+        """
+        self.model = model
+        self.push_prompt_scorer()
+        judgeval_logger.info(f"Successfully updated model for {self.name}")
 
-        Sample options:
-        {"yes": 1, "no": 0}
+    def set_options(self, options: Optional[Dict[str, float]]):
+        """
+        Updates the options of the scorer.
         """
         self.options = options
         self.push_prompt_scorer()
         judgeval_logger.info(f"Successfully updated options for {self.name}")
+
+    def set_description(self, description: Optional[str]):
+        """
+        Updates the description of the scorer.
+        """
+        self.description = description
+        self.push_prompt_scorer()
+        judgeval_logger.info(f"Successfully updated description for {self.name}")
 
     def append_to_prompt(self, prompt_addition: str):
         """
@@ -206,17 +238,23 @@ class BasePromptScorer(ABC, APIScorerConfig):
         judgeval_logger.info(f"Successfully appended to prompt for {self.name}")
 
     # Getters
-    def get_threshold(self) -> float | None:
+    def get_threshold(self) -> float:
         """
         Returns the threshold of the scorer.
         """
         return self.threshold
 
-    def get_prompt(self) -> str | None:
+    def get_prompt(self) -> str:
         """
         Returns the prompt of the scorer.
         """
         return self.prompt
+
+    def get_model(self) -> str:
+        """
+        Returns the model of the scorer.
+        """
+        return self.model
 
     def get_options(self) -> Dict[str, float] | None:
         """
@@ -224,7 +262,13 @@ class BasePromptScorer(ABC, APIScorerConfig):
         """
         return copy(self.options) if self.options is not None else None
 
-    def get_name(self) -> str | None:
+    def get_description(self) -> str | None:
+        """
+        Returns the description of the scorer.
+        """
+        return self.description
+
+    def get_name(self) -> str:
         """
         Returns the name of the scorer.
         """
@@ -236,9 +280,11 @@ class BasePromptScorer(ABC, APIScorerConfig):
         """
         return {
             "name": self.name,
+            "model": self.model,
             "prompt": self.prompt,
             "threshold": self.threshold,
             "options": self.options,
+            "description": self.description,
         }
 
     def push_prompt_scorer(self):
@@ -250,12 +296,15 @@ class BasePromptScorer(ABC, APIScorerConfig):
             self.prompt,
             self.threshold,
             self.options,
+            self.model,
+            self.description,
             self.judgment_api_key,
             self.organization_id,
+            isinstance(self, TracePromptScorer),
         )
 
     def __str__(self):
-        return f"PromptScorer(name={self.name}, prompt={self.prompt}, threshold={self.threshold}, options={self.options})"
+        return f"PromptScorer(name={self.name}, model={self.model}, prompt={self.prompt}, threshold={self.threshold}, options={self.options}, description={self.description})"
 
     def model_dump(self, *args, **kwargs) -> Dict[str, Any]:
         base = super().model_dump(*args, **kwargs)
@@ -270,9 +319,9 @@ class BasePromptScorer(ABC, APIScorerConfig):
         return base
 
 
-class PromptScorer(BasePromptScorer, APIScorerConfig):
+class PromptScorer(BasePromptScorer, ExampleAPIScorerConfig):
     pass
 
 
-class TracePromptScorer(BasePromptScorer, APIScorerConfig):
+class TracePromptScorer(BasePromptScorer, TraceAPIScorerConfig):
     pass

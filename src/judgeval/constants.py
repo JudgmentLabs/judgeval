@@ -24,17 +24,11 @@ class APIScorerType(str, Enum):
 
     @classmethod
     def __missing__(cls, value: str) -> APIScorerType:
-        # Handle case-insensitive lookup
         for member in cls:
             if member.value == value.lower():
                 return member
 
         raise ValueError(f"Invalid scorer type: {value}")
-
-
-UNBOUNDED_SCORERS: Set[APIScorerType] = (
-    set()
-)  # scorers whose scores are not bounded between 0-1
 
 
 LITELLM_SUPPORTED_MODELS: Set[str] = set(litellm.model_list)

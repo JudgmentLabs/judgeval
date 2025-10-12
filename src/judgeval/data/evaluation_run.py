@@ -1,4 +1,4 @@
-from typing import List, Optional, Union, Tuple
+from typing import List, Optional, Union, Tuple, Sequence
 from pydantic import field_validator, model_validator, Field, BaseModel
 from datetime import datetime, timezone
 import uuid
@@ -19,9 +19,11 @@ class EvaluationRun(BaseModel):
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
     custom_scorers: List[ExampleScorer] = Field(default_factory=list)
-    judgment_scorers: List[APIScorerConfig] = Field(default_factory=list)
-    scorers: List[Union[ExampleScorer, APIScorerConfig]] = Field(default_factory=list)
-    model: str
+    judgment_scorers: Sequence[APIScorerConfig] = Field(default_factory=list)
+    scorers: Sequence[Union[ExampleScorer, APIScorerConfig]] = Field(
+        default_factory=list
+    )
+    model: Optional[str] = None
 
     def __init__(
         self,
@@ -75,11 +77,8 @@ class EvaluationRun(BaseModel):
 
     @field_validator("model")
     def validate_model(cls, v, values):
-        if not v:
-            raise ValueError("Model cannot be empty.")
-
         # Check if model is string or list of strings
-        if isinstance(v, str):
+        if v is not None and isinstance(v, str):
             if v not in ACCEPTABLE_MODELS:
                 raise ValueError(
                     f"Model name {v} not recognized. Please select a valid model name.)"

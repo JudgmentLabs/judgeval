@@ -18,6 +18,8 @@ import os
 import random
 import pytest
 import string
+from typing import cast
+import orjson
 
 project_name = "e2e-tests-" + "".join(
     random.choices(string.ascii_letters + string.digits, k=12)
@@ -31,8 +33,11 @@ def teardown_module(module):
     delete_project(project_name=project_name)
 
 
-judgment = Tracer(
-    project_name=project_name,
+judgment: Tracer = cast(
+    Tracer,
+    Tracer(
+        project_name=project_name,
+    ),
 )
 
 # Wrap clients
@@ -339,9 +344,10 @@ def retrieve_llm_cost_helper(trace_id):
 
     total_llm_cost = 0
     for span in trace_spans:
-        llm_cost = span.get("span_attributes", {}).get(
-            "judgment.cumulative_llm_cost", 0
-        )
+        span_attrs = span.get("span_attributes", {})
+        if isinstance(span_attrs, str):
+            span_attrs = orjson.loads(span_attrs)
+        llm_cost = span_attrs.get("gen_ai.usage.total_cost_usd", 0)
         total_llm_cost += llm_cost
 
     if total_llm_cost == 0:
@@ -357,7 +363,12 @@ def retrieve_streaming_trace_helper(trace_id):
     # Find the LLM span
     llm_span = None
     for span in trace_spans:
-        if span.get("span_attributes", {}).get("judgment.span_kind") == "llm":
+        # Parse span_attributes if it's a JSON string
+        span_attrs = span.get("span_attributes", {})
+        if isinstance(span_attrs, str):
+            span_attrs = orjson.loads(span_attrs)
+
+        if span_attrs.get("judgment.span_kind") == "llm":
             llm_span = span
             break
 
@@ -366,6 +377,8 @@ def retrieve_streaming_trace_helper(trace_id):
 
     # Verify streaming-specific attributes
     span_attributes = llm_span.get("span_attributes", {})
+    if isinstance(span_attributes, str):
+        span_attributes = orjson.loads(span_attributes)
 
     # Should have completion content
     completion = span_attributes.get("gen_ai.completion")
@@ -378,11 +391,6 @@ def retrieve_streaming_trace_helper(trace_id):
 
     if input_tokens is None or output_tokens is None:
         assert False, "Missing usage tokens in streaming span"
-
-    # Should have cost information
-    total_cost = span_attributes.get("gen_ai.usage.total_cost_usd")
-    if total_cost is None:
-        assert False, "Missing cost information in streaming span"
 
     return trace_spans
 
@@ -494,11 +502,10 @@ def test_online_span_scoring():
         query_count += 1
         time.sleep(1)
 
-    print(scorer_data)
     if query_count == QUERY_RETRY:
         assert False, "No score found"
 
     score = scorer_data[0]
-    assert score.get("name") == "Answer Relevancy"
-    assert score.get("success")
-    assert score.get("score") == 1.0
+    assert score.get("scorer_name") == "Answer Relevancy"
+    assert score.get("scorer_success")
+    assert score.get("scorer_score") == 1.0

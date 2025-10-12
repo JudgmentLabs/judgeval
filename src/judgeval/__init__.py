@@ -5,12 +5,12 @@ from judgeval.evaluation import run_eval
 from judgeval.data.evaluation_run import ExampleEvaluationRun
 
 
-from typing import List, Optional, Union
-from judgeval.scorers import APIScorerConfig
+from typing import List, Optional, Union, Sequence
+from judgeval.scorers import ExampleAPIScorerConfig
 from judgeval.scorers.example_scorer import ExampleScorer
 from judgeval.data.example import Example
 from judgeval.logger import judgeval_logger
-from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_DEFAULT_GPT_MODEL, JUDGMENT_ORG_ID
+from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_ORG_ID
 from judgeval.utils.meta import SingletonMeta
 from judgeval.exceptions import JudgmentRuntimeError, JudgmentTestError
 from judgeval.api import JudgmentSyncClient
@@ -39,18 +39,23 @@ class JudgmentClient(metaclass=SingletonMeta):
     def run_evaluation(
         self,
         examples: List[Example],
-        scorers: List[Union[APIScorerConfig, ExampleScorer]],
+        scorers: Sequence[Union[ExampleAPIScorerConfig, ExampleScorer, None]],
         project_name: str = "default_project",
         eval_run_name: str = "default_eval_run",
-        model: str = JUDGMENT_DEFAULT_GPT_MODEL,
+        model: Optional[str] = None,
         assert_test: bool = False,
     ) -> List[ScoringResult]:
         try:
+            for scorer in scorers:
+                if scorer is None:
+                    raise ValueError(
+                        "Failed to run evaluation: At least one Prompt Scorer was not successfuly retrieved."
+                    )
             eval = ExampleEvaluationRun(
                 project_name=project_name,
                 eval_name=eval_run_name,
                 examples=examples,
-                scorers=scorers,
+                scorers=scorers,  # type: ignore
                 model=model,
             )
 

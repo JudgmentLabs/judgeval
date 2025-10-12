@@ -11,7 +11,4 @@ def clone_scorers(scorers: List[BaseScorer]) -> List[BaseScorer]:
     """
     Creates duplicates of the scorers passed as argument.
     """
-    cloned_scorers = []
-    for s in scorers:
-        cloned_scorers.append(s.model_copy(deep=True))
-    return cloned_scorers
+    return [s.model_copy(deep=True) for s in scorers]

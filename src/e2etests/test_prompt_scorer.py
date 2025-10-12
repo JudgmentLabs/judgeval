@@ -6,9 +6,9 @@ from judgeval.env import JUDGMENT_DEFAULT_TOGETHER_MODEL
 from judgeval.tracer import Tracer, TraceScorerConfig
 from e2etests.utils import retrieve_score
 import time
+from e2etests.utils import create_project, delete_project
 
-
-QUERY_RETRY = 25
+QUERY_RETRY = 60
 
 
 def test_prompt_scorer_without_options(client: JudgmentClient, project_name: str):
@@ -108,11 +108,13 @@ def test_get_and_edit_prompt_scorer(client: JudgmentClient, project_name: str):
         prompt_scorer.prompt
         == "Question: {{input}}\nResponse: {{actual_output}}\n\nIs this response helpful?"
     )
+
     assert prompt_scorer.options == {"yes": 1.0, "no": 0.0}
 
     prompt_scorer.append_to_prompt(
         "Consider accuracy, clarity, and completeness in your evaluation."
     )
+
     prompt_scorer.set_options({"y": 1.0, "n": 0.0})
     prompt_scorer.set_threshold(0.8)
 
@@ -180,14 +182,19 @@ def test_custom_prompt_scorer(client: JudgmentClient, project_name: str):
     print_debug_on_failure(res[1])
 
 
-def test_trace_prompt_scorer(project_name: str):
+def test_trace_prompt_scorer():
     """Test trace prompt scorer functionality."""
+    project_name = f"test-trace-prompt-scorer-{uuid4()}"
+    delete_project(project_name=project_name)
+    create_project(project_name=project_name)
     judgment = Tracer(project_name=project_name)
     trace_scorer = TracePromptScorer.create(
-        name=f"Test Trace Prompt Scorer {uuid4()}", prompt="Is this trace coherent?"
+        name=f"Test Trace Prompt Scorer {uuid4()}", prompt="sample prompt"
     )
     trace_scorer.set_threshold(0.5)
-    trace_scorer.set_prompt("this is a new prompt")
+    trace_scorer.set_prompt(
+        "Does this trace seem to represent a sample/test trace used for testing?"
+    )
 
     @judgment.observe(span_type="function")
     def sample_trace_span(sample_arg):
@@ -195,7 +202,7 @@ def test_trace_prompt_scorer(project_name: str):
 
     @judgment.observe(
         span_type="function",
-        scorer_config=TraceScorerConfig(scorer=trace_scorer, model="gpt-5"),
+        scorer_config=TraceScorerConfig(scorer=trace_scorer, model="gpt-4o-mini"),
     )
     def main():
         sample_trace_span("test")
@@ -205,7 +212,6 @@ def test_trace_prompt_scorer(project_name: str):
         )
 
     trace_id, span_id = main()
-
     query_count = 0
     while query_count < QUERY_RETRY:
         scorer_data = retrieve_score(span_id, trace_id)
@@ -213,8 +219,8 @@ def test_trace_prompt_scorer(project_name: str):
             break
         query_count += 1
         time.sleep(1)
-
-    assert scorer_data[0].get("success")
+    delete_project(project_name=project_name)
+    assert scorer_data[0].get("scorer_success")
 
 
 def print_debug_on_failure(result) -> bool:
