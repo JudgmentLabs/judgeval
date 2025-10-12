@@ -115,10 +115,26 @@ def wrapped_async_client(tracer, async_client):
     return wrap_openai_client_async(tracer, async_client)
 
 
+@pytest.fixture(params=["wrapped", "unwrapped"], ids=["with_tracer", "without_tracer"])
+def sync_client_maybe_wrapped(request, tracer, sync_client):
+    """Parametrized fixture that yields both wrapped and unwrapped sync clients"""
+    if request.param == "wrapped":
+        return wrap_openai_client_sync(tracer, sync_client)
+    return sync_client
+
+
+@pytest.fixture(params=["wrapped", "unwrapped"], ids=["with_tracer", "without_tracer"])
+def async_client_maybe_wrapped(request, tracer, async_client):
+    """Parametrized fixture that yields both wrapped and unwrapped async clients"""
+    if request.param == "wrapped":
+        return wrap_openai_client_async(tracer, async_client)
+    return async_client
+
+
 class TestSyncWrapper:
-    def test_chat_completions_create(self, wrapped_sync_client):
+    def test_chat_completions_create(self, sync_client_maybe_wrapped):
         """Test sync chat.completions.create with gpt-5-nano"""
-        response = wrapped_sync_client.chat.completions.create(
+        response = sync_client_maybe_wrapped.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Say 'test' and nothing else"}],
             max_completion_tokens=1000,
@@ -133,9 +149,9 @@ class TestSyncWrapper:
         assert response.usage.prompt_tokens > 0
         assert response.usage.completion_tokens > 0
 
-    def test_responses_create(self, wrapped_sync_client):
+    def test_responses_create(self, sync_client_maybe_wrapped):
         """Test sync responses.create with gpt-5-nano"""
-        response = wrapped_sync_client.responses.create(
+        response = sync_client_maybe_wrapped.responses.create(
             model="gpt-5-nano",
             input="Say 'test' and nothing else",
         )
@@ -144,14 +160,14 @@ class TestSyncWrapper:
         assert response.model
         assert hasattr(response, "output") or hasattr(response, "text")
 
-    def test_beta_chat_completions_parse(self, wrapped_sync_client):
+    def test_beta_chat_completions_parse(self, sync_client_maybe_wrapped):
         """Test sync beta.chat.completions.parse with structured outputs"""
         from pydantic import BaseModel
 
         class TestResponse(BaseModel):
             word: str
 
-        response = wrapped_sync_client.beta.chat.completions.parse(
+        response = sync_client_maybe_wrapped.beta.chat.completions.parse(
             model="gpt-5-nano",
             messages=[
                 {"role": "user", "content": "Say the word 'test' in JSON format"}
@@ -167,15 +183,15 @@ class TestSyncWrapper:
         assert response.usage
         assert response.usage.prompt_tokens > 0
 
-    def test_multiple_calls_same_client(self, wrapped_sync_client):
+    def test_multiple_calls_same_client(self, sync_client_maybe_wrapped):
         """Test multiple calls to ensure context isolation"""
-        response1 = wrapped_sync_client.chat.completions.create(
+        response1 = sync_client_maybe_wrapped.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Say 'first'"}],
             max_completion_tokens=1000,
         )
 
-        response2 = wrapped_sync_client.chat.completions.create(
+        response2 = sync_client_maybe_wrapped.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Say 'second'"}],
             max_completion_tokens=1000,
@@ -188,9 +204,9 @@ class TestSyncWrapper:
 
 class TestAsyncWrapper:
     @pytest.mark.asyncio
-    async def test_chat_completions_create(self, wrapped_async_client):
+    async def test_chat_completions_create(self, async_client_maybe_wrapped):
         """Test async chat.completions.create with gpt-5-nano"""
-        response = await wrapped_async_client.chat.completions.create(
+        response = await async_client_maybe_wrapped.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Say 'test' and nothing else"}],
             max_completion_tokens=1000,
@@ -206,9 +222,9 @@ class TestAsyncWrapper:
         assert response.usage.completion_tokens > 0
 
     @pytest.mark.asyncio
-    async def test_responses_create(self, wrapped_async_client):
+    async def test_responses_create(self, async_client_maybe_wrapped):
         """Test async responses.create with gpt-5-nano"""
-        response = await wrapped_async_client.responses.create(
+        response = await async_client_maybe_wrapped.responses.create(
             model="gpt-5-nano",
             input="Say 'test' and nothing else",
         )
@@ -218,14 +234,14 @@ class TestAsyncWrapper:
         assert hasattr(response, "output") or hasattr(response, "text")
 
     @pytest.mark.asyncio
-    async def test_beta_chat_completions_parse(self, wrapped_async_client):
+    async def test_beta_chat_completions_parse(self, async_client_maybe_wrapped):
         """Test async beta.chat.completions.parse with structured outputs"""
         from pydantic import BaseModel
 
         class TestResponse(BaseModel):
             word: str
 
-        response = await wrapped_async_client.beta.chat.completions.parse(
+        response = await async_client_maybe_wrapped.beta.chat.completions.parse(
             model="gpt-5-nano",
             messages=[
                 {"role": "user", "content": "Say the word 'test' in JSON format"}
@@ -242,15 +258,15 @@ class TestAsyncWrapper:
         assert response.usage.prompt_tokens > 0
 
     @pytest.mark.asyncio
-    async def test_multiple_calls_same_client(self, wrapped_async_client):
+    async def test_multiple_calls_same_client(self, async_client_maybe_wrapped):
         """Test multiple async calls to ensure context isolation"""
-        response1 = await wrapped_async_client.chat.completions.create(
+        response1 = await async_client_maybe_wrapped.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Say 'first'"}],
             max_completion_tokens=1000,
         )
 
-        response2 = await wrapped_async_client.chat.completions.create(
+        response2 = await async_client_maybe_wrapped.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Say 'second'"}],
             max_completion_tokens=1000,
@@ -262,9 +278,9 @@ class TestAsyncWrapper:
 
 
 class TestTracingIntegration:
-    def test_span_created_and_ended(self, tracer, wrapped_sync_client):
+    def test_span_created_and_ended(self, tracer, sync_client_maybe_wrapped):
         """Test that spans are properly created and ended"""
-        response = wrapped_sync_client.chat.completions.create(
+        response = sync_client_maybe_wrapped.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Test"}],
             max_completion_tokens=1000,
@@ -273,9 +289,11 @@ class TestTracingIntegration:
         assert response is not None
 
     @pytest.mark.asyncio
-    async def test_async_span_created_and_ended(self, tracer, wrapped_async_client):
+    async def test_async_span_created_and_ended(
+        self, tracer, async_client_maybe_wrapped
+    ):
         """Test that async spans are properly created and ended"""
-        response = await wrapped_async_client.chat.completions.create(
+        response = await async_client_maybe_wrapped.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Test"}],
             max_completion_tokens=1000,
@@ -283,19 +301,19 @@ class TestTracingIntegration:
 
         assert response is not None
 
-    def test_error_handling(self, wrapped_sync_client):
+    def test_error_handling(self, sync_client_maybe_wrapped):
         """Test that errors are properly handled and spans end"""
         with pytest.raises(Exception):
-            wrapped_sync_client.chat.completions.create(
+            sync_client_maybe_wrapped.chat.completions.create(
                 model="invalid-model-name-that-does-not-exist",
                 messages=[{"role": "user", "content": "Test"}],
             )
 
     @pytest.mark.asyncio
-    async def test_async_error_handling(self, wrapped_async_client):
+    async def test_async_error_handling(self, async_client_maybe_wrapped):
         """Test that async errors are properly handled and spans end"""
         with pytest.raises(Exception):
-            await wrapped_async_client.chat.completions.create(
+            await async_client_maybe_wrapped.chat.completions.create(
                 model="invalid-model-name-that-does-not-exist",
                 messages=[{"role": "user", "content": "Test"}],
             )
@@ -484,9 +502,9 @@ class TestSpanAttributes:
 
 
 class TestStreamingSync:
-    def test_chat_completions_streaming(self, wrapped_sync_client):
+    def test_chat_completions_streaming(self, sync_client_maybe_wrapped):
         """Test sync chat.completions.create with stream=True"""
-        stream = wrapped_sync_client.chat.completions.create(
+        stream = sync_client_maybe_wrapped.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Count to 3"}],
             stream=True,
@@ -505,9 +523,9 @@ class TestStreamingSync:
             if final_chunk and final_chunk.usage:
                 assert final_chunk.usage.prompt_tokens > 0
 
-    def test_responses_streaming(self, wrapped_sync_client):
+    def test_responses_streaming(self, sync_client_maybe_wrapped):
         """Test sync responses.create with stream=True"""
-        stream = wrapped_sync_client.responses.create(
+        stream = sync_client_maybe_wrapped.responses.create(
             model="gpt-5-nano",
             input="Count to 3",
             stream=True,
@@ -523,9 +541,9 @@ class TestStreamingSync:
                 or hasattr(chunk, "id")
             )
 
-    def test_streaming_content_accumulation(self, wrapped_sync_client):
+    def test_streaming_content_accumulation(self, sync_client_maybe_wrapped):
         """Verify content is accumulated correctly across chunks"""
-        stream = wrapped_sync_client.chat.completions.create(
+        stream = sync_client_maybe_wrapped.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Say: Hello World"}],
             stream=True,
@@ -541,9 +559,9 @@ class TestStreamingSync:
 
         assert len(accumulated) > 0
 
-    def test_streaming_early_break(self, wrapped_sync_client):
+    def test_streaming_early_break(self, sync_client_maybe_wrapped):
         """Test breaking out of stream early"""
-        stream = wrapped_sync_client.chat.completions.create(
+        stream = sync_client_maybe_wrapped.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Count to 10"}],
             stream=True,
@@ -556,9 +574,9 @@ class TestStreamingSync:
 
 class TestStreamingAsync:
     @pytest.mark.asyncio
-    async def test_chat_completions_streaming(self, wrapped_async_client):
+    async def test_chat_completions_streaming(self, async_client_maybe_wrapped):
         """Test async chat.completions.create with stream=True"""
-        stream = await wrapped_async_client.chat.completions.create(
+        stream = await async_client_maybe_wrapped.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Count to 3"}],
             stream=True,
@@ -578,9 +596,9 @@ class TestStreamingAsync:
                 assert final_chunk.usage.prompt_tokens > 0
 
     @pytest.mark.asyncio
-    async def test_responses_streaming(self, wrapped_async_client):
+    async def test_responses_streaming(self, async_client_maybe_wrapped):
         """Test async responses.create with stream=True"""
-        stream = await wrapped_async_client.responses.create(
+        stream = await async_client_maybe_wrapped.responses.create(
             model="gpt-5-nano",
             input="Count to 3",
             stream=True,
@@ -597,9 +615,9 @@ class TestStreamingAsync:
             )
 
     @pytest.mark.asyncio
-    async def test_streaming_content_accumulation(self, wrapped_async_client):
+    async def test_streaming_content_accumulation(self, async_client_maybe_wrapped):
         """Verify content is accumulated correctly across chunks"""
-        stream = await wrapped_async_client.chat.completions.create(
+        stream = await async_client_maybe_wrapped.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Say: Hello World"}],
             stream=True,
@@ -616,9 +634,9 @@ class TestStreamingAsync:
         assert len(accumulated) > 0
 
     @pytest.mark.asyncio
-    async def test_streaming_early_break(self, wrapped_async_client):
+    async def test_streaming_early_break(self, async_client_maybe_wrapped):
         """Test breaking out of stream early"""
-        stream = await wrapped_async_client.chat.completions.create(
+        stream = await async_client_maybe_wrapped.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Count to 10"}],
             stream=True,
@@ -745,9 +763,9 @@ class TestEdgeCases:
         assert response2 is not None
         assert response1.id != response2.id
 
-    def test_streaming_with_minimal_response(self, wrapped_sync_client):
+    def test_streaming_with_minimal_response(self, sync_client_maybe_wrapped):
         """Test streaming with very short response"""
-        stream = wrapped_sync_client.chat.completions.create(
+        stream = sync_client_maybe_wrapped.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Say: hi"}],
             stream=True,
@@ -758,9 +776,11 @@ class TestEdgeCases:
         assert len(chunks) >= 0
 
     @pytest.mark.asyncio
-    async def test_async_streaming_with_minimal_response(self, wrapped_async_client):
+    async def test_async_streaming_with_minimal_response(
+        self, async_client_maybe_wrapped
+    ):
         """Test async streaming with very short response"""
-        stream = await wrapped_async_client.chat.completions.create(
+        stream = await async_client_maybe_wrapped.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "Say: hi"}],
             stream=True,
@@ -819,10 +839,10 @@ class TestSafetyGuarantees:
         assert hasattr(wrapped_response, "model")
         assert wrapped_response.model == unwrapped_response.model
 
-    def test_exceptions_propagate_correctly(self, wrapped_sync_client):
+    def test_exceptions_propagate_correctly(self, sync_client_maybe_wrapped):
         """Verify API exceptions still reach user"""
         with pytest.raises(Exception) as exc_info:
-            wrapped_sync_client.chat.completions.create(
+            sync_client_maybe_wrapped.chat.completions.create(
                 model="invalid-model-name-that-does-not-exist",
                 messages=[{"role": "user", "content": "test"}],
             )
@@ -830,19 +850,19 @@ class TestSafetyGuarantees:
         assert exc_info.value is not None
 
     @pytest.mark.asyncio
-    async def test_async_exceptions_propagate(self, wrapped_async_client):
+    async def test_async_exceptions_propagate(self, async_client_maybe_wrapped):
         """Verify async API exceptions still reach user"""
         with pytest.raises(Exception) as exc_info:
-            await wrapped_async_client.chat.completions.create(
+            await async_client_maybe_wrapped.chat.completions.create(
                 model="invalid-model-name-that-does-not-exist",
                 messages=[{"role": "user", "content": "test"}],
             )
 
         assert exc_info.value is not None
 
-    def test_streaming_exceptions_propagate(self, wrapped_sync_client):
+    def test_streaming_exceptions_propagate(self, sync_client_maybe_wrapped):
         """Verify streaming exceptions propagate correctly"""
-        stream = wrapped_sync_client.chat.completions.create(
+        stream = sync_client_maybe_wrapped.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "test"}],
             stream=True,

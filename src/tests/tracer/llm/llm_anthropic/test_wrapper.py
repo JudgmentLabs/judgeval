@@ -115,10 +115,26 @@ def wrapped_async_client(tracer, async_client):
     return wrap_anthropic_client_async(tracer, async_client)
 
 
+@pytest.fixture(params=["wrapped", "unwrapped"], ids=["with_tracer", "without_tracer"])
+def sync_client_maybe_wrapped(request, tracer, sync_client):
+    """Parametrized fixture that yields both wrapped and unwrapped sync clients"""
+    if request.param == "wrapped":
+        return wrap_anthropic_client_sync(tracer, sync_client)
+    return sync_client
+
+
+@pytest.fixture(params=["wrapped", "unwrapped"], ids=["with_tracer", "without_tracer"])
+def async_client_maybe_wrapped(request, tracer, async_client):
+    """Parametrized fixture that yields both wrapped and unwrapped async clients"""
+    if request.param == "wrapped":
+        return wrap_anthropic_client_async(tracer, async_client)
+    return async_client
+
+
 class TestSyncWrapper:
-    def test_messages_create(self, wrapped_sync_client):
+    def test_messages_create(self, sync_client_maybe_wrapped):
         """Test sync messages.create"""
-        response = wrapped_sync_client.messages.create(
+        response = sync_client_maybe_wrapped.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Say 'test' and nothing else"}],
@@ -132,9 +148,9 @@ class TestSyncWrapper:
         assert response.usage.input_tokens > 0
         assert response.usage.output_tokens > 0
 
-    def test_messages_create_streaming(self, wrapped_sync_client):
+    def test_messages_create_streaming(self, sync_client_maybe_wrapped):
         """Test sync messages.create with stream=True"""
-        response = wrapped_sync_client.messages.create(
+        response = sync_client_maybe_wrapped.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Count to 3"}],
@@ -147,9 +163,9 @@ class TestSyncWrapper:
         for chunk in chunks:
             assert hasattr(chunk, "type")
 
-    def test_messages_stream(self, wrapped_sync_client):
+    def test_messages_stream(self, sync_client_maybe_wrapped):
         """Test sync messages.stream context manager"""
-        with wrapped_sync_client.messages.stream(
+        with sync_client_maybe_wrapped.messages.stream(
             model="claude-sonnet-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Say 'test'"}],
@@ -157,15 +173,15 @@ class TestSyncWrapper:
             text_chunks = list(stream.text_stream)
             assert len(text_chunks) > 0
 
-    def test_multiple_calls_same_client(self, wrapped_sync_client):
+    def test_multiple_calls_same_client(self, sync_client_maybe_wrapped):
         """Test multiple calls to ensure context isolation"""
-        response1 = wrapped_sync_client.messages.create(
+        response1 = sync_client_maybe_wrapped.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Say 'first'"}],
         )
 
-        response2 = wrapped_sync_client.messages.create(
+        response2 = sync_client_maybe_wrapped.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Say 'second'"}],
@@ -178,9 +194,9 @@ class TestSyncWrapper:
 
 class TestAsyncWrapper:
     @pytest.mark.asyncio
-    async def test_messages_create(self, wrapped_async_client):
+    async def test_messages_create(self, async_client_maybe_wrapped):
         """Test async messages.create"""
-        response = await wrapped_async_client.messages.create(
+        response = await async_client_maybe_wrapped.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Say 'test' and nothing else"}],
@@ -195,9 +211,9 @@ class TestAsyncWrapper:
         assert response.usage.output_tokens > 0
 
     @pytest.mark.asyncio
-    async def test_messages_create_streaming(self, wrapped_async_client):
+    async def test_messages_create_streaming(self, async_client_maybe_wrapped):
         """Test async messages.create with stream=True"""
-        stream = await wrapped_async_client.messages.create(
+        stream = await async_client_maybe_wrapped.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Count to 3"}],
@@ -211,9 +227,9 @@ class TestAsyncWrapper:
             assert hasattr(chunk, "type")
 
     @pytest.mark.asyncio
-    async def test_messages_stream(self, wrapped_async_client):
+    async def test_messages_stream(self, async_client_maybe_wrapped):
         """Test async messages.stream context manager"""
-        async with wrapped_async_client.messages.stream(
+        async with async_client_maybe_wrapped.messages.stream(
             model="claude-sonnet-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Say 'test'"}],
@@ -222,15 +238,15 @@ class TestAsyncWrapper:
             assert len(text_chunks) > 0
 
     @pytest.mark.asyncio
-    async def test_multiple_calls_same_client(self, wrapped_async_client):
+    async def test_multiple_calls_same_client(self, async_client_maybe_wrapped):
         """Test multiple async calls to ensure context isolation"""
-        response1 = await wrapped_async_client.messages.create(
+        response1 = await async_client_maybe_wrapped.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Say 'first'"}],
         )
 
-        response2 = await wrapped_async_client.messages.create(
+        response2 = await async_client_maybe_wrapped.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Say 'second'"}],
@@ -242,9 +258,9 @@ class TestAsyncWrapper:
 
 
 class TestTracingIntegration:
-    def test_span_created_and_ended(self, tracer, wrapped_sync_client):
+    def test_span_created_and_ended(self, tracer, sync_client_maybe_wrapped):
         """Test that spans are properly created and ended"""
-        response = wrapped_sync_client.messages.create(
+        response = sync_client_maybe_wrapped.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Test"}],
@@ -253,9 +269,11 @@ class TestTracingIntegration:
         assert response is not None
 
     @pytest.mark.asyncio
-    async def test_async_span_created_and_ended(self, tracer, wrapped_async_client):
+    async def test_async_span_created_and_ended(
+        self, tracer, async_client_maybe_wrapped
+    ):
         """Test that async spans are properly created and ended"""
-        response = await wrapped_async_client.messages.create(
+        response = await async_client_maybe_wrapped.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Test"}],
@@ -263,20 +281,20 @@ class TestTracingIntegration:
 
         assert response is not None
 
-    def test_error_handling(self, wrapped_sync_client):
+    def test_error_handling(self, sync_client_maybe_wrapped):
         """Test that errors are properly handled and spans end"""
         with pytest.raises(Exception):
-            wrapped_sync_client.messages.create(
+            sync_client_maybe_wrapped.messages.create(
                 model="invalid-model-name-that-does-not-exist",
                 max_tokens=1024,
                 messages=[{"role": "user", "content": "Test"}],
             )
 
     @pytest.mark.asyncio
-    async def test_async_error_handling(self, wrapped_async_client):
+    async def test_async_error_handling(self, async_client_maybe_wrapped):
         """Test that async errors are properly handled and spans end"""
         with pytest.raises(Exception):
-            await wrapped_async_client.messages.create(
+            await async_client_maybe_wrapped.messages.create(
                 model="invalid-model-name-that-does-not-exist",
                 max_tokens=1024,
                 messages=[{"role": "user", "content": "Test"}],
@@ -414,9 +432,9 @@ class TestSpanAttributes:
 
 
 class TestStreamingSync:
-    def test_messages_create_streaming(self, wrapped_sync_client):
+    def test_messages_create_streaming(self, sync_client_maybe_wrapped):
         """Test sync messages.create with stream=True"""
-        stream = wrapped_sync_client.messages.create(
+        stream = sync_client_maybe_wrapped.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Count to 3"}],
@@ -429,9 +447,9 @@ class TestStreamingSync:
         for chunk in chunks:
             assert hasattr(chunk, "type")
 
-    def test_messages_stream_context_manager(self, wrapped_sync_client):
+    def test_messages_stream_context_manager(self, sync_client_maybe_wrapped):
         """Test sync messages.stream with context manager"""
-        with wrapped_sync_client.messages.stream(
+        with sync_client_maybe_wrapped.messages.stream(
             model="claude-sonnet-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Count to 3"}],
@@ -439,9 +457,9 @@ class TestStreamingSync:
             text_chunks = list(stream.text_stream)
             assert len(text_chunks) > 0
 
-    def test_streaming_content_accumulation(self, wrapped_sync_client):
+    def test_streaming_content_accumulation(self, sync_client_maybe_wrapped):
         """Verify content is accumulated correctly across chunks"""
-        with wrapped_sync_client.messages.stream(
+        with sync_client_maybe_wrapped.messages.stream(
             model="claude-sonnet-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Say: Hello World"}],
@@ -452,9 +470,9 @@ class TestStreamingSync:
 
             assert len(accumulated) > 0
 
-    def test_streaming_early_break(self, wrapped_sync_client):
+    def test_streaming_early_break(self, sync_client_maybe_wrapped):
         """Test breaking out of stream early"""
-        stream = wrapped_sync_client.messages.create(
+        stream = sync_client_maybe_wrapped.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Count to 10"}],
@@ -467,9 +485,9 @@ class TestStreamingSync:
 
 class TestStreamingAsync:
     @pytest.mark.asyncio
-    async def test_messages_create_streaming(self, wrapped_async_client):
+    async def test_messages_create_streaming(self, async_client_maybe_wrapped):
         """Test async messages.create with stream=True"""
-        stream = await wrapped_async_client.messages.create(
+        stream = await async_client_maybe_wrapped.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Count to 3"}],
@@ -483,9 +501,9 @@ class TestStreamingAsync:
             assert hasattr(chunk, "type")
 
     @pytest.mark.asyncio
-    async def test_messages_stream_context_manager(self, wrapped_async_client):
+    async def test_messages_stream_context_manager(self, async_client_maybe_wrapped):
         """Test async messages.stream with context manager"""
-        async with wrapped_async_client.messages.stream(
+        async with async_client_maybe_wrapped.messages.stream(
             model="claude-sonnet-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Count to 3"}],
@@ -494,9 +512,9 @@ class TestStreamingAsync:
             assert len(text_chunks) > 0
 
     @pytest.mark.asyncio
-    async def test_streaming_content_accumulation(self, wrapped_async_client):
+    async def test_streaming_content_accumulation(self, async_client_maybe_wrapped):
         """Verify content is accumulated correctly across chunks"""
-        async with wrapped_async_client.messages.stream(
+        async with async_client_maybe_wrapped.messages.stream(
             model="claude-sonnet-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Say: Hello World"}],
@@ -508,9 +526,9 @@ class TestStreamingAsync:
             assert len(accumulated) > 0
 
     @pytest.mark.asyncio
-    async def test_streaming_early_break(self, wrapped_async_client):
+    async def test_streaming_early_break(self, async_client_maybe_wrapped):
         """Test breaking out of stream early"""
-        stream = await wrapped_async_client.messages.create(
+        stream = await async_client_maybe_wrapped.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Count to 10"}],
@@ -641,9 +659,9 @@ class TestEdgeCases:
         assert response2 is not None
         assert response1.id != response2.id
 
-    def test_streaming_with_minimal_response(self, wrapped_sync_client):
+    def test_streaming_with_minimal_response(self, sync_client_maybe_wrapped):
         """Test streaming with very short response"""
-        stream = wrapped_sync_client.messages.create(
+        stream = sync_client_maybe_wrapped.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=10,
             messages=[{"role": "user", "content": "Say: hi"}],
@@ -654,9 +672,11 @@ class TestEdgeCases:
         assert len(chunks) >= 0
 
     @pytest.mark.asyncio
-    async def test_async_streaming_with_minimal_response(self, wrapped_async_client):
+    async def test_async_streaming_with_minimal_response(
+        self, async_client_maybe_wrapped
+    ):
         """Test async streaming with very short response"""
-        stream = await wrapped_async_client.messages.create(
+        stream = await async_client_maybe_wrapped.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=10,
             messages=[{"role": "user", "content": "Say: hi"}],
@@ -717,10 +737,10 @@ class TestSafetyGuarantees:
         assert hasattr(wrapped_response, "model")
         assert wrapped_response.model == unwrapped_response.model
 
-    def test_exceptions_propagate_correctly(self, wrapped_sync_client):
+    def test_exceptions_propagate_correctly(self, sync_client_maybe_wrapped):
         """Verify API exceptions still reach user"""
         with pytest.raises(Exception) as exc_info:
-            wrapped_sync_client.messages.create(
+            sync_client_maybe_wrapped.messages.create(
                 model="invalid-model-name-that-does-not-exist",
                 max_tokens=1024,
                 messages=[{"role": "user", "content": "test"}],
@@ -729,10 +749,10 @@ class TestSafetyGuarantees:
         assert exc_info.value is not None
 
     @pytest.mark.asyncio
-    async def test_async_exceptions_propagate(self, wrapped_async_client):
+    async def test_async_exceptions_propagate(self, async_client_maybe_wrapped):
         """Verify async API exceptions still reach user"""
         with pytest.raises(Exception) as exc_info:
-            await wrapped_async_client.messages.create(
+            await async_client_maybe_wrapped.messages.create(
                 model="invalid-model-name-that-does-not-exist",
                 max_tokens=1024,
                 messages=[{"role": "user", "content": "test"}],
@@ -740,9 +760,9 @@ class TestSafetyGuarantees:
 
         assert exc_info.value is not None
 
-    def test_streaming_exceptions_propagate(self, wrapped_sync_client):
+    def test_streaming_exceptions_propagate(self, sync_client_maybe_wrapped):
         """Verify streaming exceptions propagate correctly"""
-        stream = wrapped_sync_client.messages.create(
+        stream = sync_client_maybe_wrapped.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "test"}],
