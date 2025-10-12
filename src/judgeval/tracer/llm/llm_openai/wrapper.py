@@ -1,6 +1,5 @@
 from __future__ import annotations
 import functools
-import orjson
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -481,9 +480,7 @@ def wrap_openai_client(tracer: Tracer, client: TClient) -> TClient:
                             output, usage_data = _format_openai_output(response)
                             # Serialize structured data to JSON for span attribute
                             if isinstance(output, list):
-                                output_str = orjson.dumps(
-                                    output, option=orjson.OPT_INDENT_2
-                                ).decode()
+                                output_str = safe_serialize(output)
                             else:
                                 output_str = str(output) if output is not None else None
                             set_span_attribute(
@@ -579,9 +576,7 @@ def wrap_openai_client(tracer: Tracer, client: TClient) -> TClient:
                             output, usage_data = _format_openai_output(response)
                             # Serialize structured data to JSON for span attribute
                             if isinstance(output, list):
-                                output_str = orjson.dumps(
-                                    output, option=orjson.OPT_INDENT_2
-                                ).decode()
+                                output_str = safe_serialize(output)
                             else:
                                 output_str = str(output) if output is not None else None
                             set_span_attribute(

@@ -322,11 +322,7 @@ def wrap_groq_client(tracer: Tracer, client: GroqClientType) -> GroqClientType:
                             # Serialize structured data to JSON for span attribute
                             if output:
                                 if isinstance(output, list):
-                                    import orjson
-
-                                    output_str = orjson.dumps(
-                                        output, option=orjson.OPT_INDENT_2
-                                    ).decode()
+                                    output_str = safe_serialize(output)
                                 else:
                                     output_str = str(output)
                                 set_span_attribute(
@@ -429,11 +425,7 @@ def wrap_groq_client(tracer: Tracer, client: GroqClientType) -> GroqClientType:
                             # Serialize structured data to JSON for span attribute
                             if output:
                                 if isinstance(output, list):
-                                    import orjson
-
-                                    output_str = orjson.dumps(
-                                        output, option=orjson.OPT_INDENT_2
-                                    ).decode()
+                                    output_str = safe_serialize(output)
                                 else:
                                     output_str = str(output)
                                 set_span_attribute(
