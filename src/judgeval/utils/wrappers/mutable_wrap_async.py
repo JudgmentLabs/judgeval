@@ -8,10 +8,10 @@ from typing import (
     Mapping,
     ParamSpec,
     Concatenate,
-    cast,
 )
 
 from judgeval.utils.decorators.dont_throw import dont_throw
+from judgeval.logger import judgeval_logger
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -78,25 +78,37 @@ def mutable_wrap_async(
     """
 
     pre_hook = dont_throw(pre_hook)
-    mutate_args_hook = cast(
-        Callable[[Ctx, tuple[Any, ...]], tuple[Any, ...]],
-        dont_throw(default=_identity_args)(mutate_args_hook),
-    )
-    mutate_kwargs_hook = cast(
-        Callable[[Ctx, dict[str, Any]], dict[str, Any]],
-        dont_throw(default=_identity_kwargs)(mutate_kwargs_hook),
-    )
     post_hook = dont_throw(post_hook)
     error_hook = dont_throw(error_hook)
     finally_hook = dont_throw(finally_hook)
+
+    def safe_mutate_args_hook(ctx: Ctx, args: tuple[Any, ...]) -> tuple[Any, ...]:
+        try:
+            return mutate_args_hook(ctx, args)
+        except Exception as e:
+            judgeval_logger.debug(
+                f"[Caught] An exception was raised in {mutate_args_hook.__name__}",
+                exc_info=e,
+            )
+            return _identity_args(ctx, args)
+
+    def safe_mutate_kwargs_hook(ctx: Ctx, kwargs: dict[str, Any]) -> dict[str, Any]:
+        try:
+            return mutate_kwargs_hook(ctx, kwargs)
+        except Exception as e:
+            judgeval_logger.debug(
+                f"[Caught] An exception was raised in {mutate_kwargs_hook.__name__}",
+                exc_info=e,
+            )
+            return _identity_kwargs(ctx, kwargs)
 
     @wraps(func)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         ctx: Ctx = {}
         pre_hook(ctx, *args, **kwargs)
 
-        final_args = mutate_args_hook(ctx, args)
-        final_kwargs = mutate_kwargs_hook(ctx, kwargs)
+        final_args = safe_mutate_args_hook(ctx, args)
+        final_kwargs = safe_mutate_kwargs_hook(ctx, kwargs)
 
         try:
             result = await func(*final_args, **final_kwargs)
