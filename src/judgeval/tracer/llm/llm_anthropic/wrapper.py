@@ -280,6 +280,19 @@ class TracedAnthropicAsyncGenerator:
     async def __anext__(self) -> AnthropicStreamEvent:
         try:
             chunk = await self.async_generator.__anext__()
+        except StopAsyncIteration:
+            set_span_attribute(
+                self.span, AttributeKeys.GEN_AI_COMPLETION, self.accumulated_content
+            )
+            self.span.end()
+            raise
+        except Exception as e:
+            if self.span:
+                self.span.record_exception(e)
+                self.span.end()
+            raise
+
+        try:
             content = _extract_anthropic_content(chunk)
             if content:
                 self.accumulated_content += content
@@ -312,18 +325,14 @@ class TracedAnthropicAsyncGenerator:
                     AttributeKeys.JUDGMENT_USAGE_METADATA,
                     safe_serialize(usage_data),
                 )
-            return chunk
-        except StopAsyncIteration:
-            set_span_attribute(
-                self.span, AttributeKeys.GEN_AI_COMPLETION, self.accumulated_content
-            )
-            self.span.end()
-            raise
         except Exception as e:
             if self.span:
-                self.span.record_exception(e)
                 self.span.end()
-            raise
+            judgeval_logger.error(
+                f"[anthropic wrapped_async] Error adding span metadata: {e}"
+            )
+        finally:
+            return chunk
 
 
 class TracedAnthropicSyncContextManager:
@@ -616,11 +625,6 @@ def wrap_anthropic_client(tracer: Tracer, client: TClient) -> TClient:
         setattr(client.messages, "create", wrapped(client.messages.create, span_name))
         setattr(
             client.messages,
-            "create",
-            wrapped(client.messages.create, span_name),
-        )
-        setattr(
-            client.messages,
             "stream",
             wrapped_sync_context_manager(client.messages.stream, span_name),
         )
@@ -635,9 +639,7 @@ def wrap_anthropic_client(tracer: Tracer, client: TClient) -> TClient:
         setattr(
             client.messages,
             "stream",
-            wrapped_async_context_manager(
-                client.messages.stream, span_name
-            ),
+            wrapped_async_context_manager(client.messages.stream, span_name),
         )
 
     return client
