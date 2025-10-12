@@ -1,5 +1,4 @@
 from __future__ import annotations
-import time
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -13,8 +12,6 @@ from judgeval.tracer.utils import set_span_attribute
 from judgeval.utils.serialize import safe_serialize
 from judgeval.utils.wrappers import (
     mutable_wrap_sync,
-    immutable_wrap_sync,
-    immutable_wrap_async,
     immutable_wrap_sync_generator,
     immutable_wrap_async_generator,
 )
@@ -55,9 +52,26 @@ def wrap_messages_stream_sync(tracer: Tracer, client: Anthropic) -> None:
         ctx: Dict[str, Any], result: MessageStreamManager
     ) -> MessageStreamManager:
         original_manager = result
-        original_enter = original_manager.__enter__
 
-        def post_hook_enter(enter_ctx: Dict[str, Any], stream: MessageStream) -> None:
+        class WrappedMessageStreamManager:
+            def __init__(self, manager: MessageStreamManager):
+                self._manager = manager
+
+            def __enter__(self) -> MessageStream:
+                stream = self._manager.__enter__()
+                post_hook_enter_impl(stream)
+                return stream
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                result = self._manager.__exit__(exc_type, exc_val, exc_tb)
+                post_hook_exit_impl()
+                return result
+
+            def __getattr__(self, name):
+                return getattr(self._manager, name)
+
+        def post_hook_enter_impl(stream: MessageStream) -> None:
+            ctx["stream"] = stream
             original_text_stream = stream.text_stream
 
             def traced_text_stream() -> Generator[str, None, None]:
@@ -80,13 +94,26 @@ def wrap_messages_stream_sync(tracer: Tracer, client: Anthropic) -> None:
                     span.record_exception(error)
 
             def finally_hook_inner(inner_ctx: Dict[str, Any]) -> None:
-                span = ctx.get("span")
-                if span:
-                    accumulated = ctx.get("accumulated_content", "")
-                    set_span_attribute(
-                        span, AttributeKeys.GEN_AI_COMPLETION, accumulated
-                    )
+                pass
 
+            wrapped_text_stream = immutable_wrap_sync_generator(
+                traced_text_stream,
+                yield_hook=yield_hook,
+                post_hook=post_hook_inner,
+                error_hook=error_hook_inner,
+                finally_hook=finally_hook_inner,
+            )
+
+            stream.text_stream = wrapped_text_stream()
+
+        def post_hook_exit_impl() -> None:
+            span = ctx.get("span")
+            if span:
+                accumulated = ctx.get("accumulated_content", "")
+                set_span_attribute(span, AttributeKeys.GEN_AI_COMPLETION, accumulated)
+
+                stream = ctx.get("stream")
+                if stream:
                     try:
                         final_message = stream.get_final_message()
                         if hasattr(final_message, "usage") and final_message.usage:
@@ -132,22 +159,9 @@ def wrap_messages_stream_sync(tracer: Tracer, client: Anthropic) -> None:
                     except Exception:
                         pass
 
-                    span.end()
+                span.end()
 
-            wrapped_text_stream = immutable_wrap_sync_generator(
-                traced_text_stream,
-                yield_hook=yield_hook,
-                post_hook=post_hook_inner,
-                error_hook=error_hook_inner,
-                finally_hook=finally_hook_inner,
-            )
-
-            stream.text_stream = wrapped_text_stream()
-
-        wrapped_enter = immutable_wrap_sync(original_enter, post_hook=post_hook_enter)
-
-        setattr(original_manager, "__enter__", wrapped_enter)
-        return original_manager
+        return WrappedMessageStreamManager(original_manager)  # type: ignore[return-value]
 
     def error_hook(ctx: Dict[str, Any], error: Exception) -> None:
         span = ctx.get("span")
@@ -186,11 +200,26 @@ def wrap_messages_stream_async(tracer: Tracer, client: AsyncAnthropic) -> None:
         ctx: Dict[str, Any], result: AsyncMessageStreamManager
     ) -> AsyncMessageStreamManager:
         original_manager = result
-        original_aenter = original_manager.__aenter__
 
-        def post_hook_aenter(
-            enter_ctx: Dict[str, Any], stream: AsyncMessageStream
-        ) -> None:
+        class WrappedAsyncMessageStreamManager:
+            def __init__(self, manager: AsyncMessageStreamManager):
+                self._manager = manager
+
+            async def __aenter__(self) -> AsyncMessageStream:
+                stream = await self._manager.__aenter__()
+                post_hook_aenter_impl(stream)
+                return stream
+
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                result = await self._manager.__aexit__(exc_type, exc_val, exc_tb)
+                await post_hook_aexit_impl()
+                return result
+
+            def __getattr__(self, name):
+                return getattr(self._manager, name)
+
+        def post_hook_aenter_impl(stream: AsyncMessageStream) -> None:
+            ctx["stream"] = stream
             original_text_stream = stream.text_stream
 
             async def traced_text_stream() -> AsyncGenerator[str, None]:
@@ -212,14 +241,27 @@ def wrap_messages_stream_async(tracer: Tracer, client: AsyncAnthropic) -> None:
                 if span:
                     span.record_exception(error)
 
-            async def finally_hook_inner_async(inner_ctx: Dict[str, Any]) -> None:
-                span = ctx.get("span")
-                if span:
-                    accumulated = ctx.get("accumulated_content", "")
-                    set_span_attribute(
-                        span, AttributeKeys.GEN_AI_COMPLETION, accumulated
-                    )
+            def finally_hook_inner_sync(inner_ctx: Dict[str, Any]) -> None:
+                pass
 
+            wrapped_text_stream = immutable_wrap_async_generator(
+                traced_text_stream,
+                yield_hook=yield_hook,
+                post_hook=post_hook_inner,
+                error_hook=error_hook_inner,
+                finally_hook=finally_hook_inner_sync,
+            )
+
+            stream.text_stream = wrapped_text_stream()
+
+        async def post_hook_aexit_impl() -> None:
+            span = ctx.get("span")
+            if span:
+                accumulated = ctx.get("accumulated_content", "")
+                set_span_attribute(span, AttributeKeys.GEN_AI_COMPLETION, accumulated)
+
+                stream = ctx.get("stream")
+                if stream:
                     try:
                         final_message = await stream.get_final_message()
                         if hasattr(final_message, "usage") and final_message.usage:
@@ -265,38 +307,9 @@ def wrap_messages_stream_async(tracer: Tracer, client: AsyncAnthropic) -> None:
                     except Exception:
                         pass
 
-                    span.end()
+                span.end()
 
-            def finally_hook_inner_sync(inner_ctx: Dict[str, Any]) -> None:
-                import asyncio
-
-                try:
-                    loop = asyncio.get_event_loop()
-                    if loop.is_running():
-                        asyncio.create_task(finally_hook_inner_async(inner_ctx))
-                    else:
-                        loop.run_until_complete(finally_hook_inner_async(inner_ctx))
-                except Exception:
-                    span = ctx.get("span")
-                    if span:
-                        span.end()
-
-            wrapped_text_stream = immutable_wrap_async_generator(
-                traced_text_stream,
-                yield_hook=yield_hook,
-                post_hook=post_hook_inner,
-                error_hook=error_hook_inner,
-                finally_hook=finally_hook_inner_sync,
-            )
-
-            stream.text_stream = wrapped_text_stream()
-
-        wrapped_aenter = immutable_wrap_async(
-            original_aenter, post_hook=post_hook_aenter
-        )
-
-        setattr(original_manager, "__aenter__", wrapped_aenter)
-        return original_manager
+        return WrappedAsyncMessageStreamManager(original_manager)  # type: ignore[return-value]
 
     def error_hook(ctx: Dict[str, Any], error: Exception) -> None:
         span = ctx.get("span")
@@ -355,6 +368,6 @@ if __name__ == "__main__":
                 print(text, end="", flush=True)
         print("\n")
 
-    asyncio.run(async_example())
+        print(await stream.get_final_message())
 
-    time.sleep(10)
+    asyncio.run(async_example())
