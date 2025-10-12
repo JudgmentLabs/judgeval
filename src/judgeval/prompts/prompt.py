@@ -186,7 +186,7 @@ class Prompt:
     @classmethod
     def untag(cls, project_name: str, name: str, tags: List[str]):
         prompt_config = untag_prompt(project_name, name, tags)
-        return prompt_config["commit_id"]
+        return prompt_config["commit_ids"]
 
     @classmethod
     def list(cls, project_name: str, name: str):
