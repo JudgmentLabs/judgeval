@@ -44,7 +44,12 @@ def fetch_prompt(
 ):
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
-        prompt_config = client.prompts_fetch(project_name, name, commit_id, tag)
+        prompt_config = client.prompts_fetch(
+            name=name,
+            project_name=project_name,
+            commit_id=commit_id,
+            tag=tag,
+        )
         return prompt_config["commit"]
     except JudgmentAPIError as e:
         raise JudgmentAPIError(
@@ -165,7 +170,11 @@ class Prompt:
             )
         prompt_config = fetch_prompt(project_name, name, commit_id, tag)
         if prompt_config is None:
-            raise ValueError(f"Prompt '{name}' not found in project '{project_name}'")
+            raise JudgmentAPIError(
+                status_code=404,
+                detail=f"Prompt '{name}' not found in project '{project_name}'",
+                response=None,  # type: ignore
+            )
         return cls(
             name=prompt_config["name"],
             prompt=prompt_config["prompt"],
