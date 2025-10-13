@@ -6,5 +6,4 @@ class ProviderType(Enum):
     ANTHROPIC = "anthropic"
     TOGETHER = "together"
     GOOGLE = "google"
-    GROQ = "groq"
     DEFAULT = "default"

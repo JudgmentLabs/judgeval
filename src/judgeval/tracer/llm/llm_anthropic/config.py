@@ -1,20 +1,6 @@
 from __future__ import annotations
+import importlib.util
 
-HAS_ANTHROPIC = False
-anthropic_Anthropic = None
-anthropic_AsyncAnthropic = None
+HAS_ANTHROPIC = importlib.util.find_spec("anthropic") is not None
 
-try:
-    from anthropic import Anthropic, AsyncAnthropic  # type: ignore[import-untyped]
-
-    anthropic_Anthropic = Anthropic
-    anthropic_AsyncAnthropic = AsyncAnthropic
-    HAS_ANTHROPIC = True
-except ImportError:
-    pass
-
-__all__ = [
-    "HAS_ANTHROPIC",
-    "anthropic_Anthropic",
-    "anthropic_AsyncAnthropic",
-]
+__all__ = ["HAS_ANTHROPIC"]

@@ -11,10 +11,24 @@ if TYPE_CHECKING:
 
 
 def wrap_google_client(tracer: Tracer, client: Client) -> Client:
-    from judgeval.tracer.llm.llm_google.config import google_genai_Client
+    from judgeval.tracer.llm.llm_google.config import HAS_GOOGLE_GENAI
+    from judgeval.logger import judgeval_logger
 
-    if google_genai_Client is not None and isinstance(client, google_genai_Client):
-        wrap_generate_content_sync(tracer, client)
+    if not HAS_GOOGLE_GENAI:
+        judgeval_logger.error(
+            "Cannot wrap Google GenAI client: 'google-genai' library not installed. "
+            "Install it with: pip install google-genai"
+        )
         return client
-    else:
-        raise TypeError(f"Invalid client type: {type(client)}")
+
+    try:
+        from google.genai import Client as GoogleClient
+
+        if isinstance(client, GoogleClient):
+            wrap_generate_content_sync(tracer, client)
+            return client
+        else:
+            raise TypeError(f"Invalid client type: {type(client)}")
+    except ImportError as e:
+        judgeval_logger.error(f"Failed to import Google GenAI client: {e}")
+        return client

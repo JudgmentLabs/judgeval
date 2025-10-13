@@ -1,20 +1,6 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+import importlib.util
 
-if TYPE_CHECKING:
-    from google.genai import Client
+HAS_GOOGLE_GENAI = importlib.util.find_spec("google.genai") is not None
 
-try:
-    from google.genai import Client
-
-    HAS_GOOGLE_GENAI = True
-except ImportError:
-    HAS_GOOGLE_GENAI = False
-    Client = None  # type: ignore[misc,assignment]
-
-google_genai_Client = Client
-
-__all__ = [
-    "HAS_GOOGLE_GENAI",
-    "google_genai_Client",
-]
+__all__ = ["HAS_GOOGLE_GENAI"]

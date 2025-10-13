@@ -39,16 +39,25 @@ def wrap_anthropic_client(tracer: Tracer, client: AsyncAnthropic) -> AsyncAnthro
 
 
 def wrap_anthropic_client(tracer: Tracer, client: TClient) -> TClient:
-    from judgeval.tracer.llm.llm_anthropic.config import (
-        anthropic_Anthropic,
-        anthropic_AsyncAnthropic,
-    )
+    from judgeval.tracer.llm.llm_anthropic.config import HAS_ANTHROPIC
+    from judgeval.logger import judgeval_logger
 
-    if anthropic_Anthropic is not None and isinstance(client, anthropic_Anthropic):
-        return wrap_anthropic_client_sync(tracer, client)
-    elif anthropic_AsyncAnthropic is not None and isinstance(
-        client, anthropic_AsyncAnthropic
-    ):
-        return wrap_anthropic_client_async(tracer, client)
-    else:
-        raise TypeError(f"Invalid client type: {type(client)}")
+    if not HAS_ANTHROPIC:
+        judgeval_logger.error(
+            "Cannot wrap Anthropic client: 'anthropic' library not installed. "
+            "Install it with: pip install anthropic"
+        )
+        return client
+
+    try:
+        from anthropic import Anthropic, AsyncAnthropic
+
+        if isinstance(client, AsyncAnthropic):
+            return wrap_anthropic_client_async(tracer, client)
+        elif isinstance(client, Anthropic):
+            return wrap_anthropic_client_sync(tracer, client)
+        else:
+            raise TypeError(f"Invalid client type: {type(client)}")
+    except ImportError as e:
+        judgeval_logger.error(f"Failed to import Anthropic client: {e}")
+        return client
