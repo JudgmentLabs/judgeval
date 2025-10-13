@@ -16,6 +16,8 @@ from judgeval.tracer.keys import AttributeKeys
 from judgeval.tracer.utils import set_span_attribute
 from judgeval.utils.serialize import safe_serialize
 from judgeval.utils.wrappers import (
+    immutable_wrap_sync,
+    immutable_wrap_async,
     mutable_wrap_sync,
     mutable_wrap_async,
     immutable_wrap_sync_generator,
@@ -145,7 +147,7 @@ def _wrap_non_streaming_sync(
         if span:
             span.end()
 
-    return mutable_wrap_sync(
+    return immutable_wrap_sync(
         original_func,
         pre_hook=pre_hook,
         post_hook=post_hook,
@@ -329,7 +331,7 @@ def _wrap_non_streaming_async(
         if span:
             span.end()
 
-    return mutable_wrap_async(
+    return immutable_wrap_async(
         original_func,
         pre_hook=pre_hook,
         post_hook=post_hook,
