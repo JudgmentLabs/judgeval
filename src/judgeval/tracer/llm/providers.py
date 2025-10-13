@@ -22,7 +22,6 @@ from judgeval.tracer.llm.llm_anthropic.config import (
 from judgeval.tracer.llm.llm_google.config import (
     HAS_GOOGLE_GENAI,
     google_genai_Client,
-    google_genai_AsyncClient,
 )
 from judgeval.tracer.llm.llm_groq.config import (
     HAS_GROQ,
@@ -55,7 +54,6 @@ __all__ = [
     # Google GenAI
     "HAS_GOOGLE_GENAI",
     "google_genai_Client",
-    "google_genai_AsyncClient",
     # Groq
     "HAS_GROQ",
     "groq_Groq",
