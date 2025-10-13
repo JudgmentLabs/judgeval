@@ -39,18 +39,23 @@ class JudgmentClient(metaclass=SingletonMeta):
     def run_evaluation(
         self,
         examples: List[Example],
-        scorers: Sequence[Union[ExampleAPIScorerConfig, ExampleScorer]],
+        scorers: Sequence[Union[ExampleAPIScorerConfig, ExampleScorer, None]],
         project_name: str = "default_project",
         eval_run_name: str = "default_eval_run",
         model: Optional[str] = None,
         assert_test: bool = False,
     ) -> List[ScoringResult]:
         try:
+            for scorer in scorers:
+                if scorer is None:
+                    raise ValueError(
+                        "Failed to run evaluation: At least one Prompt Scorer was not successfuly retrieved."
+                    )
             eval = ExampleEvaluationRun(
                 project_name=project_name,
                 eval_name=eval_run_name,
                 examples=examples,
-                scorers=scorers,
+                scorers=scorers,  # type: ignore
                 model=model,
             )
 

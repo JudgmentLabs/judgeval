@@ -12,6 +12,7 @@ from judgeval.logger import judgeval_logger
 from abc import ABC
 from judgeval.env import JUDGMENT_DEFAULT_GPT_MODEL
 from copy import copy
+from judgeval.utils.decorators.dont_throw import dont_throw
 
 
 def push_prompt_scorer(
@@ -60,10 +61,19 @@ def fetch_prompt_scorer(
 ):
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
-        scorer_config = client.fetch_scorers({"names": [name]})["scorers"][0]
-        scorer_config.pop("created_at")
-        scorer_config.pop("updated_at")
-        return scorer_config
+        fetched_scorers = client.fetch_scorers({"names": [name]})
+        if len(fetched_scorers["scorers"]) == 0:
+            judgeval_logger.error(f"Prompt scorer '{name}' not found")
+            raise JudgmentAPIError(
+                status_code=404,
+                detail=f"Prompt scorer '{name}' not found",
+                response=None,  # type: ignore
+            )
+        else:
+            scorer_config = fetched_scorers["scorers"][0]
+            scorer_config.pop("created_at")
+            scorer_config.pop("updated_at")
+            return scorer_config
     except JudgmentAPIError as e:
         if e.status_code == 500:
             raise JudgmentAPIError(
@@ -109,6 +119,7 @@ class BasePromptScorer(ABC, APIScorerConfig):
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or ""
 
     @classmethod
+    @dont_throw
     def get(
         cls,
         name: str,
