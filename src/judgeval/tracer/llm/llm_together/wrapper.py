@@ -26,9 +26,9 @@ def wrap_together_client_async(tracer: Tracer, client: AsyncTogether) -> AsyncTo
 
 
 @typing.overload
-def wrap_together_client(tracer: Tracer, client: Together) -> Together: ...
-@typing.overload
 def wrap_together_client(tracer: Tracer, client: AsyncTogether) -> AsyncTogether: ...
+@typing.overload
+def wrap_together_client(tracer: Tracer, client: Together) -> Together: ...
 
 
 def wrap_together_client(tracer: Tracer, client: TClient) -> TClient:

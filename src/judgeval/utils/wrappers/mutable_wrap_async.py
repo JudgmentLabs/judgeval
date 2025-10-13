@@ -2,6 +2,7 @@ from functools import wraps
 from typing import Awaitable, Callable, TypeVar, Any, Dict, ParamSpec, Concatenate
 
 from judgeval.utils.decorators.dont_throw import dont_throw
+from judgeval.utils.wrappers.utils import identity_on_throw
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -39,20 +40,24 @@ def mutable_wrap_async(
     safe_error_hook = dont_throw(error_hook) if error_hook else (lambda ctx, e: None)
     safe_finally_hook = dont_throw(finally_hook) if finally_hook else (lambda ctx: None)
 
+    safe_mutate_args = identity_on_throw(mutate_args_hook) if mutate_args_hook else None
+    safe_mutate_kwargs = (
+        identity_on_throw(mutate_kwargs_hook) if mutate_kwargs_hook else None
+    )
+    safe_mutate_hook = identity_on_throw(mutate_hook) if mutate_hook else None
+
     @wraps(func)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         ctx: Ctx = {}
         safe_pre_hook(ctx, *args, **kwargs)
 
-        final_args = args if not mutate_args_hook else mutate_args_hook(ctx, args)
-        final_kwargs = (
-            kwargs if not mutate_kwargs_hook else mutate_kwargs_hook(ctx, kwargs)
-        )
+        final_args = safe_mutate_args(ctx, args) if safe_mutate_args else args
+        final_kwargs = safe_mutate_kwargs(ctx, kwargs) if safe_mutate_kwargs else kwargs
 
         try:
             result = await func(*final_args, **final_kwargs)
             safe_post_hook(ctx, result)
-            return result if not mutate_hook else mutate_hook(ctx, result)
+            return safe_mutate_hook(ctx, result) if safe_mutate_hook else result
         except Exception as e:
             safe_error_hook(ctx, e)
             raise
