@@ -9,9 +9,7 @@ from typing import (
     AsyncIterator,
     Generator,
     AsyncGenerator,
-    Optional,
     Tuple,
-    Union,
 )
 
 from judgeval.tracer.keys import AttributeKeys
@@ -27,104 +25,48 @@ from judgeval.utils.wrappers import (
 if TYPE_CHECKING:
     from judgeval.tracer import Tracer
     from anthropic import Anthropic, AsyncAnthropic
-    from anthropic.types import Message
+    from anthropic.types import (
+        Message,
+        Usage,
+        MessageDeltaUsage,
+        RawMessageStreamEvent,
+    )
 
 
-def _extract_anthropic_content(chunk: Any) -> str:
-    if hasattr(chunk, "delta") and chunk.delta and hasattr(chunk.delta, "text"):
-        return chunk.delta.text or ""
-
-    if hasattr(chunk, "type") and chunk.type == "content_block_delta":
-        if hasattr(chunk, "delta") and chunk.delta and hasattr(chunk.delta, "text"):
-            return chunk.delta.text or ""
+def _extract_anthropic_content(chunk: RawMessageStreamEvent) -> str:
+    if chunk.type == "content_block_delta":
+        delta = chunk.delta
+        if delta.type == "text_delta" and delta.text:
+            return delta.text
     return ""
 
 
-def _extract_anthropic_tokens(usage_data: Any) -> Tuple[int, int, int, int]:
-    prompt_tokens = getattr(usage_data, "input_tokens", 0) or 0
-    completion_tokens = getattr(usage_data, "output_tokens", 0) or 0
-    cache_read_input_tokens = getattr(usage_data, "cache_read_input_tokens", 0) or 0
-    cache_creation_input_tokens = (
-        getattr(usage_data, "cache_creation_input_tokens", 0) or 0
+def _extract_anthropic_tokens(
+    usage: Usage | MessageDeltaUsage,
+) -> Tuple[int, int, int, int]:
+    input_tokens = usage.input_tokens if usage.input_tokens is not None else 0
+    output_tokens = usage.output_tokens if usage.output_tokens is not None else 0
+    cache_read = (
+        usage.cache_read_input_tokens
+        if usage.cache_read_input_tokens is not None
+        else 0
     )
-
-    return (
-        prompt_tokens,
-        completion_tokens,
-        cache_read_input_tokens,
-        cache_creation_input_tokens,
+    cache_creation = (
+        usage.cache_creation_input_tokens
+        if usage.cache_creation_input_tokens is not None
+        else 0
     )
+    return (input_tokens, output_tokens, cache_read, cache_creation)
 
 
-def _extract_anthropic_chunk_usage(chunk: Any) -> Optional[Any]:
-    if hasattr(chunk, "usage") and chunk.usage:
-        return chunk.usage
-
-    if hasattr(chunk, "type"):
-        if (
-            chunk.type == "message_start"
-            and hasattr(chunk, "message")
-            and chunk.message
-        ):
-            return getattr(chunk.message, "usage", None)
-        elif chunk.type in ("message_delta", "message_stop"):
-            return getattr(chunk, "usage", None)
+def _extract_anthropic_chunk_usage(
+    chunk: RawMessageStreamEvent,
+) -> Usage | MessageDeltaUsage | None:
+    if chunk.type == "message_start":
+        return chunk.message.usage if chunk.message else None
+    elif chunk.type == "message_delta":
+        return chunk.usage if hasattr(chunk, "usage") else None
     return None
-
-
-def _format_anthropic_output(
-    response: Any,
-) -> Tuple[Optional[Union[str, list]], Optional[Any]]:
-    message_content: Optional[Union[str, list]] = None
-    usage_data: Optional[Any] = None
-
-    try:
-        usage_data = getattr(response, "usage", None)
-        if hasattr(response, "content") and response.content:
-            content_blocks = []
-            for block in response.content:
-                block_type = getattr(block, "type", None)
-                if block_type == "text":
-                    block_data = {
-                        "type": "text",
-                        "text": getattr(block, "text", ""),
-                    }
-                    if hasattr(block, "citations"):
-                        block_data["citations"] = getattr(block, "citations", None)
-                elif block_type == "tool_use":
-                    block_data = {
-                        "type": "tool_use",
-                        "id": getattr(block, "id", None),
-                        "name": getattr(block, "name", None),
-                        "input": getattr(block, "input", None),
-                    }
-                elif block_type == "tool_result":
-                    block_data = {
-                        "type": "tool_result",
-                        "tool_use_id": getattr(block, "tool_use_id", None),
-                        "content": getattr(block, "content", None),
-                    }
-                else:
-                    block_data = {"type": block_type}
-                    for attr in [
-                        "id",
-                        "text",
-                        "name",
-                        "input",
-                        "content",
-                        "tool_use_id",
-                        "citations",
-                    ]:
-                        if hasattr(block, attr):
-                            block_data[attr] = getattr(block, attr)
-
-                content_blocks.append(block_data)
-
-            message_content = content_blocks if content_blocks else None
-    except (AttributeError, IndexError, TypeError):
-        pass
-
-    return message_content, usage_data
 
 
 def wrap_messages_create_sync(tracer: Tracer, client: Anthropic) -> None:
@@ -159,14 +101,13 @@ def _wrap_non_streaming_sync(
         if not span:
             return
 
-        output, usage_data = _format_anthropic_output(result)
         set_span_attribute(
-            span, AttributeKeys.GEN_AI_COMPLETION, safe_serialize(output)
+            span, AttributeKeys.GEN_AI_COMPLETION, safe_serialize(result)
         )
 
-        if usage_data:
+        if result.usage:
             prompt_tokens, completion_tokens, cache_read, cache_creation = (
-                _extract_anthropic_tokens(usage_data)
+                _extract_anthropic_tokens(result.usage)
             )
             set_span_attribute(
                 span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
@@ -185,13 +126,13 @@ def _wrap_non_streaming_sync(
             set_span_attribute(
                 span,
                 AttributeKeys.JUDGMENT_USAGE_METADATA,
-                safe_serialize(usage_data),
+                safe_serialize(result.usage),
             )
 
         set_span_attribute(
             span,
             AttributeKeys.GEN_AI_RESPONSE_MODEL,
-            getattr(result, "model", ctx["model_name"]),
+            result.model,
         )
 
     def error_hook(ctx: Dict[str, Any], error: Exception) -> None:
@@ -214,8 +155,8 @@ def _wrap_non_streaming_sync(
 
 
 def _wrap_streaming_sync(
-    tracer: Tracer, original_func: Callable[..., Iterator[Any]]
-) -> Callable[..., Iterator[Any]]:
+    tracer: Tracer, original_func: Callable[..., Iterator[RawMessageStreamEvent]]
+) -> Callable[..., Iterator[RawMessageStreamEvent]]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
         ctx["span"] = tracer.get_tracer().start_span(
             "ANTHROPIC_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
@@ -230,12 +171,14 @@ def _wrap_streaming_sync(
         )
         ctx["accumulated_content"] = ""
 
-    def mutate_hook(ctx: Dict[str, Any], result: Iterator[Any]) -> Iterator[Any]:
-        def traced_generator() -> Generator[Any, None, None]:
+    def mutate_hook(
+        ctx: Dict[str, Any], result: Iterator[RawMessageStreamEvent]
+    ) -> Iterator[RawMessageStreamEvent]:
+        def traced_generator() -> Generator[RawMessageStreamEvent, None, None]:
             for chunk in result:
                 yield chunk
 
-        def yield_hook(inner_ctx: Dict[str, Any], chunk: Any) -> None:
+        def yield_hook(inner_ctx: Dict[str, Any], chunk: RawMessageStreamEvent) -> None:
             span = ctx.get("span")
             if not span:
                 return
@@ -342,14 +285,13 @@ def _wrap_non_streaming_async(
         if not span:
             return
 
-        output, usage_data = _format_anthropic_output(result)
         set_span_attribute(
-            span, AttributeKeys.GEN_AI_COMPLETION, safe_serialize(output)
+            span, AttributeKeys.GEN_AI_COMPLETION, safe_serialize(result)
         )
 
-        if usage_data:
+        if result.usage:
             prompt_tokens, completion_tokens, cache_read, cache_creation = (
-                _extract_anthropic_tokens(usage_data)
+                _extract_anthropic_tokens(result.usage)
             )
             set_span_attribute(
                 span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
@@ -368,13 +310,13 @@ def _wrap_non_streaming_async(
             set_span_attribute(
                 span,
                 AttributeKeys.JUDGMENT_USAGE_METADATA,
-                safe_serialize(usage_data),
+                safe_serialize(result.usage),
             )
 
         set_span_attribute(
             span,
             AttributeKeys.GEN_AI_RESPONSE_MODEL,
-            getattr(result, "model", ctx["model_name"]),
+            result.model,
         )
 
     def error_hook(ctx: Dict[str, Any], error: Exception) -> None:
@@ -397,8 +339,9 @@ def _wrap_non_streaming_async(
 
 
 def _wrap_streaming_async(
-    tracer: Tracer, original_func: Callable[..., Awaitable[AsyncIterator[Any]]]
-) -> Callable[..., Awaitable[AsyncIterator[Any]]]:
+    tracer: Tracer,
+    original_func: Callable[..., Awaitable[AsyncIterator[RawMessageStreamEvent]]],
+) -> Callable[..., Awaitable[AsyncIterator[RawMessageStreamEvent]]]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
         ctx["span"] = tracer.get_tracer().start_span(
             "ANTHROPIC_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
@@ -414,13 +357,13 @@ def _wrap_streaming_async(
         ctx["accumulated_content"] = ""
 
     def mutate_hook(
-        ctx: Dict[str, Any], result: AsyncIterator[Any]
-    ) -> AsyncIterator[Any]:
-        async def traced_generator() -> AsyncGenerator[Any, None]:
+        ctx: Dict[str, Any], result: AsyncIterator[RawMessageStreamEvent]
+    ) -> AsyncIterator[RawMessageStreamEvent]:
+        async def traced_generator() -> AsyncGenerator[RawMessageStreamEvent, None]:
             async for chunk in result:
                 yield chunk
 
-        def yield_hook(inner_ctx: Dict[str, Any], chunk: Any) -> None:
+        def yield_hook(inner_ctx: Dict[str, Any], chunk: RawMessageStreamEvent) -> None:
             span = ctx.get("span")
             if not span:
                 return

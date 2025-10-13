@@ -112,18 +112,17 @@ def wrap_messages_stream_sync(tracer: Tracer, client: Anthropic) -> None:
                 accumulated = ctx.get("accumulated_content", "")
                 set_span_attribute(span, AttributeKeys.GEN_AI_COMPLETION, accumulated)
 
-                stream = ctx.get("stream")
+                stream: MessageStream | None = ctx.get("stream")
                 if stream:
                     try:
                         final_message = stream.get_final_message()
-                        if hasattr(final_message, "usage") and final_message.usage:
-                            usage_data = final_message.usage
+                        if final_message.usage:
                             (
                                 prompt_tokens,
                                 completion_tokens,
                                 cache_read,
                                 cache_creation,
-                            ) = _extract_anthropic_tokens(usage_data)
+                            ) = _extract_anthropic_tokens(final_message.usage)
                             set_span_attribute(
                                 span,
                                 AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
@@ -147,15 +146,14 @@ def wrap_messages_stream_sync(tracer: Tracer, client: Anthropic) -> None:
                             set_span_attribute(
                                 span,
                                 AttributeKeys.JUDGMENT_USAGE_METADATA,
-                                safe_serialize(usage_data),
+                                safe_serialize(final_message.usage),
                             )
 
-                        if hasattr(final_message, "model"):
-                            set_span_attribute(
-                                span,
-                                AttributeKeys.GEN_AI_RESPONSE_MODEL,
-                                getattr(final_message, "model", ctx["model_name"]),
-                            )
+                        set_span_attribute(
+                            span,
+                            AttributeKeys.GEN_AI_RESPONSE_MODEL,
+                            final_message.model,
+                        )
                     except Exception:
                         pass
 
@@ -260,18 +258,17 @@ def wrap_messages_stream_async(tracer: Tracer, client: AsyncAnthropic) -> None:
                 accumulated = ctx.get("accumulated_content", "")
                 set_span_attribute(span, AttributeKeys.GEN_AI_COMPLETION, accumulated)
 
-                stream = ctx.get("stream")
+                stream: AsyncMessageStream | None = ctx.get("stream")
                 if stream:
                     try:
                         final_message = await stream.get_final_message()
-                        if hasattr(final_message, "usage") and final_message.usage:
-                            usage_data = final_message.usage
+                        if final_message.usage:
                             (
                                 prompt_tokens,
                                 completion_tokens,
                                 cache_read,
                                 cache_creation,
-                            ) = _extract_anthropic_tokens(usage_data)
+                            ) = _extract_anthropic_tokens(final_message.usage)
                             set_span_attribute(
                                 span,
                                 AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
@@ -295,15 +292,14 @@ def wrap_messages_stream_async(tracer: Tracer, client: AsyncAnthropic) -> None:
                             set_span_attribute(
                                 span,
                                 AttributeKeys.JUDGMENT_USAGE_METADATA,
-                                safe_serialize(usage_data),
+                                safe_serialize(final_message.usage),
                             )
 
-                        if hasattr(final_message, "model"):
-                            set_span_attribute(
-                                span,
-                                AttributeKeys.GEN_AI_RESPONSE_MODEL,
-                                getattr(final_message, "model", ctx["model_name"]),
-                            )
+                        set_span_attribute(
+                            span,
+                            AttributeKeys.GEN_AI_RESPONSE_MODEL,
+                            final_message.model,
+                        )
                     except Exception:
                         pass
 
@@ -324,50 +320,3 @@ def wrap_messages_stream_async(tracer: Tracer, client: AsyncAnthropic) -> None:
     )
 
     setattr(client.messages, "stream", wrapped)
-
-
-if __name__ == "__main__":
-    import os
-    from anthropic import Anthropic, AsyncAnthropic
-    from judgeval.tracer import Tracer
-
-    tracer = Tracer(project_name="anthropic-stream-example")
-
-    print("=" * 60)
-    print("Sync Streaming Example")
-    print("=" * 60)
-
-    client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-    wrap_messages_stream_sync(tracer, client)
-
-    with client.messages.stream(
-        max_tokens=1024,
-        messages=[{"role": "user", "content": "Write a haiku about Python"}],
-        model="claude-sonnet-4-5",
-    ) as stream:
-        for text in stream.text_stream:
-            print(text, end="", flush=True)
-    print("\n")
-
-    print("\n" + "=" * 60)
-    print("Async Streaming Example")
-    print("=" * 60)
-
-    import asyncio
-
-    async def async_example():
-        async_client = AsyncAnthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-        wrap_messages_stream_async(tracer, async_client)
-
-        async with async_client.messages.stream(
-            max_tokens=1024,
-            messages=[{"role": "user", "content": "Count from 1 to 5"}],
-            model="claude-sonnet-4-5",
-        ) as stream:
-            async for text in stream.text_stream:
-                print(text, end="", flush=True)
-        print("\n")
-
-        print(await stream.get_final_message())
-
-    asyncio.run(async_example())
