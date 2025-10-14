@@ -71,6 +71,7 @@ def _wrap_non_streaming_sync(
         prefixed_model_name = (
             f"together_ai/{ctx['model_name']}" if ctx["model_name"] else ""
         )
+        ctx["model_name"] = prefixed_model_name
         set_span_attribute(
             ctx["span"], AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
         )
@@ -111,7 +112,7 @@ def _wrap_non_streaming_sync(
         set_span_attribute(
             span,
             AttributeKeys.GEN_AI_RESPONSE_MODEL,
-            result.model if result.model else ctx["model_name"],
+            ctx["model_name"],
         )
 
     def error_hook(ctx: Dict[str, Any], error: Exception) -> None:
@@ -148,6 +149,7 @@ def _wrap_streaming_sync(
         prefixed_model_name = (
             f"together_ai/{ctx['model_name']}" if ctx["model_name"] else ""
         )
+        ctx["model_name"] = prefixed_model_name
         set_span_attribute(
             ctx["span"], AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
         )
@@ -259,6 +261,7 @@ def _wrap_non_streaming_async(
         prefixed_model_name = (
             f"together_ai/{ctx['model_name']}" if ctx["model_name"] else ""
         )
+        ctx["model_name"] = prefixed_model_name
         set_span_attribute(
             ctx["span"], AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
         )
@@ -299,7 +302,7 @@ def _wrap_non_streaming_async(
         set_span_attribute(
             span,
             AttributeKeys.GEN_AI_RESPONSE_MODEL,
-            result.model if result.model else ctx["model_name"],
+            ctx["model_name"],
         )
 
     def error_hook(ctx: Dict[str, Any], error: Exception) -> None:
@@ -337,6 +340,7 @@ def _wrap_streaming_async(
         prefixed_model_name = (
             f"together_ai/{ctx['model_name']}" if ctx["model_name"] else ""
         )
+        ctx["model_name"] = prefixed_model_name
         set_span_attribute(
             ctx["span"], AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
         )

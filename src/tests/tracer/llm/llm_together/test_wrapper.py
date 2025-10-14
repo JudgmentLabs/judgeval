@@ -12,14 +12,6 @@ from judgeval.tracer.llm.llm_together.wrapper import (
 )
 from judgeval.tracer.keys import AttributeKeys  # type: ignore
 
-# ============================================================================
-# TEMPORARY: Together account is blocked - mark tests that need API as xfail
-# Comment out the line below when account is unblocked
-# ============================================================================
-TOGETHER_ACCOUNT_BLOCKED = pytest.mark.xfail(
-    reason="Together account blocked - expected to fail until unblocked", strict=False
-)
-
 
 class MockSpanProcessor:
     """Mock span processor to capture span data for testing"""
@@ -122,7 +114,6 @@ def async_client_maybe_wrapped(request, tracer, async_client):
     return async_client
 
 
-@TOGETHER_ACCOUNT_BLOCKED
 class TestSyncWrapper:
     def test_chat_completions_create(self, sync_client_maybe_wrapped):
         """Test sync chat.completions.create"""
@@ -184,7 +175,6 @@ class TestSyncWrapper:
         assert response1.id != response2.id
 
 
-@TOGETHER_ACCOUNT_BLOCKED
 class TestAsyncWrapper:
     @pytest.mark.asyncio
     async def test_chat_completions_create(self, async_client_maybe_wrapped):
@@ -252,7 +242,6 @@ class TestAsyncWrapper:
         assert response1.id != response2.id
 
 
-@TOGETHER_ACCOUNT_BLOCKED
 class TestTracingAttributes:
     """Test that tracing attributes are correctly set"""
 
@@ -358,7 +347,6 @@ class TestTracingAttributes:
         assert AttributeKeys.GEN_AI_COMPLETION in attrs
 
 
-@TOGETHER_ACCOUNT_BLOCKED
 class TestIdempotency:
     """Test that wrapping is idempotent and doesn't affect unwrapped clients"""
 
