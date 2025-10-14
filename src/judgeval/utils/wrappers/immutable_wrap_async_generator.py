@@ -4,7 +4,6 @@ from typing import (
     TypeVar,
     Any,
     Dict,
-    Mapping,
     ParamSpec,
     AsyncGenerator,
     cast,
@@ -17,7 +16,6 @@ P = ParamSpec("P")
 Y = TypeVar("Y")
 S = TypeVar("S")
 Ctx = Dict[str, Any]
-ImmCtx = Mapping[str, Any]
 
 
 def _void_pre_hook(ctx: Ctx, *args: Any, **kwargs: Any) -> None:

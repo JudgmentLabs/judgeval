@@ -53,15 +53,11 @@ def wrap_openai_client(tracer: Tracer, client: TClient) -> TClient:
         )
         return client
 
-    try:
-        from openai import OpenAI, AsyncOpenAI
+    from openai import OpenAI, AsyncOpenAI
 
-        if isinstance(client, AsyncOpenAI):
-            return wrap_openai_client_async(tracer, client)
-        elif isinstance(client, OpenAI):
-            return wrap_openai_client_sync(tracer, client)
-        else:
-            raise TypeError(f"Invalid client type: {type(client)}")
-    except ImportError as e:
-        judgeval_logger.error(f"Failed to import OpenAI client: {e}")
-        return client
+    if isinstance(client, AsyncOpenAI):
+        return wrap_openai_client_async(tracer, client)
+    elif isinstance(client, OpenAI):
+        return wrap_openai_client_sync(tracer, client)
+    else:
+        raise TypeError(f"Invalid client type: {type(client)}")

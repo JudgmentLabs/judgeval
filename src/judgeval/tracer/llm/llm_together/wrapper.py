@@ -42,15 +42,11 @@ def wrap_together_client(tracer: Tracer, client: TClient) -> TClient:
         )
         return client
 
-    try:
-        from together import Together, AsyncTogether  # type: ignore[import-untyped]
+    from together import Together, AsyncTogether  # type: ignore[import-untyped]
 
-        if isinstance(client, AsyncTogether):
-            return wrap_together_client_async(tracer, client)
-        elif isinstance(client, Together):
-            return wrap_together_client_sync(tracer, client)
-        else:
-            raise TypeError(f"Invalid client type: {type(client)}")
-    except ImportError as e:
-        judgeval_logger.error(f"Failed to import Together client: {e}")
-        return client
+    if isinstance(client, AsyncTogether):
+        return wrap_together_client_async(tracer, client)
+    elif isinstance(client, Together):
+        return wrap_together_client_sync(tracer, client)
+    else:
+        raise TypeError(f"Invalid client type: {type(client)}")

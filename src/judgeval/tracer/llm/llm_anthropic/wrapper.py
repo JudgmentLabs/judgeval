@@ -49,15 +49,11 @@ def wrap_anthropic_client(tracer: Tracer, client: TClient) -> TClient:
         )
         return client
 
-    try:
-        from anthropic import Anthropic, AsyncAnthropic
+    from anthropic import Anthropic, AsyncAnthropic
 
-        if isinstance(client, AsyncAnthropic):
-            return wrap_anthropic_client_async(tracer, client)
-        elif isinstance(client, Anthropic):
-            return wrap_anthropic_client_sync(tracer, client)
-        else:
-            raise TypeError(f"Invalid client type: {type(client)}")
-    except ImportError as e:
-        judgeval_logger.error(f"Failed to import Anthropic client: {e}")
-        return client
+    if isinstance(client, AsyncAnthropic):
+        return wrap_anthropic_client_async(tracer, client)
+    elif isinstance(client, Anthropic):
+        return wrap_anthropic_client_sync(tracer, client)
+    else:
+        raise TypeError(f"Invalid client type: {type(client)}")

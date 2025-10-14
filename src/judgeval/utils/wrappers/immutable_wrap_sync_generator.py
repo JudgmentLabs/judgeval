@@ -5,7 +5,6 @@ from typing import (
     TypeVar,
     Any,
     Dict,
-    Mapping,
     ParamSpec,
     Generator,
     cast,
@@ -19,7 +18,6 @@ Y = TypeVar("Y")
 S = TypeVar("S")
 R = TypeVar("R")
 Ctx = Dict[str, Any]
-ImmCtx = Mapping[str, Any]
 
 
 def _void_pre_hook(ctx: Ctx, *args: Any, **kwargs: Any) -> None:

@@ -21,14 +21,10 @@ def wrap_google_client(tracer: Tracer, client: Client) -> Client:
         )
         return client
 
-    try:
-        from google.genai import Client as GoogleClient
+    from google.genai import Client
 
-        if isinstance(client, GoogleClient):
-            wrap_generate_content_sync(tracer, client)
-            return client
-        else:
-            raise TypeError(f"Invalid client type: {type(client)}")
-    except ImportError as e:
-        judgeval_logger.error(f"Failed to import Google GenAI client: {e}")
+    if isinstance(client, Client):
+        wrap_generate_content_sync(tracer, client)
         return client
+    else:
+        raise TypeError(f"Invalid client type: {type(client)}")
