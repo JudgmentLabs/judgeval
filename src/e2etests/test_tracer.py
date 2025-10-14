@@ -4,7 +4,6 @@ from judgeval.scorers import AnswerRelevancyScorer
 import time
 from openai import OpenAI, AsyncOpenAI
 from anthropic import Anthropic, AsyncAnthropic
-from groq import Groq, AsyncGroq
 from together import Together, AsyncTogether
 from google import genai
 from e2etests.utils import (
@@ -43,14 +42,12 @@ judgment: Tracer = cast(
 # Wrap clients
 openai_client = wrap(OpenAI())
 anthropic_client = wrap(Anthropic())
-groq_client = wrap(Groq(api_key=os.getenv("GROQ_API_KEY")))
 together_client = wrap(Together(api_key=os.getenv("TOGETHER_API_KEY")))
 google_client = wrap(genai.Client(api_key=os.getenv("GOOGLE_API_KEY")))
 
 # Async clients
 openai_client_async = wrap(AsyncOpenAI())
 anthropic_client_async = wrap(AsyncAnthropic())
-groq_client_async = wrap(AsyncGroq(api_key=os.getenv("GROQ_API_KEY")))
 together_client_async = wrap(AsyncTogether(api_key=os.getenv("TOGETHER_API_KEY")))
 
 QUERY_RETRY = 15
@@ -104,18 +101,6 @@ def anthropic_llm_call():
         max_tokens=30,
     )
 
-    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
-
-
-@judgment.observe()
-def groq_llm_call():
-    groq_client.chat.completions.create(
-        model="llama-3.1-8b-instant",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": PROMPT},
-        ],
-    )
     return format(judgment.get_current_span().get_span_context().trace_id, "032x")
 
 
@@ -175,25 +160,6 @@ def anthropic_streaming_llm_call():
 
 
 @judgment.observe()
-def groq_streaming_llm_call():
-    stream = groq_client.chat.completions.create(
-        model="llama-3.1-8b-instant",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": PROMPT},
-        ],
-        stream=True,
-    )
-
-    accumulated_content = ""
-    for chunk in stream:
-        if chunk.choices and chunk.choices[0].delta.content:
-            accumulated_content += chunk.choices[0].delta.content
-
-    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
-
-
-@judgment.observe()
 def together_streaming_llm_call():
     stream = together_client.chat.completions.create(
         model="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
@@ -227,14 +193,6 @@ async def anthropic_async_llm_call():
         model="claude-3-haiku-20240307",
         messages=[{"role": "user", "content": PROMPT}],
         max_tokens=30,
-    )
-    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
-
-
-@judgment.observe()
-async def groq_async_llm_call():
-    await groq_client_async.chat.completions.create(
-        model="llama-3.1-8b-instant", messages=[{"role": "user", "content": PROMPT}]
     )
     return format(judgment.get_current_span().get_span_context().trace_id, "032x")
 
@@ -281,25 +239,6 @@ async def anthropic_async_streaming_llm_call():
     async for chunk in stream:
         if hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
             accumulated_content += chunk.delta.text or ""
-
-    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
-
-
-@judgment.observe()
-async def groq_async_streaming_llm_call():
-    stream = await groq_client_async.chat.completions.create(
-        model="llama-3.1-8b-instant",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": PROMPT},
-        ],
-        stream=True,
-    )
-
-    accumulated_content = ""
-    async for chunk in stream:
-        if chunk.choices and chunk.choices[0].delta.content:
-            accumulated_content += chunk.choices[0].delta.content
 
     return format(judgment.get_current_span().get_span_context().trace_id, "032x")
 
@@ -411,11 +350,6 @@ def test_anthropic_llm_cost():
     retrieve_llm_cost_helper(trace_id)
 
 
-def test_groq_llm_cost():
-    trace_id = groq_llm_call()
-    retrieve_llm_cost_helper(trace_id)
-
-
 def test_together_llm_cost():
     trace_id = together_llm_call()
     retrieve_llm_cost_helper(trace_id)
@@ -435,12 +369,6 @@ async def test_openai_async_llm_cost():
 @pytest.mark.asyncio
 async def test_anthropic_async_llm_cost():
     trace_id = await anthropic_async_llm_call()
-    retrieve_llm_cost_helper(trace_id)
-
-
-@pytest.mark.asyncio
-async def test_groq_async_llm_cost():
-    trace_id = await groq_async_llm_call()
     retrieve_llm_cost_helper(trace_id)
 
 
