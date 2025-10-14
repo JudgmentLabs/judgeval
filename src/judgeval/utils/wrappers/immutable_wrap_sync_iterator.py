@@ -4,9 +4,9 @@ from typing import (
     TypeVar,
     Any,
     Dict,
+    Mapping,
     ParamSpec,
-    AsyncGenerator,
-    cast,
+    Iterator,
     Concatenate,
 )
 
@@ -14,8 +14,8 @@ from judgeval.utils.decorators.dont_throw import dont_throw
 
 P = ParamSpec("P")
 Y = TypeVar("Y")
-S = TypeVar("S")
 Ctx = Dict[str, Any]
+ImmCtx = Mapping[str, Any]
 
 
 def _void_pre_hook(ctx: Ctx, *args: Any, **kwargs: Any) -> None:
@@ -38,8 +38,8 @@ def _void_finally_hook(ctx: Ctx) -> None:
     pass
 
 
-def immutable_wrap_async_generator(
-    func: Callable[P, AsyncGenerator[Y, S]],
+def immutable_wrap_sync_iterator(
+    func: Callable[P, Iterator[Y]],
     /,
     *,
     pre_hook: Callable[Concatenate[Ctx, P], None] = _void_pre_hook,
@@ -47,17 +47,17 @@ def immutable_wrap_async_generator(
     post_hook: Callable[[Ctx], None] = _void_post_hook,
     error_hook: Callable[[Ctx, Exception], None] = _void_error_hook,
     finally_hook: Callable[[Ctx], None] = _void_finally_hook,
-) -> Callable[P, AsyncGenerator[Y, S]]:
+) -> Callable[P, Iterator[Y]]:
     """
-    Wraps an async generator function with lifecycle hooks.
+    Wraps an iterator function with lifecycle hooks.
 
-    - pre_hook: called when generator function is invoked with (ctx, *args, **kwargs) matching func's signature
+    - pre_hook: called when iterator function is invoked with (ctx, *args, **kwargs) matching func's signature
     - yield_hook: called after each yield with (ctx, yielded_value)
-    - post_hook: called when generator completes successfully with (ctx)
-    - error_hook: called if generator raises an exception with (ctx, error)
-    - finally_hook: called when generator closes with (ctx)
+    - post_hook: called when iterator completes successfully with (ctx)
+    - error_hook: called if iterator raises an exception with (ctx, error)
+    - finally_hook: called when iterator closes with (ctx)
 
-    The wrapped generator yields values unchanged, and exceptions are re-raised.
+    The wrapped iterator yields values unchanged, and exceptions are re-raised.
     """
 
     pre_hook = dont_throw(pre_hook)
@@ -67,20 +67,14 @@ def immutable_wrap_async_generator(
     finally_hook = dont_throw(finally_hook)
 
     @wraps(func)
-    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> AsyncGenerator[Y, S]:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> Iterator[Y]:
         ctx: Ctx = {}
         pre_hook(ctx, *args, **kwargs)
         try:
-            gen = func(*args, **kwargs)
-            sent_value = cast(S, None)
-            while True:
-                try:
-                    value = await gen.asend(sent_value)
-                    yield_hook(ctx, value)
-                    sent_value = yield value
-                except StopAsyncIteration:
-                    post_hook(ctx)
-                    return
+            for value in func(*args, **kwargs):
+                yield_hook(ctx, value)
+                yield value
+            post_hook(ctx)
         except Exception as e:
             error_hook(ctx, e)
             raise

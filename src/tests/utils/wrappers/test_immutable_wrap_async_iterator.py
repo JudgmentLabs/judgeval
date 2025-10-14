@@ -1,21 +1,21 @@
 import pytest
-from typing import Dict, Any, Mapping, AsyncGenerator
+from typing import Dict, Any, Mapping, AsyncIterator
 
-from judgeval.utils.wrappers.immutable_wrap_async_generator import (
-    immutable_wrap_async_generator,
+from judgeval.utils.wrappers.immutable_wrap_async_iterator import (
+    immutable_wrap_async_iterator,
 )
 
 
 @pytest.mark.asyncio
 async def test_basic_functionality():
-    """Test that wrapped async generator executes and yields correct values."""
+    """Test that wrapped async iterator executes and yields correct values."""
 
-    async def count_to_three() -> AsyncGenerator[int, None]:
+    async def count_to_three() -> AsyncIterator[int]:
         yield 1
         yield 2
         yield 3
 
-    wrapped = immutable_wrap_async_generator(count_to_three)
+    wrapped = immutable_wrap_async_iterator(count_to_three)
     result = [x async for x in wrapped()]
     assert result == [1, 2, 3]
 
@@ -32,10 +32,10 @@ async def test_pre_hook_populates_context():
     def finally_hook(ctx: Mapping[str, Any]) -> None:
         captured_ctx.update(ctx)
 
-    async def simple_gen() -> AsyncGenerator[str, None]:
+    async def simple_gen() -> AsyncIterator[str]:
         yield "result"
 
-    wrapped = immutable_wrap_async_generator(
+    wrapped = immutable_wrap_async_iterator(
         simple_gen, pre_hook=pre, finally_hook=finally_hook
     )
     [x async for x in wrapped()]
@@ -52,12 +52,12 @@ async def test_yield_hook_receives_each_value():
     def yield_hook(ctx: Mapping[str, Any], value: Any) -> None:
         yielded_values.append(value)
 
-    async def count() -> AsyncGenerator[int, None]:
+    async def count() -> AsyncIterator[int]:
         yield 10
         yield 20
         yield 30
 
-    wrapped = immutable_wrap_async_generator(count, yield_hook=yield_hook)
+    wrapped = immutable_wrap_async_iterator(count, yield_hook=yield_hook)
     [x async for x in wrapped()]
 
     assert yielded_values == [10, 20, 30]
@@ -75,11 +75,11 @@ async def test_yield_hook_reads_pre_hook_context():
     def yield_hook(ctx: Mapping[str, Any], value: Any) -> None:
         captured_contexts.append(dict(ctx))
 
-    async def gen() -> AsyncGenerator[int, None]:
+    async def gen() -> AsyncIterator[int]:
         yield 1
         yield 2
 
-    wrapped = immutable_wrap_async_generator(gen, pre_hook=pre, yield_hook=yield_hook)
+    wrapped = immutable_wrap_async_iterator(gen, pre_hook=pre, yield_hook=yield_hook)
     [x async for x in wrapped()]
 
     assert all(c.get("multiplier") == 2 for c in captured_contexts)
@@ -87,51 +87,51 @@ async def test_yield_hook_reads_pre_hook_context():
 
 @pytest.mark.asyncio
 async def test_post_hook_called_on_completion():
-    """Test that post_hook is called when async generator completes."""
+    """Test that post_hook is called when async iterator completes."""
     post_called = []
 
     def post(ctx: Mapping[str, Any]) -> None:
         post_called.append(True)
 
-    async def simple_gen() -> AsyncGenerator[int, None]:
+    async def simple_gen() -> AsyncIterator[int]:
         yield 1
         yield 2
 
-    wrapped = immutable_wrap_async_generator(simple_gen, post_hook=post)
+    wrapped = immutable_wrap_async_iterator(simple_gen, post_hook=post)
     [x async for x in wrapped()]
 
     assert post_called == [True]
 
 
 @pytest.mark.asyncio
-async def test_post_hook_called_on_empty_generator():
-    """Test that post_hook is called even for empty async generator."""
+async def test_post_hook_called_on_empty_iterator():
+    """Test that post_hook is called even for empty async iterator."""
     post_called = []
 
     def post(ctx: Mapping[str, Any]) -> None:
         post_called.append(True)
 
-    async def empty_gen() -> AsyncGenerator[int, None]:
+    async def empty_gen() -> AsyncIterator[int]:
         return
         yield
 
-    wrapped = immutable_wrap_async_generator(empty_gen, post_hook=post)
+    wrapped = immutable_wrap_async_iterator(empty_gen, post_hook=post)
     [x async for x in wrapped()]
 
     assert post_called == [True]
 
 
 @pytest.mark.asyncio
-async def test_preserves_generator_signature():
-    """Test that wrapped async generator preserves argument types."""
+async def test_preserves_iterator_signature():
+    """Test that wrapped async iterator preserves argument types."""
 
     async def parameterized_gen(
         start: int, end: int, prefix: str = ""
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncIterator[str]:
         for i in range(start, end):
             yield f"{prefix}{i}"
 
-    wrapped = immutable_wrap_async_generator(parameterized_gen)
+    wrapped = immutable_wrap_async_iterator(parameterized_gen)
     result = [x async for x in wrapped(1, 4, prefix="num-")]
 
     assert result == ["num-1", "num-2", "num-3"]
@@ -144,10 +144,10 @@ async def test_pre_hook_exception_is_caught():
     def bad_pre(ctx: Dict[str, Any]) -> None:
         raise ValueError("Pre hook error")
 
-    async def safe_gen() -> AsyncGenerator[str, None]:
+    async def safe_gen() -> AsyncIterator[str]:
         yield "success"
 
-    wrapped = immutable_wrap_async_generator(safe_gen, pre_hook=bad_pre)
+    wrapped = immutable_wrap_async_iterator(safe_gen, pre_hook=bad_pre)
     result = [x async for x in wrapped()]
 
     assert result == ["success"]
@@ -160,11 +160,11 @@ async def test_yield_hook_exception_is_caught():
     def bad_yield_hook(ctx: Mapping[str, Any], value: Any) -> None:
         raise RuntimeError("Yield hook error")
 
-    async def safe_gen() -> AsyncGenerator[int, None]:
+    async def safe_gen() -> AsyncIterator[int]:
         yield 1
         yield 2
 
-    wrapped = immutable_wrap_async_generator(safe_gen, yield_hook=bad_yield_hook)
+    wrapped = immutable_wrap_async_iterator(safe_gen, yield_hook=bad_yield_hook)
     result = [x async for x in wrapped()]
 
     assert result == [1, 2]
@@ -177,10 +177,10 @@ async def test_post_hook_exception_is_caught():
     def bad_post(ctx: Mapping[str, Any]) -> None:
         raise RuntimeError("Post hook error")
 
-    async def safe_gen() -> AsyncGenerator[int, None]:
+    async def safe_gen() -> AsyncIterator[int]:
         yield 42
 
-    wrapped = immutable_wrap_async_generator(safe_gen, post_hook=bad_post)
+    wrapped = immutable_wrap_async_iterator(safe_gen, post_hook=bad_post)
     result = [x async for x in wrapped()]
 
     assert result == [42]
@@ -190,10 +190,10 @@ async def test_post_hook_exception_is_caught():
 async def test_default_void_hooks():
     """Test that default void hooks work without errors."""
 
-    async def simple() -> AsyncGenerator[str, None]:
+    async def simple() -> AsyncIterator[str]:
         yield "works"
 
-    wrapped = immutable_wrap_async_generator(simple)
+    wrapped = immutable_wrap_async_iterator(simple)
     result = [x async for x in wrapped()]
 
     assert result == ["works"]
@@ -201,7 +201,7 @@ async def test_default_void_hooks():
 
 @pytest.mark.asyncio
 async def test_multiple_calls_isolated_contexts():
-    """Test that each async generator call gets its own isolated context."""
+    """Test that each async iterator call gets its own isolated context."""
     call_count = []
 
     def pre(ctx: Dict[str, Any], i: int) -> None:
@@ -211,10 +211,10 @@ async def test_multiple_calls_isolated_contexts():
     def yield_hook(ctx: Mapping[str, Any], value: Any) -> None:
         assert ctx["id"] == value
 
-    async def gen(i: int) -> AsyncGenerator[int, None]:
+    async def gen(i: int) -> AsyncIterator[int]:
         yield i
 
-    wrapped = immutable_wrap_async_generator(gen, pre_hook=pre, yield_hook=yield_hook)
+    wrapped = immutable_wrap_async_iterator(gen, pre_hook=pre, yield_hook=yield_hook)
 
     [x async for x in wrapped(0)]
     [x async for x in wrapped(1)]
@@ -225,18 +225,18 @@ async def test_multiple_calls_isolated_contexts():
 
 @pytest.mark.asyncio
 async def test_error_hook_called_on_exception():
-    """Test that error_hook is called when async generator raises an exception."""
+    """Test that error_hook is called when async iterator raises an exception."""
     captured_error = None
 
     def error(ctx: Mapping[str, Any], err: Exception) -> None:
         nonlocal captured_error
         captured_error = err
 
-    async def failing_gen() -> AsyncGenerator[int, None]:
+    async def failing_gen() -> AsyncIterator[int]:
         yield 1
         raise ValueError("Test error")
 
-    wrapped = immutable_wrap_async_generator(failing_gen, error_hook=error)
+    wrapped = immutable_wrap_async_iterator(failing_gen, error_hook=error)
 
     gen = wrapped()
     assert await gen.__anext__() == 1
@@ -257,19 +257,19 @@ async def test_finally_hook_always_called():
     def finally_hook(ctx: Mapping[str, Any]) -> None:
         finally_call_count.append(1)
 
-    async def success_gen() -> AsyncGenerator[str, None]:
+    async def success_gen() -> AsyncIterator[str]:
         yield "ok"
 
-    async def error_gen() -> AsyncGenerator[str, None]:
+    async def error_gen() -> AsyncIterator[str]:
         yield "start"
         raise RuntimeError("fail")
 
-    wrapped_success = immutable_wrap_async_generator(
+    wrapped_success = immutable_wrap_async_iterator(
         success_gen, finally_hook=finally_hook
     )
     [x async for x in wrapped_success()]
 
-    wrapped_error = immutable_wrap_async_generator(error_gen, finally_hook=finally_hook)
+    wrapped_error = immutable_wrap_async_iterator(error_gen, finally_hook=finally_hook)
     gen = wrapped_error()
     await gen.__anext__()
     with pytest.raises(RuntimeError):
@@ -290,13 +290,11 @@ async def test_error_hook_receives_context_from_pre_hook():
     def error(ctx: Mapping[str, Any], err: Exception) -> None:
         captured_ctx.update(ctx)
 
-    async def failing_gen() -> AsyncGenerator[int, None]:
+    async def failing_gen() -> AsyncIterator[int]:
         yield 1
         raise Exception("error")
 
-    wrapped = immutable_wrap_async_generator(
-        failing_gen, pre_hook=pre, error_hook=error
-    )
+    wrapped = immutable_wrap_async_iterator(failing_gen, pre_hook=pre, error_hook=error)
 
     gen = wrapped()
     await gen.__anext__()
@@ -318,10 +316,10 @@ async def test_finally_hook_receives_context():
     def finally_hook(ctx: Mapping[str, Any]) -> None:
         captured_ctx.update(ctx)
 
-    async def dummy() -> AsyncGenerator[None, None]:
+    async def dummy() -> AsyncIterator[None]:
         yield
 
-    wrapped = immutable_wrap_async_generator(
+    wrapped = immutable_wrap_async_iterator(
         dummy, pre_hook=pre, finally_hook=finally_hook
     )
     [x async for x in wrapped()]
@@ -331,17 +329,17 @@ async def test_finally_hook_receives_context():
 
 @pytest.mark.asyncio
 async def test_post_hook_not_called_on_error():
-    """Test that post_hook is not called when async generator raises an exception."""
+    """Test that post_hook is not called when async iterator raises an exception."""
     post_called = []
 
     def post(ctx: Mapping[str, Any]) -> None:
         post_called.append(True)
 
-    async def failing_gen() -> AsyncGenerator[int, None]:
+    async def failing_gen() -> AsyncIterator[int]:
         yield 1
         raise ValueError("error")
 
-    wrapped = immutable_wrap_async_generator(failing_gen, post_hook=post)
+    wrapped = immutable_wrap_async_iterator(failing_gen, post_hook=post)
 
     gen = wrapped()
     await gen.__anext__()
@@ -372,13 +370,13 @@ async def test_complete_lifecycle_success():
     def finally_hook(ctx: Mapping[str, Any]) -> None:
         lifecycle.append("finally")
 
-    async def success_gen() -> AsyncGenerator[int, None]:
+    async def success_gen() -> AsyncIterator[int]:
         lifecycle.append("gen-start")
         yield 1
         yield 2
         lifecycle.append("gen-end")
 
-    wrapped = immutable_wrap_async_generator(
+    wrapped = immutable_wrap_async_iterator(
         success_gen,
         pre_hook=pre,
         yield_hook=yield_hook,
@@ -420,13 +418,13 @@ async def test_complete_lifecycle_error():
     def finally_hook(ctx: Mapping[str, Any]) -> None:
         lifecycle.append("finally")
 
-    async def error_gen() -> AsyncGenerator[int, None]:
+    async def error_gen() -> AsyncIterator[int]:
         lifecycle.append("gen-start")
         yield 1
         lifecycle.append("gen-before-error")
         raise ValueError("fail")
 
-    wrapped = immutable_wrap_async_generator(
+    wrapped = immutable_wrap_async_iterator(
         error_gen,
         pre_hook=pre,
         yield_hook=yield_hook,
@@ -458,11 +456,11 @@ async def test_error_hook_exception_is_caught():
     def bad_error_hook(ctx: Mapping[str, Any], err: Exception) -> None:
         raise RuntimeError("Error hook failed")
 
-    async def failing_gen() -> AsyncGenerator[int, None]:
+    async def failing_gen() -> AsyncIterator[int]:
         yield 1
         raise ValueError("Original error")
 
-    wrapped = immutable_wrap_async_generator(failing_gen, error_hook=bad_error_hook)
+    wrapped = immutable_wrap_async_iterator(failing_gen, error_hook=bad_error_hook)
 
     gen = wrapped()
     await gen.__anext__()
@@ -478,10 +476,10 @@ async def test_finally_hook_exception_is_caught():
     def bad_finally_hook(ctx: Mapping[str, Any]) -> None:
         raise RuntimeError("Finally hook failed")
 
-    async def success_gen() -> AsyncGenerator[str, None]:
+    async def success_gen() -> AsyncIterator[str]:
         yield "ok"
 
-    wrapped = immutable_wrap_async_generator(success_gen, finally_hook=bad_finally_hook)
+    wrapped = immutable_wrap_async_iterator(success_gen, finally_hook=bad_finally_hook)
 
     result = [x async for x in wrapped()]
     assert result == ["ok"]
@@ -494,11 +492,11 @@ async def test_yielded_value_not_mutated():
     def yield_hook(ctx: Mapping[str, Any], value: Dict[str, int]) -> None:
         value["modified"] = 999
 
-    async def gen_dicts() -> AsyncGenerator[Dict[str, int], None]:
+    async def gen_dicts() -> AsyncIterator[Dict[str, int]]:
         yield {"original": 1}
         yield {"original": 2}
 
-    wrapped = immutable_wrap_async_generator(gen_dicts, yield_hook=yield_hook)
+    wrapped = immutable_wrap_async_iterator(gen_dicts, yield_hook=yield_hook)
     results = [x async for x in wrapped()]
 
     assert results[0]["original"] == 1
@@ -508,33 +506,14 @@ async def test_yielded_value_not_mutated():
 
 
 @pytest.mark.asyncio
-async def test_send_support():
-    """Test that async generator asend() is properly supported."""
+async def test_iterator_with_complex_types():
+    """Test async iterator with complex type annotations."""
 
-    async def echo_gen() -> AsyncGenerator[int, int]:
-        value = yield 1
-        assert value == 10
-        value = yield 2
-        assert value == 20
-
-    wrapped = immutable_wrap_async_generator(echo_gen)
-    gen = wrapped()
-
-    assert await gen.__anext__() == 1
-    assert await gen.asend(10) == 2
-    with pytest.raises(StopAsyncIteration):
-        await gen.asend(20)
-
-
-@pytest.mark.asyncio
-async def test_generator_with_complex_types():
-    """Test async generator with complex type annotations."""
-
-    async def complex_gen(data: list[int]) -> AsyncGenerator[tuple[int, int], None]:
+    async def complex_gen(data: list[int]) -> AsyncIterator[tuple[int, int]]:
         for i, val in enumerate(data):
             yield (i, val)
 
-    wrapped = immutable_wrap_async_generator(complex_gen)
+    wrapped = immutable_wrap_async_iterator(complex_gen)
     result = [x async for x in wrapped([10, 20, 30])]
 
     assert result == [(0, 10), (1, 20), (2, 30)]
@@ -554,14 +533,14 @@ async def test_async_execution_order():
     def post(ctx: Mapping[str, Any]) -> None:
         execution_order.append("post")
 
-    async def main() -> AsyncGenerator[int, None]:
+    async def main() -> AsyncIterator[int]:
         execution_order.append("main-start")
         yield 1
         execution_order.append("main-middle")
         yield 2
         execution_order.append("main-end")
 
-    wrapped = immutable_wrap_async_generator(
+    wrapped = immutable_wrap_async_iterator(
         main, pre_hook=pre, yield_hook=yield_hook, post_hook=post
     )
     result = [x async for x in wrapped()]

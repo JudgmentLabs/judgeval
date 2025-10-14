@@ -22,8 +22,8 @@ from judgeval.utils.wrappers import (
     immutable_wrap_sync,
     mutable_wrap_sync,
     mutable_wrap_async,
-    immutable_wrap_sync_generator,
-    immutable_wrap_async_generator,
+    immutable_wrap_sync_iterator,
+    immutable_wrap_async_iterator,
 )
 
 if TYPE_CHECKING:
@@ -200,7 +200,7 @@ def _wrap_streaming_sync(
                     safe_serialize(chunk.usage),
                 )
 
-        def post_hook_inner(inner_ctx: Dict[str, Any], result: None) -> None:
+        def post_hook_inner(inner_ctx: Dict[str, Any]) -> None:
             span = ctx.get("span")
             if span:
                 accumulated = ctx.get("accumulated_content", "")
@@ -216,7 +216,7 @@ def _wrap_streaming_sync(
             if span:
                 span.end()
 
-        wrapped_generator = immutable_wrap_sync_generator(
+        wrapped_generator = immutable_wrap_sync_iterator(
             traced_generator,
             yield_hook=yield_hook,
             post_hook=post_hook_inner,
@@ -413,7 +413,7 @@ def _wrap_streaming_async(
             if span:
                 span.end()
 
-        wrapped_generator = immutable_wrap_async_generator(
+        wrapped_generator = immutable_wrap_async_iterator(
             traced_generator,
             yield_hook=yield_hook,
             post_hook=post_hook_inner,

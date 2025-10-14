@@ -12,8 +12,8 @@ from judgeval.tracer.utils import set_span_attribute
 from judgeval.utils.serialize import safe_serialize
 from judgeval.utils.wrappers import (
     mutable_wrap_sync,
-    immutable_wrap_sync_generator,
-    immutable_wrap_async_generator,
+    immutable_wrap_sync_iterator,
+    immutable_wrap_async_iterator,
 )
 from judgeval.tracer.llm.llm_anthropic.messages import (
     _extract_anthropic_tokens,
@@ -85,7 +85,7 @@ def wrap_messages_stream_sync(tracer: Tracer, client: Anthropic) -> None:
                         ctx.get("accumulated_content", "") + text_chunk
                     )
 
-            def post_hook_inner(inner_ctx: Dict[str, Any], result: None) -> None:
+            def post_hook_inner(inner_ctx: Dict[str, Any]) -> None:
                 pass
 
             def error_hook_inner(inner_ctx: Dict[str, Any], error: Exception) -> None:
@@ -96,7 +96,7 @@ def wrap_messages_stream_sync(tracer: Tracer, client: Anthropic) -> None:
             def finally_hook_inner(inner_ctx: Dict[str, Any]) -> None:
                 pass
 
-            wrapped_text_stream = immutable_wrap_sync_generator(
+            wrapped_text_stream = immutable_wrap_sync_iterator(
                 traced_text_stream,
                 yield_hook=yield_hook,
                 post_hook=post_hook_inner,
@@ -242,7 +242,7 @@ def wrap_messages_stream_async(tracer: Tracer, client: AsyncAnthropic) -> None:
             def finally_hook_inner_sync(inner_ctx: Dict[str, Any]) -> None:
                 pass
 
-            wrapped_text_stream = immutable_wrap_async_generator(
+            wrapped_text_stream = immutable_wrap_async_iterator(
                 traced_text_stream,
                 yield_hook=yield_hook,
                 post_hook=post_hook_inner,
