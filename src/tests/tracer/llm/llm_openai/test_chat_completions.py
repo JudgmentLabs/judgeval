@@ -455,7 +455,7 @@ class TestSafetyGuarantees(BaseOpenAIChatCompletionsTest):
         wrapped_client = wrap_openai_client_sync(tracer, sync_client)
         response = wrapped_client.chat.completions.create(
             model="gpt-5-nano",
-            messages=[{"role": "user", "content": "test"}],
+            messages=[{"role": "user", "content": "say test"}],
             max_completion_tokens=1000,
         )
 

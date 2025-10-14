@@ -48,9 +48,7 @@ class TestSyncBetaParse(BaseOpenAIBetaParseTest):
 
         response = sync_client_maybe_wrapped.beta.chat.completions.parse(
             model="gpt-5-nano",
-            messages=[
-                {"role": "user", "content": "Say the word 'test' in JSON format"}
-            ],
+            messages=[{"role": "user", "content": "test"}],
             response_format=TestResponse,
             max_completion_tokens=1000,
         )
@@ -79,14 +77,14 @@ class TestSyncBetaParse(BaseOpenAIBetaParseTest):
 
         response1 = sync_client_maybe_wrapped.beta.chat.completions.parse(
             model="gpt-5-nano",
-            messages=[{"role": "user", "content": "Say 'first' in JSON"}],
+            messages=[{"role": "user", "content": "word: first"}],
             response_format=TestResponse,
             max_completion_tokens=1000,
         )
 
         response2 = sync_client_maybe_wrapped.beta.chat.completions.parse(
             model="gpt-5-nano",
-            messages=[{"role": "user", "content": "Say 'second' in JSON"}],
+            messages=[{"role": "user", "content": "word: second"}],
             response_format=TestResponse,
             max_completion_tokens=1000,
         )
@@ -133,7 +131,7 @@ class TestSyncBetaParse(BaseOpenAIBetaParseTest):
         with pytest.raises(Exception):
             sync_client_maybe_wrapped.beta.chat.completions.parse(
                 model="invalid-model-name-that-does-not-exist",
-                messages=[{"role": "user", "content": "test"}],
+                messages=[{"role": "user", "content": "word: test"}],
                 response_format=TestResponse,
                 max_completion_tokens=1000,
             )
@@ -155,9 +153,7 @@ class TestAsyncBetaParse(BaseOpenAIBetaParseTest):
 
         response = await async_client_maybe_wrapped.beta.chat.completions.parse(
             model="gpt-5-nano",
-            messages=[
-                {"role": "user", "content": "Say the word 'test' in JSON format"}
-            ],
+            messages=[{"role": "user", "content": "word: test"}],
             response_format=TestResponse,
             max_completion_tokens=1000,
         )
@@ -187,14 +183,14 @@ class TestAsyncBetaParse(BaseOpenAIBetaParseTest):
 
         response1 = await async_client_maybe_wrapped.beta.chat.completions.parse(
             model="gpt-5-nano",
-            messages=[{"role": "user", "content": "Say 'first' in JSON"}],
+            messages=[{"role": "user", "content": "word: first"}],
             response_format=TestResponse,
             max_completion_tokens=1000,
         )
 
         response2 = await async_client_maybe_wrapped.beta.chat.completions.parse(
             model="gpt-5-nano",
-            messages=[{"role": "user", "content": "Say 'second' in JSON"}],
+            messages=[{"role": "user", "content": "word: second"}],
             response_format=TestResponse,
             max_completion_tokens=1000,
         )
@@ -244,7 +240,7 @@ class TestAsyncBetaParse(BaseOpenAIBetaParseTest):
         with pytest.raises(Exception):
             await async_client_maybe_wrapped.beta.chat.completions.parse(
                 model="invalid-model-name-that-does-not-exist",
-                messages=[{"role": "user", "content": "test"}],
+                messages=[{"role": "user", "content": "word: test"}],
                 response_format=TestResponse,
                 max_completion_tokens=1000,
             )
@@ -272,14 +268,14 @@ class TestEdgeCases(BaseOpenAIBetaParseTest):
 
         response1 = client1.beta.chat.completions.parse(
             model="gpt-5-nano",
-            messages=[{"role": "user", "content": "Say: one in JSON"}],
+            messages=[{"role": "user", "content": "word: one"}],
             response_format=TestResponse,
             max_completion_tokens=1000,
         )
 
         response2 = client2.beta.chat.completions.parse(
             model="gpt-5-nano",
-            messages=[{"role": "user", "content": "Say: two in JSON"}],
+            messages=[{"role": "user", "content": "word: two"}],
             response_format=TestResponse,
             max_completion_tokens=1000,
         )
@@ -335,7 +331,7 @@ class TestSafetyGuarantees(BaseOpenAIBetaParseTest):
         wrapped_client = wrap_openai_client_sync(tracer, sync_client)
         response = wrapped_client.beta.chat.completions.parse(
             model="gpt-5-nano",
-            messages=[{"role": "user", "content": "test"}],
+            messages=[{"role": "user", "content": "word: test"}],
             response_format=TestResponse,
             max_completion_tokens=1000,
         )
@@ -371,14 +367,14 @@ class TestSafetyGuarantees(BaseOpenAIBetaParseTest):
 
         unwrapped_response = unwrapped.beta.chat.completions.parse(
             model="gpt-5-nano",
-            messages=[{"role": "user", "content": "Say exactly: test in JSON"}],
+            messages=[{"role": "user", "content": "word: test"}],
             response_format=TestResponse,
             max_completion_tokens=1000,
         )
 
         wrapped_response = wrapped.beta.chat.completions.parse(
             model="gpt-5-nano",
-            messages=[{"role": "user", "content": "Say exactly: test in JSON"}],
+            messages=[{"role": "user", "content": "word: test"}],
             response_format=TestResponse,
             max_completion_tokens=1000,
         )
@@ -421,7 +417,7 @@ class TestSafetyGuarantees(BaseOpenAIBetaParseTest):
         wrapped_client = wrap_openai_client_sync(tracer, sync_client)
         response = wrapped_client.beta.chat.completions.parse(
             model="gpt-5-nano",
-            messages=[{"role": "user", "content": "test"}],
+            messages=[{"role": "user", "content": "word: test"}],
             response_format=TestResponse,
             max_completion_tokens=1000,
         )
