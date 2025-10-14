@@ -482,6 +482,32 @@ class TestStreamingSync:
         first_chunk = next(iter(stream))
         assert first_chunk is not None
 
+    def test_streaming_early_break_with_error(self, sync_client_maybe_wrapped):
+        """Test breaking out of stream early with error"""
+        with pytest.raises(Exception) as exc_info:
+            sync_client_maybe_wrapped.messages.create(
+                model="non-existent-model",
+                max_tokens=1024,
+                messages=[{"role": "user", "content": "Count to 10"}],
+                stream=True,
+            )
+
+        assert exc_info.value is not None
+
+    def test_streaming_early_break_with_error_context_manager(
+        self, sync_client_maybe_wrapped
+    ):
+        """Test breaking out of stream early with error"""
+        with pytest.raises(Exception) as exc_info:
+            with sync_client_maybe_wrapped.messages.stream(
+                model="non-existent-model",
+                max_tokens=1024,
+                messages=[{"role": "user", "content": "Count to 10"}],
+            ) as stream:
+                for chunk in stream:
+                    pass
+        assert exc_info.value is not None
+
 
 class TestStreamingAsync:
     @pytest.mark.asyncio
@@ -537,6 +563,33 @@ class TestStreamingAsync:
 
         first_chunk = await stream.__anext__()
         assert first_chunk is not None
+
+    @pytest.mark.asyncio
+    async def test_streaming_early_break_with_error(self, async_client_maybe_wrapped):
+        """Test breaking out of stream early with error"""
+        with pytest.raises(Exception) as exc_info:
+            await async_client_maybe_wrapped.messages.create(
+                model="non-existent-model",
+                max_tokens=1024,
+                messages=[{"role": "user", "content": "Count to 10"}],
+                stream=True,
+            )
+        assert exc_info.value is not None
+
+    @pytest.mark.asyncio
+    async def test_streaming_early_break_with_error_context_manager(
+        self, async_client_maybe_wrapped
+    ):
+        """Test breaking out of stream early with error"""
+        with pytest.raises(Exception) as exc_info:
+            with async_client_maybe_wrapped.messages.stream(
+                model="non-existent-model",
+                max_tokens=1024,
+                messages=[{"role": "user", "content": "Count to 10"}],
+            ) as stream:
+                async for chunk in stream:
+                    pass
+        assert exc_info.value is not None
 
 
 class TestStreamingSpanAttributes:

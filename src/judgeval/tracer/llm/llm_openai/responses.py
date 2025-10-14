@@ -151,35 +151,47 @@ def _wrap_responses_streaming_sync(
             if not span:
                 return
 
-            if hasattr(chunk, "choices") and chunk.choices and len(chunk.choices) > 0:
-                delta = chunk.choices[0].delta
-                if delta and hasattr(delta, "content") and delta.content:
+            if hasattr(chunk, "type") and chunk.type == "response.output_text.delta":
+                delta = chunk.delta
+                if delta:
                     ctx["accumulated_content"] = (
-                        ctx.get("accumulated_content", "") + delta.content
+                        ctx.get("accumulated_content", "") + delta
                     )
 
-            if hasattr(chunk, "usage") and chunk.usage:
-                prompt_tokens = chunk.usage.input_tokens or 0
-                completion_tokens = chunk.usage.output_tokens or 0
-                cache_read = 0
+            if hasattr(chunk, "type") and chunk.type == "response.completed":
+                if (
+                    hasattr(chunk, "response")
+                    and chunk.response
+                    and hasattr(chunk.response, "usage")
+                    and chunk.response.usage
+                ):
+                    prompt_tokens = chunk.response.usage.input_tokens or 0
+                    completion_tokens = chunk.response.usage.output_tokens or 0
+                    cache_read = (
+                        chunk.response.usage.input_tokens_details.cached_tokens or 0
+                    )
 
-                set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
-                )
-                set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
-                )
-                set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
-                )
-                set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
-                )
-                set_span_attribute(
-                    span,
-                    AttributeKeys.JUDGMENT_USAGE_METADATA,
-                    safe_serialize(chunk.usage),
-                )
+                    set_span_attribute(
+                        span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+                    )
+                    set_span_attribute(
+                        span,
+                        AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
+                        completion_tokens,
+                    )
+                    set_span_attribute(
+                        span,
+                        AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+                        cache_read,
+                    )
+                    set_span_attribute(
+                        span, AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
+                    )
+                    set_span_attribute(
+                        span,
+                        AttributeKeys.JUDGMENT_USAGE_METADATA,
+                        safe_serialize(chunk.response.usage),
+                    )
 
         def post_hook_inner(inner_ctx: Dict[str, Any], result: None) -> None:
             span = ctx.get("span")
@@ -339,35 +351,47 @@ def _wrap_responses_streaming_async(
             if not span:
                 return
 
-            if hasattr(chunk, "choices") and chunk.choices and len(chunk.choices) > 0:
-                delta = chunk.choices[0].delta
-                if delta and hasattr(delta, "content") and delta.content:
+            if hasattr(chunk, "type") and chunk.type == "response.output_text.delta":
+                delta = chunk.delta
+                if delta:
                     ctx["accumulated_content"] = (
-                        ctx.get("accumulated_content", "") + delta.content
+                        ctx.get("accumulated_content", "") + delta
                     )
 
-            if hasattr(chunk, "usage") and chunk.usage:
-                prompt_tokens = chunk.usage.input_tokens or 0
-                completion_tokens = chunk.usage.output_tokens or 0
-                cache_read = 0
+            if hasattr(chunk, "type") and chunk.type == "response.completed":
+                if (
+                    hasattr(chunk, "response")
+                    and chunk.response
+                    and hasattr(chunk.response, "usage")
+                    and chunk.response.usage
+                ):
+                    prompt_tokens = chunk.response.usage.input_tokens or 0
+                    completion_tokens = chunk.response.usage.output_tokens or 0
+                    cache_read = (
+                        chunk.response.usage.input_tokens_details.cached_tokens or 0
+                    )
 
-                set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
-                )
-                set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
-                )
-                set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
-                )
-                set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
-                )
-                set_span_attribute(
-                    span,
-                    AttributeKeys.JUDGMENT_USAGE_METADATA,
-                    safe_serialize(chunk.usage),
-                )
+                    set_span_attribute(
+                        span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+                    )
+                    set_span_attribute(
+                        span,
+                        AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
+                        completion_tokens,
+                    )
+                    set_span_attribute(
+                        span,
+                        AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+                        cache_read,
+                    )
+                    set_span_attribute(
+                        span, AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
+                    )
+                    set_span_attribute(
+                        span,
+                        AttributeKeys.JUDGMENT_USAGE_METADATA,
+                        safe_serialize(chunk.response.usage),
+                    )
 
         def post_hook_inner(inner_ctx: Dict[str, Any]) -> None:
             span = ctx.get("span")
