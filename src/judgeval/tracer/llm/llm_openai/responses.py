@@ -152,7 +152,7 @@ def _wrap_responses_streaming_sync(
                 return
 
             if hasattr(chunk, "type") and chunk.type == "response.output_text.delta":
-                delta = chunk.delta
+                delta = getattr(chunk, "delta", None)
                 if delta:
                     ctx["accumulated_content"] = (
                         ctx.get("accumulated_content", "") + delta
@@ -167,8 +167,14 @@ def _wrap_responses_streaming_sync(
                 ):
                     prompt_tokens = chunk.response.usage.input_tokens or 0
                     completion_tokens = chunk.response.usage.output_tokens or 0
+                    # Safely access nested cached_tokens
+                    input_tokens_details = getattr(
+                        chunk.response.usage, "input_tokens_details", None
+                    )
                     cache_read = (
-                        chunk.response.usage.input_tokens_details.cached_tokens or 0
+                        getattr(input_tokens_details, "cached_tokens", 0)
+                        if input_tokens_details
+                        else 0
                     )
 
                     set_span_attribute(
@@ -352,7 +358,7 @@ def _wrap_responses_streaming_async(
                 return
 
             if hasattr(chunk, "type") and chunk.type == "response.output_text.delta":
-                delta = chunk.delta
+                delta = getattr(chunk, "delta", None)
                 if delta:
                     ctx["accumulated_content"] = (
                         ctx.get("accumulated_content", "") + delta
@@ -367,8 +373,14 @@ def _wrap_responses_streaming_async(
                 ):
                     prompt_tokens = chunk.response.usage.input_tokens or 0
                     completion_tokens = chunk.response.usage.output_tokens or 0
+                    # Safely access nested cached_tokens
+                    input_tokens_details = getattr(
+                        chunk.response.usage, "input_tokens_details", None
+                    )
                     cache_read = (
-                        chunk.response.usage.input_tokens_details.cached_tokens or 0
+                        getattr(input_tokens_details, "cached_tokens", 0)
+                        if input_tokens_details
+                        else 0
                     )
 
                     set_span_attribute(
