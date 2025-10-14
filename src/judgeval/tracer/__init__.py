@@ -66,7 +66,6 @@ from judgeval.tracer.keys import AttributeKeys, InternalAttributeKeys
 from judgeval.api import JudgmentSyncClient
 from judgeval.tracer.llm import wrap_provider
 from judgeval.utils.url import url_for
-from judgeval.tracer.local_eval_queue import LocalEvaluationQueue
 from judgeval.tracer.processors import (
     JudgmentSpanProcessor,
     NoOpJudgmentSpanProcessor,
@@ -99,7 +98,6 @@ class Tracer(metaclass=SingletonMeta):
         "enable_evaluation",
         "resource_attributes",
         "api_client",
-        "local_eval_queue",
         "judgment_processor",
         "tracer",
         "agent_context",
@@ -113,7 +111,6 @@ class Tracer(metaclass=SingletonMeta):
     enable_evaluation: bool
     resource_attributes: Optional[Dict[str, Any]]
     api_client: JudgmentSyncClient
-    local_eval_queue: LocalEvaluationQueue
     judgment_processor: JudgmentSpanProcessor
     tracer: ABCTracer
     agent_context: ContextVar[Optional[AgentContext]]
@@ -148,7 +145,6 @@ class Tracer(metaclass=SingletonMeta):
                 api_key=self.api_key,
                 organization_id=self.organization_id,
             )
-            self.local_eval_queue = LocalEvaluationQueue()
 
             if initialize:
                 self.initialize()
@@ -189,9 +185,6 @@ class Tracer(metaclass=SingletonMeta):
             JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME,
             get_version(),
         )
-
-        if self.enable_evaluation and self.enable_monitoring:
-            self.local_eval_queue.start_workers()
 
         self._initialized = True
         atexit.register(self._atexit_flush)
@@ -956,44 +949,9 @@ class Tracer(metaclass=SingletonMeta):
                 eval_run.model_dump(warnings=False)  # type: ignore
             )
         else:
-            # Enqueue the evaluation run to the local evaluation queue
-            self.local_eval_queue.enqueue(eval_run)
-
-    def wait_for_completion(self, timeout: Optional[float] = 30.0) -> bool:
-        """Wait for all evaluations and span processing to complete.
-
-        This method blocks until all queued evaluations are processed and
-        all pending spans are flushed to the server.
-
-        Args:
-            timeout: Maximum time to wait in seconds. Defaults to 30 seconds.
-                    None means wait indefinitely.
-
-        Returns:
-            True if all processing completed within the timeout, False otherwise.
-
-        """
-        try:
-            judgeval_logger.debug(
-                "Waiting for all evaluations and spans to complete..."
+            judgeval_logger.warning(
+                "The scorer provided is not hosted, skipping evaluation."
             )
-
-            # Wait for all queued evaluation work to complete
-            eval_completed = self.local_eval_queue.wait_for_completion()
-            if not eval_completed:
-                judgeval_logger.warning(
-                    f"Local evaluation queue did not complete within {timeout} seconds"
-                )
-                return False
-
-            self.force_flush()
-
-            judgeval_logger.debug("All evaluations and spans completed successfully")
-            return True
-
-        except Exception as e:
-            judgeval_logger.warning(f"Error while waiting for completion: {e}")
-            return False
 
 
 def wrap(client: ApiClient) -> ApiClient:
