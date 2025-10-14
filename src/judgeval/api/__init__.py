@@ -239,6 +239,7 @@ class JudgmentSyncClient:
         name: str,
         project_id: Optional[str] = None,
         project_name: Optional[str] = None,
+        get_user_avatars: Optional[str] = None,
     ) -> PromptVersionsResponse:
         query_params = {}
         if project_id is not None:
@@ -246,6 +247,8 @@ class JudgmentSyncClient:
         if project_name is not None:
             query_params["project_name"] = project_name
         query_params["name"] = name
+        if get_user_avatars is not None:
+            query_params["get_user_avatars"] = get_user_avatars
         return self._request(
             "GET",
             url_for("/prompts/get_prompt_versions/"),
@@ -496,6 +499,7 @@ class JudgmentAsyncClient:
         name: str,
         project_id: Optional[str] = None,
         project_name: Optional[str] = None,
+        get_user_avatars: Optional[str] = None,
     ) -> PromptVersionsResponse:
         query_params = {}
         if project_id is not None:
@@ -503,6 +507,8 @@ class JudgmentAsyncClient:
         if project_name is not None:
             query_params["project_name"] = project_name
         query_params["name"] = name
+        if get_user_avatars is not None:
+            query_params["get_user_avatars"] = get_user_avatars
         return await self._request(
             "GET",
             url_for("/prompts/get_prompt_versions/"),
