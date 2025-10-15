@@ -1,6 +1,8 @@
 """Tests for Anthropic wrapper."""
 
 import pytest
+import random
+import string
 
 pytest.importorskip("anthropic")
 
@@ -186,7 +188,7 @@ class TestNonStreamingAsyncWrapper(BaseAnthropicTest):
         self, wrapped_async_client, mock_processor
     ):
         """Test async messages.create with cache and tracing verification"""
-        pride_text = ("<Pride and Prejudice full text goes here> ") * 700
+        pride_text = "".join(random.choices(string.ascii_letters, k=100)) * 30
         system_blocks = [
             {
                 "type": "text",
@@ -215,6 +217,7 @@ class TestNonStreamingAsyncWrapper(BaseAnthropicTest):
             system=system_blocks,
             messages=user_msg,
         )
+        print(response1)
 
         span = mock_processor.get_last_ended_span()
         attrs = mock_processor.get_span_attributes(span)
@@ -232,6 +235,8 @@ class TestNonStreamingAsyncWrapper(BaseAnthropicTest):
             system=system_blocks,
             messages=user_msg,
         )
+
+        print(response2)
 
         assert response1 is not None
         assert response2 is not None

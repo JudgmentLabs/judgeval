@@ -30,8 +30,8 @@ def verify_span_attributes_comprehensive(
         check_completion: Whether to verify GEN_AI_COMPLETION is present
         check_usage: Whether to verify usage tokens are present and > 0
         check_cache: Whether to verify cache token attributes are present
-        check_cache_read_value: Whether to verify cache read token values are 0
-        check_cache_creation_value: Whether to verify cache creation token values are 0
+        check_cache_read_value: Whether to verify cache read token values are > 0
+        check_cache_creation_value: Whether to verify cache creation token values are > 0
         check_metadata: Whether to verify JUDGMENT_USAGE_METADATA is present
     """
     # Basic span validation
