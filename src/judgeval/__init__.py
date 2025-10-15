@@ -113,6 +113,21 @@ class JudgmentClient(metaclass=SingletonMeta):
         with open(scorer_file_path, "r") as f:
             scorer_code = f.read()
 
+        # Check for multiple scorer class definitions
+        scorer_class_count = 0
+        for line in scorer_code.split("\n"):
+            if "class" in line and "ExampleScorer" in line:
+                scorer_class_count += 1
+
+        if scorer_class_count > 1:
+            error_msg = f"Multiple Scorer classes found in {scorer_file_path}. Please only upload one scorer class per file."
+            judgeval_logger.error(error_msg)
+            raise ValueError(error_msg)
+        elif scorer_class_count == 0:
+            error_msg = f"No Scorer class was found in {scorer_file_path}. Please ensure the file contains a valid scorer class."
+            judgeval_logger.error(error_msg)
+            raise ValueError(error_msg)
+
         # Read requirements (optional)
         requirements_text = ""
         if requirements_file_path and os.path.exists(requirements_file_path):
