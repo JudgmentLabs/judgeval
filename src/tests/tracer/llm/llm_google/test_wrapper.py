@@ -1,118 +1,42 @@
+"""Tests for Google wrapper."""
+
 import pytest
-import os
-from typing import Any, Optional
 
 pytest.importorskip("google.genai")
 
-from google.genai import Client
-from opentelemetry.context import Context
-from opentelemetry.sdk.trace import ReadableSpan, Span
-from judgeval.tracer.llm.llm_google.wrapper import wrap_google_client  # type: ignore
-from judgeval.tracer.keys import AttributeKeys  # type: ignore
+from judgeval.tracer.llm.llm_google.wrapper import wrap_google_client
+from ..utils import verify_span_attributes_comprehensive, assert_span_has_exception
+
+# All fixtures are imported automatically from conftest.py
 
 
-class MockSpanProcessor:
-    """Mock span processor to capture span data for testing"""
+class BaseGoogleTest:
+    """Base class with helper methods for Google tests."""
 
-    def __init__(self):
-        self.started_spans = []
-        self.ended_spans = []
-        self.resource_attributes = {}
+    def verify_tracing_if_wrapped(
+        self, client, mock_processor, expected_model_name="gemini-2.5-flash"
+    ):
+        """Helper method to verify tracing only if client is wrapped."""
+        if hasattr(client, "_judgment_tracer"):
+            span = mock_processor.get_last_ended_span()
+            attrs = mock_processor.get_span_attributes(span)
+            verify_span_attributes_comprehensive(
+                span=span,
+                attrs=attrs,
+                expected_span_name="GOOGLE_API_CALL",
+                expected_model_name=expected_model_name,
+            )
 
-    def on_start(self, span: Span, parent_context: Optional[Context] = None) -> None:
-        self.started_spans.append(span)
-
-    def on_end(self, span: ReadableSpan) -> None:
-        self.ended_spans.append(span)
-
-    def shutdown(self) -> None:
-        pass
-
-    def force_flush(self, timeout_millis: int = 30000) -> bool:
-        return True
-
-    def get_last_ended_span(self) -> Optional[ReadableSpan]:
-        return self.ended_spans[-1] if self.ended_spans else None
-
-    def get_span_attributes(self, span: ReadableSpan) -> dict[str, Any]:
-        return dict(span.attributes or {})
+    def verify_exception_if_wrapped(self, client, mock_processor):
+        """Helper method to verify exception tracing only if client is wrapped."""
+        if hasattr(client, "_judgment_tracer"):
+            span = mock_processor.get_last_ended_span()
+            assert_span_has_exception(span, "GOOGLE_API_CALL")
 
 
-class MockTracer:
-    """Minimal mock tracer for testing - no API calls, just OpenTelemetry"""
-
-    def __init__(self, tracer):
-        self.tracer = tracer
-
-    def get_tracer(self):
-        return self.tracer
-
-    def add_agent_attributes_to_span(self, span):
-        """No-op for tests"""
-        pass
-
-
-@pytest.fixture
-def mock_processor():
-    return MockSpanProcessor()
-
-
-@pytest.fixture
-def tracer(mock_processor):
-    """Minimal tracer with local OpenTelemetry only - no API, no project creation"""
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.trace import set_tracer_provider
-    from judgeval.tracer.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME  # type: ignore
-    from judgeval.version import get_version  # type: ignore
-
-    provider = TracerProvider()
-    provider.add_span_processor(mock_processor)
-    set_tracer_provider(provider)
-
-    otel_tracer = provider.get_tracer(
-        JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME,
-        get_version(),
-    )
-
-    return MockTracer(otel_tracer)
-
-
-@pytest.fixture
-def tracer_with_mock(tracer):
-    """Alias for tracer - both now use the mock processor"""
-    return tracer
-
-
-@pytest.fixture
-def google_api_key():
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        pytest.skip("GEMINI_API_KEY environment variable not set")
-    return api_key
-
-
-@pytest.fixture
-def client(google_api_key):
-    return Client(api_key=google_api_key)
-
-
-@pytest.fixture
-def client_wrapped(tracer, client):
-    """Wrapped client with tracer"""
-    return wrap_google_client(tracer, client)
-
-
-@pytest.fixture(params=["wrapped", "unwrapped"], ids=["with_tracer", "without_tracer"])
-def client_maybe_wrapped(request, tracer, client):
-    """Parametrized fixture that returns wrapped or unwrapped client"""
-    if request.param == "wrapped":
-        return wrap_google_client(tracer, client)
-    return client
-
-
-class TestWrapper:
-    def test_generate_content(self, client_maybe_wrapped):
-        """Test generate_content with gemini-2.5-flash"""
+class TestWrapper(BaseGoogleTest):
+    def test_generate_content(self, client_maybe_wrapped, mock_processor):
+        """Test generate_content with gemini-2.5-flash and tracing verification"""
         response = client_maybe_wrapped.models.generate_content(
             model="gemini-2.5-flash",
             contents="Say 'test' and nothing else",
@@ -124,8 +48,14 @@ class TestWrapper:
         assert response.usage_metadata.prompt_token_count > 0
         assert response.usage_metadata.candidates_token_count > 0
 
-    def test_multiple_calls_same_client(self, client_maybe_wrapped):
-        """Test multiple calls to ensure context isolation"""
+        # Verify tracing when wrapped
+        self.verify_tracing_if_wrapped(client_maybe_wrapped, mock_processor)
+
+    def test_multiple_calls_same_client(self, client_maybe_wrapped, mock_processor):
+        """Test multiple calls to ensure context isolation with tracing verification"""
+        # Track initial span count
+        initial_span_count = len(mock_processor.ended_spans)
+
         response1 = client_maybe_wrapped.models.generate_content(
             model="gemini-2.5-flash",
             contents="Say 'first'",
@@ -140,58 +70,49 @@ class TestWrapper:
         assert response2 is not None
         assert response1.text != response2.text
 
+        # Verify tracing when wrapped - should have exactly 2 new spans
+        if hasattr(client_maybe_wrapped, "_judgment_tracer"):
+            assert len(mock_processor.ended_spans) == initial_span_count + 2
 
-class TestTracingIntegration:
-    def test_span_created_and_ended(self, tracer, client_maybe_wrapped):
-        """Test that spans are properly created and ended"""
-        response = client_maybe_wrapped.models.generate_content(
-            model="gemini-2.5-flash",
-            contents="Test",
-        )
+            span1 = mock_processor.ended_spans[initial_span_count]
+            span2 = mock_processor.ended_spans[initial_span_count + 1]
 
-        assert response is not None
+            # Verify spans have different contexts
+            assert span1.context.span_id != span2.context.span_id
 
+            # Verify both spans have correct attributes
+            attrs1 = mock_processor.get_span_attributes(span1)
+            attrs2 = mock_processor.get_span_attributes(span2)
 
-class TestSpanAttributes:
-    def test_span_attributes_set(self, tracer, mock_processor, client_wrapped, client):
-        """Test that all required span attributes are set correctly"""
-        response = client_wrapped.models.generate_content(
-            model="gemini-2.5-flash",
-            contents="Say hello",
-        )
+            verify_span_attributes_comprehensive(
+                span=span1,
+                attrs=attrs1,
+                expected_span_name="GOOGLE_API_CALL",
+                expected_model_name="gemini-2.5-flash",
+            )
 
-        assert response is not None
+            verify_span_attributes_comprehensive(
+                span=span2,
+                attrs=attrs2,
+                expected_span_name="GOOGLE_API_CALL",
+                expected_model_name="gemini-2.5-flash",
+            )
 
-        span = mock_processor.get_last_ended_span()
-        assert span is not None
-
-        attrs = mock_processor.get_span_attributes(span)
-        assert AttributeKeys.JUDGMENT_SPAN_KIND in attrs
-        assert attrs[AttributeKeys.JUDGMENT_SPAN_KIND] == "llm"
-        assert AttributeKeys.GEN_AI_PROMPT in attrs
-        assert AttributeKeys.GEN_AI_REQUEST_MODEL in attrs
-        assert attrs[AttributeKeys.GEN_AI_REQUEST_MODEL] == "gemini-2.5-flash"
-        assert AttributeKeys.GEN_AI_COMPLETION in attrs
-        assert AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS in attrs
-        assert AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS in attrs
-
-
-class TestErrorHandling:
-    def test_error_recorded_in_span(self, tracer, mock_processor, client_wrapped):
-        """Test that errors are properly recorded in spans"""
+    def test_error_recorded_in_span(self, client_maybe_wrapped, mock_processor):
+        """Test that errors are properly recorded in spans with tracing verification"""
         with pytest.raises(Exception):
-            client_wrapped.models.generate_content(
+            client_maybe_wrapped.models.generate_content(
                 model="invalid-model-name",
                 contents="Test",
             )
 
-        span = mock_processor.get_last_ended_span()
-        assert span is not None
+        # Verify tracing when wrapped - should have exception recorded
+        self.verify_exception_if_wrapped(client_maybe_wrapped, mock_processor)
 
 
-class TestWrapperIdempotency:
-    def test_double_wrapping(self, tracer, client):
-        """Test that wrapping the same client twice doesn't break anything"""
+class TestWrapperIdempotency(BaseGoogleTest):
+    def test_double_wrapping(self, tracer, client, mock_processor):
+        """Test that wrapping the same client twice doesn't break anything with tracing verification"""
         client1 = wrap_google_client(tracer, client)
         client2 = wrap_google_client(tracer, client1)
 
@@ -201,3 +122,6 @@ class TestWrapperIdempotency:
         )
 
         assert response is not None
+
+        # Verify tracing works with double-wrapped client
+        self.verify_tracing_if_wrapped(client2, mock_processor)
