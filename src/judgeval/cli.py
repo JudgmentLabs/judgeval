@@ -26,6 +26,12 @@ def upload_scorer(
     unique_name: str = typer.Option(
         None, help="Custom name for the scorer (auto-detected if not provided)"
     ),
+    overwrite: bool = typer.Option(
+        False,
+        "--overwrite",
+        "-o",
+        help="Overwrite existing scorer if it already exists",
+    ),
 ):
     # Validate file paths
     if not Path(scorer_file_path).exists():
@@ -43,6 +49,7 @@ def upload_scorer(
             scorer_file_path=scorer_file_path,
             requirements_file_path=requirements_file_path,
             unique_name=unique_name,
+            overwrite=overwrite,
         )
 
         if not result:
