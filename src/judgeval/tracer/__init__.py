@@ -155,14 +155,10 @@ class Tracer(metaclass=SingletonMeta):
 
         self.judgment_processor = NoOpJudgmentSpanProcessor()
         if self.enable_monitoring:
-            project_id, project_created = Tracer._resolve_project_id(
+            project_id = Tracer._resolve_project_id(
                 self.project_name, self.api_key, self.organization_id
-            ) or (None, False)
+            )
             if project_id:
-                if project_created:
-                    judgeval_logger.info(
-                        f"Project {self.project_name} was autocreated successfully."
-                    )
                 self.judgment_processor = self.get_processor(
                     tracer=self,
                     project_name=self.project_name,
@@ -233,14 +229,14 @@ class Tracer(metaclass=SingletonMeta):
     @staticmethod
     def _resolve_project_id(
         project_name: str, api_key: str, organization_id: str
-    ) -> Tuple[str, bool]:
+    ) -> str:
         """Resolve project_id from project_name using the API."""
         client = JudgmentSyncClient(
             api_key=api_key,
             organization_id=organization_id,
         )
         response = client.projects_resolve({"project_name": project_name})
-        return response["project_id"], response["project_created"]
+        return response["project_id"]
 
     def get_current_span(self):
         return get_current_span()
