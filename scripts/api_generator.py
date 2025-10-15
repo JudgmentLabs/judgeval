@@ -43,6 +43,11 @@ JUDGEVAL_PATHS: List[str] = [
     "/e2e_fetch_trace/",
     "/e2e_fetch_span_score/",
     "/e2e_fetch_trace_scorer_span_score/",
+    "/prompts/insert/",
+    "/prompts/fetch/",
+    "/prompts/tag/",
+    "/prompts/untag/",
+    "/prompts/get_prompt_versions/",
 ]
 
 

@@ -40,12 +40,6 @@ def push_prompt_scorer(
             }
         )
     except JudgmentAPIError as e:
-        if e.status_code == 500:
-            raise JudgmentAPIError(
-                status_code=e.status_code,
-                detail=f"The server is temporarily unavailable. Please try your request again in a few moments. Error details: {e.detail}",
-                response=e.response,
-            )
         raise JudgmentAPIError(
             status_code=e.status_code,
             detail=f"Failed to save prompt scorer: {e.detail}",
@@ -75,12 +69,6 @@ def fetch_prompt_scorer(
             scorer_config.pop("updated_at")
             return scorer_config
     except JudgmentAPIError as e:
-        if e.status_code == 500:
-            raise JudgmentAPIError(
-                status_code=e.status_code,
-                detail=f"The server is temporarily unavailable. Please try your request again in a few moments. Error details: {e.detail}",
-                response=e.response,
-            )
         raise JudgmentAPIError(
             status_code=e.status_code,
             detail=f"Failed to fetch prompt scorer '{name}': {e.detail}",
