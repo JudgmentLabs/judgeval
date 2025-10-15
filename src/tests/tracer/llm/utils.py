@@ -15,9 +15,9 @@ def verify_span_attributes_comprehensive(
     check_completion: bool = True,
     check_usage: bool = True,
     check_cache: bool = True,
+    check_cache_read_value: bool = False,
+    check_cache_creation_value: bool = False,
     check_metadata: bool = True,
-    min_input_tokens: int = 1,
-    min_output_tokens: int = 1,
 ) -> None:
     """Comprehensive span attribute verification - combines all checks.
 
@@ -30,9 +30,9 @@ def verify_span_attributes_comprehensive(
         check_completion: Whether to verify GEN_AI_COMPLETION is present
         check_usage: Whether to verify usage tokens are present and > 0
         check_cache: Whether to verify cache token attributes are present
+        check_cache_read_value: Whether to verify cache read token values are 0
+        check_cache_creation_value: Whether to verify cache creation token values are 0
         check_metadata: Whether to verify JUDGMENT_USAGE_METADATA is present
-        min_input_tokens: Minimum expected input tokens
-        min_output_tokens: Minimum expected output tokens
     """
     # Basic span validation
     assert span is not None
@@ -56,13 +56,19 @@ def verify_span_attributes_comprehensive(
     if check_usage:
         assert AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS in attrs
         assert AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS in attrs
-        assert attrs[AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS] >= min_input_tokens
-        assert attrs[AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS] >= min_output_tokens
+        assert attrs[AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS] > 0
+        assert attrs[AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS] > 0
 
     # Verify cache tokens attribute exists
     if check_cache:
         assert AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS in attrs
         assert AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS in attrs
+
+    if check_cache_read_value:
+        assert attrs.get(AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS) > 0
+
+    if check_cache_creation_value:
+        assert attrs.get(AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS) > 0
 
     # Verify usage metadata
     if check_metadata:

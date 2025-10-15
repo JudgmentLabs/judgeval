@@ -78,7 +78,7 @@ def _wrap_responses_non_streaming_sync(
         if usage_data:
             prompt_tokens = usage_data.input_tokens or 0
             completion_tokens = usage_data.output_tokens or 0
-            cache_read = 0
+            cache_read = usage_data.input_tokens_details.cached_tokens or 0
 
             set_span_attribute(
                 span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
@@ -282,7 +282,7 @@ def _wrap_responses_non_streaming_async(
         if usage_data:
             prompt_tokens = usage_data.input_tokens or 0
             completion_tokens = usage_data.output_tokens or 0
-            cache_read = 0
+            cache_read = usage_data.input_tokens_details.cached_tokens or 0
 
             set_span_attribute(
                 span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens

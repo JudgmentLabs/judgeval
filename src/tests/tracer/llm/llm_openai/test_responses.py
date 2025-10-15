@@ -192,6 +192,37 @@ class TestAsyncResponses(BaseOpenAIResponsesTest):
         # Verify tracing when wrapped - should have exception recorded
         self.verify_exception_if_wrapped(async_client_maybe_wrapped, mock_processor)
 
+    @pytest.mark.skip(reason="Cache reading tokens does seem to be consistently set")
+    @pytest.mark.asyncio
+    async def test_responses_create_with_cache(
+        self, wrapped_async_client, mock_processor
+    ):
+        """Test async responses.create with cache and tracing verification"""
+        prompt = "Explain machine learning in detail, including supervised learning, unsupervised learning, and deep learning. Provide examples of each type and explain how they work in practice."
+        prompt = prompt * 100
+        response = await wrapped_async_client.responses.create(
+            model="gpt-4o-mini",
+            input=prompt,
+        )
+
+        response2 = await wrapped_async_client.responses.create(
+            model="gpt-4o-mini",
+            input=prompt,
+        )
+
+        assert response is not None
+        assert response2 is not None
+
+        span = mock_processor.get_last_ended_span()
+        attrs = mock_processor.get_span_attributes(span)
+        verify_span_attributes_comprehensive(
+            span=span,
+            attrs=attrs,
+            expected_span_name="OPENAI_API_CALL",
+            expected_model_name="gpt-4o-mini",
+            check_cache_read_value=True,
+        )
+
 
 class TestStreamingResponses(BaseOpenAIResponsesTest):
     def test_responses_streaming(self, sync_client_maybe_wrapped, mock_processor):
