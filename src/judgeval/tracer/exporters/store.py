@@ -46,7 +46,7 @@ class SpanStore(ABCSpanStore):
                 context = span.get_span_context()
                 if context is None:
                     continue
-                if context.span_id == id:
+                if format(context.span_id, "016x") == id:
                     return span
 
         raise ValueError(f"Span with id {id} not found")
