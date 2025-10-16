@@ -1,6 +1,5 @@
 import asyncio
 import json
-import time
 from typing import Optional, Callable, Any, List, Union, Dict
 from fireworks import Dataset  # type: ignore[import-not-found]
 from .config import TrainerConfig, ModelConfig
@@ -119,22 +118,7 @@ class FireworksTrainer(BaseTrainer):
                         pass
                     messages.append({"role": "assistant", "content": content})
 
-            elif span_type == "user":
-                output = span_attributes.get(AttributeKeys.JUDGMENT_OUTPUT)
-                if output is not None:
-                    content = str(output)
-                    try:
-                        parsed = json.loads(content)
-                        if isinstance(parsed, dict) and "messages" in parsed:
-                            for msg in parsed["messages"]:
-                                if isinstance(msg, dict) and msg.get("role") == "user":
-                                    content = msg.get("content", content)
-                                    break
-                    except (json.JSONDecodeError, KeyError):
-                        pass
-                    messages.append({"role": "user", "content": content})
-
-            elif span_type == "tool":
+            elif span_type in ("user", "tool"):
                 output = span_attributes.get(AttributeKeys.JUDGMENT_OUTPUT)
                 if output is not None:
                     content = str(output)
@@ -345,7 +329,7 @@ class FireworksTrainer(BaseTrainer):
                             _print_progress_update(f"Training job: {current_state}")
                         last_state = current_state
 
-                    time.sleep(10)
+                    await asyncio.sleep(10)
                     job = job.get()
                     if job is None:
                         raise JudgmentRuntimeError(
@@ -391,7 +375,7 @@ class FireworksTrainer(BaseTrainer):
                 agent_function, scorers, prompts
             )
         except JudgmentRuntimeError:
-            # Re-raise JudgmentAPIError as-is
+            # Re-raise JudgmentRuntimeError as-is
             raise
         except Exception as e:
             raise JudgmentRuntimeError(f"Training process failed: {str(e)}") from e

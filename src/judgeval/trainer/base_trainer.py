@@ -1,7 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Any, Callable, List, Optional, Union, Dict
+from typing import Any, Callable, List, Optional, Union, Dict, TYPE_CHECKING
 from .config import TrainerConfig, ModelConfig
 from judgeval.scorers import ExampleScorer, ExampleAPIScorerConfig
+
+if TYPE_CHECKING:
+    from judgeval.tracer import Tracer
 
 
 class BaseTrainer(ABC):
@@ -17,7 +20,7 @@ class BaseTrainer(ABC):
         self,
         config: TrainerConfig,
         trainable_model: Any,
-        tracer: Any,
+        tracer: "Tracer",
         project_name: Optional[str] = None,
     ):
         """
@@ -43,7 +46,7 @@ class BaseTrainer(ABC):
         num_prompts_per_step: Optional[int] = None,
         num_generations_per_prompt: Optional[int] = None,
         concurrency: Optional[int] = None,
-    ):
+    ) -> Any:
         """
         Generate rollouts and compute rewards using the current model snapshot.
 
