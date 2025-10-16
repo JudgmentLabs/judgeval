@@ -15,16 +15,16 @@ class ABCSpanStore(ABC):
     def get_all(self) -> List[ReadableSpan]: ...
 
     @abstractmethod
-    def get_by_trace_id(self, trace_id: int) -> List[ReadableSpan]: ...
+    def get_by_trace_id(self, trace_id: str) -> List[ReadableSpan]: ...
 
     @abstractmethod
-    def clear_trace(self, trace_id: int): ...
+    def clear_trace(self, trace_id: str): ...
 
 
 class SpanStore(ABCSpanStore):
     __slots__ = ("_spans_by_trace",)
 
-    _spans_by_trace: Dict[int, List[ReadableSpan]]
+    _spans_by_trace: Dict[str, List[ReadableSpan]]
 
     def __init__(self):
         self._spans_by_trace = {}
@@ -34,7 +34,8 @@ class SpanStore(ABCSpanStore):
             context = span.get_span_context()
             if context is None:
                 continue
-            trace_id = context.trace_id
+            # Convert trace_id to hex string per OTEL spec
+            trace_id = format(context.trace_id, "032x")
             if trace_id not in self._spans_by_trace:
                 self._spans_by_trace[trace_id] = []
             self._spans_by_trace[trace_id].append(span)
@@ -56,12 +57,12 @@ class SpanStore(ABCSpanStore):
             all_spans.extend(spans)
         return all_spans
 
-    def get_by_trace_id(self, trace_id: int) -> List[ReadableSpan]:
-        """Get all spans for a specific trace ID."""
+    def get_by_trace_id(self, trace_id: str) -> List[ReadableSpan]:
+        """Get all spans for a specific trace ID (32-char hex string)."""
         return self._spans_by_trace.get(trace_id, [])
 
-    def clear_trace(self, trace_id: int):
-        """Clear all spans for a specific trace ID."""
+    def clear_trace(self, trace_id: str):
+        """Clear all spans for a specific trace ID (32-char hex string)."""
         if trace_id in self._spans_by_trace:
             del self._spans_by_trace[trace_id]
 

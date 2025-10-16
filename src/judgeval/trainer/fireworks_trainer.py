@@ -52,7 +52,7 @@ class FireworksTrainer(BaseTrainer):
             ) from e
 
     def _extract_message_history_from_spans(
-        self, trace_id: int
+        self, trace_id: str
     ) -> List[Dict[str, str]]:
         """
         Extract message history from spans in the span store for training purposes.
@@ -61,7 +61,7 @@ class FireworksTrainer(BaseTrainer):
         extracting messages in chronological order from LLM, user, and tool spans.
 
         Args:
-            trace_id: The trace ID to extract message history from
+            trace_id: The trace ID (32-char hex string) to extract message history from
 
         Returns:
             List of message dictionaries with 'role' and 'content' keys
@@ -184,9 +184,8 @@ class FireworksTrainer(BaseTrainer):
                 current_span = self.tracer.get_current_span()
                 trace_id = None
                 if current_span and current_span.is_recording():
-                    context = current_span.get_span_context()
-                    if context:
-                        trace_id = context.trace_id
+                    # Convert trace_id to hex string per OTEL spec
+                    trace_id = format(current_span.get_span_context().trace_id, "032x")
 
                 try:
                     if trace_id is not None:

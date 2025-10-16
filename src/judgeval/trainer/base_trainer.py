@@ -107,9 +107,14 @@ class BaseTrainer(ABC):
         pass
 
     @abstractmethod
-    def _extract_message_history_from_spans(self) -> List[Dict[str, str]]:
+    def _extract_message_history_from_spans(
+        self, trace_id: str
+    ) -> List[Dict[str, str]]:
         """
         Extract message history from spans for training purposes.
+
+        Args:
+            trace_id: The trace ID (32-char hex string) to extract message history from
 
         Returns:
             List of message dictionaries with 'role' and 'content' keys
