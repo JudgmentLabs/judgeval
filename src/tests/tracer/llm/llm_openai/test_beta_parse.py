@@ -50,7 +50,7 @@ class TestSyncBetaParse(BaseOpenAIBetaParseTest):
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "test"}],
             response_format=TestResponse,
-            max_completion_tokens=1000,
+            max_completion_tokens=2000,
         )
 
         assert response is not None
@@ -79,14 +79,14 @@ class TestSyncBetaParse(BaseOpenAIBetaParseTest):
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "word: first"}],
             response_format=TestResponse,
-            max_completion_tokens=1000,
+            max_completion_tokens=2000,
         )
 
         response2 = sync_client_maybe_wrapped.beta.chat.completions.parse(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "word: second"}],
             response_format=TestResponse,
-            max_completion_tokens=1000,
+            max_completion_tokens=2000,
         )
 
         assert response1 is not None
@@ -133,7 +133,7 @@ class TestSyncBetaParse(BaseOpenAIBetaParseTest):
                 model="invalid-model-name-that-does-not-exist",
                 messages=[{"role": "user", "content": "word: test"}],
                 response_format=TestResponse,
-                max_completion_tokens=1000,
+                max_completion_tokens=2000,
             )
 
         # Verify tracing when wrapped - should have exception recorded
@@ -155,7 +155,7 @@ class TestAsyncBetaParse(BaseOpenAIBetaParseTest):
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "word: test"}],
             response_format=TestResponse,
-            max_completion_tokens=1000,
+            max_completion_tokens=2000,
         )
 
         assert response is not None
@@ -185,14 +185,14 @@ class TestAsyncBetaParse(BaseOpenAIBetaParseTest):
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "word: first"}],
             response_format=TestResponse,
-            max_completion_tokens=1000,
+            max_completion_tokens=2000,
         )
 
         response2 = await async_client_maybe_wrapped.beta.chat.completions.parse(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "word: second"}],
             response_format=TestResponse,
-            max_completion_tokens=1000,
+            max_completion_tokens=2000,
         )
 
         assert response1 is not None
@@ -242,7 +242,7 @@ class TestAsyncBetaParse(BaseOpenAIBetaParseTest):
                 model="invalid-model-name-that-does-not-exist",
                 messages=[{"role": "user", "content": "word: test"}],
                 response_format=TestResponse,
-                max_completion_tokens=1000,
+                max_completion_tokens=2000,
             )
 
         # Verify tracing when wrapped - should have exception recorded
@@ -270,14 +270,14 @@ class TestEdgeCases(BaseOpenAIBetaParseTest):
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "word: one"}],
             response_format=TestResponse,
-            max_completion_tokens=1000,
+            max_completion_tokens=2000,
         )
 
         response2 = client2.beta.chat.completions.parse(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "word: two"}],
             response_format=TestResponse,
-            max_completion_tokens=1000,
+            max_completion_tokens=2000,
         )
 
         assert response1 is not None
@@ -333,7 +333,7 @@ class TestSafetyGuarantees(BaseOpenAIBetaParseTest):
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "word: test"}],
             response_format=TestResponse,
-            max_completion_tokens=1000,
+            max_completion_tokens=2000,
         )
 
         assert response is not None
@@ -369,14 +369,14 @@ class TestSafetyGuarantees(BaseOpenAIBetaParseTest):
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "word: test"}],
             response_format=TestResponse,
-            max_completion_tokens=1000,
+            max_completion_tokens=2000,
         )
 
         wrapped_response = wrapped.beta.chat.completions.parse(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "word: test"}],
             response_format=TestResponse,
-            max_completion_tokens=1000,
+            max_completion_tokens=2000,
         )
 
         assert type(unwrapped_response) is type(wrapped_response)
@@ -419,7 +419,7 @@ class TestSafetyGuarantees(BaseOpenAIBetaParseTest):
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "word: test"}],
             response_format=TestResponse,
-            max_completion_tokens=1000,
+            max_completion_tokens=2000,
         )
 
         assert response is not None
