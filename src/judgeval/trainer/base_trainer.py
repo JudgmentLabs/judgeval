@@ -16,6 +16,7 @@ class BaseTrainer(ABC):
     def __init__(
         self,
         config: TrainerConfig,
+        trainable_model: Any,
         tracer: Any,
         project_name: Optional[str] = None,
     ):
@@ -24,10 +25,12 @@ class BaseTrainer(ABC):
 
         Args:
             config: TrainerConfig instance with training parameters
+            trainable_model: TrainableModel instance to use for training
             tracer: Tracer for observability
             project_name: Project name for organizing training runs
         """
         self.config = config
+        self.trainable_model = trainable_model
         self.tracer = tracer
         self.project_name = project_name or "judgment_training"
 

@@ -24,10 +24,13 @@ class JudgmentTrainer:
             model_id="my-model",
             rft_provider="fireworks"  # or "verifiers" in the future
         )
+
+        # User creates and configures the trainable model
+        trainable_model = TrainableModel(config)
         tracer = Tracer()
 
         # JudgmentTrainer automatically creates the appropriate provider-specific trainer
-        trainer = JudgmentTrainer(config, tracer)
+        trainer = JudgmentTrainer(config, trainable_model, tracer)
 
         # The returned trainer implements the BaseTrainer interface
         model_config = await trainer.train(agent_function, scorers, prompts)
@@ -36,17 +39,19 @@ class JudgmentTrainer:
     def __new__(
         cls,
         config: TrainerConfig,
+        trainable_model,
         tracer: Tracer,
         project_name: Optional[str] = None,
     ) -> BaseTrainer:
         """
         Create and return a provider-specific trainer instance.
 
-        This method uses the __new__ magic method to return a different class instance
+        This method uses the __new__ method to return a different class instance
         based on the configured provider, effectively making JudgmentTrainer a factory.
 
         Args:
             config: TrainerConfig instance with training parameters including rft_provider
+            trainable_model: Provider-specific trainable model instance (e.g., TrainableModel for Fireworks)
             tracer: Tracer for observability
             project_name: Project name for organizing training runs and evaluations
 
@@ -60,7 +65,7 @@ class JudgmentTrainer:
         provider = config.rft_provider.lower()
 
         if provider == "fireworks":
-            return FireworksTrainer(config, tracer, project_name)
+            return FireworksTrainer(config, trainable_model, tracer, project_name)
         elif provider == "verifiers":
             # Placeholder for future implementation
             raise JudgmentRuntimeError(

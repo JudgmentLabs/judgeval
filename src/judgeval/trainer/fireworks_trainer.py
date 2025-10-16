@@ -28,6 +28,7 @@ class FireworksTrainer(BaseTrainer):
     def __init__(
         self,
         config: TrainerConfig,
+        trainable_model: TrainableModel,
         tracer: Tracer,
         project_name: Optional[str] = None,
     ):
@@ -36,14 +37,12 @@ class FireworksTrainer(BaseTrainer):
 
         Args:
             config: TrainerConfig instance with training parameters
+            trainable_model: TrainableModel instance for Fireworks training
             tracer: Tracer for observability
             project_name: Project name for organizing training runs and evaluations
         """
         try:
-            super().__init__(config, tracer, project_name)
-
-            # Initialize trainable model with Fireworks-specific logic
-            self.trainable_model = TrainableModel(config)
+            super().__init__(config, trainable_model, tracer, project_name)
 
             self.judgment_client = JudgmentClient()
             self.span_store = SpanStore()
