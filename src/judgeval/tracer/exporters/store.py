@@ -9,9 +9,6 @@ class ABCSpanStore(ABC):
     def add(self, *spans: ReadableSpan): ...
 
     @abstractmethod
-    def get(self, id: str) -> ReadableSpan: ...
-
-    @abstractmethod
     def get_all(self) -> List[ReadableSpan]: ...
 
     @abstractmethod
@@ -39,17 +36,6 @@ class SpanStore(ABCSpanStore):
             if trace_id not in self._spans_by_trace:
                 self._spans_by_trace[trace_id] = []
             self._spans_by_trace[trace_id].append(span)
-
-    def get(self, id: str) -> ReadableSpan:
-        for spans in self._spans_by_trace.values():
-            for span in spans:
-                context = span.get_span_context()
-                if context is None:
-                    continue
-                if format(context.span_id, "016x") == id:
-                    return span
-
-        raise ValueError(f"Span with id {id} not found")
 
     def get_all(self) -> List[ReadableSpan]:
         all_spans = []
