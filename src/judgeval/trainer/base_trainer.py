@@ -5,6 +5,7 @@ from judgeval.scorers import ExampleScorer, ExampleAPIScorerConfig
 
 if TYPE_CHECKING:
     from judgeval.tracer import Tracer
+    from .trainable_model import TrainableModel
 
 
 class BaseTrainer(ABC):
@@ -19,7 +20,7 @@ class BaseTrainer(ABC):
     def __init__(
         self,
         config: TrainerConfig,
-        trainable_model: Any,
+        trainable_model: "TrainableModel",
         tracer: "Tracer",
         project_name: Optional[str] = None,
     ):
