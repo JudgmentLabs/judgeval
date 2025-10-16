@@ -16,7 +16,7 @@ class TrainerConfig:
     user_id: str
     model_id: str
     base_model_name: str = "qwen2p5-7b-instruct"
-    rft_provider: str = "fireworks"
+    rft_provider: str = "fireworks"  # Supported: "fireworks", "verifiers" (future)
     num_steps: int = 5
     num_generations_per_prompt: int = 4
     num_prompts_per_step: int = 4
