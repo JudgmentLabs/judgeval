@@ -51,17 +51,22 @@ class FireworksTrainer(BaseTrainer):
                 f"Failed to initialize FireworksTrainer: {str(e)}"
             ) from e
 
-    def _extract_message_history_from_spans(self) -> List[Dict[str, str]]:
+    def _extract_message_history_from_spans(
+        self, trace_id: int
+    ) -> List[Dict[str, str]]:
         """
         Extract message history from spans in the span store for training purposes.
 
         This method processes trace spans to reconstruct the conversation flow,
         extracting messages in chronological order from LLM, user, and tool spans.
 
+        Args:
+            trace_id: The trace ID to extract message history from
+
         Returns:
             List of message dictionaries with 'role' and 'content' keys
         """
-        spans = self.span_store.get_all()
+        spans = self.span_store.get_by_trace_id(trace_id)
         if not spans:
             return []
 
@@ -176,16 +181,27 @@ class FireworksTrainer(BaseTrainer):
                 response_data = await agent_function(**prompt_input)
                 messages = response_data.get("messages", [])
 
+                current_span = self.tracer.get_current_span()
+                trace_id = None
+                if current_span and current_span.is_recording():
+                    context = current_span.get_span_context()
+                    if context:
+                        trace_id = context.trace_id
+
                 try:
-                    traced_messages = self._extract_message_history_from_spans()
-                    if traced_messages:
-                        messages = traced_messages
+                    if trace_id is not None:
+                        traced_messages = self._extract_message_history_from_spans(
+                            trace_id
+                        )
+                        if traced_messages:
+                            messages = traced_messages
                 except Exception as e:
                     print(f"Warning: Failed to get message history from trace: {e}")
                     pass
 
                 finally:
-                    self.span_store.spans = []
+                    if trace_id is not None:
+                        self.span_store.clear_trace(trace_id)
 
                 example = Example(
                     input=prompt_input,
