@@ -2,6 +2,12 @@ from typing import List, Optional, Dict
 import os
 from judgeval.api import JudgmentSyncClient
 from judgeval.exceptions import JudgmentAPIError
+from judgeval.api.api_types import (
+    PromptCommitInfo,
+    PromptTagResponse,
+    PromptUntagResponse,
+    PromptVersionsResponse,
+)
 from dataclasses import dataclass, field
 import re
 from string import Template
@@ -25,7 +31,7 @@ def push_prompt(
                 "tags": tags,
             }
         )
-        return r["commit_id"], r["parent_commit_id"]
+        return r["commit_id"], r.get("parent_commit_id")
     except JudgmentAPIError as e:
         raise JudgmentAPIError(
             status_code=e.status_code,
@@ -41,7 +47,7 @@ def fetch_prompt(
     tag: Optional[str] = None,
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
-):
+) -> Optional[PromptCommitInfo]:
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
         prompt_config = client.prompts_fetch(
@@ -66,7 +72,7 @@ def tag_prompt(
     tags: List[str],
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
-):
+) -> PromptTagResponse:
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
         prompt_config = client.prompts_tag(
@@ -92,7 +98,7 @@ def untag_prompt(
     tags: List[str],
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
-):
+) -> PromptUntagResponse:
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
         prompt_config = client.prompts_untag(
@@ -112,7 +118,7 @@ def list_prompt(
     name: str,
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
-):
+) -> PromptVersionsResponse:
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
         prompt_config = client.prompts_get_prompt_versions(
@@ -138,14 +144,14 @@ class Prompt:
     _template: Template = field(init=False, repr=False)
 
     def __post_init__(self):
-        template_str = re.sub(r"\{\{(\w+)\}\}", r"$\1", self.prompt)
+        template_str = re.sub(r"\{\{([^}]+)\}\}", r"$\1", self.prompt)
         self._template = Template(template_str)
 
     @classmethod
     def create(
         cls, project_name: str, name: str, prompt: str, tags: Optional[List[str]] = None
     ):
-        if not tags:
+        if tags is None:
             tags = []
         commit_id, parent_commit_id = push_prompt(project_name, name, prompt, tags)
         return cls(
@@ -180,7 +186,7 @@ class Prompt:
             prompt=prompt_config["prompt"],
             tags=prompt_config["tags"],
             commit_id=prompt_config["commit_id"],
-            parent_commit_id=prompt_config["parent_commit_id"],
+            parent_commit_id=prompt_config.get("parent_commit_id"),
             metadata={
                 "creator_first_name": prompt_config["first_name"],
                 "creator_last_name": prompt_config["last_name"],
@@ -206,7 +212,7 @@ class Prompt:
                 prompt=prompt_config["prompt"],
                 tags=prompt_config["tags"],
                 commit_id=prompt_config["commit_id"],
-                parent_commit_id=prompt_config["parent_commit_id"],
+                parent_commit_id=prompt_config.get("parent_commit_id"),
                 metadata={
                     "creator_first_name": prompt_config["first_name"],
                     "creator_last_name": prompt_config["last_name"],
