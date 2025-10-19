@@ -149,11 +149,19 @@ class Prompt:
 
     @classmethod
     def create(
-        cls, project_name: str, name: str, prompt: str, tags: Optional[List[str]] = None
+        cls,
+        project_name: str,
+        name: str,
+        prompt: str,
+        tags: Optional[List[str]] = None,
+        judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
+        organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
     ):
         if tags is None:
             tags = []
-        commit_id, parent_commit_id = push_prompt(project_name, name, prompt, tags)
+        commit_id, parent_commit_id = push_prompt(
+            project_name, name, prompt, tags, judgment_api_key, organization_id
+        )
         return cls(
             name=name,
             prompt=prompt,
@@ -169,12 +177,16 @@ class Prompt:
         name: str,
         commit_id: Optional[str] = None,
         tag: Optional[str] = None,
+        judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
+        organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
     ):
         if commit_id is not None and tag is not None:
             raise ValueError(
                 "You cannot fetch a prompt by both commit_id and tag at the same time"
             )
-        prompt_config = fetch_prompt(project_name, name, commit_id, tag)
+        prompt_config = fetch_prompt(
+            project_name, name, commit_id, tag, judgment_api_key, organization_id
+        )
         if prompt_config is None:
             raise JudgmentAPIError(
                 status_code=404,
@@ -194,18 +206,45 @@ class Prompt:
         )
 
     @classmethod
-    def tag(cls, project_name: str, name: str, commit_id: str, tags: List[str]):
-        prompt_config = tag_prompt(project_name, name, commit_id, tags)
+    def tag(
+        cls,
+        project_name: str,
+        name: str,
+        commit_id: str,
+        tags: List[str],
+        judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
+        organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
+    ):
+        prompt_config = tag_prompt(
+            project_name, name, commit_id, tags, judgment_api_key, organization_id
+        )
         return prompt_config["commit_id"]
 
     @classmethod
-    def untag(cls, project_name: str, name: str, tags: List[str]):
-        prompt_config = untag_prompt(project_name, name, tags)
+    def untag(
+        cls,
+        project_name: str,
+        name: str,
+        tags: List[str],
+        judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
+        organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
+    ):
+        prompt_config = untag_prompt(
+            project_name, name, tags, judgment_api_key, organization_id
+        )
         return prompt_config["commit_ids"]
 
     @classmethod
-    def list(cls, project_name: str, name: str):
-        prompt_configs = list_prompt(project_name, name)["versions"]
+    def list(
+        cls,
+        project_name: str,
+        name: str,
+        judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
+        organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
+    ):
+        prompt_configs = list_prompt(
+            project_name, name, judgment_api_key, organization_id
+        )["versions"]
         return [
             cls(
                 name=prompt_config["name"],
