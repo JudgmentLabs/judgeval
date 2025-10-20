@@ -426,3 +426,16 @@ def test_tag_with_no_tags(client: JudgmentClient, project_name: str, random_name
             tags=[],
         )
     assert exc_info.value.status_code == 422, "Should raise 422 error for no tags"
+
+
+def test_untag_with_no_tags(
+    client: JudgmentClient, project_name: str, random_name: str
+):
+    """Test untagging a prompt with no tags."""
+    with pytest.raises(JudgmentAPIError) as exc_info:
+        Prompt.untag(
+            project_name=project_name,
+            name=random_name,
+            tags=[],
+        )
+    assert exc_info.value.status_code == 422, "Should raise 422 error for no tags"
