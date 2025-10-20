@@ -20,7 +20,7 @@ def push_prompt(
     tags: List[str],
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
-) -> tuple[str, Optional[str]]:
+) -> tuple[str, Optional[str], str]:
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
         r = client.prompts_insert(
@@ -31,7 +31,7 @@ def push_prompt(
                 "tags": tags,
             }
         )
-        return r["commit_id"], r.get("parent_commit_id")
+        return r["commit_id"], r.get("parent_commit_id"), r["created_at"]
     except JudgmentAPIError as e:
         raise JudgmentAPIError(
             status_code=e.status_code,
@@ -137,6 +137,7 @@ def list_prompt(
 class Prompt:
     name: str
     prompt: str
+    created_at: str
     tags: List[str]
     commit_id: str
     parent_commit_id: Optional[str] = None
@@ -159,12 +160,13 @@ class Prompt:
     ):
         if tags is None:
             tags = []
-        commit_id, parent_commit_id = push_prompt(
+        commit_id, parent_commit_id, created_at = push_prompt(
             project_name, name, prompt, tags, judgment_api_key, organization_id
         )
         return cls(
             name=name,
             prompt=prompt,
+            created_at=created_at,
             tags=tags,
             commit_id=commit_id,
             parent_commit_id=parent_commit_id,
@@ -196,6 +198,7 @@ class Prompt:
         return cls(
             name=prompt_config["name"],
             prompt=prompt_config["prompt"],
+            created_at=prompt_config["created_at"],
             tags=prompt_config["tags"],
             commit_id=prompt_config["commit_id"],
             parent_commit_id=prompt_config.get("parent_commit_id"),
@@ -250,12 +253,12 @@ class Prompt:
                 name=prompt_config["name"],
                 prompt=prompt_config["prompt"],
                 tags=prompt_config["tags"],
+                created_at=prompt_config["created_at"],
                 commit_id=prompt_config["commit_id"],
                 parent_commit_id=prompt_config.get("parent_commit_id"),
                 metadata={
                     "creator_first_name": prompt_config["first_name"],
                     "creator_last_name": prompt_config["last_name"],
-                    "created_at": prompt_config["created_at"],
                 },
             )
             for prompt_config in prompt_configs
