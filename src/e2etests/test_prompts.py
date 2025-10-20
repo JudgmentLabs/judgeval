@@ -373,9 +373,56 @@ def test_remove_nonexistent_tag(
         prompt="test prompt content",
         tags=["tag-1"],
     )
-    untagged_prompt = Prompt.untag(
-        project_name=project_name,
-        name=random_name,
-        tags=["nonexistent_tag"],
+    with pytest.raises(JudgmentAPIError) as exc_info:
+        Prompt.untag(
+            project_name=project_name,
+            name=random_name,
+            tags=["nonexistent_tag"],
+        )
+    assert exc_info.value.status_code == 404, (
+        "Should raise 404 error for nonexistent tag"
     )
-    assert not untagged_prompt, "No commits should be untagged"
+
+
+def test_tag_nonexistent_prompt(
+    client: JudgmentClient, project_name: str, random_name: str
+):
+    """Test tagging a nonexistent prompt."""
+    with pytest.raises(JudgmentAPIError) as exc_info:
+        Prompt.tag(
+            project_name=project_name,
+            name=random_name,
+            commit_id="nonexistent_commit_id",
+            tags=["tag-1"],
+        )
+    assert exc_info.value.status_code == 404, (
+        "Should raise 404 error for nonexistent prompt"
+    )
+
+
+def test_untag_nonexistent_prompt(
+    client: JudgmentClient, project_name: str, random_name: str
+):
+    """Test untagging a nonexistent prompt."""
+    with pytest.raises(JudgmentAPIError) as exc_info:
+        res = Prompt.untag(
+            project_name=project_name,
+            name=random_name,
+            tags=["tag-1"],
+        )
+        print(f"Result: {res}")
+    assert exc_info.value.status_code == 404, (
+        "Should raise 404 error for nonexistent prompt"
+    )
+
+
+def test_tag_with_no_tags(client: JudgmentClient, project_name: str, random_name: str):
+    """Test tagging a prompt with no tags."""
+    with pytest.raises(JudgmentAPIError) as exc_info:
+        Prompt.tag(
+            project_name=project_name,
+            name=random_name,
+            commit_id="nonexistent_commit_id",
+            tags=[],
+        )
+    assert exc_info.value.status_code == 422, "Should raise 422 error for no tags"
