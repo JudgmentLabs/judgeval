@@ -205,6 +205,7 @@ class Prompt:
             metadata={
                 "creator_first_name": prompt_config["first_name"],
                 "creator_last_name": prompt_config["last_name"],
+                "creator_email": prompt_config["user_email"],
             },
         )
 
@@ -259,6 +260,7 @@ class Prompt:
                 metadata={
                     "creator_first_name": prompt_config["first_name"],
                     "creator_last_name": prompt_config["last_name"],
+                    "creator_email": prompt_config["user_email"],
                 },
             )
             for prompt_config in prompt_configs
