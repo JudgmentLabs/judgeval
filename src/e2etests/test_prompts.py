@@ -285,9 +285,9 @@ def test_list_prompts(client: JudgmentClient, project_name: str, random_name: st
     )
     assert prompt_list is not None, "Failed to list prompts"
     assert len(prompt_list) == 3, f"Expected 3 versions, got {len(prompt_list)}"
-    assert prompt_list[0].prompt == "version 3", "First prompt should be version 1"
+    assert prompt_list[0].prompt == "version 3", "Third prompt should be version 3"
     assert prompt_list[1].prompt == "version 2", "Second prompt should be version 2"
-    assert prompt_list[2].prompt == "version 1", "Third prompt should be version 3"
+    assert prompt_list[2].prompt == "version 1", "First prompt should be version 1"
 
 
 def test_multiple_tags_on_creation(
