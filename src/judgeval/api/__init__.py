@@ -212,17 +212,13 @@ class JudgmentSyncClient:
 
     def prompts_fetch(
         self,
+        project_id: str,
         name: str,
-        project_name: Optional[str] = None,
-        project_id: Optional[str] = None,
         commit_id: Optional[str] = None,
         tag: Optional[str] = None,
     ) -> PromptFetchResponse:
         query_params = {}
-        if project_name is not None:
-            query_params["project_name"] = project_name
-        if project_id is not None:
-            query_params["project_id"] = project_id
+        query_params["project_id"] = project_id
         query_params["name"] = name
         if commit_id is not None:
             query_params["commit_id"] = commit_id
@@ -235,20 +231,11 @@ class JudgmentSyncClient:
         )
 
     def prompts_get_prompt_versions(
-        self,
-        name: str,
-        project_id: Optional[str] = None,
-        project_name: Optional[str] = None,
-        get_user_avatars: Optional[str] = None,
+        self, project_id: str, name: str
     ) -> PromptVersionsResponse:
         query_params = {}
-        if project_id is not None:
-            query_params["project_id"] = project_id
-        if project_name is not None:
-            query_params["project_name"] = project_name
+        query_params["project_id"] = project_id
         query_params["name"] = name
-        if get_user_avatars is not None:
-            query_params["get_user_avatars"] = get_user_avatars
         return self._request(
             "GET",
             url_for("/prompts/get_prompt_versions/"),
@@ -472,17 +459,13 @@ class JudgmentAsyncClient:
 
     async def prompts_fetch(
         self,
+        project_id: str,
         name: str,
-        project_name: Optional[str] = None,
-        project_id: Optional[str] = None,
         commit_id: Optional[str] = None,
         tag: Optional[str] = None,
     ) -> PromptFetchResponse:
         query_params = {}
-        if project_name is not None:
-            query_params["project_name"] = project_name
-        if project_id is not None:
-            query_params["project_id"] = project_id
+        query_params["project_id"] = project_id
         query_params["name"] = name
         if commit_id is not None:
             query_params["commit_id"] = commit_id
@@ -495,20 +478,11 @@ class JudgmentAsyncClient:
         )
 
     async def prompts_get_prompt_versions(
-        self,
-        name: str,
-        project_id: Optional[str] = None,
-        project_name: Optional[str] = None,
-        get_user_avatars: Optional[str] = None,
+        self, project_id: str, name: str
     ) -> PromptVersionsResponse:
         query_params = {}
-        if project_id is not None:
-            query_params["project_id"] = project_id
-        if project_name is not None:
-            query_params["project_name"] = project_name
+        query_params["project_id"] = project_id
         query_params["name"] = name
-        if get_user_avatars is not None:
-            query_params["get_user_avatars"] = get_user_avatars
         return await self._request(
             "GET",
             url_for("/prompts/get_prompt_versions/"),

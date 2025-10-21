@@ -6,6 +6,7 @@ from judgeval.data.evaluation_run import ExampleEvaluationRun
 
 
 from typing import List, Optional, Union, Sequence
+import ast
 from judgeval.scorers import ExampleAPIScorerConfig
 from judgeval.scorers.example_scorer import ExampleScorer
 from judgeval.data.example import Example
@@ -81,6 +82,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         scorer_file_path: str,
         requirements_file_path: Optional[str] = None,
         unique_name: Optional[str] = None,
+        overwrite: bool = False,
     ) -> bool:
         """
         Upload custom ExampleScorer from files to backend.
@@ -89,6 +91,7 @@ class JudgmentClient(metaclass=SingletonMeta):
             scorer_file_path: Path to Python file containing CustomScorer class
             requirements_file_path: Optional path to requirements.txt
             unique_name: Optional unique identifier (auto-detected from scorer.name if not provided)
+            overwrite: Whether to overwrite existing scorer if it already exists
 
         Returns:
             bool: True if upload successful
@@ -111,6 +114,31 @@ class JudgmentClient(metaclass=SingletonMeta):
         with open(scorer_file_path, "r") as f:
             scorer_code = f.read()
 
+        try:
+            tree = ast.parse(scorer_code, filename=scorer_file_path)
+        except SyntaxError as e:
+            error_msg = f"Invalid Python syntax in {scorer_file_path}: {e}"
+            judgeval_logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        scorer_classes = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                for base in node.bases:
+                    if (isinstance(base, ast.Name) and base.id == "ExampleScorer") or (
+                        isinstance(base, ast.Attribute) and base.attr == "ExampleScorer"
+                    ):
+                        scorer_classes.append(node.name)
+
+        if len(scorer_classes) > 1:
+            error_msg = f"Multiple ExampleScorer classes found in {scorer_file_path}: {scorer_classes}. Please only upload one scorer class per file."
+            judgeval_logger.error(error_msg)
+            raise ValueError(error_msg)
+        elif len(scorer_classes) == 0:
+            error_msg = f"No ExampleScorer class was found in {scorer_file_path}. Please ensure the file contains a valid scorer class that inherits from ExampleScorer."
+            judgeval_logger.error(error_msg)
+            raise ValueError(error_msg)
+
         # Read requirements (optional)
         requirements_text = ""
         if requirements_file_path and os.path.exists(requirements_file_path):
@@ -127,6 +155,7 @@ class JudgmentClient(metaclass=SingletonMeta):
                     "scorer_name": unique_name,
                     "scorer_code": scorer_code,
                     "requirements_text": requirements_text,
+                    "overwrite": overwrite,
                 }
             )
 

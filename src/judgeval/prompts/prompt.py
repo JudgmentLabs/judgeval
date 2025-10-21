@@ -1,5 +1,4 @@
 from typing import List, Optional, Dict
-import os
 from judgeval.api import JudgmentSyncClient
 from judgeval.exceptions import JudgmentAPIError
 from judgeval.api.api_types import (
@@ -11,6 +10,8 @@ from judgeval.api.api_types import (
 from dataclasses import dataclass, field
 import re
 from string import Template
+from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_ORG_ID
+from judgeval.utils.project import _resolve_project_id
 
 
 def push_prompt(
@@ -18,14 +19,23 @@ def push_prompt(
     name: str,
     prompt: str,
     tags: List[str],
-    judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
-    organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
+    judgment_api_key: str = JUDGMENT_API_KEY,
+    organization_id: str = JUDGMENT_ORG_ID,
 ) -> tuple[str, Optional[str], str]:
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
+        project_id = _resolve_project_id(
+            project_name, judgment_api_key, organization_id
+        )
+        if not project_id:
+            raise JudgmentAPIError(
+                status_code=404,
+                detail=f"Project '{project_name}' not found",
+                response=None,  # type: ignore
+            )
         r = client.prompts_insert(
             payload={
-                "project_name": project_name,
+                "project_id": project_id,
                 "name": name,
                 "prompt": prompt,
                 "tags": tags,
@@ -45,14 +55,23 @@ def fetch_prompt(
     name: str,
     commit_id: Optional[str] = None,
     tag: Optional[str] = None,
-    judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
-    organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
+    judgment_api_key: str = JUDGMENT_API_KEY,
+    organization_id: str = JUDGMENT_ORG_ID,
 ) -> Optional[PromptCommitInfo]:
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
+        project_id = _resolve_project_id(
+            project_name, judgment_api_key, organization_id
+        )
+        if not project_id:
+            raise JudgmentAPIError(
+                status_code=404,
+                detail=f"Project '{project_name}' not found",
+                response=None,  # type: ignore
+            )
         prompt_config = client.prompts_fetch(
             name=name,
-            project_name=project_name,
+            project_id=project_id,
             commit_id=commit_id,
             tag=tag,
         )
@@ -70,14 +89,23 @@ def tag_prompt(
     name: str,
     commit_id: str,
     tags: List[str],
-    judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
-    organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
+    judgment_api_key: str = JUDGMENT_API_KEY,
+    organization_id: str = JUDGMENT_ORG_ID,
 ) -> PromptTagResponse:
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
+        project_id = _resolve_project_id(
+            project_name, judgment_api_key, organization_id
+        )
+        if not project_id:
+            raise JudgmentAPIError(
+                status_code=404,
+                detail=f"Project '{project_name}' not found",
+                response=None,  # type: ignore
+            )
         prompt_config = client.prompts_tag(
             payload={
-                "project_name": project_name,
+                "project_id": project_id,
                 "name": name,
                 "commit_id": commit_id,
                 "tags": tags,
@@ -96,13 +124,22 @@ def untag_prompt(
     project_name: str,
     name: str,
     tags: List[str],
-    judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
-    organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
+    judgment_api_key: str = JUDGMENT_API_KEY,
+    organization_id: str = JUDGMENT_ORG_ID,
 ) -> PromptUntagResponse:
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
+        project_id = _resolve_project_id(
+            project_name, judgment_api_key, organization_id
+        )
+        if not project_id:
+            raise JudgmentAPIError(
+                status_code=404,
+                detail=f"Project '{project_name}' not found",
+                response=None,  # type: ignore
+            )
         prompt_config = client.prompts_untag(
-            payload={"project_name": project_name, "name": name, "tags": tags}
+            payload={"project_id": project_id, "name": name, "tags": tags}
         )
         return prompt_config
     except JudgmentAPIError as e:
@@ -116,13 +153,22 @@ def untag_prompt(
 def list_prompt(
     project_name: str,
     name: str,
-    judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
-    organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
+    judgment_api_key: str = JUDGMENT_API_KEY,
+    organization_id: str = JUDGMENT_ORG_ID,
 ) -> PromptVersionsResponse:
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
+        project_id = _resolve_project_id(
+            project_name, judgment_api_key, organization_id
+        )
+        if not project_id:
+            raise JudgmentAPIError(
+                status_code=404,
+                detail=f"Project '{project_name}' not found",
+                response=None,  # type: ignore
+            )
         prompt_config = client.prompts_get_prompt_versions(
-            project_name=project_name, name=name
+            project_id=project_id, name=name
         )
         return prompt_config
     except JudgmentAPIError as e:
@@ -155,8 +201,8 @@ class Prompt:
         name: str,
         prompt: str,
         tags: Optional[List[str]] = None,
-        judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
-        organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
+        judgment_api_key: str = JUDGMENT_API_KEY,
+        organization_id: str = JUDGMENT_ORG_ID,
     ):
         if tags is None:
             tags = []
@@ -179,8 +225,8 @@ class Prompt:
         name: str,
         commit_id: Optional[str] = None,
         tag: Optional[str] = None,
-        judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
-        organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
+        judgment_api_key: str = JUDGMENT_API_KEY,
+        organization_id: str = JUDGMENT_ORG_ID,
     ):
         if commit_id is not None and tag is not None:
             raise ValueError(
@@ -216,8 +262,8 @@ class Prompt:
         name: str,
         commit_id: str,
         tags: List[str],
-        judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
-        organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
+        judgment_api_key: str = JUDGMENT_API_KEY,
+        organization_id: str = JUDGMENT_ORG_ID,
     ):
         prompt_config = tag_prompt(
             project_name, name, commit_id, tags, judgment_api_key, organization_id
@@ -230,8 +276,8 @@ class Prompt:
         project_name: str,
         name: str,
         tags: List[str],
-        judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
-        organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
+        judgment_api_key: str = JUDGMENT_API_KEY,
+        organization_id: str = JUDGMENT_ORG_ID,
     ):
         prompt_config = untag_prompt(
             project_name, name, tags, judgment_api_key, organization_id
@@ -243,8 +289,8 @@ class Prompt:
         cls,
         project_name: str,
         name: str,
-        judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
-        organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
+        judgment_api_key: str = JUDGMENT_API_KEY,
+        organization_id: str = JUDGMENT_ORG_ID,
     ):
         prompt_configs = list_prompt(
             project_name, name, judgment_api_key, organization_id

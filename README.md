@@ -36,8 +36,7 @@ Judgeval's agent monitoring infra provides a simple harness for integrating GRPO
 await trainer.train(
     agent_function=your_agent_function,  # entry point to your agent
     scorers=[RewardScorer()],  # Custom scorer you define based on task criteria, acts as reward
-    prompts=training_prompts,  # Tasks
-    rft_provider="fireworks"
+    prompts=training_prompts  # Tasks
 )
 ```
 
