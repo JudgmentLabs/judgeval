@@ -405,12 +405,11 @@ def test_untag_nonexistent_prompt(
 ):
     """Test untagging a nonexistent prompt."""
     with pytest.raises(JudgmentAPIError) as exc_info:
-        res = Prompt.untag(
+        Prompt.untag(
             project_name=project_name,
             name=random_name,
             tags=["tag-1"],
         )
-        print(f"Result: {res}")
     assert exc_info.value.status_code == 404, (
         "Should raise 404 error for nonexistent prompt"
     )
