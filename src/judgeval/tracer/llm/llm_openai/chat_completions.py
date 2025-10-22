@@ -62,7 +62,7 @@ def _wrap_non_streaming_sync(
         ctx["span"] = tracer.get_tracer().start_span(
             "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        tracer.add_agent_attributes_to_span(ctx["span"])
+        tracer._inject_judgment_context(ctx["span"])
         set_span_attribute(
             ctx["span"], AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
         )
@@ -139,7 +139,7 @@ def _wrap_streaming_sync(
         ctx["span"] = tracer.get_tracer().start_span(
             "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        tracer.add_agent_attributes_to_span(ctx["span"])
+        tracer._inject_judgment_context(ctx["span"])
         set_span_attribute(
             ctx["span"], AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
         )
@@ -258,7 +258,7 @@ def _wrap_non_streaming_async(
         ctx["span"] = tracer.get_tracer().start_span(
             "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        tracer.add_agent_attributes_to_span(ctx["span"])
+        tracer._inject_judgment_context(ctx["span"])
         set_span_attribute(
             ctx["span"], AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
         )
@@ -336,7 +336,7 @@ def _wrap_streaming_async(
         ctx["span"] = tracer.get_tracer().start_span(
             "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        tracer.add_agent_attributes_to_span(ctx["span"])
+        tracer._inject_judgment_context(ctx["span"])
         set_span_attribute(
             ctx["span"], AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
         )

@@ -42,7 +42,7 @@ class MockTracer:
     def get_tracer(self):
         return self.tracer
 
-    def add_agent_attributes_to_span(self, span):
+    def _inject_judgment_context(self, span):
         """No-op for tests"""
         pass
 

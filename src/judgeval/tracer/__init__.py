@@ -102,6 +102,7 @@ class Tracer(metaclass=SingletonMeta):
         "judgment_processor",
         "tracer",
         "agent_context",
+        "customer_id",
         "_initialized",
     )
 
@@ -115,6 +116,7 @@ class Tracer(metaclass=SingletonMeta):
     judgment_processor: JudgmentSpanProcessor
     tracer: ABCTracer
     agent_context: ContextVar[Optional[AgentContext]]
+    customer_id: ContextVar[Optional[str]]
     _initialized: bool
 
     def __init__(
@@ -132,6 +134,7 @@ class Tracer(metaclass=SingletonMeta):
         if not hasattr(self, "_initialized"):
             self._initialized = False
             self.agent_context = ContextVar("current_agent_context", default=None)
+            self.customer_id = ContextVar("current_customer_id", default=None)
 
             self.project_name = project_name
             self.api_key = expect_api_key(api_key or JUDGMENT_API_KEY)
@@ -234,17 +237,50 @@ class Tracer(metaclass=SingletonMeta):
     def get_current_agent_context(self):
         return self.agent_context
 
+    def get_current_customer_context(self):
+        return self.customer_id
+
     def get_span_processor(self) -> JudgmentSpanProcessor:
         """Get the internal span processor of this tracer instance."""
         return self.judgment_processor
 
     def set_customer_id(self, customer_id: str) -> None:
+        if not customer_id:
+            judgeval_logger.warning("Customer ID is empty, skipping.")
+            return
+
         span = self.get_current_span()
+
+        if not span or not span.is_recording():
+            judgeval_logger.warning(
+                "No active span found. Customer ID will not be set."
+            )
+            return
+
+        if self.get_current_customer_context().get():
+            judgeval_logger.warning("Customer ID is already set, skipping.")
+            return
+
         if span and span.is_recording():
             set_span_attribute(span, AttributeKeys.JUDGMENT_CUSTOMER_ID, customer_id)
+            self.get_current_customer_context().set(customer_id)
+
+            self.get_span_processor().set_internal_attribute(
+                span_context=span.get_span_context(),
+                key=InternalAttributeKeys.IS_CUSTOMER_CONTEXT_OWNER,
+                value=True,
+            )
+
+    def _maybe_clear_customer_context(self, span: Span) -> None:
+        if self.get_span_processor().get_internal_attribute(
+            span_context=span.get_span_context(),
+            key=InternalAttributeKeys.IS_CUSTOMER_CONTEXT_OWNER,
+            default=False,
+        ):
+            self.get_current_customer_context().set(None)
 
     @dont_throw
-    def add_agent_attributes_to_span(self, span):
+    def _add_agent_attributes_to_span(self, span):
         """Add agent ID, class name, and instance name to span if they exist in context"""
         current_agent_context = self.agent_context.get()
         if not current_agent_context:
@@ -276,7 +312,7 @@ class Tracer(metaclass=SingletonMeta):
         current_agent_context["is_agent_entry_point"] = False
 
     @dont_throw
-    def record_instance_state(self, record_point: Literal["before", "after"], span):
+    def _record_instance_state(self, record_point: Literal["before", "after"], span):
         current_agent_context = self.agent_context.get()
 
         if current_agent_context and current_agent_context.get("track_state"):
@@ -304,6 +340,17 @@ class Tracer(metaclass=SingletonMeta):
                 ),
                 safe_serialize(attributes),
             )
+
+    @dont_throw
+    def _add_customer_id_to_span(self, span):
+        customer_id = self.get_current_customer_context().get()
+        if customer_id:
+            set_span_attribute(span, AttributeKeys.JUDGMENT_CUSTOMER_ID, customer_id)
+
+    @dont_throw
+    def _inject_judgment_context(self, span):
+        self._add_agent_attributes_to_span(span)
+        self._add_customer_id_to_span(span)
 
     def _set_pending_trace_eval(
         self,
@@ -385,7 +432,7 @@ class Tracer(metaclass=SingletonMeta):
                 with sync_span_context(
                     self, yield_span_name, yield_attributes, disable_partial_emit=True
                 ) as yield_span:
-                    self.add_agent_attributes_to_span(yield_span)
+                    self._inject_judgment_context(yield_span)
 
                     try:
                         value = next(generator)
@@ -429,7 +476,7 @@ class Tracer(metaclass=SingletonMeta):
                 async with async_span_context(
                     self, yield_span_name, yield_attributes, disable_partial_emit=True
                 ) as yield_span:
-                    self.add_agent_attributes_to_span(yield_span)
+                    self._inject_judgment_context(yield_span)
 
                     try:
                         value = await async_generator.__anext__()
@@ -471,8 +518,8 @@ class Tracer(metaclass=SingletonMeta):
         def wrapper(*args, **kwargs):
             n = name or f.__qualname__
             with sync_span_context(self, n, attributes) as span:
-                self.add_agent_attributes_to_span(span)
-                self.record_instance_state("before", span)
+                self._inject_judgment_context(span)
+                self._record_instance_state("before", span)
                 try:
                     set_span_attribute(
                         span,
@@ -489,13 +536,14 @@ class Tracer(metaclass=SingletonMeta):
                 except Exception as user_exc:
                     span.record_exception(user_exc)
                     span.set_status(Status(StatusCode.ERROR, str(user_exc)))
+                    self._maybe_clear_customer_context(span)
                     raise
 
                 if inspect.isgenerator(result):
                     set_span_attribute(
                         span, AttributeKeys.JUDGMENT_OUTPUT, "<generator>"
                     )
-                    self.record_instance_state("after", span)
+                    self._record_instance_state("after", span)
                     return self._create_traced_sync_generator(
                         result, span, n, attributes
                     )
@@ -503,7 +551,8 @@ class Tracer(metaclass=SingletonMeta):
                     set_span_attribute(
                         span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(result)
                     )
-                    self.record_instance_state("after", span)
+                    self._record_instance_state("after", span)
+                    self._maybe_clear_customer_context(span)
                     return result
 
         return wrapper
@@ -522,8 +571,8 @@ class Tracer(metaclass=SingletonMeta):
             n = name or f.__qualname__
 
             with sync_span_context(self, n, attributes) as main_span:
-                self.add_agent_attributes_to_span(main_span)
-                self.record_instance_state("before", main_span)
+                self._inject_judgment_context(main_span)
+                self._record_instance_state("before", main_span)
 
                 try:
                     set_span_attribute(
@@ -543,7 +592,7 @@ class Tracer(metaclass=SingletonMeta):
                     set_span_attribute(
                         main_span, AttributeKeys.JUDGMENT_OUTPUT, "<generator>"
                     )
-                    self.record_instance_state("after", main_span)
+                    self._record_instance_state("after", main_span)
 
                     return self._create_traced_sync_generator(
                         generator, main_span, n, attributes
@@ -573,8 +622,8 @@ class Tracer(metaclass=SingletonMeta):
         async def wrapper(*args, **kwargs):
             n = name or f.__qualname__
             async with async_span_context(self, n, attributes) as span:
-                self.add_agent_attributes_to_span(span)
-                self.record_instance_state("before", span)
+                self._inject_judgment_context(span)
+                self._record_instance_state("before", span)
                 try:
                     set_span_attribute(
                         span,
@@ -591,13 +640,14 @@ class Tracer(metaclass=SingletonMeta):
                 except Exception as user_exc:
                     span.record_exception(user_exc)
                     span.set_status(Status(StatusCode.ERROR, str(user_exc)))
+                    self._maybe_clear_customer_context(span)
                     raise
 
                 if inspect.isasyncgen(result):
                     set_span_attribute(
                         span, AttributeKeys.JUDGMENT_OUTPUT, "<async_generator>"
                     )
-                    self.record_instance_state("after", span)
+                    self._record_instance_state("after", span)
                     return self._create_traced_async_generator(
                         result, span, n, attributes
                     )
@@ -605,7 +655,8 @@ class Tracer(metaclass=SingletonMeta):
                     set_span_attribute(
                         span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(result)
                     )
-                    self.record_instance_state("after", span)
+                    self._record_instance_state("after", span)
+                    self._maybe_clear_customer_context(span)
                     return result
 
         return wrapper
@@ -624,8 +675,8 @@ class Tracer(metaclass=SingletonMeta):
             n = name or f.__qualname__
 
             with sync_span_context(self, n, attributes) as main_span:
-                self.add_agent_attributes_to_span(main_span)
-                self.record_instance_state("before", main_span)
+                self._inject_judgment_context(main_span)
+                self._record_instance_state("before", main_span)
 
                 try:
                     set_span_attribute(
@@ -645,7 +696,7 @@ class Tracer(metaclass=SingletonMeta):
                     set_span_attribute(
                         main_span, AttributeKeys.JUDGMENT_OUTPUT, "<async_generator>"
                     )
-                    self.record_instance_state("after", main_span)
+                    self._record_instance_state("after", main_span)
 
                     return self._create_traced_async_generator(
                         async_generator, main_span, n, attributes
