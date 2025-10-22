@@ -1,5 +1,6 @@
 # test_customer_id.py
 import pytest
+from unittest.mock import patch
 from judgeval.tracer.exporters.utils import deduplicate_spans
 from judgeval.tracer import Tracer
 from judgeval.tracer.keys import AttributeKeys
@@ -22,14 +23,25 @@ class MockExporter:
 
 @pytest.fixture
 def tracer():
-    # Create the real tracer with real processor
-    tracer = Tracer(project_name="research-agent")
+    # Mock the utility functions to avoid API key/org ID requirements
+    with (
+        patch("judgeval.tracer.expect_api_key") as mock_api_key,
+        patch("judgeval.tracer.expect_organization_id") as mock_org_id,
+        patch("judgeval.tracer._resolve_project_id") as mock_project_id,
+    ):
+        # Set up the mocks
+        mock_api_key.return_value = "test_api_key"
+        mock_org_id.return_value = "test_org_id"
+        mock_project_id.return_value = "test_project_id"
 
-    # Replace ONLY the exporter, keep everything else
-    mock_exporter = MockExporter()
-    tracer.judgment_processor._batch_processor._exporter = mock_exporter
+        # Create the real tracer with real processor
+        tracer = Tracer(project_name="research-agent")
 
-    return tracer
+        # Replace ONLY the exporter, keep everything else
+        mock_exporter = MockExporter()
+        tracer.judgment_processor._batch_processor._exporter = mock_exporter
+
+        return tracer
 
 
 def test_customer_id_propagation(tracer):
