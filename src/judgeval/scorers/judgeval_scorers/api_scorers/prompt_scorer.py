@@ -45,7 +45,7 @@ def push_prompt_scorer(
             detail=f"Failed to save prompt scorer: {e.detail}",
             response=e.response,
         )
-    return r["name"]
+    return r["scorer_response"]["name"]
 
 
 def fetch_prompt_scorer(
