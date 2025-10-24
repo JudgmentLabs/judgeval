@@ -5,7 +5,7 @@ Tests for prompt operations in the JudgmentClient.
 import uuid
 import pytest
 from judgeval import JudgmentClient
-from judgeval.prompts.prompt import Prompt
+from judgeval.prompt import Prompt
 from judgeval.exceptions import JudgmentAPIError
 
 
