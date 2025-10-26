@@ -19,9 +19,11 @@ def push_prompt(
     name: str,
     prompt: str,
     tags: List[str],
-    judgment_api_key: str = JUDGMENT_API_KEY,
-    organization_id: str = JUDGMENT_ORG_ID,
+    judgment_api_key: str | None = JUDGMENT_API_KEY,
+    organization_id: str | None = JUDGMENT_ORG_ID,
 ) -> tuple[str, Optional[str], str]:
+    if not judgment_api_key or not organization_id:
+        raise ValueError("Judgment API key and organization ID are required")
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
         project_id = _resolve_project_id(
@@ -55,9 +57,11 @@ def fetch_prompt(
     name: str,
     commit_id: Optional[str] = None,
     tag: Optional[str] = None,
-    judgment_api_key: str = JUDGMENT_API_KEY,
-    organization_id: str = JUDGMENT_ORG_ID,
+    judgment_api_key: str | None = JUDGMENT_API_KEY,
+    organization_id: str | None = JUDGMENT_ORG_ID,
 ) -> Optional[PromptCommitInfo]:
+    if not judgment_api_key or not organization_id:
+        raise ValueError("Judgment API key and organization ID are required")
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
         project_id = _resolve_project_id(
@@ -89,9 +93,11 @@ def tag_prompt(
     name: str,
     commit_id: str,
     tags: List[str],
-    judgment_api_key: str = JUDGMENT_API_KEY,
-    organization_id: str = JUDGMENT_ORG_ID,
+    judgment_api_key: str | None = JUDGMENT_API_KEY,
+    organization_id: str | None = JUDGMENT_ORG_ID,
 ) -> PromptTagResponse:
+    if not judgment_api_key or not organization_id:
+        raise ValueError("Judgment API key and organization ID are required")
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
         project_id = _resolve_project_id(
@@ -124,9 +130,11 @@ def untag_prompt(
     project_name: str,
     name: str,
     tags: List[str],
-    judgment_api_key: str = JUDGMENT_API_KEY,
-    organization_id: str = JUDGMENT_ORG_ID,
+    judgment_api_key: str | None = JUDGMENT_API_KEY,
+    organization_id: str | None = JUDGMENT_ORG_ID,
 ) -> PromptUntagResponse:
+    if not judgment_api_key or not organization_id:
+        raise ValueError("Judgment API key and organization ID are required")
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
         project_id = _resolve_project_id(
@@ -153,9 +161,11 @@ def untag_prompt(
 def list_prompt(
     project_name: str,
     name: str,
-    judgment_api_key: str = JUDGMENT_API_KEY,
-    organization_id: str = JUDGMENT_ORG_ID,
+    judgment_api_key: str | None = JUDGMENT_API_KEY,
+    organization_id: str | None = JUDGMENT_ORG_ID,
 ) -> PromptVersionsResponse:
+    if not judgment_api_key or not organization_id:
+        raise ValueError("Judgment API key and organization ID are required")
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
         project_id = _resolve_project_id(
@@ -201,8 +211,8 @@ class Prompt:
         name: str,
         prompt: str,
         tags: Optional[List[str]] = None,
-        judgment_api_key: str = JUDGMENT_API_KEY,
-        organization_id: str = JUDGMENT_ORG_ID,
+        judgment_api_key: str | None = JUDGMENT_API_KEY,
+        organization_id: str | None = JUDGMENT_ORG_ID,
     ):
         if tags is None:
             tags = []
@@ -225,8 +235,8 @@ class Prompt:
         name: str,
         commit_id: Optional[str] = None,
         tag: Optional[str] = None,
-        judgment_api_key: str = JUDGMENT_API_KEY,
-        organization_id: str = JUDGMENT_ORG_ID,
+        judgment_api_key: str | None = JUDGMENT_API_KEY,
+        organization_id: str | None = JUDGMENT_ORG_ID,
     ):
         if commit_id is not None and tag is not None:
             raise ValueError(
@@ -262,8 +272,8 @@ class Prompt:
         name: str,
         commit_id: str,
         tags: List[str],
-        judgment_api_key: str = JUDGMENT_API_KEY,
-        organization_id: str = JUDGMENT_ORG_ID,
+        judgment_api_key: str | None = JUDGMENT_API_KEY,
+        organization_id: str | None = JUDGMENT_ORG_ID,
     ):
         prompt_config = tag_prompt(
             project_name, name, commit_id, tags, judgment_api_key, organization_id
@@ -276,8 +286,8 @@ class Prompt:
         project_name: str,
         name: str,
         tags: List[str],
-        judgment_api_key: str = JUDGMENT_API_KEY,
-        organization_id: str = JUDGMENT_ORG_ID,
+        judgment_api_key: str | None = JUDGMENT_API_KEY,
+        organization_id: str | None = JUDGMENT_ORG_ID,
     ):
         prompt_config = untag_prompt(
             project_name, name, tags, judgment_api_key, organization_id
@@ -289,8 +299,8 @@ class Prompt:
         cls,
         project_name: str,
         name: str,
-        judgment_api_key: str = JUDGMENT_API_KEY,
-        organization_id: str = JUDGMENT_ORG_ID,
+        judgment_api_key: str | None = JUDGMENT_API_KEY,
+        organization_id: str | None = JUDGMENT_ORG_ID,
     ):
         prompt_configs = list_prompt(
             project_name, name, judgment_api_key, organization_id

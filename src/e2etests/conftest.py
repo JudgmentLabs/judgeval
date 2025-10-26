@@ -39,6 +39,10 @@ def project_name():
 def client(project_name: str) -> JudgmentClient:
     """Create a single JudgmentClient instance for all tests."""
     # Setup
+    if not API_KEY or not ORGANIZATION_ID:
+        pytest.skip(
+            "JUDGMENT_API_KEY or JUDGMENT_ORG_ID not set", allow_module_level=True
+        )
     client = JudgmentClient(api_key=API_KEY, organization_id=ORGANIZATION_ID)
     create_project(project_name=project_name)
     yield client

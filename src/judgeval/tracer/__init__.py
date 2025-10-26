@@ -106,8 +106,8 @@ class Tracer(metaclass=SingletonMeta):
         "_initialized",
     )
 
-    api_key: str
-    organization_id: str
+    api_key: str | None
+    organization_id: str | None
     project_name: str
     enable_monitoring: bool
     enable_evaluation: bool
@@ -124,8 +124,8 @@ class Tracer(metaclass=SingletonMeta):
         /,
         *,
         project_name: str,
-        api_key: Optional[str] = None,
-        organization_id: Optional[str] = None,
+        api_key: str | None = None,
+        organization_id: str | None = None,
         enable_monitoring: bool = JUDGMENT_ENABLE_MONITORING.lower() == "true",
         enable_evaluation: bool = JUDGMENT_ENABLE_EVALUATIONS.lower() == "true",
         resource_attributes: Optional[Dict[str, Any]] = None,
@@ -145,10 +145,14 @@ class Tracer(metaclass=SingletonMeta):
             self.enable_evaluation = enable_evaluation
             self.resource_attributes = resource_attributes
 
-            self.api_client = JudgmentSyncClient(
-                api_key=self.api_key,
-                organization_id=self.organization_id,
-            )
+            if self.api_key and self.organization_id:
+                self.api_client = JudgmentSyncClient(
+                    api_key=self.api_key, organization_id=self.organization_id
+                )
+            else:
+                judgeval_logger.error(
+                    "API Key or Organization ID is not set. You must set them in the environment variables to use the tracer."
+                )
 
             if initialize:
                 self.initialize()
@@ -162,7 +166,7 @@ class Tracer(metaclass=SingletonMeta):
             project_id = _resolve_project_id(
                 self.project_name, self.api_key, self.organization_id
             )
-            if project_id:
+            if self.api_key and self.organization_id and project_id:
                 self.judgment_processor = self.get_processor(
                     tracer=self,
                     project_name=self.project_name,
@@ -177,9 +181,10 @@ class Tracer(metaclass=SingletonMeta):
                 provider.add_span_processor(self.judgment_processor)
                 set_tracer_provider(provider)
             else:
-                judgeval_logger.error(
-                    f"Failed to resolve or autocreate project {self.project_name}, please create it first at https://app.judgmentlabs.ai/org/{self.organization_id}/projects. Skipping Judgment export."
-                )
+                if self.api_key and self.organization_id:
+                    judgeval_logger.error(
+                        f"Failed to resolve or autocreate project {self.project_name}, please create it first at https://app.judgmentlabs.ai/org/{self.organization_id}/projects. Skipping Judgment export."
+                    )
 
         self.tracer = get_tracer_provider().get_tracer(
             JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME,
@@ -198,10 +203,19 @@ class Tracer(metaclass=SingletonMeta):
     ):
         from judgeval.tracer.exporters import JudgmentSpanExporter
 
+        api_key = api_key or JUDGMENT_API_KEY
+        organization_id = organization_id or JUDGMENT_ORG_ID
+
+        if not api_key or not organization_id:
+            judgeval_logger.error(
+                "API Key or Organization ID is not set. You must set them in the environment variables to use the tracer."
+            )
+            return None
+
         return JudgmentSpanExporter(
             endpoint=url_for("/otel/v1/traces"),
-            api_key=api_key or JUDGMENT_API_KEY,
-            organization_id=organization_id or JUDGMENT_ORG_ID,
+            api_key=api_key,
+            organization_id=organization_id,
             project_id=project_id,
         )
 
@@ -217,12 +231,19 @@ class Tracer(metaclass=SingletonMeta):
         resource_attributes: Optional[Dict[str, Any]] = None,
     ) -> JudgmentSpanProcessor:
         """Create a JudgmentSpanProcessor using the correct constructor."""
+        api_key = api_key or JUDGMENT_API_KEY
+        organization_id = organization_id or JUDGMENT_ORG_ID
+        if not api_key or not organization_id:
+            judgeval_logger.error(
+                "API Key or Organization ID is not set. You must set them in the environment variables to use the tracer."
+            )
+            return NoOpJudgmentSpanProcessor()
         return JudgmentSpanProcessor(
             tracer,
             project_name,
             project_id,
-            api_key or JUDGMENT_API_KEY,
-            organization_id or JUDGMENT_ORG_ID,
+            api_key,
+            organization_id,
             max_queue_size=max_queue_size,
             export_timeout_millis=export_timeout_millis,
             resource_attributes=resource_attributes,
@@ -244,6 +265,7 @@ class Tracer(metaclass=SingletonMeta):
         """Get the internal span processor of this tracer instance."""
         return self.judgment_processor
 
+    @dont_throw
     def set_customer_id(self, customer_id: str) -> None:
         if not customer_id:
             judgeval_logger.warning("Customer ID is empty, skipping.")

@@ -112,6 +112,8 @@ def _poll_evaluation_until_complete(
 
     poll_count = 0
     exception_count = 0
+    if not JUDGMENT_API_KEY or not JUDGMENT_ORG_ID:
+        raise ValueError("Judgment API key and organization ID are required")
     api_client = JudgmentSyncClient(JUDGMENT_API_KEY, JUDGMENT_ORG_ID)
     while poll_count < max_poll_count:
         poll_count += 1
@@ -222,6 +224,8 @@ def run_eval(
         )
         t.start()
         try:
+            if not JUDGMENT_API_KEY or not JUDGMENT_ORG_ID:
+                raise ValueError("Judgment API key and organization ID are required")
             api_client = JudgmentSyncClient(JUDGMENT_API_KEY, JUDGMENT_ORG_ID)
             response = api_client.add_to_run_eval_queue_examples(
                 evaluation_run.model_dump(warnings=False)  # type: ignore

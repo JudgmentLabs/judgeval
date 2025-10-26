@@ -32,8 +32,8 @@ class Dataset:
     dataset_kind: DatasetKind = DatasetKind.example
     examples: Optional[List[Example]] = None
     traces: Optional[List[Trace]] = None
-    judgment_api_key: str = JUDGMENT_API_KEY or ""
-    organization_id: str = JUDGMENT_ORG_ID or ""
+    judgment_api_key: str | None = JUDGMENT_API_KEY
+    organization_id: str | None = JUDGMENT_ORG_ID
 
     @classmethod
     def get(
@@ -41,6 +41,8 @@ class Dataset:
         name: str,
         project_name: str,
     ):
+        if not cls.judgment_api_key or not cls.organization_id:
+            raise ValueError("Judgment API key and organization ID are required")
         client = JudgmentSyncClient(cls.judgment_api_key, cls.organization_id)
         dataset = client.datasets_pull_for_judgeval(
             {
@@ -102,6 +104,8 @@ class Dataset:
         examples: List[Example] = [],
         overwrite: bool = False,
     ):
+        if not cls.judgment_api_key or not cls.organization_id:
+            raise ValueError("Judgment API key and organization ID are required")
         if not examples:
             examples = []
 
@@ -125,6 +129,8 @@ class Dataset:
 
     @classmethod
     def list(cls, project_name: str):
+        if not cls.judgment_api_key or not cls.organization_id:
+            raise ValueError("Judgment API key and organization ID are required")
         client = JudgmentSyncClient(cls.judgment_api_key, cls.organization_id)
         datasets = client.datasets_pull_all_for_judgeval({"project_name": project_name})
 
@@ -172,6 +178,9 @@ class Dataset:
     def add_examples(self, examples: List[Example]) -> None:
         if not isinstance(examples, list):
             raise TypeError("examples must be a list")
+
+        if not self.judgment_api_key or not self.organization_id:
+            raise ValueError("Judgment API key and organization ID are required")
 
         client = JudgmentSyncClient(self.judgment_api_key, self.organization_id)
         client.datasets_insert_examples_for_judgeval(

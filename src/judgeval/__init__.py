@@ -146,6 +146,8 @@ class JudgmentClient(metaclass=SingletonMeta):
                 requirements_text = f.read()
 
         try:
+            if not self.api_key or not self.organization_id:
+                raise ValueError("Judgment API key and organization ID are required")
             client = JudgmentSyncClient(
                 api_key=self.api_key,
                 organization_id=self.organization_id,
