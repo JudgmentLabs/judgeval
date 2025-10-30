@@ -132,9 +132,10 @@ def _dump_base_model(
 def _dump_dict(
     *,
     obj: Any,
-) -> Dict[str, Any]:
+) -> Dict[Any, Any]:
     """
-    Dump a dict to a dict, using the same parameters as jsonable_encoder
+    Dump a dict to a dict, using the same parameters as jsonable_encoder.
+    Keys are preserved as-is to support non-string keys with orjson's OPT_NON_STR_KEYS.
     """
     encoded_dict = {}
     allowed_keys = set(obj.keys())
@@ -143,8 +144,6 @@ def _dump_dict(
             encoded_key = json_encoder(
                 key,
             )
-            if not isinstance(encoded_key, str):
-                encoded_key = str(encoded_key)
             encoded_value = json_encoder(
                 value,
             )
@@ -249,7 +248,10 @@ encoders_by_class_tuples = generate_encoders_by_class_tuples(ENCODERS_BY_TYPE)
 # Seralize arbitrary object to a json string
 def safe_serialize(obj: Any) -> str:
     try:
-        return orjson.dumps(json_encoder(obj)).decode()
+        return orjson.dumps(
+            json_encoder(obj),
+            option=orjson.OPT_NON_STR_KEYS
+        ).decode()
     except Exception as e:
         judgeval_logger.warning(f"Error serializing object: {e}")
-        return orjson.dumps(repr(obj)).decode()
+        return orjson.dumps(repr(obj), option=orjson.OPT_NON_STR_KEYS).decode()
