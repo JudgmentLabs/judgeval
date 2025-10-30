@@ -143,7 +143,6 @@ def _dump_dict(
             encoded_key = json_encoder(
                 key,
             )
-            # JSON only supports string keys, so convert non-string keys to strings
             if not isinstance(encoded_key, str):
                 encoded_key = str(encoded_key)
             encoded_value = json_encoder(
