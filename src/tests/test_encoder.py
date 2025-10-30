@@ -1,7 +1,7 @@
 from collections import defaultdict
 from pydantic import BaseModel
 
-from judgeval.utils.serialize import json_encoder
+from judgeval.utils.serialize import json_encoder, safe_serialize
 
 
 class SimpleModel(BaseModel):
@@ -38,3 +38,37 @@ def test_function_wrapped_in_dict():
     result = json_encoder(obj)
     assert isinstance(result["key"], str)
     assert "built-in function print" in result["key"]
+
+
+def test_integer_keys_serialization():
+    """Test that dictionaries with integer keys can be serialized with orjson.OPT_NON_STR_KEYS"""
+    data = {1: "one", 2: "two", 3: "three"}
+    result = safe_serialize(data)
+    # Should serialize successfully and parse back
+    import orjson
+    parsed = orjson.loads(result)
+    # orjson converts integer keys back to strings when parsing
+    assert parsed == {"1": "one", "2": "two", "3": "three"}
+
+
+def test_mixed_keys_serialization():
+    """Test that dictionaries with mixed key types can be serialized"""
+    data = {"str_key": "value1", 1: "value2", 2.5: "value3"}
+    result = safe_serialize(data)
+    # Should serialize successfully without errors
+    assert isinstance(result, str)
+    assert "str_key" in result
+    assert "value1" in result
+
+
+def test_nested_integer_keys():
+    """Test nested dictionaries with integer keys"""
+    data = {"outer": {1: "inner1", 2: "inner2"}, "list": [1, 2, 3]}
+    result = safe_serialize(data)
+    assert isinstance(result, str)
+    import orjson
+    parsed = orjson.loads(result)
+    # Verify structure is preserved
+    assert "outer" in parsed
+    assert "list" in parsed
+    assert parsed["list"] == [1, 2, 3]
