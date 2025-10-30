@@ -171,7 +171,14 @@ class JudgmentClient(metaclass=SingletonMeta):
                 return False
 
         except Exception as e:
-            # Don't log here - let the CLI handle error display
+            from judgeval.exceptions import JudgmentAPIError
+            
+            # Handle duplicate scorer error
+            if isinstance(e, JudgmentAPIError) and e.status_code == 409:
+                error_msg = "Duplicate scorer detected. Use overwrite=True to replace the existing scorer"
+                judgeval_logger.error(error_msg)
+                raise ValueError(error_msg) from e
+            # Re-raise other exceptions
             raise
 
 

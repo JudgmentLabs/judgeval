@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 from judgeval.logger import judgeval_logger
 from judgeval import JudgmentClient
 from judgeval.version import get_version
-from judgeval.exceptions import JudgmentAPIError
 
 load_dotenv()
 
@@ -59,11 +58,12 @@ def upload_scorer(
 
         judgeval_logger.info("Custom scorer uploaded successfully!")
         raise typer.Exit(0)
+    except ValueError as e:
+        # Handle errors from JudgmentClient (including duplicate scorer)
+        judgeval_logger.error(str(e))
+        raise typer.Exit(1)
     except Exception as e:
-        if isinstance(e, JudgmentAPIError) and e.status_code == 409:
-            judgeval_logger.error("Duplicate scorer detected. Use --overwrite flag to replace the existing scorer")
-            raise typer.Exit(1)
-        # Re-raise other exceptions
+        # Re-raise unexpected exceptions
         raise
 
 
