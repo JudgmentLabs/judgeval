@@ -171,7 +171,7 @@ class JudgmentClient(metaclass=SingletonMeta):
                 return False
 
         except Exception as e:
-            judgeval_logger.error(f"Error uploading custom scorer: {e}")
+            # Don't log here - let the CLI handle error display
             raise
 
 
