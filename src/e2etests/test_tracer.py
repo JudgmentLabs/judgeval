@@ -286,7 +286,7 @@ def retrieve_llm_cost_helper(trace_id):
         span_attrs = span.get("span_attributes", {})
         if isinstance(span_attrs, str):
             span_attrs = orjson.loads(span_attrs)
-        llm_cost = span_attrs.get("gen_ai.usage.total_cost_usd", 0)
+        llm_cost = span_attrs.get("judgment.usage.total_cost_usd", 0)
         total_llm_cost += llm_cost
 
     if total_llm_cost == 0:
@@ -325,8 +325,8 @@ def retrieve_streaming_trace_helper(trace_id):
         assert False, "No completion content found in streaming span"
 
     # Should have usage information
-    input_tokens = span_attributes.get("gen_ai.usage.input_tokens")
-    output_tokens = span_attributes.get("gen_ai.usage.output_tokens")
+    input_tokens = span_attributes.get("judgment.usage.non_cached_input_tokens")
+    output_tokens = span_attributes.get("judgment.usage.output_tokens")
 
     if input_tokens is None or output_tokens is None:
         assert False, "Missing usage tokens in streaming span"

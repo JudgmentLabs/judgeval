@@ -73,7 +73,7 @@ def _wrap_non_streaming_sync(
         )
         ctx["model_name"] = prefixed_model_name
         set_span_attribute(
-            ctx["span"], AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
+            ctx["span"], AttributeKeys.JUDGMENT_LLM_MODEL_NAME, prefixed_model_name
         )
 
     def post_hook(ctx: Dict[str, Any], result: ChatCompletionResponse) -> None:
@@ -90,10 +90,12 @@ def _wrap_non_streaming_sync(
                 result.usage
             )
             set_span_attribute(
-                span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+                span,
+                AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
+                prompt_tokens,
             )
             set_span_attribute(
-                span, AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+                span, AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
             )
             set_span_attribute(
                 span,
@@ -103,7 +105,7 @@ def _wrap_non_streaming_sync(
 
         set_span_attribute(
             span,
-            AttributeKeys.GEN_AI_RESPONSE_MODEL,
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME,
             ctx["model_name"],
         )
 
@@ -143,7 +145,7 @@ def _wrap_streaming_sync(
         )
         ctx["model_name"] = prefixed_model_name
         set_span_attribute(
-            ctx["span"], AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
+            ctx["span"], AttributeKeys.JUDGMENT_LLM_MODEL_NAME, prefixed_model_name
         )
         ctx["accumulated_content"] = ""
 
@@ -171,10 +173,12 @@ def _wrap_streaming_sync(
                     chunk.usage
                 )
                 set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+                    span,
+                    AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
+                    prompt_tokens,
                 )
                 set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+                    span, AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
                 )
                 set_span_attribute(
                     span,
@@ -249,7 +253,7 @@ def _wrap_non_streaming_async(
         )
         ctx["model_name"] = prefixed_model_name
         set_span_attribute(
-            ctx["span"], AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
+            ctx["span"], AttributeKeys.JUDGMENT_LLM_MODEL_NAME, prefixed_model_name
         )
 
     def post_hook(ctx: Dict[str, Any], result: ChatCompletionResponse) -> None:
@@ -266,10 +270,12 @@ def _wrap_non_streaming_async(
                 result.usage
             )
             set_span_attribute(
-                span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+                span,
+                AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
+                prompt_tokens,
             )
             set_span_attribute(
-                span, AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+                span, AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
             )
             set_span_attribute(
                 span,
@@ -279,7 +285,7 @@ def _wrap_non_streaming_async(
 
         set_span_attribute(
             span,
-            AttributeKeys.GEN_AI_RESPONSE_MODEL,
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME,
             ctx["model_name"],
         )
 
@@ -320,7 +326,7 @@ def _wrap_streaming_async(
         )
         ctx["model_name"] = prefixed_model_name
         set_span_attribute(
-            ctx["span"], AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
+            ctx["span"], AttributeKeys.JUDGMENT_LLM_MODEL_NAME, prefixed_model_name
         )
         ctx["accumulated_content"] = ""
 
@@ -348,10 +354,12 @@ def _wrap_streaming_async(
                     chunk.usage
                 )
                 set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+                    span,
+                    AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
+                    prompt_tokens,
                 )
                 set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+                    span, AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
                 )
                 set_span_attribute(
                     span,
