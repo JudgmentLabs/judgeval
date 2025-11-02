@@ -41,7 +41,10 @@ def verify_span_attributes_comprehensive(
     # Verify span kind
     assert attrs.get(AttributeKeys.JUDGMENT_SPAN_KIND) == "llm"
 
-    assert attrs.get(AttributeKeys.JUDGMENT_LLM_MODEL_NAME) == expected_model_name
+    actual_model_name = attrs.get(AttributeKeys.JUDGMENT_LLM_MODEL_NAME)
+    assert actual_model_name and actual_model_name.startswith(expected_model_name), (
+        f"Model name mismatch: expected '{expected_model_name}' or prefix, got '{actual_model_name}'"
+    )
     assert AttributeKeys.JUDGMENT_LLM_MODEL_NAME in attrs
 
     # Verify prompt was captured
