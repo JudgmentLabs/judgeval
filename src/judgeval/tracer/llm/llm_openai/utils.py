@@ -5,6 +5,14 @@ def openai_tokens_converter(
     cache_creation: int,
     total_tokens: int,
 ) -> tuple[int, int, int, int]:
+    """
+    Returns:
+        tuple[int, int, int, int]:
+            - judgment.usage.non_cached_input
+            - judgment.usage.output_tokens
+            - judgment.usage.cached_input_tokens
+            - judgment.usage.cache_creation_tokens
+    """
     manual_tokens = prompt_tokens + completion_tokens + cache_read + cache_creation
 
     if manual_tokens > total_tokens:
