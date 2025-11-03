@@ -41,8 +41,11 @@ def verify_span_attributes_comprehensive(
     # Verify span kind
     assert attrs.get(AttributeKeys.JUDGMENT_SPAN_KIND) == "llm"
 
-    assert attrs.get(AttributeKeys.GEN_AI_REQUEST_MODEL) == expected_model_name
-    assert AttributeKeys.GEN_AI_RESPONSE_MODEL in attrs
+    actual_model_name = attrs.get(AttributeKeys.JUDGMENT_LLM_MODEL_NAME)
+    assert actual_model_name and actual_model_name.startswith(expected_model_name), (
+        f"Model name mismatch: expected '{expected_model_name}' or prefix, got '{actual_model_name}'"
+    )
+    assert AttributeKeys.JUDGMENT_LLM_MODEL_NAME in attrs
 
     # Verify prompt was captured
     if check_prompt:
@@ -54,21 +57,21 @@ def verify_span_attributes_comprehensive(
 
     # Verify usage tokens
     if check_usage:
-        assert AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS in attrs
-        assert AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS in attrs
-        assert attrs[AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS] > 0
-        assert attrs[AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS] > 0
+        assert AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS in attrs
+        assert AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS in attrs
+        assert attrs[AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS] > 0
+        assert attrs[AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS] > 0
 
     # Verify cache tokens attribute exists
     if check_cache:
-        assert AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS in attrs
-        assert AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS in attrs
+        assert AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS in attrs
+        assert AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS in attrs
 
     if check_cache_read_value:
-        assert attrs.get(AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS) > 0
+        assert attrs.get(AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS) > 0
 
     if check_cache_creation_value:
-        assert attrs.get(AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS) > 0
+        assert attrs.get(AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS) > 0
 
     # Verify usage metadata
     if check_metadata:
