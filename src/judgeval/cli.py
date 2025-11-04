@@ -61,7 +61,9 @@ def upload_scorer(
         raise typer.Exit(0)
     except Exception as e:
         if isinstance(e, JudgmentAPIError) and e.status_code == 409:
-            judgeval_logger.error("Duplicate scorer detected. Use --overwrite flag to replace the existing scorer")
+            judgeval_logger.error(
+                "Duplicate scorer detected. Use --overwrite flag to replace the existing scorer"
+            )
             raise typer.Exit(1)
         # Re-raise other exceptions
         raise
