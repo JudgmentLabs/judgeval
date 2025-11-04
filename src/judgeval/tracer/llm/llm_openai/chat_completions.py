@@ -90,6 +90,14 @@ def _wrap_non_streaming_sync(
             if prompt_tokens_details:
                 cache_read = prompt_tokens_details.cached_tokens or 0
 
+            if hasattr(usage_data, "cost") and usage_data.cost:
+                cost = usage_data.cost
+                set_span_attribute(
+                    span,
+                    AttributeKeys.JUDGMENT_USAGE_TOTAL_COST_USD,
+                    safe_serialize(cost),
+                )
+
             prompt_tokens, completion_tokens, cache_read, cache_creation = (
                 openai_tokens_converter(
                     prompt_tokens,
@@ -194,6 +202,14 @@ def _wrap_streaming_sync(
                 cache_read = 0
                 if chunk.usage.prompt_tokens_details:
                     cache_read = chunk.usage.prompt_tokens_details.cached_tokens or 0
+
+                if hasattr(chunk.usage, "cost") and chunk.usage.cost:
+                    cost = chunk.usage.cost
+                    set_span_attribute(
+                        span,
+                        AttributeKeys.JUDGMENT_USAGE_TOTAL_COST_USD,
+                        safe_serialize(cost),
+                    )
 
                 prompt_tokens, completion_tokens, cache_read, cache_creation = (
                     openai_tokens_converter(
@@ -312,6 +328,14 @@ def _wrap_non_streaming_async(
             if prompt_tokens_details:
                 cache_read = prompt_tokens_details.cached_tokens or 0
 
+            if hasattr(usage_data, "cost") and usage_data.cost:
+                cost = usage_data.cost
+                set_span_attribute(
+                    span,
+                    AttributeKeys.JUDGMENT_USAGE_TOTAL_COST_USD,
+                    safe_serialize(cost),
+                )
+
             prompt_tokens, completion_tokens, cache_read, cache_creation = (
                 openai_tokens_converter(
                     prompt_tokens,
@@ -417,6 +441,14 @@ def _wrap_streaming_async(
                 cache_read = 0
                 if chunk.usage.prompt_tokens_details:
                     cache_read = chunk.usage.prompt_tokens_details.cached_tokens or 0
+
+                if hasattr(chunk.usage, "cost") and chunk.usage.cost:
+                    cost = chunk.usage.cost
+                    set_span_attribute(
+                        span,
+                        AttributeKeys.JUDGMENT_USAGE_TOTAL_COST_USD,
+                        safe_serialize(cost),
+                    )
 
                 prompt_tokens, completion_tokens, cache_read, cache_creation = (
                     openai_tokens_converter(
