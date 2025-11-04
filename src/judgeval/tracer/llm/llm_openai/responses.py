@@ -84,6 +84,7 @@ def _wrap_responses_non_streaming_sync(
             completion_tokens = usage_data.output_tokens or 0
             cache_read = usage_data.input_tokens_details.cached_tokens or 0
 
+            set_cost_attribute(span, usage_data)
             prompt_tokens, completion_tokens, cache_read, cache_creation = (
                 openai_tokens_converter(
                     prompt_tokens,
