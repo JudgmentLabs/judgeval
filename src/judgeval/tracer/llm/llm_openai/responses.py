@@ -24,7 +24,10 @@ from judgeval.utils.wrappers import (
     immutable_wrap_sync_iterator,
     immutable_wrap_async_iterator,
 )
-from judgeval.tracer.llm.llm_openai.utils import openai_tokens_converter
+from judgeval.tracer.llm.llm_openai.utils import (
+    openai_tokens_converter,
+    set_cost_attribute,
+)
 
 if TYPE_CHECKING:
     from judgeval.tracer import Tracer
@@ -81,13 +84,6 @@ def _wrap_responses_non_streaming_sync(
             completion_tokens = usage_data.output_tokens or 0
             cache_read = usage_data.input_tokens_details.cached_tokens or 0
 
-            if hasattr(usage_data, "cost") and usage_data.cost:
-                cost = usage_data.cost
-                set_span_attribute(
-                    span,
-                    AttributeKeys.JUDGMENT_USAGE_TOTAL_COST_USD,
-                    safe_serialize(cost),
-                )
             prompt_tokens, completion_tokens, cache_read, cache_creation = (
                 openai_tokens_converter(
                     prompt_tokens,
@@ -198,16 +194,7 @@ def _wrap_responses_streaming_sync(
                         else 0
                     )
 
-                    if (
-                        hasattr(chunk.response.usage, "cost")
-                        and chunk.response.usage.cost
-                    ):
-                        cost = chunk.response.usage.cost
-                        set_span_attribute(
-                            span,
-                            AttributeKeys.JUDGMENT_USAGE_TOTAL_COST_USD,
-                            safe_serialize(cost),
-                        )
+                    set_cost_attribute(span, chunk.response.usage)
                     prompt_tokens, completion_tokens, cache_read, cache_creation = (
                         openai_tokens_converter(
                             prompt_tokens,
@@ -329,13 +316,7 @@ def _wrap_responses_non_streaming_async(
             completion_tokens = usage_data.output_tokens or 0
             cache_read = usage_data.input_tokens_details.cached_tokens or 0
 
-            if hasattr(usage_data, "cost") and usage_data.cost:
-                cost = usage_data.cost
-                set_span_attribute(
-                    span,
-                    AttributeKeys.JUDGMENT_USAGE_TOTAL_COST_USD,
-                    safe_serialize(cost),
-                )
+            set_cost_attribute(span, usage_data)
             prompt_tokens, completion_tokens, cache_read, cache_creation = (
                 openai_tokens_converter(
                     prompt_tokens,
@@ -448,16 +429,7 @@ def _wrap_responses_streaming_async(
                         else 0
                     )
 
-                    if (
-                        hasattr(chunk.response.usage, "cost")
-                        and chunk.response.usage.cost
-                    ):
-                        cost = chunk.response.usage.cost
-                        set_span_attribute(
-                            span,
-                            AttributeKeys.JUDGMENT_USAGE_TOTAL_COST_USD,
-                            safe_serialize(cost),
-                        )
+                    set_cost_attribute(span, chunk.response.usage)
                     prompt_tokens, completion_tokens, cache_read, cache_creation = (
                         openai_tokens_converter(
                             prompt_tokens,
