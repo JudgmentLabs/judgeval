@@ -25,6 +25,10 @@ from judgeval.utils.wrappers import (
     immutable_wrap_sync_iterator,
     immutable_wrap_async_iterator,
 )
+from judgeval.tracer.llm.llm_openai.utils import (
+    openai_tokens_converter,
+    set_cost_attribute,
+)
 
 if TYPE_CHECKING:
     from judgeval.tracer import Tracer
@@ -68,7 +72,7 @@ def _wrap_non_streaming_sync(
         )
         ctx["model_name"] = kwargs.get("model", "")
         set_span_attribute(
-            ctx["span"], AttributeKeys.GEN_AI_REQUEST_MODEL, ctx["model_name"]
+            ctx["span"], AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
         )
 
     def post_hook(ctx: Dict[str, Any], result: ChatCompletion) -> None:
@@ -89,17 +93,31 @@ def _wrap_non_streaming_sync(
             if prompt_tokens_details:
                 cache_read = prompt_tokens_details.cached_tokens or 0
 
+            set_cost_attribute(span, usage_data)
+
+            prompt_tokens, completion_tokens, cache_read, cache_creation = (
+                openai_tokens_converter(
+                    prompt_tokens,
+                    completion_tokens,
+                    cache_read,
+                    0,
+                    usage_data.total_tokens,
+                )
+            )
+
             set_span_attribute(
-                span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+                span,
+                AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
+                prompt_tokens,
             )
             set_span_attribute(
-                span, AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+                span, AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
             )
             set_span_attribute(
-                span, AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
+                span, AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
             )
             set_span_attribute(
-                span, AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
+                span, AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
             )
             set_span_attribute(
                 span,
@@ -109,7 +127,7 @@ def _wrap_non_streaming_sync(
 
         set_span_attribute(
             span,
-            AttributeKeys.GEN_AI_RESPONSE_MODEL,
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME,
             result.model or ctx["model_name"],
         )
 
@@ -145,7 +163,7 @@ def _wrap_streaming_sync(
         )
         ctx["model_name"] = kwargs.get("model", "")
         set_span_attribute(
-            ctx["span"], AttributeKeys.GEN_AI_REQUEST_MODEL, ctx["model_name"]
+            ctx["span"], AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
         )
         ctx["accumulated_content"] = ""
 
@@ -182,17 +200,33 @@ def _wrap_streaming_sync(
                 if chunk.usage.prompt_tokens_details:
                     cache_read = chunk.usage.prompt_tokens_details.cached_tokens or 0
 
+                set_cost_attribute(span, chunk.usage)
+
+                prompt_tokens, completion_tokens, cache_read, cache_creation = (
+                    openai_tokens_converter(
+                        prompt_tokens,
+                        completion_tokens,
+                        cache_read,
+                        0,
+                        chunk.usage.total_tokens,
+                    )
+                )
+
                 set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+                    span,
+                    AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
+                    prompt_tokens,
                 )
                 set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+                    span, AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
                 )
                 set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
+                    span,
+                    AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS,
+                    cache_read,
                 )
                 set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
+                    span, AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
                 )
                 set_span_attribute(
                     span,
@@ -264,7 +298,7 @@ def _wrap_non_streaming_async(
         )
         ctx["model_name"] = kwargs.get("model", "")
         set_span_attribute(
-            ctx["span"], AttributeKeys.GEN_AI_REQUEST_MODEL, ctx["model_name"]
+            ctx["span"], AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
         )
 
     def post_hook(ctx: Dict[str, Any], result: ChatCompletion) -> None:
@@ -285,17 +319,31 @@ def _wrap_non_streaming_async(
             if prompt_tokens_details:
                 cache_read = prompt_tokens_details.cached_tokens or 0
 
+            set_cost_attribute(span, usage_data)
+
+            prompt_tokens, completion_tokens, cache_read, cache_creation = (
+                openai_tokens_converter(
+                    prompt_tokens,
+                    completion_tokens,
+                    cache_read,
+                    0,
+                    usage_data.total_tokens,
+                )
+            )
+
             set_span_attribute(
-                span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+                span,
+                AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
+                prompt_tokens,
             )
             set_span_attribute(
-                span, AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+                span, AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
             )
             set_span_attribute(
-                span, AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
+                span, AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
             )
             set_span_attribute(
-                span, AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
+                span, AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
             )
             set_span_attribute(
                 span,
@@ -305,7 +353,7 @@ def _wrap_non_streaming_async(
 
         set_span_attribute(
             span,
-            AttributeKeys.GEN_AI_RESPONSE_MODEL,
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME,
             result.model or ctx["model_name"],
         )
 
@@ -342,7 +390,7 @@ def _wrap_streaming_async(
         )
         ctx["model_name"] = kwargs.get("model", "")
         set_span_attribute(
-            ctx["span"], AttributeKeys.GEN_AI_REQUEST_MODEL, ctx["model_name"]
+            ctx["span"], AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
         )
         ctx["accumulated_content"] = ""
 
@@ -379,17 +427,33 @@ def _wrap_streaming_async(
                 if chunk.usage.prompt_tokens_details:
                     cache_read = chunk.usage.prompt_tokens_details.cached_tokens or 0
 
+                set_cost_attribute(span, chunk.usage)
+
+                prompt_tokens, completion_tokens, cache_read, cache_creation = (
+                    openai_tokens_converter(
+                        prompt_tokens,
+                        completion_tokens,
+                        cache_read,
+                        0,
+                        chunk.usage.total_tokens,
+                    )
+                )
+
                 set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+                    span,
+                    AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
+                    prompt_tokens,
                 )
                 set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+                    span, AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
                 )
                 set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
+                    span,
+                    AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS,
+                    cache_read,
                 )
                 set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
+                    span, AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
                 )
                 set_span_attribute(
                     span,
