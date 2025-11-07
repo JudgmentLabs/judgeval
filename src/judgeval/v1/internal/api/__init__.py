@@ -4,7 +4,7 @@ from httpx import Response
 from judgeval.exceptions import JudgmentAPIError
 from judgeval.utils.url import url_for
 from judgeval.utils.serialize import json_encoder
-from judgeval.api.api_types import *
+from judgeval.v1.internal.api.api_types import *
 
 
 def _headers(api_key: str, organization_id: str) -> Mapping[str, str]:

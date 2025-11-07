@@ -29,7 +29,10 @@ datamodel-codegen \
   --formatters ruff-format \
 
 # Generate the api.py file based on the schema in openapi.json.
-uv run scripts/api_generator.py > src/judgeval/api/__init__.py
+uv run scripts/api_generator.py .openapi.json > src/judgeval/api/__init__.py
+
+# Generate the v1 internal api files based on the schema in openapi.json.
+uv run scripts/api_generator_v1.py .openapi.json > src/judgeval/v1/internal/api/__init__.py
 
 # Remove the openapi.json file since it is no longer needed
 rm .openapi.json

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import orjson
 import sys
+import subprocess
+import tempfile
 from typing import Any, Dict, List, Optional
 import httpx
 import re
@@ -68,7 +70,6 @@ def get_method_name_from_path(path: str, method: str) -> str:
 
 
 def get_query_parameters(operation: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Extract query parameters from the operation."""
     parameters = operation.get("parameters", [])
     query_params = []
 
@@ -123,22 +124,19 @@ def generate_method_signature(
 
     params = ["self"]
 
-    # Add required query parameters first
     for param in query_params:
         if param["required"]:
             param_name = param["name"]
-            param_type = "str"  # Default to str for simplicity
+            param_type = "str"
             params.append(f"{param_name}: {param_type}")
 
-    # Add request body parameter if it exists
     if request_type:
         params.append(f"payload: {request_type}")
 
-    # Add optional query parameters last
     for param in query_params:
         if not param["required"]:
             param_name = param["name"]
-            param_type = "str"  # Default to str for simplicity
+            param_type = "str"
             params.append(f"{param_name}: Optional[{param_type}] = None")
 
     params_str = ", ".join(params)
@@ -155,7 +153,6 @@ def generate_method_body(
 ) -> str:
     async_prefix = "await " if is_async else ""
 
-    # Build query parameters dict if they exist
     if query_params:
         query_lines = ["query_params = {}"]
         for param in query_params:
@@ -259,6 +256,57 @@ def generate_client_class(
     return "\n".join(lines)
 
 
+def filter_schemas() -> Dict[str, Any]:
+    from typing import Generator
+
+    def walk(obj: Any) -> Generator[Any, None, None]:
+        yield obj
+        if isinstance(obj, list):
+            for item in obj:
+                yield from walk(item)
+        elif isinstance(obj, dict):
+            for value in obj.values():
+                yield from walk(value)
+
+    def get_referenced_schemas(obj: Any) -> Generator[str, None, None]:
+        for value in walk(obj):
+            if isinstance(value, dict) and "$ref" in value:
+                ref = value["$ref"]
+                resolved = resolve_ref(ref)
+                assert isinstance(ref, str), "Reference must be a string"
+                yield resolved
+
+    result: Dict[str, Any] = {}
+    processed_schema_names: set[str] = set()
+    schemas_to_scan: Any = {
+        path: spec_data
+        for path, spec_data in SPEC["paths"].items()
+        if path in JUDGEVAL_PATHS
+    }
+
+    while True:
+        to_commit: Dict[str, Any] = {}
+        for schema_name in get_referenced_schemas(schemas_to_scan):
+            if schema_name in processed_schema_names:
+                continue
+
+            assert schema_name in SPEC["components"]["schemas"], (
+                f"Schema {schema_name} not found in components.schemas"
+            )
+
+            schema = SPEC["components"]["schemas"][schema_name]
+            to_commit[schema_name] = schema
+            processed_schema_names.add(schema_name)
+
+        if not to_commit:
+            break
+
+        result.update(to_commit)
+        schemas_to_scan = to_commit
+
+    return result
+
+
 def generate_api_file() -> str:
     lines = [
         "from typing import Dict, Any, Mapping, Literal, Optional",
@@ -267,7 +315,7 @@ def generate_api_file() -> str:
         "from judgeval.exceptions import JudgmentAPIError",
         "from judgeval.utils.url import url_for",
         "from judgeval.utils.serialize import json_encoder",
-        "from judgeval.api.api_types import *",
+        "from judgeval.v1.internal.api.api_types import *",
         "",
         "",
         "def _headers(api_key: str, organization_id: str) -> Mapping[str, str]:",
@@ -363,6 +411,58 @@ def generate_api_file() -> str:
     return "\n".join(lines)
 
 
+def generate_api_types() -> None:
+    filtered_paths = {
+        path: spec_data
+        for path, spec_data in SPEC["paths"].items()
+        if path in JUDGEVAL_PATHS
+    }
+
+    spec = {
+        "openapi": SPEC["openapi"],
+        "info": SPEC["info"],
+        "paths": filtered_paths,
+        "components": {
+            **SPEC["components"],
+            "schemas": filter_schemas(),
+        },
+    }
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        f.write(orjson.dumps(spec, option=orjson.OPT_INDENT_2).decode("utf-8"))
+        temp_file = f.name
+
+    try:
+        subprocess.run(
+            [
+                "datamodel-codegen",
+                "--input",
+                temp_file,
+                "--output",
+                "src/judgeval/v1/internal/api/api_types.py",
+                "--output-model-type",
+                "typing.TypedDict",
+                "--target-python-version",
+                "3.10",
+                "--use-annotated",
+                "--use-default-kwarg",
+                "--use-field-description",
+                "--formatters",
+                "ruff-format",
+            ],
+            check=True,
+        )
+    finally:
+        import os
+
+        os.unlink(temp_file)
+
+
 if __name__ == "__main__":
+    import os
+
+    os.makedirs("src/judgeval/v1/internal/api", exist_ok=True)
+
+    generate_api_types()
     api_code = generate_api_file()
     print(api_code)
