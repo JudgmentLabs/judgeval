@@ -173,33 +173,30 @@ def generate_method_body(
 
     if method == "GET":
         if query_setup:
-            return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            {query_param},\n        )'
+            return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}"),\n            {query_param},\n        )'
         else:
-            return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            {{}},\n        )'
+            return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}"),\n            {{}},\n        )'
     else:
         if request_type:
             if query_setup:
-                return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            payload,\n            params={query_param},\n        )'
+                return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}"),\n            payload,\n            params={query_param},\n        )'
             else:
-                return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            payload,\n        )'
+                return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}"),\n            payload,\n        )'
         else:
             if query_setup:
-                return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            {{}},\n            params={query_param},\n        )'
+                return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}"),\n            {{}},\n            params={query_param},\n        )'
             else:
-                return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            {{}},\n        )'
+                return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}"),\n            {{}},\n        )'
 
 
 def generate_client_class(
     class_name: str, methods: List[Dict[str, Any]], is_async: bool = False
 ) -> str:
     lines = [f"class {class_name}:"]
-    lines.append('    __slots__ = ("base_url", "api_key", "organization_id", "client")')
+    lines.append('    __slots__ = ("api_key", "organization_id", "client")')
     lines.append("")
 
-    lines.append(
-        "    def __init__(self, base_url: str, api_key: str, organization_id: str):"
-    )
-    lines.append("        self.base_url = base_url")
+    lines.append("    def __init__(self, api_key: str, organization_id: str):")
     lines.append("        self.api_key = api_key")
     lines.append("        self.organization_id = organization_id")
     client_type = "httpx.AsyncClient" if is_async else "httpx.Client"
