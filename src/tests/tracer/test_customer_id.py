@@ -23,6 +23,21 @@ class MockExporter:
 
 @pytest.fixture
 def tracer():
+    """Create a tracer with mocked dependencies"""
+    # Clear any existing singleton instance
+    from judgeval.utils.meta import SingletonMeta
+    from opentelemetry.trace import _TRACER_PROVIDER_SET_ONCE, _TRACER_PROVIDER
+
+    if Tracer in SingletonMeta._instances:
+        del SingletonMeta._instances[Tracer]
+
+    # Reset the global tracer provider flag (OpenTelemetry internal)
+    try:
+        _TRACER_PROVIDER_SET_ONCE._done = False
+        _TRACER_PROVIDER._default = None
+    except Exception:
+        pass  # If the internal API changes, just continue
+
     # Mock the utility functions to avoid API key/org ID requirements
     with (
         patch("judgeval.tracer.expect_api_key") as mock_api_key,
@@ -41,7 +56,12 @@ def tracer():
         mock_exporter = MockExporter()
         tracer.judgment_processor._batch_processor._exporter = mock_exporter
 
-        return tracer
+        yield tracer
+
+        # Cleanup after test
+        tracer.judgment_processor._batch_processor.force_flush()
+        if Tracer in SingletonMeta._instances:
+            del SingletonMeta._instances[Tracer]
 
 
 def test_customer_id_propagation(tracer):
