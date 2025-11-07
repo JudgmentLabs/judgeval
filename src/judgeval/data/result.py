@@ -1,6 +1,7 @@
 from typing import List, Union
 from judgeval.data import ScorerData, Example
 from judgeval.data.judgment_types import ScoringResult as JudgmentScoringResult
+from judgeval.data.otel_trace import TraceSpanData
 
 
 class ScoringResult(JudgmentScoringResult):
@@ -17,7 +18,7 @@ class ScoringResult(JudgmentScoringResult):
     """
 
     # Need to override this so that it uses this repo's Example class
-    data_object: Example
+    data_object: Union[Example, TraceSpanData]
     scorers_data: List[ScorerData]
 
     def model_dump(self, **kwargs):
@@ -34,7 +35,7 @@ class ScoringResult(JudgmentScoringResult):
 
 
 def generate_scoring_result(
-    data_object: Union[Example],
+    data_object: Union[Example, TraceSpanData],
     scorers_data: List[ScorerData],
     run_duration: float,
     success: bool,

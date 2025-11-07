@@ -2,6 +2,7 @@ from judgeval.data.example import Example, ExampleParams
 from judgeval.data.scorer_data import ScorerData, create_scorer_data
 from judgeval.data.result import ScoringResult, generate_scoring_result
 from judgeval.data.trace import TraceUsage
+from judgeval.data.otel_trace import TraceData, TraceSpanData
 
 
 __all__ = [
@@ -12,4 +13,6 @@ __all__ = [
     "ScoringResult",
     "generate_scoring_result",
     "TraceUsage",
+    "TraceData",
+    "TraceSpanData",
 ]

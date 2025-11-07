@@ -83,6 +83,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         requirements_file_path: Optional[str] = None,
         unique_name: Optional[str] = None,
         overwrite: bool = False,
+        is_trace: bool = False,
     ) -> bool:
         """
         Upload custom ExampleScorer from files to backend.
@@ -158,6 +159,7 @@ class JudgmentClient(metaclass=SingletonMeta):
                     "scorer_code": scorer_code,
                     "requirements_text": requirements_text,
                     "overwrite": overwrite,
+                    "is_trace": is_trace,
                 }
             )
 

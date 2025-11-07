@@ -32,6 +32,12 @@ def upload_scorer(
         "-o",
         help="Overwrite existing scorer if it already exists",
     ),
+    is_trace: bool = typer.Option(
+        False,
+        "--trace",
+        "-t",
+        help="Specify that the scorer is a trace scorer",
+    ),
 ):
     # Validate file paths
     if not Path(scorer_file_path).exists():
@@ -50,6 +56,7 @@ def upload_scorer(
             requirements_file_path=requirements_file_path,
             unique_name=unique_name,
             overwrite=overwrite,
+            is_trace=is_trace,
         )
 
         if not result:
