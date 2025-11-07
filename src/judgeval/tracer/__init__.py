@@ -929,6 +929,7 @@ class _ContextPreservedSyncGeneratorWrapper:
         self.items: List[Any] = []
         self.span = span
         self.transform_fn = transform_fn
+        self._finished = False
 
     def __iter__(self) -> "_ContextPreservedSyncGeneratorWrapper":
         return self
@@ -943,28 +944,58 @@ class _ContextPreservedSyncGeneratorWrapper:
 
         except StopIteration:
             # Handle output and span cleanup when generator is exhausted
-            output: Any = self.items
+            if not self._finished:
+                output: Any = self.items
 
-            if self.transform_fn is not None:
-                output = self.transform_fn(self.items)
+                if self.transform_fn is not None:
+                    output = self.transform_fn(self.items)
 
-            elif all(isinstance(item, str) for item in self.items):
-                output = "".join(self.items)
+                elif all(isinstance(item, str) for item in self.items):
+                    output = "".join(self.items)
 
-            set_span_attribute(
-                self.span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(output)
-            )
-            set_span_attribute(self.span, AttributeKeys.JUDGMENT_SPAN_KIND, "generator")
-            self.span.end()
+                set_span_attribute(
+                    self.span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(output)
+                )
+                set_span_attribute(
+                    self.span, AttributeKeys.JUDGMENT_SPAN_KIND, "generator"
+                )
+                self.span.end()
+                self._finished = True
 
             raise  # Re-raise StopIteration
 
         except Exception as e:
-            self.span.record_exception(e)
-            self.span.set_status(Status(StatusCode.ERROR, str(e) or type(e).__name__))
-            self.tracer._maybe_clear_customer_context(self.span)
+            if not self._finished:
+                self.span.record_exception(e)
+                self.span.set_status(
+                    Status(StatusCode.ERROR, str(e) or type(e).__name__)
+                )
+                self.tracer._maybe_clear_customer_context(self.span)
+                self.span.end()
+                self._finished = True
 
             raise
+
+    def close(self) -> None:
+        """Close the generator (minimal implementation)."""
+        try:
+            self.generator.close()
+        finally:
+            if not self._finished:
+                output: Any = self.items
+                if self.transform_fn is not None:
+                    output = self.transform_fn(self.items)
+                elif all(isinstance(item, str) for item in self.items):
+                    output = "".join(self.items)
+                set_span_attribute(
+                    self.span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(output)
+                )
+                set_span_attribute(
+                    self.span, AttributeKeys.JUDGMENT_SPAN_KIND, "generator"
+                )
+                self.tracer._maybe_clear_customer_context(self.span)
+                self.span.end()
+                self._finished = True
 
 
 class _ContextPreservedAsyncGeneratorWrapper:
@@ -984,6 +1015,7 @@ class _ContextPreservedAsyncGeneratorWrapper:
         self.items: List[Any] = []
         self.span = span
         self.transform_fn = transform_fn
+        self._finished = False
 
     def __aiter__(self) -> "_ContextPreservedAsyncGeneratorWrapper":
         return self
@@ -1007,26 +1039,56 @@ class _ContextPreservedAsyncGeneratorWrapper:
 
         except StopAsyncIteration:
             # Handle output and span cleanup when generator is exhausted
-            output: Any = self.items
+            if not self._finished:
+                output: Any = self.items
 
-            if self.transform_fn is not None:
-                output = self.transform_fn(self.items)
+                if self.transform_fn is not None:
+                    output = self.transform_fn(self.items)
 
-            elif all(isinstance(item, str) for item in self.items):
-                output = "".join(self.items)
+                elif all(isinstance(item, str) for item in self.items):
+                    output = "".join(self.items)
 
-            set_span_attribute(
-                self.span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(output)
-            )
-            set_span_attribute(self.span, AttributeKeys.JUDGMENT_SPAN_KIND, "generator")
-            self.span.end()
+                set_span_attribute(
+                    self.span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(output)
+                )
+                set_span_attribute(
+                    self.span, AttributeKeys.JUDGMENT_SPAN_KIND, "generator"
+                )
+                self.span.end()
+                self._finished = True
             raise  # Re-raise StopAsyncIteration
         except Exception as e:
-            self.span.record_exception(e)
-            self.span.set_status(Status(StatusCode.ERROR, str(e) or type(e).__name__))
-            self.tracer._maybe_clear_customer_context(self.span)
+            if not self._finished:
+                self.span.record_exception(e)
+                self.span.set_status(
+                    Status(StatusCode.ERROR, str(e) or type(e).__name__)
+                )
+                self.tracer._maybe_clear_customer_context(self.span)
+                self.span.end()
+                self._finished = True
 
             raise
+
+    async def aclose(self) -> None:
+        """Close the async generator (minimal implementation)."""
+        try:
+            await self.generator.aclose()
+        finally:
+            if not self._finished:
+                output: Any = self.items
+                if self.transform_fn is not None:
+                    output = self.transform_fn(self.items)
+                elif all(isinstance(item, str) for item in self.items):
+                    output = "".join(self.items)
+                set_span_attribute(
+                    self.span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(output)
+                )
+                set_span_attribute(
+                    self.span, AttributeKeys.JUDGMENT_SPAN_KIND, "generator"
+                )
+                self.tracer._maybe_clear_customer_context(self.span)
+                self.span.end()
+                self._finished = True
 
 
 __all__ = [
