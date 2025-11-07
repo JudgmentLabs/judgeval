@@ -86,13 +86,14 @@ class JudgmentClient(metaclass=SingletonMeta):
         is_trace: bool = False,
     ) -> bool:
         """
-        Upload custom ExampleScorer from files to backend.
+        Upload custom ExampleScorer or TraceScorer from files to backend.
 
         Args:
             scorer_file_path: Path to Python file containing CustomScorer class
             requirements_file_path: Optional path to requirements.txt
             unique_name: Optional unique identifier (auto-detected from scorer.name if not provided)
             overwrite: Whether to overwrite existing scorer if it already exists
+            is_trace: Whether the scorer is a TraceScorer (default: False for ExampleScorer)
 
         Returns:
             bool: True if upload successful
@@ -122,21 +123,23 @@ class JudgmentClient(metaclass=SingletonMeta):
             judgeval_logger.error(error_msg)
             raise ValueError(error_msg)
 
+        base_class_name = "TraceScorer" if is_trace else "ExampleScorer"
+
         scorer_classes = []
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef):
                 for base in node.bases:
-                    if (isinstance(base, ast.Name) and base.id == "ExampleScorer") or (
-                        isinstance(base, ast.Attribute) and base.attr == "ExampleScorer"
+                    if (isinstance(base, ast.Name) and base.id == base_class_name) or (
+                        isinstance(base, ast.Attribute) and base.attr == base_class_name
                     ):
                         scorer_classes.append(node.name)
 
         if len(scorer_classes) > 1:
-            error_msg = f"Multiple ExampleScorer classes found in {scorer_file_path}: {scorer_classes}. Please only upload one scorer class per file."
+            error_msg = f"Multiple {base_class_name} classes found in {scorer_file_path}: {scorer_classes}. Please only upload one scorer class per file."
             judgeval_logger.error(error_msg)
             raise ValueError(error_msg)
         elif len(scorer_classes) == 0:
-            error_msg = f"No ExampleScorer class was found in {scorer_file_path}. Please ensure the file contains a valid scorer class that inherits from ExampleScorer."
+            error_msg = f"No {base_class_name} class was found in {scorer_file_path}. Please ensure the file contains a valid scorer class that inherits from {base_class_name}."
             judgeval_logger.error(error_msg)
             raise ValueError(error_msg)
 
