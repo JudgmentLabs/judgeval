@@ -512,16 +512,13 @@ def test_generator_span_timing(tracer):
 
     mock_exporter = tracer.judgment_processor._batch_processor._exporter
 
-    # Define generator outside to avoid decorator nesting issues
-    def plain_timed_generator():
+    @tracer.observe(span_name="timed_generator")
+    def timed_generator():
         yield 1
         time.sleep(0.1)
         yield 2
         time.sleep(0.1)
         yield 3
-
-    # Wrap with observe
-    timed_generator = tracer.observe(span_name="timed_generator")(plain_timed_generator)
 
     start_time = time.time()
     result = list(timed_generator())
@@ -722,18 +719,13 @@ def test_async_generator_span_timing(tracer):
 
     mock_exporter = tracer.judgment_processor._batch_processor._exporter
 
-    # Define generator outside to avoid decorator nesting issues
-    async def plain_async_timed_generator():
+    @tracer.observe(span_name="async_timed_generator")
+    async def async_timed_generator():
         yield 1
         await asyncio.sleep(0.1)
         yield 2
         await asyncio.sleep(0.1)
         yield 3
-
-    # Wrap with observe
-    async_timed_generator = tracer.observe(span_name="async_timed_generator")(
-        plain_async_timed_generator
-    )
 
     async def run_test():
         start_time = time.time()
