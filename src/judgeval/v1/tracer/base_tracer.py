@@ -19,6 +19,7 @@ from judgeval.v1.internal.api.api_types import (
 )
 from judgeval.env import JUDGMENT_DEFAULT_GPT_MODEL
 from judgeval.logger import judgeval_logger
+from judgeval.utils.decorators.dont_throw import dont_throw
 from judgeval.v1.data.example import Example
 from judgeval.v1.scorers.base_scorer import BaseScorer
 from judgeval.v1.tracer import attribute_keys
@@ -127,26 +128,6 @@ class BaseTracer(ABC):
     def set_output(self, output_data: Any) -> None:
         self.set_attribute(attribute_keys.JUDGMENT_OUTPUT, output_data)
 
-    def async_evaluate(
-        self,
-        scorer: BaseScorer,
-        example: Example,
-        model: Optional[str] = None,
-    ) -> None:
-        self._safe_execute(
-            "evaluate scorer", lambda: self._async_evaluate_impl(scorer, example, model)
-        )
-
-    def async_trace_evaluate(
-        self,
-        scorer: BaseScorer,
-        model: Optional[str] = None,
-    ) -> None:
-        self._safe_execute(
-            "evaluate trace scorer",
-            lambda: self._async_trace_evaluate_impl(scorer, model),
-        )
-
     def span(self, span_name: str, callable_func: Callable[[], Any]) -> Any:
         tracer = self.get_tracer()
         with tracer.start_as_current_span(span_name) as span:
@@ -162,7 +143,8 @@ class BaseTracer(ABC):
         tracer = trace.get_tracer(BaseTracer.TRACER_NAME)
         return tracer.start_span(span_name)
 
-    def _async_evaluate_impl(
+    @dont_throw
+    def async_evaluate(
         self,
         scorer: BaseScorer,
         example: Example,
@@ -189,7 +171,8 @@ class BaseTracer(ABC):
         )
         self._enqueue_evaluation(evaluation_run)
 
-    def _async_trace_evaluate_impl(
+    @dont_throw
+    def async_trace_evaluate(
         self,
         scorer: BaseScorer,
         model: Optional[str],
@@ -215,7 +198,7 @@ class BaseTracer(ABC):
             scorer, model, trace_id_hex, span_id_hex
         )
         try:
-            trace_eval_json = json.dumps(evaluation_run)
+            trace_eval_json = self.json_encoder(evaluation_run)
             current_span.set_attribute(
                 attribute_keys.JUDGMENT_PENDING_TRACE_EVAL, trace_eval_json
             )
@@ -229,7 +212,7 @@ class BaseTracer(ABC):
                 request
             )
             project_id = response.get("project_id")
-            return str(project_id) if project_id is not None else None
+            return str(project_id)
         except Exception:
             return None
 
@@ -328,12 +311,6 @@ class BaseTracer(ABC):
         judgeval_logger.info(
             f"{method}: project={self.project_name}, traceId={trace_id}, spanId={span_id}, scorer={scorer_name}"
         )
-
-    def _safe_execute(self, operation: str, action: Callable[[], None]) -> None:
-        try:
-            action()
-        except Exception as e:
-            judgeval_logger.error(f"Failed to {operation}: {e}")
 
     @staticmethod
     def _is_valid_key(key: str) -> bool:
