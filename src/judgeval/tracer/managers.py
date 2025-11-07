@@ -23,6 +23,7 @@ def sync_span_context(
     with tracer.get_tracer().start_as_current_span(
         name=name,
         attributes=span_attributes,
+        end_on_exit=False,
     ) as span:
         if disable_partial_emit:
             tracer.judgment_processor.set_internal_attribute(
@@ -46,6 +47,7 @@ async def async_span_context(
     with tracer.get_tracer().start_as_current_span(
         name=name,
         attributes=span_attributes,
+        end_on_exit=False,
     ) as span:
         if disable_partial_emit:
             tracer.judgment_processor.set_internal_attribute(
