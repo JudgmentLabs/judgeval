@@ -444,13 +444,12 @@ class Tracer(metaclass=SingletonMeta):
         main_span: Span,
     ):
         """Create a traced synchronous generator that wraps each yield in a span."""
-
         preserved_context = contextvars.copy_context()
         return _ContextPreservedSyncGeneratorWrapper(
             self, generator, preserved_context, main_span, None
         )
 
-    async def _create_traced_async_generator(
+    def _create_traced_async_generator(
         self,
         async_generator: AsyncGenerator,
         main_span: Span,
@@ -634,7 +633,7 @@ class Tracer(metaclass=SingletonMeta):
             **(attributes or {}),
         }
 
-        if inspect.iscoroutinefunction(func) or inspect.isasyncgenfunction(func):
+        if inspect.iscoroutinefunction(func):
             return self._wrap_async(func, name, func_attributes, scorer_config)
         else:
             return self._wrap_sync(func, name, func_attributes, scorer_config)
