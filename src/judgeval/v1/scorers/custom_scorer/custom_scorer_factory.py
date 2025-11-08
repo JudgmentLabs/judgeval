@@ -14,12 +14,3 @@ class CustomScorerFactory:
             class_name=class_name or name,
             server_hosted=True,
         )
-
-    def upload(
-        self,
-        scorer_file_path: str,
-        requirements_file_path: Optional[str] = None,
-        unique_name: Optional[str] = None,
-        overwrite: bool = False,
-    ) -> bool:
-        raise NotImplementedError("CustomScorer upload not implemented in v1")

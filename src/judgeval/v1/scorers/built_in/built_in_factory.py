@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from judgeval.v1.scorers.built_in.answer_correctness import AnswerCorrectnessScorer
 from judgeval.v1.scorers.built_in.answer_relevancy import AnswerRelevancyScorer
-from judgeval.v1.scorers.built_in.derailment import DerailmentScorer
 from judgeval.v1.scorers.built_in.faithfulness import FaithfulnessScorer
 from judgeval.v1.scorers.built_in.instruction_adherence import (
     InstructionAdherenceScorer,
@@ -25,6 +24,3 @@ class BuiltInScorersFactory:
         self, threshold: float = 0.5
     ) -> InstructionAdherenceScorer:
         return InstructionAdherenceScorer.create(threshold)
-
-    def derailment(self, threshold: float = 0.5) -> DerailmentScorer:
-        return DerailmentScorer.create(threshold)

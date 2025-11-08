@@ -23,6 +23,7 @@ from judgeval.utils.decorators.dont_throw import dont_throw
 from judgeval.v1.data.example import Example
 from judgeval.v1.scorers.base_scorer import BaseScorer
 from judgeval.v1.tracer import attribute_keys
+from judgeval.v1.tracer.processors.judgment_span_processor import JudgmentSpanProcessor
 
 C = TypeVar("C", bound=Callable[..., Any])
 
@@ -82,6 +83,22 @@ class BaseTracer(ABC):
             from judgeval.v1.tracer.exporters.noop_span_exporter import NoOpSpanExporter
 
             return NoOpSpanExporter()
+
+    def get_span_processor(self) -> JudgmentSpanProcessor:
+        if self.project_id is not None:
+            return JudgmentSpanProcessor(
+                self,
+                self.get_span_exporter(),
+            )
+        else:
+            judgeval_logger.error(
+                "Project not resolved; cannot create processor, returning NoOpSpanProcessor"
+            )
+            from judgeval.v1.tracer.processors.noop_span_processor import (
+                NoOpJudgmentSpanProcessor,
+            )
+
+            return NoOpJudgmentSpanProcessor()
 
     def get_tracer(self) -> trace.Tracer:
         return trace.get_tracer(self.TRACER_NAME)
@@ -322,7 +339,6 @@ class BaseTracer(ABC):
         func: C,
         span_type: Optional[str] = "span",
         span_name: Optional[str] = None,
-        attributes: Optional[Dict[str, Any]] = None,
     ) -> C: ...
 
     @overload
@@ -331,7 +347,6 @@ class BaseTracer(ABC):
         func: None = None,
         span_type: Optional[str] = "span",
         span_name: Optional[str] = None,
-        attributes: Optional[Dict[str, Any]] = None,
     ) -> Callable[[C], C]: ...
 
     def observe(
@@ -339,10 +354,9 @@ class BaseTracer(ABC):
         func: Optional[C] = None,
         span_type: Optional[str] = "span",
         span_name: Optional[str] = None,
-        attributes: Optional[Dict[str, Any]] = None,
     ) -> C | Callable[[C], C]:
         if func is None:
-            return lambda f: self.observe(f, span_type, span_name, attributes)  # type: ignore[return-value]
+            return lambda f: self.observe(f, span_type, span_name)  # type: ignore[return-value]
 
         tracer = self.get_tracer()
         name = span_name or func.__name__
@@ -354,18 +368,9 @@ class BaseTracer(ABC):
                 with tracer.start_as_current_span(name) as span:
                     if span_type:
                         span.set_attribute(attribute_keys.JUDGMENT_SPAN_KIND, span_type)
-                    if attributes:
-                        for key, value in attributes.items():
-                            if value is not None:
-                                serialized = (
-                                    self.serializer(value)
-                                    if not isinstance(value, (str, int, float, bool))
-                                    else value
-                                )
-                                span.set_attribute(key, serialized)
 
                     try:
-                        input_data = self._format_inputs(func, args, kwargs)
+                        input_data = _format_inputs(func, args, kwargs)
                         span.set_attribute(
                             attribute_keys.JUDGMENT_INPUT, self.serializer(input_data)
                         )
@@ -389,18 +394,9 @@ class BaseTracer(ABC):
                 with tracer.start_as_current_span(name) as span:
                     if span_type:
                         span.set_attribute(attribute_keys.JUDGMENT_SPAN_KIND, span_type)
-                    if attributes:
-                        for key, value in attributes.items():
-                            if value is not None:
-                                serialized = (
-                                    self.serializer(value)
-                                    if not isinstance(value, (str, int, float, bool))
-                                    else value
-                                )
-                                span.set_attribute(key, serialized)
 
                     try:
-                        input_data = self._format_inputs(func, args, kwargs)
+                        input_data = _format_inputs(func, args, kwargs)
                         span.set_attribute(
                             attribute_keys.JUDGMENT_INPUT, self.serializer(input_data)
                         )
@@ -418,25 +414,26 @@ class BaseTracer(ABC):
 
             return sync_wrapper  # type: ignore[return-value]
 
-    def _format_inputs(
-        self, f: Callable[..., Any], args: Tuple[Any, ...], kwargs: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        try:
-            params = list(inspect.signature(f).parameters.values())
-            inputs: Dict[str, Any] = {}
-            arg_i = 0
-            for param in params:
-                if param.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
-                    if arg_i < len(args):
-                        inputs[param.name] = args[arg_i]
-                        arg_i += 1
-                    elif param.name in kwargs:
-                        inputs[param.name] = kwargs[param.name]
-                elif param.kind == inspect.Parameter.VAR_POSITIONAL:
-                    inputs[param.name] = args[arg_i:]
-                    arg_i = len(args)
-                elif param.kind == inspect.Parameter.VAR_KEYWORD:
-                    inputs[param.name] = kwargs
-            return inputs
-        except Exception:
-            return {}
+
+def _format_inputs(
+    f: Callable[..., Any], args: Tuple[Any, ...], kwargs: Dict[str, Any]
+) -> Dict[str, Any]:
+    try:
+        params = list(inspect.signature(f).parameters.values())
+        inputs: Dict[str, Any] = {}
+        arg_i = 0
+        for param in params:
+            if param.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
+                if arg_i < len(args):
+                    inputs[param.name] = args[arg_i]
+                    arg_i += 1
+                elif param.name in kwargs:
+                    inputs[param.name] = kwargs[param.name]
+            elif param.kind == inspect.Parameter.VAR_POSITIONAL:
+                inputs[param.name] = args[arg_i:]
+                arg_i = len(args)
+            elif param.kind == inspect.Parameter.VAR_KEYWORD:
+                inputs[param.name] = kwargs
+        return inputs
+    except Exception:
+        return {}

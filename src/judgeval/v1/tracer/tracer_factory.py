@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import json
 from typing import Any, Callable, Optional
 
+from judgeval.utils.serialize import safe_serialize
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.tracer.tracer import Tracer
 
@@ -25,7 +25,7 @@ class TracerFactory:
         **kwargs: Any,
     ) -> Tracer:
         if serializer is None:
-            serializer = json.dumps
+            serializer = safe_serialize
 
         return Tracer(
             project_name=project_name,

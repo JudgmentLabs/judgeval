@@ -1,34 +1,25 @@
 from __future__ import annotations
-from typing import Optional, TYPE_CHECKING, Any, override
+
+from typing import TYPE_CHECKING, Any
+
 from collections import defaultdict
-from opentelemetry.context import Context
-from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
+
+from opentelemetry.sdk.trace import ReadableSpan
+from opentelemetry.trace import get_current_span
 from opentelemetry.trace.span import SpanContext
 from opentelemetry.sdk.trace.export import (
     BatchSpanProcessor,
+    SpanExporter,
 )
-from judgeval.tracer.exporters import JudgmentSpanExporter
-from judgeval.tracer.keys import AttributeKeys, InternalAttributeKeys, ResourceKeys
-from judgeval.utils.url import url_for
+
+from judgeval.v1.tracer import attribute_keys as AttributeKeys
 from judgeval.utils.decorators.dont_throw import dont_throw
-from judgeval.version import get_version
 
 if TYPE_CHECKING:
-    from judgeval.tracer import Tracer
+    pass
 
-
-class NoOpSpanProcessor(SpanProcessor):
-    def on_start(self, span: Span, parent_context: Optional[Context] = None) -> None:
-        pass
-
-    def on_end(self, span: ReadableSpan) -> None:
-        pass
-
-    def shutdown(self) -> None:
-        pass
-
-    def force_flush(self, timeout_millis: int = 30000) -> bool:
-        return True
+from judgeval.tracer.keys import InternalAttributeKeys
+from judgeval.v1.tracer import BaseTracer
 
 
 class JudgmentSpanProcessor(BatchSpanProcessor):
@@ -36,37 +27,19 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
 
     def __init__(
         self,
-        tracer: Tracer,
-        project_name: str,
-        project_id: str,
-        api_key: str,
-        organization_id: str,
+        tracer: BaseTracer,
+        exporter: SpanExporter,
         /,
         *,
         max_queue_size: int | None = None,
         schedule_delay_millis: float | None = None,
         max_export_batch_size: int | None = None,
         export_timeout_millis: float | None = None,
-        resource_attributes: Optional[dict[str, Any]] = None,
     ):
         self.tracer = tracer
 
-        attrs = {
-            ResourceKeys.SERVICE_NAME: project_name,
-            ResourceKeys.TELEMETRY_SDK_NAME: "judgeval",
-            ResourceKeys.TELEMETRY_SDK_VERSION: get_version(),
-            ResourceKeys.JUDGMENT_PROJECT_ID: project_id,
-            **(resource_attributes or {}),
-        }
-        self.resource_attributes = attrs
-
         super().__init__(
-            JudgmentSpanExporter(
-                endpoint=url_for("/otel/v1/traces"),
-                api_key=api_key,
-                organization_id=organization_id,
-                project_id=project_id,
-            ),
+            exporter,
             max_queue_size=max_queue_size,
             schedule_delay_millis=schedule_delay_millis,
             max_export_batch_size=max_export_batch_size,
@@ -108,7 +81,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
 
     @dont_throw
     def emit_partial(self) -> None:
-        current_span = self.tracer.get_current_span()
+        current_span = get_current_span()
         if (
             not current_span
             or not current_span.is_recording()
@@ -180,49 +153,3 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             super().on_end(final_span)
         else:
             super().on_end(span)
-
-
-class NoOpJudgmentSpanProcessor(JudgmentSpanProcessor):
-    __slots__ = ("resource_attributes",)
-
-    def __init__(self):
-        self.resource_attributes = {}
-
-    @override
-    def on_start(self, span: Span, parent_context: Optional[Context] = None) -> None:
-        pass
-
-    @override
-    def on_end(self, span: ReadableSpan) -> None:
-        pass
-
-    @override
-    def shutdown(self) -> None:
-        pass
-
-    @override
-    def force_flush(self, timeout_millis: int | None = 30000) -> bool:
-        return True
-
-    @override
-    def emit_partial(self) -> None:
-        pass
-
-    @override
-    def set_internal_attribute(
-        self, span_context: SpanContext, key: str, value: Any
-    ) -> None:
-        pass
-
-    @override
-    def get_internal_attribute(
-        self, span_context: SpanContext, key: str, default: Any = None
-    ) -> Any:
-        return default
-
-    @override
-    def increment_update_id(self, span_context: SpanContext) -> int:
-        return 0
-
-
-__all__ = ["NoOpSpanProcessor", "JudgmentSpanProcessor", "NoOpJudgmentSpanProcessor"]
