@@ -75,6 +75,7 @@ from judgeval.tracer.processors import (
 )
 from judgeval.tracer.utils import set_span_attribute, TraceScorerConfig
 from judgeval.utils.project import _resolve_project_id
+from opentelemetry.trace import use_span
 
 C = TypeVar("C", bound=Callable)
 Cls = TypeVar("Cls", bound=Type)
@@ -442,22 +443,34 @@ class Tracer(metaclass=SingletonMeta):
         self,
         generator: Generator,
         main_span: Span,
+        disable_generator_yield_span: bool = False,
     ):
         """Create a traced synchronous generator that wraps each yield in a span."""
         preserved_context = contextvars.copy_context()
         return _ContextPreservedSyncGeneratorWrapper(
-            self, generator, preserved_context, main_span, None
+            self,
+            generator,
+            preserved_context,
+            main_span,
+            None,
+            disable_generator_yield_span,
         )
 
     def _create_traced_async_generator(
         self,
         async_generator: AsyncGenerator,
         main_span: Span,
+        disable_generator_yield_span: bool = False,
     ):
         """Create a traced asynchronous generator that wraps each yield in a span."""
         preserved_context = contextvars.copy_context()
         return _ContextPreservedAsyncGeneratorWrapper(
-            self, async_generator, preserved_context, main_span, None
+            self,
+            async_generator,
+            preserved_context,
+            main_span,
+            None,
+            disable_generator_yield_span,
         )
 
     def _wrap_sync(
@@ -466,6 +479,7 @@ class Tracer(metaclass=SingletonMeta):
         name: Optional[str],
         attributes: Optional[Dict[str, Any]],
         scorer_config: TraceScorerConfig | None = None,
+        disable_generator_yield_span: bool = False,
     ):
         @functools.wraps(f)
         def wrapper(*args, **kwargs):
@@ -495,14 +509,18 @@ class Tracer(metaclass=SingletonMeta):
                             span, AttributeKeys.JUDGMENT_OUTPUT, "<generator>"
                         )
                         self._record_instance_state("after", span)
-                        return self._create_traced_sync_generator(result, span)
+                        return self._create_traced_sync_generator(
+                            result, span, disable_generator_yield_span
+                        )
                     elif inspect.isasyncgen(result):
                         is_return_type_generator = True
                         set_span_attribute(
                             span, AttributeKeys.JUDGMENT_OUTPUT, "<async_generator>"
                         )
                         self._record_instance_state("after", span)
-                        return self._create_traced_async_generator(result, span)
+                        return self._create_traced_async_generator(
+                            result, span, disable_generator_yield_span
+                        )
                     else:
                         set_span_attribute(
                             span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(result)
@@ -527,6 +545,7 @@ class Tracer(metaclass=SingletonMeta):
         name: Optional[str],
         attributes: Optional[Dict[str, Any]],
         scorer_config: TraceScorerConfig | None = None,
+        disable_generator_yield_span: bool = False,
     ):
         @functools.wraps(f)
         async def wrapper(*args, **kwargs):
@@ -554,14 +573,18 @@ class Tracer(metaclass=SingletonMeta):
                             span, AttributeKeys.JUDGMENT_OUTPUT, "<async_generator>"
                         )
                         self._record_instance_state("after", span)
-                        return self._create_traced_async_generator(result, span)
+                        return self._create_traced_async_generator(
+                            result, span, disable_generator_yield_span
+                        )
                     elif inspect.isgenerator(result):
                         is_return_type_generator = True
                         set_span_attribute(
                             span, AttributeKeys.JUDGMENT_OUTPUT, "<generator>"
                         )
                         self._record_instance_state("after", span)
-                        return self._create_traced_sync_generator(result, span)
+                        return self._create_traced_sync_generator(
+                            result, span, disable_generator_yield_span
+                        )
                     else:
                         set_span_attribute(
                             span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(result)
@@ -613,6 +636,7 @@ class Tracer(metaclass=SingletonMeta):
         span_name: str | None = None,
         attributes: Optional[Dict[str, Any]] = None,
         scorer_config: TraceScorerConfig | None = None,
+        disable_generator_yield_span: bool = False,
     ) -> Callable | None:
         if func is None:
             return partial(
@@ -621,6 +645,7 @@ class Tracer(metaclass=SingletonMeta):
                 span_name=span_name,
                 attributes=attributes,
                 scorer_config=scorer_config,
+                disable_generator_yield_span=disable_generator_yield_span,
             )
 
         if not self.enable_monitoring:
@@ -634,9 +659,13 @@ class Tracer(metaclass=SingletonMeta):
         }
 
         if inspect.iscoroutinefunction(func):
-            return self._wrap_async(func, name, func_attributes, scorer_config)
+            return self._wrap_async(
+                func, name, func_attributes, scorer_config, disable_generator_yield_span
+            )
         else:
-            return self._wrap_sync(func, name, func_attributes, scorer_config)
+            return self._wrap_sync(
+                func, name, func_attributes, scorer_config, disable_generator_yield_span
+            )
 
     @overload
     def agent(
@@ -922,14 +951,15 @@ class _ContextPreservedSyncGeneratorWrapper:
         context: contextvars.Context,
         span: Span,
         transform_fn: Optional[Callable[[Iterable], str]],
+        disable_generator_yield_span: bool = False,
     ) -> None:
         self.tracer = tracer
         self.generator = generator
         self.context = context
-        self.items: List[Any] = []
         self.span = span
         self.transform_fn = transform_fn
         self._finished = False
+        self.disable_generator_yield_span = disable_generator_yield_span
 
     def __iter__(self) -> "_ContextPreservedSyncGeneratorWrapper":
         return self
@@ -938,24 +968,30 @@ class _ContextPreservedSyncGeneratorWrapper:
         try:
             # Run the generator's __next__ in the preserved context
             item = self.context.run(next, self.generator)
-            self.items.append(item)
+
+            if not self.disable_generator_yield_span:
+                with use_span(self.span):
+                    span_name = (
+                        str(self.span.name)
+                        if hasattr(self.span, "name")
+                        else "generator_item"
+                    )  # type: ignore[attr-defined]
+                    with self.tracer.get_tracer().start_as_current_span(
+                        span_name,
+                        attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
+                        end_on_exit=True,
+                    ) as child_span:
+                        set_span_attribute(
+                            child_span,
+                            AttributeKeys.JUDGMENT_OUTPUT,
+                            safe_serialize(item),
+                        )
 
             return item
 
         except StopIteration:
             # Handle output and span cleanup when generator is exhausted
             if not self._finished:
-                output: Any = self.items
-
-                if self.transform_fn is not None:
-                    output = self.transform_fn(self.items)
-
-                elif all(isinstance(item, str) for item in self.items):
-                    output = "".join(self.items)
-
-                set_span_attribute(
-                    self.span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(output)
-                )
                 set_span_attribute(
                     self.span, AttributeKeys.JUDGMENT_SPAN_KIND, "generator"
                 )
@@ -982,14 +1018,6 @@ class _ContextPreservedSyncGeneratorWrapper:
             self.generator.close()
         finally:
             if not self._finished:
-                output: Any = self.items
-                if self.transform_fn is not None:
-                    output = self.transform_fn(self.items)
-                elif all(isinstance(item, str) for item in self.items):
-                    output = "".join(self.items)
-                set_span_attribute(
-                    self.span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(output)
-                )
                 set_span_attribute(
                     self.span, AttributeKeys.JUDGMENT_SPAN_KIND, "generator"
                 )
@@ -1008,14 +1036,15 @@ class _ContextPreservedAsyncGeneratorWrapper:
         context: contextvars.Context,
         span: Span,
         transform_fn: Optional[Callable[[Iterable], str]],
+        disable_generator_yield_span: bool = False,
     ) -> None:
         self.tracer = tracer
         self.generator = generator
         self.context = context
-        self.items: List[Any] = []
         self.span = span
         self.transform_fn = transform_fn
         self._finished = False
+        self.disable_generator_yield_span = disable_generator_yield_span
 
     def __aiter__(self) -> "_ContextPreservedAsyncGeneratorWrapper":
         return self
@@ -1033,24 +1062,29 @@ class _ContextPreservedAsyncGeneratorWrapper:
                 # Python < 3.10 fallback - context parameter not supported
                 item = await self.generator.__anext__()
 
-            self.items.append(item)
+            if not self.disable_generator_yield_span:
+                with use_span(self.span):
+                    span_name = (
+                        str(self.span.name)
+                        if hasattr(self.span, "name")
+                        else "generator_item"
+                    )  # type: ignore[attr-defined]
+                    with self.tracer.get_tracer().start_as_current_span(
+                        span_name,
+                        attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
+                        end_on_exit=True,
+                    ) as child_span:
+                        set_span_attribute(
+                            child_span,
+                            AttributeKeys.JUDGMENT_OUTPUT,
+                            safe_serialize(item),
+                        )
 
             return item
 
         except StopAsyncIteration:
             # Handle output and span cleanup when generator is exhausted
             if not self._finished:
-                output: Any = self.items
-
-                if self.transform_fn is not None:
-                    output = self.transform_fn(self.items)
-
-                elif all(isinstance(item, str) for item in self.items):
-                    output = "".join(self.items)
-
-                set_span_attribute(
-                    self.span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(output)
-                )
                 set_span_attribute(
                     self.span, AttributeKeys.JUDGMENT_SPAN_KIND, "generator"
                 )
@@ -1075,14 +1109,6 @@ class _ContextPreservedAsyncGeneratorWrapper:
             await self.generator.aclose()
         finally:
             if not self._finished:
-                output: Any = self.items
-                if self.transform_fn is not None:
-                    output = self.transform_fn(self.items)
-                elif all(isinstance(item, str) for item in self.items):
-                    output = "".join(self.items)
-                set_span_attribute(
-                    self.span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(output)
-                )
                 set_span_attribute(
                     self.span, AttributeKeys.JUDGMENT_SPAN_KIND, "generator"
                 )

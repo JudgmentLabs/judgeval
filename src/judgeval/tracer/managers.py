@@ -16,6 +16,7 @@ def sync_span_context(
     name: str,
     span_attributes: Optional[Dict[str, str]] = None,
     disable_partial_emit: bool = False,
+    end_on_exit: bool = False,
 ):
     if span_attributes is None:
         span_attributes = {}
@@ -23,7 +24,7 @@ def sync_span_context(
     with tracer.get_tracer().start_as_current_span(
         name=name,
         attributes=span_attributes,
-        end_on_exit=False,
+        end_on_exit=end_on_exit,
     ) as span:
         if disable_partial_emit:
             tracer.judgment_processor.set_internal_attribute(
@@ -40,6 +41,7 @@ async def async_span_context(
     name: str,
     span_attributes: Optional[Dict[str, str]] = None,
     disable_partial_emit: bool = False,
+    end_on_exit: bool = False,
 ):
     if span_attributes is None:
         span_attributes = {}
@@ -47,7 +49,7 @@ async def async_span_context(
     with tracer.get_tracer().start_as_current_span(
         name=name,
         attributes=span_attributes,
-        end_on_exit=False,
+        end_on_exit=end_on_exit,
     ) as span:
         if disable_partial_emit:
             tracer.judgment_processor.set_internal_attribute(
