@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, TYPE_CHECKING, Any, override
+from typing import Optional, TYPE_CHECKING, Any
 from collections import defaultdict
 from opentelemetry.context import Context
 from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
@@ -188,39 +188,31 @@ class NoOpJudgmentSpanProcessor(JudgmentSpanProcessor):
     def __init__(self):
         self.resource_attributes = {}
 
-    @override
     def on_start(self, span: Span, parent_context: Optional[Context] = None) -> None:
         pass
 
-    @override
     def on_end(self, span: ReadableSpan) -> None:
         pass
 
-    @override
     def shutdown(self) -> None:
         pass
 
-    @override
     def force_flush(self, timeout_millis: int | None = 30000) -> bool:
         return True
 
-    @override
     def emit_partial(self) -> None:
         pass
 
-    @override
     def set_internal_attribute(
         self, span_context: SpanContext, key: str, value: Any
     ) -> None:
         pass
 
-    @override
     def get_internal_attribute(
         self, span_context: SpanContext, key: str, default: Any = None
     ) -> Any:
         return default
 
-    @override
     def increment_update_id(self, span_context: SpanContext) -> int:
         return 0
 
