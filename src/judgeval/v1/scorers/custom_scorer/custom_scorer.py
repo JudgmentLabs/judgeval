@@ -1,11 +1,23 @@
 from __future__ import annotations
 
-from judgeval.v1.internal.api.api_types import ScorerConfig
+from typing import TYPE_CHECKING
+from judgeval.constants import APIScorerType
+
+if TYPE_CHECKING:
+    from judgeval.v1.internal.api.api_types import (
+        BaseScorer as BaseScorerDict,
+        ScorerConfig,
+    )
+
 from judgeval.v1.scorers.base_scorer import BaseScorer
 
 
 class CustomScorer(BaseScorer):
-    __slots__ = ("_name", "_class_name", "_server_hosted")
+    __slots__ = (
+        "_name",
+        "_class_name",
+        "_server_hosted",
+    )
 
     def __init__(
         self,
@@ -28,3 +40,11 @@ class CustomScorer(BaseScorer):
 
     def get_scorer_config(self) -> ScorerConfig:
         raise NotImplementedError("CustomScorer does not use get_scorer_config")
+
+    def to_dict(self) -> BaseScorerDict:
+        return {
+            "score_type": APIScorerType.CUSTOM.value,
+            "name": self._name,
+            "class_name": self._class_name,
+            "server_hosted": self._server_hosted,
+        }

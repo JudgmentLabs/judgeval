@@ -21,6 +21,7 @@ from judgeval.v1.internal.api.api_types import (
 )
 from judgeval.v1.scorers.base_scorer import BaseScorer
 from judgeval.judgment_attribute_keys import AttributeKeys
+from judgeval.v1.scorers.custom_scorer.custom_scorer import CustomScorer
 from judgeval.v1.tracer.exporters.judgment_span_exporter import JudgmentSpanExporter
 from judgeval.v1.tracer.processors.judgment_span_processor import JudgmentSpanProcessor
 from uuid import uuid4
@@ -265,14 +266,19 @@ class BaseTracer(ABC):
     ) -> ExampleEvaluationRun:
         run_id = self._generate_run_id("async_evaluate_", span_id)
 
+        judgment_scorers = (
+            [] if isinstance(scorer, CustomScorer) else [scorer.get_scorer_config()]
+        )
+        custom_scorers = [scorer.to_dict()] if isinstance(scorer, CustomScorer) else []
+
         return ExampleEvaluationRun(
             project_name=self.project_name,
             eval_name=run_id,
             trace_id=trace_id,
             trace_span_id=span_id,
             examples=[example.to_dict()],
-            judgment_scorers=[scorer.get_scorer_config()],
-            custom_scorers=[],
+            judgment_scorers=judgment_scorers,
+            custom_scorers=custom_scorers,
             created_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
         )
 
@@ -284,12 +290,17 @@ class BaseTracer(ABC):
     ) -> TraceEvaluationRun:
         eval_name = self._generate_run_id("async_trace_evaluate_", span_id)
 
+        judgment_scorers = (
+            [] if isinstance(scorer, CustomScorer) else [scorer.get_scorer_config()]
+        )
+        custom_scorers = [scorer.to_dict()] if isinstance(scorer, CustomScorer) else []
+
         return TraceEvaluationRun(
             project_name=self.project_name,
             eval_name=eval_name,
             trace_and_span_ids=[[trace_id, span_id]],
-            judgment_scorers=[scorer.get_scorer_config()],
-            custom_scorers=[],
+            judgment_scorers=judgment_scorers,
+            custom_scorers=custom_scorers,
             is_offline=False,
             is_bucket_run=False,
             created_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
