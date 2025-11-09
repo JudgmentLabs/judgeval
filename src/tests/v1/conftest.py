@@ -1,3 +1,4 @@
+from typing import Optional
 import pytest
 import random
 import string
@@ -18,7 +19,7 @@ def mock_client():
 
 @pytest.fixture
 def create_mock_span():
-    def _create(trace_id: int, span_id: int = None):
+    def _create(trace_id: int, span_id: Optional[int] = None):
         span = MagicMock(spec=ReadableSpan)
         context = MagicMock()
         context.trace_id = trace_id
