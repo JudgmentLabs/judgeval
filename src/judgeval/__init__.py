@@ -170,8 +170,7 @@ class JudgmentClient(metaclass=SingletonMeta):
                 judgeval_logger.error(f"Failed to upload custom scorer: {unique_name}")
                 return False
 
-        except Exception as e:
-            judgeval_logger.error(f"Error uploading custom scorer: {e}")
+        except Exception:
             raise
 
 
