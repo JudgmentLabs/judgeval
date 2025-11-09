@@ -216,8 +216,8 @@ class FireworksTrainer(BaseTrainer):
             num_completed = 0
             results = []
 
-            for coro in asyncio.as_completed(coros):
-                result = await coro
+            for future in asyncio.as_completed(coros):
+                result = await future
                 results.append(result)
                 num_completed += 1
 
@@ -256,8 +256,8 @@ class FireworksTrainer(BaseTrainer):
             try:
                 response = self._client.fetch_experiment_run(fetch_request)
                 if response and response.get("results"):
-                    results_data = response["results"]
-                    if len(results_data) > 0:
+                    results_data = response.get("results")
+                    if results_data is not None and len(results_data) > 0:
                         scoring_results = []
                         for result_data in results_data:
                             from judgeval.v1.data.scorer_data import ScorerData
