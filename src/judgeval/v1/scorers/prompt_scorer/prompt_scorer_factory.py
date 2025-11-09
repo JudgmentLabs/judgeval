@@ -14,7 +14,7 @@ from judgeval.v1.scorers.prompt_scorer.prompt_scorer import PromptScorer
 
 class PromptScorerFactory:
     __slots__ = ("_client", "_is_trace")
-    _cache: Dict[Tuple[str, str, str], APIPromptScorer] = {}
+    _cache: Dict[Tuple[str, str, str, bool], APIPromptScorer] = {}
 
     def __init__(
         self,
@@ -25,7 +25,12 @@ class PromptScorerFactory:
         self._is_trace = is_trace
 
     def get(self, name: str) -> PromptScorer:
-        cache_key = (name, self._client.organization_id, self._client.api_key)
+        cache_key = (
+            name,
+            self._client.organization_id,
+            self._client.api_key,
+            self._is_trace,
+        )
         cached = self._cache.get(cache_key)
 
         if cached is None:
