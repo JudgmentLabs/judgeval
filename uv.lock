@@ -1597,6 +1597,7 @@ source = { editable = "." }
 dependencies = [
     { name = "boto3" },
     { name = "click" },
+    { name = "dotenv" },
     { name = "httpx" },
     { name = "litellm" },
     { name = "opentelemetry-exporter-otlp" },
@@ -1647,6 +1648,7 @@ requires-dist = [
     { name = "boto3", specifier = ">=1.40.11" },
     { name = "boto3", marker = "extra == 's3'", specifier = ">=1.40.11" },
     { name = "click", specifier = "<8.2.0" },
+    { name = "dotenv", specifier = ">=0.9.9" },
     { name = "fireworks-ai", marker = "extra == 'trainer'", specifier = ">=0.19.18" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "litellm", specifier = ">=1.75.0" },

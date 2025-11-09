@@ -22,6 +22,11 @@ class Example:
     def get_property(self, key: str) -> Any:
         return self._properties.get(key)
 
+    def create(self, **kwargs: Any) -> Example:
+        for key, value in kwargs.items():
+            self.set_property(key, value)
+        return self
+
     def to_dict(self) -> APIExample:
         result: APIExample = {
             "example_id": self.example_id,

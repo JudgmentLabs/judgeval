@@ -97,14 +97,16 @@ class JudgmentSyncClient:
             params=query_params,
         )
 
-    def log_eval_results(self, payload: EvalResults) -> Any:
+    def log_eval_results(self, payload: EvalResults) -> LogEvalResultsResponse:
         return self._request(
             "POST",
             url_for("/log_eval_results/"),
             payload,
         )
 
-    def fetch_experiment_run(self, payload: EvalResultsFetch) -> Any:
+    def fetch_experiment_run(
+        self, payload: EvalResultsFetch
+    ) -> FetchExperimentRunResponse:
         return self._request(
             "POST",
             url_for("/fetch_experiment_run/"),
@@ -340,14 +342,16 @@ class JudgmentAsyncClient:
             params=query_params,
         )
 
-    async def log_eval_results(self, payload: EvalResults) -> Any:
+    async def log_eval_results(self, payload: EvalResults) -> LogEvalResultsResponse:
         return await self._request(
             "POST",
             url_for("/log_eval_results/"),
             payload,
         )
 
-    async def fetch_experiment_run(self, payload: EvalResultsFetch) -> Any:
+    async def fetch_experiment_run(
+        self, payload: EvalResultsFetch
+    ) -> FetchExperimentRunResponse:
         return await self._request(
             "POST",
             url_for("/fetch_experiment_run/"),

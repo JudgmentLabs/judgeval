@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from judgeval.constants import APIScorerType
 from judgeval.v1.scorers.api_scorer import APIScorer
 
 
@@ -14,7 +15,7 @@ class AnswerCorrectnessScorer(APIScorer):
         model: Optional[str] = None,
     ):
         super().__init__(
-            score_type="answer_correctness",
+            score_type=APIScorerType.ANSWER_CORRECTNESS.value,
             required_params=["input", "actual_output", "expected_output"],
             threshold=threshold,
             name=name,

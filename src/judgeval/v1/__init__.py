@@ -4,6 +4,7 @@ from typing import Optional
 
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
+from judgeval.v1.datasets.dataset_factory import DatasetFactory
 from judgeval.v1.evaluation.evaluation_factory import EvaluationFactory
 from judgeval.v1.scorers.scorers_factory import ScorersFactory
 from judgeval.v1.tracer.tracer_factory import TracerFactory
@@ -59,6 +60,12 @@ class JudgmentClient:
     @property
     def Trainers(self) -> TrainersFactory:
         return TrainersFactory(
+            client=self._internal_client,
+        )
+
+    @property
+    def Datasets(self) -> DatasetFactory:
+        return DatasetFactory(
             client=self._internal_client,
         )
 

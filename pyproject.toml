@@ -25,6 +25,7 @@ dependencies = [
     "click<8.2.0",
     "typer>=0.9.0",
     "boto3>=1.40.11",
+    "dotenv>=0.9.9",
 ]
 
 [project.urls]

@@ -15,20 +15,24 @@ class ScorersFactory:
     ):
         self._client = client
 
+    @property
     def prompt_scorer(self) -> PromptScorerFactory:
         return PromptScorerFactory(
             client=self._client,
             is_trace=False,
         )
 
+    @property
     def trace_prompt_scorer(self) -> PromptScorerFactory:
         return PromptScorerFactory(
             client=self._client,
             is_trace=True,
         )
 
+    @property
     def custom_scorer(self) -> CustomScorerFactory:
         return CustomScorerFactory()
 
+    @property
     def built_in(self) -> BuiltInScorersFactory:
         return BuiltInScorersFactory()
