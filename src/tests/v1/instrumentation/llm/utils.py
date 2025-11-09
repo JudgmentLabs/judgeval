@@ -3,7 +3,7 @@
 from typing import Any, Dict
 from opentelemetry.sdk.trace import ReadableSpan
 
-from judgeval.tracer.keys import AttributeKeys
+from judgeval.judgment_attribute_keys import AttributeKeys
 
 
 def verify_span_attributes_comprehensive(

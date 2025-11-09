@@ -21,6 +21,16 @@ class AttributeKeys(str, Enum):
     JUDGMENT_PENDING_TRACE_EVAL = "judgment.pending_trace_eval"
     JUDGMENT_USAGE_METADATA = "judgment.usage.metadata"
 
+    JUDGMENT_LLM_PROVIDER = "judgment.llm.provider"
+    JUDGMENT_LLM_MODEL_NAME = "judgment.llm.model"
+    JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS = "judgment.usage.non_cached_input_tokens"
+    JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS = (
+        "judgment.usage.cache_creation_input_tokens"
+    )
+    JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS = "judgment.usage.cache_read_input_tokens"
+    JUDGMENT_USAGE_OUTPUT_TOKENS = "judgment.usage.output_tokens"
+    JUDGMENT_USAGE_TOTAL_COST_USD = "judgment.usage.total_cost_usd"
+
     GEN_AI_PROMPT = "gen_ai.prompt"
     GEN_AI_COMPLETION = "gen_ai.completion"
     GEN_AI_REQUEST_MODEL = "gen_ai.request.model"
