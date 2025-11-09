@@ -108,13 +108,33 @@ class Dataset:
     def add_from_json(self, file_path: str) -> None:
         with open(file_path, "rb") as file:
             data = orjson.loads(file.read())
-        examples = [Example(**e) if isinstance(e, dict) else e for e in data]
+        examples = []
+        for e in data:
+            if isinstance(e, dict):
+                name = e.get("name")
+                example = Example(name=name)
+                for key, value in e.items():
+                    if key != "name":
+                        example.set_property(key, value)
+                examples.append(example)
+            else:
+                examples.append(e)
         self.add_examples(examples)
 
     def add_from_yaml(self, file_path: str) -> None:
         with open(file_path, "r") as file:
             data = yaml.safe_load(file)
-        examples = [Example(**e) if isinstance(e, dict) else e for e in data]
+        examples = []
+        for e in data:
+            if isinstance(e, dict):
+                name = e.get("name")
+                example = Example(name=name)
+                for key, value in e.items():
+                    if key != "name":
+                        example.set_property(key, value)
+                examples.append(example)
+            else:
+                examples.append(e)
         self.add_examples(examples)
 
     def add_examples(self, examples: List[Example]) -> None:

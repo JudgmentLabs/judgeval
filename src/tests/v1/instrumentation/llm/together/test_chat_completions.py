@@ -2,13 +2,9 @@
 
 import pytest
 
-pytestmark = pytest.mark.skip(
-    reason="Deprecated: Use v1 tests instead (src/tests/v1/instrumentation/llm/together/)"
-)
-
 pytest.importorskip("together")
 
-from judgeval.tracer.llm.llm_together.wrapper import wrap_together_client
+from judgeval.v1.instrumentation.llm.llm_together.wrapper import wrap_together_client
 from ..utils import verify_span_attributes_comprehensive, assert_span_has_exception
 
 # All fixtures are imported automatically from conftest.py
@@ -21,7 +17,7 @@ class BaseTogetherTest:
         self,
         client,
         mock_processor,
-        expected_model_name="meta-llama/Llama-3.3-70B-Instruct-Turbo",
+        expected_model_name="meta-llama/Llama-3.2-3B-Instruct-Turbo",
     ):
         """Helper method to verify tracing only if client is wrapped."""
         if hasattr(client, "_judgment_tracer"):
@@ -45,7 +41,7 @@ class TestSyncWrapper(BaseTogetherTest):
     def test_chat_completions_create(self, sync_client_maybe_wrapped, mock_processor):
         """Test sync chat.completions.create with tracing verification"""
         response = sync_client_maybe_wrapped.chat.completions.create(
-            model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            model="meta-llama/Llama-3.2-3B-Instruct-Turbo",
             messages=[{"role": "user", "content": "Say 'test' and nothing else"}],
             max_tokens=100,
         )
@@ -67,7 +63,7 @@ class TestSyncWrapper(BaseTogetherTest):
     ):
         """Test sync streaming chat.completions.create with tracing verification"""
         stream = sync_client_maybe_wrapped.chat.completions.create(
-            model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            model="meta-llama/Llama-3.2-3B-Instruct-Turbo",
             messages=[{"role": "user", "content": "Count to 3"}],
             max_tokens=50,
             stream=True,
@@ -99,13 +95,13 @@ class TestSyncWrapper(BaseTogetherTest):
         initial_span_count = len(mock_processor.ended_spans)
 
         response1 = sync_client_maybe_wrapped.chat.completions.create(
-            model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            model="meta-llama/Llama-3.2-3B-Instruct-Turbo",
             messages=[{"role": "user", "content": "Say 'first'"}],
             max_tokens=50,
         )
 
         response2 = sync_client_maybe_wrapped.chat.completions.create(
-            model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            model="meta-llama/Llama-3.2-3B-Instruct-Turbo",
             messages=[{"role": "user", "content": "Say 'second'"}],
             max_tokens=50,
         )
@@ -132,14 +128,14 @@ class TestSyncWrapper(BaseTogetherTest):
                 span=span1,
                 attrs=attrs1,
                 expected_span_name="TOGETHER_API_CALL",
-                expected_model_name="meta-llama/Llama-3.3-70B-Instruct-Turbo",
+                expected_model_name="meta-llama/Llama-3.2-3B-Instruct-Turbo",
             )
 
             verify_span_attributes_comprehensive(
                 span=span2,
                 attrs=attrs2,
                 expected_span_name="TOGETHER_API_CALL",
-                expected_model_name="meta-llama/Llama-3.3-70B-Instruct-Turbo",
+                expected_model_name="meta-llama/Llama-3.2-3B-Instruct-Turbo",
             )
 
     def test_invalid_model_name_error(self, sync_client_maybe_wrapped, mock_processor):
@@ -162,7 +158,7 @@ class TestAsyncWrapper(BaseTogetherTest):
     ):
         """Test async chat.completions.create with tracing verification"""
         response = await async_client_maybe_wrapped.chat.completions.create(
-            model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            model="meta-llama/Llama-3.2-3B-Instruct-Turbo",
             messages=[{"role": "user", "content": "Say 'test' and nothing else"}],
             max_tokens=100,
         )
@@ -185,7 +181,7 @@ class TestAsyncWrapper(BaseTogetherTest):
     ):
         """Test async streaming chat.completions.create with tracing verification"""
         stream = await async_client_maybe_wrapped.chat.completions.create(
-            model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            model="meta-llama/Llama-3.2-3B-Instruct-Turbo",
             messages=[{"role": "user", "content": "Count to 3"}],
             max_tokens=50,
             stream=True,
@@ -221,13 +217,13 @@ class TestAsyncWrapper(BaseTogetherTest):
         initial_span_count = len(mock_processor.ended_spans)
 
         response1 = await async_client_maybe_wrapped.chat.completions.create(
-            model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            model="meta-llama/Llama-3.2-3B-Instruct-Turbo",
             messages=[{"role": "user", "content": "Say 'first'"}],
             max_tokens=50,
         )
 
         response2 = await async_client_maybe_wrapped.chat.completions.create(
-            model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            model="meta-llama/Llama-3.2-3B-Instruct-Turbo",
             messages=[{"role": "user", "content": "Say 'second'"}],
             max_tokens=50,
         )
@@ -254,14 +250,14 @@ class TestAsyncWrapper(BaseTogetherTest):
                 span=span1,
                 attrs=attrs1,
                 expected_span_name="TOGETHER_API_CALL",
-                expected_model_name="meta-llama/Llama-3.3-70B-Instruct-Turbo",
+                expected_model_name="meta-llama/Llama-3.2-3B-Instruct-Turbo",
             )
 
             verify_span_attributes_comprehensive(
                 span=span2,
                 attrs=attrs2,
                 expected_span_name="TOGETHER_API_CALL",
-                expected_model_name="meta-llama/Llama-3.3-70B-Instruct-Turbo",
+                expected_model_name="meta-llama/Llama-3.2-3B-Instruct-Turbo",
             )
 
     @pytest.mark.asyncio
@@ -289,7 +285,7 @@ class TestIdempotency(BaseTogetherTest):
         wrapped_twice = wrap_together_client(tracer, wrapped_once)
 
         response = wrapped_twice.chat.completions.create(
-            model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            model="meta-llama/Llama-3.2-3B-Instruct-Turbo",
             messages=[{"role": "user", "content": "test"}],
             max_tokens=50,
         )
@@ -307,7 +303,7 @@ class TestIdempotency(BaseTogetherTest):
         wrapped_twice = wrap_together_client(tracer, wrapped_once)
 
         response = await wrapped_twice.chat.completions.create(
-            model="meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            model="meta-llama/Llama-3.2-3B-Instruct-Turbo",
             messages=[{"role": "user", "content": "test"}],
             max_tokens=50,
         )

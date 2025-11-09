@@ -2,13 +2,9 @@
 
 import pytest
 
-pytestmark = pytest.mark.skip(
-    reason="Deprecated: Use v1 tests instead (src/tests/v1/instrumentation/llm/openai/)"
-)
-
 pytest.importorskip("openai")
 
-from judgeval.tracer.llm.llm_openai.wrapper import (
+from judgeval.v1.instrumentation.llm.llm_openai.wrapper import (
     wrap_openai_client_sync,
 )
 from ..utils import verify_span_attributes_comprehensive, assert_span_has_exception
@@ -45,6 +41,7 @@ class TestSyncResponses(BaseOpenAIResponsesTest):
         """Test sync responses.create with tracing verification"""
         response = sync_client_maybe_wrapped.responses.create(
             model="gpt-5-nano",
+            temperature=1,
             input="Say 'test' and nothing else",
         )
 
@@ -64,11 +61,13 @@ class TestSyncResponses(BaseOpenAIResponsesTest):
 
         response1 = sync_client_maybe_wrapped.responses.create(
             model="gpt-5-nano",
+            temperature=1,
             input="Say 'first'",
         )
 
         response2 = sync_client_maybe_wrapped.responses.create(
             model="gpt-5-nano",
+            temperature=1,
             input="Say 'second'",
         )
 
@@ -122,6 +121,7 @@ class TestAsyncResponses(BaseOpenAIResponsesTest):
         """Test async responses.create with tracing verification"""
         response = await async_client_maybe_wrapped.responses.create(
             model="gpt-5-nano",
+            temperature=1,
             input="Say 'test' and nothing else",
         )
 
@@ -142,11 +142,13 @@ class TestAsyncResponses(BaseOpenAIResponsesTest):
 
         response1 = await async_client_maybe_wrapped.responses.create(
             model="gpt-5-nano",
+            temperature=1,
             input="Say 'first'",
         )
 
         response2 = await async_client_maybe_wrapped.responses.create(
             model="gpt-5-nano",
+            temperature=1,
             input="Say 'second'",
         )
 
@@ -233,6 +235,7 @@ class TestStreamingResponses(BaseOpenAIResponsesTest):
         """Test sync responses.create with stream=True and tracing verification"""
         stream = sync_client_maybe_wrapped.responses.create(
             model="gpt-5-nano",
+            temperature=1,
             input="Count to 3",
             stream=True,
         )
@@ -257,6 +260,7 @@ class TestStreamingResponses(BaseOpenAIResponsesTest):
         """Test async responses.create with stream=True and tracing verification"""
         stream = await async_client_maybe_wrapped.responses.create(
             model="gpt-5-nano",
+            temperature=1,
             input="Count to 3",
             stream=True,
         )
@@ -290,11 +294,13 @@ class TestEdgeCases(BaseOpenAIResponsesTest):
 
         response1 = client1.responses.create(
             model="gpt-5-nano",
+            temperature=1,
             input="Say: one",
         )
 
         response2 = client2.responses.create(
             model="gpt-5-nano",
+            temperature=1,
             input="Say: two",
         )
 
@@ -345,6 +351,7 @@ class TestSafetyGuarantees(BaseOpenAIResponsesTest):
         wrapped_client = wrap_openai_client_sync(tracer, sync_client)
         response = wrapped_client.responses.create(
             model="gpt-5-nano",
+            temperature=1,
             input="test",
         )
 
@@ -373,11 +380,13 @@ class TestSafetyGuarantees(BaseOpenAIResponsesTest):
 
         unwrapped_response = unwrapped.responses.create(
             model="gpt-5-nano",
+            temperature=1,
             input="Say exactly: test",
         )
 
         wrapped_response = wrapped.responses.create(
             model="gpt-5-nano",
+            temperature=1,
             input="Say exactly: test",
         )
 
@@ -413,6 +422,7 @@ class TestSafetyGuarantees(BaseOpenAIResponsesTest):
         wrapped_client = wrap_openai_client_sync(tracer, sync_client)
         response = wrapped_client.responses.create(
             model="gpt-5-nano",
+            temperature=1,
             input="test",
         )
 

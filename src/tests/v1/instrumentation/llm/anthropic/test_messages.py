@@ -4,13 +4,9 @@ import pytest
 import random
 import string
 
-pytestmark = pytest.mark.skip(
-    reason="Deprecated: Use v1 tests instead (src/tests/v1/instrumentation/llm/anthropic/)"
-)
-
 pytest.importorskip("anthropic")
 
-from judgeval.tracer.llm.llm_anthropic.wrapper import (
+from judgeval.v1.instrumentation.llm.llm_anthropic.wrapper import (
     wrap_anthropic_client_sync,
 )
 from ..utils import verify_span_attributes_comprehensive, assert_span_has_exception
