@@ -4,7 +4,7 @@ import asyncio
 import concurrent.futures
 import time
 import threading
-from typing import List, Tuple, TYPE_CHECKING
+from typing import Any, List, Tuple, TYPE_CHECKING
 from rich import print as rprint
 
 from judgeval.data import ScorerData, ScoringResult
@@ -46,7 +46,7 @@ def safe_run_async(coro):
 
 
 def log_evaluation_results(
-    scoring_results: List[ScoringResult],
+    scoring_results: List[Any],
     run: ExampleEvaluationRun,
 ) -> str:
     """
@@ -73,6 +73,7 @@ def log_evaluation_results(
             }
         )
         url = response.get("ui_results_url")
+        assert url is not None
         return url
 
     except Exception as e:
@@ -127,6 +128,7 @@ def _poll_evaluation_until_complete(
             )
 
             example_scorer_pairings = results_response.get("results", [])
+            assert example_scorer_pairings is not None
             if len(example_scorer_pairings) != expected_examples_count:
                 time.sleep(poll_interval_seconds)
                 continue
@@ -146,6 +148,7 @@ def _poll_evaluation_until_complete(
                 )
                 scoring_result_list.append(scoring_result)
 
+            assert url is not None
             return scoring_result_list, url
         except Exception as e:
             exception_count += 1
