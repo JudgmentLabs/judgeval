@@ -2,14 +2,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Union
 import typing
 
-from judgeval.tracer.llm.llm_together.chat_completions import (
+from judgeval.v1.instrumentation.llm.llm_together.chat_completions import (
     wrap_chat_completions_create_sync,
     wrap_chat_completions_create_async,
 )
 
 
 if TYPE_CHECKING:
-    from judgeval.tracer import Tracer
+    from judgeval.v1.tracer import Tracer
     from together import Together, AsyncTogether  # type: ignore[import-untyped]
 
     TClient = Union[Together, AsyncTogether]
@@ -32,7 +32,7 @@ def wrap_together_client(tracer: Tracer, client: AsyncTogether) -> AsyncTogether
 
 
 def wrap_together_client(tracer: Tracer, client: TClient) -> TClient:
-    from judgeval.tracer.llm.llm_together.config import HAS_TOGETHER
+    from judgeval.v1.instrumentation.llm.llm_together.config import HAS_TOGETHER
     from judgeval.logger import judgeval_logger
 
     if not HAS_TOGETHER:

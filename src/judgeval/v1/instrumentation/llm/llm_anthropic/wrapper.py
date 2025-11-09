@@ -2,17 +2,17 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Union
 import typing
 
-from judgeval.tracer.llm.llm_anthropic.messages import (
+from judgeval.v1.instrumentation.llm.llm_anthropic.messages import (
     wrap_messages_create_sync,
     wrap_messages_create_async,
 )
-from judgeval.tracer.llm.llm_anthropic.messages_stream import (
+from judgeval.v1.instrumentation.llm.llm_anthropic.messages_stream import (
     wrap_messages_stream_sync,
     wrap_messages_stream_async,
 )
 
 if TYPE_CHECKING:
-    from judgeval.tracer import Tracer
+    from judgeval.v1.tracer import Tracer
     from anthropic import Anthropic, AsyncAnthropic
 
     TClient = Union[Anthropic, AsyncAnthropic]
@@ -39,7 +39,7 @@ def wrap_anthropic_client(tracer: Tracer, client: AsyncAnthropic) -> AsyncAnthro
 
 
 def wrap_anthropic_client(tracer: Tracer, client: TClient) -> TClient:
-    from judgeval.tracer.llm.llm_anthropic.config import HAS_ANTHROPIC
+    from judgeval.v1.instrumentation.llm.llm_anthropic.config import HAS_ANTHROPIC
     from judgeval.logger import judgeval_logger
 
     if not HAS_ANTHROPIC:

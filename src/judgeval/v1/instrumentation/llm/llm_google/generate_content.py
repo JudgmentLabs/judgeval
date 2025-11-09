@@ -7,13 +7,12 @@ from typing import (
     Tuple,
 )
 
-from judgeval.tracer.keys import AttributeKeys
-from judgeval.tracer.utils import set_span_attribute
+from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.utils.serialize import safe_serialize
 from judgeval.utils.wrappers import immutable_wrap_sync
 
 if TYPE_CHECKING:
-    from judgeval.tracer import Tracer
+    from judgeval.v1.tracer import Tracer
     from google.genai import Client
     from google.genai.types import (
         GenerateContentResponse,
@@ -57,14 +56,9 @@ def wrap_generate_content_sync(tracer: Tracer, client: Client) -> None:
         ctx["span"] = tracer.get_tracer().start_span(
             "GOOGLE_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        tracer._inject_judgment_context(ctx["span"])
-        set_span_attribute(
-            ctx["span"], AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
-        )
+        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
-        set_span_attribute(
-            ctx["span"], AttributeKeys.GEN_AI_REQUEST_MODEL, ctx["model_name"]
-        )
+        ctx["span"].set_attribute(AttributeKeys.GEN_AI_REQUEST_MODEL, ctx["model_name"])
 
     def post_hook(ctx: Dict[str, Any], result: GenerateContentResponse) -> None:
         span = ctx.get("span")
@@ -72,34 +66,27 @@ def wrap_generate_content_sync(tracer: Tracer, client: Client) -> None:
             return
 
         output, usage_data = _format_google_output(result)
-        set_span_attribute(span, AttributeKeys.GEN_AI_COMPLETION, output)
+        span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, output)
 
         if usage_data:
             prompt_tokens, completion_tokens, cache_read, cache_creation = (
                 _extract_google_tokens(usage_data)
             )
-            set_span_attribute(
-                span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+            span.set_attribute(AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens)
+            span.set_attribute(
+                AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
             )
-            set_span_attribute(
-                span, AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+            span.set_attribute(
+                AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
             )
-            set_span_attribute(
-                span, AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
+            span.set_attribute(
+                AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, cache_creation
             )
-            set_span_attribute(
-                span,
-                AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
-                cache_creation,
-            )
-            set_span_attribute(
-                span,
-                AttributeKeys.JUDGMENT_USAGE_METADATA,
-                safe_serialize(usage_data),
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(usage_data)
             )
 
-        set_span_attribute(
-            span,
+        span.set_attribute(
             AttributeKeys.GEN_AI_RESPONSE_MODEL,
             result.model_version if result.model_version else ctx["model_name"],
         )

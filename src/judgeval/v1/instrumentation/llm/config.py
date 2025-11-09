@@ -42,7 +42,7 @@ def _detect_provider(client: ApiClient) -> ProviderType:
 
     judgeval_logger.warning(
         f"Unknown client type {type(client)}, Trying to wrap as OpenAI-compatible. "
-        "If this is a mistake or you think we should support this client, please file an issue at https://github.com/JudgmentLabs/judgeval/issues!"
+        "If this is a mistake or you think we should support this client, please file an issue at https://github.com/JudgmentLabs/judgeval/issues"
     )
 
     return ProviderType.DEFAULT

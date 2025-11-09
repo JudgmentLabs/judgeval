@@ -19,6 +19,7 @@ class AttributeKeys(str, Enum):
     JUDGMENT_STATE_BEFORE = "judgment.state_before"
     JUDGMENT_STATE_AFTER = "judgment.state_after"
     JUDGMENT_PENDING_TRACE_EVAL = "judgment.pending_trace_eval"
+    JUDGMENT_USAGE_METADATA = "judgment.usage.metadata"
 
     GEN_AI_PROMPT = "gen_ai.prompt"
     GEN_AI_COMPLETION = "gen_ai.completion"

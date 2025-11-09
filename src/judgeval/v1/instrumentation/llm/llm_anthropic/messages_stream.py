@@ -7,20 +7,19 @@ from typing import (
     AsyncGenerator,
 )
 
-from judgeval.tracer.keys import AttributeKeys
-from judgeval.tracer.utils import set_span_attribute
+from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.utils.serialize import safe_serialize
 from judgeval.utils.wrappers import (
     mutable_wrap_sync,
     immutable_wrap_sync_iterator,
     immutable_wrap_async_iterator,
 )
-from judgeval.tracer.llm.llm_anthropic.messages import (
+from judgeval.v1.instrumentation.llm.llm_anthropic.messages import (
     _extract_anthropic_tokens,
 )
 
 if TYPE_CHECKING:
-    from judgeval.tracer import Tracer
+    from judgeval.v1.tracer import Tracer
     from anthropic import Anthropic, AsyncAnthropic
     from anthropic.lib.streaming import (
         MessageStreamManager,
@@ -37,15 +36,10 @@ def wrap_messages_stream_sync(tracer: Tracer, client: Anthropic) -> None:
         ctx["span"] = tracer.get_tracer().start_span(
             "ANTHROPIC_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        tracer._inject_judgment_context(ctx["span"])
-        set_span_attribute(
-            ctx["span"], AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
-        )
+        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
 
         ctx["model_name"] = kwargs.get("model", "")
-        set_span_attribute(
-            ctx["span"], AttributeKeys.GEN_AI_REQUEST_MODEL, ctx["model_name"]
-        )
+        ctx["span"].set_attribute(AttributeKeys.GEN_AI_REQUEST_MODEL, ctx["model_name"])
         ctx["accumulated_content"] = ""
 
     def mutate_hook(
@@ -110,7 +104,7 @@ def wrap_messages_stream_sync(tracer: Tracer, client: Anthropic) -> None:
             span = ctx.get("span")
             if span:
                 accumulated = ctx.get("accumulated_content", "")
-                set_span_attribute(span, AttributeKeys.GEN_AI_COMPLETION, accumulated)
+                span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, accumulated)
 
                 stream: MessageStream | None = ctx.get("stream")
                 if stream:
@@ -123,36 +117,28 @@ def wrap_messages_stream_sync(tracer: Tracer, client: Anthropic) -> None:
                                 cache_read,
                                 cache_creation,
                             ) = _extract_anthropic_tokens(final_message.usage)
-                            set_span_attribute(
-                                span,
-                                AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
-                                prompt_tokens,
+                            span.set_attribute(
+                                AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
                             )
-                            set_span_attribute(
-                                span,
+                            span.set_attribute(
                                 AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
                                 completion_tokens,
                             )
-                            set_span_attribute(
-                                span,
+                            span.set_attribute(
                                 AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
                                 cache_read,
                             )
-                            set_span_attribute(
-                                span,
+                            span.set_attribute(
                                 AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
                                 cache_creation,
                             )
-                            set_span_attribute(
-                                span,
+                            span.set_attribute(
                                 AttributeKeys.JUDGMENT_USAGE_METADATA,
                                 safe_serialize(final_message.usage),
                             )
 
-                        set_span_attribute(
-                            span,
-                            AttributeKeys.GEN_AI_RESPONSE_MODEL,
-                            final_message.model,
+                        span.set_attribute(
+                            AttributeKeys.GEN_AI_RESPONSE_MODEL, final_message.model
                         )
                     except Exception:
                         pass
@@ -183,15 +169,11 @@ def wrap_messages_stream_async(tracer: Tracer, client: AsyncAnthropic) -> None:
         ctx["span"] = tracer.get_tracer().start_span(
             "ANTHROPIC_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        tracer._inject_judgment_context(ctx["span"])
-        set_span_attribute(
-            ctx["span"], AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
-        )
+
+        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
 
         ctx["model_name"] = kwargs.get("model", "")
-        set_span_attribute(
-            ctx["span"], AttributeKeys.GEN_AI_REQUEST_MODEL, ctx["model_name"]
-        )
+        ctx["span"].set_attribute(AttributeKeys.GEN_AI_REQUEST_MODEL, ctx["model_name"])
         ctx["accumulated_content"] = ""
 
     def mutate_hook(
@@ -256,7 +238,7 @@ def wrap_messages_stream_async(tracer: Tracer, client: AsyncAnthropic) -> None:
             span = ctx.get("span")
             if span:
                 accumulated = ctx.get("accumulated_content", "")
-                set_span_attribute(span, AttributeKeys.GEN_AI_COMPLETION, accumulated)
+                span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, accumulated)
 
                 stream: AsyncMessageStream | None = ctx.get("stream")
                 if stream:
@@ -269,36 +251,28 @@ def wrap_messages_stream_async(tracer: Tracer, client: AsyncAnthropic) -> None:
                                 cache_read,
                                 cache_creation,
                             ) = _extract_anthropic_tokens(final_message.usage)
-                            set_span_attribute(
-                                span,
-                                AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS,
-                                prompt_tokens,
+                            span.set_attribute(
+                                AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
                             )
-                            set_span_attribute(
-                                span,
+                            span.set_attribute(
                                 AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
                                 completion_tokens,
                             )
-                            set_span_attribute(
-                                span,
+                            span.set_attribute(
                                 AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
                                 cache_read,
                             )
-                            set_span_attribute(
-                                span,
+                            span.set_attribute(
                                 AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
                                 cache_creation,
                             )
-                            set_span_attribute(
-                                span,
+                            span.set_attribute(
                                 AttributeKeys.JUDGMENT_USAGE_METADATA,
                                 safe_serialize(final_message.usage),
                             )
 
-                        set_span_attribute(
-                            span,
-                            AttributeKeys.GEN_AI_RESPONSE_MODEL,
-                            final_message.model,
+                        span.set_attribute(
+                            AttributeKeys.GEN_AI_RESPONSE_MODEL, final_message.model
                         )
                     except Exception:
                         pass

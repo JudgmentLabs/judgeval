@@ -11,8 +11,7 @@ from typing import (
     AsyncGenerator,
 )
 
-from judgeval.tracer.keys import AttributeKeys
-from judgeval.tracer.utils import set_span_attribute
+from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.utils.serialize import safe_serialize
 from judgeval.utils.wrappers import (
     immutable_wrap_async,
@@ -24,7 +23,7 @@ from judgeval.utils.wrappers import (
 )
 
 if TYPE_CHECKING:
-    from judgeval.tracer import Tracer
+    from judgeval.v1.tracer import Tracer
     from together import Together, AsyncTogether  # type: ignore[import-untyped]
     from together.types import ChatCompletionResponse, ChatCompletionChunk  # type: ignore[import-untyped]
     from together.types.common import UsageData  # type: ignore[import-untyped]
@@ -63,17 +62,14 @@ def _wrap_non_streaming_sync(
         ctx["span"] = tracer.get_tracer().start_span(
             "TOGETHER_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        tracer._inject_judgment_context(ctx["span"])
-        set_span_attribute(
-            ctx["span"], AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
-        )
+        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
         prefixed_model_name = (
             f"together_ai/{ctx['model_name']}" if ctx["model_name"] else ""
         )
         ctx["model_name"] = prefixed_model_name
-        set_span_attribute(
-            ctx["span"], AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
+        ctx["span"].set_attribute(
+            AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
         )
 
     def post_hook(ctx: Dict[str, Any], result: ChatCompletionResponse) -> None:
@@ -81,31 +77,21 @@ def _wrap_non_streaming_sync(
         if not span:
             return
 
-        set_span_attribute(
-            span, AttributeKeys.GEN_AI_COMPLETION, safe_serialize(result)
-        )
+        span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, safe_serialize(result))
 
         if result.usage:
             prompt_tokens, completion_tokens, _, _ = _extract_together_tokens(
                 result.usage
             )
-            set_span_attribute(
-                span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+            span.set_attribute(AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens)
+            span.set_attribute(
+                AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
             )
-            set_span_attribute(
-                span, AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
-            )
-            set_span_attribute(
-                span,
-                AttributeKeys.JUDGMENT_USAGE_METADATA,
-                safe_serialize(result.usage),
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(result.usage)
             )
 
-        set_span_attribute(
-            span,
-            AttributeKeys.GEN_AI_RESPONSE_MODEL,
-            ctx["model_name"],
-        )
+        span.set_attribute(AttributeKeys.GEN_AI_RESPONSE_MODEL, ctx["model_name"])
 
     def error_hook(ctx: Dict[str, Any], error: Exception) -> None:
         span = ctx.get("span")
@@ -133,17 +119,14 @@ def _wrap_streaming_sync(
         ctx["span"] = tracer.get_tracer().start_span(
             "TOGETHER_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        tracer._inject_judgment_context(ctx["span"])
-        set_span_attribute(
-            ctx["span"], AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
-        )
+        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
         prefixed_model_name = (
             f"together_ai/{ctx['model_name']}" if ctx["model_name"] else ""
         )
         ctx["model_name"] = prefixed_model_name
-        set_span_attribute(
-            ctx["span"], AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
+        ctx["span"].set_attribute(
+            AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
         )
         ctx["accumulated_content"] = ""
 
@@ -170,23 +153,21 @@ def _wrap_streaming_sync(
                 prompt_tokens, completion_tokens, _, _ = _extract_together_tokens(
                     chunk.usage
                 )
-                set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+                span.set_attribute(
+                    AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
                 )
-                set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+                span.set_attribute(
+                    AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
                 )
-                set_span_attribute(
-                    span,
-                    AttributeKeys.JUDGMENT_USAGE_METADATA,
-                    safe_serialize(chunk.usage),
+                span.set_attribute(
+                    AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(chunk.usage)
                 )
 
         def post_hook_inner(inner_ctx: Dict[str, Any]) -> None:
             span = ctx.get("span")
             if span:
                 accumulated = ctx.get("accumulated_content", "")
-                set_span_attribute(span, AttributeKeys.GEN_AI_COMPLETION, accumulated)
+                span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, accumulated)
 
         def error_hook_inner(inner_ctx: Dict[str, Any], error: Exception) -> None:
             span = ctx.get("span")
@@ -239,17 +220,14 @@ def _wrap_non_streaming_async(
         ctx["span"] = tracer.get_tracer().start_span(
             "TOGETHER_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        tracer._inject_judgment_context(ctx["span"])
-        set_span_attribute(
-            ctx["span"], AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
-        )
+        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
         prefixed_model_name = (
             f"together_ai/{ctx['model_name']}" if ctx["model_name"] else ""
         )
         ctx["model_name"] = prefixed_model_name
-        set_span_attribute(
-            ctx["span"], AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
+        ctx["span"].set_attribute(
+            AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
         )
 
     def post_hook(ctx: Dict[str, Any], result: ChatCompletionResponse) -> None:
@@ -257,31 +235,21 @@ def _wrap_non_streaming_async(
         if not span:
             return
 
-        set_span_attribute(
-            span, AttributeKeys.GEN_AI_COMPLETION, safe_serialize(result)
-        )
+        span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, safe_serialize(result))
 
         if result.usage:
             prompt_tokens, completion_tokens, _, _ = _extract_together_tokens(
                 result.usage
             )
-            set_span_attribute(
-                span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+            span.set_attribute(AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens)
+            span.set_attribute(
+                AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
             )
-            set_span_attribute(
-                span, AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
-            )
-            set_span_attribute(
-                span,
-                AttributeKeys.JUDGMENT_USAGE_METADATA,
-                safe_serialize(result.usage),
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(result.usage)
             )
 
-        set_span_attribute(
-            span,
-            AttributeKeys.GEN_AI_RESPONSE_MODEL,
-            ctx["model_name"],
-        )
+        span.set_attribute(AttributeKeys.GEN_AI_RESPONSE_MODEL, ctx["model_name"])
 
     def error_hook(ctx: Dict[str, Any], error: Exception) -> None:
         span = ctx.get("span")
@@ -310,17 +278,14 @@ def _wrap_streaming_async(
         ctx["span"] = tracer.get_tracer().start_span(
             "TOGETHER_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        tracer._inject_judgment_context(ctx["span"])
-        set_span_attribute(
-            ctx["span"], AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs)
-        )
+        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
         prefixed_model_name = (
             f"together_ai/{ctx['model_name']}" if ctx["model_name"] else ""
         )
         ctx["model_name"] = prefixed_model_name
-        set_span_attribute(
-            ctx["span"], AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
+        ctx["span"].set_attribute(
+            AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
         )
         ctx["accumulated_content"] = ""
 
@@ -347,23 +312,21 @@ def _wrap_streaming_async(
                 prompt_tokens, completion_tokens, _, _ = _extract_together_tokens(
                     chunk.usage
                 )
-                set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+                span.set_attribute(
+                    AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
                 )
-                set_span_attribute(
-                    span, AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+                span.set_attribute(
+                    AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
                 )
-                set_span_attribute(
-                    span,
-                    AttributeKeys.JUDGMENT_USAGE_METADATA,
-                    safe_serialize(chunk.usage),
+                span.set_attribute(
+                    AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(chunk.usage)
                 )
 
         def post_hook_inner(inner_ctx: Dict[str, Any]) -> None:
             span = ctx.get("span")
             if span:
                 accumulated = ctx.get("accumulated_content", "")
-                set_span_attribute(span, AttributeKeys.GEN_AI_COMPLETION, accumulated)
+                span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, accumulated)
 
         def error_hook_inner(inner_ctx: Dict[str, Any], error: Exception) -> None:
             span = ctx.get("span")

@@ -2,21 +2,21 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Union
 import typing
 
-from judgeval.tracer.llm.llm_openai.chat_completions import (
+from judgeval.v1.instrumentation.llm.llm_openai.chat_completions import (
     wrap_chat_completions_create_sync,
     wrap_chat_completions_create_async,
 )
-from judgeval.tracer.llm.llm_openai.responses import (
+from judgeval.v1.instrumentation.llm.llm_openai.responses import (
     wrap_responses_create_sync,
     wrap_responses_create_async,
 )
-from judgeval.tracer.llm.llm_openai.beta_chat_completions import (
+from judgeval.v1.instrumentation.llm.llm_openai.beta_chat_completions import (
     wrap_beta_chat_completions_parse_sync,
     wrap_beta_chat_completions_parse_async,
 )
 
 if TYPE_CHECKING:
-    from judgeval.tracer import Tracer
+    from judgeval.v1.tracer import Tracer
     from openai import OpenAI, AsyncOpenAI
 
     TClient = Union[OpenAI, AsyncOpenAI]
@@ -43,7 +43,7 @@ def wrap_openai_client(tracer: Tracer, client: AsyncOpenAI) -> AsyncOpenAI: ...
 
 
 def wrap_openai_client(tracer: Tracer, client: TClient) -> TClient:
-    from judgeval.tracer.llm.llm_openai.config import HAS_OPENAI
+    from judgeval.v1.instrumentation.llm.llm_openai.config import HAS_OPENAI
     from judgeval.logger import judgeval_logger
 
     if not HAS_OPENAI:

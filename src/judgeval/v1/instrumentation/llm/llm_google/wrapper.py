@@ -1,17 +1,17 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
-from judgeval.tracer.llm.llm_google.generate_content import (
+from judgeval.v1.instrumentation.llm.llm_google.generate_content import (
     wrap_generate_content_sync,
 )
 
 if TYPE_CHECKING:
-    from judgeval.tracer import Tracer
+    from judgeval.v1.tracer import Tracer
     from google.genai import Client
 
 
 def wrap_google_client(tracer: Tracer, client: Client) -> Client:
-    from judgeval.tracer.llm.llm_google.config import HAS_GOOGLE_GENAI
+    from judgeval.v1.instrumentation.llm.llm_google.config import HAS_GOOGLE_GENAI
     from judgeval.logger import judgeval_logger
 
     if not HAS_GOOGLE_GENAI:
