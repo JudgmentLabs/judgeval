@@ -5,7 +5,6 @@ from typing import Any, Callable, Optional
 from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.logger import judgeval_logger
@@ -36,8 +35,6 @@ class Tracer(BaseTracer):
             self.initialize()
 
     def initialize(self) -> None:
-        span_exporter = self.get_span_exporter()
-
         resource = Resource.create(
             {
                 "service.name": self.project_name,
@@ -47,7 +44,7 @@ class Tracer(BaseTracer):
         )
 
         self._tracer_provider = TracerProvider(resource=resource)
-        self._tracer_provider.add_span_processor(BatchSpanProcessor(span_exporter))
+        self._tracer_provider.add_span_processor(self.get_span_processor())
 
         trace.set_tracer_provider(self._tracer_provider)
 

@@ -7,6 +7,7 @@ from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
 from judgeval.v1.evaluation.evaluation_factory import EvaluationFactory
 from judgeval.v1.scorers.scorers_factory import ScorersFactory
 from judgeval.v1.tracer.tracer_factory import TracerFactory
+from judgeval.v1.trainers.trainers_factory import TrainersFactory
 
 
 class JudgmentClient:
@@ -52,6 +53,12 @@ class JudgmentClient:
     @property
     def Evaluation(self) -> EvaluationFactory:
         return EvaluationFactory(
+            client=self._internal_client,
+        )
+
+    @property
+    def Trainers(self) -> TrainersFactory:
+        return TrainersFactory(
             client=self._internal_client,
         )
 

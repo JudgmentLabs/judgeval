@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 from collections import defaultdict
 
-from opentelemetry.sdk.trace import ReadableSpan
+from opentelemetry.context import Context
+from opentelemetry.sdk.trace import ReadableSpan, Span
 from opentelemetry.trace import get_current_span
 from opentelemetry.trace.span import SpanContext
 from opentelemetry.sdk.trace.export import (
@@ -12,14 +13,14 @@ from opentelemetry.sdk.trace.export import (
     SpanExporter,
 )
 
-from judgeval.v1.tracer import attribute_keys as AttributeKeys
+from judgeval.judgment_attribute_keys import AttributeKeys
+from judgeval.tracer.keys import InternalAttributeKeys
 from judgeval.utils.decorators.dont_throw import dont_throw
+from judgeval.v1.tracer.processors._lifecycles import get_all
+
 
 if TYPE_CHECKING:
-    pass
-
-from judgeval.tracer.keys import InternalAttributeKeys
-from judgeval.v1.tracer import BaseTracer
+    from judgeval.v1.tracer import BaseTracer
 
 
 class JudgmentSpanProcessor(BatchSpanProcessor):
@@ -80,6 +81,11 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
         self._internal_attributes.pop(span_key, None)
 
     @dont_throw
+    def on_start(self, span: Span, parent_context: Optional[Context] = None) -> None:
+        for processor in get_all():
+            processor.on_start(span, parent_context)
+
+    @dont_throw
     def emit_partial(self) -> None:
         current_span = get_current_span()
         if (
@@ -117,7 +123,11 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
 
         super().on_end(partial_span)
 
+    @dont_throw
     def on_end(self, span: ReadableSpan) -> None:
+        for processor in get_all():
+            processor.on_end(span)
+
         if not span.context:
             super().on_end(span)
             return
