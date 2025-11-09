@@ -123,9 +123,9 @@ class FireworksTrainer(BaseTrainer):
 
     async def generate_rollouts_and_rewards(
         self,
-        agent_function: Callable[[Any], Any],
+        agent_function: Callable[..., Any],
         scorers: List["BaseScorer"],
-        prompts: List[Any],
+        prompts: dict[int, dict[Any, Any]],
         num_prompts_per_step: Optional[int] = None,
         num_generations_per_prompt: Optional[int] = None,
         concurrency: Optional[int] = None,
@@ -296,7 +296,7 @@ class FireworksTrainer(BaseTrainer):
         self,
         agent_function: Callable[[Any], Any],
         scorers: List["BaseScorer"],
-        prompts: List[Any],
+        prompts: dict[int, dict[Any, Any]],
     ) -> "ModelConfig":
         _print_progress("Starting reinforcement learning training")
 
@@ -384,7 +384,7 @@ class FireworksTrainer(BaseTrainer):
         self,
         agent_function: Callable[[Any], Any],
         scorers: List["BaseScorer"],
-        prompts: List[Any],
+        prompts: dict[int, dict[Any, Any]],
     ) -> "ModelConfig":
         try:
             return await self.run_reinforcement_learning(
