@@ -6,7 +6,8 @@ authors = [
     { name = "Alex Shan", email = "alex@judgmentlabs.ai" },
     { name = "Joseph Camyre", email = "joseph@judgmentlabs.ai" },
 ]
-description = "Judgeval Package"
+maintainers = [{ name = "Judgment Labs", email = "contact@judgmentlabs.ai" }]
+description = "The open source post-building layer for Agent Behavior Monitoring."
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
