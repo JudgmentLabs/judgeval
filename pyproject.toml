@@ -80,6 +80,7 @@ dev = [
     "langchain-community>=0.3.29",
     "openlit>=1.35.5",
     "dotenv>=0.9.9",
+    "datasets>=4.4.1",
 ]
 
 
