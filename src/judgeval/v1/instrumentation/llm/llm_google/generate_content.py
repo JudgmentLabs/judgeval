@@ -58,7 +58,9 @@ def wrap_generate_content_sync(tracer: Tracer, client: Client) -> None:
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_REQUEST_MODEL, ctx["model_name"])
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
+        )
 
     def post_hook(ctx: Dict[str, Any], result: GenerateContentResponse) -> None:
         span = ctx.get("span")
@@ -72,22 +74,27 @@ def wrap_generate_content_sync(tracer: Tracer, client: Client) -> None:
             prompt_tokens, completion_tokens, cache_read, cache_creation = (
                 _extract_google_tokens(usage_data)
             )
-            span.set_attribute(AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens)
             span.set_attribute(
-                AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+                AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
+                prompt_tokens,
             )
             span.set_attribute(
-                AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
+                AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
             )
             span.set_attribute(
-                AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, cache_creation
+                AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
             )
             span.set_attribute(
-                AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(usage_data)
+                AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS,
+                cache_creation,
+            )
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_USAGE_METADATA,
+                safe_serialize(usage_data),
             )
 
         span.set_attribute(
-            AttributeKeys.GEN_AI_RESPONSE_MODEL,
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME,
             result.model_version if result.model_version else ctx["model_name"],
         )
 

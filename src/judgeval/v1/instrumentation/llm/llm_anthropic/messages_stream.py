@@ -39,7 +39,9 @@ def wrap_messages_stream_sync(tracer: Tracer, client: Anthropic) -> None:
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
 
         ctx["model_name"] = kwargs.get("model", "")
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_REQUEST_MODEL, ctx["model_name"])
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
+        )
         ctx["accumulated_content"] = ""
 
     def mutate_hook(
@@ -118,18 +120,19 @@ def wrap_messages_stream_sync(tracer: Tracer, client: Anthropic) -> None:
                                 cache_creation,
                             ) = _extract_anthropic_tokens(final_message.usage)
                             span.set_attribute(
-                                AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+                                AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
+                                prompt_tokens,
                             )
                             span.set_attribute(
-                                AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
+                                AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS,
                                 completion_tokens,
                             )
                             span.set_attribute(
-                                AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+                                AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS,
                                 cache_read,
                             )
                             span.set_attribute(
-                                AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+                                AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS,
                                 cache_creation,
                             )
                             span.set_attribute(
@@ -138,7 +141,7 @@ def wrap_messages_stream_sync(tracer: Tracer, client: Anthropic) -> None:
                             )
 
                         span.set_attribute(
-                            AttributeKeys.GEN_AI_RESPONSE_MODEL, final_message.model
+                            AttributeKeys.JUDGMENT_LLM_MODEL_NAME, final_message.model
                         )
                     except Exception:
                         pass
@@ -173,7 +176,9 @@ def wrap_messages_stream_async(tracer: Tracer, client: AsyncAnthropic) -> None:
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
 
         ctx["model_name"] = kwargs.get("model", "")
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_REQUEST_MODEL, ctx["model_name"])
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
+        )
         ctx["accumulated_content"] = ""
 
     def mutate_hook(
@@ -252,18 +257,19 @@ def wrap_messages_stream_async(tracer: Tracer, client: AsyncAnthropic) -> None:
                                 cache_creation,
                             ) = _extract_anthropic_tokens(final_message.usage)
                             span.set_attribute(
-                                AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+                                AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
+                                prompt_tokens,
                             )
                             span.set_attribute(
-                                AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS,
+                                AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS,
                                 completion_tokens,
                             )
                             span.set_attribute(
-                                AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+                                AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS,
                                 cache_read,
                             )
                             span.set_attribute(
-                                AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+                                AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS,
                                 cache_creation,
                             )
                             span.set_attribute(
@@ -272,7 +278,7 @@ def wrap_messages_stream_async(tracer: Tracer, client: AsyncAnthropic) -> None:
                             )
 
                         span.set_attribute(
-                            AttributeKeys.GEN_AI_RESPONSE_MODEL, final_message.model
+                            AttributeKeys.JUDGMENT_LLM_MODEL_NAME, final_message.model
                         )
                     except Exception:
                         pass

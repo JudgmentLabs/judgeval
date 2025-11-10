@@ -69,7 +69,7 @@ def _wrap_non_streaming_sync(
         )
         ctx["model_name"] = prefixed_model_name
         ctx["span"].set_attribute(
-            AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME, prefixed_model_name
         )
 
     def post_hook(ctx: Dict[str, Any], result: ChatCompletionResponse) -> None:
@@ -83,15 +83,19 @@ def _wrap_non_streaming_sync(
             prompt_tokens, completion_tokens, _, _ = _extract_together_tokens(
                 result.usage
             )
-            span.set_attribute(AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens)
             span.set_attribute(
-                AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+                AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
+                prompt_tokens,
             )
             span.set_attribute(
-                AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(result.usage)
+                AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
+            )
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_USAGE_METADATA,
+                safe_serialize(result.usage),
             )
 
-        span.set_attribute(AttributeKeys.GEN_AI_RESPONSE_MODEL, ctx["model_name"])
+        span.set_attribute(AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"])
 
     def error_hook(ctx: Dict[str, Any], error: Exception) -> None:
         span = ctx.get("span")
@@ -126,7 +130,7 @@ def _wrap_streaming_sync(
         )
         ctx["model_name"] = prefixed_model_name
         ctx["span"].set_attribute(
-            AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME, prefixed_model_name
         )
         ctx["accumulated_content"] = ""
 
@@ -154,13 +158,15 @@ def _wrap_streaming_sync(
                     chunk.usage
                 )
                 span.set_attribute(
-                    AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+                    AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
+                    prompt_tokens,
                 )
                 span.set_attribute(
-                    AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+                    AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
                 )
                 span.set_attribute(
-                    AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(chunk.usage)
+                    AttributeKeys.JUDGMENT_USAGE_METADATA,
+                    safe_serialize(chunk.usage),
                 )
 
         def post_hook_inner(inner_ctx: Dict[str, Any]) -> None:
@@ -227,7 +233,7 @@ def _wrap_non_streaming_async(
         )
         ctx["model_name"] = prefixed_model_name
         ctx["span"].set_attribute(
-            AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME, prefixed_model_name
         )
 
     def post_hook(ctx: Dict[str, Any], result: ChatCompletionResponse) -> None:
@@ -241,15 +247,19 @@ def _wrap_non_streaming_async(
             prompt_tokens, completion_tokens, _, _ = _extract_together_tokens(
                 result.usage
             )
-            span.set_attribute(AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens)
             span.set_attribute(
-                AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+                AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
+                prompt_tokens,
             )
             span.set_attribute(
-                AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(result.usage)
+                AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
+            )
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_USAGE_METADATA,
+                safe_serialize(result.usage),
             )
 
-        span.set_attribute(AttributeKeys.GEN_AI_RESPONSE_MODEL, ctx["model_name"])
+        span.set_attribute(AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"])
 
     def error_hook(ctx: Dict[str, Any], error: Exception) -> None:
         span = ctx.get("span")
@@ -285,7 +295,7 @@ def _wrap_streaming_async(
         )
         ctx["model_name"] = prefixed_model_name
         ctx["span"].set_attribute(
-            AttributeKeys.GEN_AI_REQUEST_MODEL, prefixed_model_name
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME, prefixed_model_name
         )
         ctx["accumulated_content"] = ""
 
@@ -313,13 +323,15 @@ def _wrap_streaming_async(
                     chunk.usage
                 )
                 span.set_attribute(
-                    AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+                    AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
+                    prompt_tokens,
                 )
                 span.set_attribute(
-                    AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+                    AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
                 )
                 span.set_attribute(
-                    AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(chunk.usage)
+                    AttributeKeys.JUDGMENT_USAGE_METADATA,
+                    safe_serialize(chunk.usage),
                 )
 
         def post_hook_inner(inner_ctx: Dict[str, Any]) -> None:

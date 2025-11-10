@@ -90,7 +90,9 @@ def _wrap_non_streaming_sync(
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_REQUEST_MODEL, ctx["model_name"])
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
+        )
 
     def post_hook(ctx: Dict[str, Any], result: Message) -> None:
         span = ctx.get("span")
@@ -103,21 +105,26 @@ def _wrap_non_streaming_sync(
             prompt_tokens, completion_tokens, cache_read, cache_creation = (
                 _extract_anthropic_tokens(result.usage)
             )
-            span.set_attribute(AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens)
             span.set_attribute(
-                AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+                AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
+                prompt_tokens,
             )
             span.set_attribute(
-                AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
+                AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
             )
             span.set_attribute(
-                AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, cache_creation
+                AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
             )
             span.set_attribute(
-                AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(result.usage)
+                AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS,
+                cache_creation,
+            )
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_USAGE_METADATA,
+                safe_serialize(result.usage),
             )
 
-        span.set_attribute(AttributeKeys.GEN_AI_RESPONSE_MODEL, result.model)
+        span.set_attribute(AttributeKeys.JUDGMENT_LLM_MODEL_NAME, result.model)
 
     def error_hook(ctx: Dict[str, Any], error: Exception) -> None:
         span = ctx.get("span")
@@ -147,7 +154,9 @@ def _wrap_streaming_sync(
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_REQUEST_MODEL, ctx["model_name"])
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
+        )
         ctx["accumulated_content"] = ""
 
     def mutate_hook(
@@ -174,16 +183,16 @@ def _wrap_streaming_sync(
                     _extract_anthropic_tokens(usage_data)
                 )
                 span.set_attribute(
-                    AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+                    AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS, prompt_tokens
                 )
                 span.set_attribute(
-                    AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+                    AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
                 )
                 span.set_attribute(
-                    AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
+                    AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
                 )
                 span.set_attribute(
-                    AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+                    AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS,
                     cache_creation,
                 )
                 span.set_attribute(
@@ -249,7 +258,9 @@ def _wrap_non_streaming_async(
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_REQUEST_MODEL, ctx["model_name"])
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
+        )
 
     def post_hook(ctx: Dict[str, Any], result: Message) -> None:
         span = ctx.get("span")
@@ -262,21 +273,26 @@ def _wrap_non_streaming_async(
             prompt_tokens, completion_tokens, cache_read, cache_creation = (
                 _extract_anthropic_tokens(result.usage)
             )
-            span.set_attribute(AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens)
             span.set_attribute(
-                AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+                AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
+                prompt_tokens,
             )
             span.set_attribute(
-                AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
+                AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
             )
             span.set_attribute(
-                AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, cache_creation
+                AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
             )
             span.set_attribute(
-                AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(result.usage)
+                AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS,
+                cache_creation,
+            )
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_USAGE_METADATA,
+                safe_serialize(result.usage),
             )
 
-        span.set_attribute(AttributeKeys.GEN_AI_RESPONSE_MODEL, result.model)
+        span.set_attribute(AttributeKeys.JUDGMENT_LLM_MODEL_NAME, result.model)
 
     def error_hook(ctx: Dict[str, Any], error: Exception) -> None:
         span = ctx.get("span")
@@ -307,7 +323,9 @@ def _wrap_streaming_async(
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_REQUEST_MODEL, ctx["model_name"])
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
+        )
         ctx["accumulated_content"] = ""
 
     def mutate_hook(
@@ -334,16 +352,16 @@ def _wrap_streaming_async(
                     _extract_anthropic_tokens(usage_data)
                 )
                 span.set_attribute(
-                    AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+                    AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS, prompt_tokens
                 )
                 span.set_attribute(
-                    AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+                    AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
                 )
                 span.set_attribute(
-                    AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
+                    AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
                 )
                 span.set_attribute(
-                    AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+                    AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS,
                     cache_creation,
                 )
                 span.set_attribute(

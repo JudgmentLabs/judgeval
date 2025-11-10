@@ -24,6 +24,10 @@ from judgeval.utils.wrappers import (
     immutable_wrap_sync_iterator,
     immutable_wrap_async_iterator,
 )
+from judgeval.v1.instrumentation.llm.llm_openai.utils import (
+    openai_tokens_converter,
+    set_cost_attribute,
+)
 
 if TYPE_CHECKING:
     from judgeval.v1.tracer import Tracer
@@ -63,7 +67,9 @@ def _wrap_non_streaming_sync(
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_REQUEST_MODEL, ctx["model_name"])
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
+        )
 
     def post_hook(ctx: Dict[str, Any], result: ChatCompletion) -> None:
         span = ctx.get("span")
@@ -81,22 +87,39 @@ def _wrap_non_streaming_sync(
             if prompt_tokens_details:
                 cache_read = prompt_tokens_details.cached_tokens or 0
 
-            span.set_attribute(AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens)
+            set_cost_attribute(span, usage_data)
+
+            prompt_tokens, completion_tokens, cache_read, cache_creation = (
+                openai_tokens_converter(
+                    prompt_tokens,
+                    completion_tokens,
+                    cache_read,
+                    0,
+                    usage_data.total_tokens,
+                )
+            )
+
             span.set_attribute(
-                AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+                AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
+                prompt_tokens,
             )
             span.set_attribute(
-                AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
+                AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
             )
             span.set_attribute(
-                AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
+                AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
             )
             span.set_attribute(
-                AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(usage_data)
+                AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
+            )
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_USAGE_METADATA,
+                safe_serialize(usage_data),
             )
 
         span.set_attribute(
-            AttributeKeys.GEN_AI_RESPONSE_MODEL, result.model or ctx["model_name"]
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME,
+            result.model or ctx["model_name"],
         )
 
     def error_hook(ctx: Dict[str, Any], error: Exception) -> None:
@@ -127,7 +150,9 @@ def _wrap_streaming_sync(
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_REQUEST_MODEL, ctx["model_name"])
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
+        )
         ctx["accumulated_content"] = ""
 
     def mutate_kwargs_hook(ctx: Dict[str, Any], kwargs: Any) -> Any:
@@ -163,20 +188,34 @@ def _wrap_streaming_sync(
                 if chunk.usage.prompt_tokens_details:
                     cache_read = chunk.usage.prompt_tokens_details.cached_tokens or 0
 
+                set_cost_attribute(span, chunk.usage)
+
+                prompt_tokens, completion_tokens, cache_read, cache_creation = (
+                    openai_tokens_converter(
+                        prompt_tokens,
+                        completion_tokens,
+                        cache_read,
+                        0,
+                        chunk.usage.total_tokens,
+                    )
+                )
+
                 span.set_attribute(
-                    AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+                    AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
+                    prompt_tokens,
                 )
                 span.set_attribute(
-                    AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+                    AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
                 )
                 span.set_attribute(
-                    AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
+                    AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
                 )
                 span.set_attribute(
-                    AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
+                    AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
                 )
                 span.set_attribute(
-                    AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(chunk.usage)
+                    AttributeKeys.JUDGMENT_USAGE_METADATA,
+                    safe_serialize(chunk.usage),
                 )
 
         def post_hook_inner(inner_ctx: Dict[str, Any]) -> None:
@@ -239,7 +278,9 @@ def _wrap_non_streaming_async(
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_REQUEST_MODEL, ctx["model_name"])
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
+        )
 
     def post_hook(ctx: Dict[str, Any], result: ChatCompletion) -> None:
         span = ctx.get("span")
@@ -257,22 +298,39 @@ def _wrap_non_streaming_async(
             if prompt_tokens_details:
                 cache_read = prompt_tokens_details.cached_tokens or 0
 
-            span.set_attribute(AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens)
+            set_cost_attribute(span, usage_data)
+
+            prompt_tokens, completion_tokens, cache_read, cache_creation = (
+                openai_tokens_converter(
+                    prompt_tokens,
+                    completion_tokens,
+                    cache_read,
+                    0,
+                    usage_data.total_tokens,
+                )
+            )
+
             span.set_attribute(
-                AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+                AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
+                prompt_tokens,
             )
             span.set_attribute(
-                AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
+                AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
             )
             span.set_attribute(
-                AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
+                AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
             )
             span.set_attribute(
-                AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(usage_data)
+                AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
+            )
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_USAGE_METADATA,
+                safe_serialize(usage_data),
             )
 
         span.set_attribute(
-            AttributeKeys.GEN_AI_RESPONSE_MODEL, result.model or ctx["model_name"]
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME,
+            result.model or ctx["model_name"],
         )
 
     def error_hook(ctx: Dict[str, Any], error: Exception) -> None:
@@ -304,7 +362,9 @@ def _wrap_streaming_async(
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_REQUEST_MODEL, ctx["model_name"])
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
+        )
         ctx["accumulated_content"] = ""
 
     def mutate_kwargs_hook(ctx: Dict[str, Any], kwargs: Any) -> Any:
@@ -340,20 +400,34 @@ def _wrap_streaming_async(
                 if chunk.usage.prompt_tokens_details:
                     cache_read = chunk.usage.prompt_tokens_details.cached_tokens or 0
 
+                set_cost_attribute(span, chunk.usage)
+
+                prompt_tokens, completion_tokens, cache_read, cache_creation = (
+                    openai_tokens_converter(
+                        prompt_tokens,
+                        completion_tokens,
+                        cache_read,
+                        0,
+                        chunk.usage.total_tokens,
+                    )
+                )
+
                 span.set_attribute(
-                    AttributeKeys.GEN_AI_USAGE_INPUT_TOKENS, prompt_tokens
+                    AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
+                    prompt_tokens,
                 )
                 span.set_attribute(
-                    AttributeKeys.GEN_AI_USAGE_OUTPUT_TOKENS, completion_tokens
+                    AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
                 )
                 span.set_attribute(
-                    AttributeKeys.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
+                    AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
                 )
                 span.set_attribute(
-                    AttributeKeys.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
+                    AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
                 )
                 span.set_attribute(
-                    AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(chunk.usage)
+                    AttributeKeys.JUDGMENT_USAGE_METADATA,
+                    safe_serialize(chunk.usage),
                 )
 
         def post_hook_inner(inner_ctx: Dict[str, Any]) -> None:

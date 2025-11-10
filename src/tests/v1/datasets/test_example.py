@@ -43,12 +43,11 @@ def test_set_property_returns_self():
 
 
 def test_create_method():
-    example = Example()
-    result = example.create(
+    example = Example.create(
         input="test input", output="test output", context="test context"
     )
 
-    assert result is example
+    assert isinstance(example, Example)
     assert example.get_property("input") == "test input"
     assert example.get_property("output") == "test output"
     assert example.get_property("context") == "test context"
