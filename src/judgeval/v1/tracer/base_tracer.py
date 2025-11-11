@@ -14,6 +14,8 @@ from opentelemetry.trace import Span, SpanContext, Status, StatusCode
 from judgeval.logger import judgeval_logger
 from judgeval.utils.decorators.dont_throw import dont_throw
 from judgeval.v1.data.example import Example
+from judgeval.v1.instrumentation import wrap_provider
+from judgeval.v1.instrumentation.llm.providers import ApiClient
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.internal.api.api_types import (
     ExampleEvaluationRun,
@@ -496,6 +498,9 @@ class BaseTracer(ABC):
                     detach(token)
 
             return sync_wrapper  # type: ignore[return-value]
+
+    def wrap(self, client: ApiClient) -> ApiClient:
+        return wrap_provider(self, client)
 
 
 def _format_inputs(

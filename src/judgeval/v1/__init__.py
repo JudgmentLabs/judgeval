@@ -2,13 +2,9 @@ from __future__ import annotations
 
 from typing import Optional
 
+from functools import cached_property
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
-from judgeval.v1.datasets.dataset_factory import DatasetFactory
-from judgeval.v1.evaluation.evaluation_factory import EvaluationFactory
-from judgeval.v1.scorers.scorers_factory import ScorersFactory
-from judgeval.v1.tracer.tracer_factory import TracerFactory
-from judgeval.v1.trainers.trainers_factory import TrainersFactory
 
 
 class JudgmentClient:
@@ -39,32 +35,42 @@ class JudgmentClient:
             self._organization_id,
         )
 
-    @property
-    def Tracer(self) -> TracerFactory:
+    @cached_property
+    def Tracer(self):
+        from judgeval.v1.tracer.tracer_factory import TracerFactory
+
         return TracerFactory(
             client=self._internal_client,
         )
 
-    @property
-    def Scorers(self) -> ScorersFactory:
+    @cached_property
+    def Scorers(self):
+        from judgeval.v1.scorers.scorers_factory import ScorersFactory
+
         return ScorersFactory(
             client=self._internal_client,
         )
 
-    @property
-    def Evaluation(self) -> EvaluationFactory:
+    @cached_property
+    def Evaluation(self):
+        from judgeval.v1.evaluation.evaluation_factory import EvaluationFactory
+
         return EvaluationFactory(
             client=self._internal_client,
         )
 
-    @property
-    def Trainers(self) -> TrainersFactory:
+    @cached_property
+    def Trainers(self):
+        from judgeval.v1.trainers.trainers_factory import TrainersFactory
+
         return TrainersFactory(
             client=self._internal_client,
         )
 
-    @property
-    def Datasets(self) -> DatasetFactory:
+    @cached_property
+    def Datasets(self):
+        from judgeval.v1.datasets.dataset_factory import DatasetFactory
+
         return DatasetFactory(
             client=self._internal_client,
         )

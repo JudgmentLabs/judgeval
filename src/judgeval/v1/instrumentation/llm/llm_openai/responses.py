@@ -29,7 +29,7 @@ from judgeval.v1.instrumentation.llm.llm_openai.utils import (
 )
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer import Tracer
+    from judgeval.v1.tracer import BaseTracer
     from openai import OpenAI, AsyncOpenAI
     from openai.types.responses import Response
 
@@ -37,7 +37,7 @@ P = ParamSpec("P")
 T = TypeVar("T")
 
 
-def wrap_responses_create_sync(tracer: Tracer, client: OpenAI) -> None:
+def wrap_responses_create_sync(tracer: BaseTracer, client: OpenAI) -> None:
     original_func = client.responses.create
 
     def dispatcher(*args: Any, **kwargs: Any) -> Any:
@@ -53,7 +53,7 @@ def wrap_responses_create_sync(tracer: Tracer, client: OpenAI) -> None:
 
 
 def _wrap_responses_non_streaming_sync(
-    tracer: Tracer, original_func: Callable[..., Response]
+    tracer: BaseTracer, original_func: Callable[..., Response]
 ) -> Callable[..., Response]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
         ctx["span"] = tracer.get_tracer().start_span(
@@ -133,7 +133,7 @@ def _wrap_responses_non_streaming_sync(
 
 
 def _wrap_responses_streaming_sync(
-    tracer: Tracer, original_func: Callable[..., Iterator[Any]]
+    tracer: BaseTracer, original_func: Callable[..., Iterator[Any]]
 ) -> Callable[..., Iterator[Any]]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
         ctx["span"] = tracer.get_tracer().start_span(
@@ -250,7 +250,7 @@ def _wrap_responses_streaming_sync(
     )
 
 
-def wrap_responses_create_async(tracer: Tracer, client: AsyncOpenAI) -> None:
+def wrap_responses_create_async(tracer: BaseTracer, client: AsyncOpenAI) -> None:
     original_func = client.responses.create
 
     async def dispatcher(*args: Any, **kwargs: Any) -> Any:
@@ -266,7 +266,7 @@ def wrap_responses_create_async(tracer: Tracer, client: AsyncOpenAI) -> None:
 
 
 def _wrap_responses_non_streaming_async(
-    tracer: Tracer, original_func: Callable[..., Awaitable[Response]]
+    tracer: BaseTracer, original_func: Callable[..., Awaitable[Response]]
 ) -> Callable[..., Awaitable[Response]]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
         ctx["span"] = tracer.get_tracer().start_span(
@@ -346,7 +346,7 @@ def _wrap_responses_non_streaming_async(
 
 
 def _wrap_responses_streaming_async(
-    tracer: Tracer, original_func: Callable[..., Awaitable[AsyncIterator[Any]]]
+    tracer: BaseTracer, original_func: Callable[..., Awaitable[AsyncIterator[Any]]]
 ) -> Callable[..., Awaitable[AsyncIterator[Any]]]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
         ctx["span"] = tracer.get_tracer().start_span(

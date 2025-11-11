@@ -12,20 +12,20 @@ from judgeval.v1.instrumentation.llm.llm_anthropic.messages_stream import (
 )
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer import Tracer
+    from judgeval.v1.tracer import BaseTracer
     from anthropic import Anthropic, AsyncAnthropic
 
     TClient = Union[Anthropic, AsyncAnthropic]
 
 
-def wrap_anthropic_client_sync(tracer: Tracer, client: Anthropic) -> Anthropic:
+def wrap_anthropic_client_sync(tracer: BaseTracer, client: Anthropic) -> Anthropic:
     wrap_messages_create_sync(tracer, client)
     wrap_messages_stream_sync(tracer, client)
     return client
 
 
 def wrap_anthropic_client_async(
-    tracer: Tracer, client: AsyncAnthropic
+    tracer: BaseTracer, client: AsyncAnthropic
 ) -> AsyncAnthropic:
     wrap_messages_create_async(tracer, client)
     wrap_messages_stream_async(tracer, client)
@@ -33,12 +33,14 @@ def wrap_anthropic_client_async(
 
 
 @typing.overload
-def wrap_anthropic_client(tracer: Tracer, client: Anthropic) -> Anthropic: ...
+def wrap_anthropic_client(tracer: BaseTracer, client: Anthropic) -> Anthropic: ...
 @typing.overload
-def wrap_anthropic_client(tracer: Tracer, client: AsyncAnthropic) -> AsyncAnthropic: ...
+def wrap_anthropic_client(
+    tracer: BaseTracer, client: AsyncAnthropic
+) -> AsyncAnthropic: ...
 
 
-def wrap_anthropic_client(tracer: Tracer, client: TClient) -> TClient:
+def wrap_anthropic_client(tracer: BaseTracer, client: TClient) -> TClient:
     from judgeval.v1.instrumentation.llm.llm_anthropic.config import HAS_ANTHROPIC
     from judgeval.logger import judgeval_logger
 

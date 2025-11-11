@@ -24,7 +24,7 @@ from judgeval.utils.wrappers import (
 )
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer import Tracer
+    from judgeval.v1.tracer import BaseTracer
     from anthropic import Anthropic, AsyncAnthropic
     from anthropic.types import (
         Message,
@@ -70,7 +70,7 @@ def _extract_anthropic_chunk_usage(
     return None
 
 
-def wrap_messages_create_sync(tracer: Tracer, client: Anthropic) -> None:
+def wrap_messages_create_sync(tracer: BaseTracer, client: Anthropic) -> None:
     original_func = client.messages.create
 
     def dispatcher(*args: Any, **kwargs: Any) -> Any:
@@ -82,7 +82,7 @@ def wrap_messages_create_sync(tracer: Tracer, client: Anthropic) -> None:
 
 
 def _wrap_non_streaming_sync(
-    tracer: Tracer, original_func: Callable[..., Message]
+    tracer: BaseTracer, original_func: Callable[..., Message]
 ) -> Callable[..., Message]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
         ctx["span"] = tracer.get_tracer().start_span(
@@ -146,7 +146,7 @@ def _wrap_non_streaming_sync(
 
 
 def _wrap_streaming_sync(
-    tracer: Tracer, original_func: Callable[..., Iterator[RawMessageStreamEvent]]
+    tracer: BaseTracer, original_func: Callable[..., Iterator[RawMessageStreamEvent]]
 ) -> Callable[..., Iterator[RawMessageStreamEvent]]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
         ctx["span"] = tracer.get_tracer().start_span(
@@ -238,7 +238,7 @@ def _wrap_streaming_sync(
     )
 
 
-def wrap_messages_create_async(tracer: Tracer, client: AsyncAnthropic) -> None:
+def wrap_messages_create_async(tracer: BaseTracer, client: AsyncAnthropic) -> None:
     original_func = client.messages.create
 
     async def dispatcher(*args: Any, **kwargs: Any) -> Any:
@@ -250,7 +250,7 @@ def wrap_messages_create_async(tracer: Tracer, client: AsyncAnthropic) -> None:
 
 
 def _wrap_non_streaming_async(
-    tracer: Tracer, original_func: Callable[..., Awaitable[Message]]
+    tracer: BaseTracer, original_func: Callable[..., Awaitable[Message]]
 ) -> Callable[..., Awaitable[Message]]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
         ctx["span"] = tracer.get_tracer().start_span(
@@ -314,7 +314,7 @@ def _wrap_non_streaming_async(
 
 
 def _wrap_streaming_async(
-    tracer: Tracer,
+    tracer: BaseTracer,
     original_func: Callable[..., Awaitable[AsyncIterator[RawMessageStreamEvent]]],
 ) -> Callable[..., Awaitable[AsyncIterator[RawMessageStreamEvent]]]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:

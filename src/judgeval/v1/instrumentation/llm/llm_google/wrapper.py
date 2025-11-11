@@ -6,11 +6,11 @@ from judgeval.v1.instrumentation.llm.llm_google.generate_content import (
 )
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer import Tracer
+    from judgeval.v1.tracer import BaseTracer
     from google.genai import Client
 
 
-def wrap_google_client(tracer: Tracer, client: Client) -> Client:
+def wrap_google_client(tracer: BaseTracer, client: Client) -> Client:
     from judgeval.v1.instrumentation.llm.llm_google.config import HAS_GOOGLE_GENAI
     from judgeval.logger import judgeval_logger
 

@@ -21,7 +21,7 @@ from judgeval.v1.instrumentation.llm.llm_openai.utils import (
 )
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer import Tracer
+    from judgeval.v1.tracer import BaseTracer
     from openai import OpenAI, AsyncOpenAI
     from openai.types.chat.parsed_chat_completion import ParsedChatCompletion
 
@@ -29,14 +29,14 @@ P = ParamSpec("P")
 T = TypeVar("T")
 
 
-def wrap_beta_chat_completions_parse_sync(tracer: Tracer, client: OpenAI) -> None:
+def wrap_beta_chat_completions_parse_sync(tracer: BaseTracer, client: OpenAI) -> None:
     original_func = client.beta.chat.completions.parse
     wrapped = _wrap_beta_non_streaming_sync(tracer, original_func)
     setattr(client.beta.chat.completions, "parse", wrapped)
 
 
 def _wrap_beta_non_streaming_sync(
-    tracer: Tracer, original_func: Callable[P, ParsedChatCompletion[T]]
+    tracer: BaseTracer, original_func: Callable[P, ParsedChatCompletion[T]]
 ) -> Callable[P, ParsedChatCompletion[T]]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
         ctx["span"] = tracer.get_tracer().start_span(
@@ -118,14 +118,16 @@ def _wrap_beta_non_streaming_sync(
     )
 
 
-def wrap_beta_chat_completions_parse_async(tracer: Tracer, client: AsyncOpenAI) -> None:
+def wrap_beta_chat_completions_parse_async(
+    tracer: BaseTracer, client: AsyncOpenAI
+) -> None:
     original_func = client.beta.chat.completions.parse
     wrapped = _wrap_beta_non_streaming_async(tracer, original_func)
     setattr(client.beta.chat.completions, "parse", wrapped)
 
 
 def _wrap_beta_non_streaming_async(
-    tracer: Tracer, original_func: Callable[P, Awaitable[ParsedChatCompletion[T]]]
+    tracer: BaseTracer, original_func: Callable[P, Awaitable[ParsedChatCompletion[T]]]
 ) -> Callable[P, Awaitable[ParsedChatCompletion[T]]]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
         ctx["span"] = tracer.get_tracer().start_span(

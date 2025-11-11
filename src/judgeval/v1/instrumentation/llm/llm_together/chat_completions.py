@@ -23,7 +23,7 @@ from judgeval.utils.wrappers import (
 )
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer import Tracer
+    from judgeval.v1.tracer import BaseTracer
     from together import Together, AsyncTogether  # type: ignore[import-untyped]
     from together.types import ChatCompletionResponse, ChatCompletionChunk  # type: ignore[import-untyped]
     from together.types.common import UsageData  # type: ignore[import-untyped]
@@ -44,7 +44,7 @@ def _extract_together_tokens(usage: UsageData) -> tuple[int, int, int, int]:
     )
 
 
-def wrap_chat_completions_create_sync(tracer: Tracer, client: Together) -> None:
+def wrap_chat_completions_create_sync(tracer: BaseTracer, client: Together) -> None:
     original_func = client.chat.completions.create
 
     def dispatcher(*args: Any, **kwargs: Any) -> Any:
@@ -56,7 +56,7 @@ def wrap_chat_completions_create_sync(tracer: Tracer, client: Together) -> None:
 
 
 def _wrap_non_streaming_sync(
-    tracer: Tracer, original_func: Callable[..., ChatCompletionResponse]
+    tracer: BaseTracer, original_func: Callable[..., ChatCompletionResponse]
 ) -> Callable[..., ChatCompletionResponse]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
         ctx["span"] = tracer.get_tracer().start_span(
@@ -117,7 +117,7 @@ def _wrap_non_streaming_sync(
 
 
 def _wrap_streaming_sync(
-    tracer: Tracer, original_func: Callable[..., Iterator[ChatCompletionChunk]]
+    tracer: BaseTracer, original_func: Callable[..., Iterator[ChatCompletionChunk]]
 ) -> Callable[..., Iterator[ChatCompletionChunk]]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
         ctx["span"] = tracer.get_tracer().start_span(
@@ -208,7 +208,9 @@ def _wrap_streaming_sync(
     )
 
 
-def wrap_chat_completions_create_async(tracer: Tracer, client: AsyncTogether) -> None:
+def wrap_chat_completions_create_async(
+    tracer: BaseTracer, client: AsyncTogether
+) -> None:
     original_func = client.chat.completions.create
 
     async def dispatcher(*args: Any, **kwargs: Any) -> Any:
@@ -220,7 +222,7 @@ def wrap_chat_completions_create_async(tracer: Tracer, client: AsyncTogether) ->
 
 
 def _wrap_non_streaming_async(
-    tracer: Tracer, original_func: Callable[..., Awaitable[ChatCompletionResponse]]
+    tracer: BaseTracer, original_func: Callable[..., Awaitable[ChatCompletionResponse]]
 ) -> Callable[..., Awaitable[ChatCompletionResponse]]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
         ctx["span"] = tracer.get_tracer().start_span(
@@ -281,7 +283,7 @@ def _wrap_non_streaming_async(
 
 
 def _wrap_streaming_async(
-    tracer: Tracer,
+    tracer: BaseTracer,
     original_func: Callable[..., Awaitable[AsyncIterator[ChatCompletionChunk]]],
 ) -> Callable[..., Awaitable[AsyncIterator[ChatCompletionChunk]]]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:

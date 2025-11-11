@@ -1,9 +1,7 @@
 from __future__ import annotations
 
+from functools import cached_property
 from judgeval.v1.internal.api import JudgmentSyncClient
-from judgeval.v1.scorers.built_in.built_in_factory import BuiltInScorersFactory
-from judgeval.v1.scorers.custom_scorer.custom_scorer_factory import CustomScorerFactory
-from judgeval.v1.scorers.prompt_scorer.prompt_scorer_factory import PromptScorerFactory
 
 
 class ScorersFactory:
@@ -15,24 +13,38 @@ class ScorersFactory:
     ):
         self._client = client
 
-    @property
-    def prompt_scorer(self) -> PromptScorerFactory:
+    @cached_property
+    def prompt_scorer(self):
+        from judgeval.v1.scorers.prompt_scorer.prompt_scorer_factory import (
+            PromptScorerFactory,
+        )
+
         return PromptScorerFactory(
             client=self._client,
             is_trace=False,
         )
 
-    @property
-    def trace_prompt_scorer(self) -> PromptScorerFactory:
+    @cached_property
+    def trace_prompt_scorer(self):
+        from judgeval.v1.scorers.prompt_scorer.prompt_scorer_factory import (
+            PromptScorerFactory,
+        )
+
         return PromptScorerFactory(
             client=self._client,
             is_trace=True,
         )
 
-    @property
-    def custom_scorer(self) -> CustomScorerFactory:
+    @cached_property
+    def custom_scorer(self):
+        from judgeval.v1.scorers.custom_scorer.custom_scorer_factory import (
+            CustomScorerFactory,
+        )
+
         return CustomScorerFactory()
 
-    @property
-    def built_in(self) -> BuiltInScorersFactory:
+    @cached_property
+    def built_in(self):
+        from judgeval.v1.scorers.built_in.built_in_factory import BuiltInScorersFactory
+
         return BuiltInScorersFactory()

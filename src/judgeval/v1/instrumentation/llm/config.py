@@ -12,7 +12,7 @@ from judgeval.v1.instrumentation.llm.providers import (
 )
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer import Tracer
+    from judgeval.v1.tracer.base_tracer import BaseTracer
 
 
 def _detect_provider(client: ApiClient) -> ProviderType:
@@ -48,7 +48,7 @@ def _detect_provider(client: ApiClient) -> ProviderType:
     return ProviderType.DEFAULT
 
 
-def wrap_provider(tracer: Tracer, client: ApiClient) -> ApiClient:
+def wrap_provider(tracer: BaseTracer, client: ApiClient) -> ApiClient:
     """
     Wraps an API client to add tracing capabilities.
     Supports OpenAI, Together, Anthropic, and Google GenAI clients.

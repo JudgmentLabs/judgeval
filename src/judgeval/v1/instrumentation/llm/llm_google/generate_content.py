@@ -12,7 +12,7 @@ from judgeval.utils.serialize import safe_serialize
 from judgeval.utils.wrappers import immutable_wrap_sync
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer import Tracer
+    from judgeval.v1.tracer import BaseTracer
     from google.genai import Client
     from google.genai.types import (
         GenerateContentResponse,
@@ -49,7 +49,7 @@ def _format_google_output(
     return response.text, response.usage_metadata
 
 
-def wrap_generate_content_sync(tracer: Tracer, client: Client) -> None:
+def wrap_generate_content_sync(tracer: BaseTracer, client: Client) -> None:
     original_func = client.models.generate_content
 
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:

@@ -9,29 +9,34 @@ from judgeval.v1.instrumentation.llm.llm_together.chat_completions import (
 
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer import Tracer
+    from judgeval.v1.tracer import BaseTracer
     from together import Together, AsyncTogether  # type: ignore[import-untyped]
 
     TClient = Union[Together, AsyncTogether]
 
 
-def wrap_together_client_sync(tracer: Tracer, client: Together) -> Together:
+def wrap_together_client_sync(tracer: BaseTracer, client: Together) -> Together:
     wrap_chat_completions_create_sync(tracer, client)
     return client
 
 
-def wrap_together_client_async(tracer: Tracer, client: AsyncTogether) -> AsyncTogether:
+def wrap_together_client_async(
+    tracer: BaseTracer, client: AsyncTogether
+) -> AsyncTogether:
     wrap_chat_completions_create_async(tracer, client)
     return client
 
 
 @typing.overload
-def wrap_together_client(tracer: Tracer, client: Together) -> Together: ...
+def wrap_together_client(tracer: BaseTracer, client: Together) -> Together: ...
 @typing.overload
-def wrap_together_client(tracer: Tracer, client: AsyncTogether) -> AsyncTogether: ...  # type: ignore[overload-cannot-match]
+def wrap_together_client(
+    tracer: BaseTracer,
+    client: AsyncTogether,  # type: ignore[overload-cannot-match]
+) -> AsyncTogether: ...
 
 
-def wrap_together_client(tracer: Tracer, client: TClient) -> TClient:
+def wrap_together_client(tracer: BaseTracer, client: TClient) -> TClient:
     from judgeval.v1.instrumentation.llm.llm_together.config import HAS_TOGETHER
     from judgeval.logger import judgeval_logger
 

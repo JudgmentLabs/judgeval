@@ -19,7 +19,7 @@ from judgeval.v1.instrumentation.llm.llm_anthropic.messages import (
 )
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer import Tracer
+    from judgeval.v1.tracer import BaseTracer
     from anthropic import Anthropic, AsyncAnthropic
     from anthropic.lib.streaming import (
         MessageStreamManager,
@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     )
 
 
-def wrap_messages_stream_sync(tracer: Tracer, client: Anthropic) -> None:
+def wrap_messages_stream_sync(tracer: BaseTracer, client: Anthropic) -> None:
     original_func = client.messages.stream
 
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
@@ -165,7 +165,7 @@ def wrap_messages_stream_sync(tracer: Tracer, client: Anthropic) -> None:
     setattr(client.messages, "stream", wrapped)
 
 
-def wrap_messages_stream_async(tracer: Tracer, client: AsyncAnthropic) -> None:
+def wrap_messages_stream_async(tracer: BaseTracer, client: AsyncAnthropic) -> None:
     original_func = client.messages.stream
 
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:

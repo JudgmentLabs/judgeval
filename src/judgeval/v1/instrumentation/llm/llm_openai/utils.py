@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any
 from opentelemetry.trace import Span
 from judgeval.judgment_attribute_keys import AttributeKeys
