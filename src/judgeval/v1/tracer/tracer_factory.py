@@ -21,7 +21,7 @@ class TracerFactory:
         project_name: str,
         enable_evaluation: bool = True,
         serializer: Optional[Callable[[Any], str]] = None,
-        initialize: bool = False,
+        initialize: bool = True,
         **kwargs: Any,
     ) -> Tracer:
         if serializer is None:

@@ -21,7 +21,7 @@ class Tracer(BaseTracer):
         enable_evaluation: bool,
         api_client: JudgmentSyncClient,
         serializer: Callable[[Any], str],
-        initialize: bool = False,
+        initialize: bool,
     ):
         super().__init__(
             project_name=project_name,
