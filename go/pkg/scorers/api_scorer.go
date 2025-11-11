@@ -1,12 +1,12 @@
 // Package scorers provides legacy scorer functionality.
 //
-// Deprecated: Use github.com/JudgmentLabs/judgeval-go/v1 instead.
+// Deprecated: Use github.com/JudgmentLabs/judgeval/go/v1 instead.
 // This package will be removed in a future version.
 package scorers
 
 import (
-	"github.com/JudgmentLabs/judgeval-go/pkg/data"
-	"github.com/JudgmentLabs/judgeval-go/pkg/internal/api/models"
+	"github.com/JudgmentLabs/judgeval/go/pkg/data"
+	"github.com/JudgmentLabs/judgeval/go/pkg/internal/api/models"
 )
 
 type APIScorer struct {

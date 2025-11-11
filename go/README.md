@@ -5,7 +5,7 @@ Go SDK for [Judgeval](https://judgmentlabs.ai/) - Agent Behavior Monitoring fram
 ## Installation
 
 ```bash
-go get github.com/JudgmentLabs/judgeval-go
+go get github.com/JudgmentLabs/judgeval/go
 ```
 
 ## Setup
@@ -28,7 +28,7 @@ import (
     "context"
     "os"
 
-    v1 "github.com/JudgmentLabs/judgeval-go/v1"
+    v1 "github.com/JudgmentLabs/judgeval/go/v1"
 )
 
 func main() {

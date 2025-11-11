@@ -1,8 +1,8 @@
 package api_scorers
 
 import (
-	"github.com/JudgmentLabs/judgeval-go/pkg/data"
-	"github.com/JudgmentLabs/judgeval-go/pkg/scorers"
+	"github.com/JudgmentLabs/judgeval/go/pkg/data"
+	"github.com/JudgmentLabs/judgeval/go/pkg/scorers"
 )
 
 type AnswerRelevancyScorer struct {

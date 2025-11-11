@@ -1,6 +1,6 @@
 package v1
 
-import "github.com/JudgmentLabs/judgeval-go/v1/internal/api"
+import "github.com/JudgmentLabs/judgeval/go/v1/internal/api"
 
 type ScorersFactory struct {
 	client            *api.Client

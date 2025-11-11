@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/JudgmentLabs/judgeval-go/pkg/data"
-	"github.com/JudgmentLabs/judgeval-go/pkg/env"
-	"github.com/JudgmentLabs/judgeval-go/pkg/internal/api"
-	"github.com/JudgmentLabs/judgeval-go/pkg/internal/api/models"
-	"github.com/JudgmentLabs/judgeval-go/pkg/scorers"
+	"github.com/JudgmentLabs/judgeval/go/pkg/data"
+	"github.com/JudgmentLabs/judgeval/go/pkg/env"
+	"github.com/JudgmentLabs/judgeval/go/pkg/internal/api"
+	"github.com/JudgmentLabs/judgeval/go/pkg/internal/api/models"
+	"github.com/JudgmentLabs/judgeval/go/pkg/scorers"
 )
 
 type BasePromptScorer struct {

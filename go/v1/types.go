@@ -1,6 +1,6 @@
 package v1
 
-import "github.com/JudgmentLabs/judgeval-go/v1/internal/api/models"
+import "github.com/JudgmentLabs/judgeval/go/v1/internal/api/models"
 
 type APIScorerType string
 

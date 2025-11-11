@@ -1,13 +1,13 @@
 // Package data provides legacy data structures.
 //
-// Deprecated: Use github.com/JudgmentLabs/judgeval-go/v1 instead.
+// Deprecated: Use github.com/JudgmentLabs/judgeval/go/v1 instead.
 // This package will be removed in a future version.
 package data
 
 import (
 	"time"
 
-	"github.com/JudgmentLabs/judgeval-go/pkg/internal/api/models"
+	"github.com/JudgmentLabs/judgeval/go/pkg/internal/api/models"
 	"github.com/google/uuid"
 )
 

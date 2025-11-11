@@ -1,7 +1,7 @@
 package data
 
 import (
-	"github.com/JudgmentLabs/judgeval-go/pkg/internal/api/models"
+	"github.com/JudgmentLabs/judgeval/go/pkg/internal/api/models"
 )
 
 type TraceEvaluationRun struct {

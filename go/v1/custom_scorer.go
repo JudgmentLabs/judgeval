@@ -1,7 +1,7 @@
 package v1
 
 import (
-	"github.com/JudgmentLabs/judgeval-go/v1/internal/api/models"
+	"github.com/JudgmentLabs/judgeval/go/v1/internal/api/models"
 )
 
 type CustomScorerFactory struct{}

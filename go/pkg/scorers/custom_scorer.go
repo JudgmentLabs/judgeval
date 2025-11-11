@@ -1,7 +1,7 @@
 package scorers
 
 import (
-	"github.com/JudgmentLabs/judgeval-go/pkg/internal/api/models"
+	"github.com/JudgmentLabs/judgeval/go/pkg/internal/api/models"
 )
 
 type CustomScorer struct {

@@ -3,8 +3,8 @@ package v1
 import (
 	"errors"
 
-	"github.com/JudgmentLabs/judgeval-go/pkg/env"
-	"github.com/JudgmentLabs/judgeval-go/v1/internal/api"
+	"github.com/JudgmentLabs/judgeval/go/pkg/env"
+	"github.com/JudgmentLabs/judgeval/go/v1/internal/api"
 )
 
 type Judgeval struct {

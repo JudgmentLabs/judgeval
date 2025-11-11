@@ -1,4 +1,4 @@
-module github.com/JudgmentLabs/judgeval-go
+module github.com/JudgmentLabs/judgeval/go
 
 go 1.25.1
 

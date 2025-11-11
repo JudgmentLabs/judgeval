@@ -3,7 +3,7 @@ package data
 import (
 	"time"
 
-	"github.com/JudgmentLabs/judgeval-go/pkg/internal/api/models"
+	"github.com/JudgmentLabs/judgeval/go/pkg/internal/api/models"
 	"github.com/google/uuid"
 )
 

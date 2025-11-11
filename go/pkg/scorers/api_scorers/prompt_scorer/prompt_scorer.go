@@ -3,8 +3,8 @@ package prompt_scorer
 import (
 	"fmt"
 
-	"github.com/JudgmentLabs/judgeval-go/pkg/data"
-	"github.com/JudgmentLabs/judgeval-go/pkg/env"
+	"github.com/JudgmentLabs/judgeval/go/pkg/data"
+	"github.com/JudgmentLabs/judgeval/go/pkg/env"
 )
 
 type PromptScorer struct {

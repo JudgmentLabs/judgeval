@@ -1,6 +1,6 @@
 // Package tracer provides legacy tracing functionality.
 //
-// Deprecated: Use github.com/JudgmentLabs/judgeval-go/v1 instead.
+// Deprecated: Use github.com/JudgmentLabs/judgeval/go/v1 instead.
 // This package will be removed in a future version.
 package tracer
 
@@ -8,10 +8,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/JudgmentLabs/judgeval-go/pkg/internal/api"
-	"github.com/JudgmentLabs/judgeval-go/pkg/internal/api/models"
-	"github.com/JudgmentLabs/judgeval-go/pkg/logger"
-	"github.com/JudgmentLabs/judgeval-go/pkg/version"
+	"github.com/JudgmentLabs/judgeval/go/pkg/internal/api"
+	"github.com/JudgmentLabs/judgeval/go/pkg/internal/api/models"
+	"github.com/JudgmentLabs/judgeval/go/pkg/logger"
+	"github.com/JudgmentLabs/judgeval/go/pkg/version"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"

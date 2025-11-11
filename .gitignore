@@ -4,7 +4,6 @@
 .DS_Store
 *.log
 *.out
-*.xml
 *.key
 *.db
 *.sqlite

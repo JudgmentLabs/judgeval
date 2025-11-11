@@ -3,7 +3,7 @@ package v1
 import (
 	"maps"
 
-	"github.com/JudgmentLabs/judgeval-go/v1/internal/api/models"
+	"github.com/JudgmentLabs/judgeval/go/v1/internal/api/models"
 )
 
 type BaseScorer interface {

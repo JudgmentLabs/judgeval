@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/JudgmentLabs/judgeval-go/pkg/logger"
-	"github.com/JudgmentLabs/judgeval-go/v1/internal/api"
+	"github.com/JudgmentLabs/judgeval/go/pkg/logger"
+	"github.com/JudgmentLabs/judgeval/go/v1/internal/api"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )

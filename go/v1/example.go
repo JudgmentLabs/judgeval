@@ -4,7 +4,7 @@ import (
 	"maps"
 	"time"
 
-	"github.com/JudgmentLabs/judgeval-go/v1/internal/api/models"
+	"github.com/JudgmentLabs/judgeval/go/v1/internal/api/models"
 	"github.com/google/uuid"
 )
 
