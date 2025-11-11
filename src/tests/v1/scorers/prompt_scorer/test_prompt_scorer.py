@@ -137,7 +137,7 @@ def test_prompt_scorer_get_scorer_config():
 
     config = scorer.get_scorer_config()
 
-    assert config["score_type"] == "prompt_scorer"
+    assert config["score_type"] == "Prompt Scorer"
     assert config["threshold"] == 0.6
     assert config["name"] == "TestScorer"
     assert config["kwargs"]["prompt"] == "Test prompt"
@@ -150,7 +150,7 @@ def test_prompt_scorer_get_scorer_config_trace_mode():
     scorer = PromptScorer(name="TraceScorer", prompt="Test", is_trace=True)
 
     config = scorer.get_scorer_config()
-    assert config["score_type"] == "trace_prompt_scorer"
+    assert config["score_type"] == "Trace Prompt Scorer"
 
 
 def test_prompt_scorer_get_scorer_config_minimal():
@@ -158,7 +158,7 @@ def test_prompt_scorer_get_scorer_config_minimal():
 
     config = scorer.get_scorer_config()
 
-    assert config["score_type"] == "prompt_scorer"
+    assert config["score_type"] == "Prompt Scorer"
     assert config["kwargs"]["prompt"] == "Test"
     assert "options" not in config["kwargs"]
     assert "model" not in config["kwargs"]

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
+from judgeval.constants import APIScorerType
 from judgeval.v1.internal.api.api_types import ScorerConfig
 from judgeval.v1.scorers.api_scorer import APIScorer
 
@@ -28,7 +29,11 @@ class PromptScorer(APIScorer):
         organization_id: str = "",
         is_trace: bool = False,
     ):
-        score_type = "trace_prompt_scorer" if is_trace else "prompt_scorer"
+        score_type = (
+            APIScorerType.TRACE_PROMPT_SCORER
+            if is_trace
+            else APIScorerType.PROMPT_SCORER
+        )
         super().__init__(
             score_type=score_type,
             threshold=threshold,
