@@ -1,0 +1,111 @@
+name: Java Release
+
+on:
+  workflow_dispatch:
+  release:
+    types: [created]
+  push:
+    branches: [main]
+    paths:
+      - "java/**"
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+          cache: "maven"
+
+      - name: Test and Build
+        working-directory: java
+        run: mvn clean install -Dgpg.skip=true
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: judgeval-java-build
+          path: |
+            java/target/*.jar
+            java/target/*.pom
+          retention-days: 1
+
+  publish:
+    needs: test-and-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java and Maven Central Repository
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+          cache: "maven"
+          server-id: central
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: judgeval-java-build
+          path: java/target
+
+      - name: Verify POM groupId
+        working-directory: java
+        run: |
+          echo "Checking pom.xml for correct groupId..."
+          grep -E "<groupId>.*</groupId>" pom.xml | head -1
+          echo "Expected: <groupId>com.judgmentlabs</groupId>"
+
+      - name: Show Maven coordinates
+        working-directory: java
+        run: |
+          G=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.groupId)
+          A=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.artifactId)
+          V=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)
+          echo "Publishing: ${G}:${A}:${V}"
+
+      - name: Import GPG key
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 --decode | gpg --import --batch --yes
+          echo "use-agent" >> ~/.gnupg/gpg.conf
+          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          gpg-connect-agent reloadagent /bye
+          gpg --list-secret-keys --keyid-format LONG
+
+      - name: Deploy to Central Portal
+        working-directory: java
+        run: |
+          mvn -e --batch-mode deploy \
+            -DskipTests \
+            -Dmaven.install.skip=true \
+            -Dgpg.passphrase="${{ secrets.GPG_PASSPHRASE }}" \
+            -Dgpg.pinentry-mode=loopback \
+            -Dhttp.keepAlive=true \
+            -Dmaven.wagon.http.pool=false \
+            -Dmaven.wagon.httpconnectionManager.ttlSeconds=120 \
+            -Dmaven.wagon.http.retryHandler.count=3
+        env:
+          MAVEN_USERNAME: ${{ secrets.CENTRAL_PORTAL_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.CENTRAL_PORTAL_TOKEN }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Deployment Status
+        run: |
+          echo "Deployment completed successfully!"
+          echo "Artifacts uploaded to Central Portal"
+          echo "Check status at: https://central.sonatype.com/publishing/deployments"
+          echo ""
+          echo "Note: It may take 15-30 minutes for artifacts to sync to Maven Central"
+          echo "Once published, artifacts will be available at:"
+          echo "    https://central.sonatype.com/artifact/com.judgmentlabs/judgeval-java"

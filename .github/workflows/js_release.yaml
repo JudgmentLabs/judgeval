@@ -1,0 +1,91 @@
+name: JS Release
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    outputs:
+      exists: ${{ steps.tag-check.outputs.exists }}
+      version: ${{ steps.pkg.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: "1.2.22"
+
+      - name: Install and build
+        working-directory: js
+        run: |
+          bun install --frozen-lockfile
+          bun run check
+          bun run build
+
+      - name: Get version from package.json
+        working-directory: js
+        id: pkg
+        run: echo "version=$(bun -e "console.log(require('./package.json').version)")" >> $GITHUB_OUTPUT
+
+      - name: Check if tag exists
+        id: tag-check
+        run: |
+          if git rev-parse "v${{ steps.pkg.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create and push tag
+        if: steps.tag-check.outputs.exists == 'false'
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag v${{ steps.pkg.outputs.version }}
+          git push origin v${{ steps.pkg.outputs.version }}
+
+  publish:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+
+    if: needs.release.outputs.exists == 'false'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: "1.2.22"
+
+      - name: Install and build
+        working-directory: js
+        run: |
+          bun install
+          bun run check
+          bun run build
+
+      - name: Publish to npm
+        working-directory: js
+        run: bun publish --access public
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.release.outputs.version }}
+          name: Release v${{ needs.release.outputs.version }}
+          generate_release_notes: true

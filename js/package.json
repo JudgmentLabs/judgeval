@@ -1,0 +1,87 @@
+{
+  "name": "judgeval",
+  "version": "0.6.0",
+  "description": "JavaScript/TypeScript client for Judgment evaluation platform",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    },
+    "./v1": {
+      "import": "./dist/v1/index.mjs",
+      "require": "./dist/v1/index.cjs",
+      "types": "./dist/v1/index.d.ts"
+    },
+    "./umd": "./dist/index.umd.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "bun run check && bun run build:types && bun scripts/build.ts lib cjs umd",
+    "build:types": "tsc -p tsconfig.build.json",
+    "build:lib": "bun scripts/build.ts lib",
+    "build:cjs": "bun scripts/build.ts cjs",
+    "build:umd": "bun scripts/build.ts umd",
+    "build:dev": "bun run build:types && bun scripts/build.ts lib --dev",
+    "check": "tsc --noEmit && eslint src/**/*.ts --no-warn-ignored",
+    "lint": "eslint src/**/*.ts --no-warn-ignored",
+    "lint:fix": "eslint src/**/*.ts --fix --no-warn-ignored",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "generate-client": "bunx tsx scripts/generate-client.ts && bun run format",
+    "test": "bun test",
+    "clean": "rimraf dist",
+    "prepublishOnly": "bun run clean && bun run build",
+    "example": "bun scripts/run-example.ts"
+  },
+  "keywords": [
+    "judgment",
+    "evaluation",
+    "ai",
+    "llm",
+    "tracing",
+    "opentelemetry",
+    "typescript"
+  ],
+  "author": "Judgment Labs",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JudgmentLabs/judgeval.git",
+    "directory": "js"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/core": "^2.2.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.207.0",
+    "@opentelemetry/resources": "^2.2.0",
+    "@opentelemetry/sdk-node": "^0.207.0",
+    "@opentelemetry/sdk-trace-base": "^2.2.0",
+    "@opentelemetry/sdk-trace-node": "^2.2.0",
+    "@opentelemetry/sdk-trace-web": "^2.2.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.1",
+    "@types/node": "^24.10.0",
+    "@typescript-eslint/eslint-plugin": "^8.46.3",
+    "@typescript-eslint/parser": "^8.46.3",
+    "eslint": "^9.39.1",
+    "globals": "^16.5.0",
+    "jiti": "^2.6.1",
+    "prettier": "^3.6.2",
+    "rimraf": "^6.1.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "bun": ">=1.0.0"
+  }
+}

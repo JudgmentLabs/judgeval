@@ -1,0 +1,5 @@
+[install.lockfile]
+print = "yarn"
+
+[install]
+registry = "https://registry.npmjs.org"

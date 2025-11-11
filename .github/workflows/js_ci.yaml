@@ -1,0 +1,44 @@
+name: JS CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: "1.2.22"
+
+      - name: Install dependencies
+        working-directory: js
+        run: bun install
+
+      - name: Test
+        working-directory: js
+        run: bun test
+
+      - name: Build package
+        working-directory: js
+        run: bun run build
+
+      - name: Dry run publish
+        working-directory: js
+        run: bun publish --dry-run
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Check build output
+        working-directory: js
+        run: |
+          test -f dist/index.mjs
+          test -f dist/index.umd.js
+          test -f dist/index.cjs
+          test -f dist/index.d.ts

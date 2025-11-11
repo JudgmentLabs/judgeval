@@ -1,0 +1,36 @@
+name: Go CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "go/**"
+      - ".github/workflows/go_ci.yaml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache-dependency-path: go/go.sum
+
+      - name: Download dependencies
+        working-directory: go
+        run: go mod download
+
+      - name: Run tests
+        working-directory: go
+        run: go test -v ./...
+
+      - name: Run vet
+        working-directory: go
+        run: go vet ./...
+
+      - name: Build
+        working-directory: go
+        run: go build -v ./...

@@ -1,0 +1,52 @@
+name: Go Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "go/**"
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache-dependency-path: go/go.sum
+
+      - name: Download dependencies
+        working-directory: go
+        run: go mod download
+
+      - name: Run tests
+        working-directory: go
+        run: go test -v ./...
+
+      - name: Build
+        working-directory: go
+        run: go build -v ./...
+
+      - name: Get version from go.mod
+        working-directory: go
+        id: version
+        run: |
+          VERSION=$(grep "^module" go.mod | awk '{print $2}')
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Create release notes
+        run: |
+          echo "Go SDK Release" > release-notes.md
+          echo "" >> release-notes.md
+          echo "Module: ${{ steps.version.outputs.version }}" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "Install:" >> release-notes.md
+          echo '```bash' >> release-notes.md
+          echo "go get ${{ steps.version.outputs.version }}" >> release-notes.md
+          echo '```' >> release-notes.md

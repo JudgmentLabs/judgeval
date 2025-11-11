@@ -1,0 +1,43 @@
+name: Java CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "java/**"
+      - ".github/workflows/java_ci.yaml"
+
+jobs:
+  test-install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+
+      - name: Cache Maven packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('java/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      - name: Run Tests
+        working-directory: java
+        run: mvn -B test
+
+      - name: Test Install
+        working-directory: java
+        run: mvn -B -Dgpg.skip=true clean install
+
+      - name: Verify Build Artifacts
+        working-directory: java
+        run: |
+          echo "Checking build artifacts..."
+          ls -la target/ || true
+          echo "JAR files:"
+          find target -name "*.jar" -type f
