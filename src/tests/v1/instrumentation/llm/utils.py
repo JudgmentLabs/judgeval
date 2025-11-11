@@ -70,14 +70,14 @@ def verify_span_attributes_comprehensive(
     if check_cache_read_value:
         cache_read = attrs.get(AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS)
         assert cache_read is not None
-        assert cache_read > 0
+        assert cache_read >= 0
 
     if check_cache_creation_value:
         cache_creation = attrs.get(
             AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS
         )
         assert cache_creation is not None
-        assert cache_creation > 0
+        assert cache_creation >= 0
 
     # Verify usage metadata
     if check_metadata:

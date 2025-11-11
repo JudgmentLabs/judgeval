@@ -1,5 +1,5 @@
 import pytest
-from judgeval.v1 import JudgmentClient
+from judgeval.v1 import Judgeval
 from judgeval.v1.datasets.dataset_factory import DatasetFactory
 from judgeval.v1.evaluation.evaluation_factory import EvaluationFactory
 from judgeval.v1.scorers.scorers_factory import ScorersFactory
@@ -19,7 +19,7 @@ def test_client_initialization_with_credentials(monkeypatch):
     monkeypatch.setattr(v1_module, "JUDGMENT_ORG_ID", test_org)
     monkeypatch.setattr(v1_module, "JUDGMENT_API_URL", test_url)
 
-    client = JudgmentClient()
+    client = Judgeval()
 
     assert client._api_key == test_key
     assert client._organization_id == test_org
@@ -27,7 +27,7 @@ def test_client_initialization_with_credentials(monkeypatch):
 
 
 def test_client_initialization_with_explicit_credentials():
-    client = JudgmentClient(
+    client = Judgeval(
         api_key="explicit_key",
         organization_id="explicit_org",
         api_url="http://explicit.example.com",
@@ -46,7 +46,7 @@ def test_client_missing_api_key(monkeypatch):
     monkeypatch.setattr(v1_module, "JUDGMENT_API_URL", "http://test.example.com")
 
     with pytest.raises(ValueError, match="api_key is required"):
-        JudgmentClient()
+        Judgeval()
 
 
 def test_client_missing_organization_id(monkeypatch):
@@ -57,7 +57,7 @@ def test_client_missing_organization_id(monkeypatch):
     monkeypatch.setattr(v1_module, "JUDGMENT_API_URL", "http://test.example.com")
 
     with pytest.raises(ValueError, match="organization_id is required"):
-        JudgmentClient()
+        Judgeval()
 
 
 def test_client_api_url_default(monkeypatch):
@@ -68,13 +68,13 @@ def test_client_api_url_default(monkeypatch):
     monkeypatch.setattr(v1_module, "JUDGMENT_ORG_ID", f"org_{uuid.uuid4()}")
     monkeypatch.setattr(v1_module, "JUDGMENT_API_URL", "https://api.judgmentlabs.ai")
 
-    client = JudgmentClient()
+    client = Judgeval()
 
     assert client._api_url == "https://api.judgmentlabs.ai"
 
 
 def test_client_tracer_factory_property():
-    client = JudgmentClient(
+    client = Judgeval(
         api_key="test_key", organization_id="test_org", api_url="http://test.com"
     )
     tracer_factory = client.tracer
@@ -82,7 +82,7 @@ def test_client_tracer_factory_property():
 
 
 def test_client_scorers_factory_property():
-    client = JudgmentClient(
+    client = Judgeval(
         api_key="test_key", organization_id="test_org", api_url="http://test.com"
     )
     scorers_factory = client.scorers
@@ -90,7 +90,7 @@ def test_client_scorers_factory_property():
 
 
 def test_client_evaluation_factory_property():
-    client = JudgmentClient(
+    client = Judgeval(
         api_key="test_key", organization_id="test_org", api_url="http://test.com"
     )
     evaluation_factory = client.evaluation
@@ -98,7 +98,7 @@ def test_client_evaluation_factory_property():
 
 
 def test_client_trainers_factory_property():
-    client = JudgmentClient(
+    client = Judgeval(
         api_key="test_key", organization_id="test_org", api_url="http://test.com"
     )
     trainers_factory = client.trainers
@@ -106,7 +106,7 @@ def test_client_trainers_factory_property():
 
 
 def test_client_datasets_factory_property():
-    client = JudgmentClient(
+    client = Judgeval(
         api_key="test_key", organization_id="test_org", api_url="http://test.com"
     )
     datasets_factory = client.datasets

@@ -7,7 +7,7 @@ from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
 
 
-class JudgmentClient:
+class Judgeval:
     def __init__(
         self,
         api_key: Optional[str] = None,
@@ -76,4 +76,4 @@ class JudgmentClient:
         )
 
 
-__all__ = ["JudgmentClient"]
+__all__ = ["Judgeval"]
