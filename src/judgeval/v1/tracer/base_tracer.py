@@ -383,6 +383,8 @@ class BaseTracer(ABC):
                             AttributeKeys.JUDGMENT_INPUT, self.serializer(input_data)
                         )
 
+                        self.get_span_processor().emit_partial()
+
                         result = await func(*args, **kwargs)
 
                         span.set_attribute(
@@ -408,6 +410,8 @@ class BaseTracer(ABC):
                         span.set_attribute(
                             AttributeKeys.JUDGMENT_INPUT, self.serializer(input_data)
                         )
+
+                        self.get_span_processor().emit_partial()
 
                         result = func(*args, **kwargs)
 
