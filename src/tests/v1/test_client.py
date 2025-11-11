@@ -77,7 +77,7 @@ def test_client_tracer_factory_property():
     client = JudgmentClient(
         api_key="test_key", organization_id="test_org", api_url="http://test.com"
     )
-    tracer_factory = client.Tracer
+    tracer_factory = client.tracer
     assert isinstance(tracer_factory, TracerFactory)
 
 
@@ -85,7 +85,7 @@ def test_client_scorers_factory_property():
     client = JudgmentClient(
         api_key="test_key", organization_id="test_org", api_url="http://test.com"
     )
-    scorers_factory = client.Scorers
+    scorers_factory = client.scorers
     assert isinstance(scorers_factory, ScorersFactory)
 
 
@@ -93,7 +93,7 @@ def test_client_evaluation_factory_property():
     client = JudgmentClient(
         api_key="test_key", organization_id="test_org", api_url="http://test.com"
     )
-    evaluation_factory = client.Evaluation
+    evaluation_factory = client.evaluation
     assert isinstance(evaluation_factory, EvaluationFactory)
 
 
@@ -101,7 +101,7 @@ def test_client_trainers_factory_property():
     client = JudgmentClient(
         api_key="test_key", organization_id="test_org", api_url="http://test.com"
     )
-    trainers_factory = client.Trainers
+    trainers_factory = client.trainers
     assert isinstance(trainers_factory, TrainersFactory)
 
 
@@ -109,5 +109,5 @@ def test_client_datasets_factory_property():
     client = JudgmentClient(
         api_key="test_key", organization_id="test_org", api_url="http://test.com"
     )
-    datasets_factory = client.Datasets
+    datasets_factory = client.datasets
     assert isinstance(datasets_factory, DatasetFactory)

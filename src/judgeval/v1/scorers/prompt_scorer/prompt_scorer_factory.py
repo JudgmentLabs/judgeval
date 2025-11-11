@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
 
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.internal.api.api_types import (
@@ -74,42 +74,12 @@ class PromptScorerFactory:
                     500, f"Failed to fetch prompt scorer '{name}': {e}", None
                 )
 
-        return self._create_from_model(cached, name)
-
-    def create(
-        self,
-        name: str,
-        prompt: str,
-        threshold: float = 0.5,
-        options: Optional[Dict[str, float]] = None,
-        model: Optional[str] = None,
-        description: Optional[str] = None,
-    ) -> PromptScorer:
         return PromptScorer(
             name=name,
-            prompt=prompt,
-            threshold=threshold,
-            options=options,
-            model=model,
-            description=description,
-            is_trace=self._is_trace,
-        )
-
-    def _create_from_model(self, model: APIPromptScorer, name: str) -> PromptScorer:
-        options = model.get("options")
-        if options and isinstance(options, dict):
-            options = {
-                k: float(v) for k, v in options.items() if isinstance(v, (int, float))
-            }
-        else:
-            options = None
-
-        return PromptScorer(
-            name=name,
-            prompt=model.get("prompt", ""),
-            threshold=model.get("threshold", 0.5),
-            options=options,
-            model=model.get("model"),
-            description=model.get("description"),
+            prompt=cached.get("prompt", ""),
+            threshold=cached.get("threshold", 0.5),
+            options=cached.get("options"),
+            model=cached.get("model"),
+            description=cached.get("description"),
             is_trace=self._is_trace,
         )

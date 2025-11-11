@@ -5,12 +5,18 @@ import orjson
 import yaml
 from unittest.mock import MagicMock
 from judgeval.v1.datasets.dataset import Dataset, DatasetInfo
+from judgeval.v1.datasets.dataset_factory import DatasetFactory
 from judgeval.v1.data.example import Example
 
 
 @pytest.fixture
 def mock_client():
     return MagicMock()
+
+
+@pytest.fixture
+def factory(mock_client):
+    return DatasetFactory(mock_client)
 
 
 @pytest.fixture
@@ -28,7 +34,7 @@ def sample_examples():
     ]
 
 
-def test_dataset_get(mock_client, sample_examples):
+def test_dataset_get(factory, mock_client, sample_examples):
     mock_client.datasets_pull_for_judgeval.return_value = {
         "dataset_kind": "example",
         "examples": [
@@ -44,7 +50,7 @@ def test_dataset_get(mock_client, sample_examples):
         ],
     }
 
-    dataset = Dataset.get("test_dataset", "test_project", mock_client)
+    dataset = factory.get("test_dataset", "test_project")
 
     assert dataset.name == "test_dataset"
     assert dataset.project_name == "test_project"
@@ -55,13 +61,12 @@ def test_dataset_get(mock_client, sample_examples):
     mock_client.datasets_pull_for_judgeval.assert_called_once()
 
 
-def test_dataset_create(mock_client, sample_examples):
-    dataset = Dataset.create(
+def test_dataset_create(factory, mock_client, sample_examples):
+    dataset = factory.create(
         name="test_dataset",
         project_name="test_project",
         examples=sample_examples,
         overwrite=False,
-        client=mock_client,
     )
 
     assert dataset.name == "test_dataset"
@@ -70,7 +75,7 @@ def test_dataset_create(mock_client, sample_examples):
     mock_client.datasets_create_for_judgeval.assert_called_once()
 
 
-def test_dataset_list(mock_client):
+def test_dataset_list(factory, mock_client):
     mock_client.datasets_pull_all_for_judgeval.return_value = [
         {
             "dataset_id": "1",
@@ -90,7 +95,7 @@ def test_dataset_list(mock_client):
         },
     ]
 
-    datasets = Dataset.list("test_project", mock_client)
+    datasets = factory.list("test_project")
 
     assert len(datasets) == 2
     assert isinstance(datasets[0], DatasetInfo)

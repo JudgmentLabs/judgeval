@@ -36,7 +36,7 @@ class JudgmentClient:
         )
 
     @cached_property
-    def Tracer(self):
+    def tracer(self):
         from judgeval.v1.tracer.tracer_factory import TracerFactory
 
         return TracerFactory(
@@ -44,7 +44,7 @@ class JudgmentClient:
         )
 
     @cached_property
-    def Scorers(self):
+    def scorers(self):
         from judgeval.v1.scorers.scorers_factory import ScorersFactory
 
         return ScorersFactory(
@@ -52,7 +52,7 @@ class JudgmentClient:
         )
 
     @cached_property
-    def Evaluation(self):
+    def evaluation(self):
         from judgeval.v1.evaluation.evaluation_factory import EvaluationFactory
 
         return EvaluationFactory(
@@ -60,7 +60,7 @@ class JudgmentClient:
         )
 
     @cached_property
-    def Trainers(self):
+    def trainers(self):
         from judgeval.v1.trainers.trainers_factory import TrainersFactory
 
         return TrainersFactory(
@@ -68,7 +68,7 @@ class JudgmentClient:
         )
 
     @cached_property
-    def Datasets(self):
+    def datasets(self):
         from judgeval.v1.datasets.dataset_factory import DatasetFactory
 
         return DatasetFactory(
