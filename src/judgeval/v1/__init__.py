@@ -7,6 +7,8 @@ from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
 
 
 class Judgeval:
+    __slots__ = ("_api_key", "_organization_id", "_api_url", "_internal_client")
+
     def __init__(
         self,
         api_key: Optional[str] = None,
