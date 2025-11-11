@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Optional
 
-from functools import cached_property
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
 
@@ -35,7 +34,7 @@ class Judgeval:
             self._organization_id,
         )
 
-    @cached_property
+    @property
     def tracer(self):
         from judgeval.v1.tracer.tracer_factory import TracerFactory
 
@@ -43,7 +42,7 @@ class Judgeval:
             client=self._internal_client,
         )
 
-    @cached_property
+    @property
     def scorers(self):
         from judgeval.v1.scorers.scorers_factory import ScorersFactory
 
@@ -51,7 +50,7 @@ class Judgeval:
             client=self._internal_client,
         )
 
-    @cached_property
+    @property
     def evaluation(self):
         from judgeval.v1.evaluation.evaluation_factory import EvaluationFactory
 
@@ -59,7 +58,7 @@ class Judgeval:
             client=self._internal_client,
         )
 
-    @cached_property
+    @property
     def trainers(self):
         from judgeval.v1.trainers.trainers_factory import TrainersFactory
 
@@ -67,7 +66,7 @@ class Judgeval:
             client=self._internal_client,
         )
 
-    @cached_property
+    @property
     def datasets(self):
         from judgeval.v1.datasets.dataset_factory import DatasetFactory
 
