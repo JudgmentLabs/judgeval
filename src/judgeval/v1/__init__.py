@@ -74,5 +74,13 @@ class Judgeval:
             client=self._internal_client,
         )
 
+    @property
+    def prompts(self):
+        from judgeval.v1.prompts.prompt_factory import PromptFactory
+
+        return PromptFactory(
+            client=self._internal_client,
+        )
+
 
 __all__ = ["Judgeval"]

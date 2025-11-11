@@ -2,6 +2,7 @@ from abc import ABC
 from judgeval.v1.tracer import Tracer
 from judgeval.logger import judgeval_logger
 from judgeval.utils.url import url_for
+from judgeval.v1.utils import resolve_project_id
 
 
 try:
@@ -22,7 +23,7 @@ class Openlit(ABC):
         organization_id = tracer.api_client.organization_id
         project_name = tracer.project_name
 
-        project_id = tracer._resolve_project_id(project_name)
+        project_id = resolve_project_id(tracer.api_client, project_name)
         if not project_id:
             judgeval_logger.warning(
                 f"Project {project_name} not found. Please create it first at https://app.judgmentlabs.ai/org/{organization_id}/projects."

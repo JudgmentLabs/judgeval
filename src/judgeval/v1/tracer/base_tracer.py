@@ -17,6 +17,7 @@ from judgeval.v1.data.example import Example
 from judgeval.v1.instrumentation import wrap_provider
 from judgeval.v1.instrumentation.llm.providers import ApiClient
 from judgeval.v1.internal.api import JudgmentSyncClient
+from judgeval.v1.utils import resolve_project_id
 from judgeval.v1.internal.api.api_types import (
     ExampleEvaluationRun,
     TraceEvaluationRun,
@@ -61,7 +62,7 @@ class BaseTracer(ABC):
         self.enable_evaluation = enable_evaluation
         self.api_client = api_client
         self.serializer = serializer
-        self.project_id = self._resolve_project_id(project_name)
+        self.project_id = resolve_project_id(api_client, project_name)
 
         if self.project_id is None:
             judgeval_logger.error(
@@ -238,14 +239,6 @@ class BaseTracer(ABC):
             )
         except Exception as e:
             judgeval_logger.error(f"Failed to serialize trace evaluation: {e}")
-
-    def _resolve_project_id(self, name: str) -> Optional[str]:
-        try:
-            response = self.api_client.projects_resolve({"project_name": name})
-            project_id = response.get("project_id")
-            return str(project_id)
-        except Exception:
-            return None
 
     def _build_endpoint(self, base_url: str) -> str:
         return (
