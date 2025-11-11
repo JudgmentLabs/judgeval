@@ -30,9 +30,9 @@ def wrap_together_client_async(
 @typing.overload
 def wrap_together_client(tracer: BaseTracer, client: Together) -> Together: ...
 @typing.overload
-def wrap_together_client(
+def wrap_together_client(  # type: ignore[overload-cannot-match]
     tracer: BaseTracer,
-    client: AsyncTogether,  # type: ignore[overload-cannot-match]
+    client: AsyncTogether,
 ) -> AsyncTogether: ...
 
 
