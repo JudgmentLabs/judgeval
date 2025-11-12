@@ -46,6 +46,10 @@ class MockTracer:
         """No-op for tests"""
         pass
 
+    def set_llm_span(self):
+        """No-op for tests - v1 tracer compatibility"""
+        pass
+
 
 @pytest.fixture
 def mock_processor():
