@@ -1,12 +1,19 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
-
+import sys
 from judgeval.logger import judgeval_logger
 
 if TYPE_CHECKING:
     from judgeval.v1.tracer.base_tracer import BaseTracer
 
 __all__ = ["setup_claude_agent_sdk"]
+
+try:
+    import claude_agent_sdk  # type: ignore
+except ImportError:
+    raise ImportError(
+        "Claude Agent SDK is not installed and required for the claude agent sdk integration. Please install it with `pip install claude-agent-sdk`."
+    )
 
 
 def setup_claude_agent_sdk(
@@ -40,9 +47,6 @@ def setup_claude_agent_sdk(
     )
 
     try:
-        import sys
-        import claude_agent_sdk
-
         # Store original classes before patching
         original_client = (
             claude_agent_sdk.ClaudeSDKClient
@@ -110,9 +114,6 @@ def setup_claude_agent_sdk(
         judgeval_logger.info("Claude Agent SDK integration setup successful")
         return True
 
-    except ImportError as e:
-        judgeval_logger.error(f"Failed to import Claude Agent SDK: {e}")
-        judgeval_logger.error(
-            "claude-agent-sdk is not installed. Please install it with: pip install claude-agent-sdk"
-        )
+    except Exception as e:
+        judgeval_logger.error(f"Failed to setup Claude Agent SDK integration: {e}")
         return False
