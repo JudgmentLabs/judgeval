@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 from judgeval.v1.internal.api import JudgmentSyncClient
 
 if TYPE_CHECKING:
-    from judgeval.trainer.config import TrainerConfig
-    from judgeval.trainer.trainable_model import TrainableModel
+    from judgeval.v1.trainers.config import TrainerConfig
+    from judgeval.v1.trainers.trainable_model import TrainableModel
     from judgeval.v1.tracer.tracer import Tracer
 
 
