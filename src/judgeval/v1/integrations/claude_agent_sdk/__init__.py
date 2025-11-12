@@ -1,21 +1,3 @@
-"""
-Judgeval integration for Claude Agent SDK with automatic tracing.
-
-Usage (imports can be before or after setup):
-
-    from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions
-    from judgeval.integrations.claude_agent_sdk import setup_claude_agent_sdk
-
-    setup_claude_agent_sdk(project_name="my-project")
-
-    # Use normally - all calls are automatically traced
-    options = ClaudeAgentOptions(model="claude-sonnet-4-5-20250929")
-    async with ClaudeSDKClient(options=options) as client:
-        await client.query("Hello!")
-        async for message in client.receive_response():
-            print(message)
-"""
-
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
@@ -44,7 +26,7 @@ def setup_claude_agent_sdk(
         import claude_agent_sdk
         from judgeval.v1.integrations.claude_agent_sdk import setup_claude_agent_sdk
 
-        tracer = BaseTracer(project_name="my-project")
+        tracer = Tracer(project_name="my-project")
         setup_claude_agent_sdk(tracer=tracer)
 
         # Now use claude_agent_sdk normally - all calls automatically traced
