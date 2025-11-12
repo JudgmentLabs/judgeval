@@ -81,6 +81,7 @@ dev = [
     "openlit>=1.35.5",
     "dotenv>=0.9.9",
     "datasets>=4.4.1",
+    "claude-agent-sdk>=0.1.6",
 ]
 
 

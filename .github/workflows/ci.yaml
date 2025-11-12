@@ -47,6 +47,10 @@ jobs:
           pip install uv
           uv sync --dev
 
+      - name: Install Claude Code CLI
+        run: |
+          npm install -g @anthropic-ai/claude-code
+
       - name: Run tests
         run: |
           cd src
