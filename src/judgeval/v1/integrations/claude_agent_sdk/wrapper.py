@@ -446,7 +446,6 @@ def _create_llm_span_for_messages(
         },
     )
     llm_span = llm_span_context.__enter__()
-    tracer.set_llm_span()
 
     # Record attributes
     if model:
