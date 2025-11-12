@@ -2,7 +2,7 @@ import pytest
 import os
 from typing import Any, Dict
 
-from judgeval.integrations.claude_agent_sdk import setup_claude_agent_sdk
+from judgeval.v1.integrations.claude_agent_sdk import setup_claude_agent_sdk
 from tests.tracer.integrations.claude_agent_sdk.utils import (
     find_spans_by_kind,
     verify_agent_span,
