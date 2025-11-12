@@ -10,7 +10,8 @@ from tests.tracer.integrations.claude_agent_sdk.utils import (
     verify_tool_span,
 )
 
-# Skip these tests if no API key or if running in CI
+# Skip these tests if no API key is set
+# Note: Claude Code CLI must be installed (npm install -g @anthropic-ai/claude-code)
 pytestmark = pytest.mark.skipif(
     not os.environ.get("ANTHROPIC_API_KEY"),
     reason="ANTHROPIC_API_KEY not set - skipping real API tests",
