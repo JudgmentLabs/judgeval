@@ -1,3 +1,4 @@
+import time
 from fireworks import LLM  # type: ignore[import-not-found]
 from .config import TrainerConfig, ModelConfig
 from typing import Optional, Dict, Any, Callable
@@ -159,31 +160,39 @@ class TrainableModel:
                 f"Failed to advance to training step {step}: {str(e)}"
             ) from e
 
-    def perform_reinforcement_step(self, dataset, step: int):
+    def perform_reinforcement_step(
+        self, dataset, step: int, max_retries: int = 3, initial_backoff: float = 1.0
+    ):
         """
         Perform a reinforcement learning step using the current model.
 
         Args:
             dataset: Training dataset for the reinforcement step
             step: Current step number for output model naming
+            max_retries: Maximum number of retry attempts (default: 3)
+            initial_backoff: Initial backoff time in seconds for exponential backoff (default: 1.0)
 
         Returns:
             Training job object
         """
-        try:
-            model_name = f"{self.config.model_id}-v{step + 1}"
-            return self._current_model.reinforcement_step(
-                dataset=dataset,
-                output_model=model_name,
-                epochs=self.config.epochs,
-                learning_rate=self.config.learning_rate,
-                accelerator_count=self.config.accelerator_count,
-                accelerator_type=self.config.accelerator_type,
-            )
-        except Exception as e:
-            raise JudgmentRuntimeError(
-                f"Failed to start reinforcement learning step {step + 1}: {str(e)}"
-            ) from e
+        model_name = f"{self.config.model_id}-v{step + 1}"
+
+        for attempt in range(max_retries):
+            try:
+                return self._current_model.reinforcement_step(
+                    dataset=dataset,
+                    output_model=model_name,
+                    epochs=self.config.epochs,
+                    learning_rate=self.config.learning_rate,
+                )
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    backoff_time = initial_backoff * (2**attempt)
+                    time.sleep(backoff_time)
+                else:
+                    raise JudgmentRuntimeError(
+                        f"Failed to start reinforcement learning step {step + 1} after {max_retries} attempts: {str(e)}"
+                    ) from e
 
     def get_model_config(
         self, training_params: Optional[Dict[str, Any]] = None

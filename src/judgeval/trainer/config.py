@@ -1,11 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Dict, Any, TYPE_CHECKING
+from typing import Optional, Dict, Any
 import json
-
-if TYPE_CHECKING:
-    from fireworks.llm.llm_reinforcement_step import ReinforcementAcceleratorTypeLiteral  # type: ignore[import-not-found]
 
 
 @dataclass
@@ -23,8 +20,6 @@ class TrainerConfig:
     concurrency: int = 100
     epochs: int = 1
     learning_rate: float = 1e-5
-    accelerator_count: int = 1
-    accelerator_type: ReinforcementAcceleratorTypeLiteral = "NVIDIA_A100_80GB"
     temperature: float = 1.5
     max_tokens: int = 50
     enable_addons: bool = True

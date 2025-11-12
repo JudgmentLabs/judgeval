@@ -306,8 +306,6 @@ class FireworksTrainer(BaseTrainer):
             "num_generations_per_prompt": self.config.num_generations_per_prompt,
             "epochs": self.config.epochs,
             "learning_rate": self.config.learning_rate,
-            "accelerator_count": self.config.accelerator_count,
-            "accelerator_type": self.config.accelerator_type,
             "temperature": self.config.temperature,
             "max_tokens": self.config.max_tokens,
         }
@@ -370,8 +368,6 @@ class FireworksTrainer(BaseTrainer):
                 step_num,
                 self.config.num_steps,
             )
-
-            dataset.delete()
 
         _print_progress("All training steps completed!")
 
