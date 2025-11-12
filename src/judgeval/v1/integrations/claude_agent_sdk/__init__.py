@@ -22,13 +22,13 @@ from typing import TYPE_CHECKING
 from judgeval.logger import judgeval_logger
 
 if TYPE_CHECKING:
-    from judgeval.tracer import Tracer
+    from judgeval.v1.tracer.base_tracer import BaseTracer
 
 __all__ = ["setup_claude_agent_sdk"]
 
 
 def setup_claude_agent_sdk(
-    tracer: "Tracer",
+    tracer: "BaseTracer",
 ) -> bool:
     """
     Setup Judgeval integration with Claude Agent SDK. Will automatically patch the SDK for automatic tracing.
@@ -42,15 +42,15 @@ def setup_claude_agent_sdk(
     Example:
         ```python
         import claude_agent_sdk
-        from judgeval.integrations.claude_agent_sdk import setup_claude_agent_sdk
+        from judgeval.v1.integrations.claude_agent_sdk import setup_claude_agent_sdk
 
-        tracer = Tracer(project_name="my-project")
+        tracer = BaseTracer(project_name="my-project")
         setup_claude_agent_sdk(tracer=tracer)
 
         # Now use claude_agent_sdk normally - all calls automatically traced
         ```
     """
-    from judgeval.integrations.claude_agent_sdk.wrapper import (
+    from judgeval.v1.integrations.claude_agent_sdk.wrapper import (
         _create_client_wrapper_class,
         _create_tool_wrapper_class,
         _wrap_tool_factory,
@@ -78,7 +78,6 @@ def setup_claude_agent_sdk(
         original_query_fn = (
             claude_agent_sdk.query if hasattr(claude_agent_sdk, "query") else None
         )
-        print(f"original_query_fn: {original_query_fn}")
 
         # Patch ClaudeSDKClient
         if original_client:

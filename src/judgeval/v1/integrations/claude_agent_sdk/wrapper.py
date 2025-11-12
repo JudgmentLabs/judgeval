@@ -23,7 +23,7 @@ from judgeval.tracer.utils import set_span_attribute
 from judgeval.utils.serialize import safe_serialize
 
 if TYPE_CHECKING:
-    from judgeval.tracer import Tracer
+    from judgeval.v1.tracer.tracer import BaseTracer
 
 # Thread-local storage to propagate parent span context to tool handlers
 # Claude Agent SDK breaks OpenTelemetry's automatic context propagation
@@ -43,7 +43,7 @@ class LLMSpanTracker:
     start time to ensure sequential timing (no overlapping LLM spans).
     """
 
-    def __init__(self, tracer: "Tracer", query_start_time: Optional[float] = None):
+    def __init__(self, tracer: "BaseTracer", query_start_time: Optional[float] = None):
         self.tracer = tracer
         self.current_span: Optional[Any] = None
         self.current_span_context: Optional[Any] = None
@@ -92,7 +92,9 @@ class LLMSpanTracker:
         self.current_span_context = None
 
 
-def _create_client_wrapper_class(original_client_class: Any, tracer: "Tracer") -> Any:
+def _create_client_wrapper_class(
+    original_client_class: Any, tracer: "BaseTracer"
+) -> Any:
     """Creates a wrapper class for ClaudeSDKClient that wraps query and receive_response."""
 
     class WrappedClaudeSDKClient(original_client_class):  # type: ignore
@@ -126,7 +128,6 @@ def _create_client_wrapper_class(original_client_class: Any, tracer: "Tracer") -
                 },
             )
             agent_span = agent_span_context.__enter__()
-            tracer._inject_judgment_context(agent_span)
 
             # Record input
             if self.__last_prompt:
@@ -205,7 +206,7 @@ def _create_client_wrapper_class(original_client_class: Any, tracer: "Tracer") -
     return WrappedClaudeSDKClient
 
 
-def _create_tool_wrapper_class(original_tool_class: Any, tracer: "Tracer") -> Any:
+def _create_tool_wrapper_class(original_tool_class: Any, tracer: "BaseTracer") -> Any:
     """Creates a wrapper class for SdkMcpTool that wraps handlers."""
 
     class WrappedSdkMcpTool(original_tool_class):  # type: ignore
@@ -227,7 +228,7 @@ def _create_tool_wrapper_class(original_tool_class: Any, tracer: "Tracer") -> An
 
 
 def _wrap_query_function(
-    original_query_fn: Any, tracer: "Tracer"
+    original_query_fn: Any, tracer: "BaseTracer"
 ) -> Callable[..., Any]:
     """Wraps the standalone query() function to add tracing."""
 
@@ -241,7 +242,6 @@ def _wrap_query_function(
             },
         )
         agent_span = agent_span_context.__enter__()
-        tracer._inject_judgment_context(agent_span)
 
         # Capture prompt if available
         prompt = kwargs.get("prompt") or (args[0] if args else None)
@@ -318,7 +318,7 @@ def _wrap_query_function(
     return wrapped_query
 
 
-def _wrap_tool_factory(tool_fn: Any, tracer: "Tracer") -> Callable[..., Any]:
+def _wrap_tool_factory(tool_fn: Any, tracer: "BaseTracer") -> Callable[..., Any]:
     """Wraps the tool() factory function to return wrapped tools."""
 
     def wrapped_tool(*args: Any, **kwargs: Any) -> Any:
@@ -348,7 +348,7 @@ def _wrap_tool_factory(tool_fn: Any, tracer: "Tracer") -> Callable[..., Any]:
 
 
 def _wrap_tool_handler(
-    tracer: "Tracer", handler: Any, tool_name: Any
+    tracer: "BaseTracer", handler: Any, tool_name: Any
 ) -> Callable[..., Any]:
     """Wraps a tool handler to add tracing.
 
@@ -381,8 +381,6 @@ def _wrap_tool_handler(
         try:
             # Set this span as active in the context
             with trace.use_span(span, end_on_exit=True):
-                tracer._inject_judgment_context(span)
-
                 # Record input
                 set_span_attribute(
                     span, AttributeKeys.JUDGMENT_INPUT, safe_serialize(args)
@@ -411,7 +409,7 @@ def _wrap_tool_handler(
 
 
 def _create_llm_span_for_messages(
-    tracer: "Tracer",
+    tracer: "BaseTracer",
     messages: List[Any],  # List of AssistantMessage objects
     prompt: Any,
     conversation_history: List[Dict[str, Any]],
@@ -448,7 +446,7 @@ def _create_llm_span_for_messages(
         },
     )
     llm_span = llm_span_context.__enter__()
-    tracer._inject_judgment_context(llm_span)
+    tracer.set_llm_span()
 
     # Record attributes
     if model:
