@@ -1,13 +1,48 @@
-export * from "./data";
-export * from "./env";
-export * from "./scorers";
-export * from "./tracer";
-export * from "./utils/annotate";
-export * from "./utils/logger";
-export * from "./utils/types";
+export { Judgeval, type JudgevalConfig } from "./Judgeval";
 
-export { JudgmentClient } from "./judgment-client";
-export { BrowserTracer } from "./tracer/BrowserTracer";
-export { NodeTracer } from "./tracer/NodeTracer";
+export {
+  Example,
+  ScorerData,
+  ScoringResult,
+  type ExampleConfig,
+  type ScorerDataConfig,
+  type ScoringResultConfig,
+} from "./data";
 
-export * as v1 from "./v1";
+export {
+  AnswerCorrectnessScorer,
+  AnswerRelevancyScorer,
+  APIScorer,
+  BaseScorer,
+  BuiltInScorersFactory,
+  CustomScorer,
+  CustomScorerFactory,
+  FaithfulnessScorer,
+  PromptScorer,
+  PromptScorerFactory,
+  ScorersFactory,
+  type AnswerCorrectnessScorerConfig,
+  type AnswerRelevancyScorerConfig,
+  type CustomScorerConfig,
+  type FaithfulnessScorerConfig,
+  type PromptScorerConfig,
+} from "./scorers";
+
+export {
+  BaseTracer,
+  BrowserTracer,
+  BrowserTracerFactory,
+  JudgmentSpanExporter,
+  NodeTracer,
+  NodeTracerFactory,
+  NoOpSpanExporter,
+  type BrowserTracerConfig,
+  type NodeTracerConfig,
+  type Serializer,
+} from "./tracer";
+
+export {
+  Evaluation,
+  EvaluationFactory,
+  type EvaluationConfig,
+} from "./evaluation";

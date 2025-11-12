@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	v1 "github.com/JudgmentLabs/judgeval/go/v1"
+	judgeval "github.com/JudgmentLabs/judgeval/go"
 	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
@@ -17,8 +17,8 @@ import (
 
 type ChatClient struct {
 	client         openai.Client
-	judgmentClient *v1.Judgeval
-	tracer         *v1.Tracer
+	judgmentClient *judgeval.Judgeval
+	tracer         *judgeval.Tracer
 }
 
 func NewChatClient(apiKey string) (*ChatClient, error) {
@@ -35,7 +35,7 @@ func NewChatClient(apiKey string) (*ChatClient, error) {
 	}, nil
 }
 
-func (c *ChatClient) SetJudgeval(judgmentClient *v1.Judgeval, tracer *v1.Tracer) {
+func (c *ChatClient) SetJudgeval(judgmentClient *judgeval.Judgeval, tracer *judgeval.Tracer) {
 	c.judgmentClient = judgmentClient
 	c.tracer = tracer
 }
@@ -82,10 +82,10 @@ func handleMessage(ctx context.Context, chatClient *ChatClient, userInput string
 	messages = append(messages, openai.AssistantMessage(botMessage))
 
 	if chatClient.tracer != nil && chatClient.judgmentClient != nil {
-		chatClient.tracer.AsyncEvaluate(spanCtx, chatClient.judgmentClient.Scorers.BuiltIn.AnswerCorrectness(v1.AnswerCorrectnessScorerParams{
-			Threshold: v1.Float(0.7),
-		}), v1.NewExample(v1.ExampleParams{
-			Name: v1.String(fmt.Sprintf("chat-message-%d", messageCount)),
+		chatClient.tracer.AsyncEvaluate(spanCtx, chatClient.judgmentClient.Scorers.BuiltIn.AnswerCorrectness(judgeval.AnswerCorrectnessScorerParams{
+			Threshold: judgeval.Float(0.7),
+		}), judgeval.NewExample(judgeval.ExampleParams{
+			Name: judgeval.String(fmt.Sprintf("chat-message-%d", messageCount)),
 			Properties: map[string]any{
 				"input":           "You are a helpful assistant. Echo whatever the user says. Do not do anything else.",
 				"actual_output":   botMessage,
@@ -111,19 +111,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	var tracer *v1.Tracer
-	var judgmentClient *v1.Judgeval
+	var tracer *judgeval.Tracer
+	var judgmentClient *judgeval.Judgeval
 	if os.Getenv("JUDGMENT_API_URL") != "" && os.Getenv("JUDGMENT_API_KEY") != "" {
-		client, err := v1.NewJudgeval(
-			v1.WithAPIKey(os.Getenv("JUDGMENT_API_KEY")),
-			v1.WithOrganizationID(os.Getenv("JUDGMENT_ORG_ID")),
+		client, err := judgeval.NewJudgeval(
+			judgeval.WithAPIKey(os.Getenv("JUDGMENT_API_KEY")),
+			judgeval.WithOrganizationID(os.Getenv("JUDGMENT_ORG_ID")),
 		)
 		if err != nil {
 			fmt.Printf("Warning: Failed to create Judgment client: %v\n", err)
 		} else {
 			judgmentClient = client
 			ctx := context.Background()
-			tracer, err = client.Tracer.Create(ctx, v1.TracerCreateParams{
+			tracer, err = client.Tracer.Create(ctx, judgeval.TracerCreateParams{
 				ProjectName: "default_project",
 			})
 			if err != nil {
@@ -142,7 +142,7 @@ func main() {
 	ctx, span := tracer.StartSpan(context.Background(), "main")
 	defer tracer.EndSpan(span)
 
-	tracer.AsyncEvaluate(ctx, judgmentClient.Scorers.CustomScorer.Get("Helpfulness Scorer", "HelpfulnessScorer"), v1.NewExample(v1.ExampleParams{
+	tracer.AsyncEvaluate(ctx, judgmentClient.Scorers.CustomScorer.Get("Helpfulness Scorer", "HelpfulnessScorer"), judgeval.NewExample(judgeval.ExampleParams{
 		Properties: map[string]any{
 			"question": "test",
 			"answer":   "test",

@@ -3,79 +3,102 @@ import {
   BatchSpanProcessor,
   WebTracerProvider,
 } from "@opentelemetry/sdk-trace-web";
+import { JudgmentApiClient } from "../internal/api";
+import { Logger } from "../utils/logger";
 import { VERSION } from "../version";
-import { OpenTelemetryKeys } from "./OpenTelemetryKeys";
-import { Tracer, TracerInitializeOptions } from "./Tracer";
-import { TracerConfiguration } from "./TracerConfiguration";
+import { BaseTracer, type Serializer } from "./BaseTracer";
 
-export type BrowserTracerInitializeOptions = TracerInitializeOptions & {};
+export interface BrowserTracerConfig {
+  projectName: string;
+  enableEvaluation?: boolean;
+  enableMonitoring?: boolean;
+  serializer?: Serializer;
+  resourceAttributes?: Record<string, unknown>;
+  initialize?: boolean;
+}
 
-export class BrowserTracer extends Tracer {
-  private webTracerProvider?: WebTracerProvider;
+interface InternalBrowserTracerConfig
+  extends Required<Omit<BrowserTracerConfig, "resourceAttributes">> {
+  resourceAttributes: Record<string, unknown>;
+}
 
-  public async initialize(
-    options: BrowserTracerInitializeOptions = {},
+export class BrowserTracer extends BaseTracer {
+  private webTracerProvider: WebTracerProvider | null = null;
+  private resourceAttributes: Record<string, unknown>;
+
+  private constructor(
+    projectName: string,
+    enableEvaluation: boolean,
+    apiClient: JudgmentApiClient,
+    serializer: Serializer,
+    resourceAttributes: Record<string, unknown>,
+  ) {
+    super(projectName, enableEvaluation, apiClient, serializer);
+    this.resourceAttributes = resourceAttributes;
+  }
+
+  static async create(
+    config: InternalBrowserTracerConfig,
+    apiClient: JudgmentApiClient,
   ): Promise<BrowserTracer> {
-    if (this._initialized) {
-      return this;
+    const tracer = new BrowserTracer(
+      config.projectName,
+      config.enableEvaluation,
+      apiClient,
+      config.serializer,
+      config.resourceAttributes,
+    );
+
+    await tracer.resolveAndSetProjectId();
+
+    if (config.initialize) {
+      await tracer.initialize();
+    }
+
+    return tracer;
+  }
+
+  /* eslint-disable @typescript-eslint/require-await */
+  async initialize(): Promise<void> {
+    if (this.webTracerProvider !== null) {
+      Logger.warn("BrowserTracer already initialized");
+      return;
     }
 
     try {
-      const resourceAttributes = {
-        [OpenTelemetryKeys.ResourceKeys.SERVICE_NAME]:
-          this.configuration.projectName,
-        [OpenTelemetryKeys.ResourceKeys.TELEMETRY_SDK_VERSION]: VERSION,
-        ...this.configuration.resourceAttributes,
-        ...options.resourceAttributes,
+      const attributes = {
+        "service.name": this.projectName,
+        "telemetry.sdk.version": VERSION,
+        ...this.resourceAttributes,
       };
 
-      const spanExporter = await this.getSpanExporter();
+      const spanExporter = this.getSpanExporter();
 
       this.webTracerProvider = new WebTracerProvider({
-        resource: resourceFromAttributes(resourceAttributes),
+        resource: resourceFromAttributes(attributes),
         spanProcessors: [new BatchSpanProcessor(spanExporter)],
-        ...options,
       });
 
       this.webTracerProvider.register();
-
-      this._initialized = true;
-      return this;
+      Logger.info("BrowserTracer initialized successfully");
     } catch (error) {
       throw new Error(
-        `Failed to initialize browser tracer: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to initialize BrowserTracer: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
 
-  public static getInstance(configuration: TracerConfiguration): BrowserTracer {
-    const key = `BrowserTracer:${configuration.projectName}`;
-    if (!Tracer.instances.has(key)) {
-      Tracer.instances.set(key, new BrowserTracer(configuration));
+  async shutdown(): Promise<void> {
+    if (!this.webTracerProvider) {
+      Logger.warn("BrowserTracer not initialized, skipping shutdown");
+      return;
     }
-    return Tracer.instances.get(key) as BrowserTracer;
-  }
-
-  public static async createDefault(
-    projectName: string,
-  ): Promise<BrowserTracer> {
-    const configuration = TracerConfiguration.builder()
-      .projectName(projectName)
-      .build();
-    const tracer = new BrowserTracer(configuration);
-    if (configuration.initialize) {
-      await tracer.initialize();
+    try {
+      await this.webTracerProvider.shutdown();
+      this.webTracerProvider = null;
+      Logger.info("BrowserTracer shut down successfully");
+    } catch (error) {
+      Logger.error(`Failed to shutdown BrowserTracer: ${error}`);
     }
-    return tracer;
-  }
-
-  public static async createWithConfiguration(
-    configuration: TracerConfiguration,
-  ): Promise<BrowserTracer> {
-    const tracer = new BrowserTracer(configuration);
-    if (configuration.initialize) {
-      await tracer.initialize();
-    }
-    return tracer;
   }
 }

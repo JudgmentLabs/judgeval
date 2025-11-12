@@ -28,20 +28,20 @@ import (
     "context"
     "os"
 
-    v1 "github.com/JudgmentLabs/judgeval/go/v1"
+    judgeval "github.com/JudgmentLabs/judgeval/go"
 )
 
 func main() {
-    client, err := v1.NewJudgeval(
-        v1.WithAPIKey(os.Getenv("JUDGMENT_API_KEY")),
-        v1.WithOrganizationID(os.Getenv("JUDGMENT_ORG_ID")),
+    client, err := judgeval.NewJudgeval(
+        judgeval.WithAPIKey(os.Getenv("JUDGMENT_API_KEY")),
+        judgeval.WithOrganizationID(os.Getenv("JUDGMENT_ORG_ID")),
     )
     if err != nil {
         panic(err)
     }
 
     ctx := context.Background()
-    tracer, err := client.Tracer.Create(ctx, v1.TracerCreateParams{
+    tracer, err := client.Tracer.Create(ctx, judgeval.TracerCreateParams{
         ProjectName: "my_project",
     })
     if err != nil {
@@ -56,8 +56,8 @@ func main() {
 
     tracer.AsyncEvaluate(
         ctx,
-        client.Scorers.BuiltIn.AnswerRelevancy(v1.AnswerRelevancyScorerParams{}),
-        v1.NewExample(v1.ExampleParams{
+        client.Scorers.BuiltIn.AnswerRelevancy(judgeval.AnswerRelevancyScorerParams{}),
+        judgeval.NewExample(judgeval.ExampleParams{
             Properties: map[string]any{
                 "input": "What is the capital of France?",
                 "actual_output": result,

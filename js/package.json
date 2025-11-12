@@ -11,11 +11,6 @@
       "require": "./dist/index.cjs",
       "types": "./dist/index.d.ts"
     },
-    "./v1": {
-      "import": "./dist/v1/index.mjs",
-      "require": "./dist/v1/index.cjs",
-      "types": "./dist/v1/index.d.ts"
-    },
     "./umd": "./dist/index.umd.js",
     "./package.json": "./package.json"
   },

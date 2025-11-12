@@ -1,72 +1,91 @@
 package com.judgmentlabs.judgeval.tracer;
 
 import java.lang.reflect.Type;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.Gson;
-import com.judgmentlabs.judgeval.Env;
-import com.judgmentlabs.judgeval.data.EvaluationRunBuilder;
-import com.judgmentlabs.judgeval.data.Example;
-import com.judgmentlabs.judgeval.data.TraceEvaluationRunBuilder;
+import com.judgmentlabs.judgeval.JudgmentAttributeKeys;
 import com.judgmentlabs.judgeval.internal.api.JudgmentSyncClient;
 import com.judgmentlabs.judgeval.internal.api.models.ExampleEvaluationRun;
 import com.judgmentlabs.judgeval.internal.api.models.ResolveProjectNameRequest;
 import com.judgmentlabs.judgeval.internal.api.models.ResolveProjectNameResponse;
 import com.judgmentlabs.judgeval.internal.api.models.TraceEvaluationRun;
+import com.judgmentlabs.judgeval.utils.Logger;
+import com.judgmentlabs.judgeval.data.Example;
 import com.judgmentlabs.judgeval.scorers.BaseScorer;
+import com.judgmentlabs.judgeval.scorers.custom_scorer.CustomScorer;
 import com.judgmentlabs.judgeval.tracer.exporters.JudgmentSpanExporter;
 import com.judgmentlabs.judgeval.tracer.exporters.NoOpSpanExporter;
-import com.judgmentlabs.judgeval.utils.Logger;
 
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanContext;
 import io.opentelemetry.api.trace.StatusCode;
-import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Scope;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
 
+/**
+ * Base tracer providing span manipulation, attribute setting, and evaluation
+ * capabilities.
+ */
 public abstract class BaseTracer {
-    public static final String          TRACER_NAME = "judgeval";
+    public static final String         TRACER_NAME = "judgeval";
 
-    protected final TracerConfiguration configuration;
-    protected final JudgmentSyncClient  apiClient;
-    protected final ISerializer         serializer;
-    protected final ObjectMapper        jacksonMapper;
-    protected final Optional<String>    projectId;
+    protected final String             projectName;
+    protected final boolean            enableEvaluation;
+    protected final JudgmentSyncClient apiClient;
+    protected final ISerializer        serializer;
+    protected final ObjectMapper       jacksonMapper;
+    protected final Optional<String>   projectId;
 
-    protected BaseTracer(TracerConfiguration configuration, ISerializer serializer, boolean initialize) {
-        this.configuration = Objects.requireNonNull(configuration, "Configuration cannot be null");
-        this.apiClient = new JudgmentSyncClient(configuration.apiUrl(), configuration.apiKey(),
-                configuration.organizationId());
-        this.serializer = Objects.requireNonNull(serializer, "Serializer cannot be null");
+    protected BaseTracer(String projectName,
+            boolean enableEvaluation, JudgmentSyncClient apiClient, ISerializer serializer) {
+        this.projectName = Objects.requireNonNull(projectName, "projectName required");
+        this.enableEvaluation = enableEvaluation;
+        this.apiClient = Objects.requireNonNull(apiClient, "apiClient required");
+        this.serializer = Objects.requireNonNull(serializer, "serializer required");
         this.jacksonMapper = new ObjectMapper();
-        this.projectId = resolveProjectId(configuration.projectName());
-        this.projectId.ifPresentOrElse(id -> {
-        }, () -> Logger.error("Failed to resolve project " + configuration.projectName()
-                + ", please create it first at https://app.judgmentlabs.ai/org/" + configuration.organizationId()
-                + "/projects. Skipping Judgment export."));
+        this.projectId = resolveProjectId(projectName);
 
-        if (initialize) {
-            initialize();
-        }
+        this.projectId.ifPresentOrElse(id -> {
+        }, () -> Logger.error("Failed to resolve project " + projectName
+                + ", please create it first at https://app.judgmentlabs.ai/org/" + this.apiClient.getOrganizationId()
+                + "/projects. Skipping Judgment export."));
     }
 
     /**
-     * Initializes the tracer with OpenTelemetry SDK configuration and span
-     * exporters. Must be implemented by subclasses.
+     * Initializes the tracer.
      */
     public abstract void initialize();
 
     /**
-     * Gets the span exporter for sending traces to the Judgment Labs backend.
-     * Returns a NoOpSpanExporter if the project ID is not resolved.
+     * Forces pending spans to flush.
      *
-     * @return the configured SpanExporter instance
+     * @param timeoutMillis
+     *            maximum time to wait in milliseconds
+     * @return true if flush succeeded within timeout
+     */
+    public abstract boolean forceFlush(int timeoutMillis);
+
+    /**
+     * Shuts down the tracer.
+     *
+     * @param timeoutMillis
+     *            maximum time to wait for shutdown in milliseconds
+     */
+    public abstract void shutdown(int timeoutMillis);
+
+    /**
+     * Returns the span exporter for this tracer.
+     *
+     * @return the span exporter
      */
     public SpanExporter getSpanExporter() {
         return projectId.<SpanExporter>map(this::createJudgmentSpanExporter)
@@ -77,15 +96,15 @@ public abstract class BaseTracer {
     }
 
     /**
-     * Sets the kind of the current span (e.g., "llm", "tool", "span").
+     * Sets the span kind attribute on the current span.
      *
      * @param kind
-     *            the span kind to set, ignored if null
+     *            the span kind
      */
     public void setSpanKind(String kind) {
         Optional.ofNullable(kind)
                 .ifPresent(k -> withCurrentSpan(
-                        span -> span.setAttribute(JudgevalTraceKeys.AttributeKeys.JUDGMENT_SPAN_KIND, k)));
+                        span -> span.setAttribute(JudgmentAttributeKeys.AttributeKeys.JUDGMENT_SPAN_KIND, k)));
     }
 
     private static void withCurrentSpan(java.util.function.Consumer<Span> action) {
@@ -98,13 +117,12 @@ public abstract class BaseTracer {
     }
 
     /**
-     * Sets an attribute on the current span by serializing the object value.
-     * Empty strings and null are valid attribute values, but not valid keys.
+     * Sets an attribute on the current span by serializing the value.
      *
      * @param key
      *            the attribute key
      * @param value
-     *            the attribute value (null and empty strings are valid)
+     *            the attribute value
      */
     public void setAttribute(String key, Object value) {
         if (!isValidKey(key)) {
@@ -116,14 +134,13 @@ public abstract class BaseTracer {
     }
 
     /**
-     * Sets an attribute on the current span by serializing the object value with
-     * the specified type. Empty strings and null are valid attribute values, but
-     * not valid keys.
+     * Sets an attribute on the current span by serializing the value with the
+     * specified type.
      *
      * @param key
      *            the attribute key
      * @param value
-     *            the attribute value (null and empty strings are valid)
+     *            the attribute value
      * @param type
      *            the type to use for serialization
      */
@@ -137,13 +154,12 @@ public abstract class BaseTracer {
     }
 
     /**
-     * Sets a string attribute on the current span. Empty strings and null are valid
-     * attribute values, but not valid keys.
+     * Sets a string attribute on the current span.
      *
      * @param key
      *            the attribute key
      * @param value
-     *            the string value (null and empty strings are valid)
+     *            the attribute value
      */
     public void setAttribute(String key, String value) {
         if (!isValidKey(key)) {
@@ -158,7 +174,7 @@ public abstract class BaseTracer {
      * @param key
      *            the attribute key
      * @param value
-     *            the long value
+     *            the attribute value
      */
     public void setAttribute(String key, long value) {
         if (!isValidKey(key)) {
@@ -173,7 +189,7 @@ public abstract class BaseTracer {
      * @param key
      *            the attribute key
      * @param value
-     *            the double value
+     *            the attribute value
      */
     public void setAttribute(String key, double value) {
         if (!isValidKey(key)) {
@@ -188,7 +204,7 @@ public abstract class BaseTracer {
      * @param key
      *            the attribute key
      * @param value
-     *            the boolean value
+     *            the attribute value
      */
     public void setAttribute(String key, boolean value) {
         if (!isValidKey(key)) {
@@ -211,11 +227,11 @@ public abstract class BaseTracer {
     }
 
     private boolean isEvaluationEnabled() {
-        return configuration.enableEvaluation();
+        return enableEvaluation;
     }
 
     private void logEvaluationInfo(String method, String traceId, String spanId, String scorerName) {
-        Logger.info(method + ": project=" + configuration.projectName() + ", traceId=" + traceId + ", spanId="
+        Logger.info(method + ": project=" + projectName + ", traceId=" + traceId + ", spanId="
                 + spanId + ", scorer=" + scorerName);
     }
 
@@ -228,17 +244,17 @@ public abstract class BaseTracer {
     }
 
     /**
-     * Asynchronously evaluates a scorer against an example, associating it with the
-     * current trace.
+     * Asynchronously evaluates the current span using the specified scorer and
+     * example.
+     * The evaluation is queued and processed asynchronously by the Judgment
+     * backend.
      *
      * @param scorer
-     *            the scorer to evaluate
+     *            the scorer to use for evaluation
      * @param example
-     *            the example to evaluate against
-     * @param model
-     *            the model name, or null to use the default
+     *            the example data to evaluate against
      */
-    public void asyncEvaluate(BaseScorer scorer, Example example, String model) {
+    public void asyncEvaluate(BaseScorer scorer, Example example) {
         safeExecute("evaluate scorer", () -> {
             if (!isEvaluationEnabled()) {
                 return;
@@ -250,34 +266,21 @@ public abstract class BaseTracer {
 
                 logEvaluationInfo("asyncEvaluate", traceId, spanId, scorer.getName());
 
-                ExampleEvaluationRun evaluationRun = createEvaluationRun(scorer, example, model, traceId, spanId);
+                ExampleEvaluationRun evaluationRun = createEvaluationRun(scorer, example, traceId, spanId);
                 enqueueEvaluation(evaluationRun);
             });
         });
     }
 
     /**
-     * Asynchronously evaluates a scorer against an example using the default model.
+     * Asynchronously evaluates the current trace using the specified scorer.
+     * Attaches evaluation metadata to the current span for processing after trace
+     * completion.
      *
      * @param scorer
-     *            the scorer to evaluate
-     * @param example
-     *            the example to evaluate against
+     *            the scorer to use for trace evaluation
      */
-    public void asyncEvaluate(BaseScorer scorer, Example example) {
-        asyncEvaluate(scorer, example, null);
-    }
-
-    /**
-     * Asynchronously evaluates a scorer for the current trace, attaching the
-     * evaluation as a span attribute.
-     *
-     * @param scorer
-     *            the scorer to evaluate
-     * @param model
-     *            the model name, or null to use the default
-     */
-    public void asyncTraceEvaluate(BaseScorer scorer, String model) {
+    public void asyncTraceEvaluate(BaseScorer scorer) {
         safeExecute("evaluate trace scorer", () -> {
             if (!isEvaluationEnabled()) {
                 return;
@@ -290,10 +293,11 @@ public abstract class BaseTracer {
 
                 logEvaluationInfo("asyncTraceEvaluate", traceId, spanId, scorer.getName());
 
-                TraceEvaluationRun evaluationRun = createTraceEvaluationRun(scorer, model, traceId, spanId);
+                TraceEvaluationRun evaluationRun = createTraceEvaluationRun(scorer, traceId, spanId);
                 try {
                     String traceEvalJson = jacksonMapper.writeValueAsString(evaluationRun);
-                    currentSpan.setAttribute(JudgevalTraceKeys.AttributeKeys.PENDING_TRACE_EVAL, traceEvalJson);
+                    currentSpan.setAttribute(JudgmentAttributeKeys.AttributeKeys.JUDGMENT_PENDING_TRACE_EVAL,
+                            traceEvalJson);
                 } catch (Exception e) {
                     Logger.error("Failed to serialize trace evaluation: " + e.getMessage());
                 }
@@ -302,21 +306,10 @@ public abstract class BaseTracer {
     }
 
     /**
-     * Asynchronously evaluates a scorer for the current trace using the default
-     * model.
-     *
-     * @param scorer
-     *            the scorer to evaluate
-     */
-    public void asyncTraceEvaluate(BaseScorer scorer) {
-        asyncTraceEvaluate(scorer, null);
-    }
-
-    /**
-     * Sets multiple attributes on the current span from a map.
+     * Sets multiple attributes on the current span.
      *
      * @param attributes
-     *            the map of attribute key-value pairs, ignored if null
+     *            map of attribute keys to values
      */
     public void setAttributes(Map<String, Object> attributes) {
         Optional.ofNullable(attributes)
@@ -324,80 +317,78 @@ public abstract class BaseTracer {
     }
 
     /**
-     * Sets the current span kind to "llm".
+     * Marks the current span as an LLM span.
      */
     public void setLLMSpan() {
         setSpanKind("llm");
     }
 
     /**
-     * Sets the current span kind to "tool".
+     * Marks the current span as a tool span.
      */
     public void setToolSpan() {
         setSpanKind("tool");
     }
 
     /**
-     * Sets the current span kind to "span".
+     * Marks the current span as a general span.
      */
     public void setGeneralSpan() {
         setSpanKind("span");
     }
 
     /**
-     * Sets the input attribute on the current span by serializing the object.
+     * Sets the input attribute on the current span.
      *
      * @param input
-     *            the input object to set, ignored if null
+     *            the input value
      */
     public void setInput(Object input) {
-        setAttribute(JudgevalTraceKeys.AttributeKeys.JUDGMENT_INPUT, input);
+        setInput(input, input.getClass());
     }
 
     /**
-     * Sets the output attribute on the current span by serializing the object.
+     * Sets the output attribute on the current span.
      *
      * @param output
-     *            the output object to set, ignored if null
+     *            the output value
      */
     public void setOutput(Object output) {
-        setAttribute(JudgevalTraceKeys.AttributeKeys.JUDGMENT_OUTPUT, output);
+        setOutput(output, output.getClass());
     }
 
     /**
-     * Sets the input attribute on the current span with a specific type for
-     * serialization.
+     * Sets the input attribute on the current span using the specified type.
      *
      * @param input
-     *            the input object to set, ignored if null
+     *            the input value
      * @param type
      *            the type to use for serialization
      */
     public void setInput(Object input, Type type) {
-        setAttribute(JudgevalTraceKeys.AttributeKeys.JUDGMENT_INPUT, input, type);
+        setAttribute(JudgmentAttributeKeys.AttributeKeys.JUDGMENT_INPUT, input, type);
     }
 
     /**
-     * Sets the output attribute on the current span with a specific type for
-     * serialization.
+     * Sets the output attribute on the current span using the specified type.
      *
      * @param output
-     *            the output object to set, ignored if null
+     *            the output value
      * @param type
      *            the type to use for serialization
      */
     public void setOutput(Object output, Type type) {
-        setAttribute(JudgevalTraceKeys.AttributeKeys.JUDGMENT_OUTPUT, output, type);
+        setAttribute(JudgmentAttributeKeys.AttributeKeys.JUDGMENT_OUTPUT, output, type);
     }
 
     /**
-     * Creates a new span, executes the runnable within its context, and ends the
-     * span.
+     * Executes a runnable within a new span, automatically handling span lifecycle
+     * and errors.
      *
      * @param spanName
      *            the name of the span
      * @param runnable
-     *            the code to execute within the span context
+     *            the code to execute within the span
      */
     public void span(String spanName, Runnable runnable) {
         Span span = getTracer().spanBuilder(spanName)
@@ -413,15 +404,15 @@ public abstract class BaseTracer {
     }
 
     /**
-     * Creates a new span, executes the callable within its context, and ends the
-     * span.
+     * Executes a callable within a new span, automatically handling span lifecycle
+     * and errors.
      *
      * @param <T>
-     *            the return type of the callable
+     *            the return type
      * @param spanName
      *            the name of the span
      * @param callable
-     *            the code to execute within the span context
+     *            the code to execute within the span
      * @return the result of the callable
      * @throws Exception
      *             if the callable throws an exception
@@ -440,41 +431,48 @@ public abstract class BaseTracer {
     }
 
     /**
-     * Gets the OpenTelemetry tracer instance.
+     * Returns the OpenTelemetry tracer instance.
      *
-     * @return the configured Tracer instance
+     * @return the OpenTelemetry tracer
      */
-    public Tracer getTracer() {
+    public io.opentelemetry.api.trace.Tracer getTracer() {
         return GlobalOpenTelemetry.get()
                 .getTracer(TRACER_NAME);
     }
 
     /**
-     * Gets the tracer configuration.
+     * Returns the project name.
      *
-     * @return the TracerConfiguration instance
+     * @return the project name
      */
-    public TracerConfiguration getConfiguration() {
-        return configuration;
+    public String getProjectName() {
+        return projectName;
     }
 
     /**
-     * Gets the resolved project ID, if available.
+     * Returns whether evaluation is enabled.
      *
-     * @return an Optional containing the project ID, or empty if not resolved
+     * @return true if evaluation is enabled
+     */
+    public boolean isEnableEvaluation() {
+        return enableEvaluation;
+    }
+
+    /**
+     * Returns the resolved project ID if available.
+     *
+     * @return the project ID, or empty if not resolved
      */
     public Optional<String> getProjectId() {
         return projectId;
     }
 
     /**
-     * Creates and returns a new span with the given name. The span must be entered
-     * with a try-with-resources block or manually ended by calling
-     * {@link Span#end()}.
+     * Creates and returns a new span with the specified name.
      *
      * @param spanName
      *            the name of the span
-     * @return the newly created span
+     * @return the created span
      */
     public static Span span(String spanName) {
         return GlobalOpenTelemetry.get()
@@ -483,7 +481,7 @@ public abstract class BaseTracer {
                 .startSpan();
     }
 
-    protected Optional<String> resolveProjectId(String name) {
+    private Optional<String> resolveProjectId(String name) {
         try {
             ResolveProjectNameRequest request = new ResolveProjectNameRequest();
             request.setProjectName(name);
@@ -501,9 +499,9 @@ public abstract class BaseTracer {
 
     private JudgmentSpanExporter createJudgmentSpanExporter(String projectId) {
         return JudgmentSpanExporter.builder()
-                .endpoint(buildEndpoint(configuration.apiUrl()))
-                .apiKey(configuration.apiKey())
-                .organizationId(configuration.organizationId())
+                .endpoint(buildEndpoint(apiClient.getApiUrl()))
+                .apiKey(apiClient.getApiKey())
+                .organizationId(apiClient.getOrganizationId())
                 .projectId(projectId)
                 .build();
     }
@@ -513,46 +511,46 @@ public abstract class BaseTracer {
                 .orElseGet(() -> String.valueOf(System.currentTimeMillis()));
     }
 
-    private String getModelName(String model) {
-        return Optional.ofNullable(model)
-                .orElse(Env.JUDGMENT_DEFAULT_GPT_MODEL);
-    }
-
-    private ExampleEvaluationRun createEvaluationRun(BaseScorer scorer, Example example, String model, String traceId,
+    private ExampleEvaluationRun createEvaluationRun(BaseScorer scorer, Example example, String traceId,
             String spanId) {
         String runId = generateRunId("async_evaluate_", spanId);
-        return new EvaluationRunBuilder()
-                .projectName(configuration.projectName())
-                .evalName(runId)
-                .model(model)
-                .example(example)
-                .trace(traceId, spanId)
-                .addScorer(scorer)
-                .build();
+
+        ExampleEvaluationRun evaluationRun = new ExampleEvaluationRun();
+        evaluationRun.setId(UUID.randomUUID().toString());
+        evaluationRun.setProjectName(projectName);
+        evaluationRun.setEvalName(runId);
+        evaluationRun.setTraceId(traceId);
+        evaluationRun.setTraceSpanId(spanId);
+        evaluationRun.setExamples(List.of(example));
+
+        if (scorer instanceof CustomScorer) {
+            evaluationRun.setJudgmentScorers(List.of());
+            evaluationRun.setCustomScorers(List.of((com.judgmentlabs.judgeval.internal.api.models.BaseScorer) scorer));
+        } else {
+            evaluationRun.setJudgmentScorers(List.of(scorer.getScorerConfig()));
+            evaluationRun.setCustomScorers(List.of());
+        }
+        evaluationRun.setCreatedAt(Instant.now().atOffset(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT));
+
+        return evaluationRun;
     }
 
-    private TraceEvaluationRun createTraceEvaluationRun(BaseScorer scorer, String model, String traceId,
+    private TraceEvaluationRun createTraceEvaluationRun(BaseScorer scorer, String traceId,
             String spanId) {
         String evalName = generateRunId("async_trace_evaluate_", spanId);
-        return new TraceEvaluationRunBuilder()
-                .projectName(configuration.projectName())
-                .evalName(evalName)
-                .model(model)
-                .trace(traceId, spanId)
-                .addScorer(scorer)
-                .build();
-    }
 
-    private static List<List<Object>> convertTraceAndSpanIds(List<List<String>> traceAndSpanIds) {
-        if (traceAndSpanIds == null || traceAndSpanIds.isEmpty())
-            throw new IllegalArgumentException("Trace and span IDs are required for trace evaluations.");
-        List<List<Object>> converted = new java.util.ArrayList<>();
-        for (List<String> pair : traceAndSpanIds) {
-            if (pair == null || pair.size() != 2)
-                throw new IllegalArgumentException("Each trace and span ID pair must contain exactly 2 elements.");
-            converted.add(List.of(pair.get(0), pair.get(1)));
-        }
-        return converted;
+        TraceEvaluationRun evaluationRun = new TraceEvaluationRun();
+        evaluationRun.setId(UUID.randomUUID().toString());
+        evaluationRun.setProjectName(projectName);
+        evaluationRun.setEvalName(evalName);
+        evaluationRun.setTraceAndSpanIds(List.of(List.of(traceId, spanId)));
+        evaluationRun.setJudgmentScorers(List.of(scorer.getScorerConfig()));
+        evaluationRun.setCustomScorers(List.of());
+        evaluationRun.setIsOffline(false);
+        evaluationRun.setIsBucketRun(false);
+        evaluationRun.setCreatedAt(Instant.now().atOffset(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT));
+
+        return evaluationRun;
     }
 
     private void enqueueEvaluation(ExampleEvaluationRun evaluationRun) {
@@ -560,29 +558,6 @@ public abstract class BaseTracer {
             apiClient.addToRunEvalQueue(evaluationRun);
         } catch (Exception e) {
             Logger.error("Failed to enqueue evaluation run: " + e.getMessage());
-        }
-    }
-
-    protected static class GsonSerializer implements ISerializer {
-        private final Gson gson = new Gson();
-
-        @Override
-        public String serialize(Object obj) {
-            return Optional.ofNullable(obj)
-                    .map(o -> serialize(o, o.getClass()))
-                    .orElse(null);
-        }
-
-        @Override
-        public String serialize(Object obj, Type type) {
-            try {
-                return gson.toJson(obj, type);
-            } catch (Exception e) {
-                Logger.error("Failed to serialize object: " + e.getMessage());
-                return Optional.ofNullable(obj)
-                        .map(Object::toString)
-                        .orElse(null);
-            }
         }
     }
 }

@@ -1,88 +1,111 @@
+import type { Instrumentation } from "@opentelemetry/instrumentation";
 import { resourceFromAttributes } from "@opentelemetry/resources";
-import { NodeSDK, NodeSDKConfiguration } from "@opentelemetry/sdk-node";
+import { NodeSDK } from "@opentelemetry/sdk-node";
+import { JudgmentApiClient } from "../internal/api";
 import { Logger } from "../utils/logger";
 import { VERSION } from "../version";
-import { OpenTelemetryKeys } from "./OpenTelemetryKeys";
-import { Tracer, TracerInitializeOptions } from "./Tracer";
-import { TracerConfiguration } from "./TracerConfiguration";
+import { BaseTracer, type Serializer } from "./BaseTracer";
 
-export type NodeTracerInitializeOptions = TracerInitializeOptions &
-  Partial<NodeSDKConfiguration>;
+export interface NodeTracerConfig {
+  projectName: string;
+  enableEvaluation?: boolean;
+  enableMonitoring?: boolean;
+  serializer?: Serializer;
+  resourceAttributes?: Record<string, unknown>;
+  instrumentations?: Instrumentation[];
+  initialize?: boolean;
+}
 
-export class NodeTracer extends Tracer {
-  private nodeSDK?: NodeSDK;
+interface InternalNodeTracerConfig
+  extends Required<
+    Omit<NodeTracerConfig, "resourceAttributes" | "instrumentations">
+  > {
+  resourceAttributes: Record<string, unknown>;
+  instrumentations: Instrumentation[];
+}
 
-  public async initialize(
-    options: NodeTracerInitializeOptions = {},
+export class NodeTracer extends BaseTracer {
+  private nodeSDK: NodeSDK | null = null;
+  private resourceAttributes: Record<string, unknown>;
+  private instrumentations: Instrumentation[];
+
+  private constructor(
+    projectName: string,
+    enableEvaluation: boolean,
+    apiClient: JudgmentApiClient,
+    serializer: Serializer,
+    resourceAttributes: Record<string, unknown>,
+    instrumentations: Instrumentation[],
+  ) {
+    super(projectName, enableEvaluation, apiClient, serializer);
+    this.resourceAttributes = resourceAttributes;
+    this.instrumentations = instrumentations;
+  }
+
+  static async create(
+    config: InternalNodeTracerConfig,
+    apiClient: JudgmentApiClient,
   ): Promise<NodeTracer> {
-    if (this._initialized) {
-      return this;
+    const tracer = new NodeTracer(
+      config.projectName,
+      config.enableEvaluation,
+      apiClient,
+      config.serializer,
+      config.resourceAttributes,
+      config.instrumentations,
+    );
+
+    await tracer.resolveAndSetProjectId();
+
+    if (config.initialize) {
+      await tracer.initialize();
+    }
+
+    return tracer;
+  }
+
+  /* eslint-disable @typescript-eslint/require-await */
+  async initialize(): Promise<void> {
+    if (this.nodeSDK !== null) {
+      Logger.warn("NodeTracer already initialized");
+      return;
     }
 
     try {
-      const resourceAttributes = {
-        [OpenTelemetryKeys.ResourceKeys.SERVICE_NAME]:
-          this.configuration.projectName,
-        [OpenTelemetryKeys.ResourceKeys.TELEMETRY_SDK_VERSION]: VERSION,
-        ...this.configuration.resourceAttributes,
-        ...options.resourceAttributes,
+      const attributes = {
+        "service.name": this.projectName,
+        "telemetry.sdk.version": VERSION,
+        ...this.resourceAttributes,
       };
 
-      const spanExporter = await this.getSpanExporter();
+      const spanExporter = this.getSpanExporter();
 
       this.nodeSDK = new NodeSDK({
-        resource: resourceFromAttributes(resourceAttributes),
-        instrumentations: options.instrumentations,
+        resource: resourceFromAttributes(attributes),
         traceExporter: spanExporter,
-        ...options,
+        instrumentations: this.instrumentations,
       });
 
       this.nodeSDK.start();
-
-      this._initialized = true;
-      return this;
+      Logger.info("NodeTracer initialized successfully");
     } catch (error) {
       throw new Error(
-        `Failed to initialize node tracer: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to initialize NodeTracer: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
 
-  public static getInstance(configuration: TracerConfiguration): NodeTracer {
-    const key = `NodeTracer:${configuration.projectName}`;
-    if (!Tracer.instances.has(key)) {
-      Tracer.instances.set(key, new NodeTracer(configuration));
-    }
-    return Tracer.instances.get(key) as NodeTracer;
-  }
-
-  public static async createDefault(projectName: string): Promise<NodeTracer> {
-    const configuration = TracerConfiguration.builder()
-      .projectName(projectName)
-      .enableEvaluation(true)
-      .build();
-    const tracer = new NodeTracer(configuration);
-    if (configuration.initialize) {
-      await tracer.initialize();
-    }
-    return tracer;
-  }
-
-  public static async createWithConfiguration(
-    configuration: TracerConfiguration,
-  ): Promise<NodeTracer> {
-    const tracer = new NodeTracer(configuration);
-    if (configuration.initialize) {
-      await tracer.initialize();
-    }
-    return tracer;
-  }
-
-  public async shutdown(): Promise<void> {
+  async shutdown(): Promise<void> {
     if (!this.nodeSDK) {
-      Logger.warn("Node SDK not initialized, skipping shutdown");
+      Logger.warn("NodeTracer not initialized, skipping shutdown");
       return;
     }
-    await this.nodeSDK.shutdown();
+    try {
+      await this.nodeSDK.shutdown();
+      this.nodeSDK = null;
+      Logger.info("NodeTracer shut down successfully");
+    } catch (error) {
+      Logger.error(`Failed to shutdown NodeTracer: ${error}`);
+    }
   }
 }

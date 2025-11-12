@@ -28,8 +28,8 @@ export JUDGMENT_ORG_ID=...
 ## Quick Start
 
 ```java
-import com.judgmentlabs.judgeval.v1.Judgeval;
-import com.judgmentlabs.judgeval.v1.data.Example;
+import com.judgmentlabs.judgeval.Judgeval;
+import com.judgmentlabs.judgeval.data.Example;
 
 public class SimpleExample {
     public static void main(String[] args) {

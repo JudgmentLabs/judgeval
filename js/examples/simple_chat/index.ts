@@ -1,4 +1,4 @@
-import { Example } from "judgeval/v1";
+import { Example } from "judgeval";
 import OpenAI from "openai";
 import { client, getTracer } from "./instrumentation";
 

@@ -28,7 +28,7 @@ function handleBuildResult(result: BuildOutput, target: string) {
 
 async function buildLib() {
   const config: BuildConfig = {
-    entrypoints: ["./src/index.ts", "./src/v1/index.ts"],
+    entrypoints: ["./src/index.ts"],
     outdir: "./dist",
     target: "node",
     format: "esm",
@@ -44,7 +44,7 @@ async function buildLib() {
 
 async function buildCjs() {
   const config: BuildConfig = {
-    entrypoints: ["./src/index.ts", "./src/v1/index.ts"],
+    entrypoints: ["./src/index.ts"],
     outdir: "./dist",
     target: "node",
     format: "cjs",

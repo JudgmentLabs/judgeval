@@ -28,7 +28,7 @@ export JUDGMENT_ORG_ID=...
 ## Quick Start
 
 ```typescript
-import { Judgeval, Example } from "judgeval/v1";
+import { Judgeval, Example } from "judgeval";
 import OpenAI from "openai";
 
 const client = Judgeval.create();
