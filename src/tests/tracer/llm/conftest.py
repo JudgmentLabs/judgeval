@@ -57,9 +57,26 @@ def mock_processor():
 def tracer(mock_processor):
     """Minimal tracer with local OpenTelemetry only - no API, no project creation"""
     from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.trace import set_tracer_provider
+    from opentelemetry.trace import (
+        set_tracer_provider,
+        _TRACER_PROVIDER_SET_ONCE,
+        _TRACER_PROVIDER,
+    )
     from judgeval.tracer.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
+    from judgeval.tracer import Tracer
+    from judgeval.utils.meta import SingletonMeta
     from judgeval.version import get_version
+
+    # Clear any existing Tracer singleton
+    if Tracer in SingletonMeta._instances:
+        del SingletonMeta._instances[Tracer]
+
+    # Reset the global tracer provider flag (OpenTelemetry internal)
+    try:
+        _TRACER_PROVIDER_SET_ONCE._done = False
+        _TRACER_PROVIDER._default = None
+    except Exception:
+        pass  # If the internal API changes, just continue
 
     # Set up minimal TracerProvider with mock processor
     provider = TracerProvider()
@@ -71,7 +88,12 @@ def tracer(mock_processor):
         get_version(),
     )
 
-    return MockTracer(otel_tracer)
+    yield MockTracer(otel_tracer)
+
+    # Cleanup after test
+    mock_processor.force_flush()
+    if Tracer in SingletonMeta._instances:
+        del SingletonMeta._instances[Tracer]
 
 
 @pytest.fixture

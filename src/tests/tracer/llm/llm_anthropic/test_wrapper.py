@@ -4,6 +4,10 @@ import pytest
 import random
 import string
 
+pytestmark = pytest.mark.skip(
+    reason="Deprecated: Use v1 tests instead (src/tests/v1/instrumentation/llm/anthropic/)"
+)
+
 pytest.importorskip("anthropic")
 
 from judgeval.tracer.llm.llm_anthropic.wrapper import (

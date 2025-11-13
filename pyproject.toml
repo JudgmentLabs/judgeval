@@ -6,7 +6,8 @@ authors = [
     { name = "Alex Shan", email = "alex@judgmentlabs.ai" },
     { name = "Joseph Camyre", email = "joseph@judgmentlabs.ai" },
 ]
-description = "Judgeval Package"
+maintainers = [{ name = "Judgment Labs", email = "contact@judgmentlabs.ai" }]
+description = "The open source post-building layer for Agent Behavior Monitoring."
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
@@ -17,7 +18,6 @@ license = "Apache-2.0"
 license-files = ["LICENSE.md"]
 
 dependencies = [
-    "dotenv",
     "httpx>=0.28.1",
     "litellm>=1.75.0",
     "opentelemetry-exporter-otlp>=1.36.0",
@@ -26,6 +26,7 @@ dependencies = [
     "click<8.2.0",
     "typer>=0.9.0",
     "boto3>=1.40.11",
+    "dotenv>=0.9.9",
 ]
 
 [project.urls]
@@ -41,7 +42,11 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/judgeval"]
-include = ["/src/judgeval", "/src/judgeval/**/*.py"]
+include = [
+    "/src/judgeval",
+    "/src/judgeval/**/*.py",
+    "/src/judgeval/v1/py.typed",
+]
 
 [project.optional-dependencies]
 s3 = ["boto3>=1.40.11"]
@@ -74,6 +79,9 @@ dev = [
     "streamlit>=1.49.1",
     "langchain-community>=0.3.29",
     "openlit>=1.35.5",
+    "dotenv>=0.9.9",
+    "datasets>=4.4.1",
+    "claude-agent-sdk>=0.1.6",
 ]
 
 

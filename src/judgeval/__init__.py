@@ -19,6 +19,7 @@ from judgeval.utils.file_utils import extract_scorer_name
 from judgeval.utils.guards import expect_api_key, expect_organization_id
 from judgeval.utils.version_check import check_latest_version
 from judgeval.utils.testing import assert_test_results
+from judgeval.v1 import Judgeval
 
 check_latest_version()
 
@@ -179,4 +180,4 @@ class JudgmentClient(metaclass=SingletonMeta):
             raise
 
 
-__all__ = ("JudgmentClient",)
+__all__ = ("JudgmentClient", "Judgeval")

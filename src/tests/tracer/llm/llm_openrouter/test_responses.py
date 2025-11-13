@@ -2,6 +2,10 @@
 
 import pytest
 
+pytestmark = pytest.mark.skip(
+    reason="Deprecated: Use v1 tests instead (src/tests/v1/instrumentation/llm/openrouter/)"
+)
+
 pytest.importorskip("openai")
 
 from judgeval.tracer.keys import AttributeKeys

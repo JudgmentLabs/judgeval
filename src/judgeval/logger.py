@@ -1,7 +1,7 @@
 import logging
 import sys
 
-from judgeval.env import JUDGMENT_NO_COLOR
+from judgeval.env import JUDGMENT_NO_COLOR, JUDGMENT_LOG_LEVEL
 from judgeval.utils.decorators.use_once import use_once
 
 RESET = "\033[0m"
@@ -37,11 +37,25 @@ class ColorFormatter(logging.Formatter):
         return message
 
 
+def _parse_log_level(level_str: str) -> int:
+    level_map = {
+        "debug": logging.DEBUG,
+        "info": logging.INFO,
+        "warning": logging.WARNING,
+        "warn": logging.WARNING,
+        "error": logging.ERROR,
+        "critical": logging.CRITICAL,
+    }
+    return level_map.get(level_str.lower(), logging.WARNING)
+
+
 @use_once
 def _setup_judgeval_logger():
     use_color = sys.stdout.isatty() and JUDGMENT_NO_COLOR is None
+    log_level = _parse_log_level(JUDGMENT_LOG_LEVEL)
+
     handler = logging.StreamHandler(sys.stdout)
-    handler.setLevel(logging.DEBUG)
+    handler.setLevel(log_level)
     handler.setFormatter(
         ColorFormatter(
             fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -51,7 +65,7 @@ def _setup_judgeval_logger():
     )
 
     logger = logging.getLogger("judgeval")
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(log_level)
     logger.addHandler(handler)
     return logger
 

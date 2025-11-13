@@ -2,6 +2,10 @@
 
 import pytest
 
+pytestmark = pytest.mark.skip(
+    reason="Deprecated: Use v1 tests instead (src/tests/v1/instrumentation/llm/google/)"
+)
+
 pytest.importorskip("google.genai")
 
 from judgeval.tracer.llm.llm_google.wrapper import wrap_google_client

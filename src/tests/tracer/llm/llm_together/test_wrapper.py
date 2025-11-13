@@ -2,6 +2,10 @@
 
 import pytest
 
+pytestmark = pytest.mark.skip(
+    reason="Deprecated: Use v1 tests instead (src/tests/v1/instrumentation/llm/together/)"
+)
+
 pytest.importorskip("together")
 
 from judgeval.tracer.llm.llm_together.wrapper import wrap_together_client
