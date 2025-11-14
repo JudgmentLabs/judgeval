@@ -7,6 +7,7 @@ from typing import (
     AsyncGenerator,
 )
 
+from opentelemetry.trace import Status, StatusCode
 from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.utils.serialize import safe_serialize
 from judgeval.utils.wrappers import (
@@ -88,6 +89,7 @@ def wrap_messages_stream_sync(tracer: BaseTracer, client: Anthropic) -> None:
                 span = ctx.get("span")
                 if span:
                     span.record_exception(error)
+                    span.set_status(Status(StatusCode.ERROR))
 
             def finally_hook_inner(inner_ctx: Dict[str, Any]) -> None:
                 pass
@@ -154,6 +156,7 @@ def wrap_messages_stream_sync(tracer: BaseTracer, client: Anthropic) -> None:
         span = ctx.get("span")
         if span:
             span.record_exception(error)
+            span.set_status(Status(StatusCode.ERROR))
 
     wrapped = mutable_wrap_sync(
         original_func,
@@ -225,6 +228,7 @@ def wrap_messages_stream_async(tracer: BaseTracer, client: AsyncAnthropic) -> No
                 span = ctx.get("span")
                 if span:
                     span.record_exception(error)
+                    span.set_status(Status(StatusCode.ERROR))
 
             def finally_hook_inner_sync(inner_ctx: Dict[str, Any]) -> None:
                 pass
@@ -291,6 +295,7 @@ def wrap_messages_stream_async(tracer: BaseTracer, client: AsyncAnthropic) -> No
         span = ctx.get("span")
         if span:
             span.record_exception(error)
+            span.set_status(Status(StatusCode.ERROR))
 
     wrapped = mutable_wrap_sync(
         original_func,

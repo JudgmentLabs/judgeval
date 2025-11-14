@@ -12,6 +12,7 @@ from typing import (
     Tuple,
 )
 
+from opentelemetry.trace import Status, StatusCode
 from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.utils.serialize import safe_serialize
 from judgeval.utils.wrappers import (
@@ -130,6 +131,7 @@ def _wrap_non_streaming_sync(
         span = ctx.get("span")
         if span:
             span.record_exception(error)
+            span.set_status(Status(StatusCode.ERROR))
 
     def finally_hook(ctx: Dict[str, Any]) -> None:
         span = ctx.get("span")
@@ -209,6 +211,7 @@ def _wrap_streaming_sync(
             span = ctx.get("span")
             if span:
                 span.record_exception(error)
+                span.set_status(Status(StatusCode.ERROR))
 
         def finally_hook_inner(inner_ctx: Dict[str, Any]) -> None:
             span = ctx.get("span")
@@ -229,6 +232,7 @@ def _wrap_streaming_sync(
         span = ctx.get("span")
         if span:
             span.record_exception(error)
+            span.set_status(Status(StatusCode.ERROR))
 
     return mutable_wrap_sync(
         original_func,
@@ -298,6 +302,7 @@ def _wrap_non_streaming_async(
         span = ctx.get("span")
         if span:
             span.record_exception(error)
+            span.set_status(Status(StatusCode.ERROR))
 
     def finally_hook(ctx: Dict[str, Any]) -> None:
         span = ctx.get("span")
@@ -378,6 +383,7 @@ def _wrap_streaming_async(
             span = ctx.get("span")
             if span:
                 span.record_exception(error)
+                span.set_status(Status(StatusCode.ERROR))
 
         def finally_hook_inner(inner_ctx: Dict[str, Any]) -> None:
             span = ctx.get("span")
@@ -398,6 +404,7 @@ def _wrap_streaming_async(
         span = ctx.get("span")
         if span:
             span.record_exception(error)
+            span.set_status(Status(StatusCode.ERROR))
 
     return mutable_wrap_async(
         original_func,

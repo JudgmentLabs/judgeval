@@ -2,6 +2,7 @@
 
 from typing import Any, Dict
 from opentelemetry.sdk.trace import ReadableSpan
+from opentelemetry.trace import StatusCode
 
 from judgeval.judgment_attribute_keys import AttributeKeys
 
@@ -87,12 +88,14 @@ def verify_span_attributes_comprehensive(
 def assert_span_has_exception(
     span: ReadableSpan,
     expected_span_name: str,
+    check_status: bool = True,
 ) -> None:
-    """Assert that a span has exception events recorded.
+    """Assert that a span has exception events recorded and error status set.
 
     Args:
         span: The span to validate
         expected_span_name: Expected span name
+        check_status: Whether to verify span status is set to ERROR (default: True)
     """
     assert span is not None
     assert span.name == expected_span_name
@@ -101,3 +104,10 @@ def assert_span_has_exception(
     if span.events:
         event_names = [event.name for event in span.events]
         assert any("exception" in name.lower() for name in event_names)
+
+    # Verify span status is set to ERROR
+    if check_status:
+        assert span.status is not None, "Span status should be set when an error occurs"
+        assert span.status.status_code == StatusCode.ERROR, (
+            f"Expected span status to be ERROR, got {span.status.status_code}"
+        )
