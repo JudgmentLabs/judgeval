@@ -142,9 +142,9 @@ def test_async_generator_context_preservation(tracer: Tuple[Tracer, SpanStore]) 
         @tracer_instance.observe(span_name="async_gen_with_context")
         async def async_generator_with_context():
             for i in range(3):
-                assert (
-                    test_var.get() == "ASYNC_TEST_VALUE"
-                ), f"Context lost at iteration {i}"
+                assert test_var.get() == "ASYNC_TEST_VALUE", (
+                    f"Context lost at iteration {i}"
+                )
                 yield i
 
         result = []

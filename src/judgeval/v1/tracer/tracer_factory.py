@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 from judgeval.utils.serialize import safe_serialize
 from judgeval.v1.internal.api import JudgmentSyncClient
