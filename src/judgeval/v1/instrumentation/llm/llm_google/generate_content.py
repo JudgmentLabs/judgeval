@@ -7,6 +7,7 @@ from typing import (
     Tuple,
 )
 
+from opentelemetry.trace import Status, StatusCode
 from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.utils.serialize import safe_serialize
 from judgeval.utils.wrappers import immutable_wrap_sync
@@ -102,6 +103,7 @@ def wrap_generate_content_sync(tracer: BaseTracer, client: Client) -> None:
         span = ctx.get("span")
         if span:
             span.record_exception(error)
+            span.set_status(Status(StatusCode.ERROR))
 
     def finally_hook(ctx: Dict[str, Any]) -> None:
         span = ctx.get("span")
