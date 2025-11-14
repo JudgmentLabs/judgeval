@@ -579,11 +579,14 @@ class _ObservedSyncGenerator(ABCGenerator[Any, Any, Any]):
             item = self._context.run(self._generator.send, value)
 
             with trace.use_span(self._span):
-                span_name = str(self._span.name) if hasattr(self._span, "name") else "generator_item"  # type: ignore[attr-defined]
+                span_name = (
+                    str(self._span.name)  # type: ignore[attr-defined]
+                    if hasattr(self._span, "name")
+                    else "generator_item"
+                )
                 with self._tracer.start_as_current_span(
                     span_name,
                     attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
-                    end_on_exit=True,
                 ) as child_span:
                     child_span.set_attribute(
                         AttributeKeys.JUDGMENT_OUTPUT,
@@ -629,11 +632,14 @@ class _ObservedSyncGenerator(ABCGenerator[Any, Any, Any]):
                 item = self._context.run(self._generator.throw, __typ, None, __tb)
 
             with trace.use_span(self._span):
-                span_name = str(self._span.name) if hasattr(self._span, "name") else "generator_item"  # type: ignore[attr-defined]
+                span_name = (
+                    str(self._span.name)  # type: ignore[attr-defined]
+                    if hasattr(self._span, "name")
+                    else "generator_item"
+                )
                 with self._tracer.start_as_current_span(
                     span_name,
                     attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
-                    end_on_exit=True,
                 ) as child_span:
                     child_span.set_attribute(
                         AttributeKeys.JUDGMENT_OUTPUT,
@@ -705,11 +711,14 @@ class _ObservedAsyncGenerator(ABCAsyncGenerator[Any, Any]):
                 item = await self._generator.asend(value)
 
             with trace.use_span(self._span):
-                span_name = str(self._span.name) if hasattr(self._span, "name") else "generator_item"  # type: ignore[attr-defined]
+                span_name = (
+                    str(self._span.name)  # type: ignore[attr-defined]
+                    if hasattr(self._span, "name")
+                    else "generator_item"
+                )
                 with self._tracer.start_as_current_span(
                     span_name,
                     attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
-                    end_on_exit=True,
                 ) as child_span:
                     child_span.set_attribute(
                         AttributeKeys.JUDGMENT_OUTPUT,
@@ -767,11 +776,14 @@ class _ObservedAsyncGenerator(ABCAsyncGenerator[Any, Any]):
                     item = await self._generator.athrow(__typ, None, __tb)
 
             with trace.use_span(self._span):
-                span_name = str(self._span.name) if hasattr(self._span, "name") else "generator_item"  # type: ignore[attr-defined]
+                span_name = (
+                    str(self._span.name)  # type: ignore[attr-defined]
+                    if hasattr(self._span, "name")
+                    else "generator_item"
+                )
                 with self._tracer.start_as_current_span(
                     span_name,
                     attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
-                    end_on_exit=True,
                 ) as child_span:
                     child_span.set_attribute(
                         AttributeKeys.JUDGMENT_OUTPUT,
