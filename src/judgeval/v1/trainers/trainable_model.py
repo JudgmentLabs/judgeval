@@ -1,6 +1,6 @@
 from __future__ import annotations
 import time
-from fireworks import LLM  # type: ignore[import-not-found]
+from fireworks import LLM  # type: ignore[import-untyped]
 from .config import TrainerConfig, ModelConfig
 from typing import Optional, Dict, Any, Callable, TYPE_CHECKING
 from .console import _model_spinner_progress, _print_model_progress
