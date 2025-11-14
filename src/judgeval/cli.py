@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import os
+import subprocess
+import sys
 import typer
 from pathlib import Path
 from dotenv import load_dotenv
@@ -53,7 +55,8 @@ def load_otel_env(
         f"Authorization=Bearer {api_key},X-Organization-Id={organization_id},X-Project-Id={project_id}"
     )
 
-    os.execvpe(ctx.args[0], ctx.args, env)
+    result = subprocess.run(ctx.args, env=env)
+    sys.exit(result.returncode)
 
 
 @app.command()
