@@ -1,11 +1,29 @@
 from __future__ import annotations
 
+import asyncio
+import contextvars
 import datetime
 import functools
 import inspect
 import time
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Optional, Tuple, TypeVar, overload
+from collections.abc import (
+    Generator as ABCGenerator,
+    AsyncGenerator as ABCAsyncGenerator,
+)
+from types import TracebackType
+from typing import (
+    Any,
+    AsyncGenerator,
+    Callable,
+    Dict,
+    Generator,
+    Optional,
+    Tuple,
+    TypeVar,
+    overload,
+    cast,
+)
 
 from opentelemetry import trace
 from opentelemetry.sdk.trace.export import SpanExporter
@@ -359,7 +377,7 @@ class BaseTracer(ABC):
         span_name: Optional[str] = None,
     ) -> C | Callable[[C], C]:
         if func is None:
-            return lambda f: self.observe(f, span_type, span_name)  # type: ignore[return-value]
+            return lambda f: self.observe(f, span_type, span_name)
 
         tracer = self.get_tracer()
         name = span_name or func.__name__
@@ -371,19 +389,18 @@ class BaseTracer(ABC):
                 with tracer.start_as_current_span(name) as span:
                     if span_type:
                         span.set_attribute(AttributeKeys.JUDGMENT_SPAN_KIND, span_type)
-
                     try:
-                        input_data = _format_inputs(func, args, kwargs)
                         span.set_attribute(
-                            AttributeKeys.JUDGMENT_INPUT, self.serializer(input_data)
+                            AttributeKeys.JUDGMENT_INPUT,
+                            _serialize(
+                                self.serializer, _format_inputs(func, args, kwargs)
+                            ),
                         )
-
                         self.get_span_processor().emit_partial()
-
                         result = await func(*args, **kwargs)
-
                         span.set_attribute(
-                            AttributeKeys.JUDGMENT_OUTPUT, self.serializer(result)
+                            AttributeKeys.JUDGMENT_OUTPUT,
+                            _serialize(self.serializer, result),
                         )
                         return result
                     except Exception as e:
@@ -391,35 +408,57 @@ class BaseTracer(ABC):
                         span.set_status(Status(StatusCode.ERROR, str(e)))
                         raise
 
-            return async_wrapper  # type: ignore[return-value]
+            return cast(C, async_wrapper)
         else:
 
             @functools.wraps(func)
             def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-                with tracer.start_as_current_span(name) as span:
+                with tracer.start_as_current_span(name, end_on_exit=False) as span:
                     if span_type:
                         span.set_attribute(AttributeKeys.JUDGMENT_SPAN_KIND, span_type)
-
                     try:
-                        input_data = _format_inputs(func, args, kwargs)
                         span.set_attribute(
-                            AttributeKeys.JUDGMENT_INPUT, self.serializer(input_data)
+                            AttributeKeys.JUDGMENT_INPUT,
+                            _serialize(
+                                self.serializer, _format_inputs(func, args, kwargs)
+                            ),
                         )
-
                         self.get_span_processor().emit_partial()
-
                         result = func(*args, **kwargs)
-
-                        span.set_attribute(
-                            AttributeKeys.JUDGMENT_OUTPUT, self.serializer(result)
-                        )
-                        return result
                     except Exception as e:
                         span.record_exception(e)
                         span.set_status(Status(StatusCode.ERROR, str(e)))
+                        span.end()
                         raise
 
-            return sync_wrapper  # type: ignore[return-value]
+                    if inspect.isgenerator(result):
+                        span.set_attribute(AttributeKeys.JUDGMENT_OUTPUT, "<generator>")
+                        return _ObservedSyncGenerator(
+                            result,
+                            span,
+                            self.serializer,
+                            tracer,
+                            contextvars.copy_context(),
+                        )
+                    if inspect.isasyncgen(result):
+                        span.set_attribute(
+                            AttributeKeys.JUDGMENT_OUTPUT, "<async_generator>"
+                        )
+                        return _ObservedAsyncGenerator(
+                            result,
+                            span,
+                            self.serializer,
+                            tracer,
+                            contextvars.copy_context(),
+                        )  # type: ignore[return-value]
+                    span.set_attribute(
+                        AttributeKeys.JUDGMENT_OUTPUT,
+                        _serialize(self.serializer, result),
+                    )
+                    span.end()
+                    return result
+
+            return cast(C, sync_wrapper)
 
     @overload
     def agent(self, func: C, /, *, identifier: Optional[str] = None) -> C: ...
@@ -435,62 +474,49 @@ class BaseTracer(ABC):
         if func is None:
             return lambda f: self.agent(f, identifier=identifier)  # type: ignore[return-value]
 
-        class_name = None
-        if hasattr(func, "__qualname__") and "." in func.__qualname__:
-            parts = func.__qualname__.split(".")
-            if len(parts) >= 2:
-                class_name = parts[-2]
+        class_name = (
+            func.__qualname__.rsplit(".", 1)[0]
+            if hasattr(func, "__qualname__") and "." in func.__qualname__
+            else None
+        )
+
+        def build_context(args: Tuple[Any, ...]) -> Any:
+            ctx = set_value(AGENT_ID_KEY, str(uuid4()))
+            parent_id = get_value(AGENT_ID_KEY)
+            if parent_id:
+                ctx = set_value(PARENT_AGENT_ID_KEY, parent_id, context=ctx)
+            if class_name:
+                ctx = set_value(AGENT_CLASS_NAME_KEY, class_name, context=ctx)
+            if identifier and args and hasattr(args[0], identifier):
+                ctx = set_value(
+                    AGENT_INSTANCE_NAME_KEY,
+                    str(getattr(args[0], identifier)),
+                    context=ctx,
+                )
+            return ctx
 
         if inspect.iscoroutinefunction(func):
 
             @functools.wraps(func)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-                agent_id = str(uuid4())
-                parent_agent_id = get_value(AGENT_ID_KEY)
-                ctx = set_value(AGENT_ID_KEY, agent_id)
-                if parent_agent_id:
-                    ctx = set_value(PARENT_AGENT_ID_KEY, parent_agent_id, context=ctx)
-                if class_name:
-                    ctx = set_value(AGENT_CLASS_NAME_KEY, class_name, context=ctx)
-                if identifier and args:
-                    instance = args[0]
-                    if hasattr(instance, identifier):
-                        instance_name = str(getattr(instance, identifier))
-                        ctx = set_value(
-                            AGENT_INSTANCE_NAME_KEY, instance_name, context=ctx
-                        )
-                token = attach(ctx)
+                token = attach(build_context(args))
                 try:
                     return await func(*args, **kwargs)
                 finally:
                     detach(token)
 
-            return async_wrapper  # type: ignore[return-value]
+            return cast(C, async_wrapper)
         else:
 
             @functools.wraps(func)
             def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-                agent_id = str(uuid4())
-                parent_agent_id = get_value(AGENT_ID_KEY)
-                ctx = set_value(AGENT_ID_KEY, agent_id)
-                if parent_agent_id:
-                    ctx = set_value(PARENT_AGENT_ID_KEY, parent_agent_id, context=ctx)
-                if class_name:
-                    ctx = set_value(AGENT_CLASS_NAME_KEY, class_name, context=ctx)
-                if identifier and args:
-                    instance = args[0]
-                    if hasattr(instance, identifier):
-                        instance_name = str(getattr(instance, identifier))
-                        ctx = set_value(
-                            AGENT_INSTANCE_NAME_KEY, instance_name, context=ctx
-                        )
-                token = attach(ctx)
+                token = attach(build_context(args))
                 try:
                     return func(*args, **kwargs)
                 finally:
                     detach(token)
 
-            return sync_wrapper  # type: ignore[return-value]
+            return cast(C, sync_wrapper)
 
     def wrap(self, client: ApiClient) -> ApiClient:
         return wrap_provider(self, client)
@@ -518,3 +544,265 @@ def _format_inputs(
         return inputs
     except Exception:
         return {}
+
+
+def _serialize(serializer: Callable[[Any], str], value: Any) -> Any:
+    return value if isinstance(value, (str, int, float, bool)) else serializer(value)
+
+
+class _ObservedSyncGenerator(ABCGenerator[Any, Any, Any]):
+    def __init__(
+        self,
+        generator: Generator[Any, Any, Any],
+        span: Span,
+        serializer: Callable[[Any], str],
+        tracer: trace.Tracer,
+        context: contextvars.Context,
+    ) -> None:
+        self._generator = generator
+        self._span = span
+        self._serializer = serializer
+        self._tracer = tracer
+        self._context = context
+        self._closed = False
+
+    def __iter__(self) -> "_ObservedSyncGenerator":
+        return self
+
+    def __next__(self) -> Any:
+        return self.send(None)
+
+    def send(self, value: Any) -> Any:
+        if self._closed:
+            raise StopIteration
+        try:
+            item = self._context.run(self._generator.send, value)
+
+            with trace.use_span(self._span):
+                span_name = str(self._span.name) if hasattr(self._span, "name") else "generator_item"  # type: ignore[attr-defined]
+                with self._tracer.start_as_current_span(
+                    span_name,
+                    attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
+                    end_on_exit=True,
+                ) as child_span:
+                    child_span.set_attribute(
+                        AttributeKeys.JUDGMENT_OUTPUT,
+                        _serialize(self._serializer, item),
+                    )
+
+            return item
+        except StopIteration:
+            self._finish()
+            raise
+        except Exception as e:
+            self._record_error(e)
+            raise
+
+    @overload
+    def throw(
+        self,
+        __typ: type[BaseException],
+        __val: object = ...,
+        __tb: Optional[TracebackType] = ...,
+    ) -> Any: ...
+
+    @overload
+    def throw(
+        self,
+        __typ: BaseException,
+        __val: None = ...,
+        __tb: Optional[TracebackType] = ...,
+    ) -> Any: ...
+
+    def throw(
+        self,
+        __typ: type[BaseException] | BaseException,
+        __val: object = None,
+        __tb: Optional[TracebackType] = None,
+    ) -> Any:
+        if self._closed:
+            raise StopIteration
+        try:
+            if isinstance(__typ, type):
+                item = self._context.run(self._generator.throw, __typ, __val, __tb)
+            else:
+                item = self._context.run(self._generator.throw, __typ, None, __tb)
+
+            with trace.use_span(self._span):
+                span_name = str(self._span.name) if hasattr(self._span, "name") else "generator_item"  # type: ignore[attr-defined]
+                with self._tracer.start_as_current_span(
+                    span_name,
+                    attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
+                    end_on_exit=True,
+                ) as child_span:
+                    child_span.set_attribute(
+                        AttributeKeys.JUDGMENT_OUTPUT,
+                        _serialize(self._serializer, item),
+                    )
+
+            return item
+        except StopIteration:
+            self._finish()
+            raise
+        except Exception as e:
+            self._record_error(e)
+            raise
+
+    def close(self) -> None:
+        try:
+            self._generator.close()
+        finally:
+            self._finish()
+
+    def _record_error(self, exc: BaseException) -> None:
+        self._span.record_exception(exc)
+        self._span.set_status(Status(StatusCode.ERROR, str(exc)))
+        self._finish()
+
+    def _finish(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        self._span.set_attribute(AttributeKeys.JUDGMENT_SPAN_KIND, "generator")
+        self._span.end()
+
+    def __del__(self) -> None:
+        self._finish()
+
+
+class _ObservedAsyncGenerator(ABCAsyncGenerator[Any, Any]):
+    def __init__(
+        self,
+        generator: AsyncGenerator[Any, Any],
+        span: Span,
+        serializer: Callable[[Any], str],
+        tracer: trace.Tracer,
+        context: contextvars.Context,
+    ) -> None:
+        self._generator = generator
+        self._span = span
+        self._serializer = serializer
+        self._tracer = tracer
+        self._context = context
+        self._closed = False
+
+    def __aiter__(self) -> "_ObservedAsyncGenerator":
+        return self
+
+    async def __anext__(self) -> Any:
+        return await self.asend(None)
+
+    async def asend(self, value: Any) -> Any:
+        if self._closed:
+            raise StopAsyncIteration
+        try:
+            try:
+                item = await asyncio.create_task(
+                    self._generator.asend(value),
+                    context=self._context,
+                )
+            except TypeError:
+                item = await self._generator.asend(value)
+
+            with trace.use_span(self._span):
+                span_name = str(self._span.name) if hasattr(self._span, "name") else "generator_item"  # type: ignore[attr-defined]
+                with self._tracer.start_as_current_span(
+                    span_name,
+                    attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
+                    end_on_exit=True,
+                ) as child_span:
+                    child_span.set_attribute(
+                        AttributeKeys.JUDGMENT_OUTPUT,
+                        _serialize(self._serializer, item),
+                    )
+
+            return item
+        except StopAsyncIteration:
+            self._finish()
+            raise
+        except Exception as e:
+            self._record_error(e)
+            raise
+
+    @overload
+    async def athrow(
+        self,
+        __typ: type[BaseException],
+        __val: object = ...,
+        __tb: Optional[TracebackType] = ...,
+    ) -> Any: ...
+
+    @overload
+    async def athrow(
+        self,
+        __typ: BaseException,
+        __val: None = ...,
+        __tb: Optional[TracebackType] = ...,
+    ) -> Any: ...
+
+    async def athrow(
+        self,
+        __typ: type[BaseException] | BaseException,
+        __val: object = None,
+        __tb: Optional[TracebackType] = None,
+    ) -> Any:
+        if self._closed:
+            raise StopAsyncIteration
+        try:
+            try:
+                if isinstance(__typ, type):
+                    item = await asyncio.create_task(
+                        self._generator.athrow(__typ, __val, __tb),
+                        context=self._context,
+                    )
+                else:
+                    item = await asyncio.create_task(
+                        self._generator.athrow(__typ, None, __tb),
+                        context=self._context,
+                    )
+            except TypeError:
+                if isinstance(__typ, type):
+                    item = await self._generator.athrow(__typ, __val, __tb)
+                else:
+                    item = await self._generator.athrow(__typ, None, __tb)
+
+            with trace.use_span(self._span):
+                span_name = str(self._span.name) if hasattr(self._span, "name") else "generator_item"  # type: ignore[attr-defined]
+                with self._tracer.start_as_current_span(
+                    span_name,
+                    attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
+                    end_on_exit=True,
+                ) as child_span:
+                    child_span.set_attribute(
+                        AttributeKeys.JUDGMENT_OUTPUT,
+                        _serialize(self._serializer, item),
+                    )
+
+            return item
+        except StopAsyncIteration:
+            self._finish()
+            raise
+        except Exception as e:
+            self._record_error(e)
+            raise
+
+    async def aclose(self) -> None:
+        try:
+            await self._generator.aclose()
+        finally:
+            self._finish()
+
+    def _record_error(self, exc: BaseException) -> None:
+        self._span.record_exception(exc)
+        self._span.set_status(Status(StatusCode.ERROR, str(exc)))
+        self._finish()
+
+    def _finish(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        self._span.set_attribute(AttributeKeys.JUDGMENT_SPAN_KIND, "generator")
+        self._span.end()
+
+    def __del__(self) -> None:
+        self._finish()

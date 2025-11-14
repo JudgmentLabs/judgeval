@@ -4,7 +4,12 @@ import asyncio
 import json
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
-from fireworks import Dataset  # type: ignore[import-not-found]
+try:
+    from fireworks import Dataset  # type: ignore[import-untyped]
+except ImportError as e:
+    raise ImportError(
+        "Fireworks is not installed. Please install it with 'pip install fireworks'"
+    ) from e
 
 if TYPE_CHECKING:
     from judgeval.v1.trainers.config import TrainerConfig, ModelConfig
@@ -33,11 +38,11 @@ class FireworksTrainer(BaseTrainer):
 
     def __init__(
         self,
-        config: "TrainerConfig",
-        trainable_model: "TrainableModel",
-        tracer: "Tracer",
+        config: TrainerConfig,
+        trainable_model: TrainableModel,
+        tracer: Tracer,
         project_name: Optional[str] = None,
-        client: Optional["JudgmentSyncClient"] = None,
+        client: Optional[JudgmentSyncClient] = None,
     ):
         super().__init__(config, trainable_model, tracer, project_name)
         if client is None:
@@ -334,6 +339,10 @@ class FireworksTrainer(BaseTrainer):
                 "Starting reinforcement training", step_num, self.config.num_steps
             )
             job = self.trainable_model.perform_reinforcement_step(dataset, step)
+            if job is None:
+                raise JudgmentRuntimeError(
+                    "Failed to perform reinforcement training step. Job is None."
+                )
 
             last_state = None
             with _spinner_progress(

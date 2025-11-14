@@ -1,9 +1,14 @@
+from __future__ import annotations
 import time
 from fireworks import LLM  # type: ignore[import-not-found]
 from .config import TrainerConfig, ModelConfig
-from typing import Optional, Dict, Any, Callable
+from typing import Optional, Dict, Any, Callable, TYPE_CHECKING
 from .console import _model_spinner_progress, _print_model_progress
 from judgeval.exceptions import JudgmentRuntimeError
+
+
+if TYPE_CHECKING:
+    from fireworks import LLM
 
 
 class TrainableModel:
