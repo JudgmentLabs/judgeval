@@ -7,8 +7,6 @@
   </picture>
 </a>
 
-
-
 <br>
 
 ## Agent Behavior Monitoring (ABM)
