@@ -62,7 +62,7 @@ Our mission is to unlock the power of production data for agent development, ena
 | Online ABM | [Research Agent](https://colab.research.google.com/github/JudgmentLabs/judgment-cookbook/blob/main/monitoring/Research_Agent_Online_Monitoring.ipynb) | Monitor agent behavior in production |
 | Custom Scorers | [HumanEval](https://colab.research.google.com/github/JudgmentLabs/judgment-cookbook/blob/main/custom_scorers/HumanEval_Custom_Scorer.ipynb) | Build custom evaluators for your agents |
 | Offline Testing | [Get Started For Free] | Compare how different prompts, models, or agent configs affect performance across ANY metric |
-| Prompt Comparisons | [Customer Support Agent](https://colab.research.google.com/github/JudgmentLabs/judgment-cookbook/blob/main/JudgmentCustomScorer.ipynb) | Test and score customer support prompts to see which style performs best |
+| Prompt Comparisons | [Customer Support Agent](https://colab.research.google.com/github/JudgmentLabs/judgment-cookbook/blob/main/prompt_comparisons/Customer_Support_Agent.ipynb) | Test and score customer support prompts to see which style performs best |
 
 You can access our [repo of cookbooks](https://github.com/JudgmentLabs/judgment-cookbook).
 
