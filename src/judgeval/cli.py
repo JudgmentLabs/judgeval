@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 import typer
+from enum import Enum
 from pathlib import Path
 from dotenv import load_dotenv
 from judgeval.logger import judgeval_logger
@@ -14,6 +15,11 @@ from judgeval.utils.project import _resolve_project_id
 from judgeval.utils.url import url_for
 
 load_dotenv()
+
+
+class LoadOtelEnvPreset(str, Enum):
+    claude_code = "claude-code"
+
 
 app = typer.Typer(
     no_args_is_help=True,
@@ -33,6 +39,7 @@ def load_otel_env(
     project_name: str = typer.Argument(help="Project name to send telemetry to"),
     api_key: str = typer.Option(None, envvar="JUDGMENT_API_KEY"),
     organization_id: str = typer.Option(None, envvar="JUDGMENT_ORG_ID"),
+    preset: LoadOtelEnvPreset = typer.Option(None, help="Preset configuration"),
 ):
     """Run command with OpenTelemetry environment variables configured for Judgment."""
     if not api_key or not organization_id:
@@ -54,6 +61,13 @@ def load_otel_env(
     env["OTEL_EXPORTER_OTLP_HEADERS"] = (
         f"Authorization=Bearer {api_key},X-Organization-Id={organization_id},X-Project-Id={project_id}"
     )
+
+    if preset == LoadOtelEnvPreset.claude_code:
+        env["CLAUDE_CODE_ENABLE_TELEMETRY"] = "1"
+        env["OTEL_LOGS_EXPORTER"] = "otlp"
+        env["OTEL_EXPORTER_OTLP_LOGS_PROTOCOL"] = "http/protobuf"
+        env["OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"] = url_for("/otel/v1/claude_code")
+        env["OTEL_LOG_USER_PROMPTS"] = "1"
 
     result = subprocess.run(ctx.args, env=env)
     sys.exit(result.returncode)
