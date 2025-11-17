@@ -127,8 +127,7 @@ def _poll_evaluation_until_complete(
                 }
             )
 
-            example_scorer_pairings = results_response.get("results", [])
-            assert example_scorer_pairings is not None
+            example_scorer_pairings = results_response.get("results", []) or []
             if len(example_scorer_pairings) != expected_examples_count:
                 time.sleep(poll_interval_seconds)
                 continue
