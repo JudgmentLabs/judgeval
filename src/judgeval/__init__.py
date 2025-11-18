@@ -44,7 +44,6 @@ class JudgmentClient(metaclass=SingletonMeta):
         scorers: Sequence[Union[ExampleAPIScorerConfig, ExampleScorer, None]],
         project_name: str = "default_project",
         eval_run_name: str = "default_eval_run",
-        model: Optional[str] = None,
         assert_test: bool = False,
     ) -> List[ScoringResult]:
         try:
@@ -58,7 +57,6 @@ class JudgmentClient(metaclass=SingletonMeta):
                 eval_name=eval_run_name,
                 examples=examples,
                 scorers=scorers,  # type: ignore
-                model=model,
             )
 
             results = run_eval(eval)

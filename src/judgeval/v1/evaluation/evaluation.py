@@ -58,8 +58,6 @@ class Evaluation:
             "judgment_scorers": [s.get_scorer_config() for s in scorers],
             "custom_scorers": [],
         }
-        if model:
-            payload["model"] = model
 
         console.print()
         with Progress(
