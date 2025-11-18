@@ -50,7 +50,7 @@ openai_client_async = wrap(AsyncOpenAI())
 anthropic_client_async = wrap(AsyncAnthropic())
 together_client_async = wrap(AsyncTogether(api_key=os.getenv("TOGETHER_API_KEY")))
 
-QUERY_RETRY = 15
+QUERY_RETRY = 60
 PROMPT = "I need you to solve this math problem: 1 + 1 = ?"
 
 
@@ -63,7 +63,6 @@ def scorer_span():
             actual_output="The weather in France is sunny and 72°F.",
         ),
         scorer=AnswerRelevancyScorer(),
-        model="gpt-4o-mini",
         sampling_rate=1,
     )
 
