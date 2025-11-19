@@ -9,6 +9,14 @@ from typing import List, Literal, Optional
 
 from judgeval.v1.data.example import Example
 from judgeval.v1.internal.api import JudgmentSyncClient
+from judgeval.logger import judgeval_logger
+
+
+def _batch_examples(
+    examples: List[Example], batch_size: int = 100
+) -> List[List[Example]]:
+    """Split examples into batches for efficient upload."""
+    return [examples[i : i + batch_size] for i in range(0, len(examples), batch_size)]
 
 
 @dataclass
@@ -29,7 +37,7 @@ class Dataset:
     examples: Optional[List[Example]] = None
     client: Optional[JudgmentSyncClient] = None
 
-    def add_from_json(self, file_path: str) -> None:
+    def add_from_json(self, file_path: str, batch_size: int = 100) -> None:
         with open(file_path, "rb") as file:
             data = orjson.loads(file.read())
         examples = []
@@ -43,9 +51,9 @@ class Dataset:
                 examples.append(example)
             else:
                 examples.append(e)
-        self.add_examples(examples)
+        self.add_examples(examples, batch_size=batch_size)
 
-    def add_from_yaml(self, file_path: str) -> None:
+    def add_from_yaml(self, file_path: str, batch_size: int = 100) -> None:
         with open(file_path, "r") as file:
             data = yaml.safe_load(file)
         examples = []
@@ -59,10 +67,35 @@ class Dataset:
                 examples.append(example)
             else:
                 examples.append(e)
-        self.add_examples(examples)
+        self.add_examples(examples, batch_size=batch_size)
 
-    def add_examples(self, examples: List[Example]) -> None:
-        if self.client:
+    def add_examples(self, examples: List[Example], batch_size: int = 100) -> None:
+        if not self.client:
+            return
+
+        if len(examples) > batch_size:
+            judgeval_logger.info(
+                f"Adding {len(examples)} examples in batches of {batch_size}..."
+            )
+            batches = _batch_examples(examples, batch_size)
+
+            for i, batch in enumerate(batches, start=1):
+                judgeval_logger.info(
+                    f"Uploading batch {i}/{len(batches)} ({len(batch)} examples)..."
+                )
+                self.client.datasets_insert_examples_for_judgeval(
+                    {
+                        "dataset_name": self.name,
+                        "project_name": self.project_name,
+                        "examples": [e.to_dict() for e in batch],
+                    }
+                )
+
+            judgeval_logger.info(
+                f"Successfully added {len(examples)} examples to dataset {self.name}!"
+            )
+        else:
+            # Small batch - upload all at once
             self.client.datasets_insert_examples_for_judgeval(
                 {
                     "dataset_name": self.name,

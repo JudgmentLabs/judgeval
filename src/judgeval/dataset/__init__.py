@@ -15,6 +15,12 @@ from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_ORG_ID
 from judgeval.data.judgment_types import DatasetKind
 
 
+def _batch_examples(
+    examples: List[Example], batch_size: int = 100
+) -> List[List[Example]]:
+    return [examples[i : i + batch_size] for i in range(0, len(examples), batch_size)]
+
+
 @dataclass
 class DatasetInfo:
     dataset_id: str
@@ -103,24 +109,43 @@ class Dataset:
         project_name: str,
         examples: List[Example] = [],
         overwrite: bool = False,
+        batch_size: int = 100,
     ):
+        """Create a dataset with batched example uploads for large datasets.
+
+        Args:
+            name: Dataset name
+            project_name: Project name
+            examples: List of examples to add
+            overwrite: Whether to overwrite existing dataset
+            batch_size: Number of examples to upload per batch (default: 100)
+        """
         if not cls.judgment_api_key or not cls.organization_id:
             raise ValueError("Judgment API key and organization ID are required")
         if not examples:
             examples = []
 
         client = JudgmentSyncClient(cls.judgment_api_key, cls.organization_id)
+
         client.datasets_create_for_judgeval(
             {
                 "name": name,
                 "project_name": project_name,
-                "examples": examples,  # type: ignore
+                "examples": [],  # type: ignore
                 "dataset_kind": "example",
                 "overwrite": overwrite,
             }
         )
+        judgeval_logger.info(f"Created dataset {name}")
 
-        judgeval_logger.info(f"Successfully created dataset {name}!")
+        if len(examples) > 0:
+            dataset_instance = cls(
+                name=name,
+                project_name=project_name,
+                examples=[],
+            )
+            dataset_instance.add_examples(examples, batch_size=batch_size)
+
         return cls(
             name=name,
             project_name=project_name,
@@ -175,7 +200,7 @@ class Dataset:
         examples = get_examples_from_yaml(file_path)
         self.add_examples(examples)
 
-    def add_examples(self, examples: List[Example]) -> None:
+    def add_examples(self, examples: List[Example], batch_size: int = 100) -> None:
         if not isinstance(examples, list):
             raise TypeError("examples must be a list")
 
@@ -183,13 +208,38 @@ class Dataset:
             raise ValueError("Judgment API key and organization ID are required")
 
         client = JudgmentSyncClient(self.judgment_api_key, self.organization_id)
-        client.datasets_insert_examples_for_judgeval(
-            {
-                "dataset_name": self.name,
-                "project_name": self.project_name,
-                "examples": examples,  # type: ignore
-            }
-        )
+
+        # Always use batching for consistency and to handle large uploads
+        if len(examples) > batch_size:
+            judgeval_logger.info(
+                f"Adding {len(examples)} examples in batches of {batch_size}..."
+            )
+            batches = _batch_examples(examples, batch_size)
+
+            for i, batch in enumerate(batches, start=1):
+                judgeval_logger.info(
+                    f"Uploading batch {i}/{len(batches)} ({len(batch)} examples)..."
+                )
+                client.datasets_insert_examples_for_judgeval(
+                    {
+                        "dataset_name": self.name,
+                        "project_name": self.project_name,
+                        "examples": batch,  # type: ignore
+                    }
+                )
+
+            judgeval_logger.info(
+                f"Successfully added {len(examples)} examples to dataset {self.name}!"
+            )
+        else:
+            # Small batch - upload all at once
+            client.datasets_insert_examples_for_judgeval(
+                {
+                    "dataset_name": self.name,
+                    "project_name": self.project_name,
+                    "examples": examples,  # type: ignore
+                }
+            )
 
     def save_as(
         self,

@@ -64,18 +64,22 @@ class DatasetFactory:
         project_name: str,
         examples: List[Example] = [],
         overwrite: bool = False,
+        batch_size: int = 100,
     ) -> Dataset:
         self._client.datasets_create_for_judgeval(
             {
                 "name": name,
                 "project_name": project_name,
-                "examples": [e.to_dict() for e in examples],
+                "examples": [],
                 "dataset_kind": "example",
                 "overwrite": overwrite,
             }
         )
-
         judgeval_logger.info(f"Created dataset {name}")
+
+        if len(examples) > 0:
+            self.get(name, project_name).add_examples(examples, batch_size=batch_size)
+
         return Dataset(
             name=name, project_name=project_name, examples=examples, client=self._client
         )
