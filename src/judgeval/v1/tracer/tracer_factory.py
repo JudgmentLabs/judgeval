@@ -4,6 +4,7 @@ from typing import Any, Callable, Optional
 
 from judgeval.utils.serialize import safe_serialize
 from judgeval.v1.internal.api import JudgmentSyncClient
+from judgeval.v1.tracer.judgment_tracer_provider import FilterTracerCallback
 from judgeval.v1.tracer.tracer import Tracer
 
 
@@ -21,8 +22,8 @@ class TracerFactory:
         project_name: str,
         enable_evaluation: bool = True,
         serializer: Optional[Callable[[Any], str]] = None,
+        filter_tracer: Optional[FilterTracerCallback] = None,
         initialize: bool = True,
-        **kwargs: Any,
     ) -> Tracer:
         if serializer is None:
             serializer = safe_serialize
@@ -33,4 +34,5 @@ class TracerFactory:
             api_client=self._client,
             serializer=serializer,
             initialize=initialize,
+            filter_tracer=filter_tracer,
         )
