@@ -1,7 +1,7 @@
 import asyncio
 import json
 from typing import Optional, Callable, Any, List, Union, Dict
-from fireworks import Dataset  # type: ignore[import-not-found, import-untyped]
+from fireworks import Dataset  # type: ignore[import-not-found,import-untyped]
 from .config import TrainerConfig, ModelConfig
 from .base_trainer import BaseTrainer
 from .trainable_model import TrainableModel

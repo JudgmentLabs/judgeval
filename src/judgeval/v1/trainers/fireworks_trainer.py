@@ -4,7 +4,7 @@ import asyncio
 import json
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
-from fireworks import Dataset  # type: ignore[import-not-found, import-untyped]
+from fireworks import Dataset  # type: ignore[import-not-found,import-untyped]
 
 if TYPE_CHECKING:
     from judgeval.v1.trainers.config import TrainerConfig, ModelConfig
