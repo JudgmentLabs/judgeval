@@ -4,6 +4,13 @@ import os
 import yaml
 from dataclasses import dataclass
 from typing import List, Literal, Optional
+from rich.progress import (
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    BarColumn,
+    TaskProgressColumn,
+)
 
 from judgeval.data import Example
 from judgeval.data.trace import Trace
@@ -212,24 +219,36 @@ class Dataset:
         # Always use batching for consistency and to handle large uploads
         if len(examples) > batch_size:
             total_batches = (len(examples) + batch_size - 1) // batch_size
-            judgeval_logger.info(
-                f"Adding {len(examples)} examples in batches of {batch_size}..."
-            )
 
-            for i, batch in enumerate(_batch_examples(examples, batch_size), start=1):
-                judgeval_logger.info(
-                    f"Uploading batch {i}/{total_batches} ({len(batch)} examples)..."
-                )
-                client.datasets_insert_examples_for_judgeval(
-                    {
-                        "dataset_name": self.name,
-                        "project_name": self.project_name,
-                        "examples": batch,  # type: ignore
-                    }
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[bold blue]{task.description}"),
+                BarColumn(),
+                TaskProgressColumn(),
+                TextColumn("[dim]{task.fields[info]}"),
+            ) as progress:
+                task = progress.add_task(
+                    f"Uploading to {self.name}", total=total_batches, info=""
                 )
 
+                for i, batch in enumerate(
+                    _batch_examples(examples, batch_size), start=1
+                ):
+                    progress.update(
+                        task,
+                        advance=1,
+                        info=f"Batch {i}/{total_batches} ({len(batch)} examples)",
+                    )
+                    client.datasets_insert_examples_for_judgeval(
+                        {
+                            "dataset_name": self.name,
+                            "project_name": self.project_name,
+                            "examples": batch,  # type: ignore
+                        }
+                    )
+
             judgeval_logger.info(
-                f"Successfully added {len(examples)} examples to dataset {self.name}!"
+                f"Successfully added {len(examples)} examples to dataset {self.name}"
             )
         else:
             # Small batch - upload all at once
