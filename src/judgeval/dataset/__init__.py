@@ -15,10 +15,10 @@ from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_ORG_ID
 from judgeval.data.judgment_types import DatasetKind
 
 
-def _batch_examples(
-    examples: List[Example], batch_size: int = 100
-) -> List[List[Example]]:
-    return [examples[i : i + batch_size] for i in range(0, len(examples), batch_size)]
+def _batch_examples(examples: List[Example], batch_size: int = 100):
+    """Generator that yields batches of examples for efficient memory usage."""
+    for i in range(0, len(examples), batch_size):
+        yield examples[i : i + batch_size]
 
 
 @dataclass
@@ -211,14 +211,14 @@ class Dataset:
 
         # Always use batching for consistency and to handle large uploads
         if len(examples) > batch_size:
+            total_batches = (len(examples) + batch_size - 1) // batch_size
             judgeval_logger.info(
                 f"Adding {len(examples)} examples in batches of {batch_size}..."
             )
-            batches = _batch_examples(examples, batch_size)
 
-            for i, batch in enumerate(batches, start=1):
+            for i, batch in enumerate(_batch_examples(examples, batch_size), start=1):
                 judgeval_logger.info(
-                    f"Uploading batch {i}/{len(batches)} ({len(batch)} examples)..."
+                    f"Uploading batch {i}/{total_batches} ({len(batch)} examples)..."
                 )
                 client.datasets_insert_examples_for_judgeval(
                     {
