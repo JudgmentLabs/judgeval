@@ -15,6 +15,7 @@ from types import TracebackType
 from typing import (
     Any,
     AsyncGenerator,
+    Awaitable,
     Callable,
     Dict,
     Generator,
@@ -697,6 +698,14 @@ class _ObservedAsyncGenerator(ABCAsyncGenerator[Any, Any]):
         self._closed = False
         self._disable_generator_yield_span = disable_generator_yield_span
 
+    def _create_task(self, coro: Awaitable[Any]) -> "asyncio.Task[Any]":
+        # Python 3.11 added the context kwarg to asyncio.create_task 
+        # @ref https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
+        try:
+            return asyncio.create_task(coro, context=self._context)
+        except TypeError:
+            return self._context.run(asyncio.create_task, coro)
+
     def __aiter__(self) -> "_ObservedAsyncGenerator":
         return self
 
@@ -707,10 +716,7 @@ class _ObservedAsyncGenerator(ABCAsyncGenerator[Any, Any]):
         if self._closed:
             raise StopAsyncIteration
         try:
-            item = await asyncio.create_task(
-                self._generator.asend(value),
-                context=self._context,
-            )
+            item = await self._create_task(self._generator.asend(value))
 
             if not self._disable_generator_yield_span:
                 with trace.use_span(self._span):
@@ -758,14 +764,12 @@ class _ObservedAsyncGenerator(ABCAsyncGenerator[Any, Any]):
             raise StopAsyncIteration
         try:
             if isinstance(__typ, type):
-                item = await asyncio.create_task(
-                    self._generator.athrow(__typ, __val, __tb),
-                    context=self._context,
+                item = await self._create_task(
+                    self._generator.athrow(__typ, __val, __tb)
                 )
             else:
-                item = await asyncio.create_task(
-                    self._generator.athrow(__typ, None, __tb),
-                    context=self._context,
+                item = await self._create_task(
+                    self._generator.athrow(__typ, None, __tb)
                 )
 
             if not self._disable_generator_yield_span:
