@@ -8,12 +8,14 @@ from opentelemetry.sdk.trace import TracerProvider
 
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.logger import judgeval_logger
+from judgeval.v1.tracer.judgment_tracer_provider import JudgmentTracerProvider
 from judgeval.version import get_version
 from judgeval.v1.tracer.base_tracer import BaseTracer
+from judgeval.v1.tracer.judgment_tracer_provider import FilterTracerCallback
 
 
 class Tracer(BaseTracer):
-    __slots__ = ("_tracer_provider",)
+    __slots__ = ("_tracer_provider", "_filter_tracer")
 
     def __init__(
         self,
@@ -22,6 +24,7 @@ class Tracer(BaseTracer):
         api_client: JudgmentSyncClient,
         serializer: Callable[[Any], str],
         initialize: bool,
+        filter_tracer: Optional[FilterTracerCallback] = None,
     ):
         super().__init__(
             project_name=project_name,
@@ -30,6 +33,7 @@ class Tracer(BaseTracer):
             serializer=serializer,
         )
         self._tracer_provider: Optional[TracerProvider] = None
+        self._filter_tracer = filter_tracer
 
         if initialize:
             self.initialize()
@@ -43,7 +47,9 @@ class Tracer(BaseTracer):
             }
         )
 
-        self._tracer_provider = TracerProvider(resource=resource)
+        self._tracer_provider = JudgmentTracerProvider(
+            resource=resource, filter_tracer=self._filter_tracer
+        )
         self._tracer_provider.add_span_processor(self.get_span_processor())
 
         trace.set_tracer_provider(self._tracer_provider)

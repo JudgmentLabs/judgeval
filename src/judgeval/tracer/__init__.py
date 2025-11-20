@@ -43,7 +43,6 @@ from judgeval.data.evaluation_run import ExampleEvaluationRun, TraceEvaluationRu
 from judgeval.data.example import Example
 from judgeval.env import (
     JUDGMENT_API_KEY,
-    JUDGMENT_DEFAULT_GPT_MODEL,
     JUDGMENT_ORG_ID,
     JUDGMENT_ENABLE_MONITORING,
     JUDGMENT_ENABLE_EVALUATIONS,
@@ -389,7 +388,6 @@ class Tracer(metaclass=SingletonMeta):
             return
 
         scorer = scorer_config.scorer
-        model = scorer_config.model
         run_condition = scorer_config.run_condition
         sampling_rate = scorer_config.sampling_rate
 
@@ -431,7 +429,6 @@ class Tracer(metaclass=SingletonMeta):
             project_name=self.project_name,
             eval_name=eval_run_name,
             scorers=[scorer],
-            model=model,
             trace_and_span_ids=[(trace_id, span_id)],
         )
         span.set_attribute(
@@ -811,7 +808,6 @@ class Tracer(metaclass=SingletonMeta):
         *,
         scorer: Union[ExampleAPIScorerConfig, ExampleScorer, None],
         example: Example,
-        model: Optional[str] = None,
         sampling_rate: float = 1.0,
     ):
         if not self.enable_evaluation or not self.enable_monitoring:
@@ -835,12 +831,6 @@ class Tracer(metaclass=SingletonMeta):
                 % type(example)
             )
             return
-
-        if model is None:
-            if scorer.model is None:
-                model = JUDGMENT_DEFAULT_GPT_MODEL
-            else:
-                model = scorer.model
 
         if sampling_rate < 0 or sampling_rate > 1:
             judgeval_logger.error(
@@ -874,7 +864,6 @@ class Tracer(metaclass=SingletonMeta):
             eval_name=f"async_evaluate_{span_id}",
             examples=[example],
             scorers=[scorer],
-            model=model,
             trace_span_id=span_id,
             trace_id=trace_id,
         )

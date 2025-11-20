@@ -12,7 +12,6 @@ from judgeval.scorers import (
 )
 from judgeval.scorers.example_scorer import ExampleScorer
 from judgeval.dataset import Dataset
-from judgeval.env import JUDGMENT_DEFAULT_TOGETHER_MODEL
 from judgeval.exceptions import JudgmentTestError
 
 
@@ -45,7 +44,6 @@ def run_eval_helper(client: JudgmentClient, project_name: str, eval_run_name: st
     res = client.run_evaluation(
         examples=[example1, example2],
         scorers=[scorer, scorer2],
-        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=eval_run_name,
     )
@@ -62,7 +60,6 @@ def test_no_project_or_eval_run_name(client: JudgmentClient):
             )
         ],
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
-        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
     )
 
     assert res, "No evaluation results found"
@@ -119,7 +116,6 @@ def test_assert_test(client: JudgmentClient, project_name: str):
             project_name=project_name,
             examples=[example, example1, example2],
             scorers=[scorer],
-            model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
             assert_test=True,
         )
 
@@ -146,7 +142,6 @@ def test_evaluate_dataset(client: JudgmentClient, project_name: str, random_name
     res = client.run_evaluation(
         examples=dataset.examples,
         scorers=[FaithfulnessScorer(threshold=0.5)],
-        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=random_name,
     )
@@ -185,7 +180,6 @@ def test_evaluate_dataset_custom(
     res = client.run_evaluation(
         examples=dataset.examples,
         scorers=[CustomScorer()],
-        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=random_name,
     )
@@ -224,7 +218,6 @@ def test_dataset_and_evaluation(
     res = client.run_evaluation(
         examples=examples,
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
-        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=random_name,
     )
@@ -254,7 +247,6 @@ def test_dataset_and_double_evaluation(
     res = client.run_evaluation(
         examples=dataset.examples,
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
-        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=random_name,
     )
@@ -263,7 +255,6 @@ def test_dataset_and_double_evaluation(
     res2 = client.run_evaluation(
         examples=dataset.examples,
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
-        model=JUDGMENT_DEFAULT_TOGETHER_MODEL,
         project_name=project_name,
         eval_run_name=random_name,
     )
