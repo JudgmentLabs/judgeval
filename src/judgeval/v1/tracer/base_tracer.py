@@ -360,6 +360,7 @@ class BaseTracer(ABC):
         func: C,
         span_type: Optional[str] = "span",
         span_name: Optional[str] = None,
+        disable_generator_yield_span: bool = False,
     ) -> C: ...
 
     @overload
@@ -368,6 +369,7 @@ class BaseTracer(ABC):
         func: None = None,
         span_type: Optional[str] = "span",
         span_name: Optional[str] = None,
+        disable_generator_yield_span: bool = False,
     ) -> Callable[[C], C]: ...
 
     def observe(
@@ -375,9 +377,10 @@ class BaseTracer(ABC):
         func: Optional[C] = None,
         span_type: Optional[str] = "span",
         span_name: Optional[str] = None,
+        disable_generator_yield_span: bool = False,
     ) -> C | Callable[[C], C]:
         if func is None:
-            return lambda f: self.observe(f, span_type, span_name)
+            return lambda f: self.observe(f, span_type, span_name, disable_generator_yield_span)
 
         tracer = self.get_tracer()
         name = span_name or func.__name__
@@ -439,6 +442,7 @@ class BaseTracer(ABC):
                             self.serializer,
                             tracer,
                             contextvars.copy_context(),
+                            disable_generator_yield_span,
                         )
                     if inspect.isasyncgen(result):
                         span.set_attribute(
@@ -450,6 +454,7 @@ class BaseTracer(ABC):
                             self.serializer,
                             tracer,
                             contextvars.copy_context(),
+                            disable_generator_yield_span,
                         )
                     span.set_attribute(
                         AttributeKeys.JUDGMENT_OUTPUT,
@@ -558,6 +563,7 @@ class _ObservedSyncGenerator(ABCGenerator[Any, Any, Any]):
         serializer: Callable[[Any], str],
         tracer: trace.Tracer,
         context: contextvars.Context,
+        disable_generator_yield_span: bool = False,
     ) -> None:
         self._generator = generator
         self._span = span
@@ -565,6 +571,7 @@ class _ObservedSyncGenerator(ABCGenerator[Any, Any, Any]):
         self._tracer = tracer
         self._context = context
         self._closed = False
+        self._disable_generator_yield_span = disable_generator_yield_span
 
     def __iter__(self) -> "_ObservedSyncGenerator":
         return self
@@ -578,16 +585,17 @@ class _ObservedSyncGenerator(ABCGenerator[Any, Any, Any]):
         try:
             item = self._context.run(self._generator.send, value)
 
-            with trace.use_span(self._span):
-                span_name = str(getattr(self._span, "name", "generator_item"))
-                with self._tracer.start_as_current_span(
-                    span_name,
-                    attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
-                ) as child_span:
-                    child_span.set_attribute(
-                        AttributeKeys.JUDGMENT_OUTPUT,
-                        _serialize(self._serializer, item),
-                    )
+            if not self._disable_generator_yield_span:
+                with trace.use_span(self._span):
+                    span_name = str(getattr(self._span, "name", "generator_item"))
+                    with self._tracer.start_as_current_span(
+                        span_name,
+                        attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
+                    ) as child_span:
+                        child_span.set_attribute(
+                            AttributeKeys.JUDGMENT_OUTPUT,
+                            _serialize(self._serializer, item),
+                        )
 
             return item
         except StopIteration:
@@ -627,16 +635,17 @@ class _ObservedSyncGenerator(ABCGenerator[Any, Any, Any]):
             else:
                 item = self._context.run(self._generator.throw, __typ, None, __tb)
 
-            with trace.use_span(self._span):
-                span_name = str(getattr(self._span, "name", "generator_item"))
-                with self._tracer.start_as_current_span(
-                    span_name,
-                    attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
-                ) as child_span:
-                    child_span.set_attribute(
-                        AttributeKeys.JUDGMENT_OUTPUT,
-                        _serialize(self._serializer, item),
-                    )
+            if not self._disable_generator_yield_span:
+                with trace.use_span(self._span):
+                    span_name = str(getattr(self._span, "name", "generator_item"))
+                    with self._tracer.start_as_current_span(
+                        span_name,
+                        attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
+                    ) as child_span:
+                        child_span.set_attribute(
+                            AttributeKeys.JUDGMENT_OUTPUT,
+                            _serialize(self._serializer, item),
+                        )
 
             return item
         except StopIteration:
@@ -676,6 +685,7 @@ class _ObservedAsyncGenerator(ABCAsyncGenerator[Any, Any]):
         serializer: Callable[[Any], str],
         tracer: trace.Tracer,
         context: contextvars.Context,
+        disable_generator_yield_span: bool = False,
     ) -> None:
         self._generator = generator
         self._span = span
@@ -683,6 +693,7 @@ class _ObservedAsyncGenerator(ABCAsyncGenerator[Any, Any]):
         self._tracer = tracer
         self._context = context
         self._closed = False
+        self._disable_generator_yield_span = disable_generator_yield_span
 
     def __aiter__(self) -> "_ObservedAsyncGenerator":
         return self
@@ -699,16 +710,17 @@ class _ObservedAsyncGenerator(ABCAsyncGenerator[Any, Any]):
                 context=self._context,
             )
 
-            with trace.use_span(self._span):
-                span_name = str(getattr(self._span, "name", "generator_item"))
-                with self._tracer.start_as_current_span(
-                    span_name,
-                    attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
-                ) as child_span:
-                    child_span.set_attribute(
-                        AttributeKeys.JUDGMENT_OUTPUT,
-                        _serialize(self._serializer, item),
-                    )
+            if not self._disable_generator_yield_span:
+                with trace.use_span(self._span):
+                    span_name = str(getattr(self._span, "name", "generator_item"))
+                    with self._tracer.start_as_current_span(
+                        span_name,
+                        attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
+                    ) as child_span:
+                        child_span.set_attribute(
+                            AttributeKeys.JUDGMENT_OUTPUT,
+                            _serialize(self._serializer, item),
+                        )
 
             return item
         except StopAsyncIteration:
@@ -754,16 +766,17 @@ class _ObservedAsyncGenerator(ABCAsyncGenerator[Any, Any]):
                     context=self._context,
                 )
 
-            with trace.use_span(self._span):
-                span_name = str(getattr(self._span, "name", "generator_item"))
-                with self._tracer.start_as_current_span(
-                    span_name,
-                    attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
-                ) as child_span:
-                    child_span.set_attribute(
-                        AttributeKeys.JUDGMENT_OUTPUT,
-                        _serialize(self._serializer, item),
-                    )
+            if not self._disable_generator_yield_span:
+                with trace.use_span(self._span):
+                    span_name = str(getattr(self._span, "name", "generator_item"))
+                    with self._tracer.start_as_current_span(
+                        span_name,
+                        attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
+                    ) as child_span:
+                        child_span.set_attribute(
+                            AttributeKeys.JUDGMENT_OUTPUT,
+                            _serialize(self._serializer, item),
+                        )
 
             return item
         except StopAsyncIteration:
