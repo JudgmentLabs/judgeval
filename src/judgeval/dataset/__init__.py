@@ -241,6 +241,9 @@ class Dataset:
 
             batch_num = 0
             for batch in batches:
+                if len(batch) > 0 and not isinstance(batch[0], Example):
+                    raise TypeError("Examples must be a list of Example objects")
+
                 batch_num += 1
                 batch_size_actual = len(batch)
                 total_uploaded += batch_size_actual
