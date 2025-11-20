@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List
+from typing import List, Iterable
 
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.datasets.dataset import Dataset, DatasetInfo
@@ -62,7 +62,7 @@ class DatasetFactory:
         self,
         name: str,
         project_name: str,
-        examples: List[Example] = [],
+        examples: Iterable[Example] = [],
         overwrite: bool = False,
         batch_size: int = 100,
     ) -> Dataset:
@@ -80,10 +80,16 @@ class DatasetFactory:
         dataset = Dataset(
             name=name, project_name=project_name, examples=[], client=self._client
         )
-        if len(examples) > 0:
-            dataset.add_examples(examples, batch_size=batch_size)
+        dataset.add_examples(examples, batch_size=batch_size)
+        if not isinstance(examples, list):
+            examples = list(examples)
 
-        return dataset
+        return Dataset(
+            name=name,
+            project_name=project_name,
+            examples=examples,
+            client=self._client,
+        )
 
     def list(self, project_name: str) -> List[DatasetInfo]:
         datasets = self._client.datasets_pull_all_for_judgeval(

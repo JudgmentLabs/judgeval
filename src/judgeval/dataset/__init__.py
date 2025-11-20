@@ -3,7 +3,8 @@ import orjson
 import os
 import yaml
 from dataclasses import dataclass
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Iterable, Iterator
+from itertools import islice
 from rich.progress import (
     Progress,
     SpinnerColumn,
@@ -22,10 +23,19 @@ from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_ORG_ID
 from judgeval.data.judgment_types import DatasetKind
 
 
-def _batch_examples(examples: List[Example], batch_size: int = 100):
-    """Generator that yields batches of examples for efficient memory usage."""
-    for i in range(0, len(examples), batch_size):
-        yield examples[i : i + batch_size]
+def _batch_examples(
+    examples: Iterable[Example], batch_size: int = 100
+) -> Iterator[List[Example]]:
+    """Generator that yields batches of examples for efficient memory usage.
+
+    Works with any iterable including generators, consuming only batch_size items at a time.
+    """
+    iterator = iter(examples)
+    while True:
+        batch = list(islice(iterator, batch_size))
+        if not batch:
+            break
+        yield batch
 
 
 @dataclass
@@ -114,7 +124,7 @@ class Dataset:
         cls,
         name: str,
         project_name: str,
-        examples: List[Example] = [],
+        examples: Iterable[Example] = [],
         overwrite: bool = False,
         batch_size: int = 100,
     ):
@@ -123,14 +133,12 @@ class Dataset:
         Args:
             name: Dataset name
             project_name: Project name
-            examples: List of examples to add
+            examples: Iterable of examples to add (can be a list, generator, etc.)
             overwrite: Whether to overwrite existing dataset
             batch_size: Number of examples to upload per batch (default: 100)
         """
         if not cls.judgment_api_key or not cls.organization_id:
             raise ValueError("Judgment API key and organization ID are required")
-        if not examples:
-            examples = []
 
         client = JudgmentSyncClient(cls.judgment_api_key, cls.organization_id)
 
@@ -145,13 +153,15 @@ class Dataset:
         )
         judgeval_logger.info(f"Created dataset {name}")
 
-        if len(examples) > 0:
-            dataset_instance = cls(
-                name=name,
-                project_name=project_name,
-                examples=[],
-            )
-            dataset_instance.add_examples(examples, batch_size=batch_size)
+        dataset_instance = cls(
+            name=name,
+            project_name=project_name,
+            examples=[],
+        )
+        dataset_instance.add_examples(examples, batch_size=batch_size)
+
+        if not isinstance(examples, list):
+            examples = list(examples)
 
         return cls(
             name=name,
@@ -207,58 +217,51 @@ class Dataset:
         examples = get_examples_from_yaml(file_path)
         self.add_examples(examples)
 
-    def add_examples(self, examples: List[Example], batch_size: int = 100) -> None:
-        if not isinstance(examples, list):
-            raise TypeError("examples must be a list")
-
+    def add_examples(self, examples: Iterable[Example], batch_size: int = 100) -> None:
         if not self.judgment_api_key or not self.organization_id:
             raise ValueError("Judgment API key and organization ID are required")
 
         client = JudgmentSyncClient(self.judgment_api_key, self.organization_id)
 
-        # Always use batching for consistency and to handle large uploads
-        if len(examples) > batch_size:
-            total_batches = (len(examples) + batch_size - 1) // batch_size
+        batches = _batch_examples(examples, batch_size)
+        total_uploaded = 0
 
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[bold blue]{task.description}"),
-                BarColumn(),
-                TaskProgressColumn(),
-                TextColumn("[dim]{task.fields[info]}"),
-            ) as progress:
-                task = progress.add_task(
-                    f"Uploading to {self.name}", total=total_batches, info=""
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold blue]{task.description}"),
+            BarColumn(pulse_style="green"),
+            TaskProgressColumn(),
+            TextColumn("[dim]{task.fields[info]}"),
+        ) as progress:
+            task = progress.add_task(
+                f"Uploading to {self.name}",
+                total=None,
+                info="",
+            )
+
+            batch_num = 0
+            for batch in batches:
+                batch_num += 1
+                batch_size_actual = len(batch)
+                total_uploaded += batch_size_actual
+
+                progress.update(
+                    task,
+                    advance=1,
+                    info=f"Batch {batch_num} ({batch_size_actual} examples, {total_uploaded} total)",
                 )
 
-                for i, batch in enumerate(
-                    _batch_examples(examples, batch_size), start=1
-                ):
-                    progress.update(
-                        task,
-                        advance=1,
-                        info=f"Batch {i}/{total_batches} ({len(batch)} examples)",
-                    )
-                    client.datasets_insert_examples_for_judgeval(
-                        {
-                            "dataset_name": self.name,
-                            "project_name": self.project_name,
-                            "examples": batch,  # type: ignore
-                        }
-                    )
+                client.datasets_insert_examples_for_judgeval(
+                    {
+                        "dataset_name": self.name,
+                        "project_name": self.project_name,
+                        "examples": batch,  # type: ignore
+                    }
+                )
 
-            judgeval_logger.info(
-                f"Successfully added {len(examples)} examples to dataset {self.name}"
-            )
-        else:
-            # Small batch - upload all at once
-            client.datasets_insert_examples_for_judgeval(
-                {
-                    "dataset_name": self.name,
-                    "project_name": self.project_name,
-                    "examples": examples,  # type: ignore
-                }
-            )
+        judgeval_logger.info(
+            f"Successfully added {total_uploaded} examples to dataset {self.name}"
+        )
 
     def save_as(
         self,
