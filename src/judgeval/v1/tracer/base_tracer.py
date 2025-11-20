@@ -450,7 +450,7 @@ class BaseTracer(ABC):
                             self.serializer,
                             tracer,
                             contextvars.copy_context(),
-                        )  # type: ignore[return-value]
+                        )
                     span.set_attribute(
                         AttributeKeys.JUDGMENT_OUTPUT,
                         _serialize(self.serializer, result),
@@ -472,7 +472,7 @@ class BaseTracer(ABC):
         self, func: Optional[C] = None, /, *, identifier: Optional[str] = None
     ) -> C | Callable[[C], C]:
         if func is None:
-            return lambda f: self.agent(f, identifier=identifier)  # type: ignore[return-value]
+            return lambda f: self.agent(f, identifier=identifier)
 
         class_name = (
             func.__qualname__.rsplit(".", 1)[0]
@@ -579,11 +579,7 @@ class _ObservedSyncGenerator(ABCGenerator[Any, Any, Any]):
             item = self._context.run(self._generator.send, value)
 
             with trace.use_span(self._span):
-                span_name = (
-                    str(self._span.name)  # type: ignore[attr-defined]
-                    if hasattr(self._span, "name")
-                    else "generator_item"
-                )
+                span_name = str(getattr(self._span, "name", "generator_item"))
                 with self._tracer.start_as_current_span(
                     span_name,
                     attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
@@ -632,11 +628,7 @@ class _ObservedSyncGenerator(ABCGenerator[Any, Any, Any]):
                 item = self._context.run(self._generator.throw, __typ, None, __tb)
 
             with trace.use_span(self._span):
-                span_name = (
-                    str(self._span.name)  # type: ignore[attr-defined]
-                    if hasattr(self._span, "name")
-                    else "generator_item"
-                )
+                span_name = str(getattr(self._span, "name", "generator_item"))
                 with self._tracer.start_as_current_span(
                     span_name,
                     attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
@@ -702,20 +694,13 @@ class _ObservedAsyncGenerator(ABCAsyncGenerator[Any, Any]):
         if self._closed:
             raise StopAsyncIteration
         try:
-            try:
-                item = await asyncio.create_task(
-                    self._generator.asend(value),
-                    context=self._context,
-                )
-            except TypeError:
-                item = await self._generator.asend(value)
+            item = await asyncio.create_task(
+                self._generator.asend(value),
+                context=self._context,
+            )
 
             with trace.use_span(self._span):
-                span_name = (
-                    str(self._span.name)  # type: ignore[attr-defined]
-                    if hasattr(self._span, "name")
-                    else "generator_item"
-                )
+                span_name = str(getattr(self._span, "name", "generator_item"))
                 with self._tracer.start_as_current_span(
                     span_name,
                     attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
@@ -758,29 +743,19 @@ class _ObservedAsyncGenerator(ABCAsyncGenerator[Any, Any]):
         if self._closed:
             raise StopAsyncIteration
         try:
-            try:
-                if isinstance(__typ, type):
-                    item = await asyncio.create_task(
-                        self._generator.athrow(__typ, __val, __tb),
-                        context=self._context,
-                    )
-                else:
-                    item = await asyncio.create_task(
-                        self._generator.athrow(__typ, None, __tb),
-                        context=self._context,
-                    )
-            except TypeError:
-                if isinstance(__typ, type):
-                    item = await self._generator.athrow(__typ, __val, __tb)
-                else:
-                    item = await self._generator.athrow(__typ, None, __tb)
+            if isinstance(__typ, type):
+                item = await asyncio.create_task(
+                    self._generator.athrow(__typ, __val, __tb),
+                    context=self._context,
+                )
+            else:
+                item = await asyncio.create_task(
+                    self._generator.athrow(__typ, None, __tb),
+                    context=self._context,
+                )
 
             with trace.use_span(self._span):
-                span_name = (
-                    str(self._span.name)  # type: ignore[attr-defined]
-                    if hasattr(self._span, "name")
-                    else "generator_item"
-                )
+                span_name = str(getattr(self._span, "name", "generator_item"))
                 with self._tracer.start_as_current_span(
                     span_name,
                     attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
