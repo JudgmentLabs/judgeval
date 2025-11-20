@@ -77,19 +77,14 @@ class DatasetFactory:
         )
         judgeval_logger.info(f"Created dataset {name}")
 
-        dataset = Dataset(
-            name=name, project_name=project_name, examples=[], client=self._client
-        )
-        dataset.add_examples(examples, batch_size=batch_size)
         if not isinstance(examples, list):
             examples = list(examples)
 
-        return Dataset(
-            name=name,
-            project_name=project_name,
-            examples=examples,
-            client=self._client,
+        dataset = Dataset(
+            name=name, project_name=project_name, examples=examples, client=self._client
         )
+        dataset.add_examples(examples, batch_size=batch_size)
+        return dataset
 
     def list(self, project_name: str) -> List[DatasetInfo]:
         datasets = self._client.datasets_pull_all_for_judgeval(

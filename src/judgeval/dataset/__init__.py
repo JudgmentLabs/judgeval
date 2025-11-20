@@ -153,21 +153,17 @@ class Dataset:
         )
         judgeval_logger.info(f"Created dataset {name}")
 
-        dataset_instance = cls(
-            name=name,
-            project_name=project_name,
-            examples=[],
-        )
-        dataset_instance.add_examples(examples, batch_size=batch_size)
-
         if not isinstance(examples, list):
             examples = list(examples)
 
-        return cls(
+        dataset = cls(
             name=name,
             project_name=project_name,
             examples=examples,
         )
+        dataset.add_examples(examples, batch_size=batch_size)
+
+        return dataset
 
     @classmethod
     def list(cls, project_name: str):
