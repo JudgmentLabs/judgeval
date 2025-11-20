@@ -15,8 +15,8 @@ from types import TracebackType
 from typing import (
     Any,
     AsyncGenerator,
-    Awaitable,
     Callable,
+    Coroutine,
     Dict,
     Generator,
     Optional,
@@ -57,6 +57,7 @@ from judgeval.v1.tracer.processors._lifecycles import (
 )
 
 C = TypeVar("C", bound=Callable[..., Any])
+T = TypeVar("T")
 
 
 class BaseTracer(ABC):
@@ -698,13 +699,13 @@ class _ObservedAsyncGenerator(ABCAsyncGenerator[Any, Any]):
         self._closed = False
         self._disable_generator_yield_span = disable_generator_yield_span
 
-    def _create_task(self, coro: Awaitable[Any]) -> "asyncio.Task[Any]":
-        # Python 3.11 added the context kwarg to asyncio.create_task 
+    def _create_task(self, coro: Coroutine[Any, Any, T]) -> "asyncio.Task[T]":
+        # Python 3.11 added the context kwarg to asyncio.create_task
         # @ref https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
         try:
             return asyncio.create_task(coro, context=self._context)
         except TypeError:
-            return self._context.run(asyncio.create_task, coro)
+            return self._context.run(lambda: asyncio.create_task(coro))
 
     def __aiter__(self) -> "_ObservedAsyncGenerator":
         return self
