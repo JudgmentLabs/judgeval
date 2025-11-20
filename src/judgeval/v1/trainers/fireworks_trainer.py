@@ -5,7 +5,7 @@ import json
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 try:
-    from fireworks import Dataset  # type: ignore[import-untyped]
+    from fireworks import Dataset  # type: ignore[import-not-found]
 except ImportError as e:
     raise ImportError(
         "Fireworks is not installed. Please install it with 'pip install fireworks'"

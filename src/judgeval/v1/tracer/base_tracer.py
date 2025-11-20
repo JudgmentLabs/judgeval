@@ -380,7 +380,9 @@ class BaseTracer(ABC):
         disable_generator_yield_span: bool = False,
     ) -> C | Callable[[C], C]:
         if func is None:
-            return lambda f: self.observe(f, span_type, span_name, disable_generator_yield_span)
+            return lambda f: self.observe(
+                f, span_type, span_name, disable_generator_yield_span
+            )
 
         tracer = self.get_tracer()
         name = span_name or func.__name__

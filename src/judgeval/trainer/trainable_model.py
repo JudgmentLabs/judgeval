@@ -1,7 +1,14 @@
 import time
-from fireworks import LLM  # type: ignore[import-untyped]
-from .config import TrainerConfig, ModelConfig
 from typing import Optional, Dict, Any, Callable
+
+try:
+    from fireworks import LLM  # type: ignore[import-not-found]
+except ImportError as e:
+    raise ImportError(
+        "Fireworks is not installed. Please install it with 'pip install fireworks'"
+    ) from e
+
+from .config import TrainerConfig, ModelConfig
 from .console import _model_spinner_progress, _print_model_progress
 from judgeval.exceptions import JudgmentRuntimeError
 

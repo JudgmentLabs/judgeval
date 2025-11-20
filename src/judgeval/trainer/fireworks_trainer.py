@@ -1,7 +1,14 @@
 import asyncio
 import json
 from typing import Optional, Callable, Any, List, Union, Dict
-from fireworks import Dataset  # type: ignore[import-untyped]
+
+try:
+    from fireworks import Dataset  # type: ignore[import-not-found]
+except ImportError as e:
+    raise ImportError(
+        "Fireworks is not installed. Please install it with 'pip install fireworks'"
+    ) from e
+
 from .config import TrainerConfig, ModelConfig
 from .base_trainer import BaseTrainer
 from .trainable_model import TrainableModel
