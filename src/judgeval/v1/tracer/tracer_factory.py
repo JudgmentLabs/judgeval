@@ -21,13 +21,10 @@ class TracerFactory:
         self,
         project_name: str,
         enable_evaluation: bool = True,
-        serializer: Optional[Callable[[Any], str]] = None,
+        serializer: Callable[[Any], str] = safe_serialize,
         filter_tracer: Optional[FilterTracerCallback] = None,
         initialize: bool = True,
     ) -> Tracer:
-        if serializer is None:
-            serializer = safe_serialize
-
         return Tracer(
             project_name=project_name,
             enable_evaluation=enable_evaluation,
