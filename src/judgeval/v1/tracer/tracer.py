@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Iterable, Optional
+from typing import Any, Callable, Optional
 
 from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource
@@ -26,7 +26,6 @@ class Tracer(BaseTracer):
         filter_tracer: Optional[FilterTracerCallback] = None,
         set_global_tracer_provider: bool = True,
         isolated: bool = False,
-        isolated_allowed_modules: Optional[Iterable[str]] = None,
     ):
         self._filter_tracer = filter_tracer
 
@@ -42,7 +41,6 @@ class Tracer(BaseTracer):
             resource=resource,
             filter_tracer=self._filter_tracer,
             isolated=isolated,
-            isolated_allowed_modules=isolated_allowed_modules,
         )
 
         super().__init__(
@@ -58,7 +56,7 @@ class Tracer(BaseTracer):
             judgeval_logger.info("Adding JudgmentSpanProcessor for monitoring.")
             tracer_provider.add_span_processor(self.get_span_processor())
 
-        if enable_monitoring and set_global_tracer_provider:
+        if enable_monitoring and set_global_tracer_provider and not isolated:
             judgeval_logger.info("Setting global tracer provider for monitoring.")
             trace.set_tracer_provider(tracer_provider)
 

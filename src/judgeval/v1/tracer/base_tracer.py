@@ -4,7 +4,8 @@ import datetime
 import functools
 import inspect
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Optional, Tuple, TypeVar, overload
+from contextlib import contextmanager
+from typing import Any, Callable, Dict, Iterator, Optional, Tuple, TypeVar, overload
 
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
@@ -174,19 +175,19 @@ class BaseTracer(ABC):
     def set_output(self, output_data: Any) -> None:
         self.set_attribute(AttributeKeys.JUDGMENT_OUTPUT, output_data)
 
-    def span(self, span_name: str, callable_func: Callable[[], Any]) -> Any:
+    @contextmanager
+    def span(self, span_name: str) -> Iterator[Span]:
         tracer = self.get_tracer()
         with tracer.start_as_current_span(span_name) as span:
             try:
-                return callable_func()
+                yield span
             except Exception as e:
-                span.set_status(trace.Status(trace.StatusCode.ERROR))
+                span.set_status(Status(StatusCode.ERROR))
                 span.record_exception(e)
                 raise
 
-    @staticmethod
-    def start_span(span_name: str) -> Span:
-        tracer = trace.get_tracer(BaseTracer.TRACER_NAME)
+    def start_span(self, span_name: str) -> Span:
+        tracer = self.get_tracer()
         return tracer.start_span(span_name)
 
     @dont_throw
