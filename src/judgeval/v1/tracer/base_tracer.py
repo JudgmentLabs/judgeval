@@ -52,6 +52,7 @@ class BaseTracer(ABC):
     )
 
     TRACER_NAME = "judgeval"
+    _tracers: list[BaseTracer] = []
 
     def __init__(
         self,
@@ -69,6 +70,8 @@ class BaseTracer(ABC):
         self.serializer = serializer
         self.project_id = resolve_project_id(api_client, project_name)
         self._tracer_provider = tracer_provider
+
+        BaseTracer._tracers.append(self)
 
         if self.project_id is None:
             judgeval_logger.error(
