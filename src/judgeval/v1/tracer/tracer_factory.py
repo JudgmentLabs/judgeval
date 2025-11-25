@@ -22,14 +22,11 @@ class TracerFactory:
         project_name: str,
         enable_evaluation: bool = True,
         enable_monitoring: bool = True,
-        serializer: Optional[Callable[[Any], str]] = None,
+        serializer: Callable[[Any], str] = safe_serialize,
         filter_tracer: Optional[FilterTracerCallback] = None,
         set_global_tracer_provider: bool = True,
         isolated: bool = False,
     ) -> Tracer:
-        if serializer is None:
-            serializer = safe_serialize
-
         return Tracer(
             project_name=project_name,
             enable_evaluation=enable_evaluation,

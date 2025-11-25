@@ -25,7 +25,6 @@ from judgeval.v1.trainers.console import (
     _print_progress_update,
 )
 from judgeval.exceptions import JudgmentRuntimeError
-from opentelemetry import trace
 
 
 class FireworksTrainer(BaseTrainer):
@@ -147,7 +146,7 @@ class FireworksTrainer(BaseTrainer):
                 response_data = await agent_function(**prompt_input)
                 messages = response_data.get("messages", [])
 
-                current_span = trace.get_current_span()
+                current_span = self.tracer._get_current_span()
                 trace_id = None
                 if current_span and current_span.is_recording():
                     trace_id = format(current_span.get_span_context().trace_id, "032x")

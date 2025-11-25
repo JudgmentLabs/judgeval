@@ -37,6 +37,7 @@ from judgeval.v1.tracer.processors._lifecycles import (
     AGENT_CLASS_NAME_KEY,
     AGENT_INSTANCE_NAME_KEY,
 )
+from judgeval.v1.tracer.isolated import get_current_span as get_isolated_current_span
 
 C = TypeVar("C", bound=Callable[..., Any])
 
@@ -128,10 +129,22 @@ class BaseTracer(ABC):
     def tracer_provider(self) -> TracerProvider:
         return self._tracer_provider
 
+    def _is_isolated(self) -> bool:
+        from judgeval.v1.tracer.judgment_tracer_provider import JudgmentTracerProvider
+
+        if isinstance(self._tracer_provider, JudgmentTracerProvider):
+            return self._tracer_provider._isolated
+        return False
+
+    def _get_current_span(self) -> Optional[Span]:
+        if self._is_isolated():
+            return get_isolated_current_span()
+        return trace.get_current_span()
+
     def set_span_kind(self, kind: str) -> None:
         if kind is None:
             return
-        current_span = trace.get_current_span()
+        current_span = self._get_current_span()
         if current_span is not None:
             current_span.set_attribute(AttributeKeys.JUDGMENT_SPAN_KIND, kind)
 
@@ -141,7 +154,7 @@ class BaseTracer(ABC):
             return
         if value is None:
             return
-        current_span = trace.get_current_span()
+        current_span = self._get_current_span()
         if current_span is not None:
             serialized_value = (
                 self.serializer(value)
@@ -316,7 +329,7 @@ class BaseTracer(ABC):
             judgeval_logger.error(f"Failed to enqueue evaluation run: {e}")
 
     def _get_sampled_span_context(self) -> Optional[SpanContext]:
-        current_span = trace.get_current_span()
+        current_span = self._get_current_span()
         if current_span is None:
             return None
         span_context = current_span.get_span_context()
@@ -325,7 +338,7 @@ class BaseTracer(ABC):
         return span_context
 
     def _get_sampled_span(self) -> Optional[Span]:
-        current_span = trace.get_current_span()
+        current_span = self._get_current_span()
         if current_span is None:
             return None
         span_context = current_span.get_span_context()
@@ -392,8 +405,6 @@ class BaseTracer(ABC):
                             AttributeKeys.JUDGMENT_INPUT, self.serializer(input_data)
                         )
 
-                        self.get_span_processor().emit_partial()
-
                         result = await func(*args, **kwargs)
 
                         span.set_attribute(
@@ -419,8 +430,6 @@ class BaseTracer(ABC):
                         span.set_attribute(
                             AttributeKeys.JUDGMENT_INPUT, self.serializer(input_data)
                         )
-
-                        self.get_span_processor().emit_partial()
 
                         result = func(*args, **kwargs)
 

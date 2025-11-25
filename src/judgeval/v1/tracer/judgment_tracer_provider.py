@@ -36,7 +36,7 @@ class JudgmentTracerProvider(TracerProvider):
         is_judgment_module = instrumenting_module_name == BaseTracer.TRACER_NAME
 
         if self._isolated and not is_judgment_module:
-            judgeval_logger.info(
+            judgeval_logger.debug(
                 f"Returning NoOpTracer for {instrumenting_module_name} (isolated mode)"
             )
             return NoOpTracer()
