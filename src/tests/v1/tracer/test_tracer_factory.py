@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from judgeval.v1.tracer.tracer_factory import TracerFactory
 from judgeval.v1.tracer.tracer import Tracer
 
@@ -20,6 +20,7 @@ def test_factory_create_default(tracer_factory):
     assert isinstance(tracer, Tracer)
     assert tracer.project_name == "test_project"
     assert tracer.enable_evaluation is True
+    assert tracer.enable_monitoring is True
 
 
 def test_factory_create_with_custom_serializer(tracer_factory):
@@ -39,10 +40,21 @@ def test_factory_create_without_evaluation(tracer_factory):
     assert tracer.enable_evaluation is False
 
 
-def test_factory_create_with_initialize(tracer_factory):
-    from unittest.mock import patch
+def test_factory_create_without_monitoring(tracer_factory):
+    with patch("judgeval.v1.tracer.tracer.trace.set_tracer_provider") as mock_set:
+        tracer = tracer_factory.create(
+            project_name="test_project", enable_monitoring=False
+        )
 
-    with patch("judgeval.v1.tracer.tracer.trace.set_tracer_provider"):
-        tracer = tracer_factory.create(project_name="test_project", initialize=True)
+        assert tracer.enable_monitoring is False
+        mock_set.assert_not_called()
+
+
+def test_factory_create_with_set_global_false(tracer_factory):
+    with patch("judgeval.v1.tracer.tracer.trace.set_tracer_provider") as mock_set:
+        tracer = tracer_factory.create(
+            project_name="test_project", set_global_tracer_provider=False
+        )
 
         assert tracer._tracer_provider is not None
+        mock_set.assert_not_called()
