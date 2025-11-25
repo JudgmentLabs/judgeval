@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 import functools
 import inspect
+import weakref
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Iterator, Optional, Tuple, TypeVar, overload
@@ -54,7 +55,7 @@ class BaseTracer(ABC):
     )
 
     TRACER_NAME = "judgeval"
-    _tracers: list[BaseTracer] = []
+    _tracers: weakref.WeakSet[BaseTracer] = weakref.WeakSet()
 
     def __init__(
         self,
@@ -73,7 +74,7 @@ class BaseTracer(ABC):
         self.project_id = resolve_project_id(api_client, project_name)
         self._tracer_provider = tracer_provider
 
-        BaseTracer._tracers.append(self)
+        BaseTracer._tracers.add(self)
 
         if self.project_id is None:
             judgeval_logger.error(
@@ -195,7 +196,7 @@ class BaseTracer(ABC):
             try:
                 yield span
             except Exception as e:
-                span.set_status(Status(StatusCode.ERROR))
+                span.set_status(Status(StatusCode.ERROR, str(e)))
                 span.record_exception(e)
                 raise
 
