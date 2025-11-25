@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Iterable, Optional
 
 from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource
@@ -25,6 +25,8 @@ class Tracer(BaseTracer):
         serializer: Callable[[Any], str],
         filter_tracer: Optional[FilterTracerCallback] = None,
         set_global_tracer_provider: bool = True,
+        isolated: bool = False,
+        isolated_allowed_modules: Optional[Iterable[str]] = None,
     ):
         self._filter_tracer = filter_tracer
 
@@ -37,7 +39,10 @@ class Tracer(BaseTracer):
         )
 
         tracer_provider = JudgmentTracerProvider(
-            resource=resource, filter_tracer=self._filter_tracer
+            resource=resource,
+            filter_tracer=self._filter_tracer,
+            isolated=isolated,
+            isolated_allowed_modules=isolated_allowed_modules,
         )
 
         super().__init__(

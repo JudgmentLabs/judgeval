@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Iterable, Optional
 
 from judgeval.utils.serialize import safe_serialize
 from judgeval.v1.internal.api import JudgmentSyncClient
@@ -25,6 +25,8 @@ class TracerFactory:
         serializer: Optional[Callable[[Any], str]] = None,
         filter_tracer: Optional[FilterTracerCallback] = None,
         set_global_tracer_provider: bool = True,
+        isolated: bool = False,
+        isolated_allowed_modules: Optional[Iterable[str]] = None,
     ) -> Tracer:
         if serializer is None:
             serializer = safe_serialize
@@ -37,4 +39,6 @@ class TracerFactory:
             serializer=serializer,
             filter_tracer=filter_tracer,
             set_global_tracer_provider=set_global_tracer_provider,
+            isolated=isolated,
+            isolated_allowed_modules=isolated_allowed_modules,
         )
