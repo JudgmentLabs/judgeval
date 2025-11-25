@@ -7,7 +7,7 @@ from .llm.providers import ApiClient
 def wrap(client: ApiClient) -> ApiClient:
     from judgeval.v1.tracer.base_tracer import BaseTracer
 
-    for tracer in list(BaseTracer._tracers):
+    for tracer in BaseTracer._tracers:
         client = tracer.wrap(client)
     return client
 
