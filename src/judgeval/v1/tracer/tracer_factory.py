@@ -21,9 +21,10 @@ class TracerFactory:
         self,
         project_name: str,
         enable_evaluation: bool = True,
+        enable_monitoring: bool = True,
         serializer: Optional[Callable[[Any], str]] = None,
         filter_tracer: Optional[FilterTracerCallback] = None,
-        initialize: bool = True,
+        set_global_tracer_provider: bool = True,
     ) -> Tracer:
         if serializer is None:
             serializer = safe_serialize
@@ -31,8 +32,9 @@ class TracerFactory:
         return Tracer(
             project_name=project_name,
             enable_evaluation=enable_evaluation,
+            enable_monitoring=enable_monitoring,
             api_client=self._client,
             serializer=serializer,
-            initialize=initialize,
             filter_tracer=filter_tracer,
+            set_global_tracer_provider=set_global_tracer_provider,
         )

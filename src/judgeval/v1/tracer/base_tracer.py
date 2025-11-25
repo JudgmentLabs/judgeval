@@ -3,11 +3,11 @@ from __future__ import annotations
 import datetime
 import functools
 import inspect
-import time
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Optional, Tuple, TypeVar, overload
 
 from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SpanExporter
 from opentelemetry.trace import Span, SpanContext, Status, StatusCode
 
@@ -44,9 +44,11 @@ class BaseTracer(ABC):
     __slots__ = (
         "project_name",
         "enable_evaluation",
+        "enable_monitoring",
         "api_client",
         "serializer",
         "project_id",
+        "_tracer_provider",
     )
 
     TRACER_NAME = "judgeval"
@@ -55,14 +57,18 @@ class BaseTracer(ABC):
         self,
         project_name: str,
         enable_evaluation: bool,
+        enable_monitoring: bool,
         api_client: JudgmentSyncClient,
         serializer: Callable[[Any], str],
+        tracer_provider: TracerProvider,
     ):
         self.project_name = project_name
         self.enable_evaluation = enable_evaluation
+        self.enable_monitoring = enable_monitoring
         self.api_client = api_client
         self.serializer = serializer
         self.project_id = resolve_project_id(api_client, project_name)
+        self._tracer_provider = tracer_provider
 
         if self.project_id is None:
             judgeval_logger.error(
@@ -70,10 +76,6 @@ class BaseTracer(ABC):
                 f"please create it first at https://app.judgmentlabs.ai/org/{self.api_client.organization_id}/projects. "
                 "Skipping Judgment export."
             )
-
-    @abstractmethod
-    def initialize(self) -> None:
-        pass
 
     @abstractmethod
     def force_flush(self, timeout_millis: int) -> bool:
@@ -116,7 +118,11 @@ class BaseTracer(ABC):
             return NoOpJudgmentSpanProcessor()
 
     def get_tracer(self) -> trace.Tracer:
-        return trace.get_tracer(self.TRACER_NAME)
+        return self._tracer_provider.get_tracer(self.TRACER_NAME)
+
+    @property
+    def tracer_provider(self) -> TracerProvider:
+        return self._tracer_provider
 
     def set_span_kind(self, kind: str) -> None:
         if kind is None:
@@ -247,10 +253,8 @@ class BaseTracer(ABC):
             else base_url + "/otel/v1/traces"
         )
 
-    def _generate_run_id(self, prefix: str, span_id: Optional[str]) -> str:
-        return prefix + (
-            span_id if span_id is not None else str(int(time.time() * 1000))
-        )
+    def _generate_run_id(self, prefix: str, span_id: str) -> str:
+        return prefix + span_id
 
     def _create_evaluation_run(
         self,
@@ -360,6 +364,12 @@ class BaseTracer(ABC):
     ) -> C | Callable[[C], C]:
         if func is None:
             return lambda f: self.observe(f, span_type, span_name)  # type: ignore[return-value]
+
+        if not self.enable_monitoring:
+            judgeval_logger.info(
+                "Monitoring disabled, observe() returning function unchanged"
+            )
+            return func
 
         tracer = self.get_tracer()
         name = span_name or func.__name__
