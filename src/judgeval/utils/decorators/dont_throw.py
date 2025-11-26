@@ -25,7 +25,7 @@ def dont_throw(func: Callable[P, T] | None = None, /, *, default: Any = None):
             try:
                 return f(*args, **kwargs)
             except Exception as e:
-                judgeval_logger.debug(
+                judgeval_logger.error(
                     f"[Caught] An exception was raised in {f.__name__}", exc_info=e
                 )
                 return default
