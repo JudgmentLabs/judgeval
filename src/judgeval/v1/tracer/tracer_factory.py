@@ -24,7 +24,6 @@ class TracerFactory:
         enable_monitoring: bool = True,
         serializer: Callable[[Any], str] = safe_serialize,
         filter_tracer: Optional[FilterTracerCallback] = None,
-        set_global_tracer_provider: bool = True,
         isolated: bool = False,
     ) -> Tracer:
         return Tracer(
@@ -34,6 +33,5 @@ class TracerFactory:
             api_client=self._client,
             serializer=serializer,
             filter_tracer=filter_tracer,
-            set_global_tracer_provider=set_global_tracer_provider,
             isolated=isolated,
         )

@@ -24,7 +24,6 @@ class Tracer(BaseTracer):
         api_client: JudgmentSyncClient,
         serializer: Callable[[Any], str],
         filter_tracer: Optional[FilterTracerCallback] = None,
-        set_global_tracer_provider: bool = True,
         isolated: bool = False,
     ):
         self._filter_tracer = filter_tracer
@@ -56,7 +55,7 @@ class Tracer(BaseTracer):
             judgeval_logger.info("Adding JudgmentSpanProcessor for monitoring.")
             tracer_provider.add_span_processor(self.get_span_processor())
 
-        if enable_monitoring and set_global_tracer_provider and not isolated:
+        if enable_monitoring and not isolated:
             judgeval_logger.info("Setting global tracer provider for monitoring.")
             trace.set_tracer_provider(tracer_provider)
 
