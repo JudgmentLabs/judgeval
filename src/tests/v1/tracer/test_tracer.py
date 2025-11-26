@@ -42,7 +42,7 @@ def test_tracer_initialization_monitoring_disabled(mock_client, serializer):
         mock_set.assert_not_called()
 
 
-def test_tracer_initialization_set_global_false(mock_client, serializer):
+def test_tracer_initialization_isolated(mock_client, serializer):
     with patch("judgeval.v1.tracer.tracer.trace.set_tracer_provider") as mock_set:
         tracer = Tracer(
             project_name="test_project",
@@ -50,7 +50,7 @@ def test_tracer_initialization_set_global_false(mock_client, serializer):
             enable_monitoring=True,
             api_client=mock_client,
             serializer=serializer,
-            set_global_tracer_provider=False,
+            isolated=True,
         )
 
         assert tracer._tracer_provider is not None

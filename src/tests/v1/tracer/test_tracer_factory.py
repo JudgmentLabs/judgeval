@@ -50,11 +50,9 @@ def test_factory_create_without_monitoring(tracer_factory):
         mock_set.assert_not_called()
 
 
-def test_factory_create_with_set_global_false(tracer_factory):
+def test_factory_create_isolated(tracer_factory):
     with patch("judgeval.v1.tracer.tracer.trace.set_tracer_provider") as mock_set:
-        tracer = tracer_factory.create(
-            project_name="test_project", set_global_tracer_provider=False
-        )
+        tracer = tracer_factory.create(project_name="test_project", isolated=True)
 
         assert tracer._tracer_provider is not None
         mock_set.assert_not_called()
