@@ -42,6 +42,33 @@ class MockTracer:
     def get_tracer(self):
         return self.tracer
 
+    def get_context(self):
+        """Return the current global OpenTelemetry context"""
+        from opentelemetry import context as otel_context
+
+        return otel_context.get_current()
+
+    def use_span(
+        self,
+        span,
+        end_on_exit=False,
+        record_exception=True,
+        set_status_on_exception=True,
+    ):
+        """Use the global OpenTelemetry use_span"""
+        from opentelemetry import trace
+
+        return trace.use_span(
+            span,
+            end_on_exit=end_on_exit,
+            record_exception=record_exception,
+            set_status_on_exception=set_status_on_exception,
+        )
+
+    def _is_isolated(self):
+        """MockTracer is not isolated"""
+        return False
+
     def _inject_judgment_context(self, span):
         """No-op for tests"""
         pass
