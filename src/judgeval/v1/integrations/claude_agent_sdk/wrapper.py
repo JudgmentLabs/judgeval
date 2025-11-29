@@ -15,7 +15,7 @@ from typing import (
     Tuple,
 )
 
-from opentelemetry import trace, context as otel_context
+from opentelemetry import trace
 from opentelemetry.trace import set_span_in_context
 
 from judgeval.tracer.keys import AttributeKeys
@@ -140,7 +140,7 @@ def _create_client_wrapper_class(
             # Store the parent span context in thread-local storage
             # Claude Agent SDK breaks OpenTelemetry's context propagation when executing tools,
             # so we need to explicitly store the context for tool handlers to access
-            parent_context = set_span_in_context(agent_span, otel_context.get_current())
+            parent_context = set_span_in_context(agent_span, tracer.get_context())  # type: ignore
             _thread_local.parent_context = parent_context
 
             final_results: List[Dict[str, Any]] = []
@@ -251,7 +251,7 @@ def _wrap_query_function(
             )
 
         # Store parent context for tool tracing
-        parent_context = set_span_in_context(agent_span, otel_context.get_current())
+        parent_context = set_span_in_context(agent_span, tracer.get_context())  # type: ignore
         _thread_local.parent_context = parent_context
 
         final_results: List[Dict[str, Any]] = []
