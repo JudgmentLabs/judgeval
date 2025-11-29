@@ -11,6 +11,8 @@ from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SpanExporter
 from opentelemetry.trace import Span, SpanContext, Status, StatusCode
+from opentelemetry import context as otel_context
+from opentelemetry.context.context import Context
 
 from judgeval.logger import judgeval_logger
 from judgeval.utils.decorators.dont_throw import dont_throw
@@ -37,7 +39,11 @@ from judgeval.v1.tracer.processors._lifecycles import (
     AGENT_CLASS_NAME_KEY,
     AGENT_INSTANCE_NAME_KEY,
 )
-from judgeval.v1.tracer.isolated import get_current_span as get_isolated_current_span
+from judgeval.v1.tracer.isolated import (
+    get_current_span as get_isolated_current_span,
+    get_current,
+    use_span as isolated_use_span,
+)
 
 C = TypeVar("C", bound=Callable[..., Any])
 
@@ -135,6 +141,34 @@ class BaseTracer(ABC):
         if isinstance(self._tracer_provider, JudgmentTracerProvider):
             return self._tracer_provider._isolated
         return False
+
+    def get_context(self) -> Context:
+        if self._is_isolated():
+            return get_current()
+        else:
+            return otel_context.get_current()
+
+    def use_span(
+        self,
+        span: Span,
+        end_on_exit: bool = False,
+        record_exception: bool = True,
+        set_status_on_exception: bool = True,
+    ):
+        if self._is_isolated():
+            return isolated_use_span(
+                span,
+                end_on_exit=end_on_exit,
+                record_exception=record_exception,
+                set_status_on_exception=set_status_on_exception,
+            )
+        else:
+            return trace.use_span(
+                span,
+                end_on_exit=end_on_exit,
+                record_exception=record_exception,
+                set_status_on_exception=set_status_on_exception,
+            )
 
     def _get_current_span(self) -> Optional[Span]:
         if self._is_isolated():

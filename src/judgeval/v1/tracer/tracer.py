@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Optional
 
-from opentelemetry import trace, context as otel_context
-from opentelemetry.context.context import Context
+from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource
 
 from judgeval.logger import judgeval_logger
@@ -12,7 +11,6 @@ from judgeval.v1.tracer.judgment_tracer_provider import JudgmentTracerProvider
 from judgeval.version import get_version
 from judgeval.v1.tracer.base_tracer import BaseTracer
 from judgeval.v1.tracer.judgment_tracer_provider import FilterTracerCallback
-from judgeval.v1.tracer.isolated.context import get_current as get_isolated_context
 
 
 class Tracer(BaseTracer):
@@ -66,9 +64,3 @@ class Tracer(BaseTracer):
 
     def shutdown(self, timeout_millis: int = 30000) -> None:
         self._tracer_provider.shutdown()
-
-    def get_context(self) -> Context:
-        if self._is_isolated():
-            return get_isolated_context()
-        else:
-            return otel_context.get_current()

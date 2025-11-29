@@ -15,7 +15,6 @@ from typing import (
     Tuple,
 )
 
-from opentelemetry import trace
 from opentelemetry.trace import set_span_in_context
 
 from judgeval.tracer.keys import AttributeKeys
@@ -140,7 +139,7 @@ def _create_client_wrapper_class(
             # Store the parent span context in thread-local storage
             # Claude Agent SDK breaks OpenTelemetry's context propagation when executing tools,
             # so we need to explicitly store the context for tool handlers to access
-            parent_context = set_span_in_context(agent_span, tracer.get_context())  # type: ignore
+            parent_context = set_span_in_context(agent_span, tracer.get_context())
             _thread_local.parent_context = parent_context
 
             final_results: List[Dict[str, Any]] = []
@@ -251,7 +250,7 @@ def _wrap_query_function(
             )
 
         # Store parent context for tool tracing
-        parent_context = set_span_in_context(agent_span, tracer.get_context())  # type: ignore
+        parent_context = set_span_in_context(agent_span, tracer.get_context())
         _thread_local.parent_context = parent_context
 
         final_results: List[Dict[str, Any]] = []
@@ -378,30 +377,23 @@ def _wrap_tool_handler(
             },
         )
 
-        try:
-            # Set this span as active in the context
-            with trace.use_span(span, end_on_exit=True):
-                # Record input
+        # Set this span as active in the context
+        with tracer.use_span(span, end_on_exit=True):
+            # Record input
+            set_span_attribute(span, AttributeKeys.JUDGMENT_INPUT, safe_serialize(args))
+
+            try:
+                result = await handler(args)
+
+                # Record output
                 set_span_attribute(
-                    span, AttributeKeys.JUDGMENT_INPUT, safe_serialize(args)
+                    span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(result)
                 )
 
-                try:
-                    result = await handler(args)
-
-                    # Record output
-                    set_span_attribute(
-                        span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(result)
-                    )
-
-                    return result
-                except Exception as e:
-                    span.record_exception(e)
-                    raise
-        except Exception:
-            # If something goes wrong with span setup, end it manually
-            span.end()
-            raise
+                return result
+            except Exception as e:
+                span.record_exception(e)
+                raise
 
     # Mark as wrapped to prevent double-wrapping
     wrapped_handler._judgeval_wrapped = True  # type: ignore
