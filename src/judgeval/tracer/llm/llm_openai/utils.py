@@ -34,9 +34,23 @@ def set_cost_attribute(span: Span, usage_data: Any) -> None:
     This is for OpenRouter case where the cost is provided in the usage data when they specify:
     extra_body={"usage": {"include": True}},
     """
+    # This is for openrouters charge, not BYOK
     if hasattr(usage_data, "cost") and usage_data.cost:
         set_span_attribute(
             span,
             AttributeKeys.JUDGMENT_USAGE_TOTAL_COST_USD,
             safe_serialize(usage_data.cost),
+        )
+
+    # BYOK case
+    if (
+        hasattr(usage_data, "cost_details")
+        and isinstance(usage_data.cost_details, dict)
+        and "upstream_inference_cost" in usage_data.cost_details
+        and usage_data.cost_details["upstream_inference_cost"]
+    ):
+        set_span_attribute(
+            span,
+            AttributeKeys.JUDGMENT_USAGE_TOTAL_COST_USD,
+            safe_serialize(usage_data.cost_details["upstream_inference_cost"]),
         )
