@@ -52,6 +52,14 @@ def wrap_chat_completions_create_sync(tracer: Tracer, client: OpenAI) -> None:
     original_func = client.chat.completions.create
 
     def dispatcher(*args: Any, **kwargs: Any) -> Any:
+        # Check if this is a with_streaming_response call
+        extra_headers = kwargs.get("extra_headers") or {}
+        if (
+            isinstance(extra_headers, dict)
+            and extra_headers.get("X-Stainless-Raw-Response") == "stream"
+        ):
+            return original_func(*args, **kwargs)
+
         if kwargs.get("stream", False):
             return _wrap_streaming_sync(tracer, original_func)(*args, **kwargs)
         return _wrap_non_streaming_sync(tracer, original_func)(*args, **kwargs)
@@ -278,6 +286,14 @@ def wrap_chat_completions_create_async(tracer: Tracer, client: AsyncOpenAI) -> N
     original_func = client.chat.completions.create
 
     async def dispatcher(*args: Any, **kwargs: Any) -> Any:
+        # Check if this is a with_streaming_response call
+        extra_headers = kwargs.get("extra_headers") or {}
+        if (
+            isinstance(extra_headers, dict)
+            and extra_headers.get("X-Stainless-Raw-Response") == "stream"
+        ):
+            return await original_func(*args, **kwargs)
+
         if kwargs.get("stream", False):
             return await _wrap_streaming_async(tracer, original_func)(*args, **kwargs)
         return await _wrap_non_streaming_async(tracer, original_func)(*args, **kwargs)

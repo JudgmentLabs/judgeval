@@ -551,3 +551,62 @@ class TestSafetyGuarantees(BaseOpenAIChatCompletionsTest):
         assert first_chunk is not None
 
         self.verify_tracing_if_wrapped(sync_client_maybe_wrapped, mock_processor)
+
+
+class TestWithStreamingResponse(BaseOpenAIChatCompletionsTest):
+    """Tests for with_streaming_response API which should bypass our wrapper."""
+
+    def test_with_streaming_response_sync(
+        self, sync_client_maybe_wrapped, mock_processor
+    ):
+        """Test that with_streaming_response.create() bypasses our wrapper and works correctly"""
+        initial_span_count = len(mock_processor.ended_spans)
+
+        with sync_client_maybe_wrapped.chat.completions.with_streaming_response.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": "Say 'test'"}],
+            stream=True,
+            max_completion_tokens=1000,
+            temperature=1,
+        ) as response:
+            # Verify response has iter_lines method (ResponseContextManager behavior)
+            assert hasattr(response, "iter_lines")
+
+            # Read some lines to verify it works
+            lines = list(response.iter_lines())
+            assert len(lines) > 0
+
+        # Verify no new spans were created (wrapper was bypassed)
+        if hasattr(sync_client_maybe_wrapped, "_judgment_tracer"):
+            # Should not create a span since we bypass the wrapper
+            assert len(mock_processor.ended_spans) == initial_span_count
+
+    @pytest.mark.asyncio
+    async def test_with_streaming_response_async(
+        self, async_client_maybe_wrapped, mock_processor
+    ):
+        """Test that async with_streaming_response.create() bypasses our wrapper and works correctly"""
+        initial_span_count = len(mock_processor.ended_spans)
+
+        async with (
+            async_client_maybe_wrapped.chat.completions.with_streaming_response.create(
+                model="gpt-5-nano",
+                messages=[{"role": "user", "content": "Say 'test'"}],
+                stream=True,
+                max_completion_tokens=1000,
+                temperature=1,
+            ) as response
+        ):
+            # Verify response has iter_lines method (ResponseContextManager behavior)
+            assert hasattr(response, "iter_lines")
+
+            # Read some lines to verify it works
+            lines = []
+            async for line in response.iter_lines():
+                lines.append(line)
+            assert len(lines) > 0
+
+        # Verify no new spans were created (wrapper was bypassed)
+        if hasattr(async_client_maybe_wrapped, "_judgment_tracer"):
+            # Should not create a span since we bypass the wrapper
+            assert len(mock_processor.ended_spans) == initial_span_count
