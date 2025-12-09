@@ -80,6 +80,19 @@ class BaseScorer(BaseModel):
             self.name = self.class_name
         return self
 
+    @model_validator(mode="after")
+    def validate_scorer_range(self):
+        """
+        Validates that minimum_scorer_range <= maximum_scorer_range.
+        Raises ValueError if the ranges are invalid.
+        """
+        if self.minimum_scorer_range > self.maximum_scorer_range:
+            raise ValueError(
+                f"minimum_scorer_range ({self.minimum_scorer_range}) must be less than or equal to "
+                f"maximum_scorer_range ({self.maximum_scorer_range})"
+            )
+        return self
+
     def _add_model(self, model: str):
         """
         Adds the evaluation model to the BaseScorer instance
