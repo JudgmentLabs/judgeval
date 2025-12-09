@@ -12,6 +12,8 @@ class ScorerData:
     threshold: float
     success: bool
     score: Optional[float] = None
+    minimum_score_range: float = 0
+    maximum_score_range: float = 1
     reason: Optional[str] = None
     strict_mode: Optional[bool] = None
     evaluation_model: Optional[str] = None

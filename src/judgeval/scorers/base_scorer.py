@@ -35,7 +35,9 @@ class BaseScorer(BaseModel):
     # The float score of the scorer run on the test case
     score: Optional[float] = None
 
-    score_breakdown: Optional[Dict] = None
+    maximum_scorer_range: float = 1
+    minimum_scorer_range: float = 0
+
     reason: Optional[str] = ""
 
     # Whether the model is a native model

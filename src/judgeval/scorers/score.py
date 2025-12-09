@@ -36,12 +36,16 @@ async def safe_a_score_example(
         score = await scorer.a_score_example(example)
         if score is None:
             raise Exception("a_score_example need to return a score")
-        elif score < 0:
-            judgeval_logger.warning("score cannot be less than 0 , setting to 0")
+        elif score < scorer.minimum_scorer_range:
+            judgeval_logger.warning(
+                f"score cannot be less than {scorer.minimum_scorer_range} , setting to {scorer.minimum_scorer_range}. consider increasing the minimum_score_range in the scorer"
+            )
             score = 0
-        elif score > 1:
-            judgeval_logger.warning("score cannot be greater than 1 , setting to 1")
-            score = 1
+        elif score > scorer.maximum_scorer_range:
+            judgeval_logger.warning(
+                f"score cannot be greater than {scorer.maximum_scorer_range} , setting to {scorer.maximum_scorer_range}. consider decreasing the maximum_score_range in the scorer"
+            )
+            score = scorer.maximum_scorer_range
         else:
             scorer.score = score
         scorer.success = scorer.success_check()
