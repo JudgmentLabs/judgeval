@@ -46,8 +46,7 @@ async def safe_a_score_example(
                 f"score cannot be greater than {scorer.maximum_scorer_range} , setting to {scorer.maximum_scorer_range}. consider decreasing the maximum_score_range in the scorer"
             )
             score = scorer.maximum_scorer_range
-        else:
-            scorer.score = score
+        scorer.score = score
         scorer.success = scorer.success_check()
     except Exception as e:
         judgeval_logger.error(f"Error during scoring: {str(e)}")
