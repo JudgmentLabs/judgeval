@@ -40,7 +40,7 @@ async def safe_a_score_example(
             judgeval_logger.warning(
                 f"score cannot be less than {scorer.minimum_scorer_range} , setting to {scorer.minimum_scorer_range}. consider increasing the minimum_score_range in the scorer"
             )
-            score = 0
+            score = scorer.minimum_scorer_range
         elif score > scorer.maximum_scorer_range:
             judgeval_logger.warning(
                 f"score cannot be greater than {scorer.maximum_scorer_range} , setting to {scorer.maximum_scorer_range}. consider decreasing the maximum_score_range in the scorer"
