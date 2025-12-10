@@ -35,8 +35,8 @@ class BaseScorer(BaseModel):
     # The float score of the scorer run on the test case
     score: Optional[float] = None
 
-    maximum_scorer_range: float = 1
-    minimum_scorer_range: float = 0
+    maximum_score_range: float = 1
+    minimum_score_range: float = 0
 
     reason: Optional[str] = ""
 
@@ -83,13 +83,13 @@ class BaseScorer(BaseModel):
     @model_validator(mode="after")
     def validate_scorer_range(self):
         """
-        Validates that minimum_scorer_range <= maximum_scorer_range.
+        Validates that minimum_score_range <= maximum_score_range.
         Raises ValueError if the ranges are invalid.
         """
-        if self.minimum_scorer_range > self.maximum_scorer_range:
+        if self.minimum_score_range > self.maximum_score_range:
             raise ValueError(
-                f"minimum_scorer_range ({self.minimum_scorer_range}) must be less than or equal to "
-                f"maximum_scorer_range ({self.maximum_scorer_range})"
+                f"minimum_score_range ({self.minimum_score_range}) must be less than or equal to "
+                f"maximum_score_range ({self.maximum_score_range})"
             )
         return self
 
