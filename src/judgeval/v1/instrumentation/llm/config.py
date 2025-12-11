@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar, cast
 from judgeval.logger import judgeval_logger
 
 from judgeval.v1.instrumentation.llm.constants import ProviderType
@@ -13,6 +13,8 @@ from judgeval.v1.instrumentation.llm.providers import (
 
 if TYPE_CHECKING:
     from judgeval.v1.tracer.base_tracer import BaseTracer
+
+T = TypeVar("T", bound=ApiClient)
 
 
 def _detect_provider(client: ApiClient) -> ProviderType:
@@ -48,7 +50,7 @@ def _detect_provider(client: ApiClient) -> ProviderType:
     return ProviderType.DEFAULT
 
 
-def wrap_provider(tracer: BaseTracer, client: ApiClient) -> ApiClient:
+def wrap_provider(tracer: BaseTracer, client: T) -> T:
     """
     Wraps an API client to add tracing capabilities.
     Supports OpenAI, Together, Anthropic, and Google GenAI clients.
@@ -58,21 +60,21 @@ def wrap_provider(tracer: BaseTracer, client: ApiClient) -> ApiClient:
     if provider_type == ProviderType.OPENAI:
         from .llm_openai.wrapper import wrap_openai_client
 
-        return wrap_openai_client(tracer, client)
+        return cast(T, wrap_openai_client(tracer, client))
     elif provider_type == ProviderType.ANTHROPIC:
         from .llm_anthropic.wrapper import wrap_anthropic_client
 
-        return wrap_anthropic_client(tracer, client)
+        return cast(T, wrap_anthropic_client(tracer, client))
     elif provider_type == ProviderType.TOGETHER:
         from .llm_together.wrapper import wrap_together_client
 
-        return wrap_together_client(tracer, client)
+        return cast(T, wrap_together_client(tracer, client))
     elif provider_type == ProviderType.GOOGLE:
         from .llm_google.wrapper import wrap_google_client
 
-        return wrap_google_client(tracer, client)
+        return cast(T, wrap_google_client(tracer, client))
     else:
         # Default to OpenAI-compatible wrapping for unknown clients
         from .llm_openai.wrapper import wrap_openai_client
 
-        return wrap_openai_client(tracer, client)
+        return cast(T, wrap_openai_client(tracer, client))

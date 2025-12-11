@@ -46,6 +46,7 @@ from judgeval.v1.tracer.isolated import (
 )
 
 C = TypeVar("C", bound=Callable[..., Any])
+T = TypeVar("T", bound=ApiClient)
 
 
 class BaseTracer(ABC):
@@ -549,7 +550,7 @@ class BaseTracer(ABC):
 
             return sync_wrapper  # type: ignore[return-value]
 
-    def wrap(self, client: ApiClient) -> ApiClient:
+    def wrap(self, client: T) -> T:
         return wrap_provider(self, client)
 
 
