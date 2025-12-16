@@ -493,6 +493,8 @@ def _serialize_content_blocks(content: Any) -> Any:
                     # Remove None is_error
                     if "is_error" in serialized and serialized["is_error"] is None:
                         del serialized["is_error"]
+                elif block_type == "ThinkingBlock":
+                    serialized["type"] = "thinking"
             else:
                 serialized = block
 
