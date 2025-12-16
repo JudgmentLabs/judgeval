@@ -1,5 +1,6 @@
 import pytest
 import os
+import json
 from typing import Any, Dict
 
 from judgeval.v1.integrations.claude_agent_sdk import setup_claude_agent_sdk
@@ -359,3 +360,85 @@ async def test_multiple_turns_real_api(tracer, mock_processor):
         verify_llm_span(llm_span, check_usage=True)
 
     print(f"\n✅ Test passed! Created {len(llm_spans)} LLM span(s)")
+
+
+@pytest.mark.asyncio
+async def test_thinking_block_serialization(tracer, mock_processor):
+    """Test that ThinkingBlock is properly serialized when agent is configured to output thinking blocks."""
+    # Setup integration FIRST
+    setup_claude_agent_sdk(tracer=tracer)
+
+    # Import AFTER patching
+    from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions
+    from judgeval.tracer.keys import AttributeKeys
+
+    # Configure options with thinking blocks enabled
+    options = ClaudeAgentOptions(
+        model="claude-sonnet-4-20250514",
+        max_thinking_tokens=1024,  # Enable thinking blocks
+    )
+
+    # Make real API call
+    async with ClaudeSDKClient(options=options) as client:
+        await client.query("Think step by step: What is 2 + 2?")
+
+        async for message in client.receive_response():
+            pass  # Consume all messages
+
+    # Force flush to ensure all spans are processed
+    mock_processor.force_flush()
+
+    # Verify spans were created
+    spans = mock_processor.ended_spans
+    assert len(spans) > 0, "No spans were created"
+
+    # Find LLM spans and check for ThinkingBlock in output
+    llm_spans = find_spans_by_kind(spans, "llm")
+    assert len(llm_spans) >= 1, "No LLM spans found"
+
+    # Check all LLM spans for thinking blocks
+    found_thinking_block = False
+    total = ""
+    for llm_span in llm_spans:
+        attrs = dict(llm_span.attributes or {})
+        output = attrs.get(AttributeKeys.JUDGMENT_OUTPUT)
+
+        if output is not None:
+            # Parse the output (it's a JSON string)
+            output_data = json.loads(output) if isinstance(output, str) else output
+            total += str(output_data)
+
+            # Verify output is a list of message objects
+            if isinstance(output_data, list):
+                for message in output_data:
+                    if "content" in message:
+                        content = message["content"]
+                        if isinstance(content, list):
+                            for block in content:
+                                if (
+                                    isinstance(block, dict)
+                                    and block.get("type") == "thinking"
+                                ):
+                                    found_thinking_block = True
+                                    # Verify ThinkingBlock has required fields
+                                    assert "thinking" in block, (
+                                        "ThinkingBlock missing 'thinking' field"
+                                    )
+                                    assert "signature" in block, (
+                                        "ThinkingBlock missing 'signature' field"
+                                    )
+                                    assert isinstance(block["thinking"], str), (
+                                        "ThinkingBlock 'thinking' should be a string"
+                                    )
+                                    assert isinstance(block["signature"], str), (
+                                        "ThinkingBlock 'signature' should be a string"
+                                    )
+
+    # Note: Thinking blocks may not always appear depending on the model's response
+    # If they appear, we verify they're properly serialized
+    if found_thinking_block:
+        assert True, (
+            f"\n✅ Test passed! Found and verified ThinkingBlock serialization in span output {total}"
+        )
+    else:
+        assert False, f"No ThinkingBlock found in response {total}"
