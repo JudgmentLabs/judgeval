@@ -442,3 +442,122 @@ async def test_thinking_block_serialization(tracer, mock_processor):
         )
     else:
         assert False, f"No ThinkingBlock found in response {total}"
+
+
+@pytest.mark.asyncio
+async def test_multiple_tracers_no_trace_id_collision():
+    """
+    Test that multiple tracer instances don't have trace_id collisions.
+
+    This simulates the customer's scenario where they have two separate Claude Agent
+    setups (e.g., different services or projects) and ensures that traces from different
+    tracers maintain their own separate trace IDs without cross-contamination.
+
+    Regression test for: Thread-local storage collision causing traces from different
+    projects to share the same trace_id.
+    """
+    from opentelemetry.sdk.trace import TracerProvider
+    from judgeval.v1.integrations.claude_agent_sdk import setup_claude_agent_sdk
+    from tests.tracer.integrations.claude_agent_sdk.conftest import (
+        MockSpanProcessor,
+        MockTracer,
+    )
+    import asyncio
+
+    # Create two separate mock processors to capture spans from each tracer
+    processor1 = MockSpanProcessor()
+    processor2 = MockSpanProcessor()
+
+    # Create two separate tracer providers (simulating two different projects)
+    provider1 = TracerProvider()
+    provider1.add_span_processor(processor1)
+
+    provider2 = TracerProvider()
+    provider2.add_span_processor(processor2)
+
+    # Create two mock tracers
+    tracer1 = MockTracer(provider1.get_tracer("judgeval", "1.0.0"))
+    tracer2 = MockTracer(provider2.get_tracer("judgeval", "1.0.0"))
+
+    # Import BEFORE patching
+    from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions
+
+    # Setup Claude Agent SDK integration for tracer1 and create client1
+    # This simulates Service A initializing its own tracer and clients
+    setup_claude_agent_sdk(tracer=tracer1)
+    options1 = ClaudeAgentOptions(model="claude-sonnet-4-20250514")
+    client1 = ClaudeSDKClient(options=options1)
+
+    # Setup Claude Agent SDK integration for tracer2 and create client2
+    # This simulates Service B initializing its own tracer and clients
+    # Note: This overwrites the global ClaudeSDKClient, but client1 already has tracer1 stored
+    setup_claude_agent_sdk(tracer=tracer2)
+    options2 = ClaudeAgentOptions(model="claude-sonnet-4-20250514")
+    client2 = ClaudeSDKClient(options=options2)
+
+    # Define two async tasks that will run concurrently
+    async def run_query_with_tracer1():
+        """Simulate Service A (e.g., "Dev - VRM")"""
+        async with client1 as client:
+            await client.query("What is 2 + 2?")
+            async for message in client.receive_response():
+                pass  # Consume messages
+
+    async def run_query_with_tracer2():
+        """Simulate Service B (e.g., another agent service)"""
+        async with client2 as client:
+            await client.query("What is 3 + 3?")
+            async for message in client.receive_response():
+                pass  # Consume messages
+
+    # Run both queries concurrently to simulate real-world scenario
+    # where two services might be processing requests at the same time
+    await asyncio.gather(run_query_with_tracer1(), run_query_with_tracer2())
+
+    # Force flush both processors
+    processor1.force_flush()
+    processor2.force_flush()
+
+    # Verify spans were created for both tracers
+    spans1 = processor1.ended_spans
+    spans2 = processor2.ended_spans
+
+    assert len(spans1) > 0, "No spans created for tracer1"
+    assert len(spans2) > 0, "No spans created for tracer2"
+
+    # Get all trace IDs from each tracer's spans
+    trace_ids1 = {span.context.trace_id for span in spans1}
+    trace_ids2 = {span.context.trace_id for span in spans2}
+
+    # Verify that the two tracers have DIFFERENT trace IDs
+    # (This would fail with the old implementation where thread-local storage was shared)
+    common_trace_ids = trace_ids1.intersection(trace_ids2)
+    assert len(common_trace_ids) == 0, (
+        f"TRACE ID COLLISION DETECTED! {len(common_trace_ids)} trace IDs are shared "
+        f"between tracer1 and tracer2. This indicates thread-local storage contamination.\n"
+        f"Tracer1 trace IDs: {[format(tid, '032x') for tid in trace_ids1]}\n"
+        f"Tracer2 trace IDs: {[format(tid, '032x') for tid in trace_ids2]}\n"
+        f"Common trace IDs: {[format(tid, '032x') for tid in common_trace_ids]}"
+    )
+
+    # Verify that each tracer's spans are properly nested under their own traces
+    for span in spans1:
+        assert span.context.trace_id in trace_ids1, (
+            f"Span from tracer1 has unexpected trace_id: "
+            f"{format(span.context.trace_id, '032x')}"
+        )
+
+    for span in spans2:
+        assert span.context.trace_id in trace_ids2, (
+            f"Span from tracer2 has unexpected trace_id: "
+            f"{format(span.context.trace_id, '032x')}"
+        )
+
+    print("\n✅ Test passed! No trace ID collisions detected:")
+    print(
+        f"   - Tracer1 created {len(spans1)} spans with {len(trace_ids1)} unique trace(s)"
+    )
+    print(
+        f"   - Tracer2 created {len(spans2)} spans with {len(trace_ids2)} unique trace(s)"
+    )
+    print("   - No trace IDs shared between tracers ✅")
