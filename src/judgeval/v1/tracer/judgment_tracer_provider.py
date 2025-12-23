@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Callable, Optional
 
+from opentelemetry.context.contextvars_context import ContextVarsRuntimeContext
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.trace import Tracer, NoOpTracer
 from opentelemetry.util.types import Attributes
@@ -14,7 +15,7 @@ FilterTracerCallback = Callable[[str, Optional[str], Optional[str], Attributes],
 
 
 class JudgmentTracerProvider(TracerProvider):
-    __slots__ = ("_filter_tracer", "_isolated")
+    __slots__ = ("_filter_tracer", "_isolated", "_runtime_context")
 
     def __init__(
         self,
@@ -25,6 +26,9 @@ class JudgmentTracerProvider(TracerProvider):
         super().__init__(**kwargs)
         self._filter_tracer = filter_tracer or (lambda *_: True)
         self._isolated = isolated
+        self._runtime_context = (
+            ContextVarsRuntimeContext()
+        )  # Only used for isolated tracers
 
     def get_tracer(
         self,
@@ -66,6 +70,6 @@ class JudgmentTracerProvider(TracerProvider):
         )
 
         if self._isolated and is_judgment_module:
-            return JudgmentIsolatedTracer(tracer)
+            return JudgmentIsolatedTracer(tracer, self._runtime_context)
 
         return tracer

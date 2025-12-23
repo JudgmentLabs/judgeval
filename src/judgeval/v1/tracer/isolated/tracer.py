@@ -2,22 +2,22 @@ from __future__ import annotations
 
 from typing import Iterator, Optional, Sequence
 
+from opentelemetry import trace as trace_api
 from opentelemetry.context.context import Context
-from opentelemetry.trace import Link, SpanKind, Tracer, Span
+from opentelemetry.context.contextvars_context import ContextVarsRuntimeContext
+from opentelemetry.trace import Link, SpanKind, Tracer, Span, Status, StatusCode
 from opentelemetry.util.types import Attributes
 from opentelemetry.util._decorator import _agnosticcontextmanager
-
-from judgeval.v1.tracer.isolated.context import attach, detach, get_current
-from judgeval.v1.tracer.isolated.propagation import set_span_in_context
 
 _Links = Optional[Sequence[Link]]
 
 
 class JudgmentIsolatedTracer(Tracer):
-    __slots__ = ("_delegate",)
+    __slots__ = ("_delegate", "_runtime_context")
 
-    def __init__(self, delegate: Tracer):
+    def __init__(self, delegate: Tracer, runtime_context: ContextVarsRuntimeContext):
         self._delegate = delegate
+        self._runtime_context = runtime_context
 
     def start_span(
         self,
@@ -31,7 +31,7 @@ class JudgmentIsolatedTracer(Tracer):
         set_status_on_exception: bool = True,
     ) -> Span:
         if context is None:
-            context = get_current()
+            context = self._runtime_context.get_current()
         return self._delegate.start_span(
             name,
             context,
@@ -57,7 +57,7 @@ class JudgmentIsolatedTracer(Tracer):
         end_on_exit: bool = True,
     ) -> Iterator[Span]:
         if context is None:
-            context = get_current()
+            context = self._runtime_context.get_current()
         span = self._delegate.start_span(
             name,
             context,
@@ -68,8 +68,8 @@ class JudgmentIsolatedTracer(Tracer):
             record_exception,
             set_status_on_exception,
         )
-        ctx = set_span_in_context(span, context)
-        token = attach(ctx)
+        ctx = trace_api.set_span_in_context(span, context)
+        token = self._runtime_context.attach(ctx)
         try:
             if end_on_exit:
                 try:
@@ -79,4 +79,47 @@ class JudgmentIsolatedTracer(Tracer):
             else:
                 yield span
         finally:
-            detach(token)
+            self._runtime_context.detach(token)
+
+    def get_current_span(self, context: Optional[Context] = None) -> Span:
+        """Get the current span from this tracer's isolated context."""
+        if context is None:
+            context = self._runtime_context.get_current()
+        return trace_api.get_current_span(context)
+
+    @_agnosticcontextmanager
+    def use_span(
+        self,
+        span: Span,
+        end_on_exit: bool = False,
+        record_exception: bool = True,
+        set_status_on_exception: bool = True,
+    ) -> Iterator[Span]:
+        """Use a span as the current span in this tracer's isolated context."""
+        try:
+            ctx = trace_api.set_span_in_context(
+                span, self._runtime_context.get_current()
+            )
+            token = self._runtime_context.attach(ctx)
+            try:
+                yield span
+            finally:
+                self._runtime_context.detach(token)
+
+        except Exception as exc:
+            if isinstance(span, Span) and span.is_recording():
+                if record_exception:
+                    span.record_exception(exc)
+
+                if set_status_on_exception:
+                    span.set_status(
+                        Status(
+                            status_code=StatusCode.ERROR,
+                            description=f"{type(exc).__name__}: {exc}",
+                        )
+                    )
+            raise
+
+        finally:
+            if end_on_exit:
+                span.end()

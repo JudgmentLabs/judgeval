@@ -5,7 +5,17 @@ import functools
 import inspect
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, Iterator, Optional, Tuple, TypeVar, overload
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    Optional,
+    Tuple,
+    TypeVar,
+    cast,
+    overload,
+)
 
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
@@ -39,11 +49,7 @@ from judgeval.v1.tracer.processors._lifecycles import (
     AGENT_CLASS_NAME_KEY,
     AGENT_INSTANCE_NAME_KEY,
 )
-from judgeval.v1.tracer.isolated import (
-    get_current_span as get_isolated_current_span,
-    get_current,
-    use_span as isolated_use_span,
-)
+from judgeval.v1.tracer.isolated.tracer import JudgmentIsolatedTracer
 
 C = TypeVar("C", bound=Callable[..., Any])
 T = TypeVar("T", bound=ApiClient)
@@ -145,9 +151,9 @@ class BaseTracer(ABC):
 
     def get_context(self) -> Context:
         if self._is_isolated():
-            return get_current()
-        else:
-            return otel_context.get_current()
+            tracer = cast(JudgmentIsolatedTracer, self.get_tracer())
+            return tracer._runtime_context.get_current()
+        return otel_context.get_current()
 
     def use_span(
         self,
@@ -157,7 +163,8 @@ class BaseTracer(ABC):
         set_status_on_exception: bool = True,
     ):
         if self._is_isolated():
-            return isolated_use_span(
+            tracer = cast(JudgmentIsolatedTracer, self.get_tracer())
+            return tracer.use_span(
                 span,
                 end_on_exit=end_on_exit,
                 record_exception=record_exception,
@@ -173,7 +180,8 @@ class BaseTracer(ABC):
 
     def _get_current_span(self) -> Optional[Span]:
         if self._is_isolated():
-            return get_isolated_current_span()
+            tracer = cast(JudgmentIsolatedTracer, self.get_tracer())
+            return tracer.get_current_span()
         return trace.get_current_span()
 
     def set_span_kind(self, kind: str) -> None:
