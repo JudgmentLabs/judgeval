@@ -150,9 +150,12 @@ class BaseTracer(ABC):
         return False
 
     def get_context(self) -> Context:
-        if self._is_isolated():
-            tracer = cast(JudgmentIsolatedTracer, self.get_tracer())
-            return tracer._runtime_context.get_current()
+        from judgeval.v1.tracer.judgment_tracer_provider import JudgmentTracerProvider
+
+        if self._is_isolated() and isinstance(
+            self._tracer_provider, JudgmentTracerProvider
+        ):
+            return self._tracer_provider.get_isolated_current_context()
         return otel_context.get_current()
 
     def use_span(

@@ -68,18 +68,14 @@ class JudgmentIsolatedTracer(Tracer):
             record_exception,
             set_status_on_exception,
         )
-        ctx = trace_api.set_span_in_context(span, context)
-        token = self._runtime_context.attach(ctx)
-        try:
-            if end_on_exit:
-                try:
-                    yield span
-                finally:
-                    span.end()
-            else:
-                yield span
-        finally:
-            self._runtime_context.detach(token)
+
+        with self.use_span(
+            span,
+            end_on_exit=end_on_exit,
+            record_exception=record_exception,
+            set_status_on_exception=set_status_on_exception,
+        ) as s:
+            yield s
 
     def get_current_span(self, context: Optional[Context] = None) -> Span:
         """Get the current span from this tracer's isolated context."""

@@ -110,7 +110,7 @@ def test_tracer_get_context_non_isolated(mock_client, serializer):
 
 def test_tracer_get_context_isolated(mock_client, serializer):
     """Test that get_context returns isolated context when in isolated mode."""
-    from judgeval.v1.tracer.isolated.context import get_current as get_isolated_context
+    from judgeval.v1.tracer.judgment_tracer_provider import JudgmentTracerProvider
 
     tracer = Tracer(
         project_name="test_project",
@@ -121,8 +121,10 @@ def test_tracer_get_context_isolated(mock_client, serializer):
         isolated=True,
     )
 
-    # Get the isolated context
-    isolated_context = get_isolated_context()
+    # Get the isolated context via the provider's public method
+    provider = tracer.tracer_provider
+    assert isinstance(provider, JudgmentTracerProvider)
+    isolated_context = provider.get_isolated_current_context()
     tracer_context = tracer.get_context()
 
     # They should be the same object

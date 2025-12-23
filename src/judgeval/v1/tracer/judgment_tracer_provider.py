@@ -30,6 +30,9 @@ class JudgmentTracerProvider(TracerProvider):
             ContextVarsRuntimeContext()
         )  # Only used for isolated tracers
 
+    def get_isolated_current_context(self):
+        return self._runtime_context.get_current()
+
     def get_tracer(
         self,
         instrumenting_module_name: str,

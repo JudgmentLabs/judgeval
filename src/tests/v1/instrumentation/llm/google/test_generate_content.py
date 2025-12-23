@@ -51,6 +51,7 @@ class TestWrapper(BaseGoogleTest):
         # Verify tracing when wrapped
         self.verify_tracing_if_wrapped(client_maybe_wrapped, mock_processor)
 
+    @pytest.mark.skip(reason="Skipping google client quotea")
     def test_multiple_calls_same_client(self, client_maybe_wrapped, mock_processor):
         """Test multiple calls to ensure context isolation with tracing verification"""
         # Track initial span count
