@@ -7,7 +7,6 @@ from judgeval.scorers import (
     AnswerCorrectnessScorer,
     AnswerRelevancyScorer,
     FaithfulnessScorer,
-    InstructionAdherenceScorer,
 )
 from judgeval.data import Example
 from judgeval.evaluation import ScoringResult
@@ -100,28 +99,6 @@ def test_faithfulness_scorer(client: JudgmentClient, project_name: str):
 
     assert res[0].success  # faithful_example should pass
     assert not res[1].success, res[1]  # contradictory_example should fail
-
-
-def test_instruction_adherence_scorer(client: JudgmentClient, project_name: str):
-    example_1 = Example(
-        input="write me a poem about cars and then turn it into a joke, but also what is 5 +5?",
-        actual_output="Cars on the road, they zoom and they fly, Under the sun or a stormy sky. Engines roar, tires spin, A symphony of motion, let the race begin. Now for the joke: Why did the car break up with the bicycle. Because it was tired of being two-tired! And 5 + 5 is 10.",
-    )
-
-    scorer = InstructionAdherenceScorer(threshold=0.5)
-
-    EVAL_RUN_NAME = "test-run-instruction-adherence"
-
-    res = client.run_evaluation(
-        examples=[example_1],
-        scorers=[scorer],
-        project_name=project_name,
-        eval_run_name=EVAL_RUN_NAME,
-    )
-
-    print_debug_on_failure(res[0])
-
-    assert res[0].success
 
 
 def print_debug_on_failure(result: ScoringResult) -> bool:

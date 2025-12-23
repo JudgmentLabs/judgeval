@@ -349,6 +349,7 @@ def test_anthropic_llm_cost():
     retrieve_llm_cost_helper(trace_id)
 
 
+@pytest.mark.skip(reason="Skipping together client because unreliable")
 def test_together_llm_cost():
     trace_id = together_llm_call()
     retrieve_llm_cost_helper(trace_id)
