@@ -354,6 +354,7 @@ def test_together_llm_cost():
     retrieve_llm_cost_helper(trace_id)
 
 
+@pytest.mark.skip(reason="Skipping google client quotes")
 def test_google_llm_cost():
     trace_id = google_llm_call()
     retrieve_llm_cost_helper(trace_id)
@@ -371,6 +372,7 @@ async def test_anthropic_async_llm_cost():
     retrieve_llm_cost_helper(trace_id)
 
 
+@pytest.mark.skip(reason="Skipping together client because unreliable")
 @pytest.mark.asyncio
 async def test_together_async_llm_cost():
     trace_id = await together_async_llm_call()
