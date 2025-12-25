@@ -27,7 +27,17 @@ if TYPE_CHECKING:
 # Thread-local storage to propagate parent span context to tool handlers
 # Claude Agent SDK breaks OpenTelemetry's automatic context propagation
 # when executing tools, so we need to explicitly store and pass the context
-_thread_local = threading.local()
+# Dictionary mapping tracer instances to their thread-local storage to avoid
+# cross-contamination between multiple tracer instances
+_tracer_thread_locals: Dict[int, threading.local] = {}
+
+
+def _get_thread_local(tracer: "BaseTracer") -> threading.local:
+    """Get thread-local storage for a specific tracer instance."""
+    tracer_id = id(tracer)
+    if tracer_id not in _tracer_thread_locals:
+        _tracer_thread_locals[tracer_id] = threading.local()
+    return _tracer_thread_locals[tracer_id]
 
 
 class LLMSpanTracker:
@@ -101,6 +111,8 @@ def _create_client_wrapper_class(
             super().__init__(*args, **kwargs)
             self.__last_prompt: Optional[str] = None
             self.__query_start_time: Optional[float] = None
+            # Store the tracer on the instance to support multiple tracers
+            self.__judgeval_tracer: "BaseTracer" = tracer
 
         async def query(self, *args: Any, **kwargs: Any) -> Any:
             """Wrap query to capture the prompt and start time for tracing."""
@@ -119,8 +131,11 @@ def _create_client_wrapper_class(
             """Wrap receive_response to add tracing with proper span hierarchy."""
             generator = super().receive_response()
 
+            # Use the tracer stored on this instance
+            instance_tracer = self.__judgeval_tracer
+
             # Create TASK span for the entire agent conversation
-            agent_span_context = tracer.get_tracer().start_as_current_span(
+            agent_span_context = instance_tracer.get_tracer().start_as_current_span(
                 "Claude_Agent",
                 attributes={
                     AttributeKeys.JUDGMENT_SPAN_KIND: "agent",
@@ -139,12 +154,16 @@ def _create_client_wrapper_class(
             # Store the parent span context in thread-local storage
             # Claude Agent SDK breaks OpenTelemetry's context propagation when executing tools,
             # so we need to explicitly store the context for tool handlers to access
-            parent_context = set_span_in_context(agent_span, tracer.get_context())
-            _thread_local.parent_context = parent_context
+            parent_context = set_span_in_context(
+                agent_span, instance_tracer.get_context()
+            )
+            thread_local = _get_thread_local(instance_tracer)
+            thread_local.parent_context = parent_context
+            thread_local.tracer = instance_tracer
 
             final_results: List[Dict[str, Any]] = []
             llm_tracker = LLMSpanTracker(
-                tracer, query_start_time=self.__query_start_time
+                instance_tracer, query_start_time=self.__query_start_time
             )
 
             try:
@@ -199,8 +218,11 @@ def _create_client_wrapper_class(
                 llm_tracker.cleanup()
                 agent_span_context.__exit__(None, None, None)
                 # Clean up thread-local storage
-                if hasattr(_thread_local, "parent_context"):
-                    delattr(_thread_local, "parent_context")
+                thread_local = _get_thread_local(instance_tracer)
+                if hasattr(thread_local, "parent_context"):
+                    delattr(thread_local, "parent_context")
+                if hasattr(thread_local, "tracer"):
+                    delattr(thread_local, "tracer")
 
     return WrappedClaudeSDKClient
 
@@ -251,7 +273,9 @@ def _wrap_query_function(
 
         # Store parent context for tool tracing
         parent_context = set_span_in_context(agent_span, tracer.get_context())
-        _thread_local.parent_context = parent_context
+        thread_local = _get_thread_local(tracer)
+        thread_local.parent_context = parent_context
+        thread_local.tracer = tracer
 
         final_results: List[Dict[str, Any]] = []
         llm_tracker = LLMSpanTracker(tracer, query_start_time=time.time())
@@ -311,8 +335,11 @@ def _wrap_query_function(
             llm_tracker.cleanup()
             agent_span_context.__exit__(None, None, None)
             # Clean up thread-local storage
-            if hasattr(_thread_local, "parent_context"):
-                delattr(_thread_local, "parent_context")
+            thread_local = _get_thread_local(tracer)
+            if hasattr(thread_local, "parent_context"):
+                delattr(thread_local, "parent_context")
+            if hasattr(thread_local, "tracer"):
+                delattr(thread_local, "tracer")
 
     return wrapped_query
 
@@ -362,7 +389,14 @@ def _wrap_tool_handler(
     async def wrapped_handler(args: Any) -> Any:
         # Get parent context from thread-local storage
         # Claude Agent SDK breaks context propagation, so we stored it explicitly
-        parent_context = getattr(_thread_local, "parent_context", None)
+        thread_local = _get_thread_local(tracer)
+        parent_context = getattr(thread_local, "parent_context", None)
+        stored_tracer = getattr(thread_local, "tracer", None)
+
+        # Verify this is the correct tracer to prevent cross-contamination
+        if stored_tracer is not tracer:
+            # This shouldn't happen, but log if it does
+            parent_context = None
 
         # Use the parent context if available, otherwise use current context
         ctx = parent_context if parent_context is not None else None
