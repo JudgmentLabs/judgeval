@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+import contextvars
 import dataclasses
-import threading
 import time
 from typing import (
     TYPE_CHECKING,
@@ -32,7 +32,9 @@ if TYPE_CHECKING:
 
 _registered_tracers: List["BaseTracer"] = []
 _module_patched: bool = False
-_thread_local = threading.local()
+_parent_context: contextvars.ContextVar = contextvars.ContextVar(
+    "parent_context", default=None
+)
 
 
 def register_tracer(tracer: "BaseTracer") -> None:
@@ -68,19 +70,30 @@ def mark_module_patched() -> None:
     _module_patched = True
 
 
+def _reset_registry_state() -> None:
+    """Reset tracer registry state. For testing only."""
+    global _module_patched
+    _registered_tracers.clear()
+    _module_patched = False
+
+
 # =============================================================================
 # LLM Span Tracker
 # =============================================================================
 
 
 class LLMSpanTracker:
-    """Tracks LLM spans across message stream turns."""
+    """Tracks LLM spans across message stream turns.
+
+    Manages span timing: marks when next LLM call starts (after tool results),
+    uses that time when creating the span for accurate duration tracking.
+    """
 
     def __init__(self, tracer: "BaseTracer", start_time: Optional[float] = None):
         self.tracer = tracer
         self.span = None
         self.span_ctx = None
-        self.next_start = start_time
+        self.next_start_time = start_time
 
     def start_span(
         self, message: Any, prompt: Any, history: List[Dict]
@@ -88,14 +101,16 @@ class LLMSpanTracker:
         if self.span_ctx:
             self.span_ctx.__exit__(None, None, None)
 
+        start = self.next_start_time if self.next_start_time else time.time()
         content, self.span, self.span_ctx = _create_llm_span(
-            self.tracer, message, prompt, history, self.next_start or time.time()
+            self.tracer, message, prompt, history, start
         )
-        self.next_start = None
+        self.next_start_time = None
         return content
 
     def mark_next_start(self) -> None:
-        self.next_start = time.time()
+        """Mark when next LLM call starts (after tool results)."""
+        self.next_start_time = time.time()
 
     def log_usage(self, metrics: Dict) -> None:
         if self.span and metrics:
@@ -135,10 +150,7 @@ def _create_client_wrapper_class(original_class: Any) -> Any:
                 return
 
             async for msg in _traced_response_stream(
-                super().receive_response(),
-                tracer,
-                self._prompt,
-                self._query_time or time.time(),
+                super().receive_response(), tracer, self._prompt, self._query_time
             ):
                 yield msg
 
@@ -213,7 +225,7 @@ def _wrap_tool_handler(handler: Any, name: Any) -> Callable:
         if not tracer:
             return await handler(args)
 
-        ctx = getattr(_thread_local, "parent_context", None)
+        ctx = _parent_context.get()
         span = tracer.get_tracer().start_span(
             str(name),
             context=ctx,
@@ -245,10 +257,9 @@ async def _traced_response_stream(
     generator: AsyncGenerator,
     tracer: "BaseTracer",
     prompt: Optional[str],
-    start_time: float,
+    start_time: Optional[float] = None,
 ) -> AsyncGenerator[Any, None]:
     """Wrap response stream with agent span and LLM tracking."""
-
     span_ctx = tracer.get_tracer().start_as_current_span(
         "Claude_Agent", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "agent"}
     )
@@ -257,7 +268,7 @@ async def _traced_response_stream(
     if prompt:
         set_span_attribute(span, AttributeKeys.JUDGMENT_INPUT, safe_serialize(prompt))
 
-    _thread_local.parent_context = set_span_in_context(span, tracer.get_context())
+    token = _parent_context.set(set_span_in_context(span, tracer.get_context()))
 
     results: List[Dict] = []
     tracker = LLMSpanTracker(tracer, start_time)
@@ -297,8 +308,7 @@ async def _traced_response_stream(
     finally:
         tracker.cleanup()
         span_ctx.__exit__(None, None, None)
-        if hasattr(_thread_local, "parent_context"):
-            delattr(_thread_local, "parent_context")
+        _parent_context.reset(token)
 
 
 def _create_llm_span(
@@ -306,10 +316,9 @@ def _create_llm_span(
     message: Any,
     prompt: Any,
     history: List[Dict],
-    start_time: float,
+    start_time: Optional[float] = None,
 ) -> Tuple[Optional[Dict], Optional[Any], Optional[Any]]:
     """Create LLM span for an AssistantMessage."""
-
     if type(message).__name__ != "AssistantMessage":
         return None, None, None
 
@@ -373,7 +382,8 @@ def _serialize_content(content: Any) -> Any:
                     item = data["content"][0]
                     if isinstance(item, dict) and item.get("type") == "text":
                         data["content"] = item.get("text", "")
-                data.pop("is_error", None) if data.get("is_error") is None else None
+                if data.get("is_error") is None:
+                    data.pop("is_error", None)
 
             result.append(data)
         else:

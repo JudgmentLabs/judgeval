@@ -4,6 +4,7 @@ import pytest
 from judgeval.v1.integrations.claude_agent_sdk import setup_claude_agent_sdk
 from judgeval.v1.integrations.claude_agent_sdk.wrapper import (
     _registered_tracers,
+    _reset_registry_state,
     get_active_tracer,
 )
 
@@ -11,13 +12,9 @@ from judgeval.v1.integrations.claude_agent_sdk.wrapper import (
 @pytest.fixture(autouse=True)
 def reset_wrapper_state():
     """Reset wrapper state between tests."""
-    import judgeval.v1.integrations.claude_agent_sdk.wrapper as w
-
-    w._registered_tracers.clear()
-    w._module_patched = False
+    _reset_registry_state()
     yield
-    w._registered_tracers.clear()
-    w._module_patched = False
+    _reset_registry_state()
 
 
 def test_multiple_tracers_register(tracer, mock_processor):
