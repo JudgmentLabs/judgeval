@@ -27,19 +27,27 @@ def setup_claude_agent_sdk(tracer: "BaseTracer") -> bool:
         tracer: Judgeval tracer (use isolated=True for multi-tracer setups)
 
     Returns:
-        True if successful
+        bool: True if setup was successful, False otherwise.
 
-    Examples:
-        # Single tracer - just works
+    Example:
+        ```python
+        from judgeval import Judgeval
+        from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions
+        from judgeval.v1.integrations.claude_agent_sdk import setup_claude_agent_sdk
+
         tracer = Judgeval().tracer.create(project_name="my-project")
         setup_claude_agent_sdk(tracer)
 
-        async with ClaudeSDKClient(...) as client:
+        # Now use claude_agent_sdk normally - all calls automatically traced
+        async with ClaudeSDKClient(options=ClaudeAgentOptions(...)) as client:
             await client.query("Hello")
             async for msg in client.receive_response():
-                ...  # Auto-traced!
+                print(msg)
+        ```
 
-        # Multi-tracer - use @tracer.observe() to scope
+    Multi-tracer Example:
+        ```python
+        # For multiple projects, use isolated tracers with @tracer.observe()
         vrm = Judgeval().tracer.create(project_name="VRM", isolated=True)
         copilot = Judgeval().tracer.create(project_name="Copilot", isolated=True)
 
@@ -49,12 +57,13 @@ def setup_claude_agent_sdk(tracer: "BaseTracer") -> bool:
         @vrm.observe()
         async def vrm_agent():
             async with ClaudeSDKClient(...) as client:
-                ...  # → VRM project
+                ...  # Traces go to VRM project
 
         @copilot.observe()
         async def copilot_agent():
             async with ClaudeSDKClient(...) as client:
-                ...  # → Copilot project
+                ...  # Traces go to Copilot project
+        ```
     """
     from judgeval.v1.integrations.claude_agent_sdk.wrapper import (
         register_tracer,
