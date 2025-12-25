@@ -56,24 +56,20 @@ class EvaluationRun(BaseModel):
         return data
 
     @model_validator(mode="after")
-    @classmethod
-    def validate_scorer_lists(cls, values):
-        custom_scorers = values.custom_scorers
-        judgment_scorers = values.judgment_scorers
-
+    def validate_scorer_lists(self):
         # Check that both lists are not empty
-        if not custom_scorers and not judgment_scorers:
+        if not self.custom_scorers and not self.judgment_scorers:
             raise ValueError(
                 "At least one of custom_scorers or judgment_scorers must be provided."
             )
 
         # Check that only one list is filled
-        if custom_scorers and judgment_scorers:
+        if self.custom_scorers and self.judgment_scorers:
             raise ValueError(
                 "Only one of custom_scorers or judgment_scorers can be provided, not both."
             )
 
-        return values
+        return self
 
     @field_validator("model")
     def validate_model(cls, v, values):
