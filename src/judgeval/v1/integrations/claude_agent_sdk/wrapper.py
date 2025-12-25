@@ -135,7 +135,10 @@ def _create_client_wrapper_class(original_class: Any) -> Any:
                 return
 
             async for msg in _traced_response_stream(
-                super().receive_response(), tracer, self._prompt, self._query_time
+                super().receive_response(),
+                tracer,
+                self._prompt,
+                self._query_time or time.time(),
             ):
                 yield msg
 
@@ -229,7 +232,7 @@ def _wrap_tool_handler(handler: Any, name: Any) -> Callable:
                 span.record_exception(e)
                 raise
 
-    wrapped._judgeval_wrapped = True
+    setattr(wrapped, "_judgeval_wrapped", True)
     return wrapped
 
 
@@ -391,7 +394,7 @@ def _extract_usage(msg: Any) -> Dict[str, Any]:
         else (lambda k: getattr(usage, k, None))
     )
 
-    metrics = {}
+    metrics: Dict[str, Any] = {}
     key_map = {
         "input_tokens": AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
         "output_tokens": AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS,
@@ -401,7 +404,7 @@ def _extract_usage(msg: Any) -> Dict[str, Any]:
 
     for src, dst in key_map.items():
         if (val := get(src)) is not None:
-            metrics[dst] = val
+            metrics[str(dst)] = val
 
-    metrics[AttributeKeys.JUDGMENT_USAGE_METADATA] = safe_serialize(usage)
+    metrics[str(AttributeKeys.JUDGMENT_USAGE_METADATA)] = safe_serialize(usage)
     return metrics
