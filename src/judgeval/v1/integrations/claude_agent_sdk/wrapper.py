@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import contextvars
 import dataclasses
+import threading
 import time
 from typing import (
     TYPE_CHECKING,
@@ -32,9 +32,7 @@ if TYPE_CHECKING:
 
 _registered_tracers: List["BaseTracer"] = []
 _module_patched: bool = False
-_parent_context: contextvars.ContextVar = contextvars.ContextVar(
-    "parent_context", default=None
-)
+_thread_local = threading.local()
 
 
 def register_tracer(tracer: "BaseTracer") -> None:
@@ -225,7 +223,7 @@ def _wrap_tool_handler(handler: Any, name: Any) -> Callable:
         if not tracer:
             return await handler(args)
 
-        ctx = _parent_context.get()
+        ctx = getattr(_thread_local, "parent_context", None)
         span = tracer.get_tracer().start_span(
             str(name),
             context=ctx,
@@ -268,7 +266,7 @@ async def _traced_response_stream(
     if prompt:
         set_span_attribute(span, AttributeKeys.JUDGMENT_INPUT, safe_serialize(prompt))
 
-    token = _parent_context.set(set_span_in_context(span, tracer.get_context()))
+    _thread_local.parent_context = set_span_in_context(span, tracer.get_context())
 
     results: List[Dict] = []
     tracker = LLMSpanTracker(tracer, start_time)
@@ -308,7 +306,8 @@ async def _traced_response_stream(
     finally:
         tracker.cleanup()
         span_ctx.__exit__(None, None, None)
-        _parent_context.reset(token)
+        if hasattr(_thread_local, "parent_context"):
+            delattr(_thread_local, "parent_context")
 
 
 def _create_llm_span(
@@ -405,16 +404,15 @@ def _extract_usage(msg: Any) -> Dict[str, Any]:
     )
 
     metrics: Dict[str, Any] = {}
-    key_map = {
-        "input_tokens": AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
-        "output_tokens": AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS,
-        "cache_creation_input_tokens": AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS,
-        "cache_read_input_tokens": AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS,
-    }
 
-    for src, dst in key_map.items():
-        if (val := get(src)) is not None:
-            metrics[str(dst)] = val
+    if (val := get("input_tokens")) is not None:
+        metrics[AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS] = val
+    if (val := get("output_tokens")) is not None:
+        metrics[AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS] = val
+    if (val := get("cache_creation_input_tokens")) is not None:
+        metrics[AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS] = val
+    if (val := get("cache_read_input_tokens")) is not None:
+        metrics[AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS] = val
 
-    metrics[str(AttributeKeys.JUDGMENT_USAGE_METADATA)] = safe_serialize(usage)
+    metrics[AttributeKeys.JUDGMENT_USAGE_METADATA] = safe_serialize(usage)
     return metrics

@@ -16,7 +16,7 @@ try:
     import claude_agent_sdk
 except ImportError:
     raise ImportError(
-        "Claude Agent SDK not installed. Install with: pip install claude-agent-sdk"
+        "Claude Agent SDK is not installed and required for the claude agent sdk integration. Please install it with `pip install claude-agent-sdk`."
     )
 
 
@@ -70,7 +70,7 @@ def setup_claude_agent_sdk(tracer: "BaseTracer") -> bool:
         register_tracer(tracer)
 
         if is_module_patched():
-            judgeval_logger.debug(f"Registered tracer for '{tracer.project_name}'")
+            judgeval_logger.debug("Registered additional tracer for Claude Agent SDK")
             return True
 
         _patch_attr(claude_agent_sdk, "ClaudeSDKClient", _create_client_wrapper_class)
@@ -79,7 +79,7 @@ def setup_claude_agent_sdk(tracer: "BaseTracer") -> bool:
         _patch_attr(claude_agent_sdk, "query", _wrap_query_function)
 
         mark_module_patched()
-        judgeval_logger.info(f"Claude Agent SDK setup for '{tracer.project_name}'")
+        judgeval_logger.info("Claude Agent SDK integration setup successful")
         return True
 
     except Exception as e:
