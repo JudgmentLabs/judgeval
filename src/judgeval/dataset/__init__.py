@@ -83,12 +83,6 @@ class Dataset:
             if examples is None:
                 examples = []
 
-            for e in examples:
-                if isinstance(e, dict) and isinstance(e.get("data", {}), dict):
-                    e.update(e.pop("data"))  # type: ignore
-                    e.pop(
-                        "example_id"
-                    )  # TODO: remove once scorer data migration is complete
             judgeval_logger.info(f"Successfully retrieved example dataset {name}!")
             return cls(
                 name=name,
@@ -102,11 +96,11 @@ class Dataset:
             if trace_data is None:
                 trace_data = []
 
-            traces = []
-            for trace_item in trace_data:
-                if isinstance(trace_item, dict):
-                    trace = Trace.from_dataset_trace_with_spans(trace_item)
-                    traces.append(trace)
+            traces = [
+                Trace.from_dataset_trace_with_spans(t)
+                for t in trace_data
+                if isinstance(t, dict)
+            ]
 
             judgeval_logger.info(f"Successfully retrieved trace dataset {name}!")
             return cls(
