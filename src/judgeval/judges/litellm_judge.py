@@ -107,25 +107,15 @@ class LiteLLMJudge(JudgevalJudge):
 
         if isinstance(input, str):
             convo = BASE_CONVERSATION + [{"role": "user", "content": input}]
-            if litellm.supports_response_schema(model=self.model):
-                response = await afetch_litellm_api_response(
-                    model=self.model, messages=convo, response_format=response_format
-                )
-            else:
-                response = await afetch_litellm_api_response(
-                    model=self.model, messages=convo
-                )
+            response = await afetch_litellm_api_response(
+                model=self.model, messages=convo, response_format=response_format
+            )
             return response
         elif isinstance(input, list):
             messages = [dict(msg) for msg in input]
-            if litellm.supports_response_schema(model=self.model):
-                response = await afetch_litellm_api_response(
-                    model=self.model, messages=messages, response_format=response_format
-                )
-            else:
-                response = await afetch_litellm_api_response(
-                    model=self.model, messages=messages
-                )
+            response = await afetch_litellm_api_response(
+                model=self.model, messages=messages, response_format=response_format
+            )
             return response
         else:
             raise TypeError(
