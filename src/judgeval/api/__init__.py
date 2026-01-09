@@ -18,7 +18,8 @@ def _headers(api_key: str, organization_id: str) -> Mapping[str, str]:
 def _handle_response(r: Response) -> Any:
     if r.status_code >= 400:
         try:
-            detail = r.json().get("detail", r.json().get("error", ""))
+            json_data = r.json()
+            detail = json_data.get("detail", json_data.get("error", ""))
         except Exception:
             detail = r.text
         raise JudgmentAPIError(r.status_code, detail, r)
