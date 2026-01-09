@@ -10,6 +10,7 @@ from judgeval.v1.internal.api.api_types import (
 )
 from judgeval.exceptions import JudgmentAPIError
 from judgeval.v1.scorers.prompt_scorer.prompt_scorer import PromptScorer
+from judgeval.logger import judgeval_logger
 
 
 class PromptScorerFactory:
@@ -24,7 +25,7 @@ class PromptScorerFactory:
         self._client = client
         self._is_trace = is_trace
 
-    def get(self, name: str) -> PromptScorer:
+    def get(self, name: str) -> PromptScorer | None:
         cache_key = (
             name,
             self._client.organization_id,
@@ -68,7 +69,8 @@ class PromptScorerFactory:
                 self._cache[cache_key] = scorer
                 cached = scorer
             except JudgmentAPIError:
-                raise
+                judgeval_logger.error(f"Failed to fetch prompt scorer '{name}'.")
+                return None
             except Exception as e:
                 raise JudgmentAPIError(
                     500, f"Failed to fetch prompt scorer '{name}': {e}", None

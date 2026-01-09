@@ -252,9 +252,13 @@ class BaseTracer(ABC):
     @dont_throw
     def async_evaluate(
         self,
-        scorer: BaseScorer,
+        scorer: BaseScorer | None,
         example: Example,
     ) -> None:
+        if scorer is None:
+            judgeval_logger.error("Scorer was not found, skipping evaluation.")
+            return
+
         if not self.enable_evaluation:
             return
 
@@ -279,8 +283,12 @@ class BaseTracer(ABC):
     @dont_throw
     def async_trace_evaluate(
         self,
-        scorer: BaseScorer,
+        scorer: BaseScorer | None,
     ) -> None:
+        if scorer is None:
+            judgeval_logger.error("Scorer was not found, skipping trace evaluation.")
+            return
+
         if not self.enable_evaluation:
             return
 
