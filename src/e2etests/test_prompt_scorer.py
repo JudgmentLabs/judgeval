@@ -108,10 +108,6 @@ def test_get_and_edit_prompt_scorer(client: JudgmentClient, project_name: str):
 
     assert prompt_scorer.options == {"yes": 1.0, "no": 0.0}
 
-    prompt_scorer.append_to_prompt(
-        "Consider accuracy, clarity, and completeness in your evaluation."
-    )
-
     prompt_scorer.set_options({"y": 1.0, "n": 0.0})
     prompt_scorer.set_threshold(0.8)
 
@@ -122,7 +118,7 @@ def test_get_and_edit_prompt_scorer(client: JudgmentClient, project_name: str):
     assert prompt_scorer2.name == f"Test Prompt Scorer {random_id}"
     assert (
         prompt_scorer2.prompt
-        == "Question: {{input}}\nResponse: {{actual_output}}\n\nIs this response helpful?Consider accuracy, clarity, and completeness in your evaluation."
+        == "Question: {{input}}\nResponse: {{actual_output}}\n\nIs this response helpful?"
     )
     assert prompt_scorer2.options == {"y": 1.0, "n": 0.0}
     assert prompt_scorer2.threshold == 0.8
