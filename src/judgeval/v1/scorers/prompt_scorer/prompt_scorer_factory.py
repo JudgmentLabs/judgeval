@@ -69,12 +69,13 @@ class PromptScorerFactory:
                 self._cache[cache_key] = scorer
                 cached = scorer
             except JudgmentAPIError:
+                judgeval_logger.error(
+                    f"Failed to fetch prompt scorer '{name}' : prompt scorer '{name}' not found in the organization."
+                )
+                return None
+            except Exception:
                 judgeval_logger.error(f"Failed to fetch prompt scorer '{name}'.")
                 return None
-            except Exception as e:
-                raise JudgmentAPIError(
-                    500, f"Failed to fetch prompt scorer '{name}': {e}", None
-                )
 
         return PromptScorer(
             name=name,

@@ -65,9 +65,6 @@ class PromptScorer(APIScorer):
     def set_description(self, description: str) -> None:
         self._description = description
 
-    def append_to_prompt(self, addition: str) -> None:
-        self._prompt = self._prompt + addition
-
     def get_scorer_config(self) -> ScorerConfig:
         kwargs: Dict[str, Any] = {"prompt": self._prompt}
 
