@@ -77,6 +77,8 @@ class CustomScorerUploadPayload(TypedDict):
     scorer_code: str
     requirements_text: str
     overwrite: NotRequired[bool]
+    scorer_type: str
+    class_name: str
 
 
 class CustomScorerTemplateResponse(TypedDict):

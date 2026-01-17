@@ -82,6 +82,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         requirements_file_path: Optional[str] = None,
         unique_name: Optional[str] = None,
         overwrite: bool = False,
+        scorer_type: str = "example",
     ) -> bool:
         """
         Upload custom ExampleScorer from files to backend.
@@ -91,6 +92,7 @@ class JudgmentClient(metaclass=SingletonMeta):
             requirements_file_path: Optional path to requirements.txt
             unique_name: Optional unique identifier (auto-detected from scorer.name if not provided)
             overwrite: Whether to overwrite existing scorer if it already exists
+            scorer_type: Optional scorer type (e.g., "trace" for trace scorers)
 
         Returns:
             bool: True if upload successful
@@ -154,9 +156,11 @@ class JudgmentClient(metaclass=SingletonMeta):
             response = client.upload_custom_scorer(
                 payload={
                     "scorer_name": unique_name,
+                    "class_name": scorer_classes[0],
                     "scorer_code": scorer_code,
                     "requirements_text": requirements_text,
                     "overwrite": overwrite,
+                    "scorer_type": scorer_type,
                 }
             )
 
