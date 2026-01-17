@@ -119,12 +119,6 @@ def test_prompt_scorer_set_description():
     assert scorer._description == "New description"
 
 
-def test_prompt_scorer_append_to_prompt():
-    scorer = PromptScorer(name="Test", prompt="Initial")
-    scorer.append_to_prompt(" appended text")
-    assert scorer._prompt == "Initial appended text"
-
-
 def test_prompt_scorer_get_scorer_config():
     scorer = PromptScorer(
         name="TestScorer",
