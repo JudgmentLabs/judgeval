@@ -12,20 +12,13 @@ from judgeval.version import get_version
 from judgeval.exceptions import JudgmentAPIError
 from judgeval.utils.project import _resolve_project_id
 from judgeval.utils.url import url_for
-
+from judgeval.v1.cli import app
 load_dotenv()
 
-app = typer.Typer(
-    no_args_is_help=True,
-    pretty_exceptions_enable=False,
-    pretty_exceptions_show_locals=False,
-    pretty_exceptions_short=False,
-    rich_help_panel=None,
-    rich_markup_mode=None,
-)
+legacy_app = typer.Typer(help="Legacy commands (deprecated)")
 
 
-@app.command(
+@legacy_app.command(
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
 )
 def load_otel_env(
@@ -59,7 +52,7 @@ def load_otel_env(
     sys.exit(result.returncode)
 
 
-@app.command()
+@legacy_app.command()
 def upload_scorer(
     scorer_file_path: str = typer.Argument(help="Path to scorer Python file"),
     requirements_file_path: str = typer.Argument(help="Path to requirements.txt file"),
@@ -104,11 +97,13 @@ def upload_scorer(
         raise
 
 
-@app.command()
+@legacy_app.command()
 def version():
     """Show Judgeval CLI version."""
     typer.echo(f"Judgeval CLI v{get_version()}")
 
+
+app.add_typer(legacy_app, name="legacy")
 
 if __name__ == "__main__":
     app()
