@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Make sure judgeval server is running on port 100001
+# Make sure judgeval server is running on port 10001
 # This openapi_transform.py will get the openapi.json file and save it to openapi.json
 
 

@@ -125,7 +125,6 @@ class Evaluation:
                     "minimum_score_range": scorer_dict.get("minimum_score_range", 0),
                     "maximum_score_range": scorer_dict.get("maximum_score_range", 1),
                     "reason": scorer_dict.get("reason"),
-                    "strict_mode": scorer_dict.get("strict_mode"),
                     "evaluation_model": scorer_dict.get("evaluation_model"),
                     "error": scorer_dict.get("error"),
                     "additional_metadata": scorer_dict.get("additional_metadata", {}),

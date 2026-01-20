@@ -77,7 +77,12 @@ class CustomScorerFactory:
                 requirements_text = f.read()
 
         try:
-            if not api_key or not organization_id:
+            if (
+                not api_key
+                or not api_key.strip()
+                or not organization_id
+                or not organization_id.strip()
+            ):
                 raise ValueError("Judgment API key and organization ID are required")
             client = JudgmentSyncClient(
                 api_key=api_key,

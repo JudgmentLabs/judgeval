@@ -48,7 +48,6 @@ def test_factory_run(evaluation_factory, mock_client, sample_examples, sample_sc
                         "success": True,
                         "score": 0.9,
                         "reason": "Relevant",
-                        "strict_mode": False,
                         "evaluation_model": "gpt-4o-mini",
                         "error": None,
                         "additional_metadata": {},

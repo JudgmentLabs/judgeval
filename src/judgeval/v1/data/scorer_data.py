@@ -15,7 +15,6 @@ class ScorerData:
     minimum_score_range: float = 0
     maximum_score_range: float = 1
     reason: Optional[str] = None
-    strict_mode: Optional[bool] = None
     evaluation_model: Optional[str] = None
     error: Optional[str] = None
     additional_metadata: Dict[str, Any] = field(default_factory=dict)
@@ -35,8 +34,6 @@ class ScorerData:
             result["maximum_score_range"] = self.maximum_score_range
         if self.reason is not None:
             result["reason"] = self.reason
-        if self.strict_mode is not None:
-            result["strict_mode"] = self.strict_mode
         if self.evaluation_model is not None:
             result["evaluation_model"] = self.evaluation_model
         if self.error is not None:

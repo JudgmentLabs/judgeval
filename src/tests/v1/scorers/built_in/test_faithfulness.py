@@ -6,7 +6,6 @@ def test_faithfulness_initialization():
     scorer = FaithfulnessScorer()
     assert scorer._threshold == 0.5
     assert scorer._name == APIScorerType.FAITHFULNESS.value
-    assert scorer._strict_mode is False
     assert scorer._model is None
 
 
@@ -18,11 +17,6 @@ def test_faithfulness_with_custom_threshold():
 def test_faithfulness_with_name():
     scorer = FaithfulnessScorer(name="Custom Faithfulness Scorer")
     assert scorer._name == "Custom Faithfulness Scorer"
-
-
-def test_faithfulness_with_strict_mode():
-    scorer = FaithfulnessScorer(strict_mode=True)
-    assert scorer._strict_mode is True
 
 
 def test_faithfulness_with_model():
@@ -48,7 +42,7 @@ def test_faithfulness_create_method():
 
 def test_faithfulness_get_scorer_config():
     scorer = FaithfulnessScorer(
-        threshold=1.0, name="Strict Faithfulness", strict_mode=True, model="gpt-4o"
+        threshold=1.0, name="Strict Faithfulness", model="gpt-4o"
     )
 
     config = scorer.get_scorer_config()
@@ -56,5 +50,4 @@ def test_faithfulness_get_scorer_config():
     assert config["score_type"] == APIScorerType.FAITHFULNESS.value
     assert config.get("threshold") == 1.0
     assert config.get("name") == "Strict Faithfulness"
-    assert config.get("strict_mode") is True
     assert config.get("kwargs", {}).get("model") == "gpt-4o"
