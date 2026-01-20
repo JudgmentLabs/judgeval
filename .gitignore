@@ -116,3 +116,11 @@ demo
 src/judgeval/data/openapi_new.json
 
 CLAUDE.md
+
+# Local Claude settings
+.claude/settings.local.json
+
+# Test/dev files
+braintrust-claude-plugin/
+test_fastapi_multi.zip
+*.zip
