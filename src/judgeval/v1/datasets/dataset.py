@@ -42,7 +42,7 @@ class DatasetInfo:
     name: str
     created_at: str
     kind: str
-    entries: int
+    entries: float
     creator: str
 
 

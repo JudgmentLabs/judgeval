@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import orjson
 import sys
 import subprocess
@@ -17,6 +18,199 @@ if spec_file.startswith("http"):
 else:
     with open(spec_file, "rb") as f:
         SPEC = orjson.loads(f.read())
+
+
+def normalize_schema_for_comparison(schema: Dict[str, Any]) -> str:
+    """
+    Create a normalized string representation of a schema for comparison.
+    This handles property ordering and optional fields.
+    """
+    if not isinstance(schema, dict):
+        return str(schema)
+
+    # Skip if it's already a reference
+    if "$ref" in schema:
+        return f"$ref:{schema['$ref']}"
+
+    # Create a normalized copy
+    normalized = {}
+
+    # For objects, normalize properties
+    if schema.get("type") == "object" or "properties" in schema:
+        normalized["type"] = "object"
+        if "properties" in schema:
+            # Sort properties by name for consistent comparison
+            props = {}
+            for key in sorted(schema["properties"].keys()):
+                props[key] = normalize_schema_for_comparison(schema["properties"][key])
+            normalized["properties"] = props
+        if "required" in schema:
+            normalized["required"] = sorted(schema["required"])
+        if "additionalProperties" in schema:
+            normalized["additionalProperties"] = schema["additionalProperties"]
+    elif schema.get("type") == "array":
+        normalized["type"] = "array"
+        if "items" in schema:
+            normalized["items"] = normalize_schema_for_comparison(schema["items"])
+    elif "anyOf" in schema:
+        normalized["anyOf"] = [
+            normalize_schema_for_comparison(s) for s in schema["anyOf"]
+        ]
+    elif "oneOf" in schema:
+        normalized["oneOf"] = [
+            normalize_schema_for_comparison(s) for s in schema["oneOf"]
+        ]
+    elif "allOf" in schema:
+        normalized["allOf"] = [
+            normalize_schema_for_comparison(s) for s in schema["allOf"]
+        ]
+    else:
+        # For primitive types
+        for key in ["type", "format", "enum", "const", "default", "minimum", "maximum"]:
+            if key in schema:
+                normalized[key] = schema[key]
+
+    return orjson.dumps(normalized, option=orjson.OPT_SORT_KEYS).decode("utf-8")
+
+
+def build_schema_fingerprints(components_schemas: Dict[str, Any]) -> Dict[str, str]:
+    """
+    Build a mapping of schema fingerprints to schema names.
+    Returns: {fingerprint: schema_name}
+    """
+    fingerprints = {}
+    for name, schema in components_schemas.items():
+        fingerprint = normalize_schema_for_comparison(schema)
+        # If multiple schemas have the same fingerprint, prefer the shorter name
+        if fingerprint not in fingerprints or len(name) < len(
+            fingerprints[fingerprint]
+        ):
+            fingerprints[fingerprint] = name
+    return fingerprints
+
+
+def deduplicate_schema(
+    schema: Any, fingerprints: Dict[str, str], path: str = ""
+) -> Any:
+    """
+    Recursively walk through a schema and replace inline schemas
+    that match component schemas with $ref references.
+    """
+    if not isinstance(schema, dict):
+        return schema
+
+    # Skip if already a reference
+    if "$ref" in schema:
+        return schema
+
+    # Check if this schema matches a component schema
+    fingerprint = normalize_schema_for_comparison(schema)
+    if fingerprint in fingerprints:
+        schema_name = fingerprints[fingerprint]
+        print(
+            f"  Deduplicating inline schema at {path} -> {schema_name}", file=sys.stderr
+        )
+        return {"$ref": f"#/components/schemas/{schema_name}"}
+
+    # Recursively process nested schemas
+    result = {}
+    for key, value in schema.items():
+        if key == "properties" and isinstance(value, dict):
+            result[key] = {
+                prop_name: deduplicate_schema(
+                    prop_schema, fingerprints, f"{path}.{prop_name}"
+                )
+                for prop_name, prop_schema in value.items()
+            }
+        elif key == "items":
+            result[key] = deduplicate_schema(value, fingerprints, f"{path}.items")
+        elif key in ("anyOf", "oneOf", "allOf") and isinstance(value, list):
+            result[key] = [
+                deduplicate_schema(item, fingerprints, f"{path}.{key}[{i}]")
+                for i, item in enumerate(value)
+            ]
+        elif key == "additionalProperties" and isinstance(value, dict):
+            result[key] = deduplicate_schema(
+                value, fingerprints, f"{path}.additionalProperties"
+            )
+        else:
+            result[key] = value
+
+    return result
+
+
+def deduplicate_openapi_spec(spec: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Post-process an OpenAPI spec to replace inline schemas with $ref references
+    where they match schemas defined in components/schemas.
+    """
+    spec = copy.deepcopy(spec)
+
+    components_schemas = spec.get("components", {}).get("schemas", {})
+    if not components_schemas:
+        return spec
+
+    print("Building schema fingerprints...", file=sys.stderr)
+    fingerprints = build_schema_fingerprints(components_schemas)
+    print(f"Found {len(fingerprints)} unique component schemas", file=sys.stderr)
+
+    # Deduplicate schemas within components/schemas themselves (nested schemas)
+    print("Deduplicating component schemas...", file=sys.stderr)
+    for name, schema in list(components_schemas.items()):
+        # Don't replace the top-level schema itself, only its nested parts
+        if "properties" in schema:
+            schema["properties"] = {
+                prop_name: deduplicate_schema(
+                    prop_schema, fingerprints, f"components.schemas.{name}.{prop_name}"
+                )
+                for prop_name, prop_schema in schema["properties"].items()
+            }
+        if "items" in schema:
+            schema["items"] = deduplicate_schema(
+                schema["items"], fingerprints, f"components.schemas.{name}.items"
+            )
+        for union_key in ("anyOf", "oneOf", "allOf"):
+            if union_key in schema:
+                schema[union_key] = [
+                    deduplicate_schema(
+                        item,
+                        fingerprints,
+                        f"components.schemas.{name}.{union_key}[{i}]",
+                    )
+                    for i, item in enumerate(schema[union_key])
+                ]
+
+    # Deduplicate schemas in paths
+    print("Deduplicating path schemas...", file=sys.stderr)
+    for path, path_item in spec.get("paths", {}).items():
+        for method, operation in path_item.items():
+            if not isinstance(operation, dict):
+                continue
+
+            # Request body
+            request_body = operation.get("requestBody", {})
+            if request_body:
+                for content_type, content in request_body.get("content", {}).items():
+                    if "schema" in content:
+                        content["schema"] = deduplicate_schema(
+                            content["schema"],
+                            fingerprints,
+                            f"paths.{path}.{method}.requestBody.{content_type}",
+                        )
+
+            # Responses
+            for status_code, response in operation.get("responses", {}).items():
+                if not isinstance(response, dict):
+                    continue
+                for content_type, content in response.get("content", {}).items():
+                    if "schema" in content:
+                        content["schema"] = deduplicate_schema(
+                            content["schema"],
+                            fingerprints,
+                            f"paths.{path}.{method}.responses.{status_code}.{content_type}",
+                        )
+
+    return spec
 
 
 def to_snake_case(name: str) -> str:
@@ -339,6 +533,11 @@ def generate_api_types() -> None:
         "components": SPEC["components"],
     }
 
+    # Deduplicate inline schemas by replacing them with $ref references
+    print("Deduplicating OpenAPI spec...", file=sys.stderr)
+    spec = deduplicate_openapi_spec(spec)
+    print("Deduplication complete.", file=sys.stderr)
+
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         f.write(orjson.dumps(spec, option=orjson.OPT_INDENT_2).decode("utf-8"))
         temp_file = f.name
@@ -363,6 +562,26 @@ def generate_api_types() -> None:
             ],
             check=True,
         )
+
+        # Post-process: Convert Optional[X] fields to NotRequired[Optional[X]]
+        # This makes nullable fields truly optional (don't need to be present)
+        output_path = "src/judgeval/v1/internal/api/api_types.py"
+        with open(output_path, "r") as f:
+            content = f.read()
+
+        # Match lines like "    field: Optional[...]" but not already wrapped in NotRequired
+        import re
+
+        content = re.sub(
+            r"^(\s+)(\w+): Optional\[(.+)\]$",
+            r"\1\2: NotRequired[Optional[\3]]",
+            content,
+            flags=re.MULTILINE,
+        )
+
+        with open(output_path, "w") as f:
+            f.write(content)
+
     finally:
         import os
 

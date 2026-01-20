@@ -10,6 +10,7 @@ from judgeval.logger import judgeval_logger
 from judgeval.v1.scorers.custom_scorer.utils import extract_scorer_name
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.env import JUDGMENT_API_URL
+from typing import Literal
 
 
 class CustomScorerFactory:
@@ -28,7 +29,7 @@ class CustomScorerFactory:
         requirements_file_path: str | None,
         unique_name: str | None,
         overwrite: bool = False,
-        scorer_type: str = "example",
+        scorer_type: Literal["example", "trace"] = "example",
         api_key: str | None = os.getenv("JUDGMENT_API_KEY"),
         organization_id: str | None = os.getenv("JUDGMENT_ORG_ID"),
     ) -> bool:

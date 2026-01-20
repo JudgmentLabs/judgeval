@@ -4,8 +4,8 @@ from typing import Dict, Tuple
 
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.internal.api.api_types import (
-    FetchPromptScorersRequest,
-    FetchPromptScorersResponse,
+    FetchScorersPostRequest,
+    FetchScorersPostResponse200,
     PromptScorer as APIPromptScorer,
 )
 from judgeval.exceptions import JudgmentAPIError
@@ -35,12 +35,12 @@ class PromptScorerFactory:
         cached = self._cache.get(cache_key)
 
         if cached is None:
-            request: FetchPromptScorersRequest = {"names": [name]}
+            request: FetchScorersPostRequest = {"names": [name]}
             if self._is_trace is not None:
                 request["is_trace"] = self._is_trace
 
             try:
-                response: FetchPromptScorersResponse = self._client.fetch_scorers(
+                response: FetchScorersPostResponse200 = self._client.fetch_scorers(
                     request
                 )
                 scorers = response.get("scorers", [])

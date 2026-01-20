@@ -159,6 +159,7 @@ class Evaluation:
                 ScoringResult(
                     success=success,
                     scorers_data=scorers_data,
+                    data_object=examples[i],
                 )
             )
 
