@@ -13,6 +13,7 @@ from judgeval.exceptions import JudgmentAPIError
 from judgeval.utils.project import _resolve_project_id
 from judgeval.utils.url import url_for
 from judgeval.v1.cli import app
+
 load_dotenv()
 
 legacy_app = typer.Typer(help="Legacy commands (deprecated)")

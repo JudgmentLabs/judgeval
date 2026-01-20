@@ -11,6 +11,7 @@ from judgeval.v1.scorers.custom_scorer.utils import extract_scorer_name
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.env import JUDGMENT_API_URL
 
+
 class CustomScorerFactory:
     __slots__ = ()
 
@@ -20,8 +21,17 @@ class CustomScorerFactory:
             class_name=class_name or name,
             server_hosted=True,
         )
-    
-    def upload(self, scorer_file_path: str, requirements_file_path: str | None, unique_name: str | None, overwrite: bool = False, scorer_type: str = "example", api_key: str | None = os.getenv("JUDGMENT_API_KEY"), organization_id: str | None = os.getenv("JUDGMENT_ORG_ID")) -> bool:
+
+    def upload(
+        self,
+        scorer_file_path: str,
+        requirements_file_path: str | None,
+        unique_name: str | None,
+        overwrite: bool = False,
+        scorer_type: str = "example",
+        api_key: str | None = os.getenv("JUDGMENT_API_KEY"),
+        organization_id: str | None = os.getenv("JUDGMENT_ORG_ID"),
+    ) -> bool:
         if not os.path.exists(scorer_file_path):
             raise FileNotFoundError(f"Scorer file not found: {scorer_file_path}")
 

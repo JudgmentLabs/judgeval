@@ -26,9 +26,12 @@ def to_snake_case(name: str) -> str:
 
 def to_pascal_case(name: str) -> str:
     """Convert schema name to PascalCase to match datamodel-codegen output."""
-    # Split on underscores and capitalize each part
-    parts = name.split("_")
-    return "".join(part.capitalize() for part in parts)
+    # If name has underscores, split and capitalize each part
+    if "_" in name:
+        parts = name.split("_")
+        return "".join(part[0].upper() + part[1:] if part else "" for part in parts)
+    # Otherwise assume it's already PascalCase and return as-is
+    return name
 
 
 def resolve_ref(ref: str) -> str:

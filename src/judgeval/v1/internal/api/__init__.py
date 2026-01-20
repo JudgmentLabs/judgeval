@@ -35,7 +35,11 @@ class JudgmentSyncClient:
         self.client = httpx.Client(timeout=30)
 
     def _request(
-        self, method: Literal["POST", "PATCH", "GET", "DELETE"], url: str, payload: Any, params: Optional[Dict[str, Any]] = None
+        self,
+        method: Literal["POST", "PATCH", "GET", "DELETE"],
+        url: str,
+        payload: Any,
+        params: Optional[Dict[str, Any]] = None,
     ) -> Any:
         if method == "GET":
             r = self.client.request(
@@ -75,84 +79,104 @@ class JudgmentSyncClient:
             {},
         )
 
-    def otel_trigger_root_span_rules(self, payload: OtelTriggerRootSpanRulesPostRequest) -> Any:
+    def otel_trigger_root_span_rules(
+        self, payload: OtelTriggerRootSpanRulesPostRequest
+    ) -> Any:
         return self._request(
             "POST",
             url_for("/otel/trigger_root_span_rules", self.base_url),
             payload,
         )
 
-    def projects_resolve(self, payload: ProjectsResolvePostRequest) -> ProjectsResolvePostResponse200:
+    def projects_resolve(
+        self, payload: ProjectsResolvePostRequest
+    ) -> ProjectsResolvePostResponse200:
         return self._request(
             "POST",
             url_for("/projects/resolve/", self.base_url),
             payload,
         )
 
-    def projects_add(self, payload: ProjectsResolvePostRequest) -> ProjectsResolvePostResponse200:
+    def projects_add(
+        self, payload: ProjectsResolvePostRequest
+    ) -> ProjectsResolvePostResponse200:
         return self._request(
             "POST",
             url_for("/projects/add/", self.base_url),
             payload,
         )
 
-    def projects_delete_from_judgeval(self, payload: ProjectsResolvePostRequest) -> ProjectsDeleteFromJudgevalDeleteResponse200:
+    def projects_delete_from_judgeval(
+        self, payload: ProjectsResolvePostRequest
+    ) -> ProjectsDeleteFromJudgevalDeleteResponse200:
         return self._request(
             "DELETE",
             url_for("/projects/delete_from_judgeval/", self.base_url),
             payload,
         )
 
-    def datasets_create_for_judgeval(self, payload: DatasetsCreateForJudgevalPostRequest) -> DatasetsCreateForJudgevalPostResponse200:
+    def datasets_create_for_judgeval(
+        self, payload: DatasetsCreateForJudgevalPostRequest
+    ) -> DatasetsCreateForJudgevalPostResponse200:
         return self._request(
             "POST",
             url_for("/datasets/create_for_judgeval/", self.base_url),
             payload,
         )
 
-    def datasets_insert_examples_for_judgeval(self, payload: DatasetsInsertExamplesForJudgevalPostRequest) -> DatasetsCreateForJudgevalPostResponse200:
+    def datasets_insert_examples_for_judgeval(
+        self, payload: DatasetsInsertExamplesForJudgevalPostRequest
+    ) -> DatasetsCreateForJudgevalPostResponse200:
         return self._request(
             "POST",
             url_for("/datasets/insert_examples_for_judgeval/", self.base_url),
             payload,
         )
 
-    def datasets_pull_for_judgeval(self, payload: DatasetsPullForJudgevalPostRequest) -> DatasetsPullForJudgevalPostResponse200:
+    def datasets_pull_for_judgeval(
+        self, payload: DatasetsPullForJudgevalPostRequest
+    ) -> DatasetsPullForJudgevalPostResponse200:
         return self._request(
             "POST",
             url_for("/datasets/pull_for_judgeval/", self.base_url),
             payload,
         )
 
-    def datasets_pull_all_for_judgeval(self, payload: ProjectsResolvePostRequest) -> DatasetsPullAllForJudgevalPostResponse200:
+    def datasets_pull_all_for_judgeval(
+        self, payload: ProjectsResolvePostRequest
+    ) -> DatasetsPullAllForJudgevalPostResponse200:
         return self._request(
             "POST",
             url_for("/datasets/pull_all_for_judgeval/", self.base_url),
             payload,
         )
 
-    def evaluate_examples(self, payload: EvaluateExamplesPostRequest) -> Any:
+    def evaluate_examples(self, payload: ExampleEvaluationRun) -> Any:
         return self._request(
             "POST",
             url_for("/evaluate/examples", self.base_url),
             payload,
         )
 
-    def evaluate_traces(self, payload: EvaluateTracesPostRequest) -> Any:
+    def evaluate_traces(self, payload: TraceEvaluationRun) -> Any:
         return self._request(
             "POST",
             url_for("/evaluate/traces", self.base_url),
             payload,
         )
 
-    def log_eval_results(self, payload: LogEvalResultsPostRequest) -> LogEvalResultsPostResponse200:
+    def log_eval_results(
+        self, payload: LogEvalResultsPostRequest
+    ) -> LogEvalResultsPostResponse200:
         return self._request(
             "POST",
             url_for("/log_eval_results/", self.base_url),
             payload,
         )
 
-    def fetch_experiment_run(self, payload: FetchExperimentRunPostRequest) -> FetchExperimentRunPostResponse200:
+    def fetch_experiment_run(
+        self, payload: FetchExperimentRunPostRequest
+    ) -> FetchExperimentRunPostResponse200:
         return self._request(
             "POST",
             url_for("/fetch_experiment_run/", self.base_url),
@@ -166,35 +190,47 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def add_to_run_eval_queue_examples(self, payload: EvaluateExamplesPostRequest) -> AddToRunEvalQueueExamplesPostResponse200:
+    def add_to_run_eval_queue_examples(
+        self, payload: ExampleEvaluationRun
+    ) -> AddToRunEvalQueueExamplesPostResponse200:
         return self._request(
             "POST",
             url_for("/add_to_run_eval_queue/examples", self.base_url),
             payload,
         )
 
-    def add_to_run_eval_queue_traces(self, payload: EvaluateTracesPostRequest) -> AddToRunEvalQueueExamplesPostResponse200:
+    def add_to_run_eval_queue_traces(
+        self, payload: TraceEvaluationRun
+    ) -> AddToRunEvalQueueExamplesPostResponse200:
         return self._request(
             "POST",
             url_for("/add_to_run_eval_queue/traces", self.base_url),
             payload,
         )
 
-    def prompts_fetch(self, project_id: str, name: str, commit_id: Optional[str] = None, tag: Optional[str] = None) -> PromptsFetchGetResponse200:
+    def prompts_fetch(
+        self,
+        project_id: str,
+        name: str,
+        commit_id: Optional[str] = None,
+        tag: Optional[str] = None,
+    ) -> PromptsFetchGetResponse200:
         query_params = {}
-        query_params['project_id'] = project_id
-        query_params['name'] = name
+        query_params["project_id"] = project_id
+        query_params["name"] = name
         if commit_id is not None:
-            query_params['commit_id'] = commit_id
+            query_params["commit_id"] = commit_id
         if tag is not None:
-            query_params['tag'] = tag
+            query_params["tag"] = tag
         return self._request(
             "GET",
             url_for("/prompts/fetch", self.base_url),
             query_params,
         )
 
-    def prompts_insert(self, payload: PromptsInsertPostRequest) -> PromptsInsertPostResponse200:
+    def prompts_insert(
+        self, payload: PromptsInsertPostRequest
+    ) -> PromptsInsertPostResponse200:
         return self._request(
             "POST",
             url_for("/prompts/insert", self.base_url),
@@ -208,24 +244,30 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def prompts_untag(self, payload: PromptsUntagPostRequest) -> PromptsUntagPostResponse200:
+    def prompts_untag(
+        self, payload: PromptsUntagPostRequest
+    ) -> PromptsUntagPostResponse200:
         return self._request(
             "POST",
             url_for("/prompts/untag", self.base_url),
             payload,
         )
 
-    def prompts_get_prompt_versions(self, project_id: str, name: str) -> PromptsGetPromptVersionsGetResponse200:
+    def prompts_get_prompt_versions(
+        self, project_id: str, name: str
+    ) -> PromptsGetPromptVersionsGetResponse200:
         query_params = {}
-        query_params['project_id'] = project_id
-        query_params['name'] = name
+        query_params["project_id"] = project_id
+        query_params["name"] = name
         return self._request(
             "GET",
             url_for("/prompts/get_prompt_versions", self.base_url),
             query_params,
         )
 
-    def fetch_scorers(self, payload: FetchScorersPostRequest) -> FetchScorersPostResponse200:
+    def fetch_scorers(
+        self, payload: FetchScorersPostRequest
+    ) -> FetchScorersPostResponse200:
         return self._request(
             "POST",
             url_for("/fetch_scorers", self.base_url),
@@ -239,20 +281,23 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def scorer_exists(self, payload: ScorerExistsPostRequest) -> ScorerExistsPostResponse200:
+    def scorer_exists(
+        self, payload: ScorerExistsPostRequest
+    ) -> ScorerExistsPostResponse200:
         return self._request(
             "POST",
             url_for("/scorer_exists", self.base_url),
             payload,
         )
 
-    def upload_custom_scorer(self, payload: UploadCustomScorerPostRequest) -> UploadCustomScorerPostResponse200:
+    def upload_custom_scorer(
+        self, payload: UploadCustomScorerPostRequest
+    ) -> UploadCustomScorerPostResponse200:
         return self._request(
             "POST",
             url_for("/upload_custom_scorer/", self.base_url),
             payload,
         )
-
 
 
 class JudgmentAsyncClient:
@@ -265,7 +310,11 @@ class JudgmentAsyncClient:
         self.client = httpx.AsyncClient(timeout=30)
 
     async def _request(
-        self, method: Literal["POST", "PATCH", "GET", "DELETE"], url: str, payload: Any, params: Optional[Dict[str, Any]] = None
+        self,
+        method: Literal["POST", "PATCH", "GET", "DELETE"],
+        url: str,
+        payload: Any,
+        params: Optional[Dict[str, Any]] = None,
     ) -> Any:
         if method == "GET":
             r = self.client.request(
@@ -305,84 +354,104 @@ class JudgmentAsyncClient:
             {},
         )
 
-    async def otel_trigger_root_span_rules(self, payload: OtelTriggerRootSpanRulesPostRequest) -> Any:
+    async def otel_trigger_root_span_rules(
+        self, payload: OtelTriggerRootSpanRulesPostRequest
+    ) -> Any:
         return await self._request(
             "POST",
             url_for("/otel/trigger_root_span_rules", self.base_url),
             payload,
         )
 
-    async def projects_resolve(self, payload: ProjectsResolvePostRequest) -> ProjectsResolvePostResponse200:
+    async def projects_resolve(
+        self, payload: ProjectsResolvePostRequest
+    ) -> ProjectsResolvePostResponse200:
         return await self._request(
             "POST",
             url_for("/projects/resolve/", self.base_url),
             payload,
         )
 
-    async def projects_add(self, payload: ProjectsResolvePostRequest) -> ProjectsResolvePostResponse200:
+    async def projects_add(
+        self, payload: ProjectsResolvePostRequest
+    ) -> ProjectsResolvePostResponse200:
         return await self._request(
             "POST",
             url_for("/projects/add/", self.base_url),
             payload,
         )
 
-    async def projects_delete_from_judgeval(self, payload: ProjectsResolvePostRequest) -> ProjectsDeleteFromJudgevalDeleteResponse200:
+    async def projects_delete_from_judgeval(
+        self, payload: ProjectsResolvePostRequest
+    ) -> ProjectsDeleteFromJudgevalDeleteResponse200:
         return await self._request(
             "DELETE",
             url_for("/projects/delete_from_judgeval/", self.base_url),
             payload,
         )
 
-    async def datasets_create_for_judgeval(self, payload: DatasetsCreateForJudgevalPostRequest) -> DatasetsCreateForJudgevalPostResponse200:
+    async def datasets_create_for_judgeval(
+        self, payload: DatasetsCreateForJudgevalPostRequest
+    ) -> DatasetsCreateForJudgevalPostResponse200:
         return await self._request(
             "POST",
             url_for("/datasets/create_for_judgeval/", self.base_url),
             payload,
         )
 
-    async def datasets_insert_examples_for_judgeval(self, payload: DatasetsInsertExamplesForJudgevalPostRequest) -> DatasetsCreateForJudgevalPostResponse200:
+    async def datasets_insert_examples_for_judgeval(
+        self, payload: DatasetsInsertExamplesForJudgevalPostRequest
+    ) -> DatasetsCreateForJudgevalPostResponse200:
         return await self._request(
             "POST",
             url_for("/datasets/insert_examples_for_judgeval/", self.base_url),
             payload,
         )
 
-    async def datasets_pull_for_judgeval(self, payload: DatasetsPullForJudgevalPostRequest) -> DatasetsPullForJudgevalPostResponse200:
+    async def datasets_pull_for_judgeval(
+        self, payload: DatasetsPullForJudgevalPostRequest
+    ) -> DatasetsPullForJudgevalPostResponse200:
         return await self._request(
             "POST",
             url_for("/datasets/pull_for_judgeval/", self.base_url),
             payload,
         )
 
-    async def datasets_pull_all_for_judgeval(self, payload: ProjectsResolvePostRequest) -> DatasetsPullAllForJudgevalPostResponse200:
+    async def datasets_pull_all_for_judgeval(
+        self, payload: ProjectsResolvePostRequest
+    ) -> DatasetsPullAllForJudgevalPostResponse200:
         return await self._request(
             "POST",
             url_for("/datasets/pull_all_for_judgeval/", self.base_url),
             payload,
         )
 
-    async def evaluate_examples(self, payload: EvaluateExamplesPostRequest) -> Any:
+    async def evaluate_examples(self, payload: ExampleEvaluationRun) -> Any:
         return await self._request(
             "POST",
             url_for("/evaluate/examples", self.base_url),
             payload,
         )
 
-    async def evaluate_traces(self, payload: EvaluateTracesPostRequest) -> Any:
+    async def evaluate_traces(self, payload: TraceEvaluationRun) -> Any:
         return await self._request(
             "POST",
             url_for("/evaluate/traces", self.base_url),
             payload,
         )
 
-    async def log_eval_results(self, payload: LogEvalResultsPostRequest) -> LogEvalResultsPostResponse200:
+    async def log_eval_results(
+        self, payload: LogEvalResultsPostRequest
+    ) -> LogEvalResultsPostResponse200:
         return await self._request(
             "POST",
             url_for("/log_eval_results/", self.base_url),
             payload,
         )
 
-    async def fetch_experiment_run(self, payload: FetchExperimentRunPostRequest) -> FetchExperimentRunPostResponse200:
+    async def fetch_experiment_run(
+        self, payload: FetchExperimentRunPostRequest
+    ) -> FetchExperimentRunPostResponse200:
         return await self._request(
             "POST",
             url_for("/fetch_experiment_run/", self.base_url),
@@ -396,93 +465,118 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def add_to_run_eval_queue_examples(self, payload: EvaluateExamplesPostRequest) -> AddToRunEvalQueueExamplesPostResponse200:
+    async def add_to_run_eval_queue_examples(
+        self, payload: ExampleEvaluationRun
+    ) -> AddToRunEvalQueueExamplesPostResponse200:
         return await self._request(
             "POST",
             url_for("/add_to_run_eval_queue/examples", self.base_url),
             payload,
         )
 
-    async def add_to_run_eval_queue_traces(self, payload: EvaluateTracesPostRequest) -> AddToRunEvalQueueExamplesPostResponse200:
+    async def add_to_run_eval_queue_traces(
+        self, payload: TraceEvaluationRun
+    ) -> AddToRunEvalQueueExamplesPostResponse200:
         return await self._request(
             "POST",
             url_for("/add_to_run_eval_queue/traces", self.base_url),
             payload,
         )
 
-    async def prompts_fetch(self, project_id: str, name: str, commit_id: Optional[str] = None, tag: Optional[str] = None) -> PromptsFetchGetResponse200:
+    async def prompts_fetch(
+        self,
+        project_id: str,
+        name: str,
+        commit_id: Optional[str] = None,
+        tag: Optional[str] = None,
+    ) -> PromptsFetchGetResponse200:
         query_params = {}
-        query_params['project_id'] = project_id
-        query_params['name'] = name
+        query_params["project_id"] = project_id
+        query_params["name"] = name
         if commit_id is not None:
-            query_params['commit_id'] = commit_id
+            query_params["commit_id"] = commit_id
         if tag is not None:
-            query_params['tag'] = tag
+            query_params["tag"] = tag
         return await self._request(
             "GET",
             url_for("/prompts/fetch", self.base_url),
             query_params,
         )
 
-    async def prompts_insert(self, payload: PromptsInsertPostRequest) -> PromptsInsertPostResponse200:
+    async def prompts_insert(
+        self, payload: PromptsInsertPostRequest
+    ) -> PromptsInsertPostResponse200:
         return await self._request(
             "POST",
             url_for("/prompts/insert", self.base_url),
             payload,
         )
 
-    async def prompts_tag(self, payload: PromptsTagPostRequest) -> PromptsTagPostResponse200:
+    async def prompts_tag(
+        self, payload: PromptsTagPostRequest
+    ) -> PromptsTagPostResponse200:
         return await self._request(
             "POST",
             url_for("/prompts/tag", self.base_url),
             payload,
         )
 
-    async def prompts_untag(self, payload: PromptsUntagPostRequest) -> PromptsUntagPostResponse200:
+    async def prompts_untag(
+        self, payload: PromptsUntagPostRequest
+    ) -> PromptsUntagPostResponse200:
         return await self._request(
             "POST",
             url_for("/prompts/untag", self.base_url),
             payload,
         )
 
-    async def prompts_get_prompt_versions(self, project_id: str, name: str) -> PromptsGetPromptVersionsGetResponse200:
+    async def prompts_get_prompt_versions(
+        self, project_id: str, name: str
+    ) -> PromptsGetPromptVersionsGetResponse200:
         query_params = {}
-        query_params['project_id'] = project_id
-        query_params['name'] = name
+        query_params["project_id"] = project_id
+        query_params["name"] = name
         return await self._request(
             "GET",
             url_for("/prompts/get_prompt_versions", self.base_url),
             query_params,
         )
 
-    async def fetch_scorers(self, payload: FetchScorersPostRequest) -> FetchScorersPostResponse200:
+    async def fetch_scorers(
+        self, payload: FetchScorersPostRequest
+    ) -> FetchScorersPostResponse200:
         return await self._request(
             "POST",
             url_for("/fetch_scorers", self.base_url),
             payload,
         )
 
-    async def save_scorer(self, payload: SaveScorerPostRequest) -> SaveScorerPostResponse200:
+    async def save_scorer(
+        self, payload: SaveScorerPostRequest
+    ) -> SaveScorerPostResponse200:
         return await self._request(
             "POST",
             url_for("/save_scorer", self.base_url),
             payload,
         )
 
-    async def scorer_exists(self, payload: ScorerExistsPostRequest) -> ScorerExistsPostResponse200:
+    async def scorer_exists(
+        self, payload: ScorerExistsPostRequest
+    ) -> ScorerExistsPostResponse200:
         return await self._request(
             "POST",
             url_for("/scorer_exists", self.base_url),
             payload,
         )
 
-    async def upload_custom_scorer(self, payload: UploadCustomScorerPostRequest) -> UploadCustomScorerPostResponse200:
+    async def upload_custom_scorer(
+        self, payload: UploadCustomScorerPostRequest
+    ) -> UploadCustomScorerPostResponse200:
         return await self._request(
             "POST",
             url_for("/upload_custom_scorer/", self.base_url),
             payload,
         )
-
 
 
 __all__ = [
