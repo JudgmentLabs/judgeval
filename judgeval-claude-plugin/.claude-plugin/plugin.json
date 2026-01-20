@@ -1,0 +1,8 @@
+{
+  "name": "judgeval",
+  "description": "Enables AI agents to use Judgeval for LLM evaluation, logging, and observability. Provides correct API usage, working examples, and helper scripts for common operations.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Judgment Labs"
+  }
+}

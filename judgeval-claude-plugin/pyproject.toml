@@ -1,0 +1,19 @@
+[project]
+name = "judgeval-claude-plugin"
+version = "1.0.0"
+description = "Claude Code plugins for Judgeval - LLM evaluation, logging, and observability"
+authors = [
+    { name = "Judgment Labs", email = "support@judgmentlabs.ai" }
+]
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+
+[project.urls]
+Homepage = "https://judgmentlabs.ai"
+Documentation = "https://docs.judgmentlabs.ai"
+Repository = "https://github.com/judgmentlabs/judgeval-claude-plugin"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

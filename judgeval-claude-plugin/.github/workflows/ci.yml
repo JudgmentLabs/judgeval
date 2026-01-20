@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Validate JSON
+        run: |
+          jq . .claude-plugin/plugin.json > /dev/null
+          jq . .claude-plugin/marketplace.json > /dev/null
+          echo "JSON files valid"
+      
+      - name: Check bash syntax
+        run: |
+          bash -n skills/trace-claude-code/setup.sh
+          for f in skills/trace-claude-code/hooks/*.sh; do
+            bash -n "$f"
+          done
+          echo "Bash syntax valid"
+      
+      - name: Check required files
+        run: |
+          files=(
+            ".claude-plugin/plugin.json"
+            ".claude-plugin/marketplace.json"
+            "skills/trace-claude-code/SKILL.md"
+            "skills/trace-claude-code/setup.sh"
+            "skills/trace-claude-code/hooks/common.sh"
+            "README.md"
+            "LICENSE"
+          )
+          for f in "${files[@]}"; do
+            [ -f "$f" ] || { echo "Missing: $f"; exit 1; }
+          done
+          echo "All required files present"
