@@ -105,6 +105,7 @@ if [ -z "$SUBAGENT_TRANSCRIPT" ] || [ ! -f "$SUBAGENT_TRANSCRIPT" ]; then
             "$HOME/.claude/projects/*/agent-${SUBAGENT_ID}.jsonl" \
             "$HOME/.claude/projects/*/${SUBAGENT_ID}.jsonl" \
             "$HOME/.claude/state/agent-${SUBAGENT_ID}.jsonl"; do
+            # shellcheck disable=SC2086
             FOUND=$(find $pattern -type f 2>/dev/null | head -1)
             if [ -n "$FOUND" ] && [ -f "$FOUND" ]; then
                 SUBAGENT_TRANSCRIPT="$FOUND"
