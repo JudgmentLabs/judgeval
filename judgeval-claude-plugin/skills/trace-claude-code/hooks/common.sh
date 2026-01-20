@@ -242,7 +242,6 @@ insert_span() {
     fi
     
     log "WARN" "OTLP insert failed (HTTP $http_code)"
-    echo "failed"
     return 1
 }
 

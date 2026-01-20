@@ -1,0 +1,73 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/minhpham/Documents/Judgement/judgment_dev/judgeval/judgeval-claude-plugin/skills/trace-claude-code/hooks/session_start.sh"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/minhpham/Documents/Judgement/judgment_dev/judgeval/judgeval-claude-plugin/skills/trace-claude-code/hooks/user_prompt_submit.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/minhpham/Documents/Judgement/judgment_dev/judgeval/judgeval-claude-plugin/skills/trace-claude-code/hooks/post_tool_use.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/minhpham/Documents/Judgement/judgment_dev/judgeval/judgeval-claude-plugin/skills/trace-claude-code/hooks/stop_hook.sh"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/minhpham/Documents/Judgement/judgment_dev/judgeval/judgeval-claude-plugin/skills/trace-claude-code/hooks/session_end.sh"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/minhpham/Documents/Judgement/judgment_dev/judgeval/judgeval-claude-plugin/skills/trace-claude-code/hooks/subagent_stop.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "env": {
+    "TRACE_TO_JUDGEVAL": "true",
+    "JUDGMENT_API_KEY": "736046e3-b3a2-4a1a-bd3e-af6a6f8a9a5d",
+    "JUDGMENT_ORG_ID": "27c7d380-6cb0-495f-b27c-8c1ff82b72af",
+    "JUDGMENT_API_URL": "https://staging.api.judgmentlabs.ai",
+    "JUDGEVAL_CC_PROJECT": "claude-code-test",
+    "JUDGEVAL_CC_DEBUG": "true"
+  }
+}
