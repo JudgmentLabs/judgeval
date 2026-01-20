@@ -92,6 +92,7 @@ class CustomScorerFactory:
                     "requirements_text": requirements_text,
                     "overwrite": overwrite,
                     "scorer_type": scorer_type,
+                    "version": 1,
                 }
             )
 

@@ -6,20 +6,26 @@ import sys
 import typer
 from pathlib import Path
 from dotenv import load_dotenv
+from urllib.parse import urljoin
+from judgeval.env import JUDGMENT_API_URL
+from judgeval.v1.utils import resolve_project_id
 from judgeval.logger import judgeval_logger
-from judgeval import JudgmentClient
-from judgeval.version import get_version
 from judgeval.exceptions import JudgmentAPIError
-from judgeval.utils.project import _resolve_project_id
-from judgeval.utils.url import url_for
-from judgeval.v1.cli import app
+from judgeval import Judgeval
 
 load_dotenv()
 
-legacy_app = typer.Typer(help="Legacy commands (deprecated)")
+app = typer.Typer(
+    no_args_is_help=True,
+    pretty_exceptions_enable=False,
+    pretty_exceptions_show_locals=False,
+    pretty_exceptions_short=False,
+    rich_help_panel=None,
+    rich_markup_mode=None,
+)
 
 
-@legacy_app.command(
+@app.command(
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
 )
 def load_otel_env(
@@ -32,7 +38,7 @@ def load_otel_env(
     if not api_key or not organization_id:
         raise typer.BadParameter("JUDGMENT_API_KEY and JUDGMENT_ORG_ID required")
 
-    project_id = _resolve_project_id(project_name, api_key, organization_id)
+    project_id = resolve_project_id(project_name, api_key, organization_id)
     if not project_id:
         raise typer.BadParameter(f"Project '{project_name}' not found")
 
@@ -44,7 +50,9 @@ def load_otel_env(
     env = os.environ.copy()
     env["OTEL_TRACES_EXPORTER"] = "otlp"
     env["OTEL_EXPORTER_OTLP_TRACES_PROTOCOL"] = "http/protobuf"
-    env["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"] = url_for("/otel/v1/traces")
+    env["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"] = urljoin(
+        JUDGMENT_API_URL, "/otel/v1/traces"
+    )
     env["OTEL_EXPORTER_OTLP_HEADERS"] = (
         f"Authorization=Bearer {api_key},X-Organization-Id={organization_id},X-Project-Id={project_id}"
     )
@@ -53,7 +61,7 @@ def load_otel_env(
     sys.exit(result.returncode)
 
 
-@legacy_app.command()
+@app.command()
 def upload_scorer(
     scorer_file_path: str = typer.Argument(help="Path to scorer Python file"),
     requirements_file_path: str = typer.Argument(help="Path to requirements.txt file"),
@@ -78,10 +86,10 @@ def upload_scorer(
             f"Requirements file not found: {requirements_file_path}"
         )
 
-    client = JudgmentClient(api_key=api_key, organization_id=organization_id)
+    client = Judgeval(api_key=api_key, organization_id=organization_id)
 
     try:
-        result = client.upload_custom_scorer(
+        result = client.scorers.custom_scorer.upload(
             scorer_file_path=scorer_file_path,
             requirements_file_path=requirements_file_path,
             unique_name=unique_name,
@@ -97,14 +105,6 @@ def upload_scorer(
             raise typer.Exit(1)
         raise
 
-
-@legacy_app.command()
-def version():
-    """Show Judgeval CLI version."""
-    typer.echo(f"Judgeval CLI v{get_version()}")
-
-
-app.add_typer(legacy_app, name="legacy")
 
 if __name__ == "__main__":
     app()
