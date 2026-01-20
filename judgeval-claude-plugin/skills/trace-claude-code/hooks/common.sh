@@ -296,12 +296,17 @@ get_project_id() {
     return 1
 }
 
-# Time Utilities
+# Time Utilities - Pure bash, no Python needed
 get_time_nanos() {
-    if command -v python3 &>/dev/null; then
-        python3 -c "import time; print(int(time.time() * 1e9))"
-    else
+    # Linux/Docker: date +%s%N works natively
+    # macOS: %N not supported, fallback to seconds
+    local nanos
+    nanos=$(date +%s%N 2>/dev/null)
+    if [[ "$nanos" == *N ]]; then
+        # macOS - %N literal, use seconds * 1e9
         echo "$(($(date +%s) * 1000000000))"
+    else
+        echo "$nanos"
     fi
 }
 
@@ -309,17 +314,25 @@ iso_to_nanos() {
     local ts="$1"
     [ -z "$ts" ] && { get_time_nanos; return; }
     
-    if command -v python3 &>/dev/null; then
-        local result
-        result=$(python3 -c "
-from datetime import datetime
-try:
-    ts = '${ts}'.replace('Z', '+00:00')
-    print(int(datetime.fromisoformat(ts).timestamp() * 1e9))
-except: print('')
-" 2>/dev/null)
-        [ -n "$result" ] && { echo "$result"; return; }
+    # Try GNU date first (Linux / Docker)
+    local epoch
+    epoch=$(date -d "$ts" +%s%N 2>/dev/null)
+    if [ -n "$epoch" ] && [[ "$epoch" != *N ]]; then
+        echo "$epoch"
+        return
     fi
+    
+    # macOS with BSD date - strip milliseconds and timezone
+    local clean_ts secs
+    clean_ts="${ts%%.*}"  # Remove .123Z suffix
+    clean_ts="${clean_ts//T/ }"  # Replace T with space
+    secs=$(date -j -f "%Y-%m-%d %H:%M:%S" "$clean_ts" +%s 2>/dev/null)
+    if [ -n "$secs" ]; then
+        echo "$((secs * 1000000000))"
+        return
+    fi
+    
+    # Last fallback
     get_time_nanos
 }
 
