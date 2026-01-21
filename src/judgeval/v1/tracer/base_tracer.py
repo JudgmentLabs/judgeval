@@ -46,6 +46,7 @@ from judgeval.v1.tracer.processors._lifecycles import (
     AGENT_ID_KEY,
     PARENT_AGENT_ID_KEY,
     CUSTOMER_ID_KEY,
+    SESSION_ID_KEY,
     AGENT_CLASS_NAME_KEY,
     AGENT_INSTANCE_NAME_KEY,
 )
@@ -316,6 +317,14 @@ class BaseTracer(ABC):
             )
         except Exception as e:
             judgeval_logger.error(f"Failed to serialize trace evaluation: {e}")
+
+    def set_session_id(self, session_id: str) -> None:
+        current_span = self._get_sampled_span()
+        if current_span is None:
+            return
+        current_span.set_attribute(AttributeKeys.JUDGMENT_SESSION_ID, session_id)
+        ctx = set_value(SESSION_ID_KEY, session_id)
+        attach(ctx)
 
     def _build_endpoint(self, base_url: str) -> str:
         return (
