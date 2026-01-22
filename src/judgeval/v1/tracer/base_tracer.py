@@ -217,6 +217,10 @@ class BaseTracer(ABC):
             self.set_attribute(key, value)
 
     def set_customer_id(self, customer_id: str) -> None:
+        current_span = self._get_current_span()
+        if current_span is None:
+            return
+        current_span.set_attribute(AttributeKeys.JUDGMENT_CUSTOMER_ID, customer_id)
         ctx = set_value(CUSTOMER_ID_KEY, customer_id)
         attach(ctx)
 
