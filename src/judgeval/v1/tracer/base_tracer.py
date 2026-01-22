@@ -417,6 +417,8 @@ class BaseTracer(ABC):
         func: C,
         span_type: Optional[str] = "span",
         span_name: Optional[str] = None,
+        record_input: bool = True,
+        record_output: bool = True,
     ) -> C: ...
 
     @overload
@@ -425,6 +427,8 @@ class BaseTracer(ABC):
         func: None = None,
         span_type: Optional[str] = "span",
         span_name: Optional[str] = None,
+        record_input: bool = True,
+        record_output: bool = True,
     ) -> Callable[[C], C]: ...
 
     def observe(
@@ -432,9 +436,13 @@ class BaseTracer(ABC):
         func: Optional[C] = None,
         span_type: Optional[str] = "span",
         span_name: Optional[str] = None,
+        record_input: bool = True,
+        record_output: bool = True,
     ) -> C | Callable[[C], C]:
         if func is None:
-            return lambda f: self.observe(f, span_type, span_name)  # type: ignore[return-value]
+            return lambda f: self.observe(
+                f, span_type, span_name, record_input, record_output
+            )  # type: ignore[return-value]
 
         if not self.enable_monitoring:
             judgeval_logger.info(
@@ -454,16 +462,19 @@ class BaseTracer(ABC):
                         span.set_attribute(AttributeKeys.JUDGMENT_SPAN_KIND, span_type)
 
                     try:
-                        input_data = _format_inputs(func, args, kwargs)
-                        span.set_attribute(
-                            AttributeKeys.JUDGMENT_INPUT, self.serializer(input_data)
-                        )
+                        if record_input:
+                            input_data = _format_inputs(func, args, kwargs)
+                            span.set_attribute(
+                                AttributeKeys.JUDGMENT_INPUT,
+                                self.serializer(input_data),
+                            )
 
                         result = await func(*args, **kwargs)
 
-                        span.set_attribute(
-                            AttributeKeys.JUDGMENT_OUTPUT, self.serializer(result)
-                        )
+                        if record_output:
+                            span.set_attribute(
+                                AttributeKeys.JUDGMENT_OUTPUT, self.serializer(result)
+                            )
                         return result
                     except Exception as e:
                         span.record_exception(e)
@@ -480,16 +491,19 @@ class BaseTracer(ABC):
                         span.set_attribute(AttributeKeys.JUDGMENT_SPAN_KIND, span_type)
 
                     try:
-                        input_data = _format_inputs(func, args, kwargs)
-                        span.set_attribute(
-                            AttributeKeys.JUDGMENT_INPUT, self.serializer(input_data)
-                        )
+                        if record_input:
+                            input_data = _format_inputs(func, args, kwargs)
+                            span.set_attribute(
+                                AttributeKeys.JUDGMENT_INPUT,
+                                self.serializer(input_data),
+                            )
 
                         result = func(*args, **kwargs)
 
-                        span.set_attribute(
-                            AttributeKeys.JUDGMENT_OUTPUT, self.serializer(result)
-                        )
+                        if record_output:
+                            span.set_attribute(
+                                AttributeKeys.JUDGMENT_OUTPUT, self.serializer(result)
+                            )
                         return result
                     except Exception as e:
                         span.record_exception(e)
