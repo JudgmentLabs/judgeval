@@ -28,34 +28,42 @@ def test_generates_valid_trace_id():
 
 def test_immune_to_global_random_seed():
     """Verify that random.seed() does not affect ID generation."""
-    generator = IsolatedRandomIdGenerator()
+    original_state = random.getstate()
+    try:
+        generator = IsolatedRandomIdGenerator()
 
-    random.seed(42)
-    trace_id_1 = generator.generate_trace_id()
-    span_id_1 = generator.generate_span_id()
+        random.seed(42)
+        trace_id_1 = generator.generate_trace_id()
+        span_id_1 = generator.generate_span_id()
 
-    random.seed(42)
-    trace_id_2 = generator.generate_trace_id()
-    span_id_2 = generator.generate_span_id()
+        random.seed(42)
+        trace_id_2 = generator.generate_trace_id()
+        span_id_2 = generator.generate_span_id()
 
-    assert trace_id_1 != trace_id_2
-    assert span_id_1 != span_id_2
+        assert trace_id_1 != trace_id_2
+        assert span_id_1 != span_id_2
+    finally:
+        random.setstate(original_state)
 
 
 def test_default_generator_affected_by_seed():
     """Verify that the default RandomIdGenerator IS affected by random.seed()."""
-    generator = RandomIdGenerator()
+    original_state = random.getstate()
+    try:
+        generator = RandomIdGenerator()
 
-    random.seed(42)
-    trace_id_1 = generator.generate_trace_id()
-    span_id_1 = generator.generate_span_id()
+        random.seed(42)
+        trace_id_1 = generator.generate_trace_id()
+        span_id_1 = generator.generate_span_id()
 
-    random.seed(42)
-    trace_id_2 = generator.generate_trace_id()
-    span_id_2 = generator.generate_span_id()
+        random.seed(42)
+        trace_id_2 = generator.generate_trace_id()
+        span_id_2 = generator.generate_span_id()
 
-    assert trace_id_1 == trace_id_2
-    assert span_id_1 == span_id_2
+        assert trace_id_1 == trace_id_2
+        assert span_id_1 == span_id_2
+    finally:
+        random.setstate(original_state)
 
 
 def test_different_instances_produce_different_ids():
@@ -78,3 +86,37 @@ def test_generates_unique_ids():
 
     assert len(trace_ids) == 1000
     assert len(span_ids) == 1000
+
+
+def test_judgment_tracer_provider_uses_isolated_generator():
+    """Verify JudgmentTracerProvider uses IsolatedRandomIdGenerator by default."""
+    from judgeval.v1.tracer.judgment_tracer_provider import JudgmentTracerProvider
+
+    provider = JudgmentTracerProvider()
+
+    assert isinstance(provider.id_generator, IsolatedRandomIdGenerator)
+
+
+def test_judgment_tracer_provider_immune_to_seed():
+    """Verify spans created via JudgmentTracerProvider are immune to random.seed()."""
+    from judgeval.v1.tracer.judgment_tracer_provider import JudgmentTracerProvider
+
+    original_state = random.getstate()
+    try:
+        provider = JudgmentTracerProvider()
+        tracer = provider.get_tracer("judgeval")
+
+        random.seed(42)
+        span1 = tracer.start_span("test1")
+        ctx1 = span1.get_span_context()
+        span1.end()
+
+        random.seed(42)
+        span2 = tracer.start_span("test2")
+        ctx2 = span2.get_span_context()
+        span2.end()
+
+        assert ctx1.trace_id != ctx2.trace_id
+        assert ctx1.span_id != ctx2.span_id
+    finally:
+        random.setstate(original_state)
