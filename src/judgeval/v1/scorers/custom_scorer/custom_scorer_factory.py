@@ -10,7 +10,6 @@ from judgeval.logger import judgeval_logger
 from judgeval.v1.scorers.custom_scorer.utils import extract_scorer_name
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.env import JUDGMENT_API_URL
-from typing import Literal
 
 
 class CustomScorerFactory:
@@ -29,7 +28,6 @@ class CustomScorerFactory:
         requirements_file_path: str | None,
         unique_name: str | None,
         overwrite: bool = False,
-        scorer_type: Literal["example", "trace"] = "example",
         api_key: str | None = os.getenv("JUDGMENT_API_KEY"),
         organization_id: str | None = os.getenv("JUDGMENT_ORG_ID"),
     ) -> bool:
@@ -53,6 +51,7 @@ class CustomScorerFactory:
             raise ValueError(error_msg)
 
         scorer_classes = []
+        scorer_type = "example"
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef):
                 for base in node.bases:
@@ -60,13 +59,18 @@ class CustomScorerFactory:
                         isinstance(base, ast.Attribute) and base.attr == "ExampleScorer"
                     ):
                         scorer_classes.append(node.name)
+                    if (isinstance(base, ast.Name) and base.id == "TraceScorer") or (
+                        isinstance(base, ast.Attribute) and base.attr == "TraceScorer"
+                    ):
+                        scorer_classes.append(node.name)
+                        scorer_type = "trace"
 
         if len(scorer_classes) > 1:
-            error_msg = f"Multiple ExampleScorer classes found in {scorer_file_path}: {scorer_classes}. Please only upload one scorer class per file."
+            error_msg = f"Multiple ExampleScorer/TraceScorer classes found in {scorer_file_path}: {scorer_classes}. Please only upload one scorer class per file."
             judgeval_logger.error(error_msg)
             raise ValueError(error_msg)
         elif len(scorer_classes) == 0:
-            error_msg = f"No ExampleScorer class was found in {scorer_file_path}. Please ensure the file contains a valid scorer class that inherits from ExampleScorer."
+            error_msg = f"No ExampleScorer or TraceScorer class was found in {scorer_file_path}. Please ensure the file contains a valid scorer class that inherits from ExampleScorer or TraceScorer."
             judgeval_logger.error(error_msg)
             raise ValueError(error_msg)
 

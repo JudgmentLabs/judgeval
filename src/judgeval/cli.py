@@ -69,7 +69,6 @@ def upload_scorer(
     overwrite: bool = typer.Option(
         False, "--overwrite", "-o", help="Overwrite if exists"
     ),
-    trace: bool = typer.Option(False, "--trace", "-t", help="Upload as a trace scorer"),
     api_key: str = typer.Option(None, envvar="JUDGMENT_API_KEY"),
     organization_id: str = typer.Option(None, envvar="JUDGMENT_ORG_ID"),
 ):
@@ -92,7 +91,6 @@ def upload_scorer(
             requirements_file_path=requirements_file_path,
             unique_name=unique_name,
             overwrite=overwrite,
-            scorer_type="trace" if trace else "example",
         )
         if not result:
             raise typer.Abort()
