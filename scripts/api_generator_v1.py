@@ -30,7 +30,7 @@ def normalize_schema_for_comparison(schema: Dict[str, Any]) -> str:
         return f"$ref:{schema['$ref']}"
 
     # Create a normalized copy
-    normalized = {}
+    normalized: Dict[str, Any] = {}
 
     # For objects, normalize properties
     if schema.get("type") == "object" or "properties" in schema:
@@ -75,7 +75,7 @@ def build_schema_fingerprints(components_schemas: Dict[str, Any]) -> Dict[str, s
     Build a mapping of schema fingerprints to schema names.
     Returns: {fingerprint: schema_name}
     """
-    fingerprints = {}
+    fingerprints: Dict[str, str] = {}
     for name, schema in components_schemas.items():
         fingerprint = normalize_schema_for_comparison(schema)
         # If multiple schemas have the same fingerprint, prefer the shorter name
@@ -110,7 +110,7 @@ def deduplicate_schema(
         return {"$ref": f"#/components/schemas/{schema_name}"}
 
     # Recursively process nested schemas
-    result = {}
+    result: Dict[str, Any] = {}
     for key, value in schema.items():
         if key == "properties" and isinstance(value, dict):
             result[key] = {
@@ -447,10 +447,21 @@ def get_python_type(
         return "Any"
 
 
-def generate_typeddict_class(
+def generate_type_definition(
     class_name: str, schema: Dict[str, Any], schemas_by_id: Dict[str, Dict[str, Any]]
 ) -> str:
-    """Generate a TypedDict class from a schema."""
+    """Generate a type definition from a schema (TypedDict for objects, type alias for arrays)."""
+    schema_type = schema.get("type", "object")
+
+    # Handle array types - generate a type alias
+    if schema_type == "array":
+        items = schema.get("items", {})
+        if items:
+            item_type = get_python_type(items, schemas_by_id)
+            return f"{class_name} = List[{item_type}]"
+        return f"{class_name} = List[Any]"
+
+    # Handle object types - generate a TypedDict
     lines = [f"class {class_name}(TypedDict):"]
 
     required_fields = set(schema.get("required", []))
@@ -467,7 +478,12 @@ def generate_typeddict_class(
                 field_type = get_python_type(field_schema, schemas_by_id)
 
             if is_required:
-                lines.append(f"    {field_name}: {field_type}")
+                # If the type is Optional, make it NotRequired as well
+                # (nullable fields should be optional to provide)
+                if field_type.startswith("Optional["):
+                    lines.append(f"    {field_name}: NotRequired[{field_type}]")
+                else:
+                    lines.append(f"    {field_name}: {field_type}")
             else:
                 # Use NotRequired for optional fields
                 # If the type is already Optional, we still need NotRequired
@@ -798,7 +814,7 @@ def generate_api_types() -> None:
     generated_count = 0
     for schema_id in sorted(schemas_by_id.keys()):
         schema = schemas_by_id[schema_id]
-        class_code = generate_typeddict_class(schema_id, schema, schemas_by_id)
+        class_code = generate_type_definition(schema_id, schema, schemas_by_id)
         lines.append(class_code)
         lines.append("")
         generated_count += 1

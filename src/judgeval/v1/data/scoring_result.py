@@ -7,7 +7,7 @@ from judgeval.v1.internal.api.api_types import (
     TraceSpan,
     ScorerData as APIScorerData,
     ExampleScoringResult,
-    ScoringResult1 as TraceScoringResult,
+    TraceScoringResult,
     ScoringResult as APIScoringResult,
 )
 from judgeval.v1.data.example import Example

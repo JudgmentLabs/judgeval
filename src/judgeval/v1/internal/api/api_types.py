@@ -118,7 +118,7 @@ class ExperimentRunItem(TypedDict):
     experiment_run_id: str
     example_id: str
     data: Dict[str, Any]
-    name: Optional[str]
+    name: NotRequired[Optional[str]]
     created_at: str
     scorers: List[ExperimentScorer]
 
@@ -128,11 +128,14 @@ class ExperimentScorer(TypedDict):
     name: str
     score: float
     success: float
-    reason: Optional[str]
-    evaluation_model: Optional[str]
+    reason: NotRequired[Optional[str]]
+    evaluation_model: NotRequired[Optional[str]]
     threshold: float
     created_at: str
-    error: Optional[str]
+    error: NotRequired[Optional[str]]
+    additional_metadata: NotRequired[Optional[str]]
+    minimum_score_range: float
+    maximum_score_range: float
 
 
 class FetchExperimentRunRequest(TypedDict):
@@ -141,12 +144,12 @@ class FetchExperimentRunRequest(TypedDict):
 
 
 class FetchExperimentRunResponse(TypedDict):
-    results: Optional[List[ExperimentRunItem]]
-    ui_results_url: Optional[str]
+    results: NotRequired[Optional[List[ExperimentRunItem]]]
+    ui_results_url: NotRequired[Optional[str]]
 
 
 class FetchPromptResponse(TypedDict):
-    commit: Optional[PromptCommitInfo]
+    commit: NotRequired[Optional[PromptCommitInfo]]
 
 
 class FetchPromptScorersRequest(TypedDict):
@@ -186,12 +189,12 @@ class InsertPromptRequest(TypedDict):
 
 class InsertPromptResponse(TypedDict):
     commit_id: str
-    parent_commit_id: Optional[str]
+    parent_commit_id: NotRequired[Optional[str]]
     created_at: str
 
 
 class LogEvalResultsRequest(TypedDict):
-    results: List[ExampleScoringResult]
+    results: List[ScoringResult]
     run: ExampleEvaluationRun
 
 
@@ -204,7 +207,7 @@ class PromptCommitInfo(TypedDict):
     prompt: str
     tags: List[str]
     commit_id: str
-    parent_commit_id: Optional[str]
+    parent_commit_id: NotRequired[Optional[str]]
     created_at: str
     first_name: str
     last_name: str
@@ -221,8 +224,8 @@ class PromptScorer(TypedDict):
     model: str
     options: NotRequired[Optional[Dict[str, Any]]]
     description: NotRequired[Optional[str]]
-    created_at: Optional[str]
-    updated_at: Optional[str]
+    created_at: NotRequired[Optional[str]]
+    updated_at: NotRequired[Optional[str]]
     is_trace: NotRequired[Optional[bool]]
     is_bucket_rubric: NotRequired[Optional[bool]]
 
@@ -231,8 +234,7 @@ class PullAllDatasetsRequest(TypedDict):
     project_name: str
 
 
-class PullAllDatasetsResponse(TypedDict):
-    pass
+PullAllDatasetsResponse = List[DatasetInfo]
 
 
 class PullDatasetRequest(TypedDict):
@@ -279,7 +281,7 @@ class ScorerConfig(TypedDict):
 
 
 class ScorerData(TypedDict):
-    id: Optional[str]
+    id: NotRequired[Optional[str]]
     name: str
     threshold: float
     success: bool
@@ -299,6 +301,10 @@ class ScorerExistsRequest(TypedDict):
 
 class ScorerExistsResponse(TypedDict):
     exists: bool
+
+
+class ScoringResult(TypedDict):
+    pass
 
 
 class TagPromptRequest(TypedDict):
@@ -330,6 +336,37 @@ class TraceEvaluationRun(TypedDict):
 class TraceInfo(TypedDict):
     trace_id: str
     span_id: str
+
+
+class TraceScoringResult(TypedDict):
+    success: bool
+    scorers_data: List[ScorerData]
+    name: NotRequired[Optional[str]]
+    data_object: TraceSpan
+    trace_id: NotRequired[Optional[str]]
+    run_duration: NotRequired[Optional[float]]
+    evaluation_cost: NotRequired[Optional[float]]
+
+
+class TraceSpan(TypedDict):
+    organization_id: str
+    project_id: str
+    user_id: str
+    timestamp: str
+    trace_id: str
+    span_id: str
+    parent_span_id: NotRequired[Optional[str]]
+    trace_state: NotRequired[Optional[str]]
+    span_name: NotRequired[Optional[str]]
+    span_kind: NotRequired[Optional[str]]
+    service_name: NotRequired[Optional[str]]
+    resource_attributes: Dict[str, Any]
+    span_attributes: Dict[str, Any]
+    duration: str
+    status_code: float
+    status_message: NotRequired[Optional[str]]
+    events: List[Dict[str, Any]]
+    links: NotRequired[Optional[str]]
 
 
 class TriggerRootSpanRulesRequest(TypedDict):

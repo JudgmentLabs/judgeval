@@ -7,6 +7,7 @@ from typing import List, Optional
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+import json
 
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.internal.api.api_types import ExampleEvaluationRun
@@ -117,20 +118,23 @@ class Evaluation:
             for scorer_dict in scorers_raw:
                 judgeval_logger.debug(f"Scorer data fields: {scorer_dict.keys()}")
 
-                scorer_fields = {
-                    "name": scorer_dict.get("name"),
-                    "threshold": scorer_dict.get("threshold"),
-                    "success": scorer_dict.get("success"),
-                    "score": scorer_dict.get("score"),
-                    "minimum_score_range": scorer_dict.get("minimum_score_range", 0),
-                    "maximum_score_range": scorer_dict.get("maximum_score_range", 1),
-                    "reason": scorer_dict.get("reason"),
-                    "evaluation_model": scorer_dict.get("evaluation_model"),
-                    "error": scorer_dict.get("error"),
-                    "additional_metadata": scorer_dict.get("additional_metadata", {}),
-                    "id": scorer_dict.get("scorer_data_id") or scorer_dict.get("id"),
-                }
-                scorers_data.append(ScorerData(**scorer_fields))
+                scorers_data.append(
+                    ScorerData(
+                        name=scorer_dict["name"],
+                        threshold=scorer_dict["threshold"],
+                        success=bool(scorer_dict["success"]),
+                        score=scorer_dict["score"],
+                        minimum_score_range=scorer_dict["minimum_score_range"],
+                        maximum_score_range=scorer_dict["maximum_score_range"],
+                        reason=scorer_dict.get("reason"),
+                        evaluation_model=scorer_dict.get("evaluation_model"),
+                        error=scorer_dict.get("error"),
+                        additional_metadata=json.loads(
+                            scorer_dict["additional_metadata"] or "{}"
+                        ),
+                        id=scorer_dict.get("scorer_data_id"),
+                    )
+                )
 
             success = all(s.success for s in scorers_data)
 
