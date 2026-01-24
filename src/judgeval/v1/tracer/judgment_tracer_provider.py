@@ -9,6 +9,7 @@ from opentelemetry.util.types import Attributes
 
 from judgeval.logger import judgeval_logger
 from judgeval.v1.tracer.base_tracer import BaseTracer
+from judgeval.v1.tracer.id_generator import IsolatedRandomIdGenerator
 from judgeval.v1.tracer.isolated import JudgmentIsolatedTracer
 
 FilterTracerCallback = Callable[[str, Optional[str], Optional[str], Attributes], bool]
@@ -23,6 +24,9 @@ class JudgmentTracerProvider(TracerProvider):
         isolated: bool = False,
         **kwargs,
     ):
+        # Use our isolated ID generator to be immune to user random.seed() calls
+        if "id_generator" not in kwargs:
+            kwargs["id_generator"] = IsolatedRandomIdGenerator()
         super().__init__(**kwargs)
         self._filter_tracer = filter_tracer or (lambda *_: True)
         self._isolated = isolated
