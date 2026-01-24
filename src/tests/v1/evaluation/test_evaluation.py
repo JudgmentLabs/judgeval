@@ -51,6 +51,8 @@ def test_evaluation_run_success(
                         "error": None,
                         "additional_metadata": {},
                         "scorer_data_id": "1",
+                        "minimum_score_range": 0,
+                        "maximum_score_range": 1,
                     }
                 ]
             },
@@ -66,6 +68,8 @@ def test_evaluation_run_success(
                         "error": None,
                         "additional_metadata": {},
                         "scorer_data_id": "2",
+                        "minimum_score_range": 0,
+                        "maximum_score_range": 1,
                     }
                 ]
             },
@@ -106,6 +110,8 @@ def test_evaluation_run_with_failures(
                         "error": None,
                         "additional_metadata": {},
                         "scorer_data_id": "1",
+                        "minimum_score_range": 0,
+                        "maximum_score_range": 1,
                     }
                 ]
             },
@@ -121,6 +127,8 @@ def test_evaluation_run_with_failures(
                         "error": None,
                         "additional_metadata": {},
                         "scorer_data_id": "2",
+                        "minimum_score_range": 0,
+                        "maximum_score_range": 1,
                     }
                 ]
             },
@@ -157,6 +165,8 @@ def test_evaluation_run_with_assert_mode_success(
                         "error": None,
                         "additional_metadata": {},
                         "scorer_data_id": "1",
+                        "minimum_score_range": 0,
+                        "maximum_score_range": 1,
                     }
                 ]
             },
@@ -172,6 +182,8 @@ def test_evaluation_run_with_assert_mode_success(
                         "error": None,
                         "additional_metadata": {},
                         "scorer_data_id": "2",
+                        "minimum_score_range": 0,
+                        "maximum_score_range": 1,
                     }
                 ]
             },
@@ -208,6 +220,8 @@ def test_evaluation_run_with_assert_mode_failure(
                         "error": None,
                         "additional_metadata": {},
                         "scorer_data_id": "1",
+                        "minimum_score_range": 0,
+                        "maximum_score_range": 1,
                     }
                 ]
             },
@@ -223,6 +237,8 @@ def test_evaluation_run_with_assert_mode_failure(
                         "error": None,
                         "additional_metadata": {},
                         "scorer_data_id": "2",
+                        "minimum_score_range": 0,
+                        "maximum_score_range": 1,
                     }
                 ]
             },
@@ -273,6 +289,8 @@ def test_evaluation_scorer_data_parsing(
                         "error": None,
                         "additional_metadata": {"key": "value"},
                         "scorer_data_id": "test-id",
+                        "minimum_score_range": 0,
+                        "maximum_score_range": 1,
                     }
                 ]
             }

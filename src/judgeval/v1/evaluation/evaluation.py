@@ -7,7 +7,6 @@ from typing import List, Optional
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
-import json
 
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.internal.api.api_types import ExampleEvaluationRun
@@ -129,9 +128,8 @@ class Evaluation:
                         reason=scorer_dict.get("reason"),
                         evaluation_model=scorer_dict.get("evaluation_model"),
                         error=scorer_dict.get("error"),
-                        additional_metadata=json.loads(
-                            scorer_dict["additional_metadata"] or "{}"
-                        ),
+                        additional_metadata=scorer_dict.get("additional_metadata")
+                        or {},
                         id=scorer_dict.get("scorer_data_id"),
                     )
                 )

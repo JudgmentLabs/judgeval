@@ -133,7 +133,7 @@ class ExperimentScorer(TypedDict):
     threshold: float
     created_at: str
     error: NotRequired[Optional[str]]
-    additional_metadata: NotRequired[Optional[str]]
+    additional_metadata: NotRequired[Optional[Dict[str, Any]]]
     minimum_score_range: float
     maximum_score_range: float
 

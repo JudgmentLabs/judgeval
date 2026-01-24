@@ -52,6 +52,8 @@ def test_factory_run(evaluation_factory, mock_client, sample_examples, sample_sc
                         "error": None,
                         "additional_metadata": {},
                         "scorer_data_id": "1",
+                        "minimum_score_range": 0,
+                        "maximum_score_range": 1,
                     }
                 ]
             }
