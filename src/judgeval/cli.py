@@ -6,12 +6,12 @@ import sys
 import typer
 from pathlib import Path
 from dotenv import load_dotenv
-from urllib.parse import urljoin
-from judgeval.env import JUDGMENT_API_URL
 from judgeval.v1.utils import resolve_project_id
 from judgeval.logger import judgeval_logger
 from judgeval.exceptions import JudgmentAPIError
 from judgeval import Judgeval
+from judgeval.version import get_version
+from judgeval.utils.url import url_for
 
 load_dotenv()
 
@@ -50,9 +50,7 @@ def load_otel_env(
     env = os.environ.copy()
     env["OTEL_TRACES_EXPORTER"] = "otlp"
     env["OTEL_EXPORTER_OTLP_TRACES_PROTOCOL"] = "http/protobuf"
-    env["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"] = urljoin(
-        JUDGMENT_API_URL, "/otel/v1/traces"
-    )
+    env["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"] = url_for("/otel/v1/traces")
     env["OTEL_EXPORTER_OTLP_HEADERS"] = (
         f"Authorization=Bearer {api_key},X-Organization-Id={organization_id},X-Project-Id={project_id}"
     )
@@ -104,6 +102,12 @@ def upload_scorer(
             judgeval_logger.error("Scorer exists. Use --overwrite to replace")
             raise typer.Exit(1)
         raise
+
+
+@app.command()
+def version():
+    """Show Judgeval CLI version."""
+    typer.echo(f"Judgeval CLI v{get_version()}")
 
 
 if __name__ == "__main__":

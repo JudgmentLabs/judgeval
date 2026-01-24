@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import copy
 import orjson
 import sys
-import subprocess
-import tempfile
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 import httpx
 import re
 
@@ -139,78 +136,46 @@ def deduplicate_schema(
     return result
 
 
-def deduplicate_openapi_spec(spec: Dict[str, Any]) -> Dict[str, Any]:
+def collect_schemas_with_id(spec: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     """
-    Post-process an OpenAPI spec to replace inline schemas with $ref references
-    where they match schemas defined in components/schemas.
+    Collect all schemas with $id from the entire OpenAPI spec (including nested schemas).
+    Returns a dict mapping schema $id to the schema (without $id field).
     """
-    spec = copy.deepcopy(spec)
+    schemas_by_id: Dict[str, Dict[str, Any]] = {}
 
-    components_schemas = spec.get("components", {}).get("schemas", {})
-    if not components_schemas:
-        return spec
+    def collect_from_value(value: Any) -> None:
+        """Recursively walk through the entire spec and collect schemas with $id."""
+        if isinstance(value, dict):
+            # Check if this dict has an $id (it's a schema)
+            if "$id" in value:
+                schema_id = value["$id"]
+                # Avoid processing the same schema multiple times
+                if schema_id not in schemas_by_id:
+                    # Store schema without $id field
+                    schema_without_id = {k: v for k, v in value.items() if k != "$id"}
+                    schemas_by_id[schema_id] = schema_without_id
+                    print(f"  Collected schema: {schema_id}", file=sys.stderr)
 
-    print("Building schema fingerprints...", file=sys.stderr)
-    fingerprints = build_schema_fingerprints(components_schemas)
-    print(f"Found {len(fingerprints)} unique component schemas", file=sys.stderr)
+            # Skip $ref to avoid following references (we only want inline schemas)
+            if "$ref" not in value:
+                # Recursively process all values in this dict
+                for v in value.values():
+                    collect_from_value(v)
+        elif isinstance(value, list):
+            # Recursively process all items in the list
+            for item in value:
+                collect_from_value(item)
+        # For primitive types (str, int, bool, None), do nothing
 
-    # Deduplicate schemas within components/schemas themselves (nested schemas)
-    print("Deduplicating component schemas...", file=sys.stderr)
-    for name, schema in list(components_schemas.items()):
-        # Don't replace the top-level schema itself, only its nested parts
-        if "properties" in schema:
-            schema["properties"] = {
-                prop_name: deduplicate_schema(
-                    prop_schema, fingerprints, f"components.schemas.{name}.{prop_name}"
-                )
-                for prop_name, prop_schema in schema["properties"].items()
-            }
-        if "items" in schema:
-            schema["items"] = deduplicate_schema(
-                schema["items"], fingerprints, f"components.schemas.{name}.items"
-            )
-        for union_key in ("anyOf", "oneOf", "allOf"):
-            if union_key in schema:
-                schema[union_key] = [
-                    deduplicate_schema(
-                        item,
-                        fingerprints,
-                        f"components.schemas.{name}.{union_key}[{i}]",
-                    )
-                    for i, item in enumerate(schema[union_key])
-                ]
+    # Walk through the entire OpenAPI spec
+    print("Collecting schemas with $id from entire OpenAPI spec...", file=sys.stderr)
+    collect_from_value(spec)
 
-    # Deduplicate schemas in paths
-    print("Deduplicating path schemas...", file=sys.stderr)
-    for path, path_item in spec.get("paths", {}).items():
-        for method, operation in path_item.items():
-            if not isinstance(operation, dict):
-                continue
-
-            # Request body
-            request_body = operation.get("requestBody", {})
-            if request_body:
-                for content_type, content in request_body.get("content", {}).items():
-                    if "schema" in content:
-                        content["schema"] = deduplicate_schema(
-                            content["schema"],
-                            fingerprints,
-                            f"paths.{path}.{method}.requestBody.{content_type}",
-                        )
-
-            # Responses
-            for status_code, response in operation.get("responses", {}).items():
-                if not isinstance(response, dict):
-                    continue
-                for content_type, content in response.get("content", {}).items():
-                    if "schema" in content:
-                        content["schema"] = deduplicate_schema(
-                            content["schema"],
-                            fingerprints,
-                            f"paths.{path}.{method}.responses.{status_code}.{content_type}",
-                        )
-
-    return spec
+    print(
+        f"Collected {len(schemas_by_id)} schemas with $id: {sorted(schemas_by_id.keys())}",
+        file=sys.stderr,
+    )
+    return schemas_by_id
 
 
 def to_snake_case(name: str) -> str:
@@ -235,6 +200,288 @@ def resolve_ref(ref: str) -> str:
     schema_name = ref.replace("#/components/schemas/", "")
     # Convert to PascalCase to match datamodel-codegen output
     return to_pascal_case(schema_name)
+
+
+def get_schema_name_from_id(schema: Dict[str, Any]) -> Optional[str]:
+    """
+    Extract schema name from $id field in inline schema.
+    Returns None if schema doesn't have $id or is a reference.
+    """
+    if "$ref" in schema:
+        return resolve_ref(schema["$ref"])
+    if "$id" in schema:
+        # $id values are already in PascalCase, return as-is
+        return schema["$id"]
+    return None
+
+
+def extract_dependencies(
+    schema: Dict[str, Any],
+    schemas_by_id: Dict[str, Dict[str, Any]],
+    visited: Optional[Set[str]] = None,
+) -> Set[str]:
+    """Extract all schema $id dependencies from a schema."""
+    if visited is None:
+        visited = set()
+
+    dependencies: Set[str] = set()
+
+    if "$ref" in schema:
+        # This shouldn't happen in our case since we're working with inline schemas
+        return dependencies
+
+    # If this schema has an $id, we need to get its dependencies (but don't add itself)
+    schema_id = schema.get("$id")
+    if schema_id and schema_id in visited:
+        return dependencies  # Already processed this schema
+
+    if schema_id:
+        visited.add(schema_id)
+        # Get the full schema from schemas_by_id to extract its dependencies
+        if schema_id in schemas_by_id:
+            full_schema = schemas_by_id[schema_id]
+        else:
+            full_schema = schema
+    else:
+        full_schema = schema
+
+    # Check for nested schemas with $id
+    if "properties" in full_schema and isinstance(full_schema["properties"], dict):
+        for prop_schema in full_schema["properties"].values():
+            if isinstance(prop_schema, dict):
+                if "$id" in prop_schema:
+                    dep_id = prop_schema["$id"]
+                    dependencies.add(dep_id)
+                    # Recursively get dependencies of nested schema
+                    dependencies.update(
+                        extract_dependencies(prop_schema, schemas_by_id, visited)
+                    )
+                else:
+                    dependencies.update(
+                        extract_dependencies(prop_schema, schemas_by_id, visited)
+                    )
+
+    if "items" in full_schema:
+        items_schema = full_schema["items"]
+        if isinstance(items_schema, dict):
+            if "$id" in items_schema:
+                dep_id = items_schema["$id"]
+                dependencies.add(dep_id)
+                dependencies.update(
+                    extract_dependencies(items_schema, schemas_by_id, visited)
+                )
+            else:
+                dependencies.update(
+                    extract_dependencies(items_schema, schemas_by_id, visited)
+                )
+
+    for union_key in ("anyOf", "oneOf", "allOf"):
+        if union_key in full_schema and isinstance(full_schema[union_key], list):
+            for item in full_schema[union_key]:
+                if isinstance(item, dict):
+                    if "$id" in item:
+                        dep_id = item["$id"]
+                        dependencies.add(dep_id)
+                        dependencies.update(
+                            extract_dependencies(item, schemas_by_id, visited)
+                        )
+                    else:
+                        dependencies.update(
+                            extract_dependencies(item, schemas_by_id, visited)
+                        )
+
+    if "additionalProperties" in full_schema and isinstance(
+        full_schema["additionalProperties"], dict
+    ):
+        dependencies.update(
+            extract_dependencies(
+                full_schema["additionalProperties"], schemas_by_id, visited
+            )
+        )
+
+    return dependencies
+
+
+def find_used_schemas(
+    spec: Dict[str, Any], schemas_by_id: Dict[str, Dict[str, Any]]
+) -> Set[str]:
+    """Find all schemas used in request/response bodies."""
+    used_schemas = set()
+
+    for path, path_item in spec.get("paths", {}).items():
+        for method, operation in path_item.items():
+            if not isinstance(operation, dict):
+                continue
+
+            # Request body
+            request_body = operation.get("requestBody", {})
+            if request_body:
+                for content_type, content in request_body.get("content", {}).items():
+                    if "schema" in content:
+                        schema = content["schema"]
+                        if "$id" in schema:
+                            schema_id = schema["$id"]
+                            used_schemas.add(schema_id)
+                            # Get dependencies
+                            if schema_id in schemas_by_id:
+                                used_schemas.update(
+                                    extract_dependencies(
+                                        schemas_by_id[schema_id], schemas_by_id
+                                    )
+                                )
+
+            # Responses
+            for status_code, response in operation.get("responses", {}).items():
+                if not isinstance(response, dict):
+                    continue
+                for content_type, content in response.get("content", {}).items():
+                    if "schema" in content:
+                        schema = content["schema"]
+                        if "$id" in schema:
+                            schema_id = schema["$id"]
+                            used_schemas.add(schema_id)
+                            # Get dependencies
+                            if schema_id in schemas_by_id:
+                                used_schemas.update(
+                                    extract_dependencies(
+                                        schemas_by_id[schema_id], schemas_by_id
+                                    )
+                                )
+                        else:
+                            # Also check nested schemas even if this one doesn't have $id
+                            used_schemas.update(
+                                extract_dependencies(schema, schemas_by_id)
+                            )
+
+    return used_schemas
+
+
+def get_python_type(
+    schema: Any,
+    schemas_by_id: Dict[str, Dict[str, Any]],
+    visited: Optional[Set[str]] = None,
+) -> str:
+    """Convert a schema to a Python type string."""
+    if visited is None:
+        visited = set()
+
+    # Handle non-dict inputs (lists, primitives, etc.)
+    if not isinstance(schema, dict):
+        if isinstance(schema, list):
+            # If it's a list, process the first item (for tuple validation)
+            if schema:
+                return f"List[{get_python_type(schema[0], schemas_by_id, visited)}]"
+            return "List[Any]"
+        # For other non-dict types, return Any
+        return "Any"
+
+    if "$ref" in schema:
+        return resolve_ref(schema["$ref"])
+
+    if "$id" in schema:
+        schema_id = schema["$id"]
+        # Return the schema ID directly (it will be a TypedDict class name)
+        return schema_id
+
+    # Handle union types (anyOf, oneOf, allOf)
+    for union_key in ("anyOf", "oneOf", "allOf"):
+        if union_key in schema and isinstance(schema[union_key], list):
+            union_types = []
+            has_null = False
+            for item in schema[union_key]:
+                if isinstance(item, dict) and item.get("type") == "null":
+                    has_null = True
+                else:
+                    union_types.append(get_python_type(item, schemas_by_id, visited))
+
+            if not union_types:
+                return "Any"
+
+            # Remove duplicates while preserving order
+            seen = set()
+            unique_types = []
+            for t in union_types:
+                if t not in seen:
+                    seen.add(t)
+                    unique_types.append(t)
+
+            if len(unique_types) == 1:
+                result = unique_types[0]
+            else:
+                result = f"Union[{', '.join(unique_types)}]"
+
+            if has_null:
+                return f"Optional[{result}]"
+            return result
+
+    schema_type = schema.get("type", "object")
+
+    if schema_type == "string":
+        return "str"
+    elif schema_type == "integer":
+        return "int"
+    elif schema_type == "number":
+        return "float"
+    elif schema_type == "boolean":
+        return "bool"
+    elif schema_type == "array":
+        items = schema.get("items", {})
+        if items:
+            # Handle both dict and list items
+            if isinstance(items, dict):
+                item_type = get_python_type(items, schemas_by_id, visited)
+            elif isinstance(items, list):
+                # For tuple validation, use the first item type
+                if items:
+                    item_type = get_python_type(items[0], schemas_by_id, visited)
+                else:
+                    item_type = "Any"
+            else:
+                item_type = "Any"
+            return f"List[{item_type}]"
+        return "List[Any]"
+    elif schema_type == "object" or "properties" in schema:
+        # This should be handled by the caller (generate TypedDict)
+        return "Dict[str, Any]"
+    else:
+        return "Any"
+
+
+def generate_typeddict_class(
+    class_name: str, schema: Dict[str, Any], schemas_by_id: Dict[str, Dict[str, Any]]
+) -> str:
+    """Generate a TypedDict class from a schema."""
+    lines = [f"class {class_name}(TypedDict):"]
+
+    required_fields = set(schema.get("required", []))
+
+    if "properties" in schema and isinstance(schema["properties"], dict):
+        for field_name, field_schema in schema["properties"].items():
+            is_required = field_name in required_fields
+
+            # Get the Python type (this handles nullable and union types)
+            # field_schema should be a dict, but handle edge cases
+            if not isinstance(field_schema, dict):
+                field_type = "Any"
+            else:
+                field_type = get_python_type(field_schema, schemas_by_id)
+
+            if is_required:
+                lines.append(f"    {field_name}: {field_type}")
+            else:
+                # Use NotRequired for optional fields
+                # If the type is already Optional, we still need NotRequired
+                if field_type.startswith("Optional["):
+                    lines.append(f"    {field_name}: NotRequired[{field_type}]")
+                else:
+                    lines.append(
+                        f"    {field_name}: NotRequired[Optional[{field_type}]]"
+                    )
+    else:
+        # Empty TypedDict
+        lines.append("    pass")
+
+    return "\n".join(lines)
 
 
 def get_method_name_from_path(path: str, method: str) -> str:
@@ -268,8 +515,8 @@ def get_request_schema(operation: Dict[str, Any]) -> Optional[str]:
     content = request_body.get("content", {})
     if "application/json" in content:
         schema = content["application/json"].get("schema", {})
-        if "$ref" in schema:
-            return resolve_ref(schema["$ref"])
+        if schema:
+            return get_schema_name_from_id(schema)
 
     return None
 
@@ -282,8 +529,13 @@ def get_response_schema(operation: Dict[str, Any]) -> Optional[str]:
             content = response.get("content", {})
             if "application/json" in content:
                 schema = content["application/json"].get("schema", {})
-                if "$ref" in schema:
-                    return resolve_ref(schema["$ref"])
+                if schema:
+                    return get_schema_name_from_id(schema)
+            # Also check text/plain for string responses
+            elif "text/plain" in content:
+                schema = content["text/plain"].get("schema", {})
+                if schema:
+                    return get_schema_name_from_id(schema)
 
     return None
 
@@ -526,66 +778,37 @@ def generate_api_file() -> str:
 
 
 def generate_api_types() -> None:
-    spec = {
-        "openapi": SPEC["openapi"],
-        "info": SPEC["info"],
-        "paths": SPEC["paths"],
-        "components": SPEC["components"],
-    }
+    """Generate TypedDict classes from schemas with $id."""
+    # Collect all schemas with $id from paths
+    schemas_by_id = collect_schemas_with_id(SPEC)
 
-    # Deduplicate inline schemas by replacing them with $ref references
-    print("Deduplicating OpenAPI spec...", file=sys.stderr)
-    spec = deduplicate_openapi_spec(spec)
-    print("Deduplication complete.", file=sys.stderr)
+    print(f"Collected {len(schemas_by_id)} schemas with $id", file=sys.stderr)
 
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        f.write(orjson.dumps(spec, option=orjson.OPT_INDENT_2).decode("utf-8"))
-        temp_file = f.name
+    # Generate TypedDict classes for ALL collected schemas
+    output_path = "src/judgeval/v1/internal/api/api_types.py"
+    lines = [
+        "from __future__ import annotations",
+        "",
+        "from typing import TypedDict, NotRequired, Optional, List, Union, Any, Dict",
+        "",
+        "",
+    ]
 
-    try:
-        subprocess.run(
-            [
-                "datamodel-codegen",
-                "--input",
-                temp_file,
-                "--output",
-                "src/judgeval/v1/internal/api/api_types.py",
-                "--output-model-type",
-                "typing.TypedDict",
-                "--target-python-version",
-                "3.10",
-                "--use-annotated",
-                "--use-default-kwarg",
-                "--use-field-description",
-                "--formatters",
-                "ruff-format",
-            ],
-            check=True,
-        )
+    # Sort schema IDs for consistent output
+    generated_count = 0
+    for schema_id in sorted(schemas_by_id.keys()):
+        schema = schemas_by_id[schema_id]
+        class_code = generate_typeddict_class(schema_id, schema, schemas_by_id)
+        lines.append(class_code)
+        lines.append("")
+        generated_count += 1
+        print(f"Generated TypedDict: {schema_id}", file=sys.stderr)
 
-        # Post-process: Convert Optional[X] fields to NotRequired[Optional[X]]
-        # This makes nullable fields truly optional (don't need to be present)
-        output_path = "src/judgeval/v1/internal/api/api_types.py"
-        with open(output_path, "r") as f:
-            content = f.read()
+    # Write the file
+    with open(output_path, "w") as f:
+        f.write("\n".join(lines))
 
-        # Match lines like "    field: Optional[...]" but not already wrapped in NotRequired
-        import re
-
-        content = re.sub(
-            r"^(\s+)(\w+): Optional\[(.+)\]$",
-            r"\1\2: NotRequired[Optional[\3]]",
-            content,
-            flags=re.MULTILINE,
-        )
-
-        with open(output_path, "w") as f:
-            f.write(content)
-
-    finally:
-        import os
-
-        os.unlink(temp_file)
+    print(f"Generated {generated_count} TypedDict classes", file=sys.stderr)
 
 
 if __name__ == "__main__":
