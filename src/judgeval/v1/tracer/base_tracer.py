@@ -51,6 +51,7 @@ from judgeval.v1.tracer.processors._lifecycles import (
     AGENT_INSTANCE_NAME_KEY,
 )
 from judgeval.v1.tracer.isolated.tracer import JudgmentIsolatedTracer
+from judgeval.utils._background import submit_background
 
 C = TypeVar("C", bound=Callable[..., Any])
 T = TypeVar("T", bound=ApiClient)
@@ -390,10 +391,9 @@ class BaseTracer(ABC):
         )
 
     def _enqueue_evaluation(self, evaluation_run: ExampleEvaluationRun) -> None:
-        try:
-            self.api_client.add_to_run_eval_queue_examples(evaluation_run)
-        except Exception as e:
-            judgeval_logger.error(f"Failed to enqueue evaluation run: {e}")
+        submit_background(
+            self.api_client.add_to_run_eval_queue_examples, evaluation_run
+        )
 
     def _get_sampled_span_context(self) -> Optional[SpanContext]:
         current_span = self._get_current_span()
