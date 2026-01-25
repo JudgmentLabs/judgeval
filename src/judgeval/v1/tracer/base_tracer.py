@@ -46,6 +46,7 @@ from judgeval.v1.tracer.processors._lifecycles import (
     AGENT_ID_KEY,
     PARENT_AGENT_ID_KEY,
     CUSTOMER_ID_KEY,
+    SESSION_ID_KEY,
     AGENT_CLASS_NAME_KEY,
     AGENT_INSTANCE_NAME_KEY,
 )
@@ -216,6 +217,10 @@ class BaseTracer(ABC):
             self.set_attribute(key, value)
 
     def set_customer_id(self, customer_id: str) -> None:
+        current_span = self._get_current_span()
+        if current_span is None:
+            return
+        current_span.set_attribute(AttributeKeys.JUDGMENT_CUSTOMER_ID, customer_id)
         ctx = set_value(CUSTOMER_ID_KEY, customer_id)
         attach(ctx)
 
@@ -317,6 +322,14 @@ class BaseTracer(ABC):
         except Exception as e:
             judgeval_logger.error(f"Failed to serialize trace evaluation: {e}")
 
+    def set_session_id(self, session_id: str) -> None:
+        current_span = self._get_sampled_span()
+        if current_span is None:
+            return
+        current_span.set_attribute(AttributeKeys.JUDGMENT_SESSION_ID, session_id)
+        ctx = set_value(SESSION_ID_KEY, session_id)
+        attach(ctx)
+
     def _build_endpoint(self, base_url: str) -> str:
         return (
             base_url + "otel/v1/traces"
@@ -417,6 +430,8 @@ class BaseTracer(ABC):
         func: C,
         span_type: Optional[str] = "span",
         span_name: Optional[str] = None,
+        record_input: bool = True,
+        record_output: bool = True,
     ) -> C: ...
 
     @overload
@@ -425,6 +440,8 @@ class BaseTracer(ABC):
         func: None = None,
         span_type: Optional[str] = "span",
         span_name: Optional[str] = None,
+        record_input: bool = True,
+        record_output: bool = True,
     ) -> Callable[[C], C]: ...
 
     def observe(
@@ -432,9 +449,13 @@ class BaseTracer(ABC):
         func: Optional[C] = None,
         span_type: Optional[str] = "span",
         span_name: Optional[str] = None,
+        record_input: bool = True,
+        record_output: bool = True,
     ) -> C | Callable[[C], C]:
         if func is None:
-            return lambda f: self.observe(f, span_type, span_name)  # type: ignore[return-value]
+            return lambda f: self.observe(
+                f, span_type, span_name, record_input, record_output
+            )  # type: ignore[return-value]
 
         if not self.enable_monitoring:
             judgeval_logger.info(
@@ -454,16 +475,19 @@ class BaseTracer(ABC):
                         span.set_attribute(AttributeKeys.JUDGMENT_SPAN_KIND, span_type)
 
                     try:
-                        input_data = _format_inputs(func, args, kwargs)
-                        span.set_attribute(
-                            AttributeKeys.JUDGMENT_INPUT, self.serializer(input_data)
-                        )
+                        if record_input:
+                            input_data = _format_inputs(func, args, kwargs)
+                            span.set_attribute(
+                                AttributeKeys.JUDGMENT_INPUT,
+                                self.serializer(input_data),
+                            )
 
                         result = await func(*args, **kwargs)
 
-                        span.set_attribute(
-                            AttributeKeys.JUDGMENT_OUTPUT, self.serializer(result)
-                        )
+                        if record_output:
+                            span.set_attribute(
+                                AttributeKeys.JUDGMENT_OUTPUT, self.serializer(result)
+                            )
                         return result
                     except Exception as e:
                         span.record_exception(e)
@@ -480,16 +504,19 @@ class BaseTracer(ABC):
                         span.set_attribute(AttributeKeys.JUDGMENT_SPAN_KIND, span_type)
 
                     try:
-                        input_data = _format_inputs(func, args, kwargs)
-                        span.set_attribute(
-                            AttributeKeys.JUDGMENT_INPUT, self.serializer(input_data)
-                        )
+                        if record_input:
+                            input_data = _format_inputs(func, args, kwargs)
+                            span.set_attribute(
+                                AttributeKeys.JUDGMENT_INPUT,
+                                self.serializer(input_data),
+                            )
 
                         result = func(*args, **kwargs)
 
-                        span.set_attribute(
-                            AttributeKeys.JUDGMENT_OUTPUT, self.serializer(result)
-                        )
+                        if record_output:
+                            span.set_attribute(
+                                AttributeKeys.JUDGMENT_OUTPUT, self.serializer(result)
+                            )
                         return result
                     except Exception as e:
                         span.record_exception(e)
