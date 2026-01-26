@@ -90,7 +90,7 @@ class Example(TypedDict):
 
 class ExampleEvaluationRun(TypedDict):
     id: NotRequired[Optional[str]]
-    project_id: NotRequired[Optional[str]]
+    project_id: str
     eval_name: str
     model: NotRequired[Optional[str]]
     created_at: NotRequired[Optional[str]]
@@ -323,7 +323,7 @@ class TagPromptResponse(TypedDict):
 
 class TraceEvaluationRun(TypedDict):
     id: NotRequired[Optional[str]]
-    project_id: NotRequired[Optional[str]]
+    project_id: str
     eval_name: str
     model: NotRequired[Optional[str]]
     created_at: NotRequired[Optional[str]]
