@@ -122,7 +122,15 @@ class CustomScorerFactory:
                 else:
                     effective_project_id = self._default_project_id
 
+            if not effective_project_id:
+                raise ValueError(
+                    "project_id is required. Pass project_id or project_name to upload(), "
+                    "set project_name in Judgeval(project_name=...), "
+                    "or use CLI: judgeval upload-scorer <project_name> <scorer_file> <requirements_file>"
+                )
+
             payload = {
+                "project_id": effective_project_id,
                 "scorer_name": unique_name,
                 "class_name": scorer_classes[0],
                 "scorer_code": scorer_code,
@@ -131,8 +139,6 @@ class CustomScorerFactory:
                 "scorer_type": scorer_type,
                 "version": 1,
             }
-            if effective_project_id:
-                payload["project_id"] = effective_project_id
             response = client.upload_custom_scorer(payload=payload)
 
             if response.get("status") == "success":
