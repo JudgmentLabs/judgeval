@@ -155,6 +155,14 @@ class JudgmentClient(metaclass=SingletonMeta):
                 api_key=self.api_key,
                 organization_id=self.organization_id,
             )
+            # Resolve project_name to project_id if provided
+            project_id = None
+            if project_name:
+                resolve_resp = client.projects_resolve({"project_name": project_name})
+                project_id = resolve_resp.get("project_id")
+                if not project_id:
+                    raise ValueError(f"Project '{project_name}' not found")
+
             payload = {
                 "scorer_name": unique_name,
                 "class_name": scorer_classes[0],
@@ -163,12 +171,12 @@ class JudgmentClient(metaclass=SingletonMeta):
                 "overwrite": overwrite,
                 "scorer_type": scorer_type,
             }
-            if project_name:
-                payload["project_name"] = project_name
+            if project_id:
+                payload["project_id"] = project_id
 
-            response = client.upload_custom_scorer(payload=payload)
+            upload_resp = client.upload_custom_scorer(payload=payload)
 
-            if response.get("status") == "success":
+            if upload_resp.get("status") == "success":
                 judgeval_logger.info(
                     f"Successfully uploaded custom scorer: {unique_name}"
                 )

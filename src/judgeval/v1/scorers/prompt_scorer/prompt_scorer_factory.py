@@ -37,8 +37,19 @@ class PromptScorerFactory:
         # Resolve project_id: override requires resolution, otherwise use pre-resolved default
         if project_name:
             project_id = resolve_project_id(self._client, project_name)
+            if not project_id:
+                raise ValueError(
+                    f"Project '{project_name}' not found. Please create it first."
+                )
         else:
             project_id = self._default_project_id
+
+        # Require project_id - don't silently send empty string
+        if not project_id:
+            raise ValueError(
+                "project_id is required. Either pass project_name to get() "
+                "or set project_name in Judgeval(project_name=...)"
+            )
 
         cache_key = (
             name,
@@ -51,7 +62,7 @@ class PromptScorerFactory:
 
         if cached is None:
             request: FetchPromptScorersRequest = {
-                "project_id": project_id or "",
+                "project_id": project_id,
                 "names": [name],
             }
             if self._is_trace is not None:

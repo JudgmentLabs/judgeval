@@ -13,6 +13,7 @@ from abc import ABC
 from judgeval.env import JUDGMENT_DEFAULT_GPT_MODEL
 from copy import copy
 from judgeval.utils.decorators.dont_throw import dont_throw
+from judgeval.utils.project import _resolve_project_id
 
 
 def push_prompt_scorer(
@@ -29,6 +30,19 @@ def push_prompt_scorer(
 ) -> str:
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
+        # Resolve project_name to project_id if provided
+        project_id: Optional[str] = None
+        if project_name:
+            project_id = _resolve_project_id(
+                project_name, judgment_api_key, organization_id
+            )
+            if not project_id:
+                raise JudgmentAPIError(
+                    status_code=404,
+                    detail=f"Project '{project_name}' not found",
+                    response=None,  # type: ignore
+                )
+
         payload: Dict[str, Any] = {
             "name": name,
             "prompt": prompt,
@@ -38,8 +52,8 @@ def push_prompt_scorer(
             "description": description,
             "is_trace": is_trace,
         }
-        if project_name:
-            payload["project_name"] = project_name
+        if project_id:
+            payload["project_id"] = project_id
         r = client.save_scorer(payload=payload)
     except JudgmentAPIError as e:
         raise JudgmentAPIError(
@@ -58,9 +72,22 @@ def fetch_prompt_scorer(
 ):
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
-        request: Dict[str, Any] = {"names": [name]}
+        # Resolve project_name to project_id if provided
+        project_id: Optional[str] = None
         if project_name:
-            request["project_name"] = project_name
+            project_id = _resolve_project_id(
+                project_name, judgment_api_key, organization_id
+            )
+            if not project_id:
+                raise JudgmentAPIError(
+                    status_code=404,
+                    detail=f"Project '{project_name}' not found",
+                    response=None,  # type: ignore
+                )
+
+        request: Dict[str, Any] = {"names": [name]}
+        if project_id:
+            request["project_id"] = project_id
         fetched_scorers = client.fetch_scorers(request)
         if len(fetched_scorers["scorers"]) == 0:
             judgeval_logger.error(f"Prompt scorer '{name}' not found")
@@ -90,9 +117,22 @@ def scorer_exists(
 ):
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
-        request: Dict[str, Any] = {"name": name}
+        # Resolve project_name to project_id if provided
+        project_id: Optional[str] = None
         if project_name:
-            request["project_name"] = project_name
+            project_id = _resolve_project_id(
+                project_name, judgment_api_key, organization_id
+            )
+            if not project_id:
+                raise JudgmentAPIError(
+                    status_code=404,
+                    detail=f"Project '{project_name}' not found",
+                    response=None,  # type: ignore
+                )
+
+        request: Dict[str, Any] = {"name": name}
+        if project_id:
+            request["project_id"] = project_id
         return client.scorer_exists(request)["exists"]
     except JudgmentAPIError as e:
         if e.status_code == 500:
