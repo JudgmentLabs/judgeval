@@ -7,11 +7,13 @@ import typer
 from pathlib import Path
 from dotenv import load_dotenv
 from judgeval.v1.utils import resolve_project_id
+from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.logger import judgeval_logger
 from judgeval.exceptions import JudgmentAPIError
 from judgeval import Judgeval
 from judgeval.version import get_version
 from judgeval.utils.url import url_for
+from judgeval.env import JUDGMENT_API_URL
 
 load_dotenv()
 
@@ -38,7 +40,8 @@ def load_otel_env(
     if not api_key or not organization_id:
         raise typer.BadParameter("JUDGMENT_API_KEY and JUDGMENT_ORG_ID required")
 
-    project_id = resolve_project_id(project_name, api_key, organization_id)
+    client = JudgmentSyncClient(JUDGMENT_API_URL, api_key, organization_id)
+    project_id = resolve_project_id(client, project_name)
     if not project_id:
         raise typer.BadParameter(f"Project '{project_name}' not found")
 
@@ -78,7 +81,8 @@ def upload_scorer(
         raise typer.BadParameter("JUDGMENT_API_KEY and JUDGMENT_ORG_ID required")
 
     # Resolve project_id to validate project exists
-    project_id = resolve_project_id(project_name, api_key, organization_id)
+    internal_client = JudgmentSyncClient(JUDGMENT_API_URL, api_key, organization_id)
+    project_id = resolve_project_id(internal_client, project_name)
     if not project_id:
         raise typer.BadParameter(f"Project '{project_name}' not found")
 
@@ -100,7 +104,7 @@ def upload_scorer(
             requirements_file_path=requirements_file_path,
             unique_name=unique_name,
             overwrite=overwrite,
-            project_name=project_name,
+            project_id=project_id,
         )
         if not result:
             raise typer.Abort()

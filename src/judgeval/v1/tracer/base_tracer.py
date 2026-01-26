@@ -255,6 +255,16 @@ class BaseTracer(ABC):
         tracer = self.get_tracer()
         return tracer.start_span(span_name)
 
+    def _validate_scorer_project(self, scorer: BaseScorer) -> None:
+        """Warn if scorer's project doesn't match tracer's project."""
+        scorer_project_id = scorer.get_project_id()
+        if scorer_project_id is not None and scorer_project_id != self.project_id:
+            judgeval_logger.warning(
+                f"Scorer '{scorer.get_name()}' belongs to project_id={scorer_project_id}, "
+                f"but tracer is configured for project_id={self.project_id} (project_name={self.project_name}). "
+                "Results will be recorded under the tracer's project."
+            )
+
     @dont_throw
     def async_evaluate(
         self,
@@ -267,6 +277,8 @@ class BaseTracer(ABC):
 
         if not self.enable_evaluation:
             return
+
+        self._validate_scorer_project(scorer)
 
         span_context = self._get_sampled_span_context()
         if span_context is None:
@@ -297,6 +309,8 @@ class BaseTracer(ABC):
 
         if not self.enable_evaluation:
             return
+
+        self._validate_scorer_project(scorer)
 
         current_span = self._get_sampled_span()
         if current_span is None:
@@ -375,7 +389,7 @@ class BaseTracer(ABC):
         custom_scorers = [scorer.to_dict()] if isinstance(scorer, CustomScorer) else []
 
         return ExampleEvaluationRun(
-            project_name=self.project_name,
+            project_id=self.project_id,
             eval_name=run_id,
             trace_id=trace_id,
             trace_span_id=span_id,
@@ -399,7 +413,7 @@ class BaseTracer(ABC):
         custom_scorers = [scorer.to_dict()] if isinstance(scorer, CustomScorer) else []
 
         return TraceEvaluationRun(
-            project_name=self.project_name,
+            project_id=self.project_id,
             eval_name=eval_name,
             trace_and_span_ids=[[trace_id, span_id]],
             judgment_scorers=judgment_scorers,

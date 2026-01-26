@@ -15,7 +15,7 @@ from judgeval.logger import judgeval_logger
 
 
 class PromptScorerFactory:
-    __slots__ = ("_client", "_is_trace", "_default_project_name")
+    __slots__ = ("_client", "_is_trace", "_default_project_id")
     # Cache key: (name, org_id, api_key, project_id, is_trace)
     _cache: Dict[Tuple[str, str, str, Optional[str], bool], APIPromptScorer] = {}
 
@@ -23,22 +23,22 @@ class PromptScorerFactory:
         self,
         client: JudgmentSyncClient,
         is_trace: bool,
-        default_project_name: Optional[str] = None,
+        default_project_id: Optional[str] = None,
     ):
         self._client = client
         self._is_trace = is_trace
-        self._default_project_name = default_project_name
+        self._default_project_id = default_project_id
 
     def get(
         self,
         name: str,
         project_name: Optional[str] = None,
     ) -> PromptScorer | None:
-        # Resolve project: use param, fallback to default, else None (org-level)
-        effective_project_name = project_name or self._default_project_name
-        project_id: Optional[str] = None
-        if effective_project_name:
-            project_id = resolve_project_id(self._client, effective_project_name)
+        # Resolve project_id: override requires resolution, otherwise use pre-resolved default
+        if project_name:
+            project_id = resolve_project_id(self._client, project_name)
+        else:
+            project_id = self._default_project_id
 
         cache_key = (
             name,
@@ -50,11 +50,12 @@ class PromptScorerFactory:
         cached = self._cache.get(cache_key)
 
         if cached is None:
-            request: FetchPromptScorersRequest = {"names": [name]}
+            request: FetchPromptScorersRequest = {
+                "project_id": project_id or "",
+                "names": [name],
+            }
             if self._is_trace is not None:
                 request["is_trace"] = self._is_trace
-            if effective_project_name:
-                request["project_name"] = effective_project_name
 
             try:
                 response: FetchPromptScorersResponse = self._client.fetch_scorers(

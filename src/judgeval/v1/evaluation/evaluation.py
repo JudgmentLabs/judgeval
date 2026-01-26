@@ -14,32 +14,52 @@ from judgeval.v1.data.example import Example
 from judgeval.v1.data.scoring_result import ScoringResult
 from judgeval.v1.data.scorer_data import ScorerData
 from judgeval.v1.scorers.base_scorer import BaseScorer
+from judgeval.v1.utils import resolve_project_id
 from judgeval.logger import judgeval_logger
 
 
 class Evaluation:
-    __slots__ = ("_client",)
+    __slots__ = ("_client", "_default_project_id")
 
-    def __init__(self, client: JudgmentSyncClient):
+    def __init__(
+        self,
+        client: JudgmentSyncClient,
+        default_project_id: Optional[str] = None,
+    ):
         self._client = client
+        self._default_project_id = default_project_id
 
     def run(
         self,
         examples: List[Example],
         scorers: List[BaseScorer],
-        project_name: str,
         eval_run_name: str,
+        project_name: Optional[str] = None,
         model: Optional[str] = None,
         assert_test: bool = False,
         timeout_seconds: int = 300,
     ) -> List[ScoringResult]:
+        # Resolve project_id: override requires resolution, otherwise use pre-resolved default
+        if project_name:
+            project_id = resolve_project_id(self._client, project_name)
+            if not project_id:
+                raise ValueError(
+                    f"Project '{project_name}' not found. Please create it first."
+                )
+        else:
+            project_id = self._default_project_id
+            if not project_id:
+                raise ValueError(
+                    "project_name is required. Either pass it to run() or set it in Judgeval(project_name=...)"
+                )
+
         console = Console()
         eval_id = str(uuid.uuid4())
         created_at = datetime.now(timezone.utc).isoformat()
 
         console.print("\n[bold cyan]Starting Evaluation[/bold cyan]")
         console.print(f"[dim]Run:[/dim] {eval_run_name}")
-        console.print(f"[dim]Project:[/dim] {project_name}")
+        console.print(f"[dim]Project:[/dim] {project_name or project_id}")
         console.print(
             f"[dim]Examples:[/dim] {len(examples)} | [dim]Scorers:[/dim] {len(scorers)}"
         )
@@ -51,7 +71,7 @@ class Evaluation:
 
         payload: ExampleEvaluationRun = {
             "id": eval_id,
-            "project_name": project_name,
+            "project_id": project_id,
             "eval_name": eval_run_name,
             "created_at": created_at,
             "examples": [e.to_dict() for e in examples],
@@ -80,7 +100,7 @@ class Evaluation:
                     raise TimeoutError(f"Evaluation timed out after {timeout_seconds}s")
 
                 response = self._client.fetch_experiment_run(
-                    {"experiment_run_id": eval_id, "project_name": project_name}
+                    {"experiment_run_id": eval_id, "project_id": project_id}
                 )
                 results_data = response.get("results", []) or []
                 poll_count += 1
@@ -123,8 +143,8 @@ class Evaluation:
                         threshold=scorer_dict["threshold"],
                         success=bool(scorer_dict["success"]),
                         score=scorer_dict["score"],
-                        minimum_score_range=scorer_dict["minimum_score_range"],
-                        maximum_score_range=scorer_dict["maximum_score_range"],
+                        minimum_score_range=scorer_dict.get("minimum_score_range", 0),
+                        maximum_score_range=scorer_dict.get("maximum_score_range", 1),
                         reason=scorer_dict.get("reason"),
                         evaluation_model=scorer_dict.get("evaluation_model"),
                         error=scorer_dict.get("error"),

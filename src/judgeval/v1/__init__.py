@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Optional
 
 from judgeval.v1.internal.api import JudgmentSyncClient
+from judgeval.v1.utils import resolve_project_id
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
 
 
@@ -13,6 +14,7 @@ class Judgeval:
         "_api_url",
         "_internal_client",
         "_project_name",
+        "_project_id",
     )
 
     def __init__(
@@ -44,6 +46,11 @@ class Judgeval:
             self._organization_id,
         )
 
+        # Resolve project_id once at init
+        self._project_id: Optional[str] = None
+        if project_name:
+            self._project_id = resolve_project_id(self._internal_client, project_name)
+
     @property
     def tracer(self):
         from judgeval.v1.tracer.tracer_factory import TracerFactory
@@ -58,7 +65,7 @@ class Judgeval:
 
         return ScorersFactory(
             client=self._internal_client,
-            default_project_name=self._project_name,
+            default_project_id=self._project_id,
         )
 
     @property
@@ -67,6 +74,7 @@ class Judgeval:
 
         return EvaluationFactory(
             client=self._internal_client,
+            default_project_id=self._project_id,
         )
 
     @property

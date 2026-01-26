@@ -9,11 +9,20 @@ import ast
 from judgeval.logger import judgeval_logger
 from judgeval.v1.scorers.custom_scorer.utils import extract_scorer_name
 from judgeval.v1.internal.api import JudgmentSyncClient
+from judgeval.v1.utils import resolve_project_id
 from judgeval.env import JUDGMENT_API_URL
 
 
 class CustomScorerFactory:
-    __slots__ = ()
+    __slots__ = ("_client", "_default_project_id")
+
+    def __init__(
+        self,
+        client: Optional[JudgmentSyncClient] = None,
+        default_project_id: Optional[str] = None,
+    ):
+        self._client = client
+        self._default_project_id = default_project_id
 
     def get(self, name: str, class_name: Optional[str] = None) -> CustomScorer:
         return CustomScorer(
@@ -25,11 +34,13 @@ class CustomScorerFactory:
     def upload(
         self,
         scorer_file_path: str,
-        requirements_file_path: str | None,
-        unique_name: str | None,
+        requirements_file_path: str | None = None,
+        unique_name: str | None = None,
         overwrite: bool = False,
-        api_key: str | None = os.getenv("JUDGMENT_API_KEY"),
-        organization_id: str | None = os.getenv("JUDGMENT_ORG_ID"),
+        project_name: str | None = None,
+        project_id: str | None = None,
+        api_key: str | None = None,
+        organization_id: str | None = None,
     ) -> bool:
         if not os.path.exists(scorer_file_path):
             raise FileNotFoundError(f"Scorer file not found: {scorer_file_path}")
@@ -81,29 +92,48 @@ class CustomScorerFactory:
                 requirements_text = f.read()
 
         try:
-            if (
-                not api_key
-                or not api_key.strip()
-                or not organization_id
-                or not organization_id.strip()
-            ):
-                raise ValueError("Judgment API key and organization ID are required")
-            client = JudgmentSyncClient(
-                api_key=api_key,
-                organization_id=organization_id,
-                base_url=JUDGMENT_API_URL,
-            )
-            response = client.upload_custom_scorer(
-                payload={
-                    "scorer_name": unique_name,
-                    "class_name": scorer_classes[0],
-                    "scorer_code": scorer_code,
-                    "requirements_text": requirements_text,
-                    "overwrite": overwrite,
-                    "scorer_type": scorer_type,
-                    "version": 1,
-                }
-            )
+            # Use passed client or create one (backwards compatibility)
+            if self._client:
+                client = self._client
+            else:
+                # Fallback to env vars for backwards compatibility
+                api_key = api_key or os.getenv("JUDGMENT_API_KEY")
+                organization_id = organization_id or os.getenv("JUDGMENT_ORG_ID")
+                if (
+                    not api_key
+                    or not api_key.strip()
+                    or not organization_id
+                    or not organization_id.strip()
+                ):
+                    raise ValueError(
+                        "Judgment API key and organization ID are required"
+                    )
+                client = JudgmentSyncClient(
+                    api_key=api_key,
+                    organization_id=organization_id,
+                    base_url=JUDGMENT_API_URL,
+                )
+
+            # Resolve project_id: explicit > override (needs resolution) > default
+            effective_project_id = project_id
+            if not effective_project_id:
+                if project_name:
+                    effective_project_id = resolve_project_id(client, project_name)
+                else:
+                    effective_project_id = self._default_project_id
+
+            payload = {
+                "scorer_name": unique_name,
+                "class_name": scorer_classes[0],
+                "scorer_code": scorer_code,
+                "requirements_text": requirements_text,
+                "overwrite": overwrite,
+                "scorer_type": scorer_type,
+                "version": 1,
+            }
+            if effective_project_id:
+                payload["project_id"] = effective_project_id
+            response = client.upload_custom_scorer(payload=payload)
 
             if response.get("status") == "success":
                 judgeval_logger.info(

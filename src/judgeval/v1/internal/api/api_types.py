@@ -90,8 +90,7 @@ class Example(TypedDict):
 
 class ExampleEvaluationRun(TypedDict):
     id: NotRequired[Optional[str]]
-    project_id: str
-    project_name: str
+    project_id: NotRequired[Optional[str]]
     eval_name: str
     model: NotRequired[Optional[str]]
     created_at: NotRequired[Optional[str]]
@@ -141,7 +140,7 @@ class ExperimentScorer(TypedDict):
 
 class FetchExperimentRunRequest(TypedDict):
     experiment_run_id: str
-    project_name: str
+    project_id: str
 
 
 class FetchExperimentRunResponse(TypedDict):
@@ -324,8 +323,7 @@ class TagPromptResponse(TypedDict):
 
 class TraceEvaluationRun(TypedDict):
     id: NotRequired[Optional[str]]
-    project_id: str
-    project_name: str
+    project_id: NotRequired[Optional[str]]
     eval_name: str
     model: NotRequired[Optional[str]]
     created_at: NotRequired[Optional[str]]

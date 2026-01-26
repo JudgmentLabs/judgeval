@@ -6,15 +6,15 @@ from judgeval.v1.internal.api import JudgmentSyncClient
 
 
 class ScorersFactory:
-    __slots__ = ("_client", "_default_project_name")
+    __slots__ = ("_client", "_default_project_id")
 
     def __init__(
         self,
         client: JudgmentSyncClient,
-        default_project_name: Optional[str] = None,
+        default_project_id: Optional[str] = None,
     ):
         self._client = client
-        self._default_project_name = default_project_name
+        self._default_project_id = default_project_id
 
     @property
     def prompt_scorer(self):
@@ -25,7 +25,7 @@ class ScorersFactory:
         return PromptScorerFactory(
             client=self._client,
             is_trace=False,
-            default_project_name=self._default_project_name,
+            default_project_id=self._default_project_id,
         )
 
     @property
@@ -37,7 +37,7 @@ class ScorersFactory:
         return PromptScorerFactory(
             client=self._client,
             is_trace=True,
-            default_project_name=self._default_project_name,
+            default_project_id=self._default_project_id,
         )
 
     @property
@@ -46,7 +46,10 @@ class ScorersFactory:
             CustomScorerFactory,
         )
 
-        return CustomScorerFactory()
+        return CustomScorerFactory(
+            client=self._client,
+            default_project_id=self._default_project_id,
+        )
 
     @property
     def built_in(self):
