@@ -30,6 +30,7 @@ from judgeval.v1.data.example import Example
 from judgeval.v1.instrumentation import wrap_provider
 from judgeval.v1.instrumentation.llm.providers import ApiClient
 from judgeval.v1.internal.api import JudgmentSyncClient
+from judgeval.utils.url import url_for
 from judgeval.v1.utils import resolve_project_id
 from judgeval.v1.internal.api.api_types import (
     ExampleEvaluationRun,
@@ -329,6 +330,25 @@ class BaseTracer(ABC):
         current_span.set_attribute(AttributeKeys.JUDGMENT_SESSION_ID, session_id)
         ctx = set_value(SESSION_ID_KEY, session_id)
         attach(ctx)
+
+    @dont_throw
+    def tag(self, tags: str | list[str]) -> None:
+        # NOTE: Manual API call until PR #661 is merged, then will use generated client
+        if not tags or (isinstance(tags, list) and len(tags) == 0):
+            return
+        span_context = self._get_sampled_span_context()
+        if span_context is None:
+            return
+        trace_id = format(span_context.trace_id, "032x")
+        self.api_client._request(
+            "POST",
+            url_for("/traces/tags/add", self.api_client.base_url),
+            {
+                "project_name": self.project_name,
+                "trace_id": trace_id,
+                "tags": tags if isinstance(tags, list) else [tags],
+            },
+        )
 
     def _build_endpoint(self, base_url: str) -> str:
         return (
