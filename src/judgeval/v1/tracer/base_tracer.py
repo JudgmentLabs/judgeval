@@ -405,7 +405,7 @@ class BaseTracer(ABC):
             judgment_scorers=judgment_scorers,
             custom_scorers=custom_scorers,
             is_offline=False,
-            is_bucket_run=False,
+            is_behavior=False,
             created_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
         )
 
