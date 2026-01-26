@@ -11,7 +11,6 @@ class InstructionAdherenceScorer(APIScorer):
         self,
         threshold: float = 0.5,
         name: Optional[str] = None,
-        strict_mode: bool = False,
         model: Optional[str] = None,
     ):
         super().__init__(
@@ -19,7 +18,6 @@ class InstructionAdherenceScorer(APIScorer):
             required_params=["input", "actual_output"],
             threshold=threshold,
             name=name,
-            strict_mode=strict_mode,
             model=model,
         )
 

@@ -12,7 +12,6 @@ class APIScorer(BaseScorer):
         "_required_params",
         "_threshold",
         "_name",
-        "_strict_mode",
         "_model",
         "_additional_properties",
     )
@@ -23,7 +22,6 @@ class APIScorer(BaseScorer):
         required_params: Optional[List[str]] = None,
         threshold: float = 0.5,
         name: Optional[str] = None,
-        strict_mode: bool = False,
         model: Optional[str] = None,
         **additional_properties: Any,
     ):
@@ -31,7 +29,6 @@ class APIScorer(BaseScorer):
         self._required_params = required_params or []
         self._threshold = threshold
         self._name = name or score_type
-        self._strict_mode = strict_mode
         self._model = model
         self._additional_properties = additional_properties
 
@@ -43,9 +40,6 @@ class APIScorer(BaseScorer):
 
     def get_threshold(self) -> float:
         return self._threshold
-
-    def get_strict_mode(self) -> bool:
-        return self._strict_mode
 
     def get_model(self) -> Optional[str]:
         return self._model
@@ -61,9 +55,6 @@ class APIScorer(BaseScorer):
     def set_name(self, name: str) -> None:
         self._name = name
 
-    def set_strict_mode(self, strict_mode: bool) -> None:
-        self._strict_mode = strict_mode
-
     def set_model(self, model: str) -> None:
         self._model = model
 
@@ -76,7 +67,6 @@ class APIScorer(BaseScorer):
             score_type=self._score_type,
             threshold=self._threshold,
             name=self._name,
-            strict_mode=self._strict_mode,
             required_params=self._required_params,
             kwargs=kwargs,
         )

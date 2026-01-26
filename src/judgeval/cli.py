@@ -6,11 +6,11 @@ import sys
 import typer
 from pathlib import Path
 from dotenv import load_dotenv
+from judgeval.v1.utils import resolve_project_id
 from judgeval.logger import judgeval_logger
-from judgeval import JudgmentClient
-from judgeval.version import get_version
 from judgeval.exceptions import JudgmentAPIError
-from judgeval.utils.project import _resolve_project_id
+from judgeval import Judgeval
+from judgeval.version import get_version
 from judgeval.utils.url import url_for
 
 load_dotenv()
@@ -38,7 +38,7 @@ def load_otel_env(
     if not api_key or not organization_id:
         raise typer.BadParameter("JUDGMENT_API_KEY and JUDGMENT_ORG_ID required")
 
-    project_id = _resolve_project_id(project_name, api_key, organization_id)
+    project_id = resolve_project_id(project_name, api_key, organization_id)
     if not project_id:
         raise typer.BadParameter(f"Project '{project_name}' not found")
 
@@ -69,7 +69,6 @@ def upload_scorer(
     overwrite: bool = typer.Option(
         False, "--overwrite", "-o", help="Overwrite if exists"
     ),
-    trace: bool = typer.Option(False, "--trace", "-t", help="Upload as a trace scorer"),
     api_key: str = typer.Option(None, envvar="JUDGMENT_API_KEY"),
     organization_id: str = typer.Option(None, envvar="JUDGMENT_ORG_ID"),
 ):
@@ -84,15 +83,14 @@ def upload_scorer(
             f"Requirements file not found: {requirements_file_path}"
         )
 
-    client = JudgmentClient(api_key=api_key, organization_id=organization_id)
+    client = Judgeval(api_key=api_key, organization_id=organization_id)
 
     try:
-        result = client.upload_custom_scorer(
+        result = client.scorers.custom_scorer.upload(
             scorer_file_path=scorer_file_path,
             requirements_file_path=requirements_file_path,
             unique_name=unique_name,
             overwrite=overwrite,
-            scorer_type="trace" if trace else "example",
         )
         if not result:
             raise typer.Abort()
