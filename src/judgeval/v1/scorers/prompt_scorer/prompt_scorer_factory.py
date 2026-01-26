@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.internal.api.api_types import (
@@ -10,26 +10,41 @@ from judgeval.v1.internal.api.api_types import (
 )
 from judgeval.exceptions import JudgmentAPIError
 from judgeval.v1.scorers.prompt_scorer.prompt_scorer import PromptScorer
+from judgeval.v1.utils import resolve_project_id
 from judgeval.logger import judgeval_logger
 
 
 class PromptScorerFactory:
-    __slots__ = ("_client", "_is_trace")
-    _cache: Dict[Tuple[str, str, str, bool], APIPromptScorer] = {}
+    __slots__ = ("_client", "_is_trace", "_default_project_name")
+    # Cache key: (name, org_id, api_key, project_id, is_trace)
+    _cache: Dict[Tuple[str, str, str, Optional[str], bool], APIPromptScorer] = {}
 
     def __init__(
         self,
         client: JudgmentSyncClient,
         is_trace: bool,
+        default_project_name: Optional[str] = None,
     ):
         self._client = client
         self._is_trace = is_trace
+        self._default_project_name = default_project_name
 
-    def get(self, name: str) -> PromptScorer | None:
+    def get(
+        self,
+        name: str,
+        project_name: Optional[str] = None,
+    ) -> PromptScorer | None:
+        # Resolve project: use param, fallback to default, else None (org-level)
+        effective_project_name = project_name or self._default_project_name
+        project_id: Optional[str] = None
+        if effective_project_name:
+            project_id = resolve_project_id(self._client, effective_project_name)
+
         cache_key = (
             name,
             self._client.organization_id,
             self._client.api_key,
+            project_id,
             self._is_trace,
         )
         cached = self._cache.get(cache_key)
@@ -38,6 +53,8 @@ class PromptScorerFactory:
             request: FetchPromptScorersRequest = {"names": [name]}
             if self._is_trace is not None:
                 request["is_trace"] = self._is_trace
+            if effective_project_name:
+                request["project_name"] = effective_project_name
 
             try:
                 response: FetchPromptScorersResponse = self._client.fetch_scorers(
@@ -85,4 +102,5 @@ class PromptScorerFactory:
             model=cached.get("model"),
             description=cached.get("description"),
             is_trace=self._is_trace,
+            project_id=project_id,
         )

@@ -83,6 +83,7 @@ class JudgmentClient(metaclass=SingletonMeta):
         unique_name: Optional[str] = None,
         overwrite: bool = False,
         scorer_type: str = "example",
+        project_name: Optional[str] = None,
     ) -> bool:
         """
         Upload custom ExampleScorer from files to backend.
@@ -93,6 +94,7 @@ class JudgmentClient(metaclass=SingletonMeta):
             unique_name: Optional unique identifier (auto-detected from scorer.name if not provided)
             overwrite: Whether to overwrite existing scorer if it already exists
             scorer_type: Optional scorer type (e.g., "trace" for trace scorers)
+            project_name: Optional project name to scope the scorer to
 
         Returns:
             bool: True if upload successful
@@ -153,16 +155,18 @@ class JudgmentClient(metaclass=SingletonMeta):
                 api_key=self.api_key,
                 organization_id=self.organization_id,
             )
-            response = client.upload_custom_scorer(
-                payload={
-                    "scorer_name": unique_name,
-                    "class_name": scorer_classes[0],
-                    "scorer_code": scorer_code,
-                    "requirements_text": requirements_text,
-                    "overwrite": overwrite,
-                    "scorer_type": scorer_type,
-                }
-            )
+            payload = {
+                "scorer_name": unique_name,
+                "class_name": scorer_classes[0],
+                "scorer_code": scorer_code,
+                "requirements_text": requirements_text,
+                "overwrite": overwrite,
+                "scorer_type": scorer_type,
+            }
+            if project_name:
+                payload["project_name"] = project_name
+
+            response = client.upload_custom_scorer(payload=payload)
 
             if response.get("status") == "success":
                 judgeval_logger.info(

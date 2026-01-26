@@ -61,6 +61,7 @@ def load_otel_env(
 
 @app.command()
 def upload_scorer(
+    project_name: str = typer.Argument(help="Project to upload scorer to"),
     scorer_file_path: str = typer.Argument(help="Path to scorer Python file"),
     requirements_file_path: str = typer.Argument(help="Path to requirements.txt file"),
     unique_name: str = typer.Option(
@@ -74,6 +75,14 @@ def upload_scorer(
     organization_id: str = typer.Option(None, envvar="JUDGMENT_ORG_ID"),
 ):
     """Upload custom scorer to Judgment."""
+    if not api_key or not organization_id:
+        raise typer.BadParameter("JUDGMENT_API_KEY and JUDGMENT_ORG_ID required")
+
+    # Resolve project_id to validate project exists
+    project_id = _resolve_project_id(project_name, api_key, organization_id)
+    if not project_id:
+        raise typer.BadParameter(f"Project '{project_name}' not found")
+
     scorer_path = Path(scorer_file_path)
     requirements_path = Path(requirements_file_path)
 
@@ -93,6 +102,7 @@ def upload_scorer(
             unique_name=unique_name,
             overwrite=overwrite,
             scorer_type="trace" if trace else "example",
+            project_name=project_name,
         )
         if not result:
             raise typer.Abort()

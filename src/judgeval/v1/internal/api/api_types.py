@@ -51,6 +51,7 @@ class ProjectDeleteResponse(TypedDict):
 
 class ScorerExistsRequest(TypedDict):
     name: str
+    project_name: NotRequired[Optional[str]]
 
 
 class ScorerExistsResponse(TypedDict):
@@ -65,11 +66,13 @@ class SavePromptScorerRequest(TypedDict):
     is_trace: NotRequired[bool]
     options: NotRequired[Optional[Dict[str, float]]]
     description: NotRequired[Optional[str]]
+    project_name: NotRequired[Optional[str]]
 
 
 class FetchPromptScorersRequest(TypedDict):
     names: NotRequired[Optional[List[str]]]
     is_trace: NotRequired[Optional[bool]]
+    project_name: NotRequired[Optional[str]]
 
 
 class CustomScorerUploadPayload(TypedDict):
@@ -77,6 +80,7 @@ class CustomScorerUploadPayload(TypedDict):
     scorer_code: str
     requirements_text: str
     overwrite: NotRequired[bool]
+    project_name: NotRequired[Optional[str]]
 
 
 class CustomScorerTemplateResponse(TypedDict):
@@ -191,6 +195,7 @@ class PromptScorer(TypedDict):
     id: str
     user_id: str
     organization_id: str
+    project_id: NotRequired[Optional[str]]
     name: str
     prompt: str
     threshold: float

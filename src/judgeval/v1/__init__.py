@@ -7,13 +7,20 @@ from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
 
 
 class Judgeval:
-    __slots__ = ("_api_key", "_organization_id", "_api_url", "_internal_client")
+    __slots__ = (
+        "_api_key",
+        "_organization_id",
+        "_api_url",
+        "_internal_client",
+        "_project_name",
+    )
 
     def __init__(
         self,
         api_key: Optional[str] = None,
         organization_id: Optional[str] = None,
         api_url: Optional[str] = None,
+        project_name: Optional[str] = None,
     ):
         api_key = api_key or JUDGMENT_API_KEY
         organization_id = organization_id or JUDGMENT_ORG_ID
@@ -29,6 +36,7 @@ class Judgeval:
         self._api_key = api_key
         self._organization_id = organization_id
         self._api_url = api_url
+        self._project_name = project_name
 
         self._internal_client = JudgmentSyncClient(
             self._api_url,
@@ -50,6 +58,7 @@ class Judgeval:
 
         return ScorersFactory(
             client=self._internal_client,
+            default_project_name=self._project_name,
         )
 
     @property
