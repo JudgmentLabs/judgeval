@@ -7,7 +7,6 @@ from judgeval.v1.scorers.custom_scorer.custom_scorer import CustomScorer
 import os
 import ast
 from judgeval.logger import judgeval_logger
-from judgeval.v1.scorers.custom_scorer.utils import extract_scorer_name
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.env import JUDGMENT_API_URL
 
@@ -33,11 +32,6 @@ class CustomScorerFactory:
     ) -> bool:
         if not os.path.exists(scorer_file_path):
             raise FileNotFoundError(f"Scorer file not found: {scorer_file_path}")
-
-        # Auto-detect scorer name if not provided
-        if unique_name is None:
-            unique_name = extract_scorer_name(scorer_file_path)
-            judgeval_logger.info(f"Auto-detected scorer name: '{unique_name}'")
 
         # Read scorer code
         with open(scorer_file_path, "r") as f:
@@ -93,6 +87,11 @@ class CustomScorerFactory:
                 organization_id=organization_id,
                 base_url=JUDGMENT_API_URL,
             )
+
+            if unique_name is None:
+                unique_name = scorer_classes[0]
+                judgeval_logger.info(f"Auto-detected scorer name: '{unique_name}'")
+
             response = client.upload_custom_scorer(
                 payload={
                     "scorer_name": unique_name,
