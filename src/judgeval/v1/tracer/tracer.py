@@ -1,20 +1,22 @@
 from __future__ import annotations
 
+import warnings
 from typing import Any, Callable, Dict, Optional
 
-from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource
 
 from judgeval.logger import judgeval_logger
 from judgeval.v1.internal.api import JudgmentSyncClient
-from judgeval.v1.tracer.judgment_tracer_provider import JudgmentTracerProvider
+from judgeval.v1.tracer.judgment_tracer_provider import (
+    JudgmentTracerProvider,
+    FilterTracerCallback,
+)
 from judgeval.version import get_version
 from judgeval.v1.tracer.base_tracer import BaseTracer
-from judgeval.v1.tracer.judgment_tracer_provider import FilterTracerCallback
 
 
 class Tracer(BaseTracer):
-    __slots__ = ("_filter_tracer",)
+    __slots__ = ()
 
     def __init__(
         self,
@@ -24,11 +26,28 @@ class Tracer(BaseTracer):
         api_client: JudgmentSyncClient,
         serializer: Callable[[Any], str],
         filter_tracer: Optional[FilterTracerCallback] = None,
-        isolated: bool = False,
+        isolated: bool = True,
         resource_attributes: Optional[Dict[str, Any]] = None,
         initialize: bool = True,
     ):
-        self._filter_tracer = filter_tracer
+        if filter_tracer is not None:
+            warnings.warn(
+                "filter_tracer parameter is deprecated and will be ignored",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        if isolated is not True:
+            warnings.warn(
+                "isolated parameter is deprecated, tracers are always isolated",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        if initialize is not True:
+            warnings.warn(
+                "initialize parameter is deprecated and will be ignored",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
         resource_attrs = {
             "service.name": project_name,
@@ -40,11 +59,7 @@ class Tracer(BaseTracer):
 
         resource = Resource.create(resource_attrs)
 
-        tracer_provider = JudgmentTracerProvider(
-            resource=resource,
-            filter_tracer=self._filter_tracer,
-            isolated=isolated,
-        )
+        tracer_provider = JudgmentTracerProvider(resource=resource)
 
         super().__init__(
             project_name=project_name,
@@ -58,10 +73,6 @@ class Tracer(BaseTracer):
         if enable_monitoring:
             judgeval_logger.info("Adding JudgmentSpanProcessor for monitoring.")
             tracer_provider.add_span_processor(self.get_span_processor())
-
-        if initialize and enable_monitoring and not isolated:
-            judgeval_logger.info("Setting global tracer provider for monitoring.")
-            trace.set_tracer_provider(tracer_provider)
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         return self._tracer_provider.force_flush(timeout_millis)

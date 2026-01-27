@@ -3,6 +3,18 @@ from __future__ import annotations
 from typing import Optional
 
 from judgeval.v1.internal.api import JudgmentSyncClient
+from judgeval.v1.instrumentation import (
+    observe,
+    set_attribute,
+    set_attributes,
+    set_customer_id,
+    set_input,
+    set_output,
+    set_session_id,
+    span,
+    tag,
+    wrap,
+)
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
 
 
@@ -85,4 +97,16 @@ class Judgeval:
         )
 
 
-__all__ = ["Judgeval"]
+__all__ = [
+    "Judgeval",
+    "observe",
+    "set_attribute",
+    "set_attributes",
+    "set_customer_id",
+    "set_input",
+    "set_output",
+    "set_session_id",
+    "span",
+    "tag",
+    "wrap",
+]

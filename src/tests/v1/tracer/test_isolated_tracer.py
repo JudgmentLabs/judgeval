@@ -52,10 +52,9 @@ def test_isolated_tracer_sequential_operations_unique_trace_ids(
         tracer = Tracer(
             project_name="Prod - Verifiers",
             enable_evaluation=False,
-            enable_monitoring=False,  # Disable to avoid network calls in tests
+            enable_monitoring=False,
             api_client=mock_client,
             serializer=serializer,
-            isolated=True,
         )
 
         trace_ids = []
@@ -99,10 +98,9 @@ def test_isolated_tracer_parent_child_same_trace(mock_client, serializer):
         tracer = Tracer(
             project_name="test_project",
             enable_evaluation=False,
-            enable_monitoring=False,  # Disable to avoid network calls in tests
+            enable_monitoring=False,
             api_client=mock_client,
             serializer=serializer,
-            isolated=True,
         )
 
         parent_ctx = None
@@ -135,10 +133,9 @@ def test_isolated_tracer_stale_span_detection(mock_client, serializer):
         tracer = Tracer(
             project_name="test_project",
             enable_evaluation=False,
-            enable_monitoring=False,  # Disable to avoid network calls in tests
+            enable_monitoring=False,
             api_client=mock_client,
             serializer=serializer,
-            isolated=True,
         )
 
         first_trace_id = None
@@ -171,14 +168,12 @@ def test_multiple_isolated_tracers_same_provider_share_context(mock_client, seri
     of the application using the same provider.
     """
     with patch("judgeval.v1.utils.resolve_project_id", return_value="project-1"):
-        # Create tracer with isolated provider
         tracer1 = Tracer(
             project_name="test_project",
             enable_evaluation=False,
-            enable_monitoring=False,  # Disable to avoid network calls in tests
+            enable_monitoring=False,
             api_client=mock_client,
             serializer=serializer,
-            isolated=True,
         )
 
         # Get the same provider - this simulates getting tracer multiple times
@@ -214,10 +209,9 @@ def test_isolated_tracer_exception_handling(mock_client, serializer):
         tracer = Tracer(
             project_name="test_project",
             enable_evaluation=False,
-            enable_monitoring=False,  # Disable to avoid network calls in tests
+            enable_monitoring=False,
             api_client=mock_client,
             serializer=serializer,
-            isolated=True,
         )
 
         span_ref = None
@@ -236,23 +230,21 @@ def test_isolated_tracer_exception_handling(mock_client, serializer):
 
 def test_isolated_tracer_no_global_context_pollution(mock_client, serializer):
     """
-    Test that isolated tracers don't affect the global OpenTelemetry context.
+    Test that tracers don't affect the global OpenTelemetry context.
 
-    This ensures isolated=True actually isolates the tracer from global state.
+    All tracers are isolated by default and don't modify global state.
     """
     from opentelemetry import context as otel_context
 
     with patch("judgeval.v1.utils.resolve_project_id", return_value="project-1"):
-        # Get global context before creating isolated tracer
         global_context_before = otel_context.get_current()
 
         tracer = Tracer(
             project_name="test_project",
             enable_evaluation=False,
-            enable_monitoring=False,  # Disable to avoid network calls in tests
+            enable_monitoring=False,
             api_client=mock_client,
             serializer=serializer,
-            isolated=True,
         )
 
         # Create a span with isolated tracer
@@ -285,10 +277,9 @@ def test_isolated_tracer_concurrent_operations_pattern(mock_client, serializer):
         tracer = Tracer(
             project_name="web_service",
             enable_evaluation=False,
-            enable_monitoring=False,  # Disable to avoid network calls in tests
+            enable_monitoring=False,
             api_client=mock_client,
             serializer=serializer,
-            isolated=True,
         )
 
         results = []
@@ -338,13 +329,11 @@ def test_isolated_tracer_get_context_returns_provider_context(mock_client, seria
         tracer = Tracer(
             project_name="test_project",
             enable_evaluation=False,
-            enable_monitoring=False,  # Disable to avoid network calls in tests
+            enable_monitoring=False,
             api_client=mock_client,
             serializer=serializer,
-            isolated=True,
         )
 
-        # Get context via tracer's public method
         tracer_context = tracer.get_context()
 
         # Get context via provider's public method

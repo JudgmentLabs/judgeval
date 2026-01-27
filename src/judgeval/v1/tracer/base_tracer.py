@@ -1,21 +1,14 @@
 from __future__ import annotations
 
-import asyncio
 import contextvars
 import datetime
 import functools
 import inspect
 from abc import ABC, abstractmethod
-from collections.abc import (
-    Generator as ABCGenerator,
-    AsyncGenerator as ABCAsyncGenerator,
-)
 from contextlib import contextmanager
-from types import TracebackType
 from typing import (
     Any,
     Callable,
-    Coroutine,
     Dict,
     Iterator,
     Optional,
@@ -24,42 +17,45 @@ from typing import (
     cast,
     overload,
 )
+from uuid import uuid4
 
-from opentelemetry import trace
+from opentelemetry.context import get_value, set_value
+from opentelemetry.context.context import Context
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SpanExporter
 from opentelemetry.trace import Span, SpanContext, Status, StatusCode
-from opentelemetry import context as otel_context
-from opentelemetry.context.context import Context
 
+from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.logger import judgeval_logger
 from judgeval.utils.decorators.dont_throw import dont_throw
+from judgeval.utils.url import url_for
 from judgeval.v1.data.example import Example
 from judgeval.v1.instrumentation import wrap_provider
 from judgeval.v1.instrumentation.llm.providers import ApiClient
 from judgeval.v1.internal.api import JudgmentSyncClient
-from judgeval.utils.url import url_for
-from judgeval.v1.utils import resolve_project_id
 from judgeval.v1.internal.api.api_types import (
     ExampleEvaluationRun,
     TraceEvaluationRun,
 )
 from judgeval.v1.scorers.base_scorer import BaseScorer
-from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.v1.scorers.custom_scorer.custom_scorer import CustomScorer
 from judgeval.v1.tracer.exporters.judgment_span_exporter import JudgmentSpanExporter
-from judgeval.v1.tracer.processors.judgment_span_processor import JudgmentSpanProcessor
-from uuid import uuid4
-from opentelemetry.context import attach, detach, get_value, set_value
-from judgeval.v1.tracer.processors._lifecycles import (
-    AGENT_ID_KEY,
-    PARENT_AGENT_ID_KEY,
-    CUSTOMER_ID_KEY,
-    SESSION_ID_KEY,
-    AGENT_CLASS_NAME_KEY,
-    AGENT_INSTANCE_NAME_KEY,
+from judgeval.v1.tracer.generators import (
+    _ObservedAsyncGenerator,
+    _ObservedSyncGenerator,
+    _serialize,
 )
 from judgeval.v1.tracer.isolated.tracer import JudgmentIsolatedTracer
+from judgeval.v1.tracer.processors._lifecycles import (
+    AGENT_CLASS_NAME_KEY,
+    AGENT_ID_KEY,
+    AGENT_INSTANCE_NAME_KEY,
+    CUSTOMER_ID_KEY,
+    PARENT_AGENT_ID_KEY,
+    SESSION_ID_KEY,
+)
+from judgeval.v1.tracer.processors.judgment_span_processor import JudgmentSpanProcessor
+from judgeval.v1.utils import resolve_project_id
 
 C = TypeVar("C", bound=Callable[..., Any])
 T = TypeVar("T", bound=ApiClient)
@@ -145,28 +141,35 @@ class BaseTracer(ABC):
 
             return NoOpJudgmentSpanProcessor()
 
-    def get_tracer(self) -> trace.Tracer:
-        return self._tracer_provider.get_tracer(self.TRACER_NAME)
+    def get_tracer(self) -> JudgmentIsolatedTracer:
+        return cast(
+            JudgmentIsolatedTracer, self._tracer_provider.get_tracer(self.TRACER_NAME)
+        )
 
     @property
-    def tracer_provider(self) -> TracerProvider:
+    def tracer_provider(self):
         return self._tracer_provider
-
-    def _is_isolated(self) -> bool:
-        from judgeval.v1.tracer.judgment_tracer_provider import JudgmentTracerProvider
-
-        if isinstance(self._tracer_provider, JudgmentTracerProvider):
-            return self._tracer_provider._isolated
-        return False
 
     def get_context(self) -> Context:
         from judgeval.v1.tracer.judgment_tracer_provider import JudgmentTracerProvider
 
-        if self._is_isolated() and isinstance(
-            self._tracer_provider, JudgmentTracerProvider
-        ):
-            return self._tracer_provider.get_isolated_current_context()
-        return otel_context.get_current()
+        return cast(
+            JudgmentTracerProvider, self._tracer_provider
+        ).get_isolated_current_context()
+
+    def _attach_context(self, ctx: Context) -> Any:
+        from judgeval.v1.tracer.judgment_tracer_provider import JudgmentTracerProvider
+
+        return cast(
+            JudgmentTracerProvider, self._tracer_provider
+        )._runtime_context.attach(ctx)
+
+    def _detach_context(self, token: Any) -> None:
+        from judgeval.v1.tracer.judgment_tracer_provider import JudgmentTracerProvider
+
+        cast(JudgmentTracerProvider, self._tracer_provider)._runtime_context.detach(
+            token
+        )
 
     def use_span(
         self,
@@ -175,27 +178,15 @@ class BaseTracer(ABC):
         record_exception: bool = True,
         set_status_on_exception: bool = True,
     ):
-        if self._is_isolated():
-            tracer = cast(JudgmentIsolatedTracer, self.get_tracer())
-            return tracer.use_span(
-                span,
-                end_on_exit=end_on_exit,
-                record_exception=record_exception,
-                set_status_on_exception=set_status_on_exception,
-            )
-        else:
-            return trace.use_span(
-                span,
-                end_on_exit=end_on_exit,
-                record_exception=record_exception,
-                set_status_on_exception=set_status_on_exception,
-            )
+        return self.get_tracer().use_span(
+            span,
+            end_on_exit=end_on_exit,
+            record_exception=record_exception,
+            set_status_on_exception=set_status_on_exception,
+        )
 
     def _get_current_span(self) -> Optional[Span]:
-        if self._is_isolated():
-            tracer = cast(JudgmentIsolatedTracer, self.get_tracer())
-            return tracer.get_current_span()
-        return trace.get_current_span()
+        return self.get_tracer().get_current_span()
 
     def set_span_kind(self, kind: str) -> None:
         if kind is None:
@@ -230,8 +221,8 @@ class BaseTracer(ABC):
         if current_span is None:
             return
         current_span.set_attribute(AttributeKeys.JUDGMENT_CUSTOMER_ID, customer_id)
-        ctx = set_value(CUSTOMER_ID_KEY, customer_id)
-        attach(ctx)
+        ctx = set_value(CUSTOMER_ID_KEY, customer_id, context=self.get_context())
+        self._attach_context(ctx)
 
     def set_llm_span(self) -> None:
         self.set_span_kind("llm")
@@ -336,8 +327,8 @@ class BaseTracer(ABC):
         if current_span is None:
             return
         current_span.set_attribute(AttributeKeys.JUDGMENT_SESSION_ID, session_id)
-        ctx = set_value(SESSION_ID_KEY, session_id)
-        attach(ctx)
+        ctx = set_value(SESSION_ID_KEY, session_id, context=self.get_context())
+        self._attach_context(ctx)
 
     @dont_throw
     def tag(self, tags: str | list[str]) -> None:
@@ -613,8 +604,9 @@ class BaseTracer(ABC):
             @functools.wraps(func)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 agent_id = str(uuid4())
-                parent_agent_id = get_value(AGENT_ID_KEY)
-                ctx = set_value(AGENT_ID_KEY, agent_id)
+                current_ctx = self.get_context()
+                parent_agent_id = get_value(AGENT_ID_KEY, context=current_ctx)
+                ctx = set_value(AGENT_ID_KEY, agent_id, context=current_ctx)
                 if parent_agent_id:
                     ctx = set_value(PARENT_AGENT_ID_KEY, parent_agent_id, context=ctx)
                 if class_name:
@@ -626,11 +618,11 @@ class BaseTracer(ABC):
                         ctx = set_value(
                             AGENT_INSTANCE_NAME_KEY, instance_name, context=ctx
                         )
-                token = attach(ctx)
+                token = self._attach_context(ctx)
                 try:
                     return await func(*args, **kwargs)
                 finally:
-                    detach(token)
+                    self._detach_context(token)
 
             return async_wrapper  # type: ignore[return-value]
         else:
@@ -638,8 +630,9 @@ class BaseTracer(ABC):
             @functools.wraps(func)
             def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
                 agent_id = str(uuid4())
-                parent_agent_id = get_value(AGENT_ID_KEY)
-                ctx = set_value(AGENT_ID_KEY, agent_id)
+                current_ctx = self.get_context()
+                parent_agent_id = get_value(AGENT_ID_KEY, context=current_ctx)
+                ctx = set_value(AGENT_ID_KEY, agent_id, context=current_ctx)
                 if parent_agent_id:
                     ctx = set_value(PARENT_AGENT_ID_KEY, parent_agent_id, context=ctx)
                 if class_name:
@@ -651,11 +644,11 @@ class BaseTracer(ABC):
                         ctx = set_value(
                             AGENT_INSTANCE_NAME_KEY, instance_name, context=ctx
                         )
-                token = attach(ctx)
+                token = self._attach_context(ctx)
                 try:
                     return func(*args, **kwargs)
                 finally:
-                    detach(token)
+                    self._detach_context(token)
 
             return sync_wrapper  # type: ignore[return-value]
 
@@ -685,222 +678,3 @@ def _format_inputs(
         return inputs
     except Exception:
         return {}
-
-
-def _serialize(serializer: Callable[[Any], str], value: Any) -> Any:
-    return value if isinstance(value, (str, int, float, bool)) else serializer(value)
-
-
-R = TypeVar("R")
-
-
-class _ObservedGeneratorBase:
-    __slots__ = (
-        "_generator",
-        "_span",
-        "_serializer",
-        "_tracer",
-        "_context",
-        "_closed",
-        "_disable_generator_yield_span",
-    )
-
-    _generator: Any
-    _span: Span
-    _serializer: Callable[[Any], str]
-    _tracer: trace.Tracer
-    _context: contextvars.Context
-    _closed: bool
-    _disable_generator_yield_span: bool
-
-    def __init__(
-        self,
-        generator: Any,
-        span: Span,
-        serializer: Callable[[Any], str],
-        tracer: trace.Tracer,
-        context: contextvars.Context,
-        disable_generator_yield_span: bool = False,
-    ) -> None:
-        self._generator = generator
-        self._span = span
-        self._serializer = serializer
-        self._tracer = tracer
-        self._context = context
-        self._closed = False
-        self._disable_generator_yield_span = disable_generator_yield_span
-
-    def _emit_yield_span(self, item: Any) -> None:
-        if self._disable_generator_yield_span:
-            return
-        with trace.use_span(self._span):
-            span_name = str(getattr(self._span, "name", "generator_item"))
-            with self._tracer.start_as_current_span(
-                span_name,
-                attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
-            ) as child_span:
-                child_span.set_attribute(
-                    AttributeKeys.JUDGMENT_OUTPUT,
-                    _serialize(self._serializer, item),
-                )
-
-    def _record_error(self, exc: BaseException) -> None:
-        self._span.record_exception(exc)
-        self._span.set_status(Status(StatusCode.ERROR, str(exc)))
-        self._finish()
-
-    def _finish(self) -> None:
-        if self._closed:
-            return
-        self._closed = True
-        self._span.set_attribute(AttributeKeys.JUDGMENT_SPAN_KIND, "generator")
-        self._span.end()
-
-    def __del__(self) -> None:
-        self._finish()
-
-
-class _ObservedSyncGenerator(_ObservedGeneratorBase, ABCGenerator[Any, Any, Any]):
-    __slots__ = ()
-
-    def __iter__(self) -> _ObservedSyncGenerator:
-        return self
-
-    def __next__(self) -> Any:
-        return self.send(None)
-
-    def send(self, value: Any) -> Any:
-        if self._closed:
-            raise StopIteration
-        try:
-            item = self._context.run(self._generator.send, value)
-            self._emit_yield_span(item)
-            return item
-        except StopIteration:
-            self._finish()
-            raise
-        except Exception as e:
-            self._record_error(e)
-            raise
-
-    @overload
-    def throw(
-        self,
-        __typ: type[BaseException],
-        __val: object = ...,
-        __tb: Optional[TracebackType] = ...,
-    ) -> Any: ...
-
-    @overload
-    def throw(
-        self,
-        __typ: BaseException,
-        __val: None = ...,
-        __tb: Optional[TracebackType] = ...,
-    ) -> Any: ...
-
-    def throw(
-        self,
-        __typ: type[BaseException] | BaseException,
-        __val: object = None,
-        __tb: Optional[TracebackType] = None,
-    ) -> Any:
-        if self._closed:
-            raise StopIteration
-        try:
-            if isinstance(__typ, type):
-                item = self._context.run(self._generator.throw, __typ, __val, __tb)
-            else:
-                item = self._context.run(self._generator.throw, __typ, None, __tb)
-            self._emit_yield_span(item)
-            return item
-        except StopIteration:
-            self._finish()
-            raise
-        except Exception as e:
-            self._record_error(e)
-            raise
-
-    def close(self) -> None:
-        try:
-            self._generator.close()
-        finally:
-            self._finish()
-
-
-class _ObservedAsyncGenerator(_ObservedGeneratorBase, ABCAsyncGenerator[Any, Any]):
-    __slots__ = ()
-
-    def _create_task(self, coro: Coroutine[Any, Any, R]) -> asyncio.Task[R]:
-        try:
-            return asyncio.create_task(coro, context=self._context)
-        except TypeError:
-            return self._context.run(lambda: asyncio.create_task(coro))
-
-    def __aiter__(self) -> _ObservedAsyncGenerator:
-        return self
-
-    async def __anext__(self) -> Any:
-        return await self.asend(None)
-
-    async def asend(self, value: Any) -> Any:
-        if self._closed:
-            raise StopAsyncIteration
-        try:
-            item = await self._create_task(self._generator.asend(value))
-            self._emit_yield_span(item)
-            return item
-        except StopAsyncIteration:
-            self._finish()
-            raise
-        except Exception as e:
-            self._record_error(e)
-            raise
-
-    @overload
-    async def athrow(
-        self,
-        __typ: type[BaseException],
-        __val: object = ...,
-        __tb: Optional[TracebackType] = ...,
-    ) -> Any: ...
-
-    @overload
-    async def athrow(
-        self,
-        __typ: BaseException,
-        __val: None = ...,
-        __tb: Optional[TracebackType] = ...,
-    ) -> Any: ...
-
-    async def athrow(
-        self,
-        __typ: type[BaseException] | BaseException,
-        __val: object = None,
-        __tb: Optional[TracebackType] = None,
-    ) -> Any:
-        if self._closed:
-            raise StopAsyncIteration
-        try:
-            if isinstance(__typ, type):
-                item = await self._create_task(
-                    self._generator.athrow(__typ, __val, __tb)
-                )
-            else:
-                item = await self._create_task(
-                    self._generator.athrow(__typ, None, __tb)
-                )
-            self._emit_yield_span(item)
-            return item
-        except StopAsyncIteration:
-            self._finish()
-            raise
-        except Exception as e:
-            self._record_error(e)
-            raise
-
-    async def aclose(self) -> None:
-        try:
-            await self._generator.aclose()
-        finally:
-            self._finish()

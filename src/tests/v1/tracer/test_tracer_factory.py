@@ -1,5 +1,6 @@
+import warnings
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from judgeval.v1.tracer.tracer_factory import TracerFactory
 from judgeval.v1.tracer.tracer import Tracer
 
@@ -41,18 +42,24 @@ def test_factory_create_without_evaluation(tracer_factory):
 
 
 def test_factory_create_without_monitoring(tracer_factory):
-    with patch("judgeval.v1.tracer.tracer.trace.set_tracer_provider") as mock_set:
-        tracer = tracer_factory.create(
-            project_name="test_project", enable_monitoring=False
-        )
+    tracer = tracer_factory.create(project_name="test_project", enable_monitoring=False)
 
-        assert tracer.enable_monitoring is False
-        mock_set.assert_not_called()
+    assert tracer.enable_monitoring is False
 
 
-def test_factory_create_isolated(tracer_factory):
-    with patch("judgeval.v1.tracer.tracer.trace.set_tracer_provider") as mock_set:
-        tracer = tracer_factory.create(project_name="test_project", isolated=True)
+def test_factory_deprecated_isolated_param_emits_warning(tracer_factory):
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        tracer_factory.create(project_name="test_project", isolated=False)
+        assert len(w) == 1
+        assert issubclass(w[0].category, DeprecationWarning)
+        assert "isolated" in str(w[0].message)
 
-        assert tracer._tracer_provider is not None
-        mock_set.assert_not_called()
+
+def test_factory_deprecated_initialize_param_emits_warning(tracer_factory):
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        tracer_factory.create(project_name="test_project", initialize=False)
+        assert len(w) == 1
+        assert issubclass(w[0].category, DeprecationWarning)
+        assert "initialize" in str(w[0].message)
