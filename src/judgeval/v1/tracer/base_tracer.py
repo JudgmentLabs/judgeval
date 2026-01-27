@@ -14,11 +14,9 @@ from contextlib import contextmanager
 from types import TracebackType
 from typing import (
     Any,
-    AsyncGenerator,
     Callable,
     Coroutine,
     Dict,
-    Generator,
     Iterator,
     Optional,
     Tuple,
@@ -696,7 +694,7 @@ def _serialize(serializer: Callable[[Any], str], value: Any) -> Any:
 R = TypeVar("R")
 
 
-class _ObservedSyncGenerator(ABCGenerator[Any, Any, Any]):
+class _ObservedGeneratorBase:
     __slots__ = (
         "_generator",
         "_span",
@@ -707,9 +705,17 @@ class _ObservedSyncGenerator(ABCGenerator[Any, Any, Any]):
         "_disable_generator_yield_span",
     )
 
+    _generator: Any
+    _span: Span
+    _serializer: Callable[[Any], str]
+    _tracer: trace.Tracer
+    _context: contextvars.Context
+    _closed: bool
+    _disable_generator_yield_span: bool
+
     def __init__(
         self,
-        generator: Generator[Any, Any, Any],
+        generator: Any,
         span: Span,
         serializer: Callable[[Any], str],
         tracer: trace.Tracer,
@@ -724,6 +730,39 @@ class _ObservedSyncGenerator(ABCGenerator[Any, Any, Any]):
         self._closed = False
         self._disable_generator_yield_span = disable_generator_yield_span
 
+    def _emit_yield_span(self, item: Any) -> None:
+        if self._disable_generator_yield_span:
+            return
+        with trace.use_span(self._span):
+            span_name = str(getattr(self._span, "name", "generator_item"))
+            with self._tracer.start_as_current_span(
+                span_name,
+                attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
+            ) as child_span:
+                child_span.set_attribute(
+                    AttributeKeys.JUDGMENT_OUTPUT,
+                    _serialize(self._serializer, item),
+                )
+
+    def _record_error(self, exc: BaseException) -> None:
+        self._span.record_exception(exc)
+        self._span.set_status(Status(StatusCode.ERROR, str(exc)))
+        self._finish()
+
+    def _finish(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        self._span.set_attribute(AttributeKeys.JUDGMENT_SPAN_KIND, "generator")
+        self._span.end()
+
+    def __del__(self) -> None:
+        self._finish()
+
+
+class _ObservedSyncGenerator(_ObservedGeneratorBase, ABCGenerator[Any, Any, Any]):
+    __slots__ = ()
+
     def __iter__(self) -> _ObservedSyncGenerator:
         return self
 
@@ -735,17 +774,7 @@ class _ObservedSyncGenerator(ABCGenerator[Any, Any, Any]):
             raise StopIteration
         try:
             item = self._context.run(self._generator.send, value)
-            if not self._disable_generator_yield_span:
-                with trace.use_span(self._span):
-                    span_name = str(getattr(self._span, "name", "generator_item"))
-                    with self._tracer.start_as_current_span(
-                        span_name,
-                        attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
-                    ) as child_span:
-                        child_span.set_attribute(
-                            AttributeKeys.JUDGMENT_OUTPUT,
-                            _serialize(self._serializer, item),
-                        )
+            self._emit_yield_span(item)
             return item
         except StopIteration:
             self._finish()
@@ -783,17 +812,7 @@ class _ObservedSyncGenerator(ABCGenerator[Any, Any, Any]):
                 item = self._context.run(self._generator.throw, __typ, __val, __tb)
             else:
                 item = self._context.run(self._generator.throw, __typ, None, __tb)
-            if not self._disable_generator_yield_span:
-                with trace.use_span(self._span):
-                    span_name = str(getattr(self._span, "name", "generator_item"))
-                    with self._tracer.start_as_current_span(
-                        span_name,
-                        attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
-                    ) as child_span:
-                        child_span.set_attribute(
-                            AttributeKeys.JUDGMENT_OUTPUT,
-                            _serialize(self._serializer, item),
-                        )
+            self._emit_yield_span(item)
             return item
         except StopIteration:
             self._finish()
@@ -808,49 +827,9 @@ class _ObservedSyncGenerator(ABCGenerator[Any, Any, Any]):
         finally:
             self._finish()
 
-    def _record_error(self, exc: BaseException) -> None:
-        self._span.record_exception(exc)
-        self._span.set_status(Status(StatusCode.ERROR, str(exc)))
-        self._finish()
 
-    def _finish(self) -> None:
-        if self._closed:
-            return
-        self._closed = True
-        self._span.set_attribute(AttributeKeys.JUDGMENT_SPAN_KIND, "generator")
-        self._span.end()
-
-    def __del__(self) -> None:
-        self._finish()
-
-
-class _ObservedAsyncGenerator(ABCAsyncGenerator[Any, Any]):
-    __slots__ = (
-        "_generator",
-        "_span",
-        "_serializer",
-        "_tracer",
-        "_context",
-        "_closed",
-        "_disable_generator_yield_span",
-    )
-
-    def __init__(
-        self,
-        generator: AsyncGenerator[Any, Any],
-        span: Span,
-        serializer: Callable[[Any], str],
-        tracer: trace.Tracer,
-        context: contextvars.Context,
-        disable_generator_yield_span: bool = False,
-    ) -> None:
-        self._generator = generator
-        self._span = span
-        self._serializer = serializer
-        self._tracer = tracer
-        self._context = context
-        self._closed = False
-        self._disable_generator_yield_span = disable_generator_yield_span
+class _ObservedAsyncGenerator(_ObservedGeneratorBase, ABCAsyncGenerator[Any, Any]):
+    __slots__ = ()
 
     def _create_task(self, coro: Coroutine[Any, Any, R]) -> asyncio.Task[R]:
         try:
@@ -869,17 +848,7 @@ class _ObservedAsyncGenerator(ABCAsyncGenerator[Any, Any]):
             raise StopAsyncIteration
         try:
             item = await self._create_task(self._generator.asend(value))
-            if not self._disable_generator_yield_span:
-                with trace.use_span(self._span):
-                    span_name = str(getattr(self._span, "name", "generator_item"))
-                    with self._tracer.start_as_current_span(
-                        span_name,
-                        attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
-                    ) as child_span:
-                        child_span.set_attribute(
-                            AttributeKeys.JUDGMENT_OUTPUT,
-                            _serialize(self._serializer, item),
-                        )
+            self._emit_yield_span(item)
             return item
         except StopAsyncIteration:
             self._finish()
@@ -921,17 +890,7 @@ class _ObservedAsyncGenerator(ABCAsyncGenerator[Any, Any]):
                 item = await self._create_task(
                     self._generator.athrow(__typ, None, __tb)
                 )
-            if not self._disable_generator_yield_span:
-                with trace.use_span(self._span):
-                    span_name = str(getattr(self._span, "name", "generator_item"))
-                    with self._tracer.start_as_current_span(
-                        span_name,
-                        attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "generator_item"},
-                    ) as child_span:
-                        child_span.set_attribute(
-                            AttributeKeys.JUDGMENT_OUTPUT,
-                            _serialize(self._serializer, item),
-                        )
+            self._emit_yield_span(item)
             return item
         except StopAsyncIteration:
             self._finish()
@@ -945,18 +904,3 @@ class _ObservedAsyncGenerator(ABCAsyncGenerator[Any, Any]):
             await self._generator.aclose()
         finally:
             self._finish()
-
-    def _record_error(self, exc: BaseException) -> None:
-        self._span.record_exception(exc)
-        self._span.set_status(Status(StatusCode.ERROR, str(exc)))
-        self._finish()
-
-    def _finish(self) -> None:
-        if self._closed:
-            return
-        self._closed = True
-        self._span.set_attribute(AttributeKeys.JUDGMENT_SPAN_KIND, "generator")
-        self._span.end()
-
-    def __del__(self) -> None:
-        self._finish()
