@@ -28,6 +28,7 @@ class ScorersFactory:
             client=self._client,
             is_trace=False,
             default_project_id=self._default_project_id,
+            project_name=self._project_name,
         )
 
     @property
@@ -40,6 +41,7 @@ class ScorersFactory:
             client=self._client,
             is_trace=True,
             default_project_id=self._default_project_id,
+            project_name=self._project_name,
         )
 
     @property
@@ -51,6 +53,7 @@ class ScorersFactory:
         return CustomScorerFactory(
             client=self._client,
             default_project_id=self._default_project_id,
+            project_name=self._project_name,
         )
 
     @property
