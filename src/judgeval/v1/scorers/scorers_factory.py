@@ -1,21 +1,19 @@
 from __future__ import annotations
 
-from typing import Optional
-
 from judgeval.v1.internal.api import JudgmentSyncClient
 
 
 class ScorersFactory:
-    __slots__ = ("_client", "_default_project_id", "_project_name")
+    __slots__ = ("_client", "_project_id", "_project_name")
 
     def __init__(
         self,
         client: JudgmentSyncClient,
-        default_project_id: Optional[str] = None,
-        project_name: Optional[str] = None,
+        project_id: str,
+        project_name: str,
     ):
         self._client = client
-        self._default_project_id = default_project_id
+        self._project_id = project_id
         self._project_name = project_name
 
     @property
@@ -27,8 +25,7 @@ class ScorersFactory:
         return PromptScorerFactory(
             client=self._client,
             is_trace=False,
-            default_project_id=self._default_project_id,
-            project_name=self._project_name,
+            project_id=self._project_id,
         )
 
     @property
@@ -40,8 +37,7 @@ class ScorersFactory:
         return PromptScorerFactory(
             client=self._client,
             is_trace=True,
-            default_project_id=self._default_project_id,
-            project_name=self._project_name,
+            project_id=self._project_id,
         )
 
     @property
@@ -52,8 +48,7 @@ class ScorersFactory:
 
         return CustomScorerFactory(
             client=self._client,
-            default_project_id=self._default_project_id,
-            project_name=self._project_name,
+            project_id=self._project_id,
         )
 
     @property

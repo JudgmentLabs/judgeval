@@ -16,10 +16,3 @@ def resolve_project_id(client: JudgmentSyncClient, project_name: str) -> Optiona
     except Exception as e:
         judgeval_logger.error(f"Failed to resolve project '{project_name}': {str(e)}")
         return None
-
-
-def require_project_id(project_id: Optional[str]) -> str:
-    """Require project_id to be set. Raises ValueError if not available."""
-    if project_id:
-        return project_id
-    raise ValueError("project_name is required. Set it in Judgeval(project_name=...)")

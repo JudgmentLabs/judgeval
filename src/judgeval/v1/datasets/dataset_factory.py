@@ -5,25 +5,24 @@ from typing import List, Iterable, Optional
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.datasets.dataset import Dataset, DatasetInfo
 from judgeval.v1.data.example import Example
-from judgeval.v1.utils import require_project_id
 from judgeval.logger import judgeval_logger
 
 
 class DatasetFactory:
-    __slots__ = ("_client", "_default_project_id", "_project_name")
+    __slots__ = ("_client", "_project_id", "_project_name")
 
     def __init__(
         self,
         client: JudgmentSyncClient,
-        default_project_id: Optional[str] = None,
-        project_name: Optional[str] = None,
+        project_id: str,
+        project_name: str,
     ):
         self._client = client
-        self._default_project_id = default_project_id
+        self._project_id = project_id
         self._project_name = project_name
 
     def get(self, name: str, project_id: Optional[str] = None) -> Dataset:
-        pid = project_id or require_project_id(self._default_project_id)
+        pid = project_id or self._project_id
         dataset = self._client.datasets_pull_for_judgeval(
             {
                 "dataset_name": name,
@@ -65,7 +64,7 @@ class DatasetFactory:
             dataset_kind=dataset_kind,
             examples=examples,
             client=self._client,
-            project_name=self._project_name or "",
+            project_name=self._project_name,
         )
 
     def create(
@@ -76,7 +75,7 @@ class DatasetFactory:
         overwrite: bool = False,
         batch_size: int = 100,
     ) -> Dataset:
-        pid = project_id or require_project_id(self._default_project_id)
+        pid = project_id or self._project_id
         self._client.datasets_create_for_judgeval(
             {
                 "name": name,
@@ -96,13 +95,13 @@ class DatasetFactory:
             project_id=pid,
             examples=examples,
             client=self._client,
-            project_name=self._project_name or "",
+            project_name=self._project_name,
         )
         dataset.add_examples(examples, batch_size=batch_size)
         return dataset
 
     def list(self, project_id: Optional[str] = None) -> List[DatasetInfo]:
-        pid = project_id or require_project_id(self._default_project_id)
+        pid = project_id or self._project_id
         datasets = self._client.datasets_pull_all_for_judgeval({"project_id": pid})
         judgeval_logger.info(f"Fetched datasets for project {pid}")
         return [DatasetInfo(**d) for d in datasets]

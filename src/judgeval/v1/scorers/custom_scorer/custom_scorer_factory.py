@@ -2,30 +2,25 @@ from __future__ import annotations
 
 import ast
 import os
-from typing import Optional
 
 from judgeval.logger import judgeval_logger
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.internal.api.api_types import UploadCustomScorerRequest
 from judgeval.v1.scorers.custom_scorer.custom_scorer import CustomScorer
-from judgeval.v1.scorers.custom_scorer.utils import extract_scorer_name
-from judgeval.v1.utils import require_project_id
 
 
 class CustomScorerFactory:
-    __slots__ = ("_client", "_default_project_id", "_project_name")
+    __slots__ = ("_client", "_project_id")
 
     def __init__(
         self,
         client: JudgmentSyncClient,
-        default_project_id: Optional[str] = None,
-        project_name: Optional[str] = None,
+        project_id: str,
     ):
         self._client = client
-        self._default_project_id = default_project_id
-        self._project_name = project_name
+        self._project_id = project_id
 
-    def get(self, name: str, class_name: Optional[str] = None) -> CustomScorer:
+    def get(self, name: str, class_name: str | None = None) -> CustomScorer:
         return CustomScorer(
             name=name,
             class_name=class_name or name,
@@ -41,11 +36,6 @@ class CustomScorerFactory:
     ) -> bool:
         if not os.path.exists(scorer_file_path):
             raise FileNotFoundError(f"Scorer file not found: {scorer_file_path}")
-
-        # Auto-detect scorer name if not provided
-        if unique_name is None:
-            unique_name = extract_scorer_name(scorer_file_path)
-            judgeval_logger.info(f"Auto-detected scorer name: '{unique_name}'")
 
         # Read scorer code
         with open(scorer_file_path, "r") as f:
@@ -82,16 +72,19 @@ class CustomScorerFactory:
             judgeval_logger.error(error_msg)
             raise ValueError(error_msg)
 
+        # Auto-detect scorer name if not provided
+        if unique_name is None:
+            unique_name = scorer_classes[0]
+            judgeval_logger.info(f"Auto-detected scorer name: '{unique_name}'")
+
         # Read requirements (optional)
         requirements_text = ""
         if requirements_file_path and os.path.exists(requirements_file_path):
             with open(requirements_file_path, "r") as f:
                 requirements_text = f.read()
 
-        project_id = require_project_id(self._default_project_id)
-
         payload: UploadCustomScorerRequest = {
-            "project_id": project_id,
+            "project_id": self._project_id,
             "scorer_name": unique_name,
             "class_name": scorer_classes[0],
             "scorer_code": scorer_code,

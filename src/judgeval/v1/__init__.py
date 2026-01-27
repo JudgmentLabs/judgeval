@@ -66,7 +66,7 @@ class Judgeval:
 
         return ScorersFactory(
             client=self._internal_client,
-            default_project_id=self._project_id,
+            project_id=self._project_id,
             project_name=self._project_name,
         )
 
@@ -76,7 +76,7 @@ class Judgeval:
 
         return EvaluationFactory(
             client=self._internal_client,
-            default_project_id=self._project_id,
+            project_id=self._project_id,
             project_name=self._project_name,
         )
 
@@ -94,7 +94,7 @@ class Judgeval:
 
         return DatasetFactory(
             client=self._internal_client,
-            default_project_id=self._project_id,
+            project_id=self._project_id,
             project_name=self._project_name,
         )
 
@@ -104,7 +104,7 @@ class Judgeval:
 
         return PromptFactory(
             client=self._internal_client,
-            default_project_id=self._project_id,
+            project_id=self._project_id,
             project_name=self._project_name,
         )
 

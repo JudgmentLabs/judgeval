@@ -14,21 +14,20 @@ from judgeval.v1.data.example import Example
 from judgeval.v1.data.scoring_result import ScoringResult
 from judgeval.v1.data.scorer_data import ScorerData
 from judgeval.v1.scorers.base_scorer import BaseScorer
-from judgeval.v1.utils import require_project_id
 from judgeval.logger import judgeval_logger
 
 
 class Evaluation:
-    __slots__ = ("_client", "_default_project_id", "_project_name")
+    __slots__ = ("_client", "_project_id", "_project_name")
 
     def __init__(
         self,
         client: JudgmentSyncClient,
-        default_project_id: Optional[str] = None,
-        project_name: Optional[str] = None,
+        project_id: str,
+        project_name: str,
     ):
         self._client = client
-        self._default_project_id = default_project_id
+        self._project_id = project_id
         self._project_name = project_name
 
     def run(
@@ -40,7 +39,7 @@ class Evaluation:
         assert_test: bool = False,
         timeout_seconds: int = 300,
     ) -> List[ScoringResult]:
-        project_id = require_project_id(self._default_project_id)
+        project_id = self._project_id
 
         console = Console()
         eval_id = str(uuid.uuid4())

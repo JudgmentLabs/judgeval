@@ -6,20 +6,19 @@ from judgeval.logger import judgeval_logger
 from judgeval.utils.decorators.dont_throw import dont_throw
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.prompts.prompt import Prompt
-from judgeval.v1.utils import require_project_id
 
 
 class PromptFactory:
-    __slots__ = ("_client", "_default_project_id", "_project_name")
+    __slots__ = ("_client", "_project_id", "_project_name")
 
     def __init__(
         self,
         client: JudgmentSyncClient,
-        default_project_id: Optional[str] = None,
-        project_name: Optional[str] = None,
+        project_id: str,
+        project_name: str,
     ):
         self._client = client
-        self._default_project_id = default_project_id
+        self._project_id = project_id
         self._project_name = project_name
 
     def create(
@@ -32,7 +31,7 @@ class PromptFactory:
             if tags is None:
                 tags = []
 
-            project_id = require_project_id(self._default_project_id)
+            project_id = self._project_id
             response = self._client.prompts_insert(
                 {
                     "project_id": project_id,
@@ -84,7 +83,7 @@ class PromptFactory:
             judgeval_logger.error("Cannot fetch prompt by both commit_id and tag")
             return None
 
-        project_id = require_project_id(self._default_project_id)
+        project_id = self._project_id
 
         response = self._client.prompts_fetch(
             project_id=project_id,
@@ -118,7 +117,7 @@ class PromptFactory:
         tags: List[str],
     ) -> str:
         try:
-            project_id = require_project_id(self._default_project_id)
+            project_id = self._project_id
             response = self._client.prompts_tag(
                 {
                     "project_id": project_id,
@@ -138,7 +137,7 @@ class PromptFactory:
         tags: List[str],
     ) -> List[str]:
         try:
-            project_id = require_project_id(self._default_project_id)
+            project_id = self._project_id
             response = self._client.prompts_untag(
                 {
                     "project_id": project_id,
@@ -156,7 +155,7 @@ class PromptFactory:
         name: str,
     ) -> List[Prompt]:
         try:
-            project_id = require_project_id(self._default_project_id)
+            project_id = self._project_id
             response = self._client.prompts_get_prompt_versions(
                 project_id=project_id,
                 name=name,

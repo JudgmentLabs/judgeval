@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
 
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.internal.api.api_types import (
@@ -10,31 +10,28 @@ from judgeval.v1.internal.api.api_types import (
 )
 from judgeval.exceptions import JudgmentAPIError
 from judgeval.v1.scorers.prompt_scorer.prompt_scorer import PromptScorer
-from judgeval.v1.utils import require_project_id
 from judgeval.logger import judgeval_logger
 
 
 class PromptScorerFactory:
-    __slots__ = ("_client", "_is_trace", "_default_project_id", "_project_name")
-    _cache: Dict[Tuple[str, str, str, Optional[str], bool], APIPromptScorer] = {}
+    __slots__ = ("_client", "_is_trace", "_project_id")
+    _cache: Dict[Tuple[str, str, str, str, bool], APIPromptScorer] = {}
 
     def __init__(
         self,
         client: JudgmentSyncClient,
         is_trace: bool,
-        default_project_id: Optional[str] = None,
-        project_name: Optional[str] = None,
+        project_id: str,
     ):
         self._client = client
         self._is_trace = is_trace
-        self._default_project_id = default_project_id
-        self._project_name = project_name
+        self._project_id = project_id
 
     def get(
         self,
         name: str,
     ) -> PromptScorer | None:
-        project_id = require_project_id(self._default_project_id)
+        project_id = self._project_id
 
         cache_key = (
             name,
