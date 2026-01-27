@@ -1,17 +1,14 @@
 from __future__ import annotations
 
+import ast
+import os
 from typing import Optional
 
-from judgeval.v1.scorers.custom_scorer.custom_scorer import CustomScorer
-
-import os
-import ast
 from judgeval.logger import judgeval_logger
-from judgeval.v1.scorers.custom_scorer.utils import extract_scorer_name
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.internal.api.api_types import UploadCustomScorerRequest
-from judgeval.v1.utils import require_project_id
-from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
+from judgeval.v1.scorers.custom_scorer.custom_scorer import CustomScorer
+from judgeval.v1.scorers.custom_scorer.utils import extract_scorer_name
 
 
 class CustomScorerFactory:
@@ -19,7 +16,7 @@ class CustomScorerFactory:
 
     def __init__(
         self,
-        client: Optional[JudgmentSyncClient] = None,
+        client: JudgmentSyncClient,
         default_project_id: Optional[str] = None,
     ):
         self._client = client
@@ -38,10 +35,6 @@ class CustomScorerFactory:
         requirements_file_path: str | None = None,
         unique_name: str | None = None,
         overwrite: bool = False,
-        project_name: str | None = None,
-        project_id: str | None = None,
-        api_key: str | None = None,
-        organization_id: str | None = None,
     ) -> bool:
         if not os.path.exists(scorer_file_path):
             raise FileNotFoundError(f"Scorer file not found: {scorer_file_path}")
@@ -92,51 +85,26 @@ class CustomScorerFactory:
             with open(requirements_file_path, "r") as f:
                 requirements_text = f.read()
 
-        try:
-            if self._client:
-                client = self._client
-            else:
-                api_key = api_key or JUDGMENT_API_KEY
-                organization_id = organization_id or JUDGMENT_ORG_ID
-                if (
-                    not api_key
-                    or not api_key.strip()
-                    or not organization_id
-                    or not organization_id.strip()
-                ):
-                    raise ValueError(
-                        "Judgment API key and organization ID are required"
-                    )
-                client = JudgmentSyncClient(
-                    api_key=api_key,
-                    organization_id=organization_id,
-                    base_url=JUDGMENT_API_URL,
-                )
-
-            effective_project_id = project_id or require_project_id(
-                client, project_name, self._default_project_id
+        if not self._default_project_id:
+            raise ValueError(
+                "project_name is required. Set it in Judgeval(project_name=...)"
             )
 
-            payload: UploadCustomScorerRequest = {
-                "project_id": effective_project_id,
-                "scorer_name": unique_name,
-                "class_name": scorer_classes[0],
-                "scorer_code": scorer_code,
-                "requirements_text": requirements_text,
-                "overwrite": overwrite,
-                "scorer_type": scorer_type,
-                "version": 1,
-            }
-            response = client.upload_custom_scorer(payload=payload)
+        payload: UploadCustomScorerRequest = {
+            "project_id": self._default_project_id,
+            "scorer_name": unique_name,
+            "class_name": scorer_classes[0],
+            "scorer_code": scorer_code,
+            "requirements_text": requirements_text,
+            "overwrite": overwrite,
+            "scorer_type": scorer_type,
+            "version": 1,
+        }
+        response = self._client.upload_custom_scorer(payload=payload)
 
-            if response.get("status") == "success":
-                judgeval_logger.info(
-                    f"Successfully uploaded custom scorer: {unique_name}"
-                )
-                return True
-            else:
-                judgeval_logger.error(f"Failed to upload custom scorer: {unique_name}")
-                return False
-
-        except Exception:
-            raise
+        if response.get("status") == "success":
+            judgeval_logger.info(f"Successfully uploaded custom scorer: {unique_name}")
+            return True
+        else:
+            judgeval_logger.error(f"Failed to upload custom scorer: {unique_name}")
+            return False

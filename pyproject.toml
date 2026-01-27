@@ -90,9 +90,6 @@ directory = "dist"
 artifacts = ["src/judgeval/**/*.py"]
 exclude = ["src/e2etests/*", "src/tests/*", "src/demo/*"]
 
-[tool.mypy]
-ignore_missing_imports = true
-
 [tool.ruff]
 exclude = ["docs"]
 

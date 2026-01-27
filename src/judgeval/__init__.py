@@ -16,6 +16,7 @@ from judgeval.utils.meta import SingletonMeta
 from judgeval.exceptions import JudgmentRuntimeError, JudgmentTestError
 from judgeval.api import JudgmentSyncClient
 from judgeval.utils.file_utils import extract_scorer_name
+from judgeval.utils.project import resolve_project_id_or_none
 from judgeval.utils.guards import expect_api_key, expect_organization_id
 from judgeval.utils.version_check import check_latest_version
 from judgeval.utils.testing import assert_test_results
@@ -155,12 +156,9 @@ class JudgmentClient(metaclass=SingletonMeta):
                 api_key=self.api_key,
                 organization_id=self.organization_id,
             )
-            project_id = None
-            if project_name:
-                resolve_resp = client.projects_resolve({"project_name": project_name})
-                project_id = resolve_resp.get("project_id")
-                if not project_id:
-                    raise ValueError(f"Project '{project_name}' not found")
+            project_id = resolve_project_id_or_none(
+                project_name, self.api_key, self.organization_id
+            )
 
             payload = {
                 "scorer_name": unique_name,

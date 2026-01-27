@@ -13,7 +13,7 @@ from abc import ABC
 from judgeval.env import JUDGMENT_DEFAULT_GPT_MODEL
 from copy import copy
 from judgeval.utils.decorators.dont_throw import dont_throw
-from judgeval.utils.project import _resolve_project_id
+from judgeval.utils.project import resolve_project_id_or_none
 
 
 def push_prompt_scorer(
@@ -30,17 +30,9 @@ def push_prompt_scorer(
 ) -> str:
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
-        project_id: Optional[str] = None
-        if project_name:
-            project_id = _resolve_project_id(
-                project_name, judgment_api_key, organization_id
-            )
-            if not project_id:
-                raise JudgmentAPIError(
-                    status_code=404,
-                    detail=f"Project '{project_name}' not found",
-                    response=None,  # type: ignore
-                )
+        project_id = resolve_project_id_or_none(
+            project_name, judgment_api_key, organization_id
+        )
 
         payload: Dict[str, Any] = {
             "name": name,
@@ -71,17 +63,9 @@ def fetch_prompt_scorer(
 ):
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
-        project_id: Optional[str] = None
-        if project_name:
-            project_id = _resolve_project_id(
-                project_name, judgment_api_key, organization_id
-            )
-            if not project_id:
-                raise JudgmentAPIError(
-                    status_code=404,
-                    detail=f"Project '{project_name}' not found",
-                    response=None,  # type: ignore
-                )
+        project_id = resolve_project_id_or_none(
+            project_name, judgment_api_key, organization_id
+        )
 
         request: Dict[str, Any] = {"names": [name]}
         if project_id:
@@ -115,17 +99,9 @@ def scorer_exists(
 ):
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
-        project_id: Optional[str] = None
-        if project_name:
-            project_id = _resolve_project_id(
-                project_name, judgment_api_key, organization_id
-            )
-            if not project_id:
-                raise JudgmentAPIError(
-                    status_code=404,
-                    detail=f"Project '{project_name}' not found",
-                    response=None,  # type: ignore
-                )
+        project_id = resolve_project_id_or_none(
+            project_name, judgment_api_key, organization_id
+        )
 
         request: Dict[str, Any] = {"name": name}
         if project_id:
