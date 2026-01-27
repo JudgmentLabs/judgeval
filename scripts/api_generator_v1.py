@@ -805,7 +805,8 @@ def generate_api_types() -> None:
     lines = [
         "from __future__ import annotations",
         "",
-        "from typing import TypedDict, NotRequired, Optional, List, Union, Any, Dict",
+        "from typing import TypedDict, Optional, List, Union, Any, Dict",
+        "from typing_extensions import NotRequired",
         "",
         "",
     ]
