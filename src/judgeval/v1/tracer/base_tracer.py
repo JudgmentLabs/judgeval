@@ -255,6 +255,18 @@ class BaseTracer(ABC):
         tracer = self.get_tracer()
         return tracer.start_span(span_name)
 
+    def _check_scorer_project(self, scorer: BaseScorer) -> bool:
+        """Check if scorer belongs to this tracer's project. Returns True if valid."""
+        scorer_project_id = scorer.get_project_id()
+        if scorer_project_id is not None and scorer_project_id != self.project_id:
+            judgeval_logger.warning(
+                f"Scorer '{scorer.get_name()}' belongs to project '{scorer_project_id}', "
+                f"but this tracer is bound to project '{self.project_name}' ({self.project_id}). "
+                "Skipping evaluation."
+            )
+            return False
+        return True
+
     @dont_throw
     def async_evaluate(
         self,
@@ -266,6 +278,9 @@ class BaseTracer(ABC):
             return
 
         if not self.enable_evaluation:
+            return
+
+        if not self._check_scorer_project(scorer):
             return
 
         span_context = self._get_sampled_span_context()
@@ -296,6 +311,9 @@ class BaseTracer(ABC):
             return
 
         if not self.enable_evaluation:
+            return
+
+        if not self._check_scorer_project(scorer):
             return
 
         current_span = self._get_sampled_span()
