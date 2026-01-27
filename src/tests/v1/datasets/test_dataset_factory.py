@@ -12,7 +12,9 @@ def mock_client():
 
 @pytest.fixture
 def dataset_factory(mock_client):
-    return DatasetFactory(mock_client)
+    return DatasetFactory(
+        mock_client, project_id="test_project_id", project_name="test_project"
+    )
 
 
 @pytest.fixture
@@ -29,7 +31,7 @@ def test_factory_get(dataset_factory, mock_client):
         "examples": [],
     }
 
-    dataset = dataset_factory.get("test_dataset", "test_project_id")
+    dataset = dataset_factory.get("test_dataset")
 
     assert isinstance(dataset, Dataset)
     assert dataset.name == "test_dataset"
@@ -40,7 +42,6 @@ def test_factory_get(dataset_factory, mock_client):
 def test_factory_create(dataset_factory, mock_client, sample_examples):
     dataset = dataset_factory.create(
         name="test_dataset",
-        project_id="test_project_id",
         examples=sample_examples,
         overwrite=False,
     )
@@ -53,9 +54,7 @@ def test_factory_create(dataset_factory, mock_client, sample_examples):
 
 
 def test_factory_create_with_overwrite(dataset_factory, mock_client):
-    dataset = dataset_factory.create(
-        name="test_dataset", project_id="test_project_id", examples=[], overwrite=True
-    )
+    dataset = dataset_factory.create(name="test_dataset", examples=[], overwrite=True)
 
     assert isinstance(dataset, Dataset)
     call_args = mock_client.datasets_create_for_judgeval.call_args[0][0]
@@ -74,7 +73,7 @@ def test_factory_list(dataset_factory, mock_client):
         }
     ]
 
-    datasets = dataset_factory.list("test_project_id")
+    datasets = dataset_factory.list()
 
     assert isinstance(datasets, list)
     assert len(datasets) == 1
@@ -83,6 +82,6 @@ def test_factory_list(dataset_factory, mock_client):
 
 
 def test_factory_create_empty_examples(dataset_factory, mock_client):
-    dataset = dataset_factory.create(name="test_dataset", project_id="test_project_id")
+    dataset = dataset_factory.create(name="test_dataset")
 
     assert len(dataset.examples) == 0

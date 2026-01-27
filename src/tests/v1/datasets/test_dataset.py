@@ -16,7 +16,9 @@ def mock_client():
 
 @pytest.fixture
 def factory(mock_client):
-    return DatasetFactory(mock_client)
+    return DatasetFactory(
+        mock_client, project_id="test_project_id", project_name="test_project"
+    )
 
 
 @pytest.fixture
@@ -50,7 +52,7 @@ def test_dataset_get(factory, mock_client, sample_examples):
         ],
     }
 
-    dataset = factory.get("test_dataset", "test_project_id")
+    dataset = factory.get("test_dataset")
 
     assert dataset.name == "test_dataset"
     assert dataset.project_id == "test_project_id"
@@ -64,7 +66,6 @@ def test_dataset_get(factory, mock_client, sample_examples):
 def test_dataset_create(factory, mock_client, sample_examples):
     dataset = factory.create(
         name="test_dataset",
-        project_id="test_project_id",
         examples=sample_examples,
         overwrite=False,
     )
@@ -95,7 +96,7 @@ def test_dataset_list(factory, mock_client):
         },
     ]
 
-    datasets = factory.list("test_project_id")
+    datasets = factory.list()
 
     assert len(datasets) == 2
     assert isinstance(datasets[0], DatasetInfo)
