@@ -63,7 +63,7 @@ class Evaluation:
 
         console.print("\n[bold cyan]Starting Evaluation[/bold cyan]")
         console.print(f"[dim]Run:[/dim] {eval_run_name}")
-        console.print(f"[dim]Project:[/dim] {self._project_name or project_id}")
+        console.print(f"[dim]Project:[/dim] {self._project_name}")
         console.print(
             f"[dim]Examples:[/dim] {len(examples)} | [dim]Scorers:[/dim] {len(scorers)}"
         )
