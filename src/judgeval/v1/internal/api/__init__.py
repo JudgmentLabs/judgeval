@@ -181,13 +181,6 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def add_to_run_eval_queue(self, payload: AddToRunEvalQueueRequest) -> Any:
-        return self._request(
-            "POST",
-            url_for("/v1/add_to_run_eval_queue/", self.base_url),
-            payload,
-        )
-
     def add_to_run_eval_queue_examples(
         self, payload: ExampleEvaluationRun
     ) -> AddToRunEvalQueueExamplesResponse:
@@ -452,13 +445,6 @@ class JudgmentAsyncClient:
         return await self._request(
             "POST",
             url_for("/v1/fetch_experiment_run/", self.base_url),
-            payload,
-        )
-
-    async def add_to_run_eval_queue(self, payload: AddToRunEvalQueueRequest) -> Any:
-        return await self._request(
-            "POST",
-            url_for("/v1/add_to_run_eval_queue/", self.base_url),
             payload,
         )
 

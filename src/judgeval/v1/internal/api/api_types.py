@@ -17,14 +17,20 @@ class AddToRunEvalQueueExamplesResponse(TypedDict):
     message: str
 
 
-class AddToRunEvalQueueRequest(TypedDict):
-    pass
-
-
 class AddToRunEvalQueueTracesResponse(TypedDict):
     success: bool
     status: str
     message: str
+
+
+class AddTraceTagsRequest(TypedDict):
+    project_id: str
+    trace_id: str
+    tags: List[str]
+
+
+class AddTraceTagsResponse(TypedDict):
+    success: bool
 
 
 class BaseScorer(TypedDict):
