@@ -9,6 +9,7 @@ from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.internal.api.api_types import UploadCustomScorerRequest
 from judgeval.v1.scorers.custom_scorer.custom_scorer import CustomScorer
 from judgeval.v1.scorers.custom_scorer.utils import extract_scorer_name
+from judgeval.v1.utils import require_project_id
 
 
 class CustomScorerFactory:
@@ -85,13 +86,10 @@ class CustomScorerFactory:
             with open(requirements_file_path, "r") as f:
                 requirements_text = f.read()
 
-        if not self._default_project_id:
-            raise ValueError(
-                "project_name is required. Set it in Judgeval(project_name=...)"
-            )
+        project_id = require_project_id(self._default_project_id)
 
         payload: UploadCustomScorerRequest = {
-            "project_id": self._default_project_id,
+            "project_id": project_id,
             "scorer_name": unique_name,
             "class_name": scorer_classes[0],
             "scorer_code": scorer_code,

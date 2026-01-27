@@ -18,21 +18,8 @@ def resolve_project_id(client: JudgmentSyncClient, project_name: str) -> Optiona
         return None
 
 
-def require_project_id(
-    client: JudgmentSyncClient,
-    project_name: Optional[str],
-    default_project_id: Optional[str],
-) -> str:
-    """Resolve project_id from name or use default. Raises ValueError if neither available."""
-    if project_name:
-        project_id = resolve_project_id(client, project_name)
-        if not project_id:
-            raise ValueError(
-                f"Project '{project_name}' not found. Please create it first."
-            )
+def require_project_id(project_id: Optional[str]) -> str:
+    """Require project_id to be set. Raises ValueError if not available."""
+    if project_id:
         return project_id
-    if default_project_id:
-        return default_project_id
-    raise ValueError(
-        "project_name is required. Either pass it to this method or set it in Judgeval(project_name=...)"
-    )
+    raise ValueError("project_name is required. Set it in Judgeval(project_name=...)")

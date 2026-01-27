@@ -19,29 +19,28 @@ from judgeval.logger import judgeval_logger
 
 
 class Evaluation:
-    __slots__ = ("_client", "_default_project_id")
+    __slots__ = ("_client", "_default_project_id", "_project_name")
 
     def __init__(
         self,
         client: JudgmentSyncClient,
         default_project_id: Optional[str] = None,
+        project_name: Optional[str] = None,
     ):
         self._client = client
         self._default_project_id = default_project_id
+        self._project_name = project_name
 
     def run(
         self,
         examples: List[Example],
         scorers: List[BaseScorer],
         eval_run_name: str,
-        project_name: Optional[str] = None,
         model: Optional[str] = None,
         assert_test: bool = False,
         timeout_seconds: int = 300,
     ) -> List[ScoringResult]:
-        project_id = require_project_id(
-            self._client, project_name, self._default_project_id
-        )
+        project_id = require_project_id(self._default_project_id)
 
         console = Console()
         eval_id = str(uuid.uuid4())
@@ -49,7 +48,7 @@ class Evaluation:
 
         console.print("\n[bold cyan]Starting Evaluation[/bold cyan]")
         console.print(f"[dim]Run:[/dim] {eval_run_name}")
-        console.print(f"[dim]Project:[/dim] {project_name or project_id}")
+        console.print(f"[dim]Project:[/dim] {self._project_name or project_id}")
         console.print(
             f"[dim]Examples:[/dim] {len(examples)} | [dim]Scorers:[/dim] {len(scorers)}"
         )

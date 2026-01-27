@@ -31,11 +31,8 @@ class PromptScorerFactory:
     def get(
         self,
         name: str,
-        project_name: Optional[str] = None,
     ) -> PromptScorer | None:
-        project_id = require_project_id(
-            self._client, project_name, self._default_project_id
-        )
+        project_id = require_project_id(self._default_project_id)
 
         cache_key = (
             name,
