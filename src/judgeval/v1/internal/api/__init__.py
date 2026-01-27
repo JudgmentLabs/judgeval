@@ -58,6 +58,22 @@ class JudgmentSyncClient:
             )
         return _handle_response(r)
 
+    def otel_v1_traces(self) -> Any:
+        return self._request(
+            "POST",
+            url_for("/otel/v1/traces", self.base_url),
+            {},
+        )
+
+    def otel_trigger_root_span_rules(
+        self, payload: TriggerRootSpanRulesRequest
+    ) -> TriggerRootSpanRulesResponse:
+        return self._request(
+            "POST",
+            url_for("/otel/trigger_root_span_rules", self.base_url),
+            payload,
+        )
+
     def index(self) -> WelcomeResponse:
         return self._request(
             "GET",
@@ -72,35 +88,19 @@ class JudgmentSyncClient:
             {},
         )
 
-    def otel_v1_traces(self) -> Any:
-        return self._request(
-            "POST",
-            url_for("/v1/otel/traces", self.base_url),
-            {},
-        )
-
-    def otel_trigger_root_span_rules(
-        self, payload: TriggerRootSpanRulesRequest
-    ) -> TriggerRootSpanRulesResponse:
-        return self._request(
-            "POST",
-            url_for("/v1/otel/trigger_root_span_rules", self.base_url),
-            payload,
-        )
-
     def projects_resolve(
         self, payload: ResolveProjectRequest
     ) -> ResolveProjectResponse:
         return self._request(
             "POST",
-            url_for("/v1/projects/resolve", self.base_url),
+            url_for("/v1/projects/resolve/", self.base_url),
             payload,
         )
 
     def projects_add(self, payload: AddProjectRequest) -> AddProjectResponse:
         return self._request(
             "POST",
-            url_for("/v1/projects/add", self.base_url),
+            url_for("/v1/projects/add/", self.base_url),
             payload,
         )
 
@@ -109,7 +109,7 @@ class JudgmentSyncClient:
     ) -> DeleteProjectResponse:
         return self._request(
             "DELETE",
-            url_for("/v1/projects/delete", self.base_url),
+            url_for("/v1/projects/delete_from_judgeval/", self.base_url),
             payload,
         )
 
@@ -118,7 +118,7 @@ class JudgmentSyncClient:
     ) -> CreateDatasetResponse:
         return self._request(
             "POST",
-            url_for("/v1/datasets/create", self.base_url),
+            url_for("/v1/datasets/create_for_judgeval/", self.base_url),
             payload,
         )
 
@@ -127,7 +127,7 @@ class JudgmentSyncClient:
     ) -> InsertExamplesResponse:
         return self._request(
             "POST",
-            url_for("/v1/datasets/insert_examples", self.base_url),
+            url_for("/v1/datasets/insert_examples_for_judgeval/", self.base_url),
             payload,
         )
 
@@ -136,7 +136,7 @@ class JudgmentSyncClient:
     ) -> PullDatasetResponse:
         return self._request(
             "POST",
-            url_for("/v1/datasets/pull", self.base_url),
+            url_for("/v1/datasets/pull_for_judgeval/", self.base_url),
             payload,
         )
 
@@ -145,7 +145,7 @@ class JudgmentSyncClient:
     ) -> PullAllDatasetsResponse:
         return self._request(
             "POST",
-            url_for("/v1/datasets/pull_all", self.base_url),
+            url_for("/v1/datasets/pull_all_for_judgeval/", self.base_url),
             payload,
         )
 
@@ -168,7 +168,7 @@ class JudgmentSyncClient:
     ) -> LogEvalResultsResponse:
         return self._request(
             "POST",
-            url_for("/v1/log_eval_results", self.base_url),
+            url_for("/v1/log_eval_results/", self.base_url),
             payload,
         )
 
@@ -177,14 +177,14 @@ class JudgmentSyncClient:
     ) -> FetchExperimentRunResponse:
         return self._request(
             "POST",
-            url_for("/v1/fetch_experiment_run", self.base_url),
+            url_for("/v1/fetch_experiment_run/", self.base_url),
             payload,
         )
 
     def add_to_run_eval_queue(self, payload: AddToRunEvalQueueRequest) -> Any:
         return self._request(
             "POST",
-            url_for("/v1/add_to_run_eval_queue", self.base_url),
+            url_for("/v1/add_to_run_eval_queue/", self.base_url),
             payload,
         )
 
@@ -264,21 +264,21 @@ class JudgmentSyncClient:
     ) -> FetchPromptScorersResponse:
         return self._request(
             "POST",
-            url_for("/v1/scorers/fetch", self.base_url),
+            url_for("/v1/fetch_scorers", self.base_url),
             payload,
         )
 
     def save_scorer(self, payload: SavePromptScorerRequest) -> SavePromptScorerResponse:
         return self._request(
             "POST",
-            url_for("/v1/scorers/save", self.base_url),
+            url_for("/v1/save_scorer", self.base_url),
             payload,
         )
 
     def scorer_exists(self, payload: ScorerExistsRequest) -> ScorerExistsResponse:
         return self._request(
             "POST",
-            url_for("/v1/scorers/exists", self.base_url),
+            url_for("/v1/scorer_exists", self.base_url),
             payload,
         )
 
@@ -287,7 +287,7 @@ class JudgmentSyncClient:
     ) -> UploadCustomScorerResponse:
         return self._request(
             "POST",
-            url_for("/v1/scorers/upload_custom", self.base_url),
+            url_for("/v1/upload_custom_scorer/", self.base_url),
             payload,
         )
 
@@ -332,6 +332,22 @@ class JudgmentAsyncClient:
             )
         return _handle_response(await r)
 
+    async def otel_v1_traces(self) -> Any:
+        return await self._request(
+            "POST",
+            url_for("/otel/v1/traces", self.base_url),
+            {},
+        )
+
+    async def otel_trigger_root_span_rules(
+        self, payload: TriggerRootSpanRulesRequest
+    ) -> TriggerRootSpanRulesResponse:
+        return await self._request(
+            "POST",
+            url_for("/otel/trigger_root_span_rules", self.base_url),
+            payload,
+        )
+
     async def index(self) -> WelcomeResponse:
         return await self._request(
             "GET",
@@ -346,35 +362,19 @@ class JudgmentAsyncClient:
             {},
         )
 
-    async def otel_v1_traces(self) -> Any:
-        return await self._request(
-            "POST",
-            url_for("/v1/otel/traces", self.base_url),
-            {},
-        )
-
-    async def otel_trigger_root_span_rules(
-        self, payload: TriggerRootSpanRulesRequest
-    ) -> TriggerRootSpanRulesResponse:
-        return await self._request(
-            "POST",
-            url_for("/v1/otel/trigger_root_span_rules", self.base_url),
-            payload,
-        )
-
     async def projects_resolve(
         self, payload: ResolveProjectRequest
     ) -> ResolveProjectResponse:
         return await self._request(
             "POST",
-            url_for("/v1/projects/resolve", self.base_url),
+            url_for("/v1/projects/resolve/", self.base_url),
             payload,
         )
 
     async def projects_add(self, payload: AddProjectRequest) -> AddProjectResponse:
         return await self._request(
             "POST",
-            url_for("/v1/projects/add", self.base_url),
+            url_for("/v1/projects/add/", self.base_url),
             payload,
         )
 
@@ -383,7 +383,7 @@ class JudgmentAsyncClient:
     ) -> DeleteProjectResponse:
         return await self._request(
             "DELETE",
-            url_for("/v1/projects/delete", self.base_url),
+            url_for("/v1/projects/delete_from_judgeval/", self.base_url),
             payload,
         )
 
@@ -392,7 +392,7 @@ class JudgmentAsyncClient:
     ) -> CreateDatasetResponse:
         return await self._request(
             "POST",
-            url_for("/v1/datasets/create", self.base_url),
+            url_for("/v1/datasets/create_for_judgeval/", self.base_url),
             payload,
         )
 
@@ -401,7 +401,7 @@ class JudgmentAsyncClient:
     ) -> InsertExamplesResponse:
         return await self._request(
             "POST",
-            url_for("/v1/datasets/insert_examples", self.base_url),
+            url_for("/v1/datasets/insert_examples_for_judgeval/", self.base_url),
             payload,
         )
 
@@ -410,7 +410,7 @@ class JudgmentAsyncClient:
     ) -> PullDatasetResponse:
         return await self._request(
             "POST",
-            url_for("/v1/datasets/pull", self.base_url),
+            url_for("/v1/datasets/pull_for_judgeval/", self.base_url),
             payload,
         )
 
@@ -419,7 +419,7 @@ class JudgmentAsyncClient:
     ) -> PullAllDatasetsResponse:
         return await self._request(
             "POST",
-            url_for("/v1/datasets/pull_all", self.base_url),
+            url_for("/v1/datasets/pull_all_for_judgeval/", self.base_url),
             payload,
         )
 
@@ -442,7 +442,7 @@ class JudgmentAsyncClient:
     ) -> LogEvalResultsResponse:
         return await self._request(
             "POST",
-            url_for("/v1/log_eval_results", self.base_url),
+            url_for("/v1/log_eval_results/", self.base_url),
             payload,
         )
 
@@ -451,14 +451,14 @@ class JudgmentAsyncClient:
     ) -> FetchExperimentRunResponse:
         return await self._request(
             "POST",
-            url_for("/v1/fetch_experiment_run", self.base_url),
+            url_for("/v1/fetch_experiment_run/", self.base_url),
             payload,
         )
 
     async def add_to_run_eval_queue(self, payload: AddToRunEvalQueueRequest) -> Any:
         return await self._request(
             "POST",
-            url_for("/v1/add_to_run_eval_queue", self.base_url),
+            url_for("/v1/add_to_run_eval_queue/", self.base_url),
             payload,
         )
 
@@ -540,7 +540,7 @@ class JudgmentAsyncClient:
     ) -> FetchPromptScorersResponse:
         return await self._request(
             "POST",
-            url_for("/v1/scorers/fetch", self.base_url),
+            url_for("/v1/fetch_scorers", self.base_url),
             payload,
         )
 
@@ -549,14 +549,14 @@ class JudgmentAsyncClient:
     ) -> SavePromptScorerResponse:
         return await self._request(
             "POST",
-            url_for("/v1/scorers/save", self.base_url),
+            url_for("/v1/save_scorer", self.base_url),
             payload,
         )
 
     async def scorer_exists(self, payload: ScorerExistsRequest) -> ScorerExistsResponse:
         return await self._request(
             "POST",
-            url_for("/v1/scorers/exists", self.base_url),
+            url_for("/v1/scorer_exists", self.base_url),
             payload,
         )
 
@@ -565,7 +565,7 @@ class JudgmentAsyncClient:
     ) -> UploadCustomScorerResponse:
         return await self._request(
             "POST",
-            url_for("/v1/scorers/upload_custom", self.base_url),
+            url_for("/v1/upload_custom_scorer/", self.base_url),
             payload,
         )
 

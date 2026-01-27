@@ -19,10 +19,10 @@ class Judgeval:
 
     def __init__(
         self,
+        project_name: str,
         api_key: Optional[str] = None,
         organization_id: Optional[str] = None,
         api_url: Optional[str] = None,
-        project_name: Optional[str] = None,
     ):
         api_key = api_key or JUDGMENT_API_KEY
         organization_id = organization_id or JUDGMENT_ORG_ID
@@ -34,6 +34,8 @@ class Judgeval:
             raise ValueError("organization_id is required")
         if not api_url:
             raise ValueError("api_url is required")
+        if not project_name:
+            raise ValueError("project_name is required")
 
         self._api_key = api_key
         self._organization_id = organization_id
@@ -46,9 +48,9 @@ class Judgeval:
             self._organization_id,
         )
 
-        self._project_id: Optional[str] = None
-        if project_name:
-            self._project_id = resolve_project_id(self._internal_client, project_name)
+        self._project_id = resolve_project_id(self._internal_client, project_name)
+        if not self._project_id:
+            raise ValueError(f"Project '{project_name}' not found")
 
     @property
     def tracer(self):
@@ -92,6 +94,8 @@ class Judgeval:
 
         return DatasetFactory(
             client=self._internal_client,
+            default_project_id=self._project_id,
+            project_name=self._project_name,
         )
 
     @property

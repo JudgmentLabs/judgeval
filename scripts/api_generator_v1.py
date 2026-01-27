@@ -6,8 +6,6 @@ from typing import Any, Dict, List, Optional, Set
 import httpx
 import re
 
-API_VERSION_PREFIX = "/v1"
-
 spec_file = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:10001/openapi/json"
 
 if spec_file.startswith("http"):
@@ -506,6 +504,12 @@ def get_method_name_from_path(path: str, method: str) -> str:
     name = path.strip("/").replace("/", "_").replace("-", "_")
     if not name:
         return "index"
+    # Strip v1_ prefix for /v1/* endpoints (but not for /otel/v1/* which is OTEL's own versioning)
+    if name.startswith("v1_"):
+        name = name[3:]
+    elif name == "v1":
+        name = "index"
+    # For /otel/* endpoints, keep the otel_ prefix as-is
     return name
 
 
@@ -598,9 +602,6 @@ def generate_method_body(
 ) -> str:
     async_prefix = "await " if is_async else ""
 
-    # Prefix path with API version
-    versioned_path = f"{API_VERSION_PREFIX}{path.rstrip('/')}"
-
     if query_params:
         query_lines = ["query_params = {}"]
         for param in query_params:
@@ -618,20 +619,20 @@ def generate_method_body(
 
     if method == "GET":
         if query_setup:
-            return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{versioned_path}", self.base_url),\n            {query_param},\n        )'
+            return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            {query_param},\n        )'
         else:
-            return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{versioned_path}", self.base_url),\n            {{}},\n        )'
+            return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            {{}},\n        )'
     else:
         if request_type:
             if query_setup:
-                return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{versioned_path}", self.base_url),\n            payload,\n            params={query_param},\n        )'
+                return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            payload,\n            params={query_param},\n        )'
             else:
-                return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{versioned_path}", self.base_url),\n            payload,\n        )'
+                return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            payload,\n        )'
         else:
             if query_setup:
-                return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{versioned_path}", self.base_url),\n            {{}},\n            params={query_param},\n        )'
+                return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            {{}},\n            params={query_param},\n        )'
             else:
-                return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{versioned_path}", self.base_url),\n            {{}},\n        )'
+                return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            {{}},\n        )'
 
 
 def generate_client_class(
@@ -738,7 +739,16 @@ def generate_api_file() -> str:
     sync_methods = []
     async_methods = []
 
+    # Include endpoints that start with these prefixes
+    # - /v1: Main v1 API endpoints (strip v1 from method name)
+    # - /otel: OTEL endpoints with their own versioning (keep otel in method name)
+    INCLUDE_PREFIXES = ["/v1", "/otel"]
+
     for path, path_data in SPEC["paths"].items():
+        # Only include endpoints that start with our allowed prefixes
+        if not any(path.startswith(prefix) for prefix in INCLUDE_PREFIXES):
+            continue
+
         for method, operation in path_data.items():
             if method.upper() in ["GET", "POST", "PUT", "PATCH", "DELETE"]:
                 method_name = get_method_name_from_path(path, method.upper())

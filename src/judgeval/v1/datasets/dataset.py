@@ -49,7 +49,8 @@ class DatasetInfo:
 @dataclass
 class Dataset:
     name: str
-    project_name: str
+    project_id: str
+    project_name: str  # Display name from Judgeval client
     dataset_kind: str = "example"
     examples: Optional[List[Example]] = None
     client: Optional[JudgmentSyncClient] = None
@@ -124,7 +125,7 @@ class Dataset:
                 self.client.datasets_insert_examples_for_judgeval(
                     {
                         "dataset_name": self.name,
-                        "project_name": self.project_name,
+                        "project_id": self.project_id,
                         "examples": [e.to_dict() for e in batch],
                     }
                 )

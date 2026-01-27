@@ -32,7 +32,7 @@ class Openlit(ABC):
 
         openlit.init(
             service_name=project_name,
-            otlp_endpoint=url_for("/v1/otel"),
+            otlp_endpoint=url_for("/otel"),
             otlp_headers={
                 "Authorization": f"Bearer {api_key}",
                 "X-Organization-Id": organization_id,

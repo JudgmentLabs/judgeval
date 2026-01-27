@@ -63,6 +63,7 @@ def load_otel_env(
 def upload_scorer(
     scorer_file_path: str = typer.Argument(help="Path to scorer Python file"),
     requirements_file_path: str = typer.Argument(help="Path to requirements.txt file"),
+    project_name: str = typer.Option(..., "--project", "-p", help="Project name"),
     unique_name: str = typer.Option(
         None, help="Custom scorer name (auto-detected if not provided)"
     ),
@@ -83,7 +84,7 @@ def upload_scorer(
             f"Requirements file not found: {requirements_file_path}"
         )
 
-    client = Judgeval(api_key=api_key, organization_id=organization_id)
+    client = Judgeval(project_name, api_key=api_key, organization_id=organization_id)
 
     try:
         result = client.scorers.custom_scorer.upload(

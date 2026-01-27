@@ -29,32 +29,32 @@ def test_factory_get(dataset_factory, mock_client):
         "examples": [],
     }
 
-    dataset = dataset_factory.get("test_dataset", "test_project")
+    dataset = dataset_factory.get("test_dataset", "test_project_id")
 
     assert isinstance(dataset, Dataset)
     assert dataset.name == "test_dataset"
-    assert dataset.project_name == "test_project"
+    assert dataset.project_id == "test_project_id"
     mock_client.datasets_pull_for_judgeval.assert_called_once()
 
 
 def test_factory_create(dataset_factory, mock_client, sample_examples):
     dataset = dataset_factory.create(
         name="test_dataset",
-        project_name="test_project",
+        project_id="test_project_id",
         examples=sample_examples,
         overwrite=False,
     )
 
     assert isinstance(dataset, Dataset)
     assert dataset.name == "test_dataset"
-    assert dataset.project_name == "test_project"
+    assert dataset.project_id == "test_project_id"
     assert len(dataset.examples) == 2
     mock_client.datasets_create_for_judgeval.assert_called_once()
 
 
 def test_factory_create_with_overwrite(dataset_factory, mock_client):
     dataset = dataset_factory.create(
-        name="test_dataset", project_name="test_project", examples=[], overwrite=True
+        name="test_dataset", project_id="test_project_id", examples=[], overwrite=True
     )
 
     assert isinstance(dataset, Dataset)
@@ -74,7 +74,7 @@ def test_factory_list(dataset_factory, mock_client):
         }
     ]
 
-    datasets = dataset_factory.list("test_project")
+    datasets = dataset_factory.list("test_project_id")
 
     assert isinstance(datasets, list)
     assert len(datasets) == 1
@@ -83,6 +83,6 @@ def test_factory_list(dataset_factory, mock_client):
 
 
 def test_factory_create_empty_examples(dataset_factory, mock_client):
-    dataset = dataset_factory.create(name="test_dataset", project_name="test_project")
+    dataset = dataset_factory.create(name="test_dataset", project_id="test_project_id")
 
     assert len(dataset.examples) == 0
