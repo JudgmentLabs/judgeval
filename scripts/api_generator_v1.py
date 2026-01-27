@@ -6,6 +6,8 @@ from typing import Any, Dict, List, Optional, Set
 import httpx
 import re
 
+API_VERSION_PREFIX = "/v1"
+
 spec_file = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:10001/openapi/json"
 
 if spec_file.startswith("http"):
@@ -596,6 +598,9 @@ def generate_method_body(
 ) -> str:
     async_prefix = "await " if is_async else ""
 
+    # Prefix path with API version
+    versioned_path = f"{API_VERSION_PREFIX}{path.rstrip('/')}"
+
     if query_params:
         query_lines = ["query_params = {}"]
         for param in query_params:
@@ -613,20 +618,20 @@ def generate_method_body(
 
     if method == "GET":
         if query_setup:
-            return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            {query_param},\n        )'
+            return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{versioned_path}", self.base_url),\n            {query_param},\n        )'
         else:
-            return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            {{}},\n        )'
+            return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{versioned_path}", self.base_url),\n            {{}},\n        )'
     else:
         if request_type:
             if query_setup:
-                return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            payload,\n            params={query_param},\n        )'
+                return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{versioned_path}", self.base_url),\n            payload,\n            params={query_param},\n        )'
             else:
-                return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            payload,\n        )'
+                return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{versioned_path}", self.base_url),\n            payload,\n        )'
         else:
             if query_setup:
-                return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            {{}},\n            params={query_param},\n        )'
+                return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{versioned_path}", self.base_url),\n            {{}},\n            params={query_param},\n        )'
             else:
-                return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            {{}},\n        )'
+                return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{versioned_path}", self.base_url),\n            {{}},\n        )'
 
 
 def generate_client_class(

@@ -342,7 +342,7 @@ class BaseTracer(ABC):
         trace_id = format(span_context.trace_id, "032x")
         self.api_client._request(
             "POST",
-            url_for("/traces/tags/add", self.api_client.base_url),
+            url_for("/v1/traces/tags/add", self.api_client.base_url),
             {
                 "project_name": self.project_name,
                 "trace_id": trace_id,
@@ -352,9 +352,9 @@ class BaseTracer(ABC):
 
     def _build_endpoint(self, base_url: str) -> str:
         return (
-            base_url + "otel/v1/traces"
+            base_url + "v1/otel/traces"
             if base_url.endswith("/")
-            else base_url + "/otel/v1/traces"
+            else base_url + "/v1/otel/traces"
         )
 
     def _generate_run_id(self, prefix: str, span_id: str) -> str:
