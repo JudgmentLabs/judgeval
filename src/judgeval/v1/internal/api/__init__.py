@@ -298,6 +298,22 @@ class JudgmentSyncClient:
             payload,
         )
 
+    def e2e_fetch_trace(self, payload: E2EFetchTraceRequest) -> E2EFetchTraceResponse:
+        return self._request(
+            "POST",
+            url_for("/e2e_fetch_trace/", self.base_url),
+            payload,
+        )
+
+    def e2e_fetch_span_score(
+        self, payload: E2EFetchSpanScoreRequest
+    ) -> E2EFetchSpanScoreResponse:
+        return self._request(
+            "POST",
+            url_for("/e2e_fetch_span_score/", self.base_url),
+            payload,
+        )
+
 
 class JudgmentAsyncClient:
     __slots__ = ("base_url", "api_key", "organization_id", "client")
@@ -575,6 +591,24 @@ class JudgmentAsyncClient:
         return await self._request(
             "POST",
             url_for("/traces/tags/add", self.base_url),
+            payload,
+        )
+
+    async def e2e_fetch_trace(
+        self, payload: E2EFetchTraceRequest
+    ) -> E2EFetchTraceResponse:
+        return await self._request(
+            "POST",
+            url_for("/e2e_fetch_trace/", self.base_url),
+            payload,
+        )
+
+    async def e2e_fetch_span_score(
+        self, payload: E2EFetchSpanScoreRequest
+    ) -> E2EFetchSpanScoreResponse:
+        return await self._request(
+            "POST",
+            url_for("/e2e_fetch_span_score/", self.base_url),
             payload,
         )
 
