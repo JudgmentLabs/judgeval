@@ -48,3 +48,6 @@ class SpanStore(ABCSpanStore):
     def clear_trace(self, trace_id: str) -> None:
         if trace_id in self._spans_by_trace:
             del self._spans_by_trace[trace_id]
+
+    def clear(self) -> None:
+        self._spans_by_trace.clear()
