@@ -151,6 +151,24 @@ class BaseTracer(ABC):
             return self._tracer_provider._isolated
         return False
 
+    def _set_context_value(self, key: str, value: object) -> None:
+        """Set a value in the appropriate context (isolated or global)."""
+        if self._is_isolated():
+            from judgeval.v1.tracer.judgment_tracer_provider import (
+                JudgmentTracerProvider,
+            )
+            from opentelemetry.context.context import Context
+
+            provider = self._tracer_provider
+            assert isinstance(provider, JudgmentTracerProvider)
+            current = provider._runtime_context.get_current()
+            new_values = current.copy()
+            new_values[key] = value
+            provider._runtime_context.attach(Context(new_values))
+        else:
+            ctx = set_value(key, value)
+            attach(ctx)
+
     def get_context(self) -> Context:
         from judgeval.v1.tracer.judgment_tracer_provider import JudgmentTracerProvider
 
@@ -218,12 +236,7 @@ class BaseTracer(ABC):
             self.set_attribute(key, value)
 
     def set_customer_id(self, customer_id: str) -> None:
-        current_span = self._get_current_span()
-        if current_span is None:
-            return
-        current_span.set_attribute(AttributeKeys.JUDGMENT_CUSTOMER_ID, customer_id)
-        ctx = set_value(CUSTOMER_ID_KEY, customer_id)
-        attach(ctx)
+        self._set_context_value(CUSTOMER_ID_KEY, customer_id)
 
     def set_llm_span(self) -> None:
         self.set_span_kind("llm")
@@ -328,8 +341,7 @@ class BaseTracer(ABC):
         if current_span is None:
             return
         current_span.set_attribute(AttributeKeys.JUDGMENT_SESSION_ID, session_id)
-        ctx = set_value(SESSION_ID_KEY, session_id)
-        attach(ctx)
+        self._set_context_value(SESSION_ID_KEY, session_id)
 
     @dont_throw
     def tag(self, tags: str | list[str]) -> None:
