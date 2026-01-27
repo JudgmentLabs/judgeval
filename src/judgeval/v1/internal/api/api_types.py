@@ -153,7 +153,7 @@ class FetchPromptResponse(TypedDict):
 
 
 class FetchPromptScorersRequest(TypedDict):
-    project_id: NotRequired[Optional[str]]
+    project_id: str
     names: NotRequired[Optional[List[str]]]
     is_trace: NotRequired[Optional[bool]]
 
