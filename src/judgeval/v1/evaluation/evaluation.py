@@ -30,6 +30,18 @@ class Evaluation:
         self._project_id = project_id
         self._project_name = project_name
 
+    def _validate_scorer_project(self, scorer: BaseScorer) -> None:
+        scorer_project_id = scorer.get_project_id()
+        if scorer_project_id is not None and scorer_project_id != self._project_id:
+            judgeval_logger.warning(
+                f"Rejecting scorer '{scorer.get_name()}' with different project_id: "
+                f"{scorer_project_id} != {self._project_id}"
+            )
+            raise ValueError(
+                f"Scorer '{scorer.get_name()}' belongs to project '{scorer_project_id}', "
+                f"but this evaluation is bound to project '{self._project_name}' ({self._project_id})"
+            )
+
     def run(
         self,
         examples: List[Example],
@@ -40,6 +52,10 @@ class Evaluation:
         timeout_seconds: int = 300,
     ) -> List[ScoringResult]:
         project_id = self._project_id
+
+        # Validate all scorers belong to the same project
+        for scorer in scorers:
+            self._validate_scorer_project(scorer)
 
         console = Console()
         eval_id = str(uuid.uuid4())

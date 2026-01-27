@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Iterable, Optional
+from typing import List, Iterable
 
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.datasets.dataset import Dataset, DatasetInfo
@@ -21,12 +21,11 @@ class DatasetFactory:
         self._project_id = project_id
         self._project_name = project_name
 
-    def get(self, name: str, project_id: Optional[str] = None) -> Dataset:
-        pid = project_id or self._project_id
+    def get(self, name: str) -> Dataset:
         dataset = self._client.datasets_pull_for_judgeval(
             {
                 "dataset_name": name,
-                "project_id": pid,
+                "project_id": self._project_id,
             }
         )
 
@@ -60,7 +59,7 @@ class DatasetFactory:
         judgeval_logger.info(f"Retrieved dataset {name} with {len(examples)} examples")
         return Dataset(
             name=name,
-            project_id=pid,
+            project_id=self._project_id,
             dataset_kind=dataset_kind,
             examples=examples,
             client=self._client,
@@ -70,16 +69,14 @@ class DatasetFactory:
     def create(
         self,
         name: str,
-        project_id: Optional[str] = None,
         examples: Iterable[Example] = [],
         overwrite: bool = False,
         batch_size: int = 100,
     ) -> Dataset:
-        pid = project_id or self._project_id
         self._client.datasets_create_for_judgeval(
             {
                 "name": name,
-                "project_id": pid,
+                "project_id": self._project_id,
                 "examples": [],
                 "dataset_kind": "example",
                 "overwrite": overwrite,
@@ -92,7 +89,7 @@ class DatasetFactory:
 
         dataset = Dataset(
             name=name,
-            project_id=pid,
+            project_id=self._project_id,
             examples=examples,
             client=self._client,
             project_name=self._project_name,
@@ -100,8 +97,9 @@ class DatasetFactory:
         dataset.add_examples(examples, batch_size=batch_size)
         return dataset
 
-    def list(self, project_id: Optional[str] = None) -> List[DatasetInfo]:
-        pid = project_id or self._project_id
-        datasets = self._client.datasets_pull_all_for_judgeval({"project_id": pid})
-        judgeval_logger.info(f"Fetched datasets for project {pid}")
+    def list(self) -> List[DatasetInfo]:
+        datasets = self._client.datasets_pull_all_for_judgeval(
+            {"project_id": self._project_id}
+        )
+        judgeval_logger.info(f"Fetched datasets for project {self._project_id}")
         return [DatasetInfo(**d) for d in datasets]
