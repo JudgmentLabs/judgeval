@@ -10,13 +10,17 @@ from judgeval.v1.utils import require_project_id
 
 
 class PromptFactory:
-    __slots__ = ("_client", "_default_project_id")
+    __slots__ = ("_client", "_default_project_id", "_project_name")
 
     def __init__(
-        self, client: JudgmentSyncClient, default_project_id: Optional[str] = None
+        self,
+        client: JudgmentSyncClient,
+        default_project_id: Optional[str] = None,
+        project_name: Optional[str] = None,
     ):
         self._client = client
         self._default_project_id = default_project_id
+        self._project_name = project_name
 
     def create(
         self,

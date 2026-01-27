@@ -15,7 +15,7 @@ from judgeval.logger import judgeval_logger
 
 
 class PromptScorerFactory:
-    __slots__ = ("_client", "_is_trace", "_default_project_id")
+    __slots__ = ("_client", "_is_trace", "_default_project_id", "_project_name")
     _cache: Dict[Tuple[str, str, str, Optional[str], bool], APIPromptScorer] = {}
 
     def __init__(
@@ -23,10 +23,12 @@ class PromptScorerFactory:
         client: JudgmentSyncClient,
         is_trace: bool,
         default_project_id: Optional[str] = None,
+        project_name: Optional[str] = None,
     ):
         self._client = client
         self._is_trace = is_trace
         self._default_project_id = default_project_id
+        self._project_name = project_name
 
     def get(
         self,
