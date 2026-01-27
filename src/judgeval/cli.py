@@ -80,7 +80,6 @@ def upload_scorer(
     if not api_key or not organization_id:
         raise typer.BadParameter("JUDGMENT_API_KEY and JUDGMENT_ORG_ID required")
 
-    # Resolve project_id to validate project exists
     internal_client = JudgmentSyncClient(JUDGMENT_API_URL, api_key, organization_id)
     project_id = resolve_project_id(internal_client, project_name)
     if not project_id:

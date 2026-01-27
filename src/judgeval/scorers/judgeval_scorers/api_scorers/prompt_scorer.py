@@ -30,7 +30,6 @@ def push_prompt_scorer(
 ) -> str:
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
-        # Resolve project_name to project_id if provided
         project_id: Optional[str] = None
         if project_name:
             project_id = _resolve_project_id(
@@ -72,7 +71,6 @@ def fetch_prompt_scorer(
 ):
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
-        # Resolve project_name to project_id if provided
         project_id: Optional[str] = None
         if project_name:
             project_id = _resolve_project_id(
@@ -117,7 +115,6 @@ def scorer_exists(
 ):
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
-        # Resolve project_name to project_id if provided
         project_id: Optional[str] = None
         if project_name:
             project_id = _resolve_project_id(

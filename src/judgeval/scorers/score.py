@@ -36,7 +36,6 @@ async def safe_a_score_example(
         result = await scorer.a_score_example(example)
         if result is None:
             raise Exception("a_score_example need to return a score")
-        # Handle both float and tuple return types
         if isinstance(result, tuple):
             score, additional_metadata = result
             scorer.additional_metadata = additional_metadata

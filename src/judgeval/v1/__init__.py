@@ -46,7 +46,6 @@ class Judgeval:
             self._organization_id,
         )
 
-        # Resolve project_id once at init
         self._project_id: Optional[str] = None
         if project_name:
             self._project_id = resolve_project_id(self._internal_client, project_name)

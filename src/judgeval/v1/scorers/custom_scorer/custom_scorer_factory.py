@@ -10,8 +10,8 @@ from judgeval.logger import judgeval_logger
 from judgeval.v1.scorers.custom_scorer.utils import extract_scorer_name
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.internal.api.api_types import UploadCustomScorerRequest
-from judgeval.v1.utils import resolve_project_id
-from judgeval.env import JUDGMENT_API_URL
+from judgeval.v1.utils import require_project_id
+from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
 
 
 class CustomScorerFactory:
@@ -93,13 +93,11 @@ class CustomScorerFactory:
                 requirements_text = f.read()
 
         try:
-            # Use passed client or create one (backwards compatibility)
             if self._client:
                 client = self._client
             else:
-                # Fallback to env vars for backwards compatibility
-                api_key = api_key or os.getenv("JUDGMENT_API_KEY")
-                organization_id = organization_id or os.getenv("JUDGMENT_ORG_ID")
+                api_key = api_key or JUDGMENT_API_KEY
+                organization_id = organization_id or JUDGMENT_ORG_ID
                 if (
                     not api_key
                     or not api_key.strip()
@@ -115,20 +113,9 @@ class CustomScorerFactory:
                     base_url=JUDGMENT_API_URL,
                 )
 
-            # Resolve project_id: explicit > override (needs resolution) > default
-            effective_project_id = project_id
-            if not effective_project_id:
-                if project_name:
-                    effective_project_id = resolve_project_id(client, project_name)
-                else:
-                    effective_project_id = self._default_project_id
-
-            if not effective_project_id:
-                raise ValueError(
-                    "project_id is required. Pass project_id or project_name to upload(), "
-                    "set project_name in Judgeval(project_name=...), "
-                    "or use CLI: judgeval upload-scorer <project_name> <scorer_file> <requirements_file>"
-                )
+            effective_project_id = project_id or require_project_id(
+                client, project_name, self._default_project_id
+            )
 
             payload: UploadCustomScorerRequest = {
                 "project_id": effective_project_id,

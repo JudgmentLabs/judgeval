@@ -155,7 +155,6 @@ class JudgmentClient(metaclass=SingletonMeta):
                 api_key=self.api_key,
                 organization_id=self.organization_id,
             )
-            # Resolve project_name to project_id if provided
             project_id = None
             if project_name:
                 resolve_resp = client.projects_resolve({"project_name": project_name})

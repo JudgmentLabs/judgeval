@@ -6,7 +6,7 @@ from judgeval.logger import judgeval_logger
 from judgeval.utils.decorators.dont_throw import dont_throw
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.prompts.prompt import Prompt
-from judgeval.v1.utils import resolve_project_id
+from judgeval.v1.utils import require_project_id, resolve_project_id
 
 
 class PromptFactory:
@@ -26,8 +26,7 @@ class PromptFactory:
             if tags is None:
                 tags = []
 
-            project_id = resolve_project_id(self._client, project_name)
-            assert project_id is not None
+            project_id = require_project_id(self._client, project_name, None)
             response = self._client.prompts_insert(
                 {
                     "project_id": project_id,
@@ -119,8 +118,7 @@ class PromptFactory:
         tags: List[str],
     ) -> str:
         try:
-            project_id = resolve_project_id(self._client, project_name)
-            assert project_id is not None
+            project_id = require_project_id(self._client, project_name, None)
             response = self._client.prompts_tag(
                 {
                     "project_id": project_id,
@@ -141,8 +139,7 @@ class PromptFactory:
         tags: List[str],
     ) -> List[str]:
         try:
-            project_id = resolve_project_id(self._client, project_name)
-            assert project_id is not None
+            project_id = require_project_id(self._client, project_name, None)
             response = self._client.prompts_untag(
                 {
                     "project_id": project_id,
@@ -161,8 +158,7 @@ class PromptFactory:
         name: str,
     ) -> List[Prompt]:
         try:
-            project_id = resolve_project_id(self._client, project_name)
-            assert project_id is not None
+            project_id = require_project_id(self._client, project_name, None)
             response = self._client.prompts_get_prompt_versions(
                 project_id=project_id,
                 name=name,

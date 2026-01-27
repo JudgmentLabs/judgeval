@@ -10,13 +10,12 @@ from judgeval.v1.internal.api.api_types import (
 )
 from judgeval.exceptions import JudgmentAPIError
 from judgeval.v1.scorers.prompt_scorer.prompt_scorer import PromptScorer
-from judgeval.v1.utils import resolve_project_id
+from judgeval.v1.utils import require_project_id
 from judgeval.logger import judgeval_logger
 
 
 class PromptScorerFactory:
     __slots__ = ("_client", "_is_trace", "_default_project_id")
-    # Cache key: (name, org_id, api_key, project_id, is_trace)
     _cache: Dict[Tuple[str, str, str, Optional[str], bool], APIPromptScorer] = {}
 
     def __init__(
@@ -34,22 +33,9 @@ class PromptScorerFactory:
         name: str,
         project_name: Optional[str] = None,
     ) -> PromptScorer | None:
-        # Resolve project_id: override requires resolution, otherwise use pre-resolved default
-        if project_name:
-            project_id = resolve_project_id(self._client, project_name)
-            if not project_id:
-                raise ValueError(
-                    f"Project '{project_name}' not found. Please create it first."
-                )
-        else:
-            project_id = self._default_project_id
-
-        # Require project_id - don't silently send empty string
-        if not project_id:
-            raise ValueError(
-                "project_id is required. Either pass project_name to get() "
-                "or set project_name in Judgeval(project_name=...)"
-            )
+        project_id = require_project_id(
+            self._client, project_name, self._default_project_id
+        )
 
         cache_key = (
             name,

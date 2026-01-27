@@ -14,7 +14,7 @@ from judgeval.v1.data.example import Example
 from judgeval.v1.data.scoring_result import ScoringResult
 from judgeval.v1.data.scorer_data import ScorerData
 from judgeval.v1.scorers.base_scorer import BaseScorer
-from judgeval.v1.utils import resolve_project_id
+from judgeval.v1.utils import require_project_id
 from judgeval.logger import judgeval_logger
 
 
@@ -39,19 +39,9 @@ class Evaluation:
         assert_test: bool = False,
         timeout_seconds: int = 300,
     ) -> List[ScoringResult]:
-        # Resolve project_id: override requires resolution, otherwise use pre-resolved default
-        if project_name:
-            project_id = resolve_project_id(self._client, project_name)
-            if not project_id:
-                raise ValueError(
-                    f"Project '{project_name}' not found. Please create it first."
-                )
-        else:
-            project_id = self._default_project_id
-            if not project_id:
-                raise ValueError(
-                    "project_name is required. Either pass it to run() or set it in Judgeval(project_name=...)"
-                )
+        project_id = require_project_id(
+            self._client, project_name, self._default_project_id
+        )
 
         console = Console()
         eval_id = str(uuid.uuid4())
