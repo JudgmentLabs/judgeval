@@ -90,7 +90,8 @@ class Example(TypedDict):
 
 class ExampleEvaluationRun(TypedDict):
     id: NotRequired[Optional[str]]
-    project_id: str
+    project_id: NotRequired[Optional[str]]
+    project_name: NotRequired[Optional[str]]
     eval_name: str
     model: NotRequired[Optional[str]]
     created_at: NotRequired[Optional[str]]
@@ -140,7 +141,8 @@ class ExperimentScorer(TypedDict):
 
 class FetchExperimentRunRequest(TypedDict):
     experiment_run_id: str
-    project_id: str
+    project_id: NotRequired[Optional[str]]
+    project_name: NotRequired[Optional[str]]
 
 
 class FetchExperimentRunResponse(TypedDict):
@@ -153,7 +155,8 @@ class FetchPromptResponse(TypedDict):
 
 
 class FetchPromptScorersRequest(TypedDict):
-    project_id: str
+    project_id: NotRequired[Optional[str]]
+    project_name: NotRequired[Optional[str]]
     names: NotRequired[Optional[List[str]]]
     is_trace: NotRequired[Optional[bool]]
 
@@ -259,7 +262,8 @@ class ResolveProjectResponse(TypedDict):
 
 
 class SavePromptScorerRequest(TypedDict):
-    project_id: str
+    project_id: NotRequired[Optional[str]]
+    project_name: NotRequired[Optional[str]]
     name: str
     prompt: str
     threshold: float
@@ -298,7 +302,8 @@ class ScorerData(TypedDict):
 
 
 class ScorerExistsRequest(TypedDict):
-    project_id: str
+    project_id: NotRequired[Optional[str]]
+    project_name: NotRequired[Optional[str]]
     name: str
 
 
@@ -323,7 +328,8 @@ class TagPromptResponse(TypedDict):
 
 class TraceEvaluationRun(TypedDict):
     id: NotRequired[Optional[str]]
-    project_id: str
+    project_id: NotRequired[Optional[str]]
+    project_name: NotRequired[Optional[str]]
     eval_name: str
     model: NotRequired[Optional[str]]
     created_at: NotRequired[Optional[str]]
@@ -392,7 +398,8 @@ class UntagPromptResponse(TypedDict):
 
 
 class UploadCustomScorerRequest(TypedDict):
-    project_id: str
+    project_id: NotRequired[Optional[str]]
+    project_name: NotRequired[Optional[str]]
     scorer_name: str
     scorer_code: str
     requirements_text: str
