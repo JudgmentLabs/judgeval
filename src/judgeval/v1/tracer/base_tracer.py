@@ -704,7 +704,7 @@ class _ObservedSyncGenerator(ABCGenerator[Any, Any, Any]):
         "_tracer",
         "_context",
         "_closed",
-        "_disable_yield_span",
+        "_disable_generator_yield_span",
     )
 
     def __init__(
@@ -714,7 +714,7 @@ class _ObservedSyncGenerator(ABCGenerator[Any, Any, Any]):
         serializer: Callable[[Any], str],
         tracer: trace.Tracer,
         context: contextvars.Context,
-        disable_yield_span: bool = False,
+        disable_generator_yield_span: bool = False,
     ) -> None:
         self._generator = generator
         self._span = span
@@ -722,7 +722,7 @@ class _ObservedSyncGenerator(ABCGenerator[Any, Any, Any]):
         self._tracer = tracer
         self._context = context
         self._closed = False
-        self._disable_yield_span = disable_yield_span
+        self._disable_generator_yield_span = disable_generator_yield_span
 
     def __iter__(self) -> _ObservedSyncGenerator:
         return self
@@ -735,7 +735,7 @@ class _ObservedSyncGenerator(ABCGenerator[Any, Any, Any]):
             raise StopIteration
         try:
             item = self._context.run(self._generator.send, value)
-            if not self._disable_yield_span:
+            if not self._disable_generator_yield_span:
                 with trace.use_span(self._span):
                     span_name = str(getattr(self._span, "name", "generator_item"))
                     with self._tracer.start_as_current_span(
@@ -783,7 +783,7 @@ class _ObservedSyncGenerator(ABCGenerator[Any, Any, Any]):
                 item = self._context.run(self._generator.throw, __typ, __val, __tb)
             else:
                 item = self._context.run(self._generator.throw, __typ, None, __tb)
-            if not self._disable_yield_span:
+            if not self._disable_generator_yield_span:
                 with trace.use_span(self._span):
                     span_name = str(getattr(self._span, "name", "generator_item"))
                     with self._tracer.start_as_current_span(
@@ -832,7 +832,7 @@ class _ObservedAsyncGenerator(ABCAsyncGenerator[Any, Any]):
         "_tracer",
         "_context",
         "_closed",
-        "_disable_yield_span",
+        "_disable_generator_yield_span",
     )
 
     def __init__(
@@ -842,7 +842,7 @@ class _ObservedAsyncGenerator(ABCAsyncGenerator[Any, Any]):
         serializer: Callable[[Any], str],
         tracer: trace.Tracer,
         context: contextvars.Context,
-        disable_yield_span: bool = False,
+        disable_generator_yield_span: bool = False,
     ) -> None:
         self._generator = generator
         self._span = span
@@ -850,7 +850,7 @@ class _ObservedAsyncGenerator(ABCAsyncGenerator[Any, Any]):
         self._tracer = tracer
         self._context = context
         self._closed = False
-        self._disable_yield_span = disable_yield_span
+        self._disable_generator_yield_span = disable_generator_yield_span
 
     def _create_task(self, coro: Coroutine[Any, Any, R]) -> asyncio.Task[R]:
         try:
@@ -869,7 +869,7 @@ class _ObservedAsyncGenerator(ABCAsyncGenerator[Any, Any]):
             raise StopAsyncIteration
         try:
             item = await self._create_task(self._generator.asend(value))
-            if not self._disable_yield_span:
+            if not self._disable_generator_yield_span:
                 with trace.use_span(self._span):
                     span_name = str(getattr(self._span, "name", "generator_item"))
                     with self._tracer.start_as_current_span(
@@ -921,7 +921,7 @@ class _ObservedAsyncGenerator(ABCAsyncGenerator[Any, Any]):
                 item = await self._create_task(
                     self._generator.athrow(__typ, None, __tb)
                 )
-            if not self._disable_yield_span:
+            if not self._disable_generator_yield_span:
                 with trace.use_span(self._span):
                     span_name = str(getattr(self._span, "name", "generator_item"))
                     with self._tracer.start_as_current_span(
