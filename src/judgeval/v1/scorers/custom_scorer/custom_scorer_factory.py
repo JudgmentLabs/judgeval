@@ -9,6 +9,7 @@ import ast
 from judgeval.logger import judgeval_logger
 from judgeval.v1.scorers.custom_scorer.utils import extract_scorer_name
 from judgeval.v1.internal.api import JudgmentSyncClient
+from judgeval.v1.internal.api.api_types import UploadCustomScorerRequest
 from judgeval.v1.utils import resolve_project_id
 from judgeval.env import JUDGMENT_API_URL
 
@@ -129,7 +130,7 @@ class CustomScorerFactory:
                     "or use CLI: judgeval upload-scorer <project_name> <scorer_file> <requirements_file>"
                 )
 
-            payload = {
+            payload: UploadCustomScorerRequest = {
                 "project_id": effective_project_id,
                 "scorer_name": unique_name,
                 "class_name": scorer_classes[0],

@@ -381,6 +381,7 @@ class BaseTracer(ABC):
         trace_id: str,
         span_id: str,
     ) -> ExampleEvaluationRun:
+        assert self.project_id is not None, "project_id must be set"
         run_id = self._generate_run_id("async_evaluate_", span_id)
 
         judgment_scorers = (
@@ -405,6 +406,7 @@ class BaseTracer(ABC):
         trace_id: str,
         span_id: str,
     ) -> TraceEvaluationRun:
+        assert self.project_id is not None, "project_id must be set"
         eval_name = self._generate_run_id("async_trace_evaluate_", span_id)
 
         judgment_scorers = (

@@ -54,7 +54,7 @@ def push_prompt_scorer(
         }
         if project_id:
             payload["project_id"] = project_id
-        r = client.save_scorer(payload=payload)
+        r = client.save_scorer(payload=payload)  # type: ignore[arg-type]
     except JudgmentAPIError as e:
         raise JudgmentAPIError(
             status_code=e.status_code,
@@ -88,7 +88,7 @@ def fetch_prompt_scorer(
         request: Dict[str, Any] = {"names": [name]}
         if project_id:
             request["project_id"] = project_id
-        fetched_scorers = client.fetch_scorers(request)
+        fetched_scorers = client.fetch_scorers(request)  # type: ignore[arg-type]
         if len(fetched_scorers["scorers"]) == 0:
             judgeval_logger.error(f"Prompt scorer '{name}' not found")
             raise JudgmentAPIError(
@@ -133,7 +133,7 @@ def scorer_exists(
         request: Dict[str, Any] = {"name": name}
         if project_id:
             request["project_id"] = project_id
-        return client.scorer_exists(request)["exists"]
+        return client.scorer_exists(request)["exists"]  # type: ignore[arg-type]
     except JudgmentAPIError as e:
         if e.status_code == 500:
             raise JudgmentAPIError(

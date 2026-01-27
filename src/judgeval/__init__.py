@@ -174,7 +174,7 @@ class JudgmentClient(metaclass=SingletonMeta):
             if project_id:
                 payload["project_id"] = project_id
 
-            upload_resp = client.upload_custom_scorer(payload=payload)
+            upload_resp = client.upload_custom_scorer(payload=payload)  # type: ignore[arg-type]
 
             if upload_resp.get("status") == "success":
                 judgeval_logger.info(
