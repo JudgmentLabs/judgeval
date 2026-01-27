@@ -1,9 +1,7 @@
-from typing import List
-
-from pydantic import Field
-
-from judgeval.data import Example
 from judgeval.scorers.base_scorer import BaseScorer
+from judgeval.data import Example
+from typing import List
+from pydantic import Field
 
 
 class ExampleScorer(BaseScorer):
@@ -12,7 +10,7 @@ class ExampleScorer(BaseScorer):
 
     async def a_score_example(self, example: Example, *args, **kwargs) -> float:
         """
-        Asynchronously measures the score on a single example.
+        Asynchronously measures the score on a single example
         """
         raise NotImplementedError(
             "You must implement the `a_score_example` method in your custom scorer"

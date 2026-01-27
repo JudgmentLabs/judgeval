@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 import re
 from string import Template
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_ORG_ID
-from judgeval.utils.project import resolve_project_id_required
+from judgeval.utils.project import _resolve_project_id
 
 
 def push_prompt(
@@ -26,9 +26,15 @@ def push_prompt(
         raise ValueError("Judgment API key and organization ID are required")
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
-        project_id = resolve_project_id_required(
+        project_id = _resolve_project_id(
             project_name, judgment_api_key, organization_id
         )
+        if not project_id:
+            raise JudgmentAPIError(
+                status_code=404,
+                detail=f"Project '{project_name}' not found",
+                response=None,  # type: ignore
+            )
         r = client.prompts_insert(
             payload={
                 "project_id": project_id,
@@ -58,9 +64,15 @@ def fetch_prompt(
         raise ValueError("Judgment API key and organization ID are required")
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
-        project_id = resolve_project_id_required(
+        project_id = _resolve_project_id(
             project_name, judgment_api_key, organization_id
         )
+        if not project_id:
+            raise JudgmentAPIError(
+                status_code=404,
+                detail=f"Project '{project_name}' not found",
+                response=None,  # type: ignore
+            )
         prompt_config = client.prompts_fetch(
             name=name,
             project_id=project_id,
@@ -88,9 +100,15 @@ def tag_prompt(
         raise ValueError("Judgment API key and organization ID are required")
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
-        project_id = resolve_project_id_required(
+        project_id = _resolve_project_id(
             project_name, judgment_api_key, organization_id
         )
+        if not project_id:
+            raise JudgmentAPIError(
+                status_code=404,
+                detail=f"Project '{project_name}' not found",
+                response=None,  # type: ignore
+            )
         prompt_config = client.prompts_tag(
             payload={
                 "project_id": project_id,
@@ -119,9 +137,15 @@ def untag_prompt(
         raise ValueError("Judgment API key and organization ID are required")
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
-        project_id = resolve_project_id_required(
+        project_id = _resolve_project_id(
             project_name, judgment_api_key, organization_id
         )
+        if not project_id:
+            raise JudgmentAPIError(
+                status_code=404,
+                detail=f"Project '{project_name}' not found",
+                response=None,  # type: ignore
+            )
         prompt_config = client.prompts_untag(
             payload={"project_id": project_id, "name": name, "tags": tags}
         )
@@ -144,9 +168,15 @@ def list_prompt(
         raise ValueError("Judgment API key and organization ID are required")
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
-        project_id = resolve_project_id_required(
+        project_id = _resolve_project_id(
             project_name, judgment_api_key, organization_id
         )
+        if not project_id:
+            raise JudgmentAPIError(
+                status_code=404,
+                detail=f"Project '{project_name}' not found",
+                response=None,  # type: ignore
+            )
         prompt_config = client.prompts_get_prompt_versions(
             project_id=project_id, name=name
         )

@@ -16,7 +16,6 @@ from judgeval.utils.meta import SingletonMeta
 from judgeval.exceptions import JudgmentRuntimeError, JudgmentTestError
 from judgeval.api import JudgmentSyncClient
 from judgeval.utils.file_utils import extract_scorer_name
-from judgeval.utils.project import resolve_project_id_or_none
 from judgeval.utils.guards import expect_api_key, expect_organization_id
 from judgeval.utils.version_check import check_latest_version
 from judgeval.utils.testing import assert_test_results
@@ -84,7 +83,6 @@ class JudgmentClient(metaclass=SingletonMeta):
         unique_name: Optional[str] = None,
         overwrite: bool = False,
         scorer_type: str = "example",
-        project_name: Optional[str] = None,
     ) -> bool:
         """
         Upload custom ExampleScorer from files to backend.
@@ -95,7 +93,6 @@ class JudgmentClient(metaclass=SingletonMeta):
             unique_name: Optional unique identifier (auto-detected from scorer.name if not provided)
             overwrite: Whether to overwrite existing scorer if it already exists
             scorer_type: Optional scorer type (e.g., "trace" for trace scorers)
-            project_name: Optional project name to scope the scorer to
 
         Returns:
             bool: True if upload successful
@@ -156,24 +153,18 @@ class JudgmentClient(metaclass=SingletonMeta):
                 api_key=self.api_key,
                 organization_id=self.organization_id,
             )
-            project_id = resolve_project_id_or_none(
-                project_name, self.api_key, self.organization_id
+            response = client.upload_custom_scorer(
+                payload={
+                    "scorer_name": unique_name,
+                    "class_name": scorer_classes[0],
+                    "scorer_code": scorer_code,
+                    "requirements_text": requirements_text,
+                    "overwrite": overwrite,
+                    "scorer_type": scorer_type,
+                }
             )
 
-            payload = {
-                "scorer_name": unique_name,
-                "class_name": scorer_classes[0],
-                "scorer_code": scorer_code,
-                "requirements_text": requirements_text,
-                "overwrite": overwrite,
-                "scorer_type": scorer_type,
-            }
-            if project_id:
-                payload["project_id"] = project_id
-
-            upload_resp = client.upload_custom_scorer(payload=payload)  # type: ignore[arg-type]
-
-            if upload_resp.get("status") == "success":
+            if response.get("status") == "success":
                 judgeval_logger.info(
                     f"Successfully uploaded custom scorer: {unique_name}"
                 )

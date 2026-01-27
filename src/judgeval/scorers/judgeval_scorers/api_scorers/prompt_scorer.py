@@ -13,7 +13,6 @@ from abc import ABC
 from judgeval.env import JUDGMENT_DEFAULT_GPT_MODEL
 from copy import copy
 from judgeval.utils.decorators.dont_throw import dont_throw
-from judgeval.utils.project import resolve_project_id_or_none
 
 
 def push_prompt_scorer(
@@ -26,26 +25,20 @@ def push_prompt_scorer(
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
     is_trace: bool = False,
-    project_name: Optional[str] = None,
 ) -> str:
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
-        project_id = resolve_project_id_or_none(
-            project_name, judgment_api_key, organization_id
+        r = client.save_scorer(
+            payload={
+                "name": name,
+                "prompt": prompt,
+                "threshold": threshold,
+                "options": options,
+                "model": model,
+                "description": description,
+                "is_trace": is_trace,
+            }
         )
-
-        payload: Dict[str, Any] = {
-            "name": name,
-            "prompt": prompt,
-            "threshold": threshold,
-            "options": options,
-            "model": model,
-            "description": description,
-            "is_trace": is_trace,
-        }
-        if project_id:
-            payload["project_id"] = project_id
-        r = client.save_scorer(payload=payload)  # type: ignore[arg-type]
     except JudgmentAPIError as e:
         raise JudgmentAPIError(
             status_code=e.status_code,
@@ -59,18 +52,10 @@ def fetch_prompt_scorer(
     name: str,
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
-    project_name: Optional[str] = None,
 ):
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
-        project_id = resolve_project_id_or_none(
-            project_name, judgment_api_key, organization_id
-        )
-
-        request: Dict[str, Any] = {"names": [name]}
-        if project_id:
-            request["project_id"] = project_id
-        fetched_scorers = client.fetch_scorers(request)  # type: ignore[arg-type]
+        fetched_scorers = client.fetch_scorers({"names": [name]})
         if len(fetched_scorers["scorers"]) == 0:
             judgeval_logger.error(f"Prompt scorer '{name}' not found")
             raise JudgmentAPIError(
@@ -80,8 +65,8 @@ def fetch_prompt_scorer(
             )
         else:
             scorer_config = fetched_scorers["scorers"][0]
-            scorer_config.pop("created_at", None)
-            scorer_config.pop("updated_at", None)
+            scorer_config.pop("created_at")
+            scorer_config.pop("updated_at")
             return scorer_config
     except JudgmentAPIError as e:
         raise JudgmentAPIError(
@@ -95,18 +80,10 @@ def scorer_exists(
     name: str,
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
-    project_name: Optional[str] = None,
 ):
     client = JudgmentSyncClient(judgment_api_key, organization_id)
     try:
-        project_id = resolve_project_id_or_none(
-            project_name, judgment_api_key, organization_id
-        )
-
-        request: Dict[str, Any] = {"name": name}
-        if project_id:
-            request["project_id"] = project_id
-        return client.scorer_exists(request)["exists"]  # type: ignore[arg-type]
+        return client.scorer_exists({"name": name})["exists"]
     except JudgmentAPIError as e:
         if e.status_code == 500:
             raise JudgmentAPIError(
@@ -128,7 +105,6 @@ class BasePromptScorer(ABC, APIScorerConfig):
     description: Optional[str] = None
     judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or ""
     organization_id: str = os.getenv("JUDGMENT_ORG_ID") or ""
-    project_name: Optional[str] = None
 
     @classmethod
     @dont_throw
@@ -137,11 +113,8 @@ class BasePromptScorer(ABC, APIScorerConfig):
         name: str,
         judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
         organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
-        project_name: Optional[str] = None,
     ):
-        scorer_config = fetch_prompt_scorer(
-            name, judgment_api_key, organization_id, project_name
-        )
+        scorer_config = fetch_prompt_scorer(name, judgment_api_key, organization_id)
         if scorer_config["is_trace"] != issubclass(cls, TracePromptScorer):
             raise JudgmentAPIError(
                 status_code=400,
@@ -162,7 +135,6 @@ class BasePromptScorer(ABC, APIScorerConfig):
             description=scorer_config.get("description"),
             judgment_api_key=judgment_api_key,
             organization_id=organization_id,
-            project_name=project_name,
         )
 
     @classmethod
@@ -176,9 +148,8 @@ class BasePromptScorer(ABC, APIScorerConfig):
         description: Optional[str] = None,
         judgment_api_key: str = os.getenv("JUDGMENT_API_KEY") or "",
         organization_id: str = os.getenv("JUDGMENT_ORG_ID") or "",
-        project_name: Optional[str] = None,
     ):
-        if not scorer_exists(name, judgment_api_key, organization_id, project_name):
+        if not scorer_exists(name, judgment_api_key, organization_id):
             if issubclass(cls, TracePromptScorer):
                 is_trace = True
                 score_type = APIScorerType.TRACE_PROMPT_SCORER
@@ -195,7 +166,6 @@ class BasePromptScorer(ABC, APIScorerConfig):
                 judgment_api_key,
                 organization_id,
                 is_trace,
-                project_name,
             )
             judgeval_logger.info(f"Successfully created PromptScorer: {name}")
             return cls(
@@ -208,7 +178,6 @@ class BasePromptScorer(ABC, APIScorerConfig):
                 description=description,
                 judgment_api_key=judgment_api_key,
                 organization_id=organization_id,
-                project_name=project_name,
             )
         else:
             raise JudgmentAPIError(
@@ -305,17 +274,11 @@ class BasePromptScorer(ABC, APIScorerConfig):
         """
         return self.name
 
-    def get_project_name(self) -> Optional[str]:
-        """
-        Returns the project_name of the scorer.
-        """
-        return self.project_name
-
     def get_config(self) -> dict:
         """
         Returns a dictionary with all the fields in the scorer.
         """
-        config = {
+        return {
             "name": self.name,
             "model": self.model,
             "prompt": self.prompt,
@@ -323,9 +286,6 @@ class BasePromptScorer(ABC, APIScorerConfig):
             "options": self.options,
             "description": self.description,
         }
-        if self.project_name:
-            config["project_name"] = self.project_name
-        return config
 
     def push_prompt_scorer(self):
         """
@@ -341,11 +301,10 @@ class BasePromptScorer(ABC, APIScorerConfig):
             self.judgment_api_key,
             self.organization_id,
             isinstance(self, TracePromptScorer),
-            self.project_name,
         )
 
     def __str__(self):
-        return f"PromptScorer(name={self.name}, model={self.model}, prompt={self.prompt}, threshold={self.threshold}, options={self.options}, description={self.description}, project_name={self.project_name})"
+        return f"PromptScorer(name={self.name}, model={self.model}, prompt={self.prompt}, threshold={self.threshold}, options={self.options}, description={self.description})"
 
     def model_dump(self, *args, **kwargs) -> Dict[str, Any]:
         base = super().model_dump(*args, **kwargs)

@@ -33,15 +33,10 @@ async def safe_a_score_example(
         example (Example): The `Example` to be scored.
     """
     try:
-        result = await scorer.a_score_example(example)
-        if result is None:
+        score = await scorer.a_score_example(example)
+        if score is None:
             raise Exception("a_score_example need to return a score")
-        if isinstance(result, tuple):
-            score, additional_metadata = result
-            scorer.additional_metadata = additional_metadata
-        else:
-            score = result
-        if score < scorer.minimum_score_range:
+        elif score < scorer.minimum_score_range:
             judgeval_logger.warning(
                 f"score cannot be less than {scorer.minimum_score_range} , setting to {scorer.minimum_score_range}. consider decreasing the minimum_score_range in the scorer"
             )
