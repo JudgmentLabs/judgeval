@@ -28,6 +28,16 @@ class AddToRunEvalQueueTracesResponse(TypedDict):
     message: str
 
 
+class AddTraceTagsRequest(TypedDict):
+    project_name: str
+    trace_id: str
+    tags: List[str]
+
+
+class AddTraceTagsResponse(TypedDict):
+    success: bool
+
+
 class BaseScorer(TypedDict):
     score_type: str
     name: NotRequired[Optional[str]]

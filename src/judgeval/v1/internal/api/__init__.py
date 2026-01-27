@@ -291,11 +291,11 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def traces_tags_add(self) -> Any:
+    def traces_tags_add(self, payload: AddTraceTagsRequest) -> AddTraceTagsResponse:
         return self._request(
             "POST",
             url_for("/traces/tags/add", self.base_url),
-            {},
+            payload,
         )
 
 
@@ -569,11 +569,13 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def traces_tags_add(self) -> Any:
+    async def traces_tags_add(
+        self, payload: AddTraceTagsRequest
+    ) -> AddTraceTagsResponse:
         return await self._request(
             "POST",
             url_for("/traces/tags/add", self.base_url),
-            {},
+            payload,
         )
 
 
