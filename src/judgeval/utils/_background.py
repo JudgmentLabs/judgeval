@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import atexit
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable
+from typing import Any, Callable, ParamSpec
 
 from judgeval.env import JUDGMENT_BACKGROUND_WORKERS
 from judgeval.logger import judgeval_logger
+
+P = ParamSpec("P")
 
 _executor: ThreadPoolExecutor | None = None
 
@@ -28,14 +30,13 @@ def _shutdown() -> None:
         _executor = None
 
 
-def _run_safe(fn: Callable[..., Any], *args: Any, **kwargs: Any) -> None:
-    try:
-        fn(*args, **kwargs)
-    except Exception as e:
-        judgeval_logger.error(
-            f"[Caught] An exception was raised in {fn.__name__}", exc_info=e
-        )
+def submit_background(fn: Callable[P, Any], *args: P.args, **kwargs: P.kwargs) -> None:
+    def task() -> None:
+        try:
+            fn(*args, **kwargs)
+        except Exception as e:
+            judgeval_logger.error(
+                f"[Caught] An exception was raised in {fn.__name__}", exc_info=e
+            )
 
-
-def submit_background(fn: Callable[..., Any], *args: Any, **kwargs: Any) -> None:
-    _get_executor().submit(_run_safe, fn, *args, **kwargs)
+    _get_executor().submit(task)

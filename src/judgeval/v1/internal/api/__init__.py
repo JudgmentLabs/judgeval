@@ -291,6 +291,13 @@ class JudgmentSyncClient:
             payload,
         )
 
+    def traces_tags_add(self, payload: AddTraceTagsRequest) -> AddTraceTagsResponse:
+        return self._request(
+            "POST",
+            url_for("/traces/tags/add", self.base_url),
+            payload,
+        )
+
 
 class JudgmentAsyncClient:
     __slots__ = ("base_url", "api_key", "organization_id", "client")
@@ -559,6 +566,15 @@ class JudgmentAsyncClient:
         return await self._request(
             "POST",
             url_for("/upload_custom_scorer/", self.base_url),
+            payload,
+        )
+
+    async def traces_tags_add(
+        self, payload: AddTraceTagsRequest
+    ) -> AddTraceTagsResponse:
+        return await self._request(
+            "POST",
+            url_for("/traces/tags/add", self.base_url),
             payload,
         )
 
