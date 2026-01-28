@@ -554,12 +554,12 @@ class TestSafetyGuarantees(BaseOpenAIChatCompletionsTest):
 
 
 class TestWithStreamingResponse(BaseOpenAIChatCompletionsTest):
-    """Tests for with_streaming_response API which should bypass our wrapper."""
+    """Tests for with_streaming_response API."""
 
     def test_with_streaming_response_sync(
         self, sync_client_maybe_wrapped, mock_processor
     ):
-        """Test that with_streaming_response.create() bypasses our wrapper and works correctly"""
+        """Test that with_streaming_response.create() works correctly with tracing"""
         initial_span_count = len(mock_processor.ended_spans)
 
         with sync_client_maybe_wrapped.chat.completions.with_streaming_response.create(
@@ -569,23 +569,27 @@ class TestWithStreamingResponse(BaseOpenAIChatCompletionsTest):
             max_completion_tokens=1000,
             temperature=1,
         ) as response:
-            # Verify response has iter_lines method (ResponseContextManager behavior)
             assert hasattr(response, "iter_lines")
-
-            # Read some lines to verify it works
             lines = list(response.iter_lines())
             assert len(lines) > 0
 
-        # Verify no new spans were created (wrapper was bypassed)
         if hasattr(sync_client_maybe_wrapped, "_judgment_tracer"):
-            # Should not create a span since we bypass the wrapper
-            assert len(mock_processor.ended_spans) == initial_span_count
+            assert len(mock_processor.ended_spans) == initial_span_count + 1
+            span = mock_processor.get_last_ended_span()
+            attrs = mock_processor.get_span_attributes(span)
+            verify_span_attributes_comprehensive(
+                span=span,
+                attrs=attrs,
+                expected_span_name="OPENAI_API_CALL",
+                expected_model_name="gpt-5-nano",
+                check_completion=False,
+            )
 
     @pytest.mark.asyncio
     async def test_with_streaming_response_async(
         self, async_client_maybe_wrapped, mock_processor
     ):
-        """Test that async with_streaming_response.create() bypasses our wrapper and works correctly"""
+        """Test that async with_streaming_response.create() works correctly with tracing"""
         initial_span_count = len(mock_processor.ended_spans)
 
         async with (
@@ -597,16 +601,20 @@ class TestWithStreamingResponse(BaseOpenAIChatCompletionsTest):
                 temperature=1,
             ) as response
         ):
-            # Verify response has iter_lines method (ResponseContextManager behavior)
             assert hasattr(response, "iter_lines")
-
-            # Read some lines to verify it works
             lines = []
             async for line in response.iter_lines():
                 lines.append(line)
             assert len(lines) > 0
 
-        # Verify no new spans were created (wrapper was bypassed)
         if hasattr(async_client_maybe_wrapped, "_judgment_tracer"):
-            # Should not create a span since we bypass the wrapper
-            assert len(mock_processor.ended_spans) == initial_span_count
+            assert len(mock_processor.ended_spans) == initial_span_count + 1
+            span = mock_processor.get_last_ended_span()
+            attrs = mock_processor.get_span_attributes(span)
+            verify_span_attributes_comprehensive(
+                span=span,
+                attrs=attrs,
+                expected_span_name="OPENAI_API_CALL",
+                expected_model_name="gpt-5-nano",
+                check_completion=False,
+            )
