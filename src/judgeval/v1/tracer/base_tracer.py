@@ -393,8 +393,6 @@ class BaseTracer(ABC):
         trace_id: str,
         span_id: str,
     ) -> ExampleEvaluationRun:
-        if self.project_id is None:
-            raise ValueError("project_id must be set")
         run_id = self._generate_run_id("async_evaluate_", span_id)
 
         judgment_scorers = (
@@ -403,7 +401,7 @@ class BaseTracer(ABC):
         custom_scorers = [scorer.to_dict()] if isinstance(scorer, CustomScorer) else []
 
         return ExampleEvaluationRun(
-            project_id=self.project_id,
+            project_id=cast(str, self.project_id),
             eval_name=run_id,
             trace_id=trace_id,
             trace_span_id=span_id,
@@ -419,8 +417,6 @@ class BaseTracer(ABC):
         trace_id: str,
         span_id: str,
     ) -> TraceEvaluationRun:
-        if self.project_id is None:
-            raise ValueError("project_id must be set")
         eval_name = self._generate_run_id("async_trace_evaluate_", span_id)
 
         judgment_scorers = (
@@ -429,7 +425,7 @@ class BaseTracer(ABC):
         custom_scorers = [scorer.to_dict()] if isinstance(scorer, CustomScorer) else []
 
         return TraceEvaluationRun(
-            project_id=self.project_id,
+            project_id=cast(str, self.project_id),
             eval_name=eval_name,
             trace_and_span_ids=[[trace_id, span_id]],
             judgment_scorers=judgment_scorers,
