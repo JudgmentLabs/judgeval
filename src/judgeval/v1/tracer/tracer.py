@@ -19,6 +19,7 @@ class Tracer(BaseTracer):
     def __init__(
         self,
         project_name: str,
+        project_id: str,
         enable_evaluation: bool,
         enable_monitoring: bool,
         api_client: JudgmentSyncClient,
@@ -48,6 +49,7 @@ class Tracer(BaseTracer):
 
         super().__init__(
             project_name=project_name,
+            project_id=project_id,
             enable_evaluation=enable_evaluation,
             enable_monitoring=enable_monitoring,
             api_client=api_client,

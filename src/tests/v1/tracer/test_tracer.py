@@ -18,6 +18,7 @@ def serializer():
 def test_tracer_initialization(mock_client, serializer):
     tracer = Tracer(
         project_name="test_project",
+        project_id="test_project_id",
         enable_evaluation=True,
         enable_monitoring=True,
         api_client=mock_client,
@@ -25,6 +26,7 @@ def test_tracer_initialization(mock_client, serializer):
     )
 
     assert tracer.project_name == "test_project"
+    assert tracer.project_id == "test_project_id"
     assert tracer._tracer_provider is not None
     assert isinstance(tracer._tracer_provider, TracerProvider)
 
@@ -33,6 +35,7 @@ def test_tracer_initialization_monitoring_disabled(mock_client, serializer):
     with patch("judgeval.v1.tracer.tracer.trace.set_tracer_provider") as mock_set:
         tracer = Tracer(
             project_name="test_project",
+            project_id="test_project_id",
             enable_evaluation=True,
             enable_monitoring=False,
             api_client=mock_client,
@@ -47,6 +50,7 @@ def test_tracer_initialization_isolated(mock_client, serializer):
     with patch("judgeval.v1.tracer.tracer.trace.set_tracer_provider") as mock_set:
         tracer = Tracer(
             project_name="test_project",
+            project_id="test_project_id",
             enable_evaluation=True,
             enable_monitoring=True,
             api_client=mock_client,
@@ -61,6 +65,7 @@ def test_tracer_initialization_isolated(mock_client, serializer):
 def test_tracer_force_flush(mock_client, serializer):
     tracer = Tracer(
         project_name="test_project",
+        project_id="test_project_id",
         enable_evaluation=True,
         enable_monitoring=True,
         api_client=mock_client,
@@ -77,6 +82,7 @@ def test_tracer_force_flush(mock_client, serializer):
 def test_tracer_shutdown(mock_client, serializer):
     tracer = Tracer(
         project_name="test_project",
+        project_id="test_project_id",
         enable_evaluation=True,
         enable_monitoring=True,
         api_client=mock_client,
@@ -93,6 +99,7 @@ def test_tracer_get_context_non_isolated(mock_client, serializer):
     """Test that get_context returns global context when not in isolated mode."""
     tracer = Tracer(
         project_name="test_project",
+        project_id="test_project_id",
         enable_evaluation=True,
         enable_monitoring=True,
         api_client=mock_client,
@@ -114,6 +121,7 @@ def test_tracer_get_context_isolated(mock_client, serializer):
 
     tracer = Tracer(
         project_name="test_project",
+        project_id="test_project_id",
         enable_evaluation=True,
         enable_monitoring=True,
         api_client=mock_client,

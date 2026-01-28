@@ -24,6 +24,7 @@ def tracer():
 
             t = Tracer(
                 project_name="test_project",
+                project_id="test-project-id",
                 enable_evaluation=False,
                 enable_monitoring=True,
                 api_client=mock_client,

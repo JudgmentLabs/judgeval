@@ -9,17 +9,20 @@ from judgeval.v1.tracer.tracer import Tracer
 
 
 class TracerFactory:
-    __slots__ = "_client"
+    __slots__ = ("_client", "_project_name", "_project_id")
 
     def __init__(
         self,
         client: JudgmentSyncClient,
+        project_name: str,
+        project_id: str,
     ):
         self._client = client
+        self._project_name = project_name
+        self._project_id = project_id
 
     def create(
         self,
-        project_name: str,
         enable_evaluation: bool = True,
         enable_monitoring: bool = True,
         serializer: Callable[[Any], str] = safe_serialize,
@@ -29,7 +32,8 @@ class TracerFactory:
         initialize: bool = True,
     ) -> Tracer:
         return Tracer(
-            project_name=project_name,
+            project_name=self._project_name,
+            project_id=self._project_id,
             enable_evaluation=enable_evaluation,
             enable_monitoring=enable_monitoring,
             api_client=self._client,

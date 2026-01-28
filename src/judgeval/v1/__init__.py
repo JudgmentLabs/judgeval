@@ -58,6 +58,8 @@ class Judgeval:
 
         return TracerFactory(
             client=self._internal_client,
+            project_name=self._project_name,
+            project_id=self._project_id,
         )
 
     @property

@@ -29,23 +29,21 @@ def tracer() -> Generator[Tuple[Tracer, SpanStore], None, None]:
     span_store = SpanStore()
     exporter = InMemorySpanExporter(span_store)
 
-    with patch("judgeval.v1.utils.resolve_project_id") as mock_resolve:
-        mock_resolve.return_value = "test_project_id"
+    with patch.object(Tracer, "get_span_exporter", return_value=exporter):
+        tracer_instance = Tracer(
+            project_name="generator-test",
+            project_id="test_project_id",
+            enable_evaluation=False,
+            enable_monitoring=True,
+            api_client=mock_client,
+            serializer=serializer,
+            initialize=True,
+        )
 
-        with patch.object(Tracer, "get_span_exporter", return_value=exporter):
-            tracer_instance = Tracer(
-                project_name="generator-test",
-                enable_evaluation=False,
-                enable_monitoring=True,
-                api_client=mock_client,
-                serializer=serializer,
-                initialize=True,
-            )
+        yield tracer_instance, span_store
 
-            yield tracer_instance, span_store
-
-            tracer_instance.force_flush()
-            tracer_instance.shutdown()
+        tracer_instance.force_flush()
+        tracer_instance.shutdown()
 
 
 def test_sync_generator_basic(tracer: Tuple[Tracer, SpanStore]) -> None:

@@ -82,6 +82,7 @@ class BaseTracer(ABC):
     def __init__(
         self,
         project_name: str,
+        project_id: str,
         enable_evaluation: bool,
         enable_monitoring: bool,
         api_client: JudgmentSyncClient,
@@ -89,21 +90,14 @@ class BaseTracer(ABC):
         tracer_provider: TracerProvider,
     ):
         self.project_name = project_name
+        self.project_id = project_id
         self.enable_evaluation = enable_evaluation
         self.enable_monitoring = enable_monitoring
         self.api_client = api_client
         self.serializer = serializer
-        self.project_id = resolve_project_id(api_client, project_name)
         self._tracer_provider = tracer_provider
 
         BaseTracer._tracers.append(self)
-
-        if self.project_id is None:
-            judgeval_logger.error(
-                f"Failed to resolve project {project_name}, "
-                f"please create it first at https://app.judgmentlabs.ai/org/{self.api_client.organization_id}/projects. "
-                "Skipping Judgment export."
-            )
 
     @abstractmethod
     def force_flush(self, timeout_millis: int) -> bool:
@@ -114,36 +108,18 @@ class BaseTracer(ABC):
         pass
 
     def get_span_exporter(self) -> SpanExporter:
-        if self.project_id is not None:
-            return JudgmentSpanExporter(
-                endpoint=self._build_endpoint(self.api_client.base_url),
-                api_key=self.api_client.api_key,
-                organization_id=self.api_client.organization_id,
-                project_id=self.project_id,
-            )
-        else:
-            judgeval_logger.error(
-                "Project not resolved; cannot create exporter, returning NoOpSpanExporter"
-            )
-            from judgeval.v1.tracer.exporters.noop_span_exporter import NoOpSpanExporter
-
-            return NoOpSpanExporter()
+        return JudgmentSpanExporter(
+            endpoint=self._build_endpoint(self.api_client.base_url),
+            api_key=self.api_client.api_key,
+            organization_id=self.api_client.organization_id,
+            project_id=self.project_id,
+        )
 
     def get_span_processor(self) -> JudgmentSpanProcessor:
-        if self.project_id is not None:
-            return JudgmentSpanProcessor(
-                self,
-                self.get_span_exporter(),
-            )
-        else:
-            judgeval_logger.error(
-                "Project not resolved; cannot create processor, returning NoOpSpanProcessor"
-            )
-            from judgeval.v1.tracer.processors.noop_span_processor import (
-                NoOpJudgmentSpanProcessor,
-            )
-
-            return NoOpJudgmentSpanProcessor()
+        return JudgmentSpanProcessor(
+            self,
+            self.get_span_exporter(),
+        )
 
     def get_tracer(self) -> trace.Tracer:
         return self._tracer_provider.get_tracer(self.TRACER_NAME)
