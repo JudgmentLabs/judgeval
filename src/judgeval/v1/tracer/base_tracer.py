@@ -38,7 +38,6 @@ from judgeval.v1.data.example import Example
 from judgeval.v1.instrumentation import wrap_provider
 from judgeval.v1.instrumentation.llm.providers import ApiClient
 from judgeval.v1.internal.api import JudgmentSyncClient
-from judgeval.utils.url import url_for
 from judgeval.v1.utils import resolve_project_id
 from judgeval.v1.internal.api.api_types import (
     ExampleEvaluationRun,
@@ -287,6 +286,13 @@ class BaseTracer(ABC):
         ctx = set_value(PROJECT_ID_OVERRIDE_KEY, resolved_id, self.get_context())
         self._attach_context(ctx)
 
+    def get_effective_project_id(self) -> Optional[str]:
+        """Get the current effective project_id, respecting any override set on the span."""
+        override = get_value(PROJECT_ID_OVERRIDE_KEY, context=self.get_context())
+        if override is not None:
+            return str(override)
+        return self.project_id
+
     def set_llm_span(self) -> None:
         self.set_span_kind("llm")
 
@@ -317,6 +323,19 @@ class BaseTracer(ABC):
         tracer = self.get_tracer()
         return tracer.start_span(span_name)
 
+    def _check_scorer_project(self, scorer: BaseScorer) -> bool:
+        """Check if scorer belongs to this tracer's project. Returns True if valid."""
+        scorer_project_id = getattr(scorer, "_project_id", None)
+        effective_project_id = self.get_effective_project_id()
+        if scorer_project_id is not None and scorer_project_id != effective_project_id:
+            judgeval_logger.warning(
+                f"Scorer '{scorer.get_name()}' belongs to project '{scorer_project_id}', "
+                f"but the current effective project is '{effective_project_id}'. "
+                "Skipping evaluation."
+            )
+            return False
+        return True
+
     @dont_throw
     def async_evaluate(
         self,
@@ -328,6 +347,9 @@ class BaseTracer(ABC):
             return
 
         if not self.enable_evaluation:
+            return
+
+        if not self._check_scorer_project(scorer):
             return
 
         span_context = self._get_sampled_span_context()
@@ -346,7 +368,8 @@ class BaseTracer(ABC):
         evaluation_run = self._create_evaluation_run(
             scorer, example, trace_id_hex, span_id_hex
         )
-        self._enqueue_evaluation(evaluation_run)
+        if evaluation_run is not None:
+            self._enqueue_evaluation(evaluation_run)
 
     @dont_throw
     def async_trace_evaluate(
@@ -358,6 +381,9 @@ class BaseTracer(ABC):
             return
 
         if not self.enable_evaluation:
+            return
+
+        if not self._check_scorer_project(scorer):
             return
 
         current_span = self._get_sampled_span()
@@ -377,6 +403,8 @@ class BaseTracer(ABC):
         evaluation_run = self._create_trace_evaluation_run(
             scorer, trace_id_hex, span_id_hex
         )
+        if evaluation_run is None:
+            return
         try:
             trace_eval_json = self.serializer(evaluation_run)
             current_span.set_attribute(
@@ -387,19 +415,19 @@ class BaseTracer(ABC):
 
     @dont_throw
     def tag(self, tags: str | list[str]) -> None:
-        # NOTE: Manual API call until PR #661 is merged, then will use generated client
         if not tags or (isinstance(tags, list) and len(tags) == 0):
+            return
+        project_id = self.get_effective_project_id()
+        if project_id is None:
             return
         span_context = self._get_sampled_span_context()
         if span_context is None:
             return
         trace_id = format(span_context.trace_id, "032x")
-        self.api_client._request(
-            "POST",
-            url_for("/traces/tags/add", self.api_client.base_url),
-            {
-                "project_name": self.project_name,
-                "trace_id": trace_id,
+        self.api_client.post_projects_traces_by_trace_id_tags(
+            project_id=project_id,
+            trace_id=trace_id,
+            payload={
                 "tags": tags if isinstance(tags, list) else [tags],
             },
         )
@@ -420,7 +448,11 @@ class BaseTracer(ABC):
         example: Example,
         trace_id: str,
         span_id: str,
-    ) -> ExampleEvaluationRun:
+    ) -> Optional[ExampleEvaluationRun]:
+        project_id = self.get_effective_project_id()
+        if project_id is None:
+            return None
+
         run_id = self._generate_run_id("async_evaluate_", span_id)
 
         judgment_scorers = (
@@ -429,7 +461,7 @@ class BaseTracer(ABC):
         custom_scorers = [scorer.to_dict()] if isinstance(scorer, CustomScorer) else []
 
         return ExampleEvaluationRun(
-            project_name=self.project_name,
+            project_id=project_id,
             eval_name=run_id,
             trace_id=trace_id,
             trace_span_id=span_id,
@@ -444,7 +476,11 @@ class BaseTracer(ABC):
         scorer: BaseScorer,
         trace_id: str,
         span_id: str,
-    ) -> TraceEvaluationRun:
+    ) -> Optional[TraceEvaluationRun]:
+        project_id = self.get_effective_project_id()
+        if project_id is None:
+            return None
+
         eval_name = self._generate_run_id("async_trace_evaluate_", span_id)
 
         judgment_scorers = (
@@ -453,7 +489,7 @@ class BaseTracer(ABC):
         custom_scorers = [scorer.to_dict()] if isinstance(scorer, CustomScorer) else []
 
         return TraceEvaluationRun(
-            project_name=self.project_name,
+            project_id=project_id,
             eval_name=eval_name,
             trace_and_span_ids=[[trace_id, span_id]],
             judgment_scorers=judgment_scorers,
@@ -465,7 +501,10 @@ class BaseTracer(ABC):
 
     def _enqueue_evaluation(self, evaluation_run: ExampleEvaluationRun) -> None:
         try:
-            self.api_client.add_to_run_eval_queue_examples(evaluation_run)
+            self.api_client.post_projects_eval_queue_examples(
+                project_id=evaluation_run["project_id"],
+                payload=evaluation_run,
+            )
         except Exception as e:
             judgeval_logger.error(f"Failed to enqueue evaluation run: {e}")
 

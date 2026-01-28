@@ -14,6 +14,7 @@ class PromptScorer(APIScorer):
         "_description",
         "_judgment_api_key",
         "_organization_id",
+        "_project_id",
         "_is_trace",
     )
 
@@ -27,6 +28,7 @@ class PromptScorer(APIScorer):
         description: Optional[str] = None,
         judgment_api_key: str = "",
         organization_id: str = "",
+        project_id: Optional[str] = None,
         is_trace: bool = False,
     ):
         score_type = (
@@ -45,6 +47,7 @@ class PromptScorer(APIScorer):
         self._description = description
         self._judgment_api_key = judgment_api_key
         self._organization_id = organization_id
+        self._project_id = project_id
         self._is_trace = is_trace
 
     def get_prompt(self) -> str:

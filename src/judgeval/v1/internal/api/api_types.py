@@ -18,10 +18,6 @@ class AddToRunEvalQueueExamplesResponse(TypedDict):
     message: str
 
 
-class AddToRunEvalQueueRequest(TypedDict):
-    pass
-
-
 class AddToRunEvalQueueTracesResponse(TypedDict):
     success: bool
     status: str
@@ -29,8 +25,6 @@ class AddToRunEvalQueueTracesResponse(TypedDict):
 
 
 class AddTraceTagsRequest(TypedDict):
-    project_name: str
-    trace_id: str
     tags: List[str]
 
 
@@ -61,7 +55,6 @@ class BaseScorer(TypedDict):
 class CreateDatasetRequest(TypedDict):
     name: str
     dataset_kind: str
-    project_name: str
     examples: List[Example]
     overwrite: bool
 
@@ -79,30 +72,9 @@ class DatasetInfo(TypedDict):
     creator: str
 
 
-class DeleteProjectRequest(TypedDict):
-    project_name: str
-
-
 class DeleteProjectResponse(TypedDict):
     status: str
     message: str
-
-
-class E2EFetchSpanScoreRequest(TypedDict):
-    project_name: str
-    trace_id: str
-    span_id: str
-
-
-E2EFetchSpanScoreResponse = List[Dict[str, Any]]
-
-
-class E2EFetchTraceRequest(TypedDict):
-    project_name: str
-    trace_id: str
-
-
-E2EFetchTraceResponse = List[Dict[str, Any]]
 
 
 class ErrorResponse(TypedDict):
@@ -118,7 +90,7 @@ class Example(TypedDict):
 
 class ExampleEvaluationRun(TypedDict):
     id: NotRequired[Optional[str]]
-    project_name: str
+    project_id: str
     eval_name: str
     model: NotRequired[Optional[str]]
     created_at: NotRequired[Optional[str]]
@@ -166,11 +138,6 @@ class ExperimentScorer(TypedDict):
     maximum_score_range: float
 
 
-class FetchExperimentRunRequest(TypedDict):
-    experiment_run_id: str
-    project_name: str
-
-
 class FetchExperimentRunResponse(TypedDict):
     results: NotRequired[Optional[List[ExperimentRunItem]]]
     ui_results_url: NotRequired[Optional[str]]
@@ -178,11 +145,6 @@ class FetchExperimentRunResponse(TypedDict):
 
 class FetchPromptResponse(TypedDict):
     commit: NotRequired[Optional[PromptCommitInfo]]
-
-
-class FetchPromptScorersRequest(TypedDict):
-    names: NotRequired[Optional[List[str]]]
-    is_trace: NotRequired[Optional[bool]]
 
 
 class FetchPromptScorersResponse(TypedDict):
@@ -199,9 +161,7 @@ class HealthResponse(TypedDict):
 
 
 class InsertExamplesRequest(TypedDict):
-    dataset_name: str
     examples: List[Example]
-    project_name: str
 
 
 class InsertExamplesResponse(TypedDict):
@@ -209,7 +169,6 @@ class InsertExamplesResponse(TypedDict):
 
 
 class InsertPromptRequest(TypedDict):
-    project_id: str
     name: str
     prompt: str
     tags: NotRequired[Optional[List[str]]]
@@ -258,21 +217,12 @@ class PromptScorer(TypedDict):
     is_bucket_rubric: NotRequired[Optional[bool]]
 
 
-class PullAllDatasetsRequest(TypedDict):
-    project_name: str
-
-
 PullAllDatasetsResponse = List[DatasetInfo]
-
-
-class PullDatasetRequest(TypedDict):
-    dataset_name: str
-    project_name: str
 
 
 class PullDatasetResponse(TypedDict):
     name: str
-    project_name: str
+    project_id: str
     dataset_kind: str
     examples: List[Example]
 
@@ -323,10 +273,6 @@ class ScorerData(TypedDict):
     additional_metadata: NotRequired[Optional[Dict[str, Any]]]
 
 
-class ScorerExistsRequest(TypedDict):
-    name: str
-
-
 class ScorerExistsResponse(TypedDict):
     exists: bool
 
@@ -336,8 +282,6 @@ class ScoringResult(TypedDict):
 
 
 class TagPromptRequest(TypedDict):
-    project_id: str
-    name: str
     commit_id: str
     tags: List[str]
 
@@ -348,7 +292,7 @@ class TagPromptResponse(TypedDict):
 
 class TraceEvaluationRun(TypedDict):
     id: NotRequired[Optional[str]]
-    project_name: str
+    project_id: str
     eval_name: str
     model: NotRequired[Optional[str]]
     created_at: NotRequired[Optional[str]]
@@ -407,8 +351,6 @@ class TriggerRootSpanRulesResponse(TypedDict):
 
 
 class UntagPromptRequest(TypedDict):
-    project_id: str
-    name: str
     tags: List[str]
 
 

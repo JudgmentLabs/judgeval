@@ -17,6 +17,7 @@ class CustomScorer(BaseScorer):
         "_name",
         "_class_name",
         "_server_hosted",
+        "_project_id",
     )
 
     def __init__(
@@ -24,10 +25,13 @@ class CustomScorer(BaseScorer):
         name: str,
         class_name: str = "",
         server_hosted: bool = True,
+        *,
+        project_id: str,
     ):
         self._name = name
         self._class_name = class_name or name
         self._server_hosted = server_hosted
+        self._project_id = project_id
 
     def get_name(self) -> str:
         return self._name
