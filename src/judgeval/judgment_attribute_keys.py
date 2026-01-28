@@ -32,6 +32,7 @@ class AttributeKeys(str, Enum):
     JUDGMENT_USAGE_TOTAL_COST_USD = "judgment.usage.total_cost_usd"
 
     JUDGMENT_SESSION_ID = "judgment.session_id"
+    JUDGMENT_PROJECT_ID_OVERRIDE = "judgment.project_id_override"
 
     GEN_AI_PROMPT = "gen_ai.prompt"
     GEN_AI_COMPLETION = "gen_ai.completion"
