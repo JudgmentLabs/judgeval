@@ -7,7 +7,6 @@ from typing import (
     Generator,
     AsyncGenerator,
     Iterator,
-    AsyncIterator,
 )
 
 from opentelemetry.trace import Status, StatusCode
@@ -38,7 +37,9 @@ def wrap_with_streaming_response_sync(tracer: BaseTracer, client: OpenAI) -> Non
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
-        ctx["span"].set_attribute(AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"])
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
+        )
         ctx["accumulated_content"] = ""
 
     def mutate_hook(ctx: Dict[str, Any], result: Any) -> Any:
@@ -95,7 +96,9 @@ def wrap_with_streaming_response_sync(tracer: BaseTracer, client: OpenAI) -> Non
                     return wrapped_iter_lines()
 
                 def parse(self, *, to: type | None = None) -> Any:
-                    result = self._response.parse(to=to) if to else self._response.parse()
+                    result = (
+                        self._response.parse(to=to) if to else self._response.parse()
+                    )
                     if hasattr(result, "__iter__") and hasattr(result, "response"):
                         return _wrap_stream(context, result)
                     _process_completion(context, result)
@@ -210,7 +213,9 @@ def wrap_with_streaming_response_sync(tracer: BaseTracer, client: OpenAI) -> Non
             if usage and isinstance(usage, dict):
                 context["usage_dict"] = usage
 
-        def _finalize_span(context: Dict[str, Any], error: BaseException | None) -> None:
+        def _finalize_span(
+            context: Dict[str, Any], error: BaseException | None
+        ) -> None:
             span = context.get("span")
             if not span:
                 return
@@ -233,8 +238,10 @@ def wrap_with_streaming_response_sync(tracer: BaseTracer, client: OpenAI) -> Non
                     cache_read = usage.prompt_tokens_details.cached_tokens or 0
 
                 set_cost_attribute(span, usage)
-                prompt_tokens, completion_tokens, cache_read, _ = openai_tokens_converter(
-                    prompt_tokens, completion_tokens, cache_read, 0, total_tokens
+                prompt_tokens, completion_tokens, cache_read, _ = (
+                    openai_tokens_converter(
+                        prompt_tokens, completion_tokens, cache_read, 0, total_tokens
+                    )
                 )
                 span.set_attribute(
                     AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS, prompt_tokens
@@ -262,8 +269,10 @@ def wrap_with_streaming_response_sync(tracer: BaseTracer, client: OpenAI) -> Non
                 if prompt_details and isinstance(prompt_details, dict):
                     cache_read = prompt_details.get("cached_tokens") or 0
 
-                prompt_tokens, completion_tokens, cache_read, _ = openai_tokens_converter(
-                    prompt_tokens, completion_tokens, cache_read, 0, total_tokens
+                prompt_tokens, completion_tokens, cache_read, _ = (
+                    openai_tokens_converter(
+                        prompt_tokens, completion_tokens, cache_read, 0, total_tokens
+                    )
                 )
                 span.set_attribute(
                     AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS, prompt_tokens
@@ -314,7 +323,9 @@ def wrap_with_streaming_response_async(tracer: BaseTracer, client: AsyncOpenAI) 
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
-        ctx["span"].set_attribute(AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"])
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
+        )
         ctx["accumulated_content"] = ""
 
     def mutate_hook(ctx: Dict[str, Any], result: Any) -> Any:
@@ -500,7 +511,9 @@ def wrap_with_streaming_response_async(tracer: BaseTracer, client: AsyncOpenAI) 
             if usage and isinstance(usage, dict):
                 context["usage_dict"] = usage
 
-        def _finalize_span(context: Dict[str, Any], error: BaseException | None) -> None:
+        def _finalize_span(
+            context: Dict[str, Any], error: BaseException | None
+        ) -> None:
             span = context.get("span")
             if not span:
                 return
@@ -523,8 +536,10 @@ def wrap_with_streaming_response_async(tracer: BaseTracer, client: AsyncOpenAI) 
                     cache_read = usage.prompt_tokens_details.cached_tokens or 0
 
                 set_cost_attribute(span, usage)
-                prompt_tokens, completion_tokens, cache_read, _ = openai_tokens_converter(
-                    prompt_tokens, completion_tokens, cache_read, 0, total_tokens
+                prompt_tokens, completion_tokens, cache_read, _ = (
+                    openai_tokens_converter(
+                        prompt_tokens, completion_tokens, cache_read, 0, total_tokens
+                    )
                 )
                 span.set_attribute(
                     AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS, prompt_tokens
@@ -552,8 +567,10 @@ def wrap_with_streaming_response_async(tracer: BaseTracer, client: AsyncOpenAI) 
                 if prompt_details and isinstance(prompt_details, dict):
                     cache_read = prompt_details.get("cached_tokens") or 0
 
-                prompt_tokens, completion_tokens, cache_read, _ = openai_tokens_converter(
-                    prompt_tokens, completion_tokens, cache_read, 0, total_tokens
+                prompt_tokens, completion_tokens, cache_read, _ = (
+                    openai_tokens_converter(
+                        prompt_tokens, completion_tokens, cache_read, 0, total_tokens
+                    )
                 )
                 span.set_attribute(
                     AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS, prompt_tokens
