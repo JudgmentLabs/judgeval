@@ -42,6 +42,14 @@ def wrap_responses_create_sync(tracer: BaseTracer, client: OpenAI) -> None:
     original_func = client.responses.create
 
     def dispatcher(*args: Any, **kwargs: Any) -> Any:
+        # Check if this is a with_streaming_response call - bypass our wrapper
+        extra_headers = kwargs.get("extra_headers") or {}
+        if (
+            isinstance(extra_headers, dict)
+            and extra_headers.get("X-Stainless-Raw-Response") == "stream"
+        ):
+            return original_func(*args, **kwargs)
+
         if kwargs.get("stream", False):
             return _wrap_responses_streaming_sync(tracer, original_func)(
                 *args, **kwargs
@@ -258,6 +266,14 @@ def wrap_responses_create_async(tracer: BaseTracer, client: AsyncOpenAI) -> None
     original_func = client.responses.create
 
     async def dispatcher(*args: Any, **kwargs: Any) -> Any:
+        # Check if this is a with_streaming_response call - bypass our wrapper
+        extra_headers = kwargs.get("extra_headers") or {}
+        if (
+            isinstance(extra_headers, dict)
+            and extra_headers.get("X-Stainless-Raw-Response") == "stream"
+        ):
+            return await original_func(*args, **kwargs)
+
         if kwargs.get("stream", False):
             return await _wrap_responses_streaming_async(tracer, original_func)(
                 *args, **kwargs
