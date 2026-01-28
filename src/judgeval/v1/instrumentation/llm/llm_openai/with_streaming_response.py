@@ -13,32 +13,38 @@ from opentelemetry.trace import Status, StatusCode
 from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.utils.serialize import safe_serialize
 from judgeval.utils.decorators.dont_throw import dont_throw
-from judgeval.v1.instrumentation.llm.llm_openai.utils import openai_tokens_converter
+from judgeval.v1.instrumentation.llm.llm_openai.utils import (
+    openai_tokens_converter,
+    set_cost_attribute,
+)
 
 if TYPE_CHECKING:
     from judgeval.v1.tracer import BaseTracer
-    from openai import OpenAI, AsyncOpenAI
+    from openai import OpenAI, AsyncOpenAI, Stream, AsyncStream
     from openai._response import (
         APIResponse,
         AsyncAPIResponse,
         ResponseContextManager,
         AsyncResponseContextManager,
     )
+    from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
 
 @dont_throw
 def _process_sse_line(ctx: Dict[str, Any], line: str) -> None:
     if not line.startswith("data: ") or line == "data: [DONE]":
         return
-
     try:
         data = json.loads(line[6:])
     except json.JSONDecodeError:
         return
-
     if not isinstance(data, dict):
         return
+    _process_chunk_dict(ctx, data)
 
+
+@dont_throw
+def _process_chunk_dict(ctx: Dict[str, Any], data: Dict[str, Any]) -> None:
     model = data.get("model")
     if model:
         ctx["model"] = model
@@ -52,7 +58,55 @@ def _process_sse_line(ctx: Dict[str, Any], line: str) -> None:
 
     usage = data.get("usage")
     if usage and isinstance(usage, dict) and usage.get("prompt_tokens") is not None:
-        ctx["usage"] = usage
+        ctx["usage_dict"] = usage
+
+
+@dont_throw
+def _process_chunk(ctx: Dict[str, Any], chunk: ChatCompletionChunk) -> None:
+    if chunk.model:
+        ctx["model"] = chunk.model
+
+    if chunk.choices and len(chunk.choices) > 0:
+        delta = chunk.choices[0].delta
+        if delta and delta.content:
+            ctx["accumulated_content"] = (
+                ctx.get("accumulated_content", "") + delta.content
+            )
+
+    if chunk.usage:
+        ctx["usage"] = chunk.usage
+
+
+@dont_throw
+def _process_completion(ctx: Dict[str, Any], result: ChatCompletion) -> None:
+    if result.model:
+        ctx["model"] = result.model
+
+    if result.choices and len(result.choices) > 0:
+        message = result.choices[0].message
+        if message and message.content:
+            ctx["accumulated_content"] = message.content
+
+    if result.usage:
+        ctx["usage"] = result.usage
+
+
+@dont_throw
+def _process_json_response(ctx: Dict[str, Any], data: Dict[str, Any]) -> None:
+    model = data.get("model")
+    if model:
+        ctx["model"] = model
+
+    choices = data.get("choices", [])
+    if choices and len(choices) > 0:
+        message = choices[0].get("message", {}) if isinstance(choices[0], dict) else {}
+        content = message.get("content") if isinstance(message, dict) else None
+        if content:
+            ctx["accumulated_content"] = content
+
+    usage = data.get("usage")
+    if usage and isinstance(usage, dict):
+        ctx["usage_dict"] = usage
 
 
 @dont_throw
@@ -71,43 +125,58 @@ def _finalize_span(ctx: Dict[str, Any]) -> None:
 
     usage = ctx.get("usage")
     if usage:
-        prompt_tokens = usage.get("prompt_tokens") or 0
-        completion_tokens = usage.get("completion_tokens") or 0
-        total_tokens = usage.get("total_tokens") or 0
+        prompt_tokens = usage.prompt_tokens or 0
+        completion_tokens = usage.completion_tokens or 0
+        total_tokens = usage.total_tokens or 0
         cache_read = 0
-        prompt_details = usage.get("prompt_tokens_details")
-        if prompt_details:
+        if usage.prompt_tokens_details:
+            cache_read = usage.prompt_tokens_details.cached_tokens or 0
+
+        set_cost_attribute(span, usage)
+
+        prompt_tokens, completion_tokens, cache_read, _ = openai_tokens_converter(
+            prompt_tokens, completion_tokens, cache_read, 0, total_tokens
+        )
+
+        span.set_attribute(
+            AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS, prompt_tokens
+        )
+        span.set_attribute(
+            AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
+        )
+        span.set_attribute(
+            AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
+        )
+        span.set_attribute(AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0)
+        span.set_attribute(AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(usage))
+        return
+
+    usage_dict = ctx.get("usage_dict")
+    if usage_dict:
+        prompt_tokens = usage_dict.get("prompt_tokens") or 0
+        completion_tokens = usage_dict.get("completion_tokens") or 0
+        total_tokens = usage_dict.get("total_tokens") or 0
+        cache_read = 0
+        prompt_details = usage_dict.get("prompt_tokens_details")
+        if prompt_details and isinstance(prompt_details, dict):
             cache_read = prompt_details.get("cached_tokens") or 0
 
-        prompt_tokens, completion_tokens, cache_read, cache_creation = (
-            openai_tokens_converter(
-                prompt_tokens,
-                completion_tokens,
-                cache_read,
-                0,
-                total_tokens,
-            )
+        prompt_tokens, completion_tokens, cache_read, _ = openai_tokens_converter(
+            prompt_tokens, completion_tokens, cache_read, 0, total_tokens
         )
 
         span.set_attribute(
-            AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
-            prompt_tokens,
+            AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS, prompt_tokens
         )
         span.set_attribute(
-            AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS,
-            completion_tokens,
+            AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
         )
         span.set_attribute(
-            AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS,
-            cache_read,
+            AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
         )
+        span.set_attribute(AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0)
         span.set_attribute(
-            AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS,
-            0,
-        )
-        span.set_attribute(
-            AttributeKeys.JUDGMENT_USAGE_METADATA,
-            safe_serialize(usage),
+            AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(usage_dict)
         )
 
 
@@ -127,12 +196,32 @@ class _TracedAPIResponse:
             yield line
 
     def iter_text(self, chunk_size: int | None = None) -> Iterator[str]:
-        for chunk in self._response.iter_text(chunk_size):
-            yield chunk
+        return self._response.iter_text(chunk_size)
 
     def iter_bytes(self, chunk_size: int | None = None) -> Iterator[bytes]:
-        for chunk in self._response.iter_bytes(chunk_size):
-            yield chunk
+        return self._response.iter_bytes(chunk_size)
+
+    def parse(self, *, to: type | None = None) -> Any:
+        result = self._response.parse(to=to) if to else self._response.parse()
+        if hasattr(result, "__iter__") and hasattr(result, "response"):
+            return _TracedStream(result, self._ctx)
+        _process_completion(self._ctx, result)
+        return result
+
+    def read(self) -> bytes:
+        return self._response.read()
+
+    def text(self) -> str:
+        return self._response.text()
+
+    def json(self) -> object:
+        result = self._response.json()
+        if isinstance(result, dict):
+            _process_json_response(self._ctx, result)
+        return result
+
+    def close(self) -> None:
+        return self._response.close()
 
 
 class _TracedAsyncAPIResponse:
@@ -158,6 +247,90 @@ class _TracedAsyncAPIResponse:
         async for chunk in self._response.iter_bytes(chunk_size):
             yield chunk
 
+    async def parse(self, *, to: type | None = None) -> Any:
+        result = (
+            await self._response.parse(to=to) if to else await self._response.parse()
+        )
+        if hasattr(result, "__aiter__") and hasattr(result, "response"):
+            return _TracedAsyncStream(result, self._ctx)
+        _process_completion(self._ctx, result)
+        return result
+
+    async def read(self) -> bytes:
+        return await self._response.read()
+
+    async def text(self) -> str:
+        return await self._response.text()
+
+    async def json(self) -> object:
+        result = await self._response.json()
+        if isinstance(result, dict):
+            _process_json_response(self._ctx, result)
+        return result
+
+    async def close(self) -> None:
+        return await self._response.close()
+
+
+class _TracedStream:
+    __slots__ = ("_stream", "_ctx")
+
+    def __init__(
+        self, stream: Stream[ChatCompletionChunk], ctx: Dict[str, Any]
+    ) -> None:
+        self._stream = stream
+        self._ctx = ctx
+
+    def __iter__(self) -> Iterator[ChatCompletionChunk]:
+        for chunk in self._stream:
+            _process_chunk(self._ctx, chunk)
+            yield chunk
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._stream, name)
+
+    def __enter__(self) -> _TracedStream:
+        self._stream.__enter__()
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> Any:
+        return self._stream.__exit__(exc_type, exc_val, exc_tb)
+
+
+class _TracedAsyncStream:
+    __slots__ = ("_stream", "_ctx")
+
+    def __init__(
+        self, stream: AsyncStream[ChatCompletionChunk], ctx: Dict[str, Any]
+    ) -> None:
+        self._stream = stream
+        self._ctx = ctx
+
+    async def __aiter__(self) -> AsyncIterator[ChatCompletionChunk]:
+        async for chunk in self._stream:
+            _process_chunk(self._ctx, chunk)
+            yield chunk
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._stream, name)
+
+    async def __aenter__(self) -> _TracedAsyncStream:
+        await self._stream.__aenter__()
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> Any:
+        return await self._stream.__aexit__(exc_type, exc_val, exc_tb)
+
 
 class _TracedResponseContextManager:
     __slots__ = ("_original", "_tracer", "_kwargs", "_ctx")
@@ -174,8 +347,8 @@ class _TracedResponseContextManager:
         self._ctx: Dict[str, Any] = {}
 
     def __enter__(self) -> _TracedAPIResponse:
-        self._start_span()
         response = self._original.__enter__()
+        self._start_span()
         return _TracedAPIResponse(response, self._ctx)
 
     def __exit__(
@@ -183,11 +356,17 @@ class _TracedResponseContextManager:
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
-    ) -> None:
+    ) -> Any:
         try:
-            self._original.__exit__(exc_type, exc_val, exc_tb)
+            return self._original.__exit__(exc_type, exc_val, exc_tb)
         finally:
-            self._end_span(exc_val)
+            _finalize_span(self._ctx)
+            span = self._ctx.get("span")
+            if span:
+                if exc_val:
+                    span.record_exception(exc_val)
+                    span.set_status(Status(StatusCode.ERROR))
+                span.end()
 
     @dont_throw
     def _start_span(self) -> None:
@@ -203,17 +382,6 @@ class _TracedResponseContextManager:
             AttributeKeys.JUDGMENT_LLM_MODEL_NAME, model_name
         )
         self._ctx["accumulated_content"] = ""
-
-    @dont_throw
-    def _end_span(self, error: BaseException | None) -> None:
-        span = self._ctx.get("span")
-        if not span:
-            return
-        _finalize_span(self._ctx)
-        if error:
-            span.record_exception(error)
-            span.set_status(Status(StatusCode.ERROR))
-        span.end()
 
 
 class _TracedAsyncResponseContextManager:
@@ -231,8 +399,8 @@ class _TracedAsyncResponseContextManager:
         self._ctx: Dict[str, Any] = {}
 
     async def __aenter__(self) -> _TracedAsyncAPIResponse:
-        self._start_span()
         response = await self._original.__aenter__()
+        self._start_span()
         return _TracedAsyncAPIResponse(response, self._ctx)
 
     async def __aexit__(
@@ -240,11 +408,17 @@ class _TracedAsyncResponseContextManager:
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
-    ) -> None:
+    ) -> Any:
         try:
-            await self._original.__aexit__(exc_type, exc_val, exc_tb)
+            return await self._original.__aexit__(exc_type, exc_val, exc_tb)
         finally:
-            self._end_span(exc_val)
+            _finalize_span(self._ctx)
+            span = self._ctx.get("span")
+            if span:
+                if exc_val:
+                    span.record_exception(exc_val)
+                    span.set_status(Status(StatusCode.ERROR))
+                span.end()
 
     @dont_throw
     def _start_span(self) -> None:
@@ -260,17 +434,6 @@ class _TracedAsyncResponseContextManager:
             AttributeKeys.JUDGMENT_LLM_MODEL_NAME, model_name
         )
         self._ctx["accumulated_content"] = ""
-
-    @dont_throw
-    def _end_span(self, error: BaseException | None) -> None:
-        span = self._ctx.get("span")
-        if not span:
-            return
-        _finalize_span(self._ctx)
-        if error:
-            span.record_exception(error)
-            span.set_status(Status(StatusCode.ERROR))
-        span.end()
 
 
 def wrap_with_streaming_response_sync(tracer: BaseTracer, client: OpenAI) -> None:

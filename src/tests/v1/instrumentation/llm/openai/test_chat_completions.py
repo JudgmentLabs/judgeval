@@ -556,10 +556,8 @@ class TestSafetyGuarantees(BaseOpenAIChatCompletionsTest):
 class TestWithStreamingResponse(BaseOpenAIChatCompletionsTest):
     """Tests for with_streaming_response API."""
 
-    def test_with_streaming_response_sync(
-        self, sync_client_maybe_wrapped, mock_processor
-    ):
-        """Test that with_streaming_response.create() works correctly with tracing"""
+    def test_iter_lines_streaming_sync(self, sync_client_maybe_wrapped, mock_processor):
+        """Test iter_lines() with stream=True"""
         initial_span_count = len(mock_processor.ended_spans)
 
         with sync_client_maybe_wrapped.chat.completions.with_streaming_response.create(
@@ -585,11 +583,94 @@ class TestWithStreamingResponse(BaseOpenAIChatCompletionsTest):
                 check_completion=False,
             )
 
+    def test_parse_streaming_sync(self, sync_client_maybe_wrapped, mock_processor):
+        """Test parse() with stream=True returns Stream[ChatCompletionChunk]"""
+        initial_span_count = len(mock_processor.ended_spans)
+
+        with sync_client_maybe_wrapped.chat.completions.with_streaming_response.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": "Say hello"}],
+            stream=True,
+            stream_options={"include_usage": True},
+            max_completion_tokens=50,
+            temperature=1,
+        ) as response:
+            stream = response.parse()
+            chunks = list(stream)
+            assert len(chunks) > 0
+            for chunk in chunks:
+                assert hasattr(chunk, "choices")
+
+        if hasattr(sync_client_maybe_wrapped, "_judgment_tracer"):
+            assert len(mock_processor.ended_spans) == initial_span_count + 1
+            span = mock_processor.get_last_ended_span()
+            attrs = mock_processor.get_span_attributes(span)
+            verify_span_attributes_comprehensive(
+                span=span,
+                attrs=attrs,
+                expected_span_name="OPENAI_API_CALL",
+                expected_model_name="gpt-5-nano",
+            )
+
+    def test_parse_non_streaming_sync(self, sync_client_maybe_wrapped, mock_processor):
+        """Test parse() without stream returns ChatCompletion"""
+        initial_span_count = len(mock_processor.ended_spans)
+
+        with sync_client_maybe_wrapped.chat.completions.with_streaming_response.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": "Say bye"}],
+            max_completion_tokens=1000,
+            temperature=1,
+        ) as response:
+            completion = response.parse()
+            assert completion is not None
+            assert completion.choices
+            assert len(completion.choices) > 0
+            assert completion.usage
+            assert completion.usage.prompt_tokens > 0
+
+        if hasattr(sync_client_maybe_wrapped, "_judgment_tracer"):
+            assert len(mock_processor.ended_spans) == initial_span_count + 1
+            span = mock_processor.get_last_ended_span()
+            attrs = mock_processor.get_span_attributes(span)
+            verify_span_attributes_comprehensive(
+                span=span,
+                attrs=attrs,
+                expected_span_name="OPENAI_API_CALL",
+                expected_model_name="gpt-5-nano",
+            )
+
+    def test_json_non_streaming_sync(self, sync_client_maybe_wrapped, mock_processor):
+        """Test json() returns raw dict"""
+        initial_span_count = len(mock_processor.ended_spans)
+
+        with sync_client_maybe_wrapped.chat.completions.with_streaming_response.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": "Say ok"}],
+            max_completion_tokens=1000,
+            temperature=1,
+        ) as response:
+            data = response.json()
+            assert isinstance(data, dict)
+            assert "choices" in data
+            assert "model" in data
+
+        if hasattr(sync_client_maybe_wrapped, "_judgment_tracer"):
+            assert len(mock_processor.ended_spans) == initial_span_count + 1
+            span = mock_processor.get_last_ended_span()
+            attrs = mock_processor.get_span_attributes(span)
+            verify_span_attributes_comprehensive(
+                span=span,
+                attrs=attrs,
+                expected_span_name="OPENAI_API_CALL",
+                expected_model_name="gpt-5-nano",
+            )
+
     @pytest.mark.asyncio
-    async def test_with_streaming_response_async(
+    async def test_iter_lines_streaming_async(
         self, async_client_maybe_wrapped, mock_processor
     ):
-        """Test that async with_streaming_response.create() works correctly with tracing"""
+        """Test async iter_lines() with stream=True"""
         initial_span_count = len(mock_processor.ended_spans)
 
         async with (
@@ -617,4 +698,102 @@ class TestWithStreamingResponse(BaseOpenAIChatCompletionsTest):
                 expected_span_name="OPENAI_API_CALL",
                 expected_model_name="gpt-5-nano",
                 check_completion=False,
+            )
+
+    @pytest.mark.asyncio
+    async def test_parse_streaming_async(
+        self, async_client_maybe_wrapped, mock_processor
+    ):
+        """Test async parse() with stream=True returns AsyncStream[ChatCompletionChunk]"""
+        initial_span_count = len(mock_processor.ended_spans)
+
+        async with (
+            async_client_maybe_wrapped.chat.completions.with_streaming_response.create(
+                model="gpt-5-nano",
+                messages=[{"role": "user", "content": "Say hello"}],
+                stream=True,
+                stream_options={"include_usage": True},
+                max_completion_tokens=50,
+                temperature=1,
+            ) as response
+        ):
+            stream = await response.parse()
+            chunks = [chunk async for chunk in stream]
+            assert len(chunks) > 0
+            for chunk in chunks:
+                assert hasattr(chunk, "choices")
+
+        if hasattr(async_client_maybe_wrapped, "_judgment_tracer"):
+            assert len(mock_processor.ended_spans) == initial_span_count + 1
+            span = mock_processor.get_last_ended_span()
+            attrs = mock_processor.get_span_attributes(span)
+            verify_span_attributes_comprehensive(
+                span=span,
+                attrs=attrs,
+                expected_span_name="OPENAI_API_CALL",
+                expected_model_name="gpt-5-nano",
+            )
+
+    @pytest.mark.asyncio
+    async def test_parse_non_streaming_async(
+        self, async_client_maybe_wrapped, mock_processor
+    ):
+        """Test async parse() without stream returns ChatCompletion"""
+        initial_span_count = len(mock_processor.ended_spans)
+
+        async with (
+            async_client_maybe_wrapped.chat.completions.with_streaming_response.create(
+                model="gpt-5-nano",
+                messages=[{"role": "user", "content": "Say bye"}],
+                max_completion_tokens=1000,
+                temperature=1,
+            ) as response
+        ):
+            completion = await response.parse()
+            assert completion is not None
+            assert completion.choices
+            assert len(completion.choices) > 0
+            assert completion.usage
+            assert completion.usage.prompt_tokens > 0
+
+        if hasattr(async_client_maybe_wrapped, "_judgment_tracer"):
+            assert len(mock_processor.ended_spans) == initial_span_count + 1
+            span = mock_processor.get_last_ended_span()
+            attrs = mock_processor.get_span_attributes(span)
+            verify_span_attributes_comprehensive(
+                span=span,
+                attrs=attrs,
+                expected_span_name="OPENAI_API_CALL",
+                expected_model_name="gpt-5-nano",
+            )
+
+    @pytest.mark.asyncio
+    async def test_json_non_streaming_async(
+        self, async_client_maybe_wrapped, mock_processor
+    ):
+        """Test async json() returns raw dict"""
+        initial_span_count = len(mock_processor.ended_spans)
+
+        async with (
+            async_client_maybe_wrapped.chat.completions.with_streaming_response.create(
+                model="gpt-5-nano",
+                messages=[{"role": "user", "content": "Say ok"}],
+                max_completion_tokens=1000,
+                temperature=1,
+            ) as response
+        ):
+            data = await response.json()
+            assert isinstance(data, dict)
+            assert "choices" in data
+            assert "model" in data
+
+        if hasattr(async_client_maybe_wrapped, "_judgment_tracer"):
+            assert len(mock_processor.ended_spans) == initial_span_count + 1
+            span = mock_processor.get_last_ended_span()
+            attrs = mock_processor.get_span_attributes(span)
+            verify_span_attributes_comprehensive(
+                span=span,
+                attrs=attrs,
+                expected_span_name="OPENAI_API_CALL",
+                expected_model_name="gpt-5-nano",
             )
