@@ -5,20 +5,15 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Dict,
-    Generic,
     Iterator,
     AsyncIterator,
-    TypeVar,
 )
 
 from opentelemetry.trace import Status, StatusCode
 from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.utils.serialize import safe_serialize
 from judgeval.utils.decorators.dont_throw import dont_throw
-from judgeval.v1.instrumentation.llm.llm_openai.utils import (
-    openai_tokens_converter,
-    set_cost_attribute,
-)
+from judgeval.v1.instrumentation.llm.llm_openai.utils import openai_tokens_converter
 
 if TYPE_CHECKING:
     from judgeval.v1.tracer import BaseTracer
@@ -30,14 +25,96 @@ if TYPE_CHECKING:
         AsyncResponseContextManager,
     )
 
-_APIResponseT = TypeVar("_APIResponseT", bound="APIResponse[Any]")
-_AsyncAPIResponseT = TypeVar("_AsyncAPIResponseT", bound="AsyncAPIResponse[Any]")
+
+@dont_throw
+def _process_sse_line(ctx: Dict[str, Any], line: str) -> None:
+    if not line.startswith("data: ") or line == "data: [DONE]":
+        return
+
+    try:
+        data = json.loads(line[6:])
+    except json.JSONDecodeError:
+        return
+
+    if not isinstance(data, dict):
+        return
+
+    model = data.get("model")
+    if model:
+        ctx["model"] = model
+
+    choices = data.get("choices", [])
+    if choices and len(choices) > 0:
+        delta = choices[0].get("delta", {})
+        content = delta.get("content")
+        if content:
+            ctx["accumulated_content"] = ctx.get("accumulated_content", "") + content
+
+    usage = data.get("usage")
+    if usage and isinstance(usage, dict) and usage.get("prompt_tokens") is not None:
+        ctx["usage"] = usage
 
 
-class TracedAPIResponse(Generic[_APIResponseT]):
+@dont_throw
+def _finalize_span(ctx: Dict[str, Any]) -> None:
+    span = ctx.get("span")
+    if not span:
+        return
+
+    accumulated = ctx.get("accumulated_content", "")
+    if accumulated:
+        span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, accumulated)
+
+    model = ctx.get("model")
+    if model:
+        span.set_attribute(AttributeKeys.JUDGMENT_LLM_MODEL_NAME, model)
+
+    usage = ctx.get("usage")
+    if usage:
+        prompt_tokens = usage.get("prompt_tokens") or 0
+        completion_tokens = usage.get("completion_tokens") or 0
+        total_tokens = usage.get("total_tokens") or 0
+        cache_read = 0
+        prompt_details = usage.get("prompt_tokens_details")
+        if prompt_details:
+            cache_read = prompt_details.get("cached_tokens") or 0
+
+        prompt_tokens, completion_tokens, cache_read, cache_creation = (
+            openai_tokens_converter(
+                prompt_tokens,
+                completion_tokens,
+                cache_read,
+                0,
+                total_tokens,
+            )
+        )
+
+        span.set_attribute(
+            AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
+            prompt_tokens,
+        )
+        span.set_attribute(
+            AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS,
+            completion_tokens,
+        )
+        span.set_attribute(
+            AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS,
+            cache_read,
+        )
+        span.set_attribute(
+            AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS,
+            0,
+        )
+        span.set_attribute(
+            AttributeKeys.JUDGMENT_USAGE_METADATA,
+            safe_serialize(usage),
+        )
+
+
+class _TracedAPIResponse:
     __slots__ = ("_response", "_ctx")
 
-    def __init__(self, response: _APIResponseT, ctx: Dict[str, Any]) -> None:
+    def __init__(self, response: APIResponse[Any], ctx: Dict[str, Any]) -> None:
         self._response = response
         self._ctx = ctx
 
@@ -58,10 +135,10 @@ class TracedAPIResponse(Generic[_APIResponseT]):
             yield chunk
 
 
-class TracedAsyncAPIResponse(Generic[_AsyncAPIResponseT]):
+class _TracedAsyncAPIResponse:
     __slots__ = ("_response", "_ctx")
 
-    def __init__(self, response: _AsyncAPIResponseT, ctx: Dict[str, Any]) -> None:
+    def __init__(self, response: AsyncAPIResponse[Any], ctx: Dict[str, Any]) -> None:
         self._response = response
         self._ctx = ctx
 
@@ -82,86 +159,12 @@ class TracedAsyncAPIResponse(Generic[_AsyncAPIResponseT]):
             yield chunk
 
 
-@dont_throw
-def _process_sse_line(ctx: Dict[str, Any], line: str) -> None:
-    if not line.startswith("data: ") or line == "data: [DONE]":
-        return
-
-    try:
-        data = json.loads(line[6:])
-    except json.JSONDecodeError:
-        return
-
-    if not isinstance(data, dict):
-        return
-
-    choices = data.get("choices", [])
-    if choices and len(choices) > 0:
-        delta = choices[0].get("delta", {})
-        content = delta.get("content")
-        if content:
-            ctx["accumulated_content"] = ctx.get("accumulated_content", "") + content
-
-    usage = data.get("usage")
-    if usage:
-        ctx["usage"] = usage
-
-
-@dont_throw
-def _finalize_span(ctx: Dict[str, Any]) -> None:
-    span = ctx.get("span")
-    if not span:
-        return
-
-    accumulated = ctx.get("accumulated_content", "")
-    if accumulated:
-        span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, accumulated)
-
-    usage = ctx.get("usage")
-    if usage:
-        prompt_tokens = usage.get("prompt_tokens", 0) or 0
-        completion_tokens = usage.get("completion_tokens", 0) or 0
-        cache_read = 0
-        prompt_details = usage.get("prompt_tokens_details")
-        if prompt_details:
-            cache_read = prompt_details.get("cached_tokens", 0) or 0
-
-        class UsageObj:
-            pass
-
-        usage_obj = UsageObj()
-        for k, v in usage.items():
-            setattr(usage_obj, k, v)
-
-        set_cost_attribute(span, usage_obj)
-
-        prompt_tokens, completion_tokens, cache_read, _ = openai_tokens_converter(
-            prompt_tokens,
-            completion_tokens,
-            cache_read,
-            0,
-            usage.get("total_tokens", 0) or 0,
-        )
-
-        span.set_attribute(
-            AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS, prompt_tokens
-        )
-        span.set_attribute(
-            AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
-        )
-        span.set_attribute(
-            AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
-        )
-        span.set_attribute(AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0)
-        span.set_attribute(AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(usage))
-
-
-class TracedResponseContextManager(Generic[_APIResponseT]):
+class _TracedResponseContextManager:
     __slots__ = ("_original", "_tracer", "_kwargs", "_ctx")
 
     def __init__(
         self,
-        original: ResponseContextManager[_APIResponseT],
+        original: ResponseContextManager[APIResponse[Any]],
         tracer: BaseTracer,
         kwargs: Dict[str, Any],
     ) -> None:
@@ -170,10 +173,10 @@ class TracedResponseContextManager(Generic[_APIResponseT]):
         self._kwargs = kwargs
         self._ctx: Dict[str, Any] = {}
 
-    def __enter__(self) -> TracedAPIResponse[_APIResponseT]:
+    def __enter__(self) -> _TracedAPIResponse:
         self._start_span()
         response = self._original.__enter__()
-        return TracedAPIResponse(response, self._ctx)
+        return _TracedAPIResponse(response, self._ctx)
 
     def __exit__(
         self,
@@ -213,12 +216,12 @@ class TracedResponseContextManager(Generic[_APIResponseT]):
         span.end()
 
 
-class TracedAsyncResponseContextManager(Generic[_AsyncAPIResponseT]):
+class _TracedAsyncResponseContextManager:
     __slots__ = ("_original", "_tracer", "_kwargs", "_ctx")
 
     def __init__(
         self,
-        original: AsyncResponseContextManager[_AsyncAPIResponseT],
+        original: AsyncResponseContextManager[AsyncAPIResponse[Any]],
         tracer: BaseTracer,
         kwargs: Dict[str, Any],
     ) -> None:
@@ -227,10 +230,10 @@ class TracedAsyncResponseContextManager(Generic[_AsyncAPIResponseT]):
         self._kwargs = kwargs
         self._ctx: Dict[str, Any] = {}
 
-    async def __aenter__(self) -> TracedAsyncAPIResponse[_AsyncAPIResponseT]:
+    async def __aenter__(self) -> _TracedAsyncAPIResponse:
         self._start_span()
         response = await self._original.__aenter__()
-        return TracedAsyncAPIResponse(response, self._ctx)
+        return _TracedAsyncAPIResponse(response, self._ctx)
 
     async def __aexit__(
         self,
@@ -273,9 +276,9 @@ class TracedAsyncResponseContextManager(Generic[_AsyncAPIResponseT]):
 def wrap_with_streaming_response_sync(tracer: BaseTracer, client: OpenAI) -> None:
     original_create = client.chat.completions.with_streaming_response.create
 
-    def wrapped_create(*args: Any, **kwargs: Any) -> TracedResponseContextManager[Any]:
+    def wrapped_create(*args: Any, **kwargs: Any) -> _TracedResponseContextManager:
         original_cm = original_create(*args, **kwargs)
-        return TracedResponseContextManager(original_cm, tracer, kwargs)
+        return _TracedResponseContextManager(original_cm, tracer, kwargs)
 
     setattr(client.chat.completions.with_streaming_response, "create", wrapped_create)
 
@@ -283,10 +286,8 @@ def wrap_with_streaming_response_sync(tracer: BaseTracer, client: OpenAI) -> Non
 def wrap_with_streaming_response_async(tracer: BaseTracer, client: AsyncOpenAI) -> None:
     original_create = client.chat.completions.with_streaming_response.create
 
-    def wrapped_create(
-        *args: Any, **kwargs: Any
-    ) -> TracedAsyncResponseContextManager[Any]:
+    def wrapped_create(*args: Any, **kwargs: Any) -> _TracedAsyncResponseContextManager:
         original_cm = original_create(*args, **kwargs)
-        return TracedAsyncResponseContextManager(original_cm, tracer, kwargs)
+        return _TracedAsyncResponseContextManager(original_cm, tracer, kwargs)
 
     setattr(client.chat.completions.with_streaming_response, "create", wrapped_create)
