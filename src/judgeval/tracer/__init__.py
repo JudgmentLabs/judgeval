@@ -74,6 +74,7 @@ from judgeval.tracer.processors import (
 )
 from judgeval.tracer.utils import set_span_attribute, TraceScorerConfig
 from judgeval.utils.project import _resolve_project_id
+from judgeval.utils._background import submit_background
 from opentelemetry.trace import use_span
 
 C = TypeVar("C", bound=Callable)
@@ -868,8 +869,9 @@ class Tracer(metaclass=SingletonMeta):
             trace_id=trace_id,
         )
         if hosted_scoring:
-            self.api_client.add_to_run_eval_queue_examples(
-                eval_run.model_dump(warnings=False)  # type: ignore
+            submit_background(
+                self.api_client.add_to_run_eval_queue_examples,
+                eval_run.model_dump(warnings=False),
             )
         else:
             judgeval_logger.warning(

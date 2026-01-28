@@ -38,7 +38,6 @@ from judgeval.v1.data.example import Example
 from judgeval.v1.instrumentation import wrap_provider
 from judgeval.v1.instrumentation.llm.providers import ApiClient
 from judgeval.v1.internal.api import JudgmentSyncClient
-from judgeval.utils.url import url_for
 from judgeval.v1.utils import resolve_project_id
 from judgeval.v1.internal.api.api_types import (
     ExampleEvaluationRun,
@@ -61,6 +60,7 @@ from judgeval.v1.tracer.processors._lifecycles import (
     PROJECT_ID_OVERRIDE_KEY,
 )
 from judgeval.v1.tracer.isolated.tracer import JudgmentIsolatedTracer
+from judgeval.utils._background import submit_background
 
 C = TypeVar("C", bound=Callable[..., Any])
 T = TypeVar("T", bound=ApiClient)
@@ -387,16 +387,14 @@ class BaseTracer(ABC):
 
     @dont_throw
     def tag(self, tags: str | list[str]) -> None:
-        # NOTE: Manual API call until PR #661 is merged, then will use generated client
         if not tags or (isinstance(tags, list) and len(tags) == 0):
             return
         span_context = self._get_sampled_span_context()
         if span_context is None:
             return
         trace_id = format(span_context.trace_id, "032x")
-        self.api_client._request(
-            "POST",
-            url_for("/traces/tags/add", self.api_client.base_url),
+        submit_background(
+            self.api_client.traces_tags_add,
             {
                 "project_name": self.project_name,
                 "trace_id": trace_id,
@@ -464,10 +462,9 @@ class BaseTracer(ABC):
         )
 
     def _enqueue_evaluation(self, evaluation_run: ExampleEvaluationRun) -> None:
-        try:
-            self.api_client.add_to_run_eval_queue_examples(evaluation_run)
-        except Exception as e:
-            judgeval_logger.error(f"Failed to enqueue evaluation run: {e}")
+        submit_background(
+            self.api_client.add_to_run_eval_queue_examples, evaluation_run
+        )
 
     def _get_sampled_span_context(self) -> Optional[SpanContext]:
         current_span = self._get_current_span()
