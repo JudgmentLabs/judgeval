@@ -26,7 +26,7 @@ def sample_examples():
 
 
 def test_factory_get(dataset_factory, mock_client):
-    mock_client.datasets_pull_for_judgeval.return_value = {
+    mock_client.get_projects_datasets_by_dataset_name.return_value = {
         "dataset_kind": "example",
         "examples": [],
     }
@@ -36,7 +36,10 @@ def test_factory_get(dataset_factory, mock_client):
     assert isinstance(dataset, Dataset)
     assert dataset.name == "test_dataset"
     assert dataset.project_id == "test_project_id"
-    mock_client.datasets_pull_for_judgeval.assert_called_once()
+    mock_client.get_projects_datasets_by_dataset_name.assert_called_once_with(
+        project_id="test_project_id",
+        dataset_name="test_dataset",
+    )
 
 
 def test_factory_create(dataset_factory, mock_client, sample_examples):
@@ -50,19 +53,34 @@ def test_factory_create(dataset_factory, mock_client, sample_examples):
     assert dataset.name == "test_dataset"
     assert dataset.project_id == "test_project_id"
     assert len(dataset.examples) == 2
-    mock_client.datasets_create_for_judgeval.assert_called_once()
+    mock_client.post_projects_datasets.assert_called_once_with(
+        project_id="test_project_id",
+        payload={
+            "name": "test_dataset",
+            "examples": [],
+            "dataset_kind": "example",
+            "overwrite": False,
+        },
+    )
 
 
 def test_factory_create_with_overwrite(dataset_factory, mock_client):
     dataset = dataset_factory.create(name="test_dataset", examples=[], overwrite=True)
 
     assert isinstance(dataset, Dataset)
-    call_args = mock_client.datasets_create_for_judgeval.call_args[0][0]
-    assert call_args["overwrite"] is True
+    mock_client.post_projects_datasets.assert_called_once_with(
+        project_id="test_project_id",
+        payload={
+            "name": "test_dataset",
+            "examples": [],
+            "dataset_kind": "example",
+            "overwrite": True,
+        },
+    )
 
 
 def test_factory_list(dataset_factory, mock_client):
-    mock_client.datasets_pull_all_for_judgeval.return_value = [
+    mock_client.get_projects_datasets.return_value = [
         {
             "dataset_id": "1",
             "name": "dataset1",
@@ -78,7 +96,9 @@ def test_factory_list(dataset_factory, mock_client):
     assert isinstance(datasets, list)
     assert len(datasets) == 1
     assert isinstance(datasets[0], DatasetInfo)
-    mock_client.datasets_pull_all_for_judgeval.assert_called_once()
+    mock_client.get_projects_datasets.assert_called_once_with(
+        project_id="test_project_id",
+    )
 
 
 def test_factory_create_empty_examples(dataset_factory, mock_client):

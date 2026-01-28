@@ -44,7 +44,7 @@ def test_factory_create(evaluation_factory, mock_client):
 
 
 def test_factory_run(evaluation_factory, mock_client, sample_examples, sample_scorers):
-    mock_client.fetch_experiment_run.return_value = {
+    mock_client.get_projects_experiments_by_run_id.return_value = {
         "results": [
             {
                 "scorers": [
@@ -76,4 +76,4 @@ def test_factory_run(evaluation_factory, mock_client, sample_examples, sample_sc
 
     assert len(results) == 1
     assert results[0].success
-    mock_client.add_to_run_eval_queue_examples.assert_called_once()
+    mock_client.post_projects_eval_queue_examples.assert_called_once()
