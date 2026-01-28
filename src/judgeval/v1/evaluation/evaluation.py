@@ -91,7 +91,10 @@ class Evaluation:
             console=console,
         ) as progress:
             task = progress.add_task("Submitting evaluation...", total=None)
-            self._client.add_to_run_eval_queue_examples(payload)
+            self._client.post_projects_eval_queue_examples(
+                project_id=project_id,
+                payload=payload,
+            )
             judgeval_logger.info(f"Evaluation submitted: {eval_id}")
 
             progress.update(task, description="Running evaluation...")
@@ -103,8 +106,9 @@ class Evaluation:
                 if elapsed > timeout_seconds:
                     raise TimeoutError(f"Evaluation timed out after {timeout_seconds}s")
 
-                response = self._client.fetch_experiment_run(
-                    {"experiment_run_id": eval_id, "project_id": project_id}
+                response = self._client.get_projects_experiments_by_run_id(
+                    project_id=project_id,
+                    run_id=eval_id,
                 )
                 results_data = response.get("results", []) or []
                 poll_count += 1

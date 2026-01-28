@@ -22,11 +22,9 @@ class DatasetFactory:
         self._project_name = project_name
 
     def get(self, name: str) -> Dataset:
-        dataset = self._client.datasets_pull_for_judgeval(
-            {
-                "dataset_name": name,
-                "project_id": self._project_id,
-            }
+        dataset = self._client.get_projects_datasets_by_dataset_name(
+            project_id=self._project_id,
+            dataset_name=name,
         )
 
         dataset_kind = dataset.get("dataset_kind", "example")
@@ -73,14 +71,14 @@ class DatasetFactory:
         overwrite: bool = False,
         batch_size: int = 100,
     ) -> Dataset:
-        self._client.datasets_create_for_judgeval(
-            {
+        self._client.post_projects_datasets(
+            project_id=self._project_id,
+            payload={
                 "name": name,
-                "project_id": self._project_id,
                 "examples": [],
                 "dataset_kind": "example",
                 "overwrite": overwrite,
-            }
+            },
         )
         judgeval_logger.info(f"Created dataset {name}")
 
@@ -98,8 +96,8 @@ class DatasetFactory:
         return dataset
 
     def list(self) -> List[DatasetInfo]:
-        datasets = self._client.datasets_pull_all_for_judgeval(
-            {"project_id": self._project_id}
+        datasets = self._client.get_projects_datasets(
+            project_id=self._project_id,
         )
         judgeval_logger.info(f"Fetched datasets for project {self._project_id}")
         return [DatasetInfo(**d) for d in datasets]

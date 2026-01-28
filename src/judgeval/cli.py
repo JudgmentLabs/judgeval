@@ -7,6 +7,8 @@ import typer
 from pathlib import Path
 from dotenv import load_dotenv
 from judgeval.v1.utils import resolve_project_id
+from judgeval.v1.internal.api import JudgmentSyncClient
+from judgeval.env import JUDGMENT_API_URL
 from judgeval.logger import judgeval_logger
 from judgeval.exceptions import JudgmentAPIError
 from judgeval import Judgeval
@@ -38,7 +40,8 @@ def load_otel_env(
     if not api_key or not organization_id:
         raise typer.BadParameter("JUDGMENT_API_KEY and JUDGMENT_ORG_ID required")
 
-    project_id = resolve_project_id(project_name, api_key, organization_id)
+    client = JudgmentSyncClient(JUDGMENT_API_URL, api_key, organization_id)
+    project_id = resolve_project_id(client, project_name)
     if not project_id:
         raise typer.BadParameter(f"Project '{project_name}' not found")
 

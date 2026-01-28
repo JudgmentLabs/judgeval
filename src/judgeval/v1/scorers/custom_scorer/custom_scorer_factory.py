@@ -84,7 +84,6 @@ class CustomScorerFactory:
                 requirements_text = f.read()
 
         payload: UploadCustomScorerRequest = {
-            "project_id": self._project_id,
             "scorer_name": unique_name,
             "class_name": scorer_classes[0],
             "scorer_code": scorer_code,
@@ -93,7 +92,10 @@ class CustomScorerFactory:
             "scorer_type": scorer_type,
             "version": 1,
         }
-        response = self._client.upload_custom_scorer(payload=payload)
+        response = self._client.post_projects_scorers_custom(
+            project_id=self._project_id,
+            payload=payload,
+        )
 
         if response.get("status") == "success":
             judgeval_logger.info(f"Successfully uploaded custom scorer: {unique_name}")

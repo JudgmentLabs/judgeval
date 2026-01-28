@@ -32,13 +32,13 @@ class PromptFactory:
                 tags = []
 
             project_id = self._project_id
-            response = self._client.prompts_insert(
-                {
-                    "project_id": project_id,
+            response = self._client.post_projects_prompts(
+                project_id=project_id,
+                payload={
                     "name": name,
                     "prompt": prompt,
                     "tags": tags,
-                }
+                },
             )
             return Prompt(
                 name=name,
@@ -85,7 +85,7 @@ class PromptFactory:
 
         project_id = self._project_id
 
-        response = self._client.prompts_fetch(
+        response = self._client.get_projects_prompts_by_name(
             project_id=project_id,
             name=name,
             commit_id=commit_id,
@@ -118,13 +118,13 @@ class PromptFactory:
     ) -> str:
         try:
             project_id = self._project_id
-            response = self._client.prompts_tag(
-                {
-                    "project_id": project_id,
-                    "name": name,
+            response = self._client.post_projects_prompts_by_name_tags(
+                project_id=project_id,
+                name=name,
+                payload={
                     "commit_id": commit_id,
                     "tags": tags,
-                }
+                },
             )
             return response["commit_id"]
         except Exception as e:
@@ -138,12 +138,12 @@ class PromptFactory:
     ) -> List[str]:
         try:
             project_id = self._project_id
-            response = self._client.prompts_untag(
-                {
-                    "project_id": project_id,
-                    "name": name,
+            response = self._client.delete_projects_prompts_by_name_tags(
+                project_id=project_id,
+                name=name,
+                payload={
                     "tags": tags,
-                }
+                },
             )
             return response["commit_ids"]
         except Exception as e:
@@ -156,7 +156,7 @@ class PromptFactory:
     ) -> List[Prompt]:
         try:
             project_id = self._project_id
-            response = self._client.prompts_get_prompt_versions(
+            response = self._client.get_projects_prompts_by_name_versions(
                 project_id=project_id,
                 name=name,
             )
