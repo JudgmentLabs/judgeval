@@ -16,7 +16,9 @@ def mock_client():
 
 @pytest.fixture
 def factory(mock_client):
-    return DatasetFactory(mock_client)
+    return DatasetFactory(
+        mock_client, project_id="test_project_id", project_name="test_project"
+    )
 
 
 @pytest.fixture
@@ -35,7 +37,7 @@ def sample_examples():
 
 
 def test_dataset_get(factory, mock_client, sample_examples):
-    mock_client.datasets_pull_for_judgeval.return_value = {
+    mock_client.get_projects_datasets_by_dataset_name.return_value = {
         "dataset_kind": "example",
         "examples": [
             {
@@ -50,33 +52,43 @@ def test_dataset_get(factory, mock_client, sample_examples):
         ],
     }
 
-    dataset = factory.get("test_dataset", "test_project")
+    dataset = factory.get("test_dataset")
 
     assert dataset.name == "test_dataset"
-    assert dataset.project_name == "test_project"
+    assert dataset.project_id == "test_project_id"
     assert dataset.dataset_kind == "example"
     assert len(dataset.examples) == 1
     assert dataset.examples[0].get_property("input") == "input1"
     assert dataset.examples[0].get_property("output") == "output1"
-    mock_client.datasets_pull_for_judgeval.assert_called_once()
+    mock_client.get_projects_datasets_by_dataset_name.assert_called_once_with(
+        project_id="test_project_id",
+        dataset_name="test_dataset",
+    )
 
 
 def test_dataset_create(factory, mock_client, sample_examples):
     dataset = factory.create(
         name="test_dataset",
-        project_name="test_project",
         examples=sample_examples,
         overwrite=False,
     )
 
     assert dataset.name == "test_dataset"
-    assert dataset.project_name == "test_project"
+    assert dataset.project_id == "test_project_id"
     assert len(dataset.examples) == 3
-    mock_client.datasets_create_for_judgeval.assert_called_once()
+    mock_client.post_projects_datasets.assert_called_once_with(
+        project_id="test_project_id",
+        payload={
+            "name": "test_dataset",
+            "examples": [],
+            "dataset_kind": "example",
+            "overwrite": False,
+        },
+    )
 
 
 def test_dataset_list(factory, mock_client):
-    mock_client.datasets_pull_all_for_judgeval.return_value = [
+    mock_client.get_projects_datasets.return_value = [
         {
             "dataset_id": "1",
             "name": "dataset1",
@@ -95,7 +107,7 @@ def test_dataset_list(factory, mock_client):
         },
     ]
 
-    datasets = factory.list("test_project")
+    datasets = factory.list()
 
     assert len(datasets) == 2
     assert isinstance(datasets[0], DatasetInfo)
@@ -103,11 +115,15 @@ def test_dataset_list(factory, mock_client):
     assert datasets[0].entries == 10
     assert datasets[1].name == "dataset2"
     assert datasets[1].entries == 20
+    mock_client.get_projects_datasets.assert_called_once_with(
+        project_id="test_project_id",
+    )
 
 
 def test_dataset_add_examples(mock_client, sample_examples):
     dataset = Dataset(
         name="test_dataset",
+        project_id="test_project_id",
         project_name="test_project",
         examples=sample_examples,
         client=mock_client,
@@ -119,12 +135,15 @@ def test_dataset_add_examples(mock_client, sample_examples):
 
     dataset.add_examples(new_examples)
 
-    mock_client.datasets_insert_examples_for_judgeval.assert_called_once()
+    mock_client.post_projects_datasets_by_dataset_name_examples.assert_called_once()
 
 
 def test_dataset_iteration(sample_examples):
     dataset = Dataset(
-        name="test_dataset", project_name="test_project", examples=sample_examples
+        name="test_dataset",
+        project_id="test_project_id",
+        project_name="test_project",
+        examples=sample_examples,
     )
 
     count = 0
@@ -137,7 +156,10 @@ def test_dataset_iteration(sample_examples):
 
 def test_dataset_length(sample_examples):
     dataset = Dataset(
-        name="test_dataset", project_name="test_project", examples=sample_examples
+        name="test_dataset",
+        project_id="test_project_id",
+        project_name="test_project",
+        examples=sample_examples,
     )
 
     assert len(dataset) == 3
@@ -145,7 +167,10 @@ def test_dataset_length(sample_examples):
 
 def test_dataset_str(sample_examples):
     dataset = Dataset(
-        name="test_dataset", project_name="test_project", examples=sample_examples
+        name="test_dataset",
+        project_id="test_project_id",
+        project_name="test_project",
+        examples=sample_examples,
     )
 
     str_repr = str(dataset)
@@ -155,7 +180,10 @@ def test_dataset_str(sample_examples):
 
 def test_dataset_save_as_json(sample_examples):
     dataset = Dataset(
-        name="test_dataset", project_name="test_project", examples=sample_examples
+        name="test_dataset",
+        project_id="test_project_id",
+        project_name="test_project",
+        examples=sample_examples,
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -173,7 +201,10 @@ def test_dataset_save_as_json(sample_examples):
 
 def test_dataset_save_as_yaml(sample_examples):
     dataset = Dataset(
-        name="test_dataset", project_name="test_project", examples=sample_examples
+        name="test_dataset",
+        project_id="test_project_id",
+        project_name="test_project",
+        examples=sample_examples,
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -192,6 +223,7 @@ def test_dataset_save_as_yaml(sample_examples):
 def test_dataset_add_from_json(mock_client):
     dataset = Dataset(
         name="test_dataset",
+        project_id="test_project_id",
         project_name="test_project",
         examples=[],
         client=mock_client,
@@ -208,12 +240,13 @@ def test_dataset_add_from_json(mock_client):
 
         dataset.add_from_json(json_path)
 
-        mock_client.datasets_insert_examples_for_judgeval.assert_called_once()
+        mock_client.post_projects_datasets_by_dataset_name_examples.assert_called_once()
 
 
 def test_dataset_add_from_yaml(mock_client):
     dataset = Dataset(
         name="test_dataset",
+        project_id="test_project_id",
         project_name="test_project",
         examples=[],
         client=mock_client,
@@ -230,12 +263,15 @@ def test_dataset_add_from_yaml(mock_client):
 
         dataset.add_from_yaml(yaml_path)
 
-        mock_client.datasets_insert_examples_for_judgeval.assert_called_once()
+        mock_client.post_projects_datasets_by_dataset_name_examples.assert_called_once()
 
 
 def test_dataset_display(sample_examples, capsys):
     dataset = Dataset(
-        name="test_dataset", project_name="test_project", examples=sample_examples
+        name="test_dataset",
+        project_id="test_project_id",
+        examples=sample_examples,
+        project_name="test_project",
     )
 
     dataset.display(max_examples=2)
@@ -246,7 +282,12 @@ def test_dataset_display(sample_examples, capsys):
 
 
 def test_dataset_empty():
-    dataset = Dataset(name="test_dataset", project_name="test_project", examples=[])
+    dataset = Dataset(
+        name="test_dataset",
+        project_id="test_project_id",
+        project_name="test_project",
+        examples=[],
+    )
 
     assert len(dataset) == 0
     count = 0

@@ -3,14 +3,23 @@ from __future__ import annotations
 from typing import Optional
 
 from judgeval.v1.internal.api import JudgmentSyncClient
+from judgeval.v1.utils import resolve_project_id
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
 
 
 class Judgeval:
-    __slots__ = ("_api_key", "_organization_id", "_api_url", "_internal_client")
+    __slots__ = (
+        "_api_key",
+        "_organization_id",
+        "_api_url",
+        "_internal_client",
+        "_project_name",
+        "_project_id",
+    )
 
     def __init__(
         self,
+        project_name: str,
         api_key: Optional[str] = None,
         organization_id: Optional[str] = None,
         api_url: Optional[str] = None,
@@ -25,16 +34,23 @@ class Judgeval:
             raise ValueError("organization_id is required")
         if not api_url:
             raise ValueError("api_url is required")
+        if not project_name:
+            raise ValueError("project_name is required")
 
         self._api_key = api_key
         self._organization_id = organization_id
         self._api_url = api_url
+        self._project_name = project_name
 
         self._internal_client = JudgmentSyncClient(
             self._api_url,
             self._api_key,
             self._organization_id,
         )
+
+        self._project_id = resolve_project_id(self._internal_client, project_name)
+        if not self._project_id:
+            raise ValueError(f"Project '{project_name}' not found")
 
     @property
     def tracer(self):
@@ -50,6 +66,8 @@ class Judgeval:
 
         return ScorersFactory(
             client=self._internal_client,
+            project_id=self._project_id,
+            project_name=self._project_name,
         )
 
     @property
@@ -58,6 +76,8 @@ class Judgeval:
 
         return EvaluationFactory(
             client=self._internal_client,
+            project_id=self._project_id,
+            project_name=self._project_name,
         )
 
     @property
@@ -74,6 +94,8 @@ class Judgeval:
 
         return DatasetFactory(
             client=self._internal_client,
+            project_id=self._project_id,
+            project_name=self._project_name,
         )
 
     @property
@@ -82,6 +104,8 @@ class Judgeval:
 
         return PromptFactory(
             client=self._internal_client,
+            project_id=self._project_id,
+            project_name=self._project_name,
         )
 
 

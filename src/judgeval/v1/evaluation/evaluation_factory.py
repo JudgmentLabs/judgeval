@@ -5,13 +5,21 @@ from judgeval.v1.evaluation.evaluation import Evaluation
 
 
 class EvaluationFactory:
-    __slots__ = "_client"
+    __slots__ = ("_client", "_project_id", "_project_name")
 
     def __init__(
         self,
         client: JudgmentSyncClient,
+        project_id: str,
+        project_name: str,
     ):
         self._client = client
+        self._project_id = project_id
+        self._project_name = project_name
 
     def create(self) -> Evaluation:
-        return Evaluation(client=self._client)
+        return Evaluation(
+            client=self._client,
+            project_id=self._project_id,
+            project_name=self._project_name,
+        )
