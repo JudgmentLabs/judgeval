@@ -58,6 +58,7 @@ from judgeval.v1.tracer.processors._lifecycles import (
     SESSION_ID_KEY,
     AGENT_CLASS_NAME_KEY,
     AGENT_INSTANCE_NAME_KEY,
+    PROJECT_ID_OVERRIDE_KEY,
 )
 from judgeval.v1.tracer.isolated.tracer import JudgmentIsolatedTracer
 
@@ -197,6 +198,25 @@ class BaseTracer(ABC):
             return tracer.get_current_span()
         return trace.get_current_span()
 
+    def _attach_context(self, ctx: Context) -> object:
+        from judgeval.v1.tracer.judgment_tracer_provider import JudgmentTracerProvider
+
+        if self._is_isolated() and isinstance(
+            self._tracer_provider, JudgmentTracerProvider
+        ):
+            return self._tracer_provider._runtime_context.attach(ctx)
+        return attach(ctx)
+
+    def _detach_context(self, token: Any) -> None:
+        from judgeval.v1.tracer.judgment_tracer_provider import JudgmentTracerProvider
+
+        if self._is_isolated() and isinstance(
+            self._tracer_provider, JudgmentTracerProvider
+        ):
+            self._tracer_provider._runtime_context.detach(cast(Any, token))
+        else:
+            detach(cast(Any, token))
+
     def set_span_kind(self, kind: str) -> None:
         if kind is None:
             return
@@ -230,8 +250,42 @@ class BaseTracer(ABC):
         if current_span is None:
             return
         current_span.set_attribute(AttributeKeys.JUDGMENT_CUSTOMER_ID, customer_id)
-        ctx = set_value(CUSTOMER_ID_KEY, customer_id)
-        attach(ctx)
+        ctx = set_value(CUSTOMER_ID_KEY, customer_id, self.get_context())
+        self._attach_context(ctx)
+
+    def set_session_id(self, session_id: str) -> None:
+        current_span = self._get_sampled_span()
+        if current_span is None:
+            return
+        current_span.set_attribute(AttributeKeys.JUDGMENT_SESSION_ID, session_id)
+        ctx = set_value(SESSION_ID_KEY, session_id, self.get_context())
+        self._attach_context(ctx)
+
+    def override_project(self, project_name: str) -> None:
+        current_span = self._get_current_span()
+        if current_span is None or not current_span.is_recording():
+            judgeval_logger.error(
+                "override_project() called outside of a span context. Ignoring."
+            )
+            return
+        is_root = getattr(current_span, "parent", None) is None
+        if not is_root:
+            judgeval_logger.error(
+                f"override_project('{project_name}') called on non-root span. "
+                "Project override only allowed on root spans. Ignoring."
+            )
+            return
+        resolved_id = resolve_project_id(self.api_client, project_name)
+        if resolved_id is None:
+            judgeval_logger.error(
+                f"Failed to resolve project '{project_name}' for override. Using default."
+            )
+            return
+        current_span.set_attribute(
+            AttributeKeys.JUDGMENT_PROJECT_ID_OVERRIDE, resolved_id
+        )
+        ctx = set_value(PROJECT_ID_OVERRIDE_KEY, resolved_id, self.get_context())
+        self._attach_context(ctx)
 
     def set_llm_span(self) -> None:
         self.set_span_kind("llm")
@@ -330,14 +384,6 @@ class BaseTracer(ABC):
             )
         except Exception as e:
             judgeval_logger.error(f"Failed to serialize trace evaluation: {e}")
-
-    def set_session_id(self, session_id: str) -> None:
-        current_span = self._get_sampled_span()
-        if current_span is None:
-            return
-        current_span.set_attribute(AttributeKeys.JUDGMENT_SESSION_ID, session_id)
-        ctx = set_value(SESSION_ID_KEY, session_id)
-        attach(ctx)
 
     @dont_throw
     def tag(self, tags: str | list[str]) -> None:
@@ -613,8 +659,8 @@ class BaseTracer(ABC):
             @functools.wraps(func)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 agent_id = str(uuid4())
-                parent_agent_id = get_value(AGENT_ID_KEY)
-                ctx = set_value(AGENT_ID_KEY, agent_id)
+                parent_agent_id = get_value(AGENT_ID_KEY, context=self.get_context())
+                ctx = set_value(AGENT_ID_KEY, agent_id, self.get_context())
                 if parent_agent_id:
                     ctx = set_value(PARENT_AGENT_ID_KEY, parent_agent_id, context=ctx)
                 if class_name:
@@ -626,11 +672,11 @@ class BaseTracer(ABC):
                         ctx = set_value(
                             AGENT_INSTANCE_NAME_KEY, instance_name, context=ctx
                         )
-                token = attach(ctx)
+                token = self._attach_context(ctx)
                 try:
                     return await func(*args, **kwargs)
                 finally:
-                    detach(token)
+                    self._detach_context(token)
 
             return async_wrapper  # type: ignore[return-value]
         else:
@@ -638,8 +684,8 @@ class BaseTracer(ABC):
             @functools.wraps(func)
             def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
                 agent_id = str(uuid4())
-                parent_agent_id = get_value(AGENT_ID_KEY)
-                ctx = set_value(AGENT_ID_KEY, agent_id)
+                parent_agent_id = get_value(AGENT_ID_KEY, context=self.get_context())
+                ctx = set_value(AGENT_ID_KEY, agent_id, self.get_context())
                 if parent_agent_id:
                     ctx = set_value(PARENT_AGENT_ID_KEY, parent_agent_id, context=ctx)
                 if class_name:
@@ -651,11 +697,11 @@ class BaseTracer(ABC):
                         ctx = set_value(
                             AGENT_INSTANCE_NAME_KEY, instance_name, context=ctx
                         )
-                token = attach(ctx)
+                token = self._attach_context(ctx)
                 try:
                     return func(*args, **kwargs)
                 finally:
-                    detach(token)
+                    self._detach_context(token)
 
             return sync_wrapper  # type: ignore[return-value]
 
