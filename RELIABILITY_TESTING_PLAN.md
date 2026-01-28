@@ -2,7 +2,48 @@
 
 **Version:** 1.0
 **Last Updated:** 2026-01-27
+**Branch:** `joseph/reliability-tests`
 **Purpose:** Comprehensive test plan to ensure the SDK never negatively impacts customer applications
+
+---
+
+## 🔗 Accessing This Document
+
+### For Claude.ai Cloud Sessions
+
+This document is available at:
+
+```text
+https://github.com/JudgmentLabs/judgeval/blob/joseph/reliability-tests/RELIABILITY_TESTING_PLAN.md
+```
+
+**To reference in Claude.ai:**
+
+```text
+Review the testing plan at:
+https://github.com/JudgmentLabs/judgeval/blob/joseph/reliability-tests/RELIABILITY_TESTING_PLAN.md
+
+Let's implement [specific test suite]
+```
+
+### Related Documentation
+
+- **[Reliability Analysis](./RELIABILITY_ANALYSIS.md)** - Problems found and proposed solutions
+- **[CLAUDE.md](./CLAUDE.md)** - Project overview and development commands
+- **Existing Tests:** `src/tests/reliability/` - Current test implementations
+
+### Quick Start
+
+```bash
+# Clone and switch to reliability branch
+git checkout joseph/reliability-tests
+
+# Run fast reliability tests
+pytest src/tests/reliability/ -m "reliability and not slow" -v
+
+# Run specific test suite
+pytest src/tests/reliability/test_api_failures.py -v
+```
 
 ---
 
