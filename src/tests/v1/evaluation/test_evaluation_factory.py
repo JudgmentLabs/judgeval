@@ -13,7 +13,11 @@ def mock_client():
 
 @pytest.fixture
 def evaluation_factory(mock_client):
-    return EvaluationFactory(mock_client)
+    return EvaluationFactory(
+        client=mock_client,
+        project_id="test_project_id",
+        project_name="test_project",
+    )
 
 
 @pytest.fixture
@@ -35,6 +39,8 @@ def test_factory_create(evaluation_factory, mock_client):
 
     assert isinstance(evaluation, Evaluation)
     assert evaluation._client == mock_client
+    assert evaluation._project_id == "test_project_id"
+    assert evaluation._project_name == "test_project"
 
 
 def test_factory_run(evaluation_factory, mock_client, sample_examples, sample_scorers):
@@ -65,7 +71,6 @@ def test_factory_run(evaluation_factory, mock_client, sample_examples, sample_sc
     results = evaluation.run(
         examples=sample_examples,
         scorers=sample_scorers,
-        project_name="test_project",
         eval_run_name="test_run",
     )
 

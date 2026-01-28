@@ -14,7 +14,11 @@ def mock_client():
 
 @pytest.fixture
 def evaluation(mock_client):
-    return Evaluation(mock_client)
+    return Evaluation(
+        client=mock_client,
+        project_id="test_project_id",
+        project_name="test_project",
+    )
 
 
 @pytest.fixture
@@ -80,7 +84,6 @@ def test_evaluation_run_success(
     results = evaluation.run(
         examples=sample_examples,
         scorers=sample_scorers,
-        project_name="test_project",
         eval_run_name="test_run",
         model="gpt-4o-mini",
         timeout_seconds=10,
@@ -139,7 +142,6 @@ def test_evaluation_run_with_failures(
     results = evaluation.run(
         examples=sample_examples,
         scorers=sample_scorers,
-        project_name="test_project",
         eval_run_name="test_run",
     )
 
@@ -194,7 +196,6 @@ def test_evaluation_run_with_assert_mode_success(
     results = evaluation.run(
         examples=sample_examples,
         scorers=sample_scorers,
-        project_name="test_project",
         eval_run_name="test_run",
         assert_test=True,
     )
@@ -301,7 +302,6 @@ def test_evaluation_scorer_data_parsing(
     results = evaluation.run(
         examples=[sample_examples[0]],
         scorers=sample_scorers,
-        project_name="test_project",
         eval_run_name="test_run",
     )
 
