@@ -89,14 +89,16 @@ class DeleteProjectResponse(TypedDict):
 
 
 class E2EFetchSpanScoreRequest(TypedDict):
-    span_id: str
+    project_name: str
     trace_id: str
+    span_id: str
 
 
 E2EFetchSpanScoreResponse = List[Dict[str, Any]]
 
 
 class E2EFetchTraceRequest(TypedDict):
+    project_name: str
     trace_id: str
 
 

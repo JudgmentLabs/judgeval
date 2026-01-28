@@ -264,7 +264,7 @@ async def together_async_streaming_llm_call():
 def retrieve_trace_helper(trace_id, expected_span_amount):
     query_count = 0
     while query_count < QUERY_RETRY:
-        val = retrieve_trace(trace_id)
+        val = retrieve_trace(project_name, trace_id)
         if len(val) == expected_span_amount:
             break
         query_count += 1
