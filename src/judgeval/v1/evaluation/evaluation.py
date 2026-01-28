@@ -31,7 +31,7 @@ class Evaluation:
         self._project_name = project_name
 
     def _validate_scorer_project(self, scorer: BaseScorer) -> None:
-        scorer_project_id = scorer.get_project_id()
+        scorer_project_id = getattr(scorer, "_project_id", None)
         if scorer_project_id is not None and scorer_project_id != self._project_id:
             judgeval_logger.warning(
                 f"Rejecting scorer '{scorer.get_name()}' with different project_id: "

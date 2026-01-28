@@ -42,9 +42,6 @@ class CustomScorer(BaseScorer):
     def is_server_hosted(self) -> bool:
         return self._server_hosted
 
-    def get_project_id(self) -> str:
-        return self._project_id
-
     def get_scorer_config(self) -> ScorerConfig:
         raise NotImplementedError("CustomScorer does not use get_scorer_config")
 

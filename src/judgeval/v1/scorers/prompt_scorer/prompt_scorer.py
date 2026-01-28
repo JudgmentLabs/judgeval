@@ -59,9 +59,6 @@ class PromptScorer(APIScorer):
     def get_description(self) -> Optional[str]:
         return self._description
 
-    def get_project_id(self) -> Optional[str]:
-        return self._project_id
-
     def set_prompt(self, prompt: str) -> None:
         self._prompt = prompt
 

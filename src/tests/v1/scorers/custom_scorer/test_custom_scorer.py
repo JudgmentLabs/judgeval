@@ -55,8 +55,3 @@ def test_custom_scorer_get_scorer_config_raises():
     scorer = CustomScorer(name="TestScorer", project_id=TEST_PROJECT_ID)
     with pytest.raises(NotImplementedError):
         scorer.get_scorer_config()
-
-
-def test_custom_scorer_get_project_id():
-    scorer = CustomScorer(name="TestScorer", project_id=TEST_PROJECT_ID)
-    assert scorer.get_project_id() == TEST_PROJECT_ID

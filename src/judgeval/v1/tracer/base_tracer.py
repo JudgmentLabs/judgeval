@@ -325,7 +325,7 @@ class BaseTracer(ABC):
 
     def _check_scorer_project(self, scorer: BaseScorer) -> bool:
         """Check if scorer belongs to this tracer's project. Returns True if valid."""
-        scorer_project_id = scorer.get_project_id()
+        scorer_project_id = getattr(scorer, "_project_id", None)
         effective_project_id = self.get_effective_project_id()
         if scorer_project_id is not None and scorer_project_id != effective_project_id:
             judgeval_logger.warning(
