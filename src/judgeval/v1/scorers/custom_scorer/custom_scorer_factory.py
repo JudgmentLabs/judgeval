@@ -25,6 +25,7 @@ class CustomScorerFactory:
             name=name,
             class_name=class_name or name,
             server_hosted=True,
+            project_id=self._project_id,
         )
 
     def upload(
