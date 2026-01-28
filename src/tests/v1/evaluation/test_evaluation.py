@@ -251,7 +251,6 @@ def test_evaluation_run_with_assert_mode_failure(
         evaluation.run(
             examples=sample_examples,
             scorers=sample_scorers,
-            project_name="test_project",
             eval_run_name="test_run",
             assert_test=True,
         )
@@ -267,7 +266,6 @@ def test_evaluation_timeout(evaluation, mock_client, sample_examples, sample_sco
         evaluation.run(
             examples=sample_examples,
             scorers=sample_scorers,
-            project_name="test_project",
             eval_run_name="test_run",
             timeout_seconds=1,
         )
