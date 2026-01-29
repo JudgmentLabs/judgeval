@@ -77,6 +77,23 @@ class DeleteProjectResponse(TypedDict):
     message: str
 
 
+class E2EFetchSpanScoreRequest(TypedDict):
+    project_name: str
+    trace_id: str
+    span_id: str
+
+
+E2EFetchSpanScoreResponse = List[Dict[str, Any]]
+
+
+class E2EFetchTraceRequest(TypedDict):
+    project_name: str
+    trace_id: str
+
+
+E2EFetchTraceResponse = List[Dict[str, Any]]
+
+
 class ErrorResponse(TypedDict):
     error: str
     message: NotRequired[Optional[str]]
