@@ -20,6 +20,9 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "reliability: mark test as reliability/sanity check test"
     )
+    config.addinivalue_line("markers", "slow: mark test as slow-running")
+    config.addinivalue_line("markers", "chaos: mark test as chaos engineering")
+    config.addinivalue_line("markers", "load: mark test as load test")
 
 
 @pytest.fixture
