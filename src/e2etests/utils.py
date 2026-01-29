@@ -17,12 +17,12 @@ def create_project(project_name: str):
 
 
 def retrieve_trace(project_name: str, trace_id: str):
-    return client_v1.e2e_fetch_trace(
+    return client_v1.post_e2e_fetch_trace(
         payload={"project_name": project_name, "trace_id": trace_id}
     )
 
 
 def retrieve_score(project_name: str, span_id: str, trace_id: str):
-    return client_v1.e2e_fetch_span_score(
+    return client_v1.post_e2e_fetch_span_score(
         payload={"project_name": project_name, "span_id": span_id, "trace_id": trace_id}
     )
