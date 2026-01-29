@@ -127,8 +127,7 @@ async def main():
     # Get environment variables
     api_key = os.environ.get("JUDGMENT_API_KEY", "280353d5-f015-4dfe-86d2-e67ff16a1747")
     org_id = os.environ.get("JUDGMENT_ORG_ID", "df8607d9-1467-4e5e-b33d-c23e52a161fc")
-    # api_url = os.environ.get("JUDGMENT_API_URL", "https://staging.judgmentlabs.ai")
-    api_url = "https://api.judgmentlabs.ai"
+    api_url = os.environ.get("JUDGMENT_API_URL", "https://staging.judgmentlabs.ai")
 
     if not api_key:
         print("Error: JUDGMENT_API_KEY environment variable not set")
