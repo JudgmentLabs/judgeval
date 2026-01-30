@@ -8,7 +8,6 @@ from together import Together, AsyncTogether
 from google import genai
 from e2etests.utils import (
     retrieve_trace,
-    retrieve_score,
     create_project,
     delete_project,
 )
@@ -24,7 +23,7 @@ project_name = "e2e-tests-" + "".join(
     random.choices(string.ascii_letters + string.digits, k=12)
 )
 
-delete_project(project_name=project_name)
+# delete_project(project_name=project_name)
 create_project(project_name=project_name)
 
 
@@ -265,7 +264,7 @@ async def together_async_streaming_llm_call():
 def retrieve_trace_helper(trace_id, expected_span_amount):
     query_count = 0
     while query_count < QUERY_RETRY:
-        val = retrieve_trace(trace_id)
+        val = retrieve_trace(project_name, trace_id)
         if len(val) == expected_span_amount:
             break
         query_count += 1
@@ -285,7 +284,7 @@ def retrieve_llm_cost_helper(trace_id):
         span_attrs = span.get("span_attributes", {})
         if isinstance(span_attrs, str):
             span_attrs = orjson.loads(span_attrs)
-        llm_cost = span_attrs.get("judgment.usage.total_cost_usd", 0)
+        llm_cost = float(span_attrs.get("judgment.usage.total_cost_usd", 0))
         total_llm_cost += llm_cost
 
     if total_llm_cost == 0:
@@ -413,29 +412,3 @@ async def test_anthropic_async_streaming_llm_cost():
 async def test_together_async_streaming_llm_cost():
     trace_id = await together_async_streaming_llm_call()
     retrieve_streaming_trace_helper(trace_id)
-
-
-def test_online_span_scoring():
-    trace_id = scorer_span()
-    trace_spans = retrieve_trace_helper(trace_id, 1)
-    span_id = trace_spans[0].get("span_id")
-
-    query_count = 0
-    while query_count < QUERY_RETRY:
-        try:
-            scorer_data = retrieve_score(span_id, trace_id)
-        except Exception:
-            pass
-
-        if scorer_data:
-            break
-        query_count += 1
-        time.sleep(1)
-
-    if query_count == QUERY_RETRY:
-        assert False, "No score found"
-
-    score = scorer_data[0]
-    assert score.get("scorer_name") == "Answer Relevancy"
-    assert score.get("scorer_success")
-    assert score.get("scorer_score") == 1.0

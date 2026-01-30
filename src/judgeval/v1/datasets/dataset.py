@@ -49,7 +49,8 @@ class DatasetInfo:
 @dataclass
 class Dataset:
     name: str
-    project_name: str
+    project_id: str
+    project_name: str  # Display name from Judgeval client
     dataset_kind: str = "example"
     examples: Optional[List[Example]] = None
     client: Optional[JudgmentSyncClient] = None
@@ -121,12 +122,10 @@ class Dataset:
                     info=f"Batch {batch_num} ({batch_size_actual} examples, {total_uploaded} total)",
                 )
 
-                self.client.datasets_insert_examples_for_judgeval(
-                    {
-                        "dataset_name": self.name,
-                        "project_name": self.project_name,
-                        "examples": [e.to_dict() for e in batch],
-                    }
+                self.client.post_projects_datasets_by_dataset_name_examples(
+                    project_id=self.project_id,
+                    dataset_name=self.name,
+                    payload={"examples": [e.to_dict() for e in batch]},
                 )
 
         judgeval_logger.info(

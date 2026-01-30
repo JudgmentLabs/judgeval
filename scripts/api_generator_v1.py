@@ -500,10 +500,47 @@ def generate_type_definition(
     return "\n".join(lines)
 
 
-def get_method_name_from_path(path: str, method: str) -> str:
-    name = path.strip("/").replace("/", "_").replace("-", "_")
+def extract_path_params(path: str) -> List[Dict[str, Any]]:
+    """Extract path parameters from OpenAPI path like /projects/{projectId}/datasets"""
+    params = []
+    for match in re.finditer(r"\{(\w+)\}", path):
+        params.append(
+            {"name": match.group(1), "required": True, "type": "str", "in": "path"}
+        )
+    return params
+
+
+def get_method_name_from_operation(
+    operation: Dict[str, Any], path: str, method: str
+) -> str:
+    """Get method name from operationId, converting camelCase to snake_case."""
+    operation_id = operation.get("operationId")
+    if operation_id:
+        # Convert camelCase operationId to snake_case
+        # e.g. "getV1ProjectsByProjectIdDatasets" -> "get_v1_projects_by_project_id_datasets"
+        name = to_snake_case(operation_id)
+        # Strip v1_ prefix for cleaner method names
+        # e.g. "get_v1_projects_by_project_id_datasets" -> "get_projects_by_project_id_datasets"
+        name = re.sub(r"^(get|post|put|patch|delete)_v1_", r"\1_", name)
+        # Only strip "by_project_id" (the common parent scope)
+        # Keep other path params like "by_dataset_name" to distinguish list vs single
+        # e.g. "get_projects_by_project_id_datasets" -> "get_project_datasets"
+        # but "get_projects_by_project_id_datasets_by_dataset_name" -> "get_project_dataset_by_name"
+        name = re.sub(r"_by_project_id", "", name)
+        # Replace hyphens with underscores for valid Python identifiers
+        name = name.replace("-", "_")
+        return name
+
+    # Fallback: construct from path
+    name = re.sub(r"\{[^}]+\}", "", path)
+    name = name.strip("/").replace("/", "_").replace("-", "_")
+    name = re.sub(r"_+", "_", name).strip("_")
     if not name:
         return "index"
+    if name.startswith("v1_"):
+        name = name[3:]
+    elif name == "v1":
+        name = "index"
     return name
 
 
@@ -559,6 +596,7 @@ def get_response_schema(operation: Dict[str, Any]) -> Optional[str]:
 def generate_method_signature(
     method_name: str,
     request_type: Optional[str],
+    path_params: List[Dict[str, Any]],
     query_params: List[Dict[str, Any]],
     response_type: str,
     is_async: bool = False,
@@ -567,15 +605,23 @@ def generate_method_signature(
 
     params = ["self"]
 
+    # Add path params first (always required)
+    for param in path_params:
+        param_name = to_snake_case(param["name"])
+        params.append(f"{param_name}: str")
+
+    # Add required query params
     for param in query_params:
         if param["required"]:
             param_name = param["name"]
             param_type = "str"
             params.append(f"{param_name}: {param_type}")
 
+    # Add payload if present
     if request_type:
         params.append(f"payload: {request_type}")
 
+    # Add optional query params
     for param in query_params:
         if not param["required"]:
             param_name = param["name"]
@@ -591,10 +637,22 @@ def generate_method_body(
     path: str,
     method: str,
     request_type: Optional[str],
+    path_params: List[Dict[str, Any]],
     query_params: List[Dict[str, Any]],
     is_async: bool = False,
 ) -> str:
     async_prefix = "await " if is_async else ""
+
+    # Build URL with path parameter interpolation
+    if path_params:
+        url_path = path
+        for param in path_params:
+            snake_name = to_snake_case(param["name"])
+            # Replace {paramName} with Python f-string interpolation
+            url_path = url_path.replace(f"{{{param['name']}}}", f"{{{snake_name}}}")
+        url_expr = f'f"{url_path}"'
+    else:
+        url_expr = f'"{path}"'
 
     if query_params:
         query_lines = ["query_params = {}"]
@@ -613,20 +671,20 @@ def generate_method_body(
 
     if method == "GET":
         if query_setup:
-            return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            {query_param},\n        )'
+            return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            {query_param},\n        )'
         else:
-            return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            {{}},\n        )'
+            return f'return {async_prefix}self._request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            {{}},\n        )'
     else:
         if request_type:
             if query_setup:
-                return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            payload,\n            params={query_param},\n        )'
+                return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            payload,\n            params={query_param},\n        )'
             else:
-                return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            payload,\n        )'
+                return f'return {async_prefix}self._request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            payload,\n        )'
         else:
             if query_setup:
-                return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            {{}},\n            params={query_param},\n        )'
+                return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            {{}},\n            params={query_param},\n        )'
             else:
-                return f'return {async_prefix}self._request(\n            "{method}",\n            url_for("{path}", self.base_url),\n            {{}},\n        )'
+                return f'return {async_prefix}self._request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            {{}},\n        )'
 
 
 def generate_client_class(
@@ -682,16 +740,28 @@ def generate_client_class(
         path = method_info["path"]
         http_method = method_info["method"]
         request_type = method_info["request_type"]
+        path_params = method_info["path_params"]
         query_params = method_info["query_params"]
         response_type = method_info["response_type"]
 
         signature = generate_method_signature(
-            method_name, request_type, query_params, response_type, is_async
+            method_name,
+            request_type,
+            path_params,
+            query_params,
+            response_type,
+            is_async,
         )
         lines.append(f"    {signature}")
 
         body = generate_method_body(
-            method_name, path, http_method, request_type, query_params, is_async
+            method_name,
+            path,
+            http_method,
+            request_type,
+            path_params,
+            query_params,
+            is_async,
         )
         lines.append(f"        {body}")
         lines.append("")
@@ -733,18 +803,31 @@ def generate_api_file() -> str:
     sync_methods = []
     async_methods = []
 
+    # Include endpoints that start with these prefixes
+    # - /v1: Main v1 API endpoints (strip v1 from method name)
+    # - /otel: OTEL endpoints with their own versioning (keep otel in method name)
+    INCLUDE_PREFIXES = ["/v1", "/otel"]
+
     for path, path_data in SPEC["paths"].items():
+        # Only include endpoints that start with our allowed prefixes
+        if not any(path.startswith(prefix) for prefix in INCLUDE_PREFIXES):
+            continue
+
         for method, operation in path_data.items():
             if method.upper() in ["GET", "POST", "PUT", "PATCH", "DELETE"]:
-                method_name = get_method_name_from_path(path, method.upper())
+                method_name = get_method_name_from_operation(
+                    operation, path, method.upper()
+                )
                 request_schema = get_request_schema(operation)
                 response_schema = get_response_schema(operation)
+                path_params = extract_path_params(path)
                 query_params = get_query_parameters(operation)
 
                 print(
                     method_name,
                     request_schema,
                     response_schema,
+                    path_params,
                     query_params,
                     file=sys.stderr,
                 )
@@ -765,6 +848,7 @@ def generate_api_file() -> str:
                     "path": path,
                     "method": method.upper(),
                     "request_type": request_type,
+                    "path_params": path_params,
                     "query_params": query_params,
                     "response_type": response_type,
                 }
@@ -835,4 +919,9 @@ if __name__ == "__main__":
 
     generate_api_types()
     api_code = generate_api_file()
-    print(api_code)
+
+    # Write the client code to file
+    client_path = "src/judgeval/v1/internal/api/api_client.py"
+    with open(client_path, "w") as f:
+        f.write(api_code)
+    print(f"Generated API client at {client_path}", file=sys.stderr)

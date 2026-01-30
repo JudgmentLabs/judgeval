@@ -336,6 +336,244 @@ class TestEdgeCases(BaseOpenAIResponsesTest):
         )
 
 
+class TestWithStreamingResponse(BaseOpenAIResponsesTest):
+    """Tests for responses.with_streaming_response.create"""
+
+    def test_iter_lines_streaming_sync(self, sync_client_maybe_wrapped, mock_processor):
+        """Test iter_lines() with stream=True"""
+        initial_span_count = len(mock_processor.ended_spans)
+
+        with sync_client_maybe_wrapped.responses.with_streaming_response.create(
+            model="gpt-5-nano",
+            input="Say 'test'",
+            stream=True,
+        ) as response:
+            assert hasattr(response, "iter_lines")
+            lines = list(response.iter_lines())
+            assert len(lines) > 0
+
+        if hasattr(sync_client_maybe_wrapped, "_judgment_tracer"):
+            assert len(mock_processor.ended_spans) == initial_span_count + 1
+            span = mock_processor.get_last_ended_span()
+            attrs = mock_processor.get_span_attributes(span)
+            verify_span_attributes_comprehensive(
+                span=span,
+                attrs=attrs,
+                expected_span_name="OPENAI_API_CALL",
+                expected_model_name="gpt-5-nano",
+                check_completion=False,
+            )
+
+    def test_parse_streaming_sync(self, sync_client_maybe_wrapped, mock_processor):
+        """Test parse() with stream=True returns streaming response"""
+        initial_span_count = len(mock_processor.ended_spans)
+
+        with sync_client_maybe_wrapped.responses.with_streaming_response.create(
+            model="gpt-5-nano",
+            input="Say hello",
+            stream=True,
+        ) as response:
+            stream = response.parse()
+            # Stream should be iterable
+            chunks = list(stream)
+            assert len(chunks) > 0
+
+        if hasattr(sync_client_maybe_wrapped, "_judgment_tracer"):
+            assert len(mock_processor.ended_spans) == initial_span_count + 1
+            span = mock_processor.get_last_ended_span()
+            attrs = mock_processor.get_span_attributes(span)
+            verify_span_attributes_comprehensive(
+                span=span,
+                attrs=attrs,
+                expected_span_name="OPENAI_API_CALL",
+                expected_model_name="gpt-5-nano",
+                check_completion=False,
+            )
+
+    def test_parse_non_streaming_sync(self, sync_client_maybe_wrapped, mock_processor):
+        """Test parse() without stream returns Response object"""
+        initial_span_count = len(mock_processor.ended_spans)
+
+        with sync_client_maybe_wrapped.responses.with_streaming_response.create(
+            model="gpt-5-nano",
+            input="Say bye",
+        ) as response:
+            result = response.parse()
+            assert result is not None
+            assert hasattr(result, "id") or hasattr(result, "output")
+
+        if hasattr(sync_client_maybe_wrapped, "_judgment_tracer"):
+            assert len(mock_processor.ended_spans) == initial_span_count + 1
+            span = mock_processor.get_last_ended_span()
+            attrs = mock_processor.get_span_attributes(span)
+            verify_span_attributes_comprehensive(
+                span=span,
+                attrs=attrs,
+                expected_span_name="OPENAI_API_CALL",
+                expected_model_name="gpt-5-nano",
+            )
+
+    def test_json_non_streaming_sync(self, sync_client_maybe_wrapped, mock_processor):
+        """Test json() returns raw dict"""
+        initial_span_count = len(mock_processor.ended_spans)
+
+        with sync_client_maybe_wrapped.responses.with_streaming_response.create(
+            model="gpt-5-nano",
+            input="Say ok",
+        ) as response:
+            data = response.json()
+            assert isinstance(data, dict)
+            assert "id" in data or "output" in data
+
+        if hasattr(sync_client_maybe_wrapped, "_judgment_tracer"):
+            assert len(mock_processor.ended_spans) == initial_span_count + 1
+            span = mock_processor.get_last_ended_span()
+            attrs = mock_processor.get_span_attributes(span)
+            verify_span_attributes_comprehensive(
+                span=span,
+                attrs=attrs,
+                expected_span_name="OPENAI_API_CALL",
+                expected_model_name="gpt-5-nano",
+            )
+
+    @pytest.mark.asyncio
+    async def test_iter_lines_streaming_async(
+        self, async_client_maybe_wrapped, mock_processor
+    ):
+        """Test async iter_lines() with stream=True"""
+        initial_span_count = len(mock_processor.ended_spans)
+
+        async with async_client_maybe_wrapped.responses.with_streaming_response.create(
+            model="gpt-5-nano",
+            input="Say 'test'",
+            stream=True,
+        ) as response:
+            assert hasattr(response, "iter_lines")
+            lines = []
+            async for line in response.iter_lines():
+                lines.append(line)
+            assert len(lines) > 0
+
+        if hasattr(async_client_maybe_wrapped, "_judgment_tracer"):
+            assert len(mock_processor.ended_spans) == initial_span_count + 1
+            span = mock_processor.get_last_ended_span()
+            attrs = mock_processor.get_span_attributes(span)
+            verify_span_attributes_comprehensive(
+                span=span,
+                attrs=attrs,
+                expected_span_name="OPENAI_API_CALL",
+                expected_model_name="gpt-5-nano",
+                check_completion=False,
+            )
+
+    @pytest.mark.asyncio
+    async def test_parse_streaming_async(
+        self, async_client_maybe_wrapped, mock_processor
+    ):
+        """Test async parse() with stream=True returns streaming response"""
+        initial_span_count = len(mock_processor.ended_spans)
+
+        async with async_client_maybe_wrapped.responses.with_streaming_response.create(
+            model="gpt-5-nano",
+            input="Say hello",
+            stream=True,
+        ) as response:
+            stream = await response.parse()
+            chunks = [chunk async for chunk in stream]
+            assert len(chunks) > 0
+
+        if hasattr(async_client_maybe_wrapped, "_judgment_tracer"):
+            assert len(mock_processor.ended_spans) == initial_span_count + 1
+            span = mock_processor.get_last_ended_span()
+            attrs = mock_processor.get_span_attributes(span)
+            verify_span_attributes_comprehensive(
+                span=span,
+                attrs=attrs,
+                expected_span_name="OPENAI_API_CALL",
+                expected_model_name="gpt-5-nano",
+                check_completion=False,
+            )
+
+    @pytest.mark.asyncio
+    async def test_parse_non_streaming_async(
+        self, async_client_maybe_wrapped, mock_processor
+    ):
+        """Test async parse() without stream returns Response object"""
+        initial_span_count = len(mock_processor.ended_spans)
+
+        async with async_client_maybe_wrapped.responses.with_streaming_response.create(
+            model="gpt-5-nano",
+            input="Say bye",
+        ) as response:
+            result = await response.parse()
+            assert result is not None
+            assert hasattr(result, "id") or hasattr(result, "output")
+
+        if hasattr(async_client_maybe_wrapped, "_judgment_tracer"):
+            assert len(mock_processor.ended_spans) == initial_span_count + 1
+            span = mock_processor.get_last_ended_span()
+            attrs = mock_processor.get_span_attributes(span)
+            verify_span_attributes_comprehensive(
+                span=span,
+                attrs=attrs,
+                expected_span_name="OPENAI_API_CALL",
+                expected_model_name="gpt-5-nano",
+            )
+
+    @pytest.mark.asyncio
+    async def test_json_non_streaming_async(
+        self, async_client_maybe_wrapped, mock_processor
+    ):
+        """Test async json() returns raw dict"""
+        initial_span_count = len(mock_processor.ended_spans)
+
+        async with async_client_maybe_wrapped.responses.with_streaming_response.create(
+            model="gpt-5-nano",
+            input="Say ok",
+        ) as response:
+            data = await response.json()
+            assert isinstance(data, dict)
+            assert "id" in data or "output" in data
+
+        if hasattr(async_client_maybe_wrapped, "_judgment_tracer"):
+            assert len(mock_processor.ended_spans) == initial_span_count + 1
+            span = mock_processor.get_last_ended_span()
+            attrs = mock_processor.get_span_attributes(span)
+            verify_span_attributes_comprehensive(
+                span=span,
+                attrs=attrs,
+                expected_span_name="OPENAI_API_CALL",
+                expected_model_name="gpt-5-nano",
+            )
+
+    def test_sync_error_handling(self, sync_client_maybe_wrapped, mock_processor):
+        """Test sync error handling for invalid model"""
+        with pytest.raises(Exception):
+            with sync_client_maybe_wrapped.responses.with_streaming_response.create(
+                model="invalid-model-that-does-not-exist",
+                input="test",
+            ) as response:
+                _ = response.json()
+
+        self.verify_exception_if_wrapped(sync_client_maybe_wrapped, mock_processor)
+
+    @pytest.mark.asyncio
+    async def test_async_error_handling(
+        self, async_client_maybe_wrapped, mock_processor
+    ):
+        """Test async error handling for invalid model"""
+        with pytest.raises(Exception):
+            async with (
+                async_client_maybe_wrapped.responses.with_streaming_response.create(
+                    model="invalid-model-that-does-not-exist",
+                    input="test",
+                ) as response
+            ):
+                _ = await response.json()
+
+        self.verify_exception_if_wrapped(async_client_maybe_wrapped, mock_processor)
+
+
 class TestSafetyGuarantees(BaseOpenAIResponsesTest):
     def test_safe_serialize_error_doesnt_crash(
         self, monkeypatch, tracer, sync_client, openai_api_key, mock_processor

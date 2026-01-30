@@ -14,7 +14,11 @@ def mock_client():
 
 @pytest.fixture
 def evaluation(mock_client):
-    return Evaluation(mock_client)
+    return Evaluation(
+        client=mock_client,
+        project_id="test_project_id",
+        project_name="test_project",
+    )
 
 
 @pytest.fixture
@@ -37,7 +41,7 @@ def sample_scorers():
 def test_evaluation_run_success(
     evaluation, mock_client, sample_examples, sample_scorers
 ):
-    mock_client.fetch_experiment_run.return_value = {
+    mock_client.get_projects_experiments_by_run_id.return_value = {
         "results": [
             {
                 "scorers": [
@@ -80,7 +84,6 @@ def test_evaluation_run_success(
     results = evaluation.run(
         examples=sample_examples,
         scorers=sample_scorers,
-        project_name="test_project",
         eval_run_name="test_run",
         model="gpt-4o-mini",
         timeout_seconds=10,
@@ -89,14 +92,14 @@ def test_evaluation_run_success(
     assert len(results) == 2
     assert all(isinstance(r, ScoringResult) for r in results)
     assert all(r.success for r in results)
-    mock_client.add_to_run_eval_queue_examples.assert_called_once()
-    mock_client.fetch_experiment_run.assert_called()
+    mock_client.post_projects_eval_queue_examples.assert_called_once()
+    mock_client.get_projects_experiments_by_run_id.assert_called()
 
 
 def test_evaluation_run_with_failures(
     evaluation, mock_client, sample_examples, sample_scorers
 ):
-    mock_client.fetch_experiment_run.return_value = {
+    mock_client.get_projects_experiments_by_run_id.return_value = {
         "results": [
             {
                 "scorers": [
@@ -139,7 +142,6 @@ def test_evaluation_run_with_failures(
     results = evaluation.run(
         examples=sample_examples,
         scorers=sample_scorers,
-        project_name="test_project",
         eval_run_name="test_run",
     )
 
@@ -151,7 +153,7 @@ def test_evaluation_run_with_failures(
 def test_evaluation_run_with_assert_mode_success(
     evaluation, mock_client, sample_examples, sample_scorers
 ):
-    mock_client.fetch_experiment_run.return_value = {
+    mock_client.get_projects_experiments_by_run_id.return_value = {
         "results": [
             {
                 "scorers": [
@@ -194,7 +196,6 @@ def test_evaluation_run_with_assert_mode_success(
     results = evaluation.run(
         examples=sample_examples,
         scorers=sample_scorers,
-        project_name="test_project",
         eval_run_name="test_run",
         assert_test=True,
     )
@@ -206,7 +207,7 @@ def test_evaluation_run_with_assert_mode_success(
 def test_evaluation_run_with_assert_mode_failure(
     evaluation, mock_client, sample_examples, sample_scorers
 ):
-    mock_client.fetch_experiment_run.return_value = {
+    mock_client.get_projects_experiments_by_run_id.return_value = {
         "results": [
             {
                 "scorers": [
@@ -250,14 +251,13 @@ def test_evaluation_run_with_assert_mode_failure(
         evaluation.run(
             examples=sample_examples,
             scorers=sample_scorers,
-            project_name="test_project",
             eval_run_name="test_run",
             assert_test=True,
         )
 
 
 def test_evaluation_timeout(evaluation, mock_client, sample_examples, sample_scorers):
-    mock_client.fetch_experiment_run.return_value = {
+    mock_client.get_projects_experiments_by_run_id.return_value = {
         "results": [],
         "ui_results_url": "http://test.example.com/results",
     }
@@ -266,7 +266,6 @@ def test_evaluation_timeout(evaluation, mock_client, sample_examples, sample_sco
         evaluation.run(
             examples=sample_examples,
             scorers=sample_scorers,
-            project_name="test_project",
             eval_run_name="test_run",
             timeout_seconds=1,
         )
@@ -275,7 +274,7 @@ def test_evaluation_timeout(evaluation, mock_client, sample_examples, sample_sco
 def test_evaluation_scorer_data_parsing(
     evaluation, mock_client, sample_examples, sample_scorers
 ):
-    mock_client.fetch_experiment_run.return_value = {
+    mock_client.get_projects_experiments_by_run_id.return_value = {
         "results": [
             {
                 "scorers": [
@@ -301,7 +300,6 @@ def test_evaluation_scorer_data_parsing(
     results = evaluation.run(
         examples=[sample_examples[0]],
         scorers=sample_scorers,
-        project_name="test_project",
         eval_run_name="test_run",
     )
 

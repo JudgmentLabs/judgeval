@@ -9,17 +9,22 @@ from judgeval.logger import judgeval_logger
 
 
 class DatasetFactory:
-    __slots__ = "_client"
+    __slots__ = ("_client", "_project_id", "_project_name")
 
-    def __init__(self, client: JudgmentSyncClient):
+    def __init__(
+        self,
+        client: JudgmentSyncClient,
+        project_id: str,
+        project_name: str,
+    ):
         self._client = client
+        self._project_id = project_id
+        self._project_name = project_name
 
-    def get(self, name: str, project_name: str) -> Dataset:
-        dataset = self._client.datasets_pull_for_judgeval(
-            {
-                "dataset_name": name,
-                "project_name": project_name,
-            }
+    def get(self, name: str) -> Dataset:
+        dataset = self._client.get_projects_datasets_by_dataset_name(
+            project_id=self._project_id,
+            dataset_name=name,
         )
 
         dataset_kind = dataset.get("dataset_kind", "example")
@@ -52,28 +57,28 @@ class DatasetFactory:
         judgeval_logger.info(f"Retrieved dataset {name} with {len(examples)} examples")
         return Dataset(
             name=name,
-            project_name=project_name,
+            project_id=self._project_id,
             dataset_kind=dataset_kind,
             examples=examples,
             client=self._client,
+            project_name=self._project_name,
         )
 
     def create(
         self,
         name: str,
-        project_name: str,
         examples: Iterable[Example] = [],
         overwrite: bool = False,
         batch_size: int = 100,
     ) -> Dataset:
-        self._client.datasets_create_for_judgeval(
-            {
+        self._client.post_projects_datasets(
+            project_id=self._project_id,
+            payload={
                 "name": name,
-                "project_name": project_name,
                 "examples": [],
                 "dataset_kind": "example",
                 "overwrite": overwrite,
-            }
+            },
         )
         judgeval_logger.info(f"Created dataset {name}")
 
@@ -81,14 +86,18 @@ class DatasetFactory:
             examples = list(examples)
 
         dataset = Dataset(
-            name=name, project_name=project_name, examples=examples, client=self._client
+            name=name,
+            project_id=self._project_id,
+            examples=examples,
+            client=self._client,
+            project_name=self._project_name,
         )
         dataset.add_examples(examples, batch_size=batch_size)
         return dataset
 
-    def list(self, project_name: str) -> List[DatasetInfo]:
-        datasets = self._client.datasets_pull_all_for_judgeval(
-            {"project_name": project_name}
+    def list(self) -> List[DatasetInfo]:
+        datasets = self._client.get_projects_datasets(
+            project_id=self._project_id,
         )
-        judgeval_logger.info(f"Fetched datasets for project {project_name}")
+        judgeval_logger.info(f"Fetched datasets for project {self._project_id}")
         return [DatasetInfo(**d) for d in datasets]
