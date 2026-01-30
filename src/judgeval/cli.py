@@ -71,8 +71,8 @@ def upload_scorer(
     ),
     unique_name: str = typer.Option(
         None,
-        "--unique-name",
-        "-u",
+        "--name",
+        "-n",
         help="Custom scorer name (auto-detected if not provided)",
     ),
     overwrite: bool = typer.Option(
