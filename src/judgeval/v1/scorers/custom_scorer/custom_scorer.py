@@ -15,8 +15,6 @@ from judgeval.v1.scorers.base_scorer import BaseScorer
 class CustomScorer(BaseScorer):
     __slots__ = (
         "_name",
-        "_class_name",
-        "_server_hosted",
         "_project_id",
     )
 
@@ -29,26 +27,13 @@ class CustomScorer(BaseScorer):
         project_id: str,
     ):
         self._name = name
-        self._class_name = class_name or name
-        self._server_hosted = server_hosted
         self._project_id = project_id
 
     def get_name(self) -> str:
         return self._name
 
-    def get_class_name(self) -> str:
-        return self._class_name
-
-    def is_server_hosted(self) -> bool:
-        return self._server_hosted
-
     def get_scorer_config(self) -> ScorerConfig:
         raise NotImplementedError("CustomScorer does not use get_scorer_config")
 
     def to_dict(self) -> BaseScorerDict:
-        return {
-            "score_type": APIScorerType.CUSTOM.value,
-            "name": self._name,
-            "class_name": self._class_name,
-            "server_hosted": self._server_hosted,
-        }
+        return {"score_type": APIScorerType.CUSTOM.value, "name": self._name}

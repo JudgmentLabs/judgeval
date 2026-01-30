@@ -7,6 +7,7 @@ from judgeval.logger import judgeval_logger
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.internal.api.api_types import UploadCustomScorerRequest
 from judgeval.v1.scorers.custom_scorer.custom_scorer import CustomScorer
+from judgeval.exceptions import JudgmentAPIError
 
 
 class CustomScorerFactory:
@@ -20,11 +21,16 @@ class CustomScorerFactory:
         self._client = client
         self._project_id = project_id
 
-    def get(self, name: str, class_name: str | None = None) -> CustomScorer:
+    def get(self, name: str) -> CustomScorer:
+        scorer_exists = self._client.get_projects_scorers_custom_by_name_exists(
+            project_id=self._project_id, name=name
+        )
+        if not scorer_exists["exists"]:
+            raise JudgmentAPIError(
+                status_code=404, detail=f"Scorer {name} does not exist", response=None
+            )
         return CustomScorer(
             name=name,
-            class_name=class_name or name,
-            server_hosted=True,
             project_id=self._project_id,
         )
 
