@@ -65,12 +65,15 @@ def load_otel_env(
 @app.command()
 def upload_scorer(
     scorer_file_path: str = typer.Argument(help="Path to scorer Python file"),
-    requirements_file_path: str = typer.Option(
-        None, help="Path to requirements.txt file"
-    ),
     project_name: str = typer.Option(..., "--project", "-p", help="Project name"),
+    requirements_file_path: str = typer.Option(
+        None, "--requirements", "-r", help="Path to requirements.txt file"
+    ),
     unique_name: str = typer.Option(
-        None, help="Custom scorer name (auto-detected if not provided)"
+        None,
+        "--unique-name",
+        "-u",
+        help="Custom scorer name (auto-detected if not provided)",
     ),
     overwrite: bool = typer.Option(
         False, "--overwrite", "-o", help="Overwrite if exists"
