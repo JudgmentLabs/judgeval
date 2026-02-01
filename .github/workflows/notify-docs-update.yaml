@@ -3,6 +3,8 @@ name: Notify Docs Update
 on:
   push:
     branches: [staging]
+    paths:
+    - "src/judgeval/*"
 
 jobs:
   notify-docs:
