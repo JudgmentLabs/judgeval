@@ -4,7 +4,7 @@ on:
   push:
     branches: [staging]
     paths:
-    - "src/judgeval/*"
+    - "src/judgeval/**"
 
 jobs:
   notify-docs:
@@ -18,9 +18,7 @@ jobs:
       - name: Get commit info
         id: commit
         run: |
-          echo "sha=${{ github.sha }}" >> $GITHUB_OUTPUT
-          # Get first line of commit message, escape quotes for JSON
-          message=$(git log -1 --pretty=%B | head -1 | sed 's/"/\\"/g')
+          message=$(git log -1 --pretty=%B | head -1 | jq -Rs '.[:-1]')
           echo "message=$message" >> $GITHUB_OUTPUT
 
       - name: Trigger docs workflow
@@ -33,8 +31,8 @@ jobs:
             {
               "repo": "${{ github.repository }}",
               "repo_name": "judgeval",
-              "sha": "${{ steps.commit.outputs.sha }}",
-              "message": "${{ steps.commit.outputs.message }}",
+              "sha": "${{ github.sha }}",
+              "message": ${{ steps.commit.outputs.message }},
               "ref": "${{ github.ref_name }}",
               "sdk_type": "python"
             }
