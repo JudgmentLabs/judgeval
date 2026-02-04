@@ -30,7 +30,6 @@ class TestPromptScorerFactoryGet:
         factory = PromptScorerFactory(
             client=mock_client, is_trace=False, project_id="test_project_id"
         )
-        # Clear cache to ensure fresh API call
         PromptScorerFactory._cache.clear()
         scorer = factory.get("TestScorer")
 
@@ -89,5 +88,4 @@ class TestPromptScorerFactoryGet:
 
         assert scorer1 is not None
         assert scorer2 is not None
-        # Should only call API once due to caching
         assert mock_client.get_projects_scorers.call_count == 1

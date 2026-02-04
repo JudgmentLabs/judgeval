@@ -48,7 +48,6 @@ class Tracer(BaseTracer):
             isolated=isolated,
         )
 
-        # Force disable monitoring if project_id is not set
         if enable_monitoring and not project_id:
             judgeval_logger.warning(
                 "Monitoring disabled: project_id is not set. "
