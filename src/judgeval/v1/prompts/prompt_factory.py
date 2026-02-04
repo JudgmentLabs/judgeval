@@ -28,7 +28,7 @@ class PromptFactory:
         prompt: str,
         tags: Optional[List[str]] = None,
     ) -> Optional[Prompt]:
-        project_id = expect_project_id(self._project_id, context="prompt creation")
+        project_id = expect_project_id(self._project_id)
         if not project_id:
             return None
 
@@ -87,7 +87,7 @@ class PromptFactory:
             judgeval_logger.error("Cannot fetch prompt by both commit_id and tag")
             return None
 
-        project_id = expect_project_id(self._project_id, context="prompt retrieval")
+        project_id = expect_project_id(self._project_id)
         if not project_id:
             return None
 
@@ -121,10 +121,10 @@ class PromptFactory:
         name: str,
         commit_id: str,
         tags: List[str],
-    ) -> str:
-        project_id = expect_project_id(self._project_id, context="prompt tagging")
+    ) -> Optional[str]:
+        project_id = expect_project_id(self._project_id)
         if not project_id:
-            return ""
+            return None
 
         try:
             response = self._client.post_projects_prompts_by_name_tags(
@@ -144,10 +144,10 @@ class PromptFactory:
         self,
         name: str,
         tags: List[str],
-    ) -> List[str]:
-        project_id = expect_project_id(self._project_id, context="prompt untagging")
+    ) -> Optional[List[str]]:
+        project_id = expect_project_id(self._project_id)
         if not project_id:
-            return []
+            return None
 
         try:
             response = self._client.delete_projects_prompts_by_name_tags(
@@ -165,10 +165,10 @@ class PromptFactory:
     def list(
         self,
         name: str,
-    ) -> List[Prompt]:
-        project_id = expect_project_id(self._project_id, context="prompt listing")
+    ) -> Optional[List[Prompt]]:
+        project_id = expect_project_id(self._project_id)
         if not project_id:
-            return []
+            return None
 
         try:
             response = self._client.get_projects_prompts_by_name_versions(

@@ -23,7 +23,7 @@ class DatasetFactory:
         self._project_name = project_name
 
     def get(self, name: str) -> Optional[Dataset]:
-        project_id = expect_project_id(self._project_id, context="dataset retrieval")
+        project_id = expect_project_id(self._project_id)
         if not project_id:
             return None
         dataset = self._client.get_projects_datasets_by_dataset_name(
@@ -75,7 +75,7 @@ class DatasetFactory:
         overwrite: bool = False,
         batch_size: int = 100,
     ) -> Optional[Dataset]:
-        project_id = expect_project_id(self._project_id, context="dataset creation")
+        project_id = expect_project_id(self._project_id)
         if not project_id:
             return None
 
@@ -103,10 +103,10 @@ class DatasetFactory:
         dataset.add_examples(examples, batch_size=batch_size)
         return dataset
 
-    def list(self) -> List[DatasetInfo]:
-        project_id = expect_project_id(self._project_id, context="dataset listing")
+    def list(self) -> Optional[List[DatasetInfo]]:
+        project_id = expect_project_id(self._project_id)
         if not project_id:
-            return []
+            return None
 
         datasets = self._client.get_projects_datasets(
             project_id=project_id,

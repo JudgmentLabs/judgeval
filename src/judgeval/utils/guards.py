@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import inspect
 from typing import TYPE_CHECKING
+
 from judgeval.logger import judgeval_logger
 
 if TYPE_CHECKING:
@@ -33,26 +35,22 @@ def expect_organization_id(organization_id: str | None) -> str | None:
     )
 
 
-def expect_project_id(
-    project_id: str | None,
-    context: str | None = None,
-) -> str | None:
+def expect_project_id(project_id: str | None) -> str | None:
     """
     Validates that a project_id exists. Returns None and logs if missing.
 
     Args:
         project_id: The project_id to validate.
-        context: Optional context to include in the log message (e.g., "scorer retrieval").
 
     Returns:
         The project_id if it exists, None otherwise.
     """
-    context_msg = f" for {context}" if context else ""
-    return expect_exists(
-        project_id,
-        f"project_id is not set{context_msg}. This operation will be skipped.",
-        default=None,
-    )
+    if project_id:
+        return project_id
+
+    caller = inspect.currentframe().f_back.f_code.co_name
+    judgeval_logger.error(f"project_id is not set. {caller}() will be skipped.")
+    return None
 
 
 __all__ = (

@@ -24,9 +24,7 @@ class CustomScorerFactory:
         self._project_id = project_id
 
     def get(self, name: str) -> Optional[CustomScorer]:
-        project_id = expect_project_id(
-            self._project_id, context="custom scorer retrieval"
-        )
+        project_id = expect_project_id(self._project_id)
         if not project_id:
             return None
 
@@ -50,7 +48,7 @@ class CustomScorerFactory:
         unique_name: str | None = None,
         overwrite: bool = False,
     ) -> bool:
-        project_id = expect_project_id(self._project_id, context="custom scorer upload")
+        project_id = expect_project_id(self._project_id)
         if not project_id:
             return False
 

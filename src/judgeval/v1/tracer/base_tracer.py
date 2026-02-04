@@ -108,8 +108,6 @@ class BaseTracer(ABC):
         pass
 
     def get_span_exporter(self) -> SpanExporter:
-        if not self.project_id:
-            raise ValueError("project_id is required for span exporter")
         return JudgmentSpanExporter(
             endpoint=self._build_endpoint(self.api_client.base_url),
             api_key=self.api_client.api_key,

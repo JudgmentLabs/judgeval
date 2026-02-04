@@ -31,9 +31,7 @@ class PromptScorerFactory:
         self,
         name: str,
     ) -> PromptScorer | None:
-        project_id = expect_project_id(
-            self._project_id, context="prompt scorer retrieval"
-        )
+        project_id = expect_project_id(self._project_id)
         if not project_id:
             return None
 

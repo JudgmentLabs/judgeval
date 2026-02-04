@@ -57,21 +57,15 @@ class TestExpectProjectId:
         result = expect_project_id("")
         assert result is None
 
-    def test_includes_context_in_message(self, caplog):
+    def test_logs_caller_name_when_missing(self, caplog):
         import logging
 
-        with caplog.at_level(logging.WARNING):
-            result = expect_project_id(None, context="scorer retrieval")
+        def my_function():
+            return expect_project_id(None)
 
-        assert result is None
-        assert "scorer retrieval" in caplog.text
-        assert "project_id is not set" in caplog.text
-
-    def test_no_context_in_message(self, caplog):
-        import logging
-
-        with caplog.at_level(logging.WARNING):
-            result = expect_project_id(None)
+        with caplog.at_level(logging.ERROR):
+            result = my_function()
 
         assert result is None
         assert "project_id is not set" in caplog.text
+        assert "my_function()" in caplog.text

@@ -21,7 +21,7 @@ class EvaluationFactory:
         self._project_name = project_name
 
     def create(self) -> Optional[Evaluation]:
-        project_id = expect_project_id(self._project_id, context="evaluation creation")
+        project_id = expect_project_id(self._project_id)
         if not project_id:
             return None
 
