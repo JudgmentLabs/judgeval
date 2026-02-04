@@ -1,0 +1,38 @@
+name: Notify Docs Update
+
+on:
+  push:
+    branches: [staging]
+    paths:
+    - "src/judgeval/**"
+
+jobs:
+  notify-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Get commit info
+        id: commit
+        run: |
+          message=$(git log -1 --pretty=%B | head -1 | jq -Rs '.[:-1]')
+          echo "message=$message" >> $GITHUB_OUTPUT
+
+      - name: Trigger docs workflow
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.RELEASE_BOT_GITHUB_PAT }}
+          repository: judgmentlabs/docs
+          event-type: sdk-update
+          client-payload: |
+            {
+              "repo": "${{ github.repository }}",
+              "repo_name": "judgeval",
+              "sha": "${{ github.sha }}",
+              "message": ${{ steps.commit.outputs.message }},
+              "ref": "${{ github.ref_name }}",
+              "sdk_type": "python"
+            }
