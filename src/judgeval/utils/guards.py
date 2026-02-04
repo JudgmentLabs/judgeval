@@ -49,7 +49,10 @@ def expect_project_id(project_id: str | None) -> str | None:
         return project_id
 
     frame = inspect.currentframe()
-    caller = frame.f_back.f_code.co_name if frame and frame.f_back else "unknown"
+    try:
+        caller = frame.f_back.f_code.co_name if frame and frame.f_back else "unknown"
+    finally:
+        del frame
     judgeval_logger.error(f"project_id is not set. {caller}() will be skipped.")
     return None
 
