@@ -12,15 +12,12 @@ class NoopEvaluation(Evaluation):
     """A no-op Evaluation that silently skips all operations.
 
     Used when project_id is not available, allowing code to continue
-    without raising exceptions. Logging happens once at factory level,
-    not on every method call (consistent with legacy NoOpJudgmentSpanProcessor).
+    without raising exceptions.
     """
 
     __slots__ = ()
 
     def __init__(self, project_name: str = ""):
-        # Don't call super().__init__ - just set minimal state
-        # to avoid requiring a real client
         self._client = None  # type: ignore[assignment]
         self._project_id = ""
         self._project_name = project_name

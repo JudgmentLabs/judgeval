@@ -7,8 +7,7 @@ class NoopPrompt(Prompt):
     """A no-op Prompt that returns empty/placeholder values.
 
     Used when project_id is not available, allowing code to continue
-    without raising exceptions. Logging happens once at factory level,
-    not on every method call (consistent with legacy NoOpJudgmentSpanProcessor).
+    without raising exceptions.
     """
 
     def __init__(self, name: str = ""):

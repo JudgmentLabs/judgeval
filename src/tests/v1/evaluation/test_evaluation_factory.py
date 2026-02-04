@@ -95,11 +95,6 @@ def test_factory_create_returns_noop_when_project_id_missing(mock_client):
 def test_noop_evaluation_run_returns_empty_list(
     mock_client, sample_examples, sample_scorers
 ):
-    """NoopEvaluation.run() returns empty results and doesn't call the API.
-
-    Logging happens once at factory level via expect_project_id, not per method call
-    (consistent with legacy NoOpJudgmentSpanProcessor pattern).
-    """
     factory = EvaluationFactory(
         client=mock_client,
         project_id=None,

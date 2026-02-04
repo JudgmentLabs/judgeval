@@ -8,9 +8,7 @@ class NoopPromptScorer(PromptScorer):
     """A no-op PromptScorer that indicates the scorer could not be loaded.
 
     Used when project_id is not available or scorer doesn't exist,
-    allowing code to continue without raising exceptions. Logging happens
-    once at factory level, not on every method call (consistent with
-    legacy NoOpJudgmentSpanProcessor).
+    allowing code to continue without raising exceptions.
     """
 
     __slots__ = ()

@@ -10,8 +10,7 @@ class NoopDataset(Dataset):
     """A no-op Dataset that silently skips all operations.
 
     Used when project_id is not available, allowing code to continue
-    without raising exceptions. Logging happens once at factory level,
-    not on every method call (consistent with legacy NoOpJudgmentSpanProcessor).
+    without raising exceptions.
     """
 
     def __init__(self, name: str = "", project_name: str = ""):
