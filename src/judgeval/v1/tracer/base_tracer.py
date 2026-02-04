@@ -112,7 +112,7 @@ class BaseTracer(ABC):
             endpoint=self._build_endpoint(self.api_client.base_url),
             api_key=self.api_client.api_key,
             organization_id=self.api_client.organization_id,
-            project_id=self.project_id,
+            project_id=self.project_id,  # type: ignore[arg-type]
         )
 
     def get_span_processor(self) -> JudgmentSpanProcessor:

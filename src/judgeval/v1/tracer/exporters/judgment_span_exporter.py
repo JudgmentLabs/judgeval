@@ -19,9 +19,6 @@ class JudgmentSpanExporter(SpanExporter):
         organization_id: str,
         project_id: str,
     ):
-        if not project_id or len(project_id.strip()) == 0:
-            raise ValueError("project_id is required for JudgmentSpanExporter")
-
         self._delegate = OTLPSpanExporter(
             endpoint=endpoint,
             headers={
