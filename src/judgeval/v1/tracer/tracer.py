@@ -48,6 +48,14 @@ class Tracer(BaseTracer):
             isolated=isolated,
         )
 
+        # Force disable monitoring if project_id is not set
+        if enable_monitoring and not project_id:
+            judgeval_logger.warning(
+                "Monitoring disabled: project_id is not set. "
+                "Spans will not be exported."
+            )
+            enable_monitoring = False
+
         super().__init__(
             project_name=project_name,
             project_id=project_id,
@@ -59,14 +67,8 @@ class Tracer(BaseTracer):
         )
 
         if enable_monitoring and use_default_span_processor:
-            if project_id:
-                judgeval_logger.info("Adding JudgmentSpanProcessor for monitoring.")
-                tracer_provider.add_span_processor(self.get_span_processor())
-            else:
-                judgeval_logger.warning(
-                    "Monitoring disabled: project_id is not set. "
-                    "Spans will not be exported."
-                )
+            judgeval_logger.info("Adding JudgmentSpanProcessor for monitoring.")
+            tracer_provider.add_span_processor(self.get_span_processor())
 
         if initialize and enable_monitoring and not isolated:
             judgeval_logger.info("Setting global tracer provider for monitoring.")

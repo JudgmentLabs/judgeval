@@ -4,7 +4,6 @@ from typing import List, Iterable, Optional
 
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.datasets.dataset import Dataset, DatasetInfo
-from judgeval.v1.datasets.noop_dataset import NoopDataset
 from judgeval.v1.data.example import Example
 from judgeval.logger import judgeval_logger
 from judgeval.utils.guards import expect_project_id
@@ -23,10 +22,10 @@ class DatasetFactory:
         self._project_id = project_id
         self._project_name = project_name
 
-    def get(self, name: str) -> Dataset:
+    def get(self, name: str) -> Optional[Dataset]:
         project_id = expect_project_id(self._project_id, context="dataset retrieval")
         if not project_id:
-            return NoopDataset(name=name, project_name=self._project_name)
+            return None
         dataset = self._client.get_projects_datasets_by_dataset_name(
             project_id=project_id,
             dataset_name=name,
@@ -75,10 +74,10 @@ class DatasetFactory:
         examples: Iterable[Example] = [],
         overwrite: bool = False,
         batch_size: int = 100,
-    ) -> Dataset:
+    ) -> Optional[Dataset]:
         project_id = expect_project_id(self._project_id, context="dataset creation")
         if not project_id:
-            return NoopDataset(name=name, project_name=self._project_name)
+            return None
 
         self._client.post_projects_datasets(
             project_id=project_id,

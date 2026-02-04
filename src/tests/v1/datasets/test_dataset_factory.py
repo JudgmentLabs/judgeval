@@ -2,7 +2,6 @@ import pytest
 from unittest.mock import MagicMock
 from judgeval.v1.datasets.dataset_factory import DatasetFactory
 from judgeval.v1.datasets.dataset import Dataset, DatasetInfo
-from judgeval.v1.datasets.noop_dataset import NoopDataset
 from judgeval.v1.data.example import Example
 
 
@@ -108,7 +107,7 @@ def test_factory_create_empty_examples(dataset_factory, mock_client):
     assert len(dataset.examples) == 0
 
 
-def test_factory_get_returns_noop_when_project_id_missing(mock_client, caplog):
+def test_factory_get_returns_none_when_project_id_missing(mock_client, caplog):
     import logging
 
     factory = DatasetFactory(mock_client, project_id=None, project_name="test_project")
@@ -116,13 +115,12 @@ def test_factory_get_returns_noop_when_project_id_missing(mock_client, caplog):
     with caplog.at_level(logging.WARNING):
         dataset = factory.get("test_dataset")
 
-    assert isinstance(dataset, NoopDataset)
-    assert dataset.name == "test_dataset"
+    assert dataset is None
     assert "project_id is not set" in caplog.text
     mock_client.get_projects_datasets_by_dataset_name.assert_not_called()
 
 
-def test_factory_create_returns_noop_when_project_id_missing(mock_client, caplog):
+def test_factory_create_returns_none_when_project_id_missing(mock_client, caplog):
     import logging
 
     factory = DatasetFactory(mock_client, project_id=None, project_name="test_project")
@@ -130,8 +128,7 @@ def test_factory_create_returns_noop_when_project_id_missing(mock_client, caplog
     with caplog.at_level(logging.WARNING):
         dataset = factory.create(name="test_dataset")
 
-    assert isinstance(dataset, NoopDataset)
-    assert dataset.name == "test_dataset"
+    assert dataset is None
     assert "project_id is not set" in caplog.text
     mock_client.post_projects_datasets.assert_not_called()
 

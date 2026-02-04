@@ -4,7 +4,6 @@ from typing import Optional
 
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.evaluation.evaluation import Evaluation
-from judgeval.v1.evaluation.noop_evaluation import NoopEvaluation
 from judgeval.utils.guards import expect_project_id
 
 
@@ -21,10 +20,10 @@ class EvaluationFactory:
         self._project_id = project_id
         self._project_name = project_name
 
-    def create(self) -> Evaluation:
+    def create(self) -> Optional[Evaluation]:
         project_id = expect_project_id(self._project_id, context="evaluation creation")
         if not project_id:
-            return NoopEvaluation(project_name=self._project_name)
+            return None
 
         return Evaluation(
             client=self._client,

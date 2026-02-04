@@ -2,7 +2,6 @@ import pytest
 from unittest.mock import MagicMock
 from judgeval.v1.evaluation.evaluation_factory import EvaluationFactory
 from judgeval.v1.evaluation.evaluation import Evaluation
-from judgeval.v1.evaluation.noop_evaluation import NoopEvaluation
 from judgeval.v1.data.example import Example
 from judgeval.v1.scorers.built_in.answer_relevancy import AnswerRelevancyScorer
 
@@ -80,7 +79,7 @@ def test_factory_run(evaluation_factory, mock_client, sample_examples, sample_sc
     mock_client.post_projects_eval_queue_examples.assert_called_once()
 
 
-def test_factory_create_returns_noop_when_project_id_missing(mock_client):
+def test_factory_create_returns_none_when_project_id_missing(mock_client):
     factory = EvaluationFactory(
         client=mock_client,
         project_id=None,
@@ -89,24 +88,4 @@ def test_factory_create_returns_noop_when_project_id_missing(mock_client):
 
     evaluation = factory.create()
 
-    assert isinstance(evaluation, NoopEvaluation)
-
-
-def test_noop_evaluation_run_returns_empty_list(
-    mock_client, sample_examples, sample_scorers
-):
-    factory = EvaluationFactory(
-        client=mock_client,
-        project_id=None,
-        project_name="test_project",
-    )
-    evaluation = factory.create()
-
-    results = evaluation.run(
-        examples=sample_examples,
-        scorers=sample_scorers,
-        eval_run_name="test_run",
-    )
-
-    assert results == []
-    mock_client.post_projects_eval_queue_examples.assert_not_called()
+    assert evaluation is None

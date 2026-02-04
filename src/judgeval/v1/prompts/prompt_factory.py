@@ -6,7 +6,6 @@ from judgeval.logger import judgeval_logger
 from judgeval.utils.decorators.dont_throw import dont_throw
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.prompts.prompt import Prompt
-from judgeval.v1.prompts.noop_prompt import NoopPrompt
 from judgeval.utils.guards import expect_project_id
 
 
@@ -28,10 +27,10 @@ class PromptFactory:
         name: str,
         prompt: str,
         tags: Optional[List[str]] = None,
-    ) -> Prompt:
+    ) -> Optional[Prompt]:
         project_id = expect_project_id(self._project_id, context="prompt creation")
         if not project_id:
-            return NoopPrompt(name=name)
+            return None
 
         try:
             if tags is None:

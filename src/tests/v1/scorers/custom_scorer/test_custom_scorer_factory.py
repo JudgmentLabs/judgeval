@@ -2,7 +2,6 @@ import pytest
 from unittest.mock import MagicMock
 from judgeval.v1.scorers.custom_scorer.custom_scorer_factory import CustomScorerFactory
 from judgeval.v1.scorers.custom_scorer.custom_scorer import CustomScorer
-from judgeval.v1.scorers.custom_scorer.noop_custom_scorer import NoopCustomScorer
 from judgeval.exceptions import JudgmentAPIError
 
 
@@ -37,7 +36,7 @@ class TestCustomScorerFactoryGet:
         assert exc_info.value.status_code == 404
         assert "NonExistentScorer" in str(exc_info.value)
 
-    def test_get_returns_noop_when_project_id_missing(self, mock_client, caplog):
+    def test_get_returns_none_when_project_id_missing(self, mock_client, caplog):
         import logging
 
         factory = CustomScorerFactory(client=mock_client, project_id=None)
@@ -45,8 +44,7 @@ class TestCustomScorerFactoryGet:
         with caplog.at_level(logging.WARNING):
             scorer = factory.get("TestScorer")
 
-        assert isinstance(scorer, NoopCustomScorer)
-        assert scorer._name == "TestScorer"
+        assert scorer is None
         assert "project_id is not set" in caplog.text
         assert "custom scorer retrieval" in caplog.text
         mock_client.get_projects_scorers_custom_by_name_exists.assert_not_called()

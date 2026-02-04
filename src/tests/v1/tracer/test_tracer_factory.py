@@ -73,5 +73,6 @@ def test_factory_create_with_none_project_id(mock_client, caplog):
 
     assert isinstance(tracer, Tracer)
     assert tracer.project_id is None
+    assert tracer.enable_monitoring is False
     assert "Monitoring disabled" in caplog.text
     assert "project_id is not set" in caplog.text

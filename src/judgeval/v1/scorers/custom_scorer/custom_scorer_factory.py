@@ -8,7 +8,6 @@ from judgeval.logger import judgeval_logger
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.internal.api.api_types import UploadCustomScorerRequest
 from judgeval.v1.scorers.custom_scorer.custom_scorer import CustomScorer
-from judgeval.v1.scorers.custom_scorer.noop_custom_scorer import NoopCustomScorer
 from judgeval.utils.guards import expect_project_id
 from judgeval.exceptions import JudgmentAPIError
 
@@ -24,12 +23,12 @@ class CustomScorerFactory:
         self._client = client
         self._project_id = project_id
 
-    def get(self, name: str) -> CustomScorer:
+    def get(self, name: str) -> Optional[CustomScorer]:
         project_id = expect_project_id(
             self._project_id, context="custom scorer retrieval"
         )
         if not project_id:
-            return NoopCustomScorer(name=name)
+            return None
 
         scorer_exists = self._client.get_projects_scorers_custom_by_name_exists(
             project_id=project_id, name=name
