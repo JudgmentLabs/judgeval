@@ -3,12 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from judgeval.v1.scorers.custom_scorer.custom_scorer import CustomScorer
+from judgeval.v1.internal.api.api_types import ScorerConfig
 
 if TYPE_CHECKING:
-    from judgeval.v1.internal.api.api_types import (
-        BaseScorer as BaseScorerDict,
-        ScorerConfig,
-    )
+    from judgeval.v1.internal.api.api_types import BaseScorer as BaseScorerDict
 
 
 class NoopCustomScorer(CustomScorer):
@@ -21,15 +19,14 @@ class NoopCustomScorer(CustomScorer):
     __slots__ = ()
 
     def __init__(self, name: str = ""):
-        self._name = name
-        self._project_id = ""
+        super().__init__(name=name, project_id="")
 
     def get_scorer_config(self) -> ScorerConfig:
-        return {
-            "score_type": "noop",
-            "name": self._name,
-            "threshold": 0.0,
-        }
+        return ScorerConfig(
+            score_type="noop",
+            name=self._name,
+            threshold=0.0,
+        )
 
     def to_dict(self) -> BaseScorerDict:
         return {"score_type": "noop", "name": self._name}

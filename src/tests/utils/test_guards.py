@@ -60,7 +60,7 @@ class TestExpectProjectId:
     def test_includes_context_in_message(self, caplog):
         import logging
 
-        with caplog.at_level(logging.ERROR):
+        with caplog.at_level(logging.WARNING):
             result = expect_project_id(None, context="scorer retrieval")
 
         assert result is None
@@ -70,7 +70,7 @@ class TestExpectProjectId:
     def test_no_context_in_message(self, caplog):
         import logging
 
-        with caplog.at_level(logging.ERROR):
+        with caplog.at_level(logging.WARNING):
             result = expect_project_id(None)
 
         assert result is None

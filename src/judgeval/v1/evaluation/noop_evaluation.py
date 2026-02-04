@@ -18,9 +18,11 @@ class NoopEvaluation(Evaluation):
     __slots__ = ()
 
     def __init__(self, project_name: str = ""):
-        self._client = None  # type: ignore[assignment]
-        self._project_id = ""
-        self._project_name = project_name
+        super().__init__(
+            client=None,  # type: ignore[arg-type]
+            project_id="",
+            project_name=project_name,
+        )
 
     def _validate_scorer_project(self, scorer: BaseScorer) -> None:
         pass

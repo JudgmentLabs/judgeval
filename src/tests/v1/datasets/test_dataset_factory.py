@@ -113,7 +113,7 @@ def test_factory_get_returns_noop_when_project_id_missing(mock_client, caplog):
 
     factory = DatasetFactory(mock_client, project_id=None, project_name="test_project")
 
-    with caplog.at_level(logging.ERROR):
+    with caplog.at_level(logging.WARNING):
         dataset = factory.get("test_dataset")
 
     assert isinstance(dataset, NoopDataset)
@@ -127,7 +127,7 @@ def test_factory_create_returns_noop_when_project_id_missing(mock_client, caplog
 
     factory = DatasetFactory(mock_client, project_id=None, project_name="test_project")
 
-    with caplog.at_level(logging.ERROR):
+    with caplog.at_level(logging.WARNING):
         dataset = factory.create(name="test_dataset")
 
     assert isinstance(dataset, NoopDataset)
@@ -141,7 +141,7 @@ def test_factory_list_returns_empty_when_project_id_missing(mock_client, caplog)
 
     factory = DatasetFactory(mock_client, project_id=None, project_name="test_project")
 
-    with caplog.at_level(logging.ERROR):
+    with caplog.at_level(logging.WARNING):
         datasets = factory.list()
 
     assert datasets == []

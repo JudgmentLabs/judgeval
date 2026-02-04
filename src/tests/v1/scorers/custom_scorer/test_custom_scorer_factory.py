@@ -42,7 +42,7 @@ class TestCustomScorerFactoryGet:
 
         factory = CustomScorerFactory(client=mock_client, project_id=None)
 
-        with caplog.at_level(logging.ERROR):
+        with caplog.at_level(logging.WARNING):
             scorer = factory.get("TestScorer")
 
         assert isinstance(scorer, NoopCustomScorer)
@@ -80,7 +80,7 @@ class TestScorer(ExampleScorer):
 
         factory = CustomScorerFactory(client=mock_client, project_id=None)
 
-        with caplog.at_level(logging.ERROR):
+        with caplog.at_level(logging.WARNING):
             result = factory.upload(str(scorer_file))
 
         assert result is False

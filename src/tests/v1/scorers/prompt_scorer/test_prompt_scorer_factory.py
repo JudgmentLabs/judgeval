@@ -58,7 +58,7 @@ class TestPromptScorerFactoryGet:
             client=mock_client, is_trace=False, project_id=None
         )
 
-        with caplog.at_level(logging.ERROR):
+        with caplog.at_level(logging.WARNING):
             scorer = factory.get("TestScorer")
 
         assert isinstance(scorer, NoopPromptScorer)
