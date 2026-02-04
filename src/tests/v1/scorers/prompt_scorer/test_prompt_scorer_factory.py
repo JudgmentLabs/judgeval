@@ -2,7 +2,6 @@ import pytest
 from unittest.mock import MagicMock
 from judgeval.v1.scorers.prompt_scorer.prompt_scorer_factory import PromptScorerFactory
 from judgeval.v1.scorers.prompt_scorer.prompt_scorer import PromptScorer
-from judgeval.v1.scorers.prompt_scorer.noop_prompt_scorer import NoopPromptScorer
 
 
 @pytest.fixture
@@ -51,7 +50,7 @@ class TestPromptScorerFactoryGet:
 
         assert scorer is None
 
-    def test_get_returns_noop_when_project_id_missing(self, mock_client, caplog):
+    def test_get_returns_none_when_project_id_missing(self, mock_client, caplog):
         import logging
 
         factory = PromptScorerFactory(
@@ -61,8 +60,7 @@ class TestPromptScorerFactoryGet:
         with caplog.at_level(logging.WARNING):
             scorer = factory.get("TestScorer")
 
-        assert isinstance(scorer, NoopPromptScorer)
-        assert scorer._name == "TestScorer"
+        assert scorer is None
         assert "project_id is not set" in caplog.text
         assert "prompt scorer retrieval" in caplog.text
         mock_client.get_projects_scorers.assert_not_called()

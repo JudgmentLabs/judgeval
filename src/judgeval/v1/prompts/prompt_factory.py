@@ -90,7 +90,7 @@ class PromptFactory:
 
         project_id = expect_project_id(self._project_id, context="prompt retrieval")
         if not project_id:
-            return NoopPrompt(name=name)
+            return None
 
         response = self._client.get_projects_prompts_by_name(
             project_id=project_id,

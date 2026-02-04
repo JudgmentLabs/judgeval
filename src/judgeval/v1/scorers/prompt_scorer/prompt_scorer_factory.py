@@ -9,7 +9,6 @@ from judgeval.v1.internal.api.api_types import (
 )
 from judgeval.exceptions import JudgmentAPIError
 from judgeval.v1.scorers.prompt_scorer.prompt_scorer import PromptScorer
-from judgeval.v1.scorers.prompt_scorer.noop_prompt_scorer import NoopPromptScorer
 from judgeval.logger import judgeval_logger
 from judgeval.utils.guards import expect_project_id
 
@@ -36,7 +35,7 @@ class PromptScorerFactory:
             self._project_id, context="prompt scorer retrieval"
         )
         if not project_id:
-            return NoopPromptScorer(name=name)
+            return None
 
         cache_key = (
             name,
