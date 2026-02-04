@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 def expect_exists(value: T | None, message: str, default: T) -> T:
     if not value:
-        judgeval_logger.warning(message)
+        judgeval_logger.error(message)
         return default
 
     return value
