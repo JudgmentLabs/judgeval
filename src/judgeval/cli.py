@@ -107,6 +107,53 @@ def upload_scorer(
 
 
 @app.command()
+def upload_scorer_v2(
+    scorer_file_path: str = typer.Argument(help="Path to scorer Python file"),
+    project_name: str = typer.Option(..., "--project", "-p", help="Project name"),
+    requirements_file_path: str = typer.Option(
+        None, "--requirements", "-r", help="Path to requirements.txt file"
+    ),
+    unique_name: str = typer.Option(
+        None,
+        "--name",
+        "-n",
+        help="Custom scorer name (auto-detected if not provided)",
+    ),
+    overwrite: bool = typer.Option(
+        False, "--overwrite", "-o", help="Overwrite if exists"
+    ),
+    api_key: str = typer.Option(None, envvar="JUDGMENT_API_KEY"),
+    organization_id: str = typer.Option(None, envvar="JUDGMENT_ORG_ID"),
+):
+    """Upload v2 custom scorer (TraceCustomScorer/ExampleCustomScorer with typed responses)."""
+    scorer_path = Path(scorer_file_path)
+
+    if not scorer_path.exists():
+        raise typer.BadParameter(f"Scorer file not found: {scorer_file_path}")
+
+    client = Judgeval(project_name, api_key=api_key, organization_id=organization_id)
+
+    try:
+        result = client.scorers.custom_scorer.upload_v2(
+            scorer_file_path=scorer_file_path,
+            requirements_file_path=requirements_file_path,
+            unique_name=unique_name,
+            overwrite=overwrite,
+        )
+        if not result:
+            raise typer.Abort()
+        judgeval_logger.info("V2 custom scorer uploaded successfully!")
+    except JudgmentAPIError as e:
+        if e.status_code == 409:
+            judgeval_logger.error("Scorer exists. Use --overwrite to replace")
+            raise typer.Exit(1)
+        raise
+    except ValueError as e:
+        judgeval_logger.error(str(e))
+        raise typer.Exit(1)
+
+
+@app.command()
 def version():
     """Show Judgeval CLI version."""
     typer.echo(f"Judgeval CLI v{get_version()}")
