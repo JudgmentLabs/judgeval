@@ -28,6 +28,7 @@ class Tracer(BaseTracer):
         isolated: bool = False,
         resource_attributes: Optional[Dict[str, Any]] = None,
         initialize: bool = True,
+        use_default_span_processor: bool = True,
     ):
         self._filter_tracer = filter_tracer
 
@@ -57,7 +58,7 @@ class Tracer(BaseTracer):
             tracer_provider=tracer_provider,
         )
 
-        if enable_monitoring:
+        if enable_monitoring and use_default_span_processor:
             judgeval_logger.info("Adding JudgmentSpanProcessor for monitoring.")
             tracer_provider.add_span_processor(self.get_span_processor())
 
