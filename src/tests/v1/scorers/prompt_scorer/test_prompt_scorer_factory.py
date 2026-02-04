@@ -56,12 +56,12 @@ class TestPromptScorerFactoryGet:
             client=mock_client, is_trace=False, project_id=None
         )
 
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.ERROR):
             scorer = factory.get("TestScorer")
 
         assert scorer is None
         assert "project_id is not set" in caplog.text
-        assert "prompt scorer retrieval" in caplog.text
+        assert "get()" in caplog.text
         mock_client.get_projects_scorers.assert_not_called()
 
     def test_get_caches_results(self, mock_client):

@@ -41,12 +41,12 @@ class TestCustomScorerFactoryGet:
 
         factory = CustomScorerFactory(client=mock_client, project_id=None)
 
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.ERROR):
             scorer = factory.get("TestScorer")
 
         assert scorer is None
         assert "project_id is not set" in caplog.text
-        assert "custom scorer retrieval" in caplog.text
+        assert "get()" in caplog.text
         mock_client.get_projects_scorers_custom_by_name_exists.assert_not_called()
 
     def test_get_propagates_api_error(self, mock_client):
@@ -78,9 +78,10 @@ class TestScorer(ExampleScorer):
 
         factory = CustomScorerFactory(client=mock_client, project_id=None)
 
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.ERROR):
             result = factory.upload(str(scorer_file))
 
         assert result is False
         assert "project_id is not set" in caplog.text
+        assert "upload()" in caplog.text
         mock_client.post_projects_scorers_custom.assert_not_called()

@@ -41,12 +41,12 @@ class TestPromptFactoryCreate:
             client=mock_client, project_id=None, project_name="test_project"
         )
 
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.ERROR):
             prompt = factory.create(name="test_prompt", prompt="Hello")
 
         assert prompt is None
         assert "project_id is not set" in caplog.text
-        assert "prompt creation" in caplog.text
+        assert "create()" in caplog.text
         mock_client.post_projects_prompts.assert_not_called()
 
 
@@ -79,12 +79,12 @@ class TestPromptFactoryGet:
             client=mock_client, project_id=None, project_name="test_project"
         )
 
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.ERROR):
             prompt = factory.get(name="test_prompt", tag="production")
 
         assert prompt is None
         assert "project_id is not set" in caplog.text
-        assert "prompt retrieval" in caplog.text
+        assert "get()" in caplog.text
         mock_client.get_projects_prompts_by_name.assert_not_called()
 
 
@@ -101,23 +101,21 @@ class TestPromptFactoryTag:
         assert result == "abc123"
         mock_client.post_projects_prompts_by_name_tags.assert_called_once()
 
-    def test_tag_returns_empty_string_when_project_id_missing(
-        self, mock_client, caplog
-    ):
+    def test_tag_returns_none_when_project_id_missing(self, mock_client, caplog):
         import logging
 
         factory = PromptFactory(
             client=mock_client, project_id=None, project_name="test_project"
         )
 
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.ERROR):
             result = factory.tag(
                 name="test_prompt", commit_id="abc123", tags=["production"]
             )
 
-        assert result == ""
+        assert result is None
         assert "project_id is not set" in caplog.text
-        assert "prompt tagging" in caplog.text
+        assert "tag()" in caplog.text
         mock_client.post_projects_prompts_by_name_tags.assert_not_called()
 
 
@@ -132,21 +130,19 @@ class TestPromptFactoryUntag:
         assert result == ["abc123", "def456"]
         mock_client.delete_projects_prompts_by_name_tags.assert_called_once()
 
-    def test_untag_returns_empty_list_when_project_id_missing(
-        self, mock_client, caplog
-    ):
+    def test_untag_returns_none_when_project_id_missing(self, mock_client, caplog):
         import logging
 
         factory = PromptFactory(
             client=mock_client, project_id=None, project_name="test_project"
         )
 
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.ERROR):
             result = factory.untag(name="test_prompt", tags=["old_tag"])
 
-        assert result == []
+        assert result is None
         assert "project_id is not set" in caplog.text
-        assert "prompt untagging" in caplog.text
+        assert "untag()" in caplog.text
         mock_client.delete_projects_prompts_by_name_tags.assert_not_called()
 
 
@@ -186,17 +182,17 @@ class TestPromptFactoryList:
         assert prompts[0].commit_id == "abc123"
         assert prompts[1].commit_id == "def456"
 
-    def test_list_returns_empty_list_when_project_id_missing(self, mock_client, caplog):
+    def test_list_returns_none_when_project_id_missing(self, mock_client, caplog):
         import logging
 
         factory = PromptFactory(
             client=mock_client, project_id=None, project_name="test_project"
         )
 
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.ERROR):
             prompts = factory.list(name="test_prompt")
 
-        assert prompts == []
+        assert prompts is None
         assert "project_id is not set" in caplog.text
-        assert "prompt listing" in caplog.text
+        assert "list()" in caplog.text
         mock_client.get_projects_prompts_by_name_versions.assert_not_called()
