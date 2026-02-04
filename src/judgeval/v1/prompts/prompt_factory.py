@@ -6,6 +6,8 @@ from judgeval.logger import judgeval_logger
 from judgeval.utils.decorators.dont_throw import dont_throw
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.prompts.prompt import Prompt
+from judgeval.v1.prompts.noop_prompt import NoopPrompt
+from judgeval.utils.guards import expect_project_id
 
 
 class PromptFactory:
@@ -14,7 +16,7 @@ class PromptFactory:
     def __init__(
         self,
         client: JudgmentSyncClient,
-        project_id: str,
+        project_id: Optional[str],
         project_name: str,
     ):
         self._client = client
@@ -27,11 +29,14 @@ class PromptFactory:
         prompt: str,
         tags: Optional[List[str]] = None,
     ) -> Prompt:
+        project_id = expect_project_id(self._project_id, context="prompt creation")
+        if not project_id:
+            return NoopPrompt(name=name)
+
         try:
             if tags is None:
                 tags = []
 
-            project_id = self._project_id
             response = self._client.post_projects_prompts(
                 project_id=project_id,
                 payload={
@@ -83,7 +88,9 @@ class PromptFactory:
             judgeval_logger.error("Cannot fetch prompt by both commit_id and tag")
             return None
 
-        project_id = self._project_id
+        project_id = expect_project_id(self._project_id, context="prompt retrieval")
+        if not project_id:
+            return None
 
         response = self._client.get_projects_prompts_by_name(
             project_id=project_id,
@@ -116,8 +123,11 @@ class PromptFactory:
         commit_id: str,
         tags: List[str],
     ) -> str:
+        project_id = expect_project_id(self._project_id, context="prompt tagging")
+        if not project_id:
+            return ""
+
         try:
-            project_id = self._project_id
             response = self._client.post_projects_prompts_by_name_tags(
                 project_id=project_id,
                 name=name,
@@ -136,8 +146,11 @@ class PromptFactory:
         name: str,
         tags: List[str],
     ) -> List[str]:
+        project_id = expect_project_id(self._project_id, context="prompt untagging")
+        if not project_id:
+            return []
+
         try:
-            project_id = self._project_id
             response = self._client.delete_projects_prompts_by_name_tags(
                 project_id=project_id,
                 name=name,
@@ -154,8 +167,11 @@ class PromptFactory:
         self,
         name: str,
     ) -> List[Prompt]:
+        project_id = expect_project_id(self._project_id, context="prompt listing")
+        if not project_id:
+            return []
+
         try:
-            project_id = self._project_id
             response = self._client.get_projects_prompts_by_name_versions(
                 project_id=project_id,
                 name=name,

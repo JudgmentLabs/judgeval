@@ -33,4 +33,31 @@ def expect_organization_id(organization_id: str | None) -> str | None:
     )
 
 
-__all__ = ("expect_exists", "expect_api_key", "expect_organization_id")
+def expect_project_id(
+    project_id: str | None,
+    context: str | None = None,
+) -> str | None:
+    """
+    Validates that a project_id exists. Returns None and logs if missing.
+
+    Args:
+        project_id: The project_id to validate.
+        context: Optional context to include in the log message (e.g., "scorer retrieval").
+
+    Returns:
+        The project_id if it exists, None otherwise.
+    """
+    context_msg = f" for {context}" if context else ""
+    return expect_exists(
+        project_id,
+        f"project_id is not set{context_msg}. This operation will be skipped.",
+        default=None,
+    )
+
+
+__all__ = (
+    "expect_exists",
+    "expect_api_key",
+    "expect_organization_id",
+    "expect_project_id",
+)

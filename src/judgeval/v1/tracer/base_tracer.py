@@ -82,7 +82,7 @@ class BaseTracer(ABC):
     def __init__(
         self,
         project_name: str,
-        project_id: str,
+        project_id: Optional[str],
         enable_evaluation: bool,
         enable_monitoring: bool,
         api_client: JudgmentSyncClient,

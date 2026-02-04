@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.internal.api.api_types import (
@@ -9,7 +9,9 @@ from judgeval.v1.internal.api.api_types import (
 )
 from judgeval.exceptions import JudgmentAPIError
 from judgeval.v1.scorers.prompt_scorer.prompt_scorer import PromptScorer
+from judgeval.v1.scorers.prompt_scorer.noop_prompt_scorer import NoopPromptScorer
 from judgeval.logger import judgeval_logger
+from judgeval.utils.guards import expect_project_id
 
 
 class PromptScorerFactory:
@@ -20,7 +22,7 @@ class PromptScorerFactory:
         self,
         client: JudgmentSyncClient,
         is_trace: bool,
-        project_id: str,
+        project_id: Optional[str],
     ):
         self._client = client
         self._is_trace = is_trace
@@ -30,7 +32,11 @@ class PromptScorerFactory:
         self,
         name: str,
     ) -> PromptScorer | None:
-        project_id = self._project_id
+        project_id = expect_project_id(
+            self._project_id, context="prompt scorer retrieval"
+        )
+        if not project_id:
+            return NoopPromptScorer(name=name)
 
         cache_key = (
             name,
