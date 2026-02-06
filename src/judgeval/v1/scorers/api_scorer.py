@@ -69,4 +69,5 @@ class APIScorer(BaseScorer):
             name=self._name,
             required_params=self._required_params,
             kwargs=kwargs,
+            result_type="numeric",
         )

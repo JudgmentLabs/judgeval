@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
-from judgeval.v1.internal.api.api_types import ScorerData as APIScorerData
-
 
 @dataclass(slots=True)
 class ScorerData:
@@ -20,8 +18,8 @@ class ScorerData:
     additional_metadata: Dict[str, Any] = field(default_factory=dict)
     id: Optional[str] = None
 
-    def to_dict(self) -> APIScorerData:
-        result: APIScorerData = {
+    def to_dict(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
             "name": self.name,
             "threshold": self.threshold,
             "success": self.success,

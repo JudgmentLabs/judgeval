@@ -5,7 +5,6 @@ from typing import Any, Dict, List, Optional, Union, cast
 
 from judgeval.v1.internal.api.api_types import (
     TraceSpan,
-    ScorerData as APIScorerData,
     ExampleScoringResult,
     TraceScoringResult,
     ScoringResult as APIScoringResult,
@@ -25,7 +24,7 @@ class ScoringResult:
     evaluation_cost: Optional[float] = None
 
     def to_dict(self) -> APIScoringResult:
-        scorers_list: List[APIScorerData] = [s.to_dict() for s in self.scorers_data]
+        scorers_list: List[Dict[str, Any]] = [s.to_dict() for s in self.scorers_data]
         result: Dict[str, Any] = {
             "success": self.success,
             "scorers_data": scorers_list,
