@@ -385,6 +385,7 @@ class UploadCustomScorerRequest(TypedDict):
     class_name: str
     overwrite: bool
     scorer_type: NotRequired[Optional[str]]
+    response_type: NotRequired[Optional[str]]
     version: NotRequired[Optional[float]]
 
 
