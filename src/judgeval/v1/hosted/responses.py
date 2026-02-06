@@ -7,10 +7,8 @@ ReturnType = Literal["binary", "categorical", "numeric"]
 
 
 class Citation(BaseModel):
-    content: str
-    source: Optional[str] = None
-    start_index: Optional[int] = None
-    end_index: Optional[int] = None
+    span_id: str
+    span_attribute: str
 
 
 class BinaryResponse(BaseModel):
