@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - staging
-      - justin/stagin-pypi
 
 jobs:
   release:
