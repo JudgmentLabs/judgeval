@@ -1,0 +1,67 @@
+name: Release on Staging Merge
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - staging
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.bump_version.outputs.new_version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+
+      - name: Get latest version
+        id: get_version
+        run: |
+          # Try to get version from TestPyPI, default to 0.0.0 if package doesn't exist
+          response=$(curl -s https://test.pypi.org/pypi/judgeval/json)
+          if echo "$response" | grep -q "Not Found"; then
+            version="0.0.0"
+            echo "Package not found on TestPyPI, starting with version 0.0.0"
+          else
+            version=$(echo "$response" | jq -r .info.version)
+          fi
+          echo "latest_version=$version" >> $GITHUB_OUTPUT
+
+      - name: Bump patch version
+        id: bump_version
+        run: |
+          latest_version=${{ steps.get_version.outputs.latest_version }}
+          echo "Latest version: $latest_version"
+
+          # Extract version numbers
+          IFS='.' read -r major minor patch <<< "$latest_version"
+
+          # Always bump patch version
+          patch=$((patch + 1))
+          new_version="$major.$minor.$patch"
+
+          echo "New version: $new_version"
+          echo "new_version=$new_version" >> $GITHUB_OUTPUT
+      
+      - name: Bump pyproject.toml and version.py version
+        run: |
+          python update_version.py ${{ steps.bump_version.outputs.new_version }}
+
+      - name: Build PyPI package
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+
+      - name: Create TestPyPI release
+        run: |
+          python -m pip install --upgrade twine
+          python -m twine upload --repository testpypi -u ${{ secrets.TEST_PYPI_USERNAME }} -p ${{ secrets.TEST_PYPI_PASSWORD }} dist/*
