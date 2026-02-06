@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from typing import List, Iterable
+from typing import List, Iterable, Optional
 
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.datasets.dataset import Dataset, DatasetInfo
 from judgeval.v1.data.example import Example
 from judgeval.logger import judgeval_logger
+from judgeval.utils.guards import expect_project_id
 
 
 class DatasetFactory:
@@ -14,16 +15,19 @@ class DatasetFactory:
     def __init__(
         self,
         client: JudgmentSyncClient,
-        project_id: str,
+        project_id: Optional[str],
         project_name: str,
     ):
         self._client = client
         self._project_id = project_id
         self._project_name = project_name
 
-    def get(self, name: str) -> Dataset:
+    def get(self, name: str) -> Optional[Dataset]:
+        project_id = expect_project_id(self._project_id)
+        if not project_id:
+            return None
         dataset = self._client.get_projects_datasets_by_dataset_name(
-            project_id=self._project_id,
+            project_id=project_id,
             dataset_name=name,
         )
 
@@ -57,7 +61,7 @@ class DatasetFactory:
         judgeval_logger.info(f"Retrieved dataset {name} with {len(examples)} examples")
         return Dataset(
             name=name,
-            project_id=self._project_id,
+            project_id=project_id,
             dataset_kind=dataset_kind,
             examples=examples,
             client=self._client,
@@ -70,9 +74,13 @@ class DatasetFactory:
         examples: Iterable[Example] = [],
         overwrite: bool = False,
         batch_size: int = 100,
-    ) -> Dataset:
+    ) -> Optional[Dataset]:
+        project_id = expect_project_id(self._project_id)
+        if not project_id:
+            return None
+
         self._client.post_projects_datasets(
-            project_id=self._project_id,
+            project_id=project_id,
             payload={
                 "name": name,
                 "examples": [],
@@ -87,7 +95,7 @@ class DatasetFactory:
 
         dataset = Dataset(
             name=name,
-            project_id=self._project_id,
+            project_id=project_id,
             examples=examples,
             client=self._client,
             project_name=self._project_name,
@@ -95,9 +103,13 @@ class DatasetFactory:
         dataset.add_examples(examples, batch_size=batch_size)
         return dataset
 
-    def list(self) -> List[DatasetInfo]:
+    def list(self) -> Optional[List[DatasetInfo]]:
+        project_id = expect_project_id(self._project_id)
+        if not project_id:
+            return None
+
         datasets = self._client.get_projects_datasets(
-            project_id=self._project_id,
+            project_id=project_id,
         )
-        judgeval_logger.info(f"Fetched datasets for project {self._project_id}")
+        judgeval_logger.info(f"Fetched datasets for project {project_id}")
         return [DatasetInfo(**d) for d in datasets]

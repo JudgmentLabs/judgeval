@@ -47,7 +47,9 @@ from judgeval.v1.scorers.base_scorer import BaseScorer
 from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.v1.scorers.custom_scorer.custom_scorer import CustomScorer
 from judgeval.v1.tracer.exporters.judgment_span_exporter import JudgmentSpanExporter
+from judgeval.v1.tracer.exporters.noop_span_exporter import NoOpSpanExporter
 from judgeval.v1.tracer.processors.judgment_span_processor import JudgmentSpanProcessor
+from judgeval.v1.tracer.processors.noop_span_processor import NoOpJudgmentSpanProcessor
 from uuid import uuid4
 from opentelemetry.context import attach, detach, get_value, set_value
 from judgeval.v1.tracer.processors._lifecycles import (
@@ -82,7 +84,7 @@ class BaseTracer(ABC):
     def __init__(
         self,
         project_name: str,
-        project_id: str,
+        project_id: Optional[str],
         enable_evaluation: bool,
         enable_monitoring: bool,
         api_client: JudgmentSyncClient,
@@ -108,6 +110,8 @@ class BaseTracer(ABC):
         pass
 
     def get_span_exporter(self) -> SpanExporter:
+        if not self.project_id:
+            return NoOpSpanExporter()
         return JudgmentSpanExporter(
             endpoint=self._build_endpoint(self.api_client.base_url),
             api_key=self.api_client.api_key,
@@ -116,6 +120,8 @@ class BaseTracer(ABC):
         )
 
     def get_span_processor(self) -> JudgmentSpanProcessor:
+        if not self.project_id:
+            return NoOpJudgmentSpanProcessor()
         return JudgmentSpanProcessor(
             self,
             self.get_span_exporter(),

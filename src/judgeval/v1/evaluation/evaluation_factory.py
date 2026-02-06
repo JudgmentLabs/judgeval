@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.evaluation.evaluation import Evaluation
+from judgeval.utils.guards import expect_project_id
 
 
 class EvaluationFactory:
@@ -10,16 +13,20 @@ class EvaluationFactory:
     def __init__(
         self,
         client: JudgmentSyncClient,
-        project_id: str,
+        project_id: Optional[str],
         project_name: str,
     ):
         self._client = client
         self._project_id = project_id
         self._project_name = project_name
 
-    def create(self) -> Evaluation:
+    def create(self) -> Optional[Evaluation]:
+        project_id = expect_project_id(self._project_id)
+        if not project_id:
+            return None
+
         return Evaluation(
             client=self._client,
-            project_id=self._project_id,
+            project_id=project_id,
             project_name=self._project_name,
         )

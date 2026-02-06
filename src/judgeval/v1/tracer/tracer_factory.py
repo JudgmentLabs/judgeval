@@ -15,7 +15,7 @@ class TracerFactory:
         self,
         client: JudgmentSyncClient,
         project_name: str,
-        project_id: str,
+        project_id: Optional[str],
     ):
         self._client = client
         self._project_name = project_name

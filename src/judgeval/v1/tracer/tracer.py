@@ -19,7 +19,7 @@ class Tracer(BaseTracer):
     def __init__(
         self,
         project_name: str,
-        project_id: str,
+        project_id: Optional[str],
         enable_evaluation: bool,
         enable_monitoring: bool,
         api_client: JudgmentSyncClient,
@@ -47,6 +47,13 @@ class Tracer(BaseTracer):
             filter_tracer=self._filter_tracer,
             isolated=isolated,
         )
+
+        if enable_monitoring and not project_id:
+            judgeval_logger.warning(
+                "Monitoring disabled: project_id is not set. "
+                "Spans will not be exported."
+            )
+            enable_monitoring = False
 
         super().__init__(
             project_name=project_name,
