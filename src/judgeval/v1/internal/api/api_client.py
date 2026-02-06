@@ -263,15 +263,6 @@ class JudgmentSyncClient:
             query_params,
         )
 
-    def post_projects_scorers(
-        self, project_id: str, payload: SavePromptScorerRequest
-    ) -> SavePromptScorerResponse:
-        return self._request(
-            "POST",
-            url_for(f"/v1/projects/{project_id}/scorers", self.base_url),
-            payload,
-        )
-
     def get_projects_scorers_by_name_exists(
         self, project_id: str, name: str
     ) -> ScorerExistsResponse:
@@ -565,15 +556,6 @@ class JudgmentAsyncClient:
             "GET",
             url_for(f"/v1/projects/{project_id}/scorers", self.base_url),
             query_params,
-        )
-
-    async def post_projects_scorers(
-        self, project_id: str, payload: SavePromptScorerRequest
-    ) -> SavePromptScorerResponse:
-        return await self._request(
-            "POST",
-            url_for(f"/v1/projects/{project_id}/scorers", self.base_url),
-            payload,
         )
 
     async def get_projects_scorers_by_name_exists(

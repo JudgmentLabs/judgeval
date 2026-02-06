@@ -83,4 +83,5 @@ class PromptScorer(APIScorer):
             threshold=self._threshold,
             name=self._name,
             kwargs=kwargs,
+            result_type="numeric",
         )
