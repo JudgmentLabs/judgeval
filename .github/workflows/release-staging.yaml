@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - staging
+      - justin/stagin-pypi
 
 jobs:
   release:
@@ -27,7 +28,7 @@ jobs:
         id: get_version
         run: |
           # Try to get version from TestPyPI, default to 0.0.0 if package doesn't exist
-          response=$(curl -s https://test.pypi.org/pypi/judgeval-staging/json)
+          response=$(curl -s https://test.pypi.org/pypi/judgeval/json)
           if echo "$response" | grep -q "Not Found"; then
             version="0.0.0"
             echo "Package not found on TestPyPI, starting with version 0.0.0"
@@ -55,8 +56,6 @@ jobs:
       - name: Bump pyproject.toml and version.py version
         run: |
           python update_version.py ${{ steps.bump_version.outputs.new_version }}
-          # Update package name to judgeval-staging for TestPyPI
-          sed -i 's/name = "judgeval"/name = "judgeval-staging"/' pyproject.toml
 
       - name: Build PyPI package
         run: |
