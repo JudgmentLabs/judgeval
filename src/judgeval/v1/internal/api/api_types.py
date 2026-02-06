@@ -125,8 +125,7 @@ class ExampleEvaluationRun(TypedDict):
 
 
 class ExampleScoringResult(TypedDict):
-    success: bool
-    scorers_data: List[ScorerData]
+    scorers_data: List[Dict[str, Any]]
     name: NotRequired[Optional[str]]
     data_object: Example
     trace_id: NotRequired[Optional[str]]
@@ -255,20 +254,6 @@ class ResolveProjectResponse(TypedDict):
     project_id: str
 
 
-class SavePromptScorerRequest(TypedDict):
-    name: str
-    prompt: str
-    threshold: float
-    model: str
-    is_trace: bool
-    options: NotRequired[Optional[Dict[str, Any]]]
-    description: NotRequired[Optional[str]]
-
-
-class SavePromptScorerResponse(TypedDict):
-    scorer_response: PromptScorer
-
-
 class ScorerConfig(TypedDict):
     score_type: str
     name: NotRequired[Optional[str]]
@@ -276,21 +261,7 @@ class ScorerConfig(TypedDict):
     model: NotRequired[Optional[str]]
     required_params: NotRequired[Optional[List[str]]]
     kwargs: NotRequired[Optional[Dict[str, Any]]]
-
-
-class ScorerData(TypedDict):
-    id: NotRequired[Optional[str]]
-    name: str
-    threshold: float
-    success: bool
-    score: NotRequired[Optional[float]]
-    minimum_score_range: NotRequired[Optional[Union[str, float]]]
-    maximum_score_range: NotRequired[Optional[Union[str, float]]]
-    reason: NotRequired[Optional[Union[str, Dict[str, Any]]]]
-    strict_mode: NotRequired[Optional[bool]]
-    evaluation_model: NotRequired[Optional[str]]
-    error: NotRequired[Optional[str]]
-    additional_metadata: NotRequired[Optional[Dict[str, Any]]]
+    result_type: str
 
 
 class ScorerExistsResponse(TypedDict):
@@ -331,8 +302,7 @@ class TraceInfo(TypedDict):
 
 
 class TraceScoringResult(TypedDict):
-    success: bool
-    scorers_data: List[ScorerData]
+    scorers_data: List[Dict[str, Any]]
     name: NotRequired[Optional[str]]
     data_object: TraceSpan
     trace_id: NotRequired[Optional[str]]
@@ -385,6 +355,7 @@ class UploadCustomScorerRequest(TypedDict):
     class_name: str
     overwrite: bool
     scorer_type: NotRequired[Optional[str]]
+    response_type: str
     version: NotRequired[Optional[float]]
 
 
