@@ -52,7 +52,9 @@ def test_override_project_sets_attribute(tracer):
 
     spans = span_store.get_all()
     assert len(spans) == 2  # pending + final
-    span = [s for s in spans if s.attributes.get(AttributeKeys.JUDGMENT_UPDATE_ID) == 1][0]
+    span = [
+        s for s in spans if s.attributes.get(AttributeKeys.JUDGMENT_UPDATE_ID) == 1
+    ][0]
     assert (
         span.attributes.get(AttributeKeys.JUDGMENT_PROJECT_ID_OVERRIDE)
         == "override-project-id"
@@ -79,7 +81,9 @@ def test_override_project_propagates_to_children(tracer):
     spans = span_store.get_all()
     assert len(spans) == 4  # parent (2) + child (2)
 
-    final_spans = [s for s in spans if s.attributes.get(AttributeKeys.JUDGMENT_UPDATE_ID) == 1]
+    final_spans = [
+        s for s in spans if s.attributes.get(AttributeKeys.JUDGMENT_UPDATE_ID) == 1
+    ]
     for span in final_spans:
         assert (
             span.attributes.get(AttributeKeys.JUDGMENT_PROJECT_ID_OVERRIDE)
@@ -111,7 +115,9 @@ def test_override_project_deeply_nested(tracer):
     spans = span_store.get_all()
     assert len(spans) == 6  # level1 (2) + level2 (2) + level3 (2)
 
-    final_spans = [s for s in spans if s.attributes.get(AttributeKeys.JUDGMENT_UPDATE_ID) == 1]
+    final_spans = [
+        s for s in spans if s.attributes.get(AttributeKeys.JUDGMENT_UPDATE_ID) == 1
+    ]
     for span in final_spans:
         assert (
             span.attributes.get(AttributeKeys.JUDGMENT_PROJECT_ID_OVERRIDE)
@@ -196,7 +202,9 @@ def test_override_project_does_not_persist_across_traces(tracer):
     spans = span_store.get_all()
     assert len(spans) == 4  # trace1 (2) + trace2 (2)
 
-    final_spans = [s for s in spans if s.attributes.get(AttributeKeys.JUDGMENT_UPDATE_ID) == 1]
+    final_spans = [
+        s for s in spans if s.attributes.get(AttributeKeys.JUDGMENT_UPDATE_ID) == 1
+    ]
     for span in final_spans:
         if span.name == "trace1_span":
             assert (
@@ -232,7 +240,9 @@ def test_override_project_async_spans(tracer):
     spans = span_store.get_all()
     assert len(spans) == 4  # async_parent (2) + async_child (2)
 
-    final_spans = [s for s in spans if s.attributes.get(AttributeKeys.JUDGMENT_UPDATE_ID) == 1]
+    final_spans = [
+        s for s in spans if s.attributes.get(AttributeKeys.JUDGMENT_UPDATE_ID) == 1
+    ]
     for span in final_spans:
         assert (
             span.attributes.get(AttributeKeys.JUDGMENT_PROJECT_ID_OVERRIDE)
@@ -257,7 +267,9 @@ def test_override_project_with_exception(tracer):
     spans = span_store.get_all()
     assert len(spans) == 2  # pending + final (with exception)
 
-    span = [s for s in spans if s.attributes.get(AttributeKeys.JUDGMENT_UPDATE_ID) == 1][0]
+    span = [
+        s for s in spans if s.attributes.get(AttributeKeys.JUDGMENT_UPDATE_ID) == 1
+    ][0]
     assert (
         span.attributes.get(AttributeKeys.JUDGMENT_PROJECT_ID_OVERRIDE)
         == "exception-project-id"

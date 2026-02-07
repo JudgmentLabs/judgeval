@@ -125,7 +125,9 @@ def test_generator_context_preservation(tracer: Tuple[Tracer, SpanStore]) -> Non
 
     tracer_instance.force_flush()
     spans = span_store.get_all()
-    assert len(spans) == 10  # 1 parent (2 versions) + 1 child main (2 versions) + 3 items (2 each)
+    assert (
+        len(spans) == 10
+    )  # 1 parent (2 versions) + 1 child main (2 versions) + 3 items (2 each)
 
 
 def test_async_generator_context_preservation(tracer: Tuple[Tracer, SpanStore]) -> None:
@@ -156,7 +158,9 @@ def test_async_generator_context_preservation(tracer: Tuple[Tracer, SpanStore]) 
 
     tracer_instance.force_flush()
     spans = span_store.get_all()
-    assert len(spans) == 10  # 1 parent (2 versions) + 1 child main (2 versions) + 3 items (2 each)
+    assert (
+        len(spans) == 10
+    )  # 1 parent (2 versions) + 1 child main (2 versions) + 3 items (2 each)
 
 
 def test_generator_with_customer_id(tracer: Tuple[Tracer, SpanStore]) -> None:
@@ -179,7 +183,9 @@ def test_generator_with_customer_id(tracer: Tuple[Tracer, SpanStore]) -> None:
 
     tracer_instance.force_flush()
     spans = span_store.get_all()
-    assert len(spans) == 10  # 1 parent (2 versions) + 1 child main (2 versions) + 3 items (2 each)
+    assert (
+        len(spans) == 10
+    )  # 1 parent (2 versions) + 1 child main (2 versions) + 3 items (2 each)
 
     child_spans = [
         s
@@ -312,7 +318,9 @@ def test_generator_parent_child_relationship(tracer: Tuple[Tracer, SpanStore]) -
 
     tracer_instance.force_flush()
     spans = span_store.get_all()
-    assert len(spans) == 8  # 1 parent (2 versions) + 1 child main (2 versions) + 2 items (2 each)
+    assert (
+        len(spans) == 8
+    )  # 1 parent (2 versions) + 1 child main (2 versions) + 2 items (2 each)
 
     parent_span = [s for s in spans if s.name == "parent_function"][0]
     child_gen_span = [
@@ -356,7 +364,11 @@ def test_sync_generator_with_child_spans(tracer: Tuple[Tracer, SpanStore]) -> No
 
     assert len(child_spans) == 6  # 3 items, 2 emissions each (pending + final)
 
-    final_spans = [s for s in child_spans if s.attributes.get(AttributeKeys.JUDGMENT_UPDATE_ID) == 1]
+    final_spans = [
+        s
+        for s in child_spans
+        if s.attributes.get(AttributeKeys.JUDGMENT_UPDATE_ID) == 1
+    ]
     assert len(final_spans) == 3
     for child_span in final_spans:
         output = (
@@ -399,7 +411,11 @@ def test_async_generator_with_child_spans(tracer: Tuple[Tracer, SpanStore]) -> N
 
     assert len(child_spans) == 6  # 3 items, 2 emissions each (pending + final)
 
-    final_spans = [s for s in child_spans if s.attributes.get(AttributeKeys.JUDGMENT_UPDATE_ID) == 1]
+    final_spans = [
+        s
+        for s in child_spans
+        if s.attributes.get(AttributeKeys.JUDGMENT_UPDATE_ID) == 1
+    ]
     assert len(final_spans) == 3
     for child_span in final_spans:
         output = (

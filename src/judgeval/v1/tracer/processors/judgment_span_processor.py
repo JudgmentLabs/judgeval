@@ -74,7 +74,9 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             span.context, AttributeKeys.JUDGMENT_UPDATE_ID, curr_id + 1
         )
 
-        attributes = dict(span.attributes or {}) | {AttributeKeys.JUDGMENT_UPDATE_ID: curr_id}
+        attributes = dict(span.attributes or {}) | {
+            AttributeKeys.JUDGMENT_UPDATE_ID: curr_id
+        }
 
         emitted_span = ReadableSpan(
             name=span.name,
@@ -106,7 +108,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             return
 
         self._emit_span(span=span)
-    
+
     @dont_throw
     def on_start(self, span: Span, parent_context: Optional[Context] = None) -> None:
         for processor in get_all():
@@ -131,5 +133,3 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             self._emit_span(span=span)
 
         self._cleanup_span_state(span.context)
-
-
