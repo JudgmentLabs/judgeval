@@ -76,6 +76,7 @@ class BaseTracer(ABC):
         "serializer",
         "project_id",
         "_tracer_provider",
+        "_judgment_span_processor",
     )
 
     TRACER_NAME = "judgeval"
@@ -98,6 +99,7 @@ class BaseTracer(ABC):
         self.api_client = api_client
         self.serializer = serializer
         self._tracer_provider = tracer_provider
+        self._judgment_span_processor: Optional[JudgmentSpanProcessor] = None
 
         BaseTracer._tracers.append(self)
 
@@ -122,13 +124,19 @@ class BaseTracer(ABC):
     def get_span_processor(self) -> JudgmentSpanProcessor:
         if not self.project_id:
             return NoOpJudgmentSpanProcessor()
-        return JudgmentSpanProcessor(
+        processor = JudgmentSpanProcessor(
             self,
             self.get_span_exporter(),
         )
+        self._judgment_span_processor = processor
+        return processor
 
     def get_tracer(self) -> trace.Tracer:
         return self._tracer_provider.get_tracer(self.TRACER_NAME)
+
+    def emit_partial(self) -> None:
+        if self._judgment_span_processor is not None:
+            self._judgment_span_processor.emit_partial()
 
     @property
     def tracer_provider(self) -> TracerProvider:
@@ -584,6 +592,8 @@ class BaseTracer(ABC):
                                     self.serializer, _format_inputs(func, args, kwargs)
                                 ),
                             )
+                        self.emit_partial()
+
                         result = await func(*args, **kwargs)
                         if record_output:
                             span.set_attribute(
@@ -612,6 +622,8 @@ class BaseTracer(ABC):
                                     self.serializer, _format_inputs(func, args, kwargs)
                                 ),
                             )
+                        self.emit_partial()
+
                         result = func(*args, **kwargs)
                     except Exception as e:
                         span.record_exception(e)

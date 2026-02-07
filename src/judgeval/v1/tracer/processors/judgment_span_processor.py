@@ -63,6 +63,9 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             self._span_finalizers.pop(span_key, None)
 
     def _register_span(self, span: Span) -> None:
+        if not span.context:
+            return
+
         span_key = (span.context.trace_id, span.context.span_id)
 
         with self._lock:
@@ -87,6 +90,9 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             return self._internal_attributes.get(span_key, {}).get(key, default)
 
     def _emit_span(self, span: ReadableSpan) -> None:
+        if not span.context:
+            return
+
         span_key = (span.context.trace_id, span.context.span_id)
 
         with self._lock:
@@ -121,6 +127,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
         if (
             not span.is_recording()
             or not isinstance(span, ReadableSpan)
+            or not span.context
             or self.get_internal_attribute(
                 span.context, InternalAttributeKeys.DISABLE_PARTIAL_EMIT, False
             )
