@@ -127,7 +127,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
         for processor in get_all():
             processor.on_start(span, parent_context)
 
-        # Register span for weak reference tracking with cleanup callback
+        # Register span for weak reference tracking with a cleanup callback
         self._register_span(span)
 
         if span.is_recording() and isinstance(span, ReadableSpan):
