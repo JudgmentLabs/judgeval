@@ -1,0 +1,43 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Get version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      
+      - name: Validate version matches
+        run: |
+          tag_version="${{ steps.version.outputs.version }}"
+          plugin_version=$(jq -r '.version' .claude-plugin/marketplace.json)
+          
+          if [[ "$tag_version" != "$plugin_version" ]]; then
+            echo "Tag version ($tag_version) doesn't match plugin version ($plugin_version)"
+            exit 1
+          fi
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          generate_release_notes: true
+          body: |
+            ## Installation
+            
+            ```bash
+            claude plugin marketplace add judgmentlabs/judgeval-claude-plugin
+            claude plugin install trace-claude-code@judgeval-claude-plugin
+            ```
+            
+            See [README.md](README.md) for setup instructions.

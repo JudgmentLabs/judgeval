@@ -1,0 +1,26 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "judgeval-claude-plugin",
+  "version": "1.0.0",
+  "description": "Judgeval plugins for LLM evaluation, logging, and observability",
+  "owner": {
+    "name": "Judgment Labs",
+    "email": "support@judgmentlabs.ai"
+  },
+  "plugins": [
+    {
+      "name": "judgeval",
+      "description": "Enables AI agents to use Judgeval for LLM evaluation, logging, and observability. Provides correct API usage, working examples, and helper scripts.",
+      "version": "1.0.0",
+      "source": "./",
+      "category": "development"
+    },
+    {
+      "name": "trace-claude-code",
+      "description": "Automatically trace Claude Code conversations to Judgeval. Captures user messages, assistant responses, and tool calls for observability.",
+      "version": "1.0.0",
+      "source": "./skills/trace-claude-code",
+      "category": "observability"
+    }
+  ]
+}
