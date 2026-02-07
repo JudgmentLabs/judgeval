@@ -771,6 +771,7 @@ def generate_client_class(
 
 def generate_api_file() -> str:
     lines = [
+        "# mypy: ignore-errors",
         "from typing import Dict, Any, Mapping, Literal, Optional",
         "import httpx",
         "from httpx import Response",

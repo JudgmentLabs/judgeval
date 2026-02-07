@@ -284,8 +284,8 @@ class ScorerData(TypedDict):
     threshold: float
     success: bool
     score: NotRequired[Optional[float]]
-    minimum_score_range: NotRequired[Optional[Union[str, float]]]
-    maximum_score_range: NotRequired[Optional[Union[str, float]]]
+    minimum_score_range: NotRequired[Optional[float]]
+    maximum_score_range: NotRequired[Optional[float]]
     reason: NotRequired[Optional[Union[str, Dict[str, Any]]]]
     strict_mode: NotRequired[Optional[bool]]
     evaluation_model: NotRequired[Optional[str]]

@@ -60,9 +60,8 @@ def wrap_messages_stream_sync(tracer: BaseTracer, client: Anthropic) -> None:
                 return stream
 
             def __exit__(self, exc_type, exc_val, exc_tb):
-                result = self._manager.__exit__(exc_type, exc_val, exc_tb)
+                self._manager.__exit__(exc_type, exc_val, exc_tb)
                 post_hook_exit_impl()
-                return result
 
             def __getattr__(self, name):
                 return getattr(self._manager, name)
@@ -199,9 +198,8 @@ def wrap_messages_stream_async(tracer: BaseTracer, client: AsyncAnthropic) -> No
                 return stream
 
             async def __aexit__(self, exc_type, exc_val, exc_tb):
-                result = await self._manager.__aexit__(exc_type, exc_val, exc_tb)
+                await self._manager.__aexit__(exc_type, exc_val, exc_tb)
                 await post_hook_aexit_impl()
-                return result
 
             def __getattr__(self, name):
                 return getattr(self._manager, name)

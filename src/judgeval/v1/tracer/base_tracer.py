@@ -206,19 +206,25 @@ class BaseTracer(ABC):
             current_span.set_attribute(AttributeKeys.JUDGMENT_SPAN_KIND, kind)
 
     @dont_throw
-    def set_attribute(self, key: str, value: Any) -> None:
+    def set_span_attribute(self, span: Span, key: str, value: Any) -> None:
         if not self._is_valid_key(key):
             return
         if value is None:
             return
-        current_span = self._get_current_span()
-        if current_span is not None:
+        if span is not None:
             serialized_value = (
                 self.serializer(value)
                 if not isinstance(value, (str, int, float, bool))
                 else value
             )
-            current_span.set_attribute(key, serialized_value)
+            span.set_attribute(key, serialized_value)
+
+    @dont_throw
+    def set_attribute(self, key: str, value: Any) -> None:
+        current_span = self._get_current_span()
+        if current_span is None:
+            return
+        self.set_span_attribute(current_span, key, value)
 
     def set_attributes(self, attributes: Dict[str, Any]) -> None:
         if attributes is None:
