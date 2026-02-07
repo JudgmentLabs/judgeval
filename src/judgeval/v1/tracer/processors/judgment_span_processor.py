@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from typing import TYPE_CHECKING, Any, Optional
 from weakref import ref as weakref_ref, ReferenceType
 
@@ -23,7 +24,13 @@ if TYPE_CHECKING:
 
 
 class JudgmentSpanProcessor(BatchSpanProcessor):
-    __slots__ = ("tracer", "resource_attributes", "_span_refs", "_internal_attributes")
+    __slots__ = (
+        "tracer",
+        "resource_attributes",
+        "_span_refs",
+        "_internal_attributes",
+        "_lock",
+    )
 
     def __init__(
         self,
@@ -46,46 +53,52 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             export_timeout_millis=export_timeout_millis,
         )
 
+        self._lock = threading.Lock()
         self._span_refs: dict[tuple[int, int], ReferenceType[Span]] = {}
         self._internal_attributes: dict[tuple[int, int], dict[str, Any]] = {}
 
     def _on_span_deleted(self, span_key: tuple[int, int]) -> None:
-        self._internal_attributes.pop(span_key, None)
-        self._span_refs.pop(span_key, None)
+        with self._lock:
+            self._internal_attributes.pop(span_key, None)
+            self._span_refs.pop(span_key, None)
 
     def _register_span(self, span: Span) -> None:
         span_key = (span.context.trace_id, span.context.span_id)
 
-        self._span_refs[span_key] = weakref_ref(
-            span, lambda _: self._on_span_deleted(span_key)
-        )
+        with self._lock:
+            self._span_refs[span_key] = weakref_ref(
+                span, lambda _: self._on_span_deleted(span_key)
+            )
 
     def set_internal_attribute(
         self, span_context: SpanContext, key: str, value: Any
     ) -> None:
         span_key = (span_context.trace_id, span_context.span_id)
-        if span_key not in self._internal_attributes:
-            self._internal_attributes[span_key] = {}
-        self._internal_attributes[span_key][key] = value
+        with self._lock:
+            if span_key not in self._internal_attributes:
+                self._internal_attributes[span_key] = {}
+            self._internal_attributes[span_key][key] = value
 
     def get_internal_attribute(
         self, span_context: SpanContext, key: str, default: Any = None
     ) -> Any:
         span_key = (span_context.trace_id, span_context.span_id)
-        return self._internal_attributes.get(span_key, {}).get(key, default)
+        with self._lock:
+            return self._internal_attributes.get(span_key, {}).get(key, default)
 
     def _cleanup_span_state(self, span_context: SpanContext) -> None:
         span_key = (span_context.trace_id, span_context.span_id)
-        self._internal_attributes.pop(span_key, None)
-        self._span_refs.pop(span_key, None)
+        with self._lock:
+            self._internal_attributes.pop(span_key, None)
+            self._span_refs.pop(span_key, None)
 
     def _emit_span(self, span: ReadableSpan) -> None:
-        curr_id = self.get_internal_attribute(
-            span.context, AttributeKeys.JUDGMENT_UPDATE_ID, 0
-        )
-        self.set_internal_attribute(
-            span.context, AttributeKeys.JUDGMENT_UPDATE_ID, curr_id + 1
-        )
+        span_key = (span.context.trace_id, span.context.span_id)
+
+        with self._lock:
+            internal_attrs = self._internal_attributes.setdefault(span_key, {})
+            curr_id = internal_attrs.get(AttributeKeys.JUDGMENT_UPDATE_ID, 0)
+            internal_attrs[AttributeKeys.JUDGMENT_UPDATE_ID] = curr_id + 1
 
         attributes = dict(span.attributes or {}) | {
             AttributeKeys.JUDGMENT_UPDATE_ID: curr_id
