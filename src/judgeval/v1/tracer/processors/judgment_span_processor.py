@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Optional
-
-from collections import defaultdict
+from weakref import ref as weakref_ref, ReferenceType
 
 from opentelemetry.context import Context
 from opentelemetry.sdk.trace import ReadableSpan, Span
@@ -24,7 +23,7 @@ if TYPE_CHECKING:
 
 
 class JudgmentSpanProcessor(BatchSpanProcessor):
-    __slots__ = ("tracer", "resource_attributes", "_internal_attributes")
+    __slots__ = ("tracer", "resource_attributes", "_span_refs", "_internal_attributes")
 
     def __init__(
         self,
@@ -46,25 +45,39 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             max_export_batch_size=max_export_batch_size,
             export_timeout_millis=export_timeout_millis,
         )
-        self._internal_attributes: defaultdict[tuple[int, int], dict[str, Any]] = (
-            defaultdict(dict)
+
+        self._span_refs: dict[tuple[int, int], ReferenceType[Span]] = {}
+        self._internal_attributes: dict[tuple[int, int], dict[str, Any]] = {}
+
+    def _on_span_deleted(self, span_key: tuple[int, int]) -> None:
+        self._internal_attributes.pop(span_key, None)
+        self._span_refs.pop(span_key, None)
+
+    def _register_span(self, span: Span) -> None:
+        span_key = (span.context.trace_id, span.context.span_id)
+
+        self._span_refs[span_key] = weakref_ref(
+            span, lambda _: self._on_span_deleted(span_key)
         )
 
     def set_internal_attribute(
         self, span_context: SpanContext, key: str, value: Any
     ) -> None:
         span_key = (span_context.trace_id, span_context.span_id)
+        if span_key not in self._internal_attributes:
+            self._internal_attributes[span_key] = {}
         self._internal_attributes[span_key][key] = value
 
     def get_internal_attribute(
         self, span_context: SpanContext, key: str, default: Any = None
     ) -> Any:
         span_key = (span_context.trace_id, span_context.span_id)
-        return self._internal_attributes[span_key].get(key, default)
+        return self._internal_attributes.get(span_key, {}).get(key, default)
 
     def _cleanup_span_state(self, span_context: SpanContext) -> None:
         span_key = (span_context.trace_id, span_context.span_id)
         self._internal_attributes.pop(span_key, None)
+        self._span_refs.pop(span_key, None)
 
     def _emit_span(self, span: ReadableSpan) -> None:
         curr_id = self.get_internal_attribute(
@@ -113,6 +126,9 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
     def on_start(self, span: Span, parent_context: Optional[Context] = None) -> None:
         for processor in get_all():
             processor.on_start(span, parent_context)
+
+        # Register span for weak reference tracking with cleanup callback
+        self._register_span(span)
 
         if span.is_recording() and isinstance(span, ReadableSpan):
             self._emit_span(span=span)
