@@ -53,7 +53,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             export_timeout_millis=export_timeout_millis,
         )
 
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._span_refs: dict[tuple[int, int], ReferenceType[Span]] = {}
         self._internal_attributes: dict[tuple[int, int], dict[str, Any]] = {}
 
