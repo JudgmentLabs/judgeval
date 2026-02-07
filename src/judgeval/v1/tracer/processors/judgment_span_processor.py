@@ -66,7 +66,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
         return self._internal_attributes[span_key].get(key, default)
 
     def increment_update_id(self, span_context: SpanContext) -> int:
-        current_id: int = self.get_internal_attribute(
+        current_id = self.get_internal_attribute(
             span_context=span_context, key=AttributeKeys.JUDGMENT_UPDATE_ID, default=0
         )
         new_id = current_id + 1
