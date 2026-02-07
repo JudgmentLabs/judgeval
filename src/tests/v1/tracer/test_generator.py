@@ -60,7 +60,7 @@ def test_sync_generator_basic(tracer: Tuple[Tracer, SpanStore]) -> None:
 
     tracer_instance.force_flush()
     spans = span_store.get_all()
-    assert len(spans) == 4
+    assert len(spans) == 8  # 1 main (2 versions) + 3 items (2 versions each)
 
     generator_span = [
         s
@@ -91,7 +91,7 @@ def test_async_generator_basic(tracer: Tuple[Tracer, SpanStore]) -> None:
 
     tracer_instance.force_flush()
     spans = span_store.get_all()
-    assert len(spans) == 4
+    assert len(spans) == 8  # 1 main (2 versions) + 3 items (2 versions each)
 
     generator_span = [
         s
@@ -125,7 +125,7 @@ def test_generator_context_preservation(tracer: Tuple[Tracer, SpanStore]) -> Non
 
     tracer_instance.force_flush()
     spans = span_store.get_all()
-    assert len(spans) == 5
+    assert len(spans) == 10  # 1 parent (2 versions) + 1 child main (2 versions) + 3 items (2 each)
 
 
 def test_async_generator_context_preservation(tracer: Tuple[Tracer, SpanStore]) -> None:
@@ -156,7 +156,7 @@ def test_async_generator_context_preservation(tracer: Tuple[Tracer, SpanStore]) 
 
     tracer_instance.force_flush()
     spans = span_store.get_all()
-    assert len(spans) == 5
+    assert len(spans) == 10  # 1 parent (2 versions) + 1 child main (2 versions) + 3 items (2 each)
 
 
 def test_generator_with_customer_id(tracer: Tuple[Tracer, SpanStore]) -> None:
@@ -179,7 +179,7 @@ def test_generator_with_customer_id(tracer: Tuple[Tracer, SpanStore]) -> None:
 
     tracer_instance.force_flush()
     spans = span_store.get_all()
-    assert len(spans) == 5
+    assert len(spans) == 10  # 1 parent (2 versions) + 1 child main (2 versions) + 3 items (2 each)
 
     child_spans = [
         s
@@ -212,7 +212,7 @@ def test_generator_exception_handling(tracer: Tuple[Tracer, SpanStore]) -> None:
 
     tracer_instance.force_flush()
     spans = span_store.get_all()
-    assert len(spans) == 3
+    assert len(spans) == 6  # 1 main (2 versions: pending + final) + 2 items (2 each)
 
     generator_span = [s for s in spans if s.name == "failing_generator"][0]
     assert generator_span.name == "failing_generator"
@@ -237,7 +237,7 @@ def test_async_generator_exception_handling(tracer: Tuple[Tracer, SpanStore]) ->
 
     tracer_instance.force_flush()
     spans = span_store.get_all()
-    assert len(spans) == 3
+    assert len(spans) == 6  # 1 main (2 versions: pending + final) + 2 items (2 each)
 
     generator_span = [s for s in spans if s.name == "failing_async_generator"][0]
     assert generator_span.name == "failing_async_generator"
@@ -261,7 +261,7 @@ def test_generator_partial_consumption(tracer: Tuple[Tracer, SpanStore]) -> None
 
     tracer_instance.force_flush()
     spans = span_store.get_all()
-    assert len(spans) == 3
+    assert len(spans) == 6  # 1 main (2 versions: pending + final) + 2 items (2 each)
 
     generator_span = [s for s in spans if s.name == "partial_generator"][0]
     assert generator_span.name == "partial_generator"
@@ -289,7 +289,7 @@ def test_async_generator_partial_consumption(tracer: Tuple[Tracer, SpanStore]) -
 
     tracer_instance.force_flush()
     spans = span_store.get_all()
-    assert len(spans) == 3
+    assert len(spans) == 6  # 1 main (2 versions: pending + final) + 2 items (2 each)
 
     generator_span = [s for s in spans if s.name == "async_partial_generator"][0]
     assert generator_span.name == "async_partial_generator"
@@ -312,7 +312,7 @@ def test_generator_parent_child_relationship(tracer: Tuple[Tracer, SpanStore]) -
 
     tracer_instance.force_flush()
     spans = span_store.get_all()
-    assert len(spans) == 4
+    assert len(spans) == 8  # 1 parent (2 versions) + 1 child main (2 versions) + 2 items (2 each)
 
     parent_span = [s for s in spans if s.name == "parent_function"][0]
     child_gen_span = [
@@ -345,7 +345,7 @@ def test_sync_generator_with_child_spans(tracer: Tuple[Tracer, SpanStore]) -> No
     tracer_instance.force_flush()
     spans = span_store.get_all()
 
-    assert len(spans) == 4
+    assert len(spans) == 8  # 1 main (2 versions) + 3 items (2 versions each)
 
     child_spans = [
         s
@@ -354,9 +354,11 @@ def test_sync_generator_with_child_spans(tracer: Tuple[Tracer, SpanStore]) -> No
         and s.attributes.get(AttributeKeys.JUDGMENT_SPAN_KIND) == "generator_item"
     ]
 
-    assert len(child_spans) == 3
+    assert len(child_spans) == 6  # 3 items, 2 emissions each (pending + final)
 
-    for child_span in child_spans:
+    final_spans = [s for s in child_spans if s.attributes.get(AttributeKeys.JUDGMENT_UPDATE_ID) == 1]
+    assert len(final_spans) == 3
+    for child_span in final_spans:
         output = (
             child_span.attributes.get(AttributeKeys.JUDGMENT_OUTPUT)
             if child_span.attributes
@@ -386,7 +388,7 @@ def test_async_generator_with_child_spans(tracer: Tuple[Tracer, SpanStore]) -> N
     tracer_instance.force_flush()
     spans = span_store.get_all()
 
-    assert len(spans) == 4
+    assert len(spans) == 8  # 1 main (2 versions) + 3 items (2 versions each)
 
     child_spans = [
         s
@@ -395,9 +397,11 @@ def test_async_generator_with_child_spans(tracer: Tuple[Tracer, SpanStore]) -> N
         and s.attributes.get(AttributeKeys.JUDGMENT_SPAN_KIND) == "generator_item"
     ]
 
-    assert len(child_spans) == 3
+    assert len(child_spans) == 6  # 3 items, 2 emissions each (pending + final)
 
-    for child_span in child_spans:
+    final_spans = [s for s in child_spans if s.attributes.get(AttributeKeys.JUDGMENT_UPDATE_ID) == 1]
+    assert len(final_spans) == 3
+    for child_span in final_spans:
         output = (
             child_span.attributes.get(AttributeKeys.JUDGMENT_OUTPUT)
             if child_span.attributes
