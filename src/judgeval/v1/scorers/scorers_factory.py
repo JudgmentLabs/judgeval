@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from judgeval.v1.internal.api import JudgmentSyncClient
 
 
@@ -9,7 +11,7 @@ class ScorersFactory:
     def __init__(
         self,
         client: JudgmentSyncClient,
-        project_id: str,
+        project_id: Optional[str],
         project_name: str,
     ):
         self._client = client

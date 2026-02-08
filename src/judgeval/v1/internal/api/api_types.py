@@ -235,7 +235,6 @@ class PromptScorer(TypedDict):
     created_at: NotRequired[Optional[str]]
     updated_at: NotRequired[Optional[str]]
     is_trace: NotRequired[Optional[bool]]
-    is_bucket_rubric: NotRequired[Optional[bool]]
 
 
 PullAllDatasetsResponse = List[DatasetInfo]

@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import ast
 import os
+from typing import Optional
 
 from judgeval.logger import judgeval_logger
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.internal.api.api_types import UploadCustomScorerRequest
 from judgeval.v1.scorers.custom_scorer.custom_scorer import CustomScorer
+from judgeval.utils.guards import expect_project_id
 from judgeval.exceptions import JudgmentAPIError
 
 
@@ -16,22 +18,27 @@ class CustomScorerFactory:
     def __init__(
         self,
         client: JudgmentSyncClient,
-        project_id: str,
+        project_id: Optional[str],
     ):
         self._client = client
         self._project_id = project_id
 
-    def get(self, name: str) -> CustomScorer:
+    def get(self, name: str) -> Optional[CustomScorer]:
+        project_id = expect_project_id(self._project_id)
+        if not project_id:
+            return None
+
         scorer_exists = self._client.get_projects_scorers_custom_by_name_exists(
-            project_id=self._project_id, name=name
+            project_id=project_id, name=name
         )
         if not scorer_exists["exists"]:
             raise JudgmentAPIError(
                 status_code=404, detail=f"Scorer {name} does not exist", response=None
             )
+
         return CustomScorer(
             name=name,
-            project_id=self._project_id,
+            project_id=project_id,
         )
 
     def upload(
@@ -41,6 +48,10 @@ class CustomScorerFactory:
         unique_name: str | None = None,
         overwrite: bool = False,
     ) -> bool:
+        project_id = expect_project_id(self._project_id)
+        if not project_id:
+            return False
+
         if not os.path.exists(scorer_file_path):
             raise FileNotFoundError(f"Scorer file not found: {scorer_file_path}")
 
@@ -100,7 +111,7 @@ class CustomScorerFactory:
             "version": 1,
         }
         response = self._client.post_projects_scorers_custom(
-            project_id=self._project_id,
+            project_id=project_id,
             payload=payload,
         )
 

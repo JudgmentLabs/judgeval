@@ -47,7 +47,9 @@ from judgeval.v1.scorers.base_scorer import BaseScorer
 from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.v1.scorers.custom_scorer.custom_scorer import CustomScorer
 from judgeval.v1.tracer.exporters.judgment_span_exporter import JudgmentSpanExporter
+from judgeval.v1.tracer.exporters.noop_span_exporter import NoOpSpanExporter
 from judgeval.v1.tracer.processors.judgment_span_processor import JudgmentSpanProcessor
+from judgeval.v1.tracer.processors.noop_span_processor import NoOpJudgmentSpanProcessor
 from uuid import uuid4
 from opentelemetry.context import attach, detach, get_value, set_value
 from judgeval.v1.tracer.processors._lifecycles import (
@@ -74,6 +76,7 @@ class BaseTracer(ABC):
         "serializer",
         "project_id",
         "_tracer_provider",
+        "_judgment_span_processor",
     )
 
     TRACER_NAME = "judgeval"
@@ -82,7 +85,7 @@ class BaseTracer(ABC):
     def __init__(
         self,
         project_name: str,
-        project_id: str,
+        project_id: Optional[str],
         enable_evaluation: bool,
         enable_monitoring: bool,
         api_client: JudgmentSyncClient,
@@ -96,6 +99,7 @@ class BaseTracer(ABC):
         self.api_client = api_client
         self.serializer = serializer
         self._tracer_provider = tracer_provider
+        self._judgment_span_processor: Optional[JudgmentSpanProcessor] = None
 
         BaseTracer._tracers.append(self)
 
@@ -108,6 +112,8 @@ class BaseTracer(ABC):
         pass
 
     def get_span_exporter(self) -> SpanExporter:
+        if not self.project_id:
+            return NoOpSpanExporter()
         return JudgmentSpanExporter(
             endpoint=self._build_endpoint(self.api_client.base_url),
             api_key=self.api_client.api_key,
@@ -116,13 +122,21 @@ class BaseTracer(ABC):
         )
 
     def get_span_processor(self) -> JudgmentSpanProcessor:
-        return JudgmentSpanProcessor(
+        if not self.project_id:
+            return NoOpJudgmentSpanProcessor()
+        processor = JudgmentSpanProcessor(
             self,
             self.get_span_exporter(),
         )
+        self._judgment_span_processor = processor
+        return processor
 
     def get_tracer(self) -> trace.Tracer:
         return self._tracer_provider.get_tracer(self.TRACER_NAME)
+
+    def emit_partial(self) -> None:
+        if self._judgment_span_processor is not None:
+            self._judgment_span_processor.emit_partial()
 
     @property
     def tracer_provider(self) -> TracerProvider:
@@ -578,6 +592,8 @@ class BaseTracer(ABC):
                                     self.serializer, _format_inputs(func, args, kwargs)
                                 ),
                             )
+                        self.emit_partial()
+
                         result = await func(*args, **kwargs)
                         if record_output:
                             span.set_attribute(
@@ -606,6 +622,8 @@ class BaseTracer(ABC):
                                     self.serializer, _format_inputs(func, args, kwargs)
                                 ),
                             )
+                        self.emit_partial()
+
                         result = func(*args, **kwargs)
                     except Exception as e:
                         span.record_exception(e)

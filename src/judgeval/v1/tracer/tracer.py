@@ -19,7 +19,7 @@ class Tracer(BaseTracer):
     def __init__(
         self,
         project_name: str,
-        project_id: str,
+        project_id: Optional[str],
         enable_evaluation: bool,
         enable_monitoring: bool,
         api_client: JudgmentSyncClient,
@@ -28,6 +28,7 @@ class Tracer(BaseTracer):
         isolated: bool = False,
         resource_attributes: Optional[Dict[str, Any]] = None,
         initialize: bool = True,
+        use_default_span_processor: bool = True,
     ):
         self._filter_tracer = filter_tracer
 
@@ -47,6 +48,13 @@ class Tracer(BaseTracer):
             isolated=isolated,
         )
 
+        if enable_monitoring and not project_id:
+            judgeval_logger.warning(
+                "Monitoring disabled: project_id is not set. "
+                "Spans will not be exported."
+            )
+            enable_monitoring = False
+
         super().__init__(
             project_name=project_name,
             project_id=project_id,
@@ -57,7 +65,7 @@ class Tracer(BaseTracer):
             tracer_provider=tracer_provider,
         )
 
-        if enable_monitoring:
+        if enable_monitoring and use_default_span_processor:
             judgeval_logger.info("Adding JudgmentSpanProcessor for monitoring.")
             tracer_provider.add_span_processor(self.get_span_processor())
 

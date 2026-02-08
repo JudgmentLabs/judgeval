@@ -57,3 +57,22 @@ def test_factory_create_isolated(tracer_factory):
 
         assert tracer._tracer_provider is not None
         mock_set.assert_not_called()
+
+
+def test_factory_create_with_none_project_id(mock_client, caplog):
+    import logging
+
+    factory = TracerFactory(
+        client=mock_client,
+        project_name="test_project",
+        project_id=None,
+    )
+
+    with caplog.at_level(logging.WARNING):
+        tracer = factory.create()
+
+    assert isinstance(tracer, Tracer)
+    assert tracer.project_id is None
+    assert tracer.enable_monitoring is False
+    assert "Monitoring disabled" in caplog.text
+    assert "project_id is not set" in caplog.text

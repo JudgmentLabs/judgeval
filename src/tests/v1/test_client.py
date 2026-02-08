@@ -134,3 +134,36 @@ def test_client_datasets_factory_property(mock_resolve_project_id):
     )
     datasets_factory = client.datasets
     assert isinstance(datasets_factory, DatasetFactory)
+
+
+def test_client_project_not_found_logs_warning(caplog):
+    import logging
+
+    with patch("judgeval.v1.resolve_project_id", return_value=None):
+        with caplog.at_level(logging.WARNING):
+            client = Judgeval(
+                project_name="nonexistent_project",
+                api_key="test_key",
+                organization_id="test_org",
+                api_url="http://test.com",
+            )
+
+    assert client._project_id is None
+    assert "nonexistent_project" in caplog.text
+    assert "not found" in caplog.text
+
+
+def test_client_project_not_found_still_creates_factories():
+    with patch("judgeval.v1.resolve_project_id", return_value=None):
+        client = Judgeval(
+            project_name="nonexistent_project",
+            api_key="test_key",
+            organization_id="test_org",
+            api_url="http://test.com",
+        )
+
+    assert client._project_id is None
+    assert isinstance(client.tracer, TracerFactory)
+    assert isinstance(client.scorers, ScorersFactory)
+    assert isinstance(client.evaluation, EvaluationFactory)
+    assert isinstance(client.datasets, DatasetFactory)

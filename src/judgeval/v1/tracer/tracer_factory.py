@@ -15,7 +15,7 @@ class TracerFactory:
         self,
         client: JudgmentSyncClient,
         project_name: str,
-        project_id: str,
+        project_id: Optional[str],
     ):
         self._client = client
         self._project_name = project_name
@@ -30,6 +30,7 @@ class TracerFactory:
         isolated: bool = False,
         resource_attributes: Optional[Dict[str, Any]] = None,
         initialize: bool = True,
+        use_default_span_processor: bool = True,
     ) -> Tracer:
         return Tracer(
             project_name=self._project_name,
@@ -42,4 +43,5 @@ class TracerFactory:
             isolated=isolated,
             resource_attributes=resource_attributes,
             initialize=initialize,
+            use_default_span_processor=use_default_span_processor,
         )

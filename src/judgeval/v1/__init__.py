@@ -5,6 +5,7 @@ from typing import Optional
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.utils import resolve_project_id
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
+from judgeval.logger import judgeval_logger
 
 
 class Judgeval:
@@ -48,9 +49,14 @@ class Judgeval:
             self._organization_id,
         )
 
-        self._project_id = resolve_project_id(self._internal_client, project_name)
+        self._project_id: Optional[str] = resolve_project_id(
+            self._internal_client, project_name
+        )
         if not self._project_id:
-            raise ValueError(f"Project '{project_name}' not found")
+            judgeval_logger.warning(
+                f"Project '{project_name}' not found. "
+                "Some operations requiring project_id will be skipped."
+            )
 
     @property
     def tracer(self):

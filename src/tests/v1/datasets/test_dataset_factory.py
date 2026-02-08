@@ -105,3 +105,45 @@ def test_factory_create_empty_examples(dataset_factory, mock_client):
     dataset = dataset_factory.create(name="test_dataset")
 
     assert len(dataset.examples) == 0
+
+
+def test_factory_get_returns_none_when_project_id_missing(mock_client, caplog):
+    import logging
+
+    factory = DatasetFactory(mock_client, project_id=None, project_name="test_project")
+
+    with caplog.at_level(logging.ERROR):
+        dataset = factory.get("test_dataset")
+
+    assert dataset is None
+    assert "project_id is not set" in caplog.text
+    assert "get()" in caplog.text
+    mock_client.get_projects_datasets_by_dataset_name.assert_not_called()
+
+
+def test_factory_create_returns_none_when_project_id_missing(mock_client, caplog):
+    import logging
+
+    factory = DatasetFactory(mock_client, project_id=None, project_name="test_project")
+
+    with caplog.at_level(logging.ERROR):
+        dataset = factory.create(name="test_dataset")
+
+    assert dataset is None
+    assert "project_id is not set" in caplog.text
+    assert "create()" in caplog.text
+    mock_client.post_projects_datasets.assert_not_called()
+
+
+def test_factory_list_returns_none_when_project_id_missing(mock_client, caplog):
+    import logging
+
+    factory = DatasetFactory(mock_client, project_id=None, project_name="test_project")
+
+    with caplog.at_level(logging.ERROR):
+        datasets = factory.list()
+
+    assert datasets is None
+    assert "project_id is not set" in caplog.text
+    assert "list()" in caplog.text
+    mock_client.get_projects_datasets.assert_not_called()
