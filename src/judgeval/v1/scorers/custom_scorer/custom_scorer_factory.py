@@ -130,6 +130,21 @@ class CustomScorerFactory:
             with open(requirements_file_path, "r") as f:
                 requirements_text = f.read()
 
+        if not overwrite:
+            try:
+                exists_resp = self._client.get_projects_scorers_custom_by_name_exists(
+                    project_id=project_id, name=unique_name
+                )
+                if exists_resp.get("exists"):
+                    raise JudgmentAPIError(
+                        status_code=409,
+                        detail=f"Scorer '{unique_name}' already exists. Use --overwrite to replace.",
+                        response=None,
+                    )
+            except JudgmentAPIError as e:
+                if e.status_code == 409:
+                    raise
+
         payload: UploadCustomScorerRequest = {
             "scorer_name": unique_name,
             "class_name": class_name,
