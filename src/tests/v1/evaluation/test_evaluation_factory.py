@@ -79,7 +79,7 @@ def test_factory_run(evaluation_factory, mock_client, sample_examples, sample_sc
     mock_client.post_projects_eval_queue_examples.assert_called_once()
 
 
-def test_factory_create_returns_none_when_project_id_missing(mock_client):
+def test_factory_create_with_no_project_id(mock_client):
     factory = EvaluationFactory(
         client=mock_client,
         project_id=None,
@@ -88,4 +88,5 @@ def test_factory_create_returns_none_when_project_id_missing(mock_client):
 
     evaluation = factory.create()
 
-    assert evaluation is None
+    assert isinstance(evaluation, Evaluation)
+    assert evaluation._project_id is None
