@@ -8,6 +8,7 @@ from typing import List, Optional
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 
+from judgeval.utils.guards import expect_project_id
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.internal.api.api_types import ExampleEvaluationRun
 from judgeval.v1.data.example import Example
@@ -23,7 +24,7 @@ class Evaluation:
     def __init__(
         self,
         client: JudgmentSyncClient,
-        project_id: str,
+        project_id: Optional[str],
         project_name: str,
     ):
         self._client = client
@@ -51,7 +52,9 @@ class Evaluation:
         assert_test: bool = False,
         timeout_seconds: int = 300,
     ) -> List[ScoringResult]:
-        project_id = self._project_id
+        project_id = expect_project_id(self._project_id)
+        if project_id is None:
+            return []
 
         # Validate all scorers belong to the same project
         for scorer in scorers:
