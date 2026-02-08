@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from enum import Enum
 
+JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME = "judgeval"
+
 
 class APIScorerType(str, Enum):
     """

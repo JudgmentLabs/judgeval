@@ -44,6 +44,7 @@ from judgeval.v1.internal.api.api_types import (
     TraceEvaluationRun,
 )
 from judgeval.v1.scorers.base_scorer import BaseScorer
+from judgeval.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
 from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.v1.scorers.custom_scorer.custom_scorer import CustomScorer
 from judgeval.v1.tracer.exporters.judgment_span_exporter import JudgmentSpanExporter
@@ -79,7 +80,7 @@ class BaseTracer(ABC):
         "_judgment_span_processor",
     )
 
-    TRACER_NAME = "judgeval"
+    TRACER_NAME = JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
     _tracers: list[BaseTracer] = []
 
     def __init__(

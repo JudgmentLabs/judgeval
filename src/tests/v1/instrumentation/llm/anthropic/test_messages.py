@@ -638,16 +638,16 @@ class TestSafetyGuarantees(BaseAnthropicTest):
         self, monkeypatch, tracer, sync_client, anthropic_api_key, mock_processor
     ):
         """Test that span attribute errors don't break user code with tracing verification"""
-        from judgeval.tracer import utils  # type: ignore
+        from judgeval.v1.tracer.base_tracer import BaseTracer
 
-        original_set = utils.set_span_attribute
+        original_set = BaseTracer.set_span_attribute
 
-        def broken_set_attribute(span, key, value):
+        def broken_set_attribute(self, span, key, value):
             if "COMPLETION" in key:
                 raise RuntimeError("Attribute setting failed!")
-            return original_set(span, key, value)
+            return original_set(self, span, key, value)
 
-        monkeypatch.setattr(utils, "set_span_attribute", broken_set_attribute)
+        monkeypatch.setattr(BaseTracer, "set_span_attribute", broken_set_attribute)
 
         wrapped_client = wrap_anthropic_client_sync(tracer, sync_client)
         response = wrapped_client.messages.create(
