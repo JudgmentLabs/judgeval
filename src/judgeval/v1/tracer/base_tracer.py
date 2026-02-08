@@ -77,6 +77,7 @@ class BaseTracer(ABC):
         "serializer",
         "project_id",
         "_tracer_provider",
+        "_judgment_span_exporter",
         "_judgment_span_processor",
     )
 
@@ -100,6 +101,7 @@ class BaseTracer(ABC):
         self.api_client = api_client
         self.serializer = serializer
         self._tracer_provider = tracer_provider
+        self._judgment_span_exporter: Optional[SpanExporter] = None
         self._judgment_span_processor: Optional[JudgmentSpanProcessor] = None
 
         BaseTracer._tracers.append(self)
@@ -113,14 +115,19 @@ class BaseTracer(ABC):
         pass
 
     def get_span_exporter(self) -> SpanExporter:
+        if self._judgment_span_exporter is not None:
+            return self._judgment_span_exporter
+
         if not self.project_id:
-            return NoOpSpanExporter()
-        return JudgmentSpanExporter(
-            endpoint=self._build_endpoint(self.api_client.base_url),
-            api_key=self.api_client.api_key,
-            organization_id=self.api_client.organization_id,
-            project_id=self.project_id,
-        )
+            self._judgment_span_exporter = NoOpSpanExporter()
+        else:
+            self._judgment_span_exporter = JudgmentSpanExporter(
+                endpoint=self._build_endpoint(self.api_client.base_url),
+                api_key=self.api_client.api_key,
+                organization_id=self.api_client.organization_id,
+                project_id=self.project_id,
+            )
+        return self._judgment_span_exporter
 
     def get_span_processor(self) -> JudgmentSpanProcessor:
         if self._judgment_span_processor is not None:
@@ -128,11 +135,11 @@ class BaseTracer(ABC):
 
         if not self.project_id:
             self._judgment_span_processor = NoOpJudgmentSpanProcessor()
-
-        self._judgment_span_processor = JudgmentSpanProcessor(
-            self,
-            self.get_span_exporter(),
-        )
+        else:
+            self._judgment_span_processor = JudgmentSpanProcessor(
+                self,
+                self.get_span_exporter(),
+            )
         return self._judgment_span_processor
 
     def get_tracer(self) -> trace.Tracer:
