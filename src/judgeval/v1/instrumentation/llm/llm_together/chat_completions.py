@@ -26,8 +26,7 @@ from judgeval.utils.wrappers import (
 if TYPE_CHECKING:
     from judgeval.v1.tracer import BaseTracer
     from together import Together, AsyncTogether  # type: ignore[import-untyped]
-    from together.types import ChatCompletionResponse, ChatCompletionChunk  # type: ignore[import-untyped]
-    from together.types.common import UsageData  # type: ignore[import-untyped]
+    from together.types import ChatCompletionResponse, ChatCompletionChunk, UsageData  # type: ignore[import-untyped]
 
 
 def _extract_together_tokens(usage: UsageData) -> tuple[int, int, int, int]:
