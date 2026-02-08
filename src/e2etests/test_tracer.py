@@ -277,7 +277,7 @@ def retrieve_llm_cost_helper(trace_id):
         span_attrs = span.get("span_attributes", {})
         if isinstance(span_attrs, str):
             span_attrs = orjson.loads(span_attrs)
-        llm_cost = span_attrs.get("judgment.usage.total_cost_usd", 0)
+        llm_cost = float(span_attrs.get("judgment.usage.total_cost_usd", 0))
         total_llm_cost += llm_cost
 
     if total_llm_cost == 0:
@@ -376,6 +376,7 @@ def test_anthropic_streaming_llm_cost():
     retrieve_streaming_trace_helper(trace_id)
 
 
+@pytest.mark.skip(reason="Together account blocked")
 def test_together_streaming_llm_cost():
     trace_id = together_streaming_llm_call()
     retrieve_streaming_trace_helper(trace_id)
@@ -393,6 +394,7 @@ async def test_anthropic_async_streaming_llm_cost():
     retrieve_streaming_trace_helper(trace_id)
 
 
+@pytest.mark.skip(reason="Together account blocked")
 @pytest.mark.asyncio
 async def test_together_async_streaming_llm_cost():
     trace_id = await together_async_streaming_llm_call()
@@ -405,6 +407,7 @@ def test_online_span_scoring():
     span_id = trace_spans[0].get("span_id")
 
     query_count = 0
+    scorer_data = None
     while query_count < QUERY_RETRY:
         try:
             scorer_data = retrieve_score(project_name, span_id, trace_id)

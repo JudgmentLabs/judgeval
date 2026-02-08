@@ -58,22 +58,14 @@ def test_faithfulness_scorer(client: Judgeval, random_name: str):
         input="What's the capital of France?",
         actual_output="The capital of France is Paris.",
         expected_output="France's capital is Paris. It used to be called the city of lights until 1968.",
-        retrieval_context=[
-            "Paris is a city in central France. It is the capital of France.",
-            "Paris is well known for its museums, architecture, and cuisine.",
-            "Flights to Paris are available from San Francisco starting at $1000.",
-        ],
+        retrieval_context="Paris is a city in central France. It is the capital of France. Paris is well known for its museums, architecture, and cuisine. Flights to Paris are available from San Francisco starting at $1000.",
     )
 
     contradictory_example = Example.create(
         input="What's the capital of France?",
         actual_output="The capital of France is Lyon. It's located in southern France near the Mediterranean coast.",
         expected_output="France's capital is Paris. It used to be called the city of lights until 1968.",
-        retrieval_context=[
-            "Paris is a city in central France. It is the capital of France.",
-            "Paris is well known for its museums, architecture, and cuisine.",
-            "Flights to Paris are available from San Francisco starting at $1000.",
-        ],
+        retrieval_context="Paris is a city in central France. It is the capital of France. Paris is well known for its museums, architecture, and cuisine. Flights to Paris are available from San Francisco starting at $1000.",
     )
 
     scorer = FaithfulnessScorer(threshold=1.0)

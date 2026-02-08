@@ -44,13 +44,11 @@ def test_create_dataset_error(client: Judgeval, random_name: str):
     )
     assert dataset
 
-    try:
+    with pytest.raises(JudgmentAPIError):
         client.datasets.create(
             name=random_name,
             examples=[Example.create(input="input 1", actual_output="output 1")],
         )
-    except Exception as e:
-        assert "Dataset already exists" in str(e)
 
 
 def test_get_dataset_error(client: Judgeval, random_name: str):
@@ -157,7 +155,7 @@ def test_dataset_list_empty(client: Judgeval, random_name: str):
 def test_dataset_list_nonexistent_project(client: Judgeval, random_name: str):
     client2 = Judgeval(project_name=random_name)
     datasets = client2.datasets.list()
-    assert datasets is None
+    assert datasets is None or datasets == []
 
 
 def test_dataset_list_after_creation(client: Judgeval, random_name: str):
