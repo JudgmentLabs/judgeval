@@ -1,5 +1,7 @@
 from judgeval.v1.scorers.prompt_scorer.prompt_scorer import PromptScorer
+from judgeval.v1.internal.api.api_types import SavePromptScorerRequest
 from uuid import uuid4
+from typing import Optional, Dict
 from judgeval.v1 import Judgeval
 from judgeval.v1.data import Example
 from e2etests.utils import retrieve_score
@@ -11,9 +13,14 @@ QUERY_RETRY = 60
 
 
 def _create_prompt_scorer(
-    client: Judgeval, name: str, prompt: str, options=None, is_trace=False
+    client: Judgeval,
+    name: str,
+    prompt: str,
+    options: Optional[Dict[str, float]] = None,
+    is_trace: bool = False,
 ):
-    payload = {
+    assert client._project_id is not None
+    payload: SavePromptScorerRequest = {
         "name": name,
         "prompt": prompt,
         "threshold": 0.5,
@@ -191,6 +198,7 @@ def test_trace_prompt_scorer():
         query_count += 1
         time.sleep(1)
     delete_project(project_name=project_name)
+    assert scorer_data is not None
     assert scorer_data[0].get("scorer_success")
 
 

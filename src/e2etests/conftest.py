@@ -24,7 +24,7 @@ def project_name():
 
 
 @pytest.fixture(scope="session")
-def client(project_name: str) -> Judgeval:
+def client(project_name: str):
     if not API_KEY or not ORGANIZATION_ID:
         pytest.skip(
             "JUDGMENT_API_KEY or JUDGMENT_ORG_ID not set", allow_module_level=True

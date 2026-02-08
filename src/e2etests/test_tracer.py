@@ -4,7 +4,7 @@ from judgeval.v1.scorers.built_in import AnswerRelevancyScorer
 import time
 from openai import OpenAI, AsyncOpenAI
 from anthropic import Anthropic, AsyncAnthropic
-from together import Together, AsyncTogether
+from together import Together, AsyncTogether  # type: ignore[import-untyped]
 from google import genai
 from e2etests.utils import (
     retrieve_trace,

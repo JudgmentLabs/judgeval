@@ -333,9 +333,11 @@ def _wrap_tool_factory(tool_fn: Any, tracer: "BaseTracer") -> Callable[..., Any]
             # Now we have the actual tool definition, wrap its handler
             if tool_def and hasattr(tool_def, "handler"):
                 tool_name = getattr(tool_def, "name", "unknown")
-                original_handler = tool_def.handler
-                tool_def.handler = _wrap_tool_handler(
-                    tracer, original_handler, tool_name
+                original_handler = getattr(tool_def, "handler")
+                setattr(
+                    tool_def,
+                    "handler",
+                    _wrap_tool_handler(tracer, original_handler, tool_name),
                 )
 
             return tool_def

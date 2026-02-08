@@ -1,6 +1,10 @@
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_ORG_ID, JUDGMENT_API_URL
 
+assert JUDGMENT_API_KEY, "JUDGMENT_API_KEY must be set"
+assert JUDGMENT_ORG_ID, "JUDGMENT_ORG_ID must be set"
+assert JUDGMENT_API_URL, "JUDGMENT_API_URL must be set"
+
 client = JudgmentSyncClient(
     base_url=JUDGMENT_API_URL,
     api_key=JUDGMENT_API_KEY,

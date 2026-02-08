@@ -123,14 +123,17 @@ class BaseTracer(ABC):
         )
 
     def get_span_processor(self) -> JudgmentSpanProcessor:
+        if self._judgment_span_processor is not None:
+            return self._judgment_span_processor
+
         if not self.project_id:
-            return NoOpJudgmentSpanProcessor()
-        processor = JudgmentSpanProcessor(
+            self._judgment_span_processor = NoOpJudgmentSpanProcessor()
+
+        self._judgment_span_processor = JudgmentSpanProcessor(
             self,
             self.get_span_exporter(),
         )
-        self._judgment_span_processor = processor
-        return processor
+        return self._judgment_span_processor
 
     def get_tracer(self) -> trace.Tracer:
         return self._tracer_provider.get_tracer(self.TRACER_NAME)
@@ -182,9 +185,9 @@ class BaseTracer(ABC):
                 set_status_on_exception=set_status_on_exception,
             )
 
-    def _get_current_span(self) -> Optional[Span]:
-        if self._is_isolated():
-            tracer = cast(JudgmentIsolatedTracer, self.get_tracer())
+    def get_current_span(self) -> Span:
+        tracer = self.get_tracer()
+        if isinstance(tracer, JudgmentIsolatedTracer):
             return tracer.get_current_span()
         return trace.get_current_span()
 
@@ -210,7 +213,7 @@ class BaseTracer(ABC):
     def set_span_kind(self, kind: str) -> None:
         if kind is None:
             return
-        current_span = self._get_current_span()
+        current_span = self.get_current_span()
         if current_span is not None:
             current_span.set_attribute(AttributeKeys.JUDGMENT_SPAN_KIND, kind)
 
@@ -230,7 +233,7 @@ class BaseTracer(ABC):
 
     @dont_throw
     def set_attribute(self, key: str, value: Any) -> None:
-        current_span = self._get_current_span()
+        current_span = self.get_current_span()
         if current_span is None:
             return
         self.set_span_attribute(current_span, key, value)
@@ -242,7 +245,7 @@ class BaseTracer(ABC):
             self.set_attribute(key, value)
 
     def set_customer_id(self, customer_id: str) -> None:
-        current_span = self._get_current_span()
+        current_span = self.get_current_span()
         if current_span is None:
             return
         current_span.set_attribute(AttributeKeys.JUDGMENT_CUSTOMER_ID, customer_id)
@@ -258,7 +261,7 @@ class BaseTracer(ABC):
         self._attach_context(ctx)
 
     def override_project(self, project_name: str) -> None:
-        current_span = self._get_current_span()
+        current_span = self.get_current_span()
         if current_span is None or not current_span.is_recording():
             judgeval_logger.error(
                 "override_project() called outside of a span context. Ignoring."
@@ -506,7 +509,7 @@ class BaseTracer(ABC):
             judgeval_logger.error(f"Failed to enqueue evaluation run: {e}")
 
     def _get_sampled_span_context(self) -> Optional[SpanContext]:
-        current_span = self._get_current_span()
+        current_span = self.get_current_span()
         if current_span is None:
             return None
         span_context = current_span.get_span_context()
@@ -515,7 +518,7 @@ class BaseTracer(ABC):
         return span_context
 
     def _get_sampled_span(self) -> Optional[Span]:
-        current_span = self._get_current_span()
+        current_span = self.get_current_span()
         if current_span is None:
             return None
         span_context = current_span.get_span_context()
