@@ -3,6 +3,7 @@
 import pytest
 
 pytest.importorskip("together")
+# pytestmark = pytest.mark.skip(reason="Together account blocked")
 
 from judgeval.v1.instrumentation.llm.llm_together.wrapper import wrap_together_client
 from ..utils import verify_span_attributes_comprehensive, assert_span_has_exception
