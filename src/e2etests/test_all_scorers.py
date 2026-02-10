@@ -5,7 +5,6 @@ from judgeval.v1.scorers.built_in import (
     FaithfulnessScorer,
 )
 from judgeval.v1.data import Example
-from judgeval.v1.data.scoring_result import ScoringResult
 
 
 def test_ac_scorer(client: Judgeval, random_name: str):
@@ -18,12 +17,12 @@ def test_ac_scorer(client: Judgeval, random_name: str):
     scorer = AnswerCorrectnessScorer(threshold=0.5)
 
     evaluation = client.evaluation.create()
-    res = evaluation.run(
+    evaluation.run(
         examples=[example],
         scorers=[scorer],
         eval_run_name=random_name,
+        assert_test=True,
     )
-    print_debug_on_failure(res[0])
 
 
 def test_ar_scorer(client: Judgeval, random_name: str):
@@ -45,9 +44,6 @@ def test_ar_scorer(client: Judgeval, random_name: str):
         scorers=[scorer],
         eval_run_name=random_name,
     )
-
-    print_debug_on_failure(res[0])
-    print_debug_on_failure(res[1])
 
     assert res[0].success
     assert not res[1].success
@@ -77,24 +73,5 @@ def test_faithfulness_scorer(client: Judgeval, random_name: str):
         eval_run_name=random_name,
     )
 
-    print_debug_on_failure(res[0])
-    print_debug_on_failure(res[1])
-
     assert res[0].success
-    assert not res[1].success, res[1]
-
-
-def print_debug_on_failure(result: ScoringResult) -> bool:
-    if not result.success:
-        print(result.data_object)
-        print("\nScorer Details:")
-        for scorer_data in result.scorers_data:
-            print(f"- Name: {scorer_data.name}")
-            print(f"- Score: {scorer_data.score}")
-            print(f"- Threshold: {scorer_data.threshold}")
-            print(f"- Success: {scorer_data.success}")
-            print(f"- Reason: {scorer_data.reason}")
-            print(f"- Error: {scorer_data.error}")
-
-        return False
-    return True
+    assert not res[1].success

@@ -101,9 +101,12 @@ def upload_scorer(
         judgeval_logger.info("Custom scorer uploaded successfully!")
     except JudgmentAPIError as e:
         if e.status_code == 409:
-            judgeval_logger.error("Scorer exists. Use --overwrite to replace")
+            judgeval_logger.error(e.detail)
             raise typer.Exit(1)
         raise
+    except ValueError as e:
+        judgeval_logger.error(str(e))
+        raise typer.Exit(1)
 
 
 @app.command()

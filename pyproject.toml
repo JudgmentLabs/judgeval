@@ -92,6 +92,7 @@ exclude = ["src/e2etests/*", "src/tests/*", "src/demo/*"]
 check_untyped_defs = true
 warn_return_any = true
 warn_unreachable = false
+
 [tool.ruff]
 exclude = ["docs"]
 
