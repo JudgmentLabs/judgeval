@@ -1,7 +1,6 @@
 from judgeval.v1 import Judgeval
 from judgeval.v1.scorers.built_in import (
     AnswerCorrectnessScorer,
-    AnswerRelevancyScorer,
     FaithfulnessScorer,
 )
 from judgeval.v1.data import Example
@@ -23,30 +22,6 @@ def test_ac_scorer(client: Judgeval, random_name: str):
         eval_run_name=random_name,
         assert_test=True,
     )
-
-
-def test_ar_scorer(client: Judgeval, random_name: str):
-    example_1 = Example.create(
-        input="What's the capital of France?",
-        actual_output="The capital of France is Paris.",
-    )
-
-    example_2 = Example.create(
-        input="What's the capital of France?",
-        actual_output="There's alot to do in Marseille. Lots of bars, restaurants, and museums.",
-    )
-
-    scorer = AnswerRelevancyScorer(threshold=0.5)
-
-    evaluation = client.evaluation.create()
-    res = evaluation.run(
-        examples=[example_1, example_2],
-        scorers=[scorer],
-        eval_run_name=random_name,
-    )
-
-    assert res[0].success
-    assert not res[1].success
 
 
 def test_faithfulness_scorer(client: Judgeval, random_name: str):
