@@ -2,11 +2,22 @@ name: Auto Changelog (prod)
 
 on:
   push:
-    branches: [main, geoffrey/auto-changelog]
+    branches: [main]
   workflow_dispatch: {}
 
 jobs:
   changelog:
+    # Only run when:
+    # - manually triggered, OR
+    # - a push to main whose head commit message indicates a prod release
+    if: >
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.ref == 'refs/heads/main' &&
+          contains(github.event.head_commit.message, 'Prod release:')
+        )
+      }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout full history
@@ -62,7 +73,8 @@ jobs:
           python3 - << 'PY'
           import json, os, urllib.request
 
-          repo = os.environ.get("GITHUB_REPOSITORY", "")
+          repo_full = os.environ.get("GITHUB_REPOSITORY", "")
+          repo_short = repo_full.split("/")[-1] if repo_full else "repo"
           latest = """${{ steps.inputs.outputs.latest }}""".strip()
           title = """${{ steps.inputs.outputs.title }}""".strip()
           body = """${{ steps.inputs.outputs.body }}""".strip()
@@ -72,22 +84,28 @@ jobs:
           with open("${{ steps.inputs.outputs.patch_path }}", "r", encoding="utf-8", errors="replace") as f:
             patch = f.read().strip()
 
-          commit_url = f"https://github.com/{repo}/commit/{latest}"
+          commit_url = f"https://github.com/{repo_full}/commit/{latest}"
 
           prompt = f"""
           You are writing an INTERNAL Slack update for engineers and product.
 
-          Goal: helpful, relevant release notes. Prefer user-facing + developer-impacting changes.
-          Avoid noisy implementation details (file deletions, minor refactors) unless they require action or explain a visible change.
+          Goals:
+          - Helpful, relevant release notes.
+          - Prioritize user-facing + developer-impacting changes.
+          - Avoid noisy implementation details (file deletions, minor refactors) unless they require action or explain a visible change.
 
-          Formatting rules (Slack):
+          Formatting rules (Slack mrkdwn):
           - Do NOT use markdown headings like # or ##.
-          - Use Slack mrkdwn: *bold* titles, _italics_ sparingly, emojis are OK but keep them minimal (1-2 per section).
+          - Use Slack mrkdwn: *bold* titles, emojis are OK but minimal.
           - Use short paragraphs plus bullets. Mix both for readability.
           - Put code, commands, env vars, and snippets inside triple backticks.
           - Keep the whole message scannable.
 
-          Output format (use exactly these section headers):
+          Output must start with a prominent repo label:
+          First line must be exactly:
+          :package: *{repo_short}* (prod)
+
+          Then use exactly these section headers:
 
           :rocket: *Release*
           <One sentence summary of what this release enables or improves.>
@@ -97,19 +115,19 @@ jobs:
 
           :warning: *Upgrade notes (if you need to change anything)*
           - Only include if there are required actions.
-          - Focus on SDK/API/config/behavior changes. This is not "db migration only".
+          - Focus on SDK/API/config/behavior changes.
           - For each required action:
             * Who is impacted
             * What changed
             * Exactly what to do
-            * Include a small before/after snippet if you can infer it from the diff.
+            * Include a small before/after snippet if inferable from the diff.
           - If no required actions, write: "No upgrade actions required."
 
           :clipboard: *Details (optional, only if useful)*
           - Up to 5 bullets for extra context that helps engineers operate or debug, but skip low-signal items.
 
           Context:
-          - Repo: {repo}
+          - Repo: {repo_full}
           - Commit URL: {commit_url}
           - Latest prod release merge commit:
             - {latest}
@@ -189,18 +207,18 @@ jobs:
               chunks.append(cur)
             return chunks
 
-          repo = os.environ.get("GITHUB_REPOSITORY", "")
+          repo_full = os.environ.get("GITHUB_REPOSITORY", "")
+          repo_short = repo_full.split("/")[-1] if repo_full else "repo"
           latest = "${{ steps.inputs.outputs.latest }}"
-          commit_url = f"https://github.com/{repo}/commit/{latest}"
+          commit_url = f"https://github.com/{repo_full}/commit/{latest}"
           text = """${{ steps.claude.outputs.changelog }}""".strip()
 
-          # Slack section text limit is tight; stay under it
           chunks = chunk_text(text, max_len=2800)
 
           blocks = [
             {
               "type": "section",
-              "text": {"type": "mrkdwn", "text": f"*{repo}* prod changelog\n<{commit_url}|View release commit>"}
+              "text": {"type": "mrkdwn", "text": f":package: *{repo_short}* (prod)\n<{commit_url}|View release commit>"}
             },
             {"type": "divider"},
           ]
