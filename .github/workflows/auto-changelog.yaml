@@ -1,0 +1,221 @@
+name: Auto Changelog (prod)
+
+on:
+  push:
+    branches: [main, geoffrey/auto-changelog]
+  workflow_dispatch: {}
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve latest prod release commit
+        id: latest
+        run: |
+          git fetch origin main --prune
+
+          LATEST=$(git log -1 --pretty=%H --author=release-bot origin/main)
+          if [ -z "$LATEST" ]; then
+            echo "No release-bot commit found on origin/main" >&2
+            exit 1
+          fi
+
+          echo "latest=$LATEST" >> $GITHUB_OUTPUT
+
+      - name: Build changelog inputs from latest release commit
+        id: inputs
+        run: |
+          LATEST="${{ steps.latest.outputs.latest }}"
+
+          TITLE="$(git log -1 --pretty=%s "$LATEST")"
+          BODY="$(git log -1 --pretty=%b "$LATEST")"
+
+          echo "title<<EOF" >> $GITHUB_OUTPUT
+          echo "$TITLE" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "$BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "latest=$LATEST" >> $GITHUB_OUTPUT
+
+          git show -m "$LATEST" > /tmp/patch.txt
+          git show --name-status --pretty="" -m "$LATEST" > /tmp/name_status.txt
+
+          # Keep the prompt safe but allow enough context for better "upgrade notes"
+          head -c 160000 /tmp/patch.txt > /tmp/patch_trunc.txt
+
+          echo "name_status_path=/tmp/name_status.txt" >> $GITHUB_OUTPUT
+          echo "patch_path=/tmp/patch_trunc.txt" >> $GITHUB_OUTPUT
+
+      - name: Generate Slack changelog with Claude
+        id: claude
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          python3 - << 'PY'
+          import json, os, urllib.request
+
+          repo = os.environ.get("GITHUB_REPOSITORY", "")
+          latest = """${{ steps.inputs.outputs.latest }}""".strip()
+          title = """${{ steps.inputs.outputs.title }}""".strip()
+          body = """${{ steps.inputs.outputs.body }}""".strip()
+
+          with open("${{ steps.inputs.outputs.name_status_path }}", "r", encoding="utf-8") as f:
+            name_status = f.read().strip()
+          with open("${{ steps.inputs.outputs.patch_path }}", "r", encoding="utf-8", errors="replace") as f:
+            patch = f.read().strip()
+
+          commit_url = f"https://github.com/{repo}/commit/{latest}"
+
+          prompt = f"""
+          You are writing an INTERNAL Slack update for engineers and product.
+
+          Goal: helpful, relevant release notes. Prefer user-facing + developer-impacting changes.
+          Avoid noisy implementation details (file deletions, minor refactors) unless they require action or explain a visible change.
+
+          Formatting rules (Slack):
+          - Do NOT use markdown headings like # or ##.
+          - Use Slack mrkdwn: *bold* titles, _italics_ sparingly, emojis are OK but keep them minimal (1-2 per section).
+          - Use short paragraphs plus bullets. Mix both for readability.
+          - Put code, commands, env vars, and snippets inside triple backticks.
+          - Keep the whole message scannable.
+
+          Output format (use exactly these section headers):
+
+          :rocket: *Release*
+          <One sentence summary of what this release enables or improves.>
+
+          :sparkles: *Highlights*
+          - 4 to 7 bullets, only the most important changes.
+
+          :warning: *Upgrade notes (if you need to change anything)*
+          - Only include if there are required actions.
+          - Focus on SDK/API/config/behavior changes. This is not "db migration only".
+          - For each required action:
+            * Who is impacted
+            * What changed
+            * Exactly what to do
+            * Include a small before/after snippet if you can infer it from the diff.
+          - If no required actions, write: "No upgrade actions required."
+
+          :clipboard: *Details (optional, only if useful)*
+          - Up to 5 bullets for extra context that helps engineers operate or debug, but skip low-signal items.
+
+          Context:
+          - Repo: {repo}
+          - Commit URL: {commit_url}
+          - Latest prod release merge commit:
+            - {latest}
+            - title: {title}
+            - body: {body}
+
+          Use the diff to detect upgrade notes:
+          - Look for changes to public exports, SDK types, function/class signatures, config fields, env vars, flags, endpoints, schemas.
+          - If something changes but you cannot be 100% sure, phrase it cautiously ("If you use X, verify Y").
+
+          Files changed (name-status):
+          {name_status}
+
+          Patch (truncated):
+          {patch}
+          """.strip()
+
+          payload = {
+            "model": "claude-opus-4-6",
+            "max_tokens": 1200,
+            "messages": [{"role": "user", "content": prompt}],
+          }
+
+          req = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+              "Content-Type": "application/json",
+              "x-api-key": os.environ["ANTHROPIC_API_KEY"],
+              "anthropic-version": "2023-06-01",
+            },
+            method="POST",
+          )
+
+          with urllib.request.urlopen(req, timeout=90) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+
+          text = ""
+          for block in data.get("content", []):
+            if block.get("type") == "text":
+              text += block.get("text", "")
+
+          text = text.strip()
+          if not text:
+            raise SystemExit("Claude returned empty output")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+            out.write("changelog<<EOF\n")
+            out.write(text + "\n")
+            out.write("EOF\n")
+          PY
+
+      - name: Post to Slack (mrkdwn blocks, chunked)
+        env:
+          CHANGELOG_SLACK_TOKEN: ${{ secrets.CHANGELOG_SLACK_TOKEN }}
+        run: |
+          python3 - << 'PY'
+          import json, os, urllib.request
+
+          def chunk_text(s: str, max_len: int):
+            parts = s.split("\n\n")
+            chunks = []
+            cur = ""
+            for p in parts:
+              candidate = (cur + "\n\n" + p).strip() if cur else p
+              if len(candidate) <= max_len:
+                cur = candidate
+                continue
+              if cur:
+                chunks.append(cur)
+                cur = ""
+              while len(p) > max_len:
+                chunks.append(p[:max_len])
+                p = p[max_len:]
+              cur = p
+            if cur:
+              chunks.append(cur)
+            return chunks
+
+          repo = os.environ.get("GITHUB_REPOSITORY", "")
+          latest = "${{ steps.inputs.outputs.latest }}"
+          commit_url = f"https://github.com/{repo}/commit/{latest}"
+          text = """${{ steps.claude.outputs.changelog }}""".strip()
+
+          # Slack section text limit is tight; stay under it
+          chunks = chunk_text(text, max_len=2800)
+
+          blocks = [
+            {
+              "type": "section",
+              "text": {"type": "mrkdwn", "text": f"*{repo}* prod changelog\n<{commit_url}|View release commit>"}
+            },
+            {"type": "divider"},
+          ]
+
+          for c in chunks:
+            blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": c}})
+
+          payload = {"blocks": blocks}
+
+          req = urllib.request.Request(
+            os.environ["CHANGELOG_SLACK_TOKEN"],
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+          )
+          with urllib.request.urlopen(req, timeout=30) as resp:
+            resp.read()
+          PY
