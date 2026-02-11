@@ -423,6 +423,6 @@ def test_online_span_scoring():
         assert False, "No score found"
 
     score = scorer_data[0]
-    assert score.get("scorer_name") == "Answer Relevancy"
-    assert score.get("scorer_success")
-    assert score.get("scorer_score") == 1.0
+    assert score.get("judge_name") == "Answer Relevancy"
+    assert score.get("bool_value")
+    assert score.get("num_value") == 1.0

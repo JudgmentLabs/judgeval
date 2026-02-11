@@ -6,6 +6,7 @@ from judgeval.exceptions import JudgmentAPIError
 from judgeval.utils.url import url_for
 from judgeval.utils.serialize import json_encoder
 from judgeval.v1.internal.api.api_types import *
+from judgeval.logger import judgeval_logger as logger
 
 
 def _headers(api_key: str, organization_id: str) -> Mapping[str, str]:
@@ -42,6 +43,7 @@ class JudgmentSyncClient:
         payload: Any,
         params: Optional[Dict[str, Any]] = None,
     ) -> Any:
+        logger.debug(f"HTTP {method} {url}")
         if method == "GET":
             r = self.client.request(
                 method,
@@ -57,6 +59,7 @@ class JudgmentSyncClient:
                 params=params,
                 headers=_headers(self.api_key, self.organization_id),
             )
+        logger.debug(f"HTTP {method} {url} -> {r.status_code}")
         return _handle_response(r)
 
     def post_otel_v1_traces(self) -> Any:
@@ -337,6 +340,7 @@ class JudgmentAsyncClient:
         payload: Any,
         params: Optional[Dict[str, Any]] = None,
     ) -> Any:
+        logger.debug(f"HTTP {method} {url}")
         if method == "GET":
             r = self.client.request(
                 method,
@@ -352,7 +356,9 @@ class JudgmentAsyncClient:
                 params=params,
                 headers=_headers(self.api_key, self.organization_id),
             )
-        return _handle_response(await r)
+        r = await r
+        logger.debug(f"HTTP {method} {url} -> {r.status_code}")
+        return _handle_response(r)
 
     async def post_otel_v1_traces(self) -> Any:
         return await self._request(

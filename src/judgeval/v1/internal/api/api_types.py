@@ -261,7 +261,7 @@ class ScorerConfig(TypedDict):
     model: NotRequired[Optional[str]]
     required_params: NotRequired[Optional[List[str]]]
     kwargs: NotRequired[Optional[Dict[str, Any]]]
-    result_type: str
+    result_type: NotRequired[Optional[str]]
 
 
 class ScorerExistsResponse(TypedDict):

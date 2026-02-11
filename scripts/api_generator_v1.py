@@ -710,6 +710,7 @@ def generate_client_class(
         '        self, method: Literal["POST", "PATCH", "GET", "DELETE"], url: str, payload: Any, params: Optional[Dict[str, Any]] = None'
     )
     lines.append("    ) -> Any:")
+    lines.append('        logger.debug(f"HTTP {method} {url}")')
     lines.append('        if method == "GET":')
     lines.append("            r = self.client.request(")
     lines.append("                method,")
@@ -730,9 +731,9 @@ def generate_client_class(
     )
     lines.append("            )")
     if is_async:
-        lines.append("        return _handle_response(await r)")
-    else:
-        lines.append("        return _handle_response(r)")
+        lines.append("        r = await r")
+    lines.append('        logger.debug(f"HTTP {method} {url} -> {r.status_code}")')
+    lines.append("        return _handle_response(r)")
     lines.append("")
 
     for method_info in methods:
@@ -779,6 +780,7 @@ def generate_api_file() -> str:
         "from judgeval.utils.url import url_for",
         "from judgeval.utils.serialize import json_encoder",
         "from judgeval.v1.internal.api.api_types import *",
+        "from judgeval.logger import judgeval_logger as logger",
         "",
         "",
         "def _headers(api_key: str, organization_id: str) -> Mapping[str, str]:",
