@@ -19,13 +19,10 @@ license-files = ["LICENSE.md"]
 
 dependencies = [
     "httpx>=0.28.1",
-    "litellm>=1.75.0",
     "opentelemetry-exporter-otlp>=1.36.0",
     "opentelemetry-sdk>=1.36.0",
     "orjson>=3.9.0",
-    "click<8.2.0",
     "typer>=0.9.0",
-    "boto3>=1.40.11",
     "dotenv>=0.9.9",
 ]
 
@@ -60,7 +57,7 @@ dev = [
     "datamodel-code-generator>=0.32.0",
     "google-genai>=1.28.0",
     "groq>=0.30.0",
-    "langchain-core>=0.3.72",
+    "langchain-core>=0.3.81",
     "langgraph>=0.6.4",
     "mypy>=1.17.1",
     "openai>=1.92.0",
@@ -89,6 +86,12 @@ dev = [
 directory = "dist"
 artifacts = ["src/judgeval/**/*.py"]
 exclude = ["src/e2etests/*", "src/tests/*", "src/demo/*"]
+
+
+[tool.mypy]
+check_untyped_defs = true
+warn_return_any = true
+warn_unreachable = false
 
 [tool.ruff]
 exclude = ["docs"]

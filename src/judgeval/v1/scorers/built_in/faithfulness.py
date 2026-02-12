@@ -15,7 +15,7 @@ class FaithfulnessScorer(APIScorer):
     ):
         super().__init__(
             score_type=APIScorerType.FAITHFULNESS.value,
-            required_params=["context", "actual_output"],
+            required_params=["retrieval_context", "actual_output"],
             threshold=threshold,
             name=name,
             model=model,

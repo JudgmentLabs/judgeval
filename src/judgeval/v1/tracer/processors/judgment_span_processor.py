@@ -14,7 +14,7 @@ from opentelemetry.sdk.trace.export import (
 )
 
 from judgeval.judgment_attribute_keys import AttributeKeys
-from judgeval.tracer.keys import InternalAttributeKeys
+from judgeval.judgment_attribute_keys import InternalAttributeKeys
 from judgeval.utils.decorators.dont_throw import dont_throw
 from judgeval.v1.tracer.processors._lifecycles import get_all
 

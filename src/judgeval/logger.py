@@ -12,10 +12,6 @@ GRAY = "\033[90m"
 
 
 class ColorFormatter(logging.Formatter):
-    """
-    Wrap the final formatted log record in ANSI color codes based on level.
-    """
-
     COLORS = {
         logging.DEBUG: GRAY,
         logging.INFO: GRAY,

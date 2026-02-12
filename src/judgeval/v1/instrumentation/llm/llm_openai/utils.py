@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 from opentelemetry.trace import Span
 from judgeval.judgment_attribute_keys import AttributeKeys
-from judgeval.utils.serialize import safe_serialize
+from judgeval.utils.decorators.dont_throw import dont_throw
 
 
 def openai_tokens_converter(
@@ -29,6 +29,7 @@ def openai_tokens_converter(
         return prompt_tokens, completion_tokens, cache_read, cache_creation
 
 
+@dont_throw
 def set_cost_attribute(span: Span, usage_data: Any) -> None:
     """
     This is for OpenRouter case where the cost is provided in the usage data when they specify:
@@ -38,7 +39,7 @@ def set_cost_attribute(span: Span, usage_data: Any) -> None:
     if hasattr(usage_data, "cost") and usage_data.cost:
         span.set_attribute(
             AttributeKeys.JUDGMENT_USAGE_TOTAL_COST_USD,
-            safe_serialize(usage_data.cost),
+            float(usage_data.cost),
         )
 
     # BYOK case
@@ -50,5 +51,5 @@ def set_cost_attribute(span: Span, usage_data: Any) -> None:
     ):
         span.set_attribute(
             AttributeKeys.JUDGMENT_USAGE_TOTAL_COST_USD,
-            safe_serialize(usage_data.cost_details["upstream_inference_cost"]),
+            float(usage_data.cost_details["upstream_inference_cost"]),
         )

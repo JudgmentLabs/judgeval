@@ -1,29 +1,28 @@
-from judgeval.tracer import Tracer
-from judgeval.data import Example
-from judgeval.scorers import AnswerRelevancyScorer
+from judgeval.v1 import Judgeval
+from judgeval.v1.data import Example
+from judgeval.v1.scorers.built_in import AnswerRelevancyScorer
 import time
 from openai import OpenAI, AsyncOpenAI
 from anthropic import Anthropic, AsyncAnthropic
-from together import Together, AsyncTogether
+from together import Together, AsyncTogether  # type: ignore[import-untyped]
 from google import genai
 from e2etests.utils import (
     retrieve_trace,
+    retrieve_score,
     create_project,
     delete_project,
 )
-from judgeval.tracer import wrap
 import os
 import random
 import pytest
 import string
-from typing import cast
 import orjson
 
 project_name = "e2e-tests-" + "".join(
     random.choices(string.ascii_letters + string.digits, k=12)
 )
 
-# delete_project(project_name=project_name)
+delete_project(project_name=project_name)
 create_project(project_name=project_name)
 
 
@@ -31,23 +30,19 @@ def teardown_module(module):
     delete_project(project_name=project_name)
 
 
-judgment: Tracer = cast(
-    Tracer,
-    Tracer(
-        project_name=project_name,
-    ),
+judgeval_client = Judgeval(project_name=project_name)
+judgment = judgeval_client.tracer.create()
+
+openai_client = judgment.wrap(OpenAI())
+anthropic_client = judgment.wrap(Anthropic())
+together_client = judgment.wrap(Together(api_key=os.getenv("TOGETHER_API_KEY")))
+google_client = judgment.wrap(genai.Client(api_key=os.getenv("GOOGLE_API_KEY")))
+
+openai_client_async = judgment.wrap(AsyncOpenAI())
+anthropic_client_async = judgment.wrap(AsyncAnthropic())
+together_client_async = judgment.wrap(
+    AsyncTogether(api_key=os.getenv("TOGETHER_API_KEY"))
 )
-
-# Wrap clients
-openai_client = wrap(OpenAI())
-anthropic_client = wrap(Anthropic())
-together_client = wrap(Together(api_key=os.getenv("TOGETHER_API_KEY")))
-google_client = wrap(genai.Client(api_key=os.getenv("GOOGLE_API_KEY")))
-
-# Async clients
-openai_client_async = wrap(AsyncOpenAI())
-anthropic_client_async = wrap(AsyncAnthropic())
-together_client_async = wrap(AsyncTogether(api_key=os.getenv("TOGETHER_API_KEY")))
 
 QUERY_RETRY = 60
 PROMPT = "I need you to solve this math problem: 1 + 1 = ?"
@@ -55,14 +50,12 @@ PROMPT = "I need you to solve this math problem: 1 + 1 = ?"
 
 @judgment.observe(span_type="function")
 def scorer_span():
-    """Generate a travel itinerary using the researched data."""
     judgment.async_evaluate(
-        example=Example(
+        scorer=AnswerRelevancyScorer(threshold=0.5),
+        example=Example.create(
             input="Tell me the weather in Paris.",
-            actual_output="The weather in France is sunny and 72°F.",
+            actual_output="The weather in France is sunny and 72F.",
         ),
-        scorer=AnswerRelevancyScorer(),
-        sampling_rate=1,
     )
 
     return format(judgment.get_current_span().get_span_context().trace_id, "032x")
@@ -294,13 +287,10 @@ def retrieve_llm_cost_helper(trace_id):
 
 
 def retrieve_streaming_trace_helper(trace_id):
-    """Helper to validate streaming traces have proper attributes."""
     trace_spans = retrieve_trace_helper(trace_id, 2)
 
-    # Find the LLM span
     llm_span = None
     for span in trace_spans:
-        # Parse span_attributes if it's a JSON string
         span_attrs = span.get("span_attributes", {})
         if isinstance(span_attrs, str):
             span_attrs = orjson.loads(span_attrs)
@@ -312,17 +302,14 @@ def retrieve_streaming_trace_helper(trace_id):
     if not llm_span:
         assert False, "No LLM span found in streaming trace"
 
-    # Verify streaming-specific attributes
     span_attributes = llm_span.get("span_attributes", {})
     if isinstance(span_attributes, str):
         span_attributes = orjson.loads(span_attributes)
 
-    # Should have completion content
     completion = span_attributes.get("gen_ai.completion")
     if not completion:
         assert False, "No completion content found in streaming span"
 
-    # Should have usage information
     input_tokens = span_attributes.get("judgment.usage.non_cached_input_tokens")
     output_tokens = span_attributes.get("judgment.usage.output_tokens")
 
@@ -379,7 +366,6 @@ async def test_together_async_llm_cost():
     retrieve_llm_cost_helper(trace_id)
 
 
-# Sync streaming tests
 def test_openai_streaming_llm_cost():
     trace_id = openai_streaming_llm_call()
     retrieve_streaming_trace_helper(trace_id)
@@ -390,12 +376,12 @@ def test_anthropic_streaming_llm_cost():
     retrieve_streaming_trace_helper(trace_id)
 
 
+@pytest.mark.skip(reason="Together account blocked")
 def test_together_streaming_llm_cost():
     trace_id = together_streaming_llm_call()
     retrieve_streaming_trace_helper(trace_id)
 
 
-# Async streaming tests
 @pytest.mark.asyncio
 async def test_openai_async_streaming_llm_cost():
     trace_id = await openai_async_streaming_llm_call()
@@ -408,7 +394,35 @@ async def test_anthropic_async_streaming_llm_cost():
     retrieve_streaming_trace_helper(trace_id)
 
 
+@pytest.mark.skip(reason="Together account blocked")
 @pytest.mark.asyncio
 async def test_together_async_streaming_llm_cost():
     trace_id = await together_async_streaming_llm_call()
     retrieve_streaming_trace_helper(trace_id)
+
+
+def test_online_span_scoring():
+    trace_id = scorer_span()
+    trace_spans = retrieve_trace_helper(trace_id, 1)
+    span_id = trace_spans[0].get("span_id")
+
+    query_count = 0
+    scorer_data = None
+    while query_count < QUERY_RETRY:
+        try:
+            scorer_data = retrieve_score(project_name, span_id, trace_id)
+        except Exception:
+            pass
+
+        if scorer_data:
+            break
+        query_count += 1
+        time.sleep(1)
+
+    if query_count == QUERY_RETRY:
+        assert False, "No score found"
+
+    score = scorer_data[0]
+    assert score.get("judge_name") == "Answer Relevancy"
+    assert score.get("bool_value") is not None
+    assert score.get("num_value") is not None
