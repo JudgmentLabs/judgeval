@@ -252,7 +252,9 @@ def safe_serialize(obj: Any) -> str:
         return repr(obj)
 
 
-def serialize_value(obj: Any, serializer: Callable[[Any], str] = safe_serialize) -> Any:
+def serialize_attribute(
+    obj: Any, serializer: Callable[[Any], str] = safe_serialize
+) -> Any:
     if isinstance(obj, (str, int, float, bool)):
         return obj
     return serializer(obj)

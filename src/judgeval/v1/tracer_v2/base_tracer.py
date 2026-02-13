@@ -5,6 +5,7 @@ import inspect
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Dict,
@@ -20,11 +21,19 @@ from opentelemetry.trace import Span, Status, StatusCode
 from opentelemetry.sdk.trace import TracerProvider
 from judgeval.logger import judgeval_logger
 from judgeval.judgment_attribute_keys import AttributeKeys
+from judgeval.utils.decorators.debug_time import debug_time
 from judgeval.utils.decorators.dont_throw import dont_throw
-from judgeval.utils.serialize import serialize_value, safe_serialize
+from judgeval.utils.serialize import serialize_attribute, safe_serialize
 from judgeval.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
 from judgeval.v1.data import Example
 from judgeval.v1.tracer_v2.proxy_tracer_provider import ProxyTracerProvider
+from judgeval.v1.background_queue import enqueue as bg_enqueue
+
+if TYPE_CHECKING:
+    from judgeval.v1.internal.api.api_types import (
+        JudgeExampleEvaluationRun,
+        JudgeTraceEvaluationRun,
+    )
 
 C = TypeVar("C", bound=Callable[..., Any])
 
@@ -76,6 +85,11 @@ class BaseTracer(ABC):
         return proxy.get_current_span()
 
     @staticmethod
+    def flush(timeout_ms: int = 30000) -> bool:
+        proxy = BaseTracer._get_proxy_provider()
+        return proxy.force_flush(timeout_ms)
+
+    @staticmethod
     def _get_serializer() -> Callable[[Any], str]:
         tracer = BaseTracer._get_proxy_provider().get_active_tracer()
         return tracer.serializer if tracer else safe_serialize
@@ -92,12 +106,12 @@ class BaseTracer(ABC):
         return format(ctx.trace_id, "032x"), format(ctx.span_id, "016x")
 
     @staticmethod
+    @debug_time
     @dont_throw
     def asyncEvaluate(
         judge: str,
         examples: Sequence[Example],
-        *,
-        model: Optional[str] = None,
+        /,
     ) -> None:
         proxy = BaseTracer._get_proxy_provider()
         tracer = proxy.get_active_tracer()
@@ -108,19 +122,21 @@ class BaseTracer(ABC):
         if not ids:
             judgeval_logger.warning("asyncEvaluate: no active span")
             return
-        tracer._client.post_projects_eval_queue_judge_examples(
-            tracer.project_id,
-            {
-                "eval_name": f"async_evaluate_{ids[1]}",
-                "judge_names": [judge],
-                "model": model,
-                "examples": [example.to_dict() for example in examples],
-            },
+        client = tracer._client
+        project_id = tracer.project_id
+        payload: JudgeExampleEvaluationRun = {
+            "eval_name": f"async_evaluate_{ids[1]}",
+            "judge_names": [judge],
+            "examples": [example.to_dict() for example in examples],
+        }
+        bg_enqueue(
+            lambda: client.post_projects_eval_queue_judge_examples(project_id, payload)
         )
 
     @staticmethod
+    @debug_time
     @dont_throw
-    def asyncTraceEvaluate(judge: str, *, model: Optional[str] = None) -> None:
+    def asyncTraceEvaluate(judge: str, /) -> None:
         proxy = BaseTracer._get_proxy_provider()
         tracer = proxy.get_active_tracer()
         if not tracer or not tracer._client or not tracer.project_id:
@@ -132,14 +148,15 @@ class BaseTracer(ABC):
         if not ids:
             judgeval_logger.warning("asyncTraceEvaluate: no active span")
             return
-        tracer._client.post_projects_eval_queue_judge_traces(
-            tracer.project_id,
-            {
-                "eval_name": f"async_trace_evaluate_{ids[1]}",
-                "judge_names": [judge],
-                "model": model,
-                "trace_and_span_ids": [[ids[0], ids[1]]],
-            },
+        client = tracer._client
+        project_id = tracer.project_id
+        payload: JudgeTraceEvaluationRun = {
+            "eval_name": f"async_trace_evaluate_{ids[1]}",
+            "judge_names": [judge],
+            "trace_and_span_ids": [[ids[0], ids[1]]],
+        }
+        bg_enqueue(
+            lambda: client.post_projects_eval_queue_judge_traces(project_id, payload)
         )
 
     @staticmethod
@@ -190,7 +207,7 @@ class BaseTracer(ABC):
                             if record_input:
                                 span.set_attribute(
                                     AttributeKeys.JUDGMENT_INPUT,
-                                    serialize_value(
+                                    serialize_attribute(
                                         _format_inputs(f, args, kwargs),
                                         BaseTracer._get_serializer(),
                                     ),
@@ -199,7 +216,7 @@ class BaseTracer(ABC):
                             if record_output:
                                 span.set_attribute(
                                     AttributeKeys.JUDGMENT_OUTPUT,
-                                    serialize_value(
+                                    serialize_attribute(
                                         result, BaseTracer._get_serializer()
                                     ),
                                 )
@@ -226,7 +243,7 @@ class BaseTracer(ABC):
                             if record_input:
                                 span.set_attribute(
                                     AttributeKeys.JUDGMENT_INPUT,
-                                    serialize_value(
+                                    serialize_attribute(
                                         _format_inputs(f, args, kwargs),
                                         BaseTracer._get_serializer(),
                                     ),
@@ -235,7 +252,7 @@ class BaseTracer(ABC):
                             if record_output:
                                 span.set_attribute(
                                     AttributeKeys.JUDGMENT_OUTPUT,
-                                    serialize_value(
+                                    serialize_attribute(
                                         result, BaseTracer._get_serializer()
                                     ),
                                 )
@@ -266,7 +283,7 @@ class BaseTracer(ABC):
             return
         if not key or value is None:
             return
-        current_span.set_attribute(key, serialize_value(value, self.serializer))
+        current_span.set_attribute(key, serialize_attribute(value, self.serializer))
 
     def set_attributes(self, attributes: Dict[str, Any]) -> None:
         if attributes is None:
