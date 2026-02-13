@@ -11,9 +11,10 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter
 
 from judgeval.judgment_attribute_keys import AttributeKeys, InternalAttributeKeys
 from judgeval.utils.decorators.dont_throw import dont_throw
+from judgeval.v1.trace.processors._lifecycles import get_all
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer_v2.base_tracer import BaseTracer
+    from judgeval.v1.trace.base_tracer import BaseTracer
 
 
 class SpanProcessor(BatchSpanProcessor):
@@ -108,7 +109,7 @@ class SpanProcessor(BatchSpanProcessor):
 
     @dont_throw
     def emit_partial(self) -> None:
-        from judgeval.v1.tracer_v2.proxy_tracer_provider import ProxyTracerProvider
+        from judgeval.v1.trace.proxy_tracer_provider import ProxyTracerProvider
 
         proxy = ProxyTracerProvider.get_instance()
         span = proxy.get_current_span()
@@ -125,10 +126,14 @@ class SpanProcessor(BatchSpanProcessor):
 
     @dont_throw
     def on_start(self, span: Span, parent_context: Optional[Context] = None) -> None:
+        for processor in get_all():
+            processor.on_start(span, parent_context)
         self._register_span(span)
 
     @dont_throw
     def on_end(self, span: ReadableSpan) -> None:
+        for processor in get_all():
+            processor.on_end(span)
         if not span.context:
             super().on_end(span)
             return

@@ -9,13 +9,13 @@ from opentelemetry.sdk.trace.export import SpanExporter as BaseSpanExporter
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
 from judgeval.logger import judgeval_logger
 from judgeval.utils.serialize import safe_serialize
-from judgeval.v1.tracer_v2.base_tracer import BaseTracer
-from judgeval.v1.tracer_v2.proxy_tracer_provider import ProxyTracerProvider
-from judgeval.v1.tracer_v2.exporters.span_exporter import SpanExporter
-from judgeval.v1.tracer_v2.exporters.noop_span_exporter import NoOpSpanExporter
-from judgeval.v1.tracer_v2.processors.span_processor import SpanProcessor
-from judgeval.v1.tracer_v2.processors.noop_span_processor import NoOpSpanProcessor
-from judgeval.v1.tracer_v2.id_generator import IsolatedRandomIdGenerator
+from judgeval.v1.trace.base_tracer import BaseTracer
+from judgeval.v1.trace.proxy_tracer_provider import ProxyTracerProvider
+from judgeval.v1.trace.exporters.span_exporter import SpanExporter
+from judgeval.v1.trace.exporters.noop_span_exporter import NoOpSpanExporter
+from judgeval.v1.trace.processors.span_processor import SpanProcessor
+from judgeval.v1.trace.processors.noop_span_processor import NoOpSpanProcessor
+from judgeval.v1.trace.id_generator import IsolatedRandomIdGenerator
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.utils import resolve_project_id
 from judgeval.version import get_version

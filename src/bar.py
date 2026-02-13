@@ -1,7 +1,7 @@
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from judgeval.v1.tracer_v2 import Tracer
+from judgeval.v1.trace import Tracer
 
 fib_tracer = Tracer.create(project_name="fibonacci-threaded", set_active=False)
 fizzbuzz_tracer = Tracer.create(project_name="fizzbuzz-threaded", set_active=False)

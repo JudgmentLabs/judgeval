@@ -3,8 +3,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from opentelemetry.context import Context
-from opentelemetry.sdk.trace import ReadableSpan, Span
-from opentelemetry.sdk.trace.export import SpanProcessor
+from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
 from opentelemetry.trace.span import SpanContext
 
 

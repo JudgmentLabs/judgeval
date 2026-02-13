@@ -19,6 +19,24 @@ def optional_env_var(var_name: str, default: str | None = None) -> str | None:
     return os.getenv(var_name, default)
 
 
+@overload
+def optional_int_env_var(var_name: str) -> int | None: ...
+
+
+@overload
+def optional_int_env_var(var_name: str, default: int) -> int: ...
+
+
+def optional_int_env_var(var_name: str, default: int | None = None) -> int | None:
+    result = optional_env_var(var_name)
+    if result is None:
+        return default
+    try:
+        return int(result)
+    except ValueError:
+        return default
+
+
 JUDGMENT_API_KEY = optional_env_var("JUDGMENT_API_KEY")
 JUDGMENT_ORG_ID = optional_env_var("JUDGMENT_ORG_ID")
 JUDGMENT_API_URL = optional_env_var("JUDGMENT_API_URL", "https://api.judgmentlabs.ai")
@@ -35,6 +53,9 @@ JUDGMENT_S3_ENDPOINT_URL = optional_env_var("JUDGMENT_S3_ENDPOINT_URL")
 JUDGMENT_S3_SIGNATURE_VERSION = optional_env_var("JUDGMENT_S3_SIGNATURE_VERSION", "s3")
 JUDGMENT_S3_ADDRESSING_STYLE = optional_env_var("JUDGMENT_S3_ADDRESSING_STYLE", "auto")
 
+
+JUDGMENT_BG_WORKERS = optional_int_env_var("JUDGMENT_BG_WORKERS", 4)
+JUDGMENT_BG_MAX_QUEUE = optional_int_env_var("JUDGMENT_BG_MAX_QUEUE", 1024)
 
 JUDGMENT_NO_COLOR = optional_env_var("JUDGMENT_NO_COLOR")
 JUDGMENT_LOG_LEVEL = optional_env_var("JUDGMENT_LOG_LEVEL", "WARNING")

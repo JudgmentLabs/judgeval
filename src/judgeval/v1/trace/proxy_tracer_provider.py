@@ -15,7 +15,7 @@ from judgeval.logger import judgeval_logger
 from judgeval.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer_v2.tracer import Tracer as JudgmentTracer
+    from judgeval.v1.trace.tracer import Tracer as JudgmentTracer
 
 _Links = Optional[Sequence[Link]]
 _active_tracer_var: ContextVar[Optional[JudgmentTracer]] = ContextVar(
@@ -140,6 +140,7 @@ class ProxyTracerProvider(TracerProvider):
     def _get_delegate_tracer(self) -> Tracer:
         tracer = _active_tracer_var.get()
         if tracer is None:
+            judgeval_logger.debug("No active tracer, returning NoOpTracer")
             return NoOpTracer()
         return tracer._tracer_provider.get_tracer(
             JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
