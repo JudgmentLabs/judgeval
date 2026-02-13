@@ -94,7 +94,7 @@ class BaseTracer(ABC):
         self._tracer_provider = tracer_provider
 
     # ------------------------------------------------------------------ #
-    #  Abstract Lifecycle                                                 #
+    #  Abstract Lifecycle                                                #
     # ------------------------------------------------------------------ #
 
     @abstractmethod
@@ -106,7 +106,7 @@ class BaseTracer(ABC):
         """Shut down the tracer provider and release resources."""
 
     # ------------------------------------------------------------------ #
-    #  Internal Helpers                                                   #
+    #  Internal Helpers                                                  #
     # ------------------------------------------------------------------ #
 
     @staticmethod
@@ -144,7 +144,7 @@ class BaseTracer(ABC):
             processor.emit_partial()
 
     # ------------------------------------------------------------------ #
-    #  Static API: Span Access & Flushing                                 #
+    #  Static API: Span Access & Flushing                                #
     # ------------------------------------------------------------------ #
 
     @staticmethod
@@ -165,7 +165,7 @@ class BaseTracer(ABC):
         proxy.add_instrumentation(instrumentor)
 
     # ------------------------------------------------------------------ #
-    #  Static API: Observation Decorator                                  #
+    #  Static API: Observation Decorator                                 #
     # ------------------------------------------------------------------ #
 
     @staticmethod

@@ -11,9 +11,9 @@ client = AsyncOpenAI(
 )
 
 # This works too
-# fibonacci_tracer = Tracer.create(project_name="fibonacci", set_active=False)
-# fizzbuzz_tracer = Tracer.create(project_name="fizzbuzz", set_active=False)
-# chat_tracer = Tracer.create(project_name="chat", set_active=False)
+# fibonacci_tracer = Tracer.init(project_name="fibonacci", set_active=False)
+# fizzbuzz_tracer = Tracer.init(project_name="fizzbuzz", set_active=False)
+# chat_tracer = Tracer.init(project_name="chat", set_active=False)
 
 
 @Tracer.observe()
@@ -67,7 +67,7 @@ async def handle_request(
     tags: list[str],
     **kwargs,
 ):
-    Tracer.create(project_name=name)
+    Tracer.init(project_name=name)
     with Tracer.span("handle"):
         Tracer.set_customer_id(customer_id)
         Tracer.set_session_id(session_id)

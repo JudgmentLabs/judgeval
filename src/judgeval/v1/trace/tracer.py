@@ -61,7 +61,7 @@ class Tracer(BaseTracer):
         self._span_processor: Optional[BaseSpanProcessor] = None
 
     @classmethod
-    def create(
+    def init(
         cls,
         project_name: Optional[str] = None,
         api_key: Optional[str] = None,
