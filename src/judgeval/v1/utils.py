@@ -7,7 +7,7 @@ from judgeval.logger import judgeval_logger
 from judgeval.v1.internal.api import JudgmentSyncClient
 
 
-@lru_cache(maxsize=128)
+@lru_cache
 def resolve_project_id(client: JudgmentSyncClient, project_name: str) -> Optional[str]:
     try:
         response = client.post_projects_resolve(payload={"project_name": project_name})

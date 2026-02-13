@@ -200,6 +200,32 @@ class InsertPromptResponse(TypedDict):
     created_at: str
 
 
+class JudgeEvalQueueExamplesResponse(TypedDict):
+    success: bool
+    status: str
+    message: str
+
+
+class JudgeEvalQueueTracesResponse(TypedDict):
+    success: bool
+    status: str
+    message: str
+
+
+class JudgeExampleEvaluationRun(TypedDict):
+    eval_name: str
+    judge_names: List[str]
+    model: NotRequired[Optional[str]]
+    examples: List[Example]
+
+
+class JudgeTraceEvaluationRun(TypedDict):
+    eval_name: str
+    judge_names: List[str]
+    model: NotRequired[Optional[str]]
+    trace_and_span_ids: List[List[str]]
+
+
 class LogEvalResultsRequest(TypedDict):
     results: List[ScoringResult]
     run: ExampleEvaluationRun
