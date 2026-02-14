@@ -63,6 +63,7 @@ from judgeval.v1.tracer.processors._lifecycles import (
     PROJECT_ID_OVERRIDE_KEY,
 )
 from judgeval.v1.tracer.isolated.tracer import JudgmentIsolatedTracer
+import warnings
 
 C = TypeVar("C", bound=Callable[..., Any])
 T = TypeVar("T", bound=ApiClient)
@@ -94,6 +95,13 @@ class BaseTracer(ABC):
         serializer: Callable[[Any], str],
         tracer_provider: TracerProvider,
     ):
+        warnings.warn(
+            "judgeval.v1.tracer.Tracer and judgeval.v1.tracer.BaseTracer is deprecated. Use `judgeval.v1.trace.Tracer`` instead."
+            "You can import this from `from judgeval import Tracer`. Please refer to the documentation [link] for a migration guide."
+            "This module will be removed in a future version.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.project_name = project_name
         self.project_id = project_id
         self.enable_evaluation = enable_evaluation

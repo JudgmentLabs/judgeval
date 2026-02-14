@@ -194,6 +194,28 @@ class JudgmentSyncClient:
             payload,
         )
 
+    def post_projects_eval_queue_judge_examples(
+        self, project_id: str, payload: JudgeExampleEvaluationRun
+    ) -> JudgeEvalQueueExamplesResponse:
+        return self._request(
+            "POST",
+            url_for(
+                f"/v1/projects/{project_id}/eval-queue/judge/examples", self.base_url
+            ),
+            payload,
+        )
+
+    def post_projects_eval_queue_judge_traces(
+        self, project_id: str, payload: JudgeTraceEvaluationRun
+    ) -> JudgeEvalQueueTracesResponse:
+        return self._request(
+            "POST",
+            url_for(
+                f"/v1/projects/{project_id}/eval-queue/judge/traces", self.base_url
+            ),
+            payload,
+        )
+
     def get_projects_prompts_by_name(
         self,
         project_id: str,
@@ -489,6 +511,28 @@ class JudgmentAsyncClient:
         return await self._request(
             "POST",
             url_for(f"/v1/projects/{project_id}/eval-queue/traces", self.base_url),
+            payload,
+        )
+
+    async def post_projects_eval_queue_judge_examples(
+        self, project_id: str, payload: JudgeExampleEvaluationRun
+    ) -> JudgeEvalQueueExamplesResponse:
+        return await self._request(
+            "POST",
+            url_for(
+                f"/v1/projects/{project_id}/eval-queue/judge/examples", self.base_url
+            ),
+            payload,
+        )
+
+    async def post_projects_eval_queue_judge_traces(
+        self, project_id: str, payload: JudgeTraceEvaluationRun
+    ) -> JudgeEvalQueueTracesResponse:
+        return await self._request(
+            "POST",
+            url_for(
+                f"/v1/projects/{project_id}/eval-queue/judge/traces", self.base_url
+            ),
             payload,
         )
 

@@ -244,10 +244,17 @@ def generate_encoders_by_class_tuples(
 encoders_by_class_tuples = generate_encoders_by_class_tuples(ENCODERS_BY_TYPE)
 
 
-# Seralize arbitrary object to a json string
 def safe_serialize(obj: Any) -> str:
     try:
         return orjson.dumps(json_encoder(obj), option=orjson.OPT_NON_STR_KEYS).decode()
     except Exception as e:
         judgeval_logger.warning(f"Error serializing object: {e}")
         return repr(obj)
+
+
+def serialize_attribute(
+    obj: Any, serializer: Callable[[Any], str] = safe_serialize
+) -> Any:
+    if isinstance(obj, (str, int, float, bool)):
+        return obj
+    return serializer(obj)
