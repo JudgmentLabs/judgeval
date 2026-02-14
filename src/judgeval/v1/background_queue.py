@@ -15,8 +15,8 @@ class BackgroundQueue:
 
     def __init__(self, workers: int, max_queue_size: int):
         self._max_queue_size = max_queue_size
-        self._futures: list[Future[Any]] = []
-        self._futures_lock = threading.Lock()
+        self._semaphore = threading.Semaphore(max_queue_size)
+        self._futures: set[Future[Any]] = set()
         self._executor = ThreadPoolExecutor(
             max_workers=workers,
             thread_name_prefix="judgeval-bg",
@@ -38,17 +38,17 @@ class BackgroundQueue:
     def enqueue(self, fn: Callable[[], Any]) -> bool:
         if self._shutdown:
             return False
-        with self._futures_lock:
-            self._futures = [f for f in self._futures if not f.done()]
-            if len(self._futures) >= self._max_queue_size:
-                judgeval_logger.warning("[BackgroundQueue] Queue full, dropping job")
-                return False
-            future = self._executor.submit(fn)
-            future.add_done_callback(self._on_done)
-            self._futures.append(future)
+        if not self._semaphore.acquire(blocking=False):
+            judgeval_logger.warning("[BackgroundQueue] Queue full, dropping job")
+            return False
+        future = self._executor.submit(fn)
+        self._futures.add(future)
+        future.add_done_callback(self._on_done)
         return True
 
     def _on_done(self, future: Future[Any]) -> None:
+        self._semaphore.release()
+        self._futures.discard(future)
         exc = future.exception()
         if exc is not None:
             judgeval_logger.error(f"[BackgroundQueue] Job failed: {repr(exc)}")
@@ -56,11 +56,9 @@ class BackgroundQueue:
     def force_flush(self, timeout_ms: int = 30000) -> bool:
         if self._shutdown:
             return False
-        with self._futures_lock:
-            pending = list(self._futures)
-        if not pending:
+        if not self._futures:
             return True
-        done, not_done = wait(pending, timeout=timeout_ms / 1000.0)
+        _, not_done = wait(self._futures, timeout=timeout_ms / 1000.0)
         if not_done:
             judgeval_logger.warning(
                 f"[BackgroundQueue] Flush timed out, {len(not_done)} jobs still pending"
