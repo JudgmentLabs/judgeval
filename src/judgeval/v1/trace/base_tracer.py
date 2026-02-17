@@ -13,6 +13,7 @@ from typing import (
     Iterator,
     Optional,
     Sequence,
+    TypedDict,
     TypeVar,
     cast,
     overload,
@@ -44,8 +45,20 @@ if TYPE_CHECKING:
         JudgeExampleEvaluationRun,
         JudgeTraceEvaluationRun,
     )
+    from judgeval.v1.trace.processors.judgment_span_processor import (
+        JudgmentSpanProcessor,
+    )
+    from judgeval.v1.trace.exporters.judgment_span_exporter import JudgmentSpanExporter
 
 C = TypeVar("C", bound=Callable[..., Any])
+
+
+class LLMMetadata(TypedDict, total=False):
+    non_cached_input_tokens: int
+    output_tokens: int
+    cache_read_input_tokens: int
+    cache_creation_input_tokens: int
+    total_cost_usd: float
 
 
 class BaseTracer(ABC):
@@ -98,12 +111,12 @@ class BaseTracer(ABC):
     # ------------------------------------------------------------------ #
 
     @abstractmethod
-    def force_flush(self, timeout_millis: int) -> bool:
-        """Flush pending spans to the exporter within the given timeout."""
+    def get_span_processor(self) -> JudgmentSpanProcessor:
+        """Return the span processor for this tracer."""
 
     @abstractmethod
-    def shutdown(self, timeout_millis: int) -> None:
-        """Shut down the tracer provider and release resources."""
+    def get_span_exporter(self) -> JudgmentSpanExporter:
+        """Return the span exporter for this tracer."""
 
     # ------------------------------------------------------------------ #
     #  Internal Helpers                                                  #
@@ -139,12 +152,10 @@ class BaseTracer(ABC):
         tracer = BaseTracer._get_proxy_provider().get_active_tracer()
         if tracer is None:
             return
-        processor = getattr(tracer, "_span_processor", None)
-        if processor is not None and hasattr(processor, "emit_partial"):
-            processor.emit_partial()
+        tracer.get_span_processor().emit_partial()
 
     # ------------------------------------------------------------------ #
-    #  Static API: Span Access & Flushing                                #
+    #  Static API: Span Access & Lifecycle                               #
     # ------------------------------------------------------------------ #
 
     @staticmethod
@@ -153,9 +164,16 @@ class BaseTracer(ABC):
         return proxy.get_current_span()
 
     @staticmethod
-    def flush(timeout_ms: int = 30000) -> bool:
+    def force_flush(timeout_millis: int = 30000) -> bool:
+        """Flush pending spans to the exporter within the given timeout."""
         proxy = BaseTracer._get_proxy_provider()
-        return proxy.force_flush(timeout_ms)
+        return proxy.force_flush(timeout_millis)
+
+    @staticmethod
+    def shutdown(timeout_millis: int = 30000) -> None:
+        """Shut down the active tracer provider and release resources."""
+        proxy = BaseTracer._get_proxy_provider()
+        proxy.shutdown()
 
     @staticmethod
     def registerOTELInstrumentation(instrumentor) -> None:
@@ -163,6 +181,26 @@ class BaseTracer(ABC):
         routed through the Judgment trace pipeline."""
         proxy = BaseTracer._get_proxy_provider()
         proxy.add_instrumentation(instrumentor)
+
+    # ------------------------------------------------------------------ #
+    #  Static: Span Context Manager                                      #
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    @contextmanager
+    def span(span_name: str) -> Iterator[Span]:
+        """Open a child span under the current trace context.
+        Exceptions propagate after being recorded on the span."""
+        proxy = BaseTracer._get_proxy_provider()
+        tracer = proxy.get_tracer(JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME)
+        with tracer.start_as_current_span(span_name) as span:
+            BaseTracer._emit_partial()
+            try:
+                yield span
+            except Exception as e:
+                span.set_status(Status(StatusCode.ERROR, str(e)))
+                span.record_exception(e)
+                raise
 
     # ------------------------------------------------------------------ #
     #  Static API: Observation Decorator                                 #
@@ -199,11 +237,8 @@ class BaseTracer(ABC):
         record_output: bool = True,
         disable_generator_yield_span: bool = False,
     ) -> C | Callable[[C], C]:
-        """Wrap a sync or async function in an OTel span.
-
-        Supports ``@observe``, ``@observe()``, and ``@observe(span_type="tool")``
-        usage. Handles sync generators and async generators by keeping the
-        span open until the generator is exhausted.
+        """
+        Wrap a sync or async function in an OTel span recording the input and output.
 
         Args:
             func: The function to wrap (provided implicitly for bare decorator usage).
@@ -331,7 +366,7 @@ class BaseTracer(ABC):
         return decorator(func)
 
     # ------------------------------------------------------------------ #
-    #  Static API: Async Evaluation                                       #
+    #  Static API: Async Evaluation                                      #
     # ------------------------------------------------------------------ #
 
     @staticmethod
@@ -459,6 +494,37 @@ class BaseTracer(ABC):
         """Set the ``judgment.output`` attribute on the current span."""
         BaseTracer.set_attribute(AttributeKeys.JUDGMENT_OUTPUT, output_data)
 
+    @staticmethod
+    @dont_throw
+    def recordLLMMetadata(metadata: LLMMetadata) -> None:
+        current_span = BaseTracer._get_proxy_provider().get_current_span()
+        if current_span is None or not current_span.is_recording():
+            return
+
+        if "non_cached_input_tokens" in metadata:
+            current_span.set_attribute(
+                AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
+                metadata["non_cached_input_tokens"],
+            )
+        if "output_tokens" in metadata:
+            current_span.set_attribute(
+                AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, metadata["output_tokens"]
+            )
+        if "cache_read_input_tokens" in metadata:
+            current_span.set_attribute(
+                AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS,
+                metadata["cache_read_input_tokens"],
+            )
+        if "cache_creation_input_tokens" in metadata:
+            current_span.set_attribute(
+                AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS,
+                metadata["cache_creation_input_tokens"],
+            )
+        if "total_cost_usd" in metadata:
+            current_span.set_attribute(
+                AttributeKeys.JUDGMENT_USAGE_TOTAL_COST_USD, metadata["total_cost_usd"]
+            )
+
     # ------------------------------------------------------------------ #
     #  Static: Context Propagation                                       #
     # ------------------------------------------------------------------ #
@@ -522,26 +588,6 @@ class BaseTracer(ABC):
                 payload={"tags": tag_list},
             )
         )
-
-    # ------------------------------------------------------------------ #
-    #  Static: Span Context Manager                                      #
-    # ------------------------------------------------------------------ #
-
-    @staticmethod
-    @contextmanager
-    def span(span_name: str) -> Iterator[Span]:
-        """Open a child span under the current trace context.
-        Exceptions propagate after being recorded on the span."""
-        proxy = BaseTracer._get_proxy_provider()
-        tracer = proxy.get_tracer(JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME)
-        with tracer.start_as_current_span(span_name) as span:
-            BaseTracer._emit_partial()
-            try:
-                yield span
-            except Exception as e:
-                span.set_status(Status(StatusCode.ERROR, str(e)))
-                span.record_exception(e)
-                raise
 
 
 def _format_inputs(

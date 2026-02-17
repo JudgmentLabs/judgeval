@@ -3,12 +3,17 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from opentelemetry.context import Context
-from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
+from opentelemetry.sdk.trace import ReadableSpan, Span
 from opentelemetry.trace.span import SpanContext
 
+from judgeval.v1.trace.processors.judgment_span_processor import JudgmentSpanProcessor
 
-class NoOpSpanProcessor(SpanProcessor):
+
+class NoOpSpanProcessor(JudgmentSpanProcessor):
     __slots__ = ()
+
+    def __init__(self):
+        pass
 
     def on_start(self, span: Span, parent_context: Optional[Context] = None) -> None:
         pass

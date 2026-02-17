@@ -12,7 +12,7 @@ from opentelemetry.sdk.trace.export import (
 from judgeval.logger import judgeval_logger
 
 
-class SpanExporter(BaseSpanExporter):
+class JudgmentSpanExporter(BaseSpanExporter):
     __slots__ = ("_delegate",)
 
     def __init__(

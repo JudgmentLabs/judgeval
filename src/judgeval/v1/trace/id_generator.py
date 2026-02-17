@@ -7,6 +7,11 @@ from opentelemetry.sdk.trace.id_generator import IdGenerator
 
 
 class IsolatedRandomIdGenerator(IdGenerator):
+    """
+    ID generator using an isolated random instance immune to global random.seed() calls.
+    This ensures in forking processes like FastAPI over Uvicorn, traces do not collide.
+    """
+
     __slots__ = ("_random",)
 
     def __init__(self):

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextvars import ContextVar
 from typing import TYPE_CHECKING, ClassVar, Optional, Sequence
+from weakref import WeakSet
 
 from opentelemetry import trace as trace_api
 from opentelemetry.context.context import Context
@@ -95,18 +96,26 @@ class ProxyTracerProvider(TracerProvider):
         "_runtime_context",
         "_instrumentations",
         "_proxy_tracer",
+        "_tracers",
     )
 
     def __init__(self):
         self._runtime_context = ContextVarsRuntimeContext()
         self._instrumentations: list = []
         self._proxy_tracer = ProxyTracer(self)
+        self._tracers: WeakSet[JudgmentTracer] = WeakSet()
 
     @classmethod
     def get_instance(cls) -> ProxyTracerProvider:
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
+
+    def register(self, tracer: JudgmentTracer) -> None:
+        self._tracers.add(tracer)
+
+    def deregister(self, tracer: JudgmentTracer) -> None:
+        self._tracers.discard(tracer)
 
     def set_active(self, tracer: JudgmentTracer) -> bool:
         current_span = self.get_current_span()
@@ -118,6 +127,7 @@ class ProxyTracerProvider(TracerProvider):
                     "Keeping existing tracer provider."
                 )
                 return False
+        self.register(tracer)
         _active_tracer_var.set(tracer)
         return True
 
@@ -202,12 +212,11 @@ class ProxyTracerProvider(TracerProvider):
         self._runtime_context.detach(token)
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
-        tracer = _active_tracer_var.get()
-        if tracer is None:
-            return True
-        return tracer._tracer_provider.force_flush(timeout_millis)
+        return all(
+            t._tracer_provider.force_flush(timeout_millis) for t in self._tracers
+        )
 
     def shutdown(self) -> None:
-        tracer = _active_tracer_var.get()
-        if tracer is not None:
-            tracer._tracer_provider.shutdown()
+        for t in self._tracers:
+            t._tracer_provider.shutdown()
+        self._tracers.clear()

@@ -11,9 +11,9 @@ client = AsyncOpenAI(
 )
 
 # This works too
-# fibonacci_tracer = Tracer.init(project_name="fibonacci", set_active=False)
-# fizzbuzz_tracer = Tracer.init(project_name="fizzbuzz", set_active=False)
-# chat_tracer = Tracer.init(project_name="chat", set_active=False)
+# fibonacci_tracer = Tracer.create(project_name="fibonacci", set_active=False)
+# fizzbuzz_tracer = Tracer.create(project_name="fizzbuzz", set_active=False)
+# chat_tracer = Tracer.create(project_name="chat", set_active=False)
 
 
 @Tracer.observe()
@@ -102,6 +102,13 @@ async def main():
             duration=10,
         ),
         handle_request(
+            "fibonacci",
+            customer_id="cust_001",
+            session_id="sess_02",
+            tags=["math", "recursive"],
+            n=24,
+        ),
+        handle_request(
             "chat",
             customer_id="cust_003",
             session_id="sess_03",
@@ -178,3 +185,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+    Tracer.shutdown(timeout_millis=100000)

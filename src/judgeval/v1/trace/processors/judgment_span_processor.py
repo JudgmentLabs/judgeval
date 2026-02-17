@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from judgeval.v1.trace.base_tracer import BaseTracer
 
 
-class SpanProcessor(BatchSpanProcessor):
+class JudgmentSpanProcessor(BatchSpanProcessor):
     __slots__ = (
         "tracer",
         "_span_finalizers",

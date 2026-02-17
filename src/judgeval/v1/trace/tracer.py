@@ -3,17 +3,16 @@ from __future__ import annotations
 from typing import Any, Callable, Dict, Optional
 
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider, SpanProcessor as BaseSpanProcessor
-from opentelemetry.sdk.trace.export import SpanExporter as BaseSpanExporter
+from opentelemetry.sdk.trace import TracerProvider
 
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
 from judgeval.logger import judgeval_logger
 from judgeval.utils.serialize import safe_serialize
 from judgeval.v1.trace.base_tracer import BaseTracer
 from judgeval.v1.trace.proxy_tracer_provider import ProxyTracerProvider
-from judgeval.v1.trace.exporters.span_exporter import SpanExporter
+from judgeval.v1.trace.exporters.judgment_span_exporter import JudgmentSpanExporter
 from judgeval.v1.trace.exporters.noop_span_exporter import NoOpSpanExporter
-from judgeval.v1.trace.processors.span_processor import SpanProcessor
+from judgeval.v1.trace.processors.judgment_span_processor import JudgmentSpanProcessor
 from judgeval.v1.trace.processors.noop_span_processor import NoOpSpanProcessor
 from judgeval.v1.trace.id_generator import IsolatedRandomIdGenerator
 from judgeval.v1.internal.api import JudgmentSyncClient
@@ -24,6 +23,7 @@ from judgeval.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
 
 class Tracer(BaseTracer):
     __slots__ = (
+        "__weakref__",
         "_client",
         "_span_exporter",
         "_span_processor",
@@ -57,8 +57,8 @@ class Tracer(BaseTracer):
         )
         self._enable_monitoring = enable_monitoring
         self._client = client
-        self._span_exporter: Optional[BaseSpanExporter] = None
-        self._span_processor: Optional[BaseSpanProcessor] = None
+        self._span_exporter: Optional[JudgmentSpanExporter] = None
+        self._span_processor: Optional[JudgmentSpanProcessor] = None
 
     @classmethod
     def init(
@@ -151,6 +151,9 @@ class Tracer(BaseTracer):
         if enable_monitoring:
             tracer_provider.add_span_processor(tracer.get_span_processor())
 
+        proxy = ProxyTracerProvider.get_instance()
+        proxy.register(tracer)
+
         if set_active:
             tracer.set_active()
 
@@ -160,7 +163,7 @@ class Tracer(BaseTracer):
         proxy = ProxyTracerProvider.get_instance()
         return proxy.set_active(self)
 
-    def get_span_exporter(self) -> BaseSpanExporter:
+    def get_span_exporter(self) -> JudgmentSpanExporter:
         if self._span_exporter is not None:
             return self._span_exporter
 
@@ -178,7 +181,7 @@ class Tracer(BaseTracer):
                 if self.api_url.endswith("/")
                 else self.api_url + "/otel/v1/traces"
             )
-            self._span_exporter = SpanExporter(
+            self._span_exporter = JudgmentSpanExporter(
                 endpoint=endpoint,
                 api_key=self.api_key,
                 organization_id=self.organization_id,
@@ -186,21 +189,15 @@ class Tracer(BaseTracer):
             )
         return self._span_exporter
 
-    def get_span_processor(self) -> BaseSpanProcessor:
+    def get_span_processor(self) -> JudgmentSpanProcessor:
         if self._span_processor is not None:
             return self._span_processor
 
         if not self._enable_monitoring:
             self._span_processor = NoOpSpanProcessor()
         else:
-            self._span_processor = SpanProcessor(
+            self._span_processor = JudgmentSpanProcessor(
                 self,
                 self.get_span_exporter(),
             )
         return self._span_processor
-
-    def force_flush(self, timeout_millis: int = 30000) -> bool:
-        return self._tracer_provider.force_flush(timeout_millis)
-
-    def shutdown(self, timeout_millis: int = 30000) -> None:
-        self._tracer_provider.shutdown()
