@@ -120,7 +120,8 @@ class LocalEvaluatorRunner(EvaluatorRunner[ExampleCustomScorer]):
             scorer: ExampleCustomScorer,
             example: Example,
         ) -> ScorerResponse:
-            return asyncio.run(scorer.score(example))
+            result: ScorerResponse = asyncio.run(scorer.score(example))
+            return result
 
         with ThreadPoolExecutor() as executor:
             futures: Dict[Any, Tuple[int, str]] = {}
