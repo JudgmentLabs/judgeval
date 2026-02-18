@@ -167,6 +167,15 @@ class JudgmentSyncClient:
             payload,
         )
 
+    def post_projects_eval_results_examples(
+        self, project_id: str, payload: LogEvalResultsExamplesRequest
+    ) -> LogEvalResultsExamplesResponse:
+        return self._request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/eval-results/examples", self.base_url),
+            payload,
+        )
+
     def get_projects_experiments_by_run_id(
         self, project_id: str, run_id: str
     ) -> FetchExperimentRunResponse:
@@ -462,6 +471,15 @@ class JudgmentAsyncClient:
         return await self._request(
             "POST",
             url_for(f"/v1/projects/{project_id}/eval-results", self.base_url),
+            payload,
+        )
+
+    async def post_projects_eval_results_examples(
+        self, project_id: str, payload: LogEvalResultsExamplesRequest
+    ) -> LogEvalResultsExamplesResponse:
+        return await self._request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/eval-results/examples", self.base_url),
             payload,
         )
 
