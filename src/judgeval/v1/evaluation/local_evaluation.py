@@ -134,6 +134,6 @@ class LocalEvaluatorRunner(EvaluatorRunner[ExampleCustomScorer]):
                 idx, name = futures[future]
                 try:
                     result: Union[ScorerResponse, BaseException] = future.result()
-                except BaseException as exc:
+                except Exception as exc:
                     result = exc
                 yield (idx, name, result)
