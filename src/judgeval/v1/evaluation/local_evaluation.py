@@ -110,7 +110,11 @@ class LocalEvaluatorRunner(EvaluatorRunner[ExampleCustomScorer]):
         self,
         examples: List[Example],
         scorers: List[ExampleCustomScorer],
-    ) -> Generator[Tuple[int, str, Union[ScorerResponse, BaseException]], None, None]:
+    ) -> Generator[
+        Tuple[int, str, ScorerResponse, None] | Tuple[int, str, None, BaseException],
+        None,
+        None,
+    ]:
         """Run custom scorers in a thread pool, yielding results as they complete.
 
         Exceptions are returned as values (like ``gather(return_exceptions=True)``).
