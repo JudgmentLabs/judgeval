@@ -314,13 +314,13 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def post_e2e_fetch_trace(
-        self, payload: E2EFetchTraceRequest
+    def get_e2e_fetch_trace(
+        self, project_name: str, trace_id: str
     ) -> E2EFetchTraceResponse:
         return self._request(
-            "POST",
-            url_for("/v1/e2e_fetch_trace/", self.base_url),
-            payload,
+            "GET",
+            url_for(f"/v1/e2e_fetch_trace/{project_name}/{trace_id}", self.base_url),
+            {},
         )
 
     def post_e2e_fetch_span_score(
@@ -621,13 +621,13 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def post_e2e_fetch_trace(
-        self, payload: E2EFetchTraceRequest
+    async def get_e2e_fetch_trace(
+        self, project_name: str, trace_id: str
     ) -> E2EFetchTraceResponse:
         return await self._request(
-            "POST",
-            url_for("/v1/e2e_fetch_trace/", self.base_url),
-            payload,
+            "GET",
+            url_for(f"/v1/e2e_fetch_trace/{project_name}/{trace_id}", self.base_url),
+            {},
         )
 
     async def post_e2e_fetch_span_score(
