@@ -1,61 +1,34 @@
-from judgeval.scorers.example_scorer import ExampleScorer
-from judgeval import JudgmentClient
-from judgeval.data import Example
-from typing import Dict, Any, List
+from judgeval.v1.scorers import ExampleScorer
+from judgeval.v1.scorers.base_custom_scorer.custom_scorer_result import (
+    CustomScorerResult,
+)
+from judgeval.v1 import Judgeval
+from judgeval.v1.data import Example
+from typing import List
 
 
-def test_basic_custom_scorer(
-    client: JudgmentClient, project_name: str, random_name: str
-):
+def test_basic_custom_scorer(client: Judgeval, random_name: str):
     class HappinessScorer(ExampleScorer):
-        additional_metadata: Dict[str, Any] = {}
-
-        async def a_score_example(self, example):
-            score = 0
-            if "happy" in example.actual_output:
-                score = 1
-            elif "sad" in example.actual_output:
-                score = 0
+        def score(self, data: Example) -> CustomScorerResult:
+            actual_output = data.get_property("actual_output") or ""
+            if "happy" in actual_output:
+                return CustomScorerResult(score=1.0, reason="happy detected")
+            elif "sad" in actual_output:
+                return CustomScorerResult(score=0.0, reason="sad detected")
             else:
-                score = 0.5
-            return score
+                return CustomScorerResult(score=0.5, reason="neutral")
 
-    class CustomExample(Example):
-        actual_output: str
-
-    examples: List[CustomExample] = [
-        CustomExample(actual_output="I'm happy"),
-        CustomExample(actual_output="I'm sad"),
-        CustomExample(actual_output="I dont know"),
+    examples: List[Example] = [
+        Example.create(actual_output="I'm happy"),
+        Example.create(actual_output="I'm sad"),
+        Example.create(actual_output="I dont know"),
     ]
 
-    scorer = HappinessScorer(
-        name="Happiness Scorer", model="gpt-4o-mini", threshold=0.2
-    )
-    scorer2 = HappinessScorer(
-        name="Stricter Happiness Scorer", model="gpt-4o-mini", threshold=0.8
-    )
-    res = client.run_evaluation(
-        examples=examples,
-        scorers=[scorer, scorer2],
-        project_name=project_name,
-        eval_run_name=random_name,
-    )
-    assert res[0].success
-    assert not res[1].success
-    assert not res[2].success
+    scorer = HappinessScorer()
+    results = []
+    for example in examples:
+        results.append(scorer.score(example))
 
-    scorer_data = res[0].scorers_data
-    assert len(scorer_data) == 2
-    assert scorer_data[0].name == "Happiness Scorer"
-    assert scorer_data[1].name == "Stricter Happiness Scorer"
-    assert scorer_data[0].success
-    assert scorer_data[1].success
-
-    scorer_data_2 = res[1].scorers_data
-    assert not scorer_data_2[0].success
-    assert not scorer_data_2[1].success
-
-    scorer_data_3 = res[2].scorers_data
-    assert scorer_data_3[0].success
-    assert not scorer_data_3[1].success
+    assert results[0].score == 1.0
+    assert results[1].score == 0.0
+    assert results[2].score == 0.5

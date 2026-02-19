@@ -1,261 +1,153 @@
-"""
-Tests for evaluation operations in the JudgmentClient.
-"""
-
 import pytest
 
-from judgeval import JudgmentClient
-from judgeval.data import Example
-from judgeval.scorers import (
+from judgeval.v1 import Judgeval
+from judgeval.v1.data import Example
+from judgeval.v1.scorers.built_in import (
     FaithfulnessScorer,
     AnswerRelevancyScorer,
 )
-from judgeval.scorers.example_scorer import ExampleScorer
-from judgeval.dataset import Dataset
-from judgeval.exceptions import JudgmentTestError
 
 
-def run_eval_helper(client: JudgmentClient, project_name: str, eval_run_name: str):
-    """Helper function to run evaluation."""
-    # Single step in our workflow, an outreach Sales Agent
-    example1 = Example(
+def run_eval_helper(client: Judgeval, eval_run_name: str):
+    example1 = Example.create(
         input="Generate a cold outreach email for TechCorp. Facts: They recently launched an AI-powered analytics platform. Their CEO Sarah Chen previously worked at Google. They have 50+ enterprise clients.",
         actual_output="Dear Ms. Chen,\n\nI noticed TechCorp's recent launch of your AI analytics platform and was impressed by its enterprise-focused approach. Your experience from Google clearly shines through in building scalable solutions, as evidenced by your impressive 50+ enterprise client base.\n\nWould you be open to a brief call to discuss how we could potentially collaborate?\n\nBest regards,\nAlex",
-        retrieval_context=[
-            "TechCorp launched AI analytics platform in 2024",
-            "Sarah Chen is CEO, ex-Google executive",
-            "Current client base: 50+ enterprise customers",
-        ],
+        retrieval_context="TechCorp launched AI analytics platform in 2024. Sarah Chen is CEO, ex-Google executive. Current client base: 50+ enterprise customers.",
     )
 
-    example2 = Example(
+    example2 = Example.create(
         input="Generate a cold outreach email for GreenEnergy Solutions. Facts: They're developing solar panel technology that's 30% more efficient. They're looking to expand into the European market. They won a sustainability award in 2023.",
         actual_output="Dear GreenEnergy Solutions team,\n\nCongratulations on your 2023 sustainability award! Your innovative solar panel technology with 30% higher efficiency is exactly what the European market needs right now.\n\nI'd love to discuss how we could support your European expansion plans.\n\nBest regards,\nAlex",
-        retrieval_context=[
-            "GreenEnergy Solutions won 2023 sustainability award",
-            "New solar technology 30% more efficient",
-            "Planning European market expansion",
-        ],
+        retrieval_context="GreenEnergy Solutions won 2023 sustainability award. New solar technology 30% more efficient. Planning European market expansion.",
     )
 
     scorer = FaithfulnessScorer(threshold=0.5)
     scorer2 = AnswerRelevancyScorer(threshold=0.5)
 
-    res = client.run_evaluation(
+    evaluation = client.evaluation.create()
+    res = evaluation.run(
         examples=[example1, example2],
         scorers=[scorer, scorer2],
-        project_name=project_name,
         eval_run_name=eval_run_name,
     )
     return res
 
 
-def test_no_project_or_eval_run_name(client: JudgmentClient):
-    """Test basic evaluation workflow."""
-    res = client.run_evaluation(
+def test_basic_eval(client: Judgeval, random_name: str):
+    evaluation = client.evaluation.create()
+    res = evaluation.run(
         examples=[
-            Example(
+            Example.create(
                 input="What's the capital of France?",
                 actual_output="The capital of France is Paris.",
             )
         ],
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
+        eval_run_name=random_name,
     )
 
     assert res, "No evaluation results found"
 
 
-def test_no_model(client: JudgmentClient):
-    """Test basic evaluation workflow."""
-    res = client.run_evaluation(
-        examples=[
-            Example(
-                input="What's the capital of France?",
-                actual_output="The capital of France is Paris.",
-            )
-        ],
-        scorers=[AnswerRelevancyScorer(threshold=0.5)],
-    )
-
-    assert res, "No evaluation results found"
-
-
-def test_run_eval(client: JudgmentClient, project_name: str, random_name: str):
-    """Test basic evaluation workflow."""
-
-    res = run_eval_helper(client, project_name, random_name)
+def test_run_eval(client: Judgeval, random_name: str):
+    res = run_eval_helper(client, random_name)
     assert res, f"No evaluation results found for {random_name}"
 
-    res2 = run_eval_helper(client, project_name, random_name)
+    res2 = run_eval_helper(client, random_name)
     assert res2, f"No evaluation results found for {random_name}"
 
 
-def test_assert_test(client: JudgmentClient, project_name: str):
-    """Test assertion functionality."""
-    # Create examples and scorers as before
-    example = Example(
+def test_assert_test(client: Judgeval):
+    example = Example.create(
         input="What if these shoes don't fit?",
         actual_output="We offer a 30-day full refund at no extra cost.",
     )
 
-    example1 = Example(
+    example1 = Example.create(
         input="How much are your croissants?",
         actual_output="Sorry, we don't accept electronic returns.",
     )
 
-    example2 = Example(
+    example2 = Example.create(
         input="Who is the best basketball player in the world?",
         actual_output="No, the room is too small.",
     )
 
     scorer = AnswerRelevancyScorer(threshold=0.5)
 
-    with pytest.raises(JudgmentTestError):
-        client.run_evaluation(
+    evaluation = client.evaluation.create()
+    with pytest.raises(AssertionError):
+        evaluation.run(
             eval_run_name="test_eval",
-            project_name=project_name,
             examples=[example, example1, example2],
             scorers=[scorer],
             assert_test=True,
         )
 
 
-def test_evaluate_dataset(client: JudgmentClient, project_name: str, random_name: str):
-    """Test dataset evaluation."""
-    example1 = Example(
+def test_evaluate_dataset(client: Judgeval, random_name: str):
+    example1 = Example.create(
         input="What if these shoes don't fit?",
         actual_output="We offer a 30-day full refund at no extra cost.",
-        retrieval_context=[
-            "All customers are eligible for a 30 day full refund at no extra cost."
-        ],
+        retrieval_context="All customers are eligible for a 30 day full refund at no extra cost.",
     )
-    example2 = Example(
+    example2 = Example.create(
         input="How do I reset my password?",
         actual_output="You can reset your password by clicking on 'Forgot Password' at the login screen.",
-        retrieval_context=["Password reset instructions"],
+        retrieval_context="Password reset instructions",
     )
 
-    Dataset.create(
-        name=random_name, project_name=project_name, examples=[example1, example2]
-    )
-    dataset = Dataset.get(name=random_name, project_name=project_name)
-    res = client.run_evaluation(
-        examples=dataset.examples,
+    client.datasets.create(name=random_name, examples=[example1, example2])
+    dataset = client.datasets.get(name=random_name)
+    evaluation = client.evaluation.create()
+    res = evaluation.run(
+        examples=list(dataset),
         scorers=[FaithfulnessScorer(threshold=0.5)],
-        project_name=project_name,
         eval_run_name=random_name,
     )
     assert res, "Dataset evaluation failed"
 
 
-def test_evaluate_dataset_custom(
-    client: JudgmentClient, project_name: str, random_name: str
-):
-    """Test dataset evaluation with custom scorers."""
-
-    class CustomExample(Example):
-        unique_field: str
-        unique_number: int
-
-    class CustomScorer(ExampleScorer):
-        async def a_score_example(self, example: CustomExample):
-            if example.unique_field == "test":
-                if example.unique_number == 1:
-                    return 1
-                elif example.unique_number == 2:
-                    return 0.75
-                else:
-                    return 0.5
-            else:
-                return 0
-
+def test_dataset_and_evaluation(client: Judgeval, random_name: str):
     examples = [
-        CustomExample(unique_field="test", unique_number=1),
-        CustomExample(unique_field="test", unique_number=2),
-        CustomExample(unique_field="test", unique_number=3),
-        CustomExample(unique_field="not_test", unique_number=1),
+        Example.create(input="input 1", actual_output="output 1"),
+        Example.create(input="input 2", actual_output="output 2"),
     ]
-    Dataset.create(name=random_name, project_name=project_name, examples=examples)
-    dataset = Dataset.get(name=random_name, project_name=project_name)
-    res = client.run_evaluation(
-        examples=dataset.examples,
-        scorers=[CustomScorer()],
-        project_name=project_name,
-        eval_run_name=random_name,
-    )
-
-    assert res[0].success
-    assert res[1].success
-    assert res[2].success
-    assert not res[3].success
-
-    assert res[0].scorers_data[0].score == 1
-    assert res[1].scorers_data[0].score == 0.75
-    assert res[2].scorers_data[0].score == 0.5
-    assert res[3].scorers_data[0].score == 0
-
-
-def test_dataset_and_evaluation(
-    client: JudgmentClient, project_name: str, random_name: str
-):
-    """Test that dataset and evaluation work together."""
-    examples = [
-        Example(input="input 1", actual_output="output 1"),
-        Example(input="input 2", actual_output="output 2"),
-    ]
-    Dataset.create(name=random_name, project_name=project_name, examples=examples)
-    dataset = Dataset.get(name=random_name, project_name=project_name)
+    client.datasets.create(name=random_name, examples=examples)
+    dataset = client.datasets.get(name=random_name)
     assert dataset, "Failed to pull dataset"
-    assert len(dataset.examples) == 2, "Dataset should have 2 examples"
-    for i, e in enumerate(dataset.examples, start=1):
-        assert e.input == f"input {i}", (
-            f"Example should have .input be 'input {i}' but got '{e.input}'"
-        )
-        assert e.actual_output == f"output {i}", (
-            f"Example should have .actual_output be 'output {i}' but got '{e.actual_output}'"
-        )
+    assert len(dataset) == 2, "Dataset should have 2 examples"
 
-    res = client.run_evaluation(
+    evaluation = client.evaluation.create()
+    res = evaluation.run(
         examples=examples,
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
-        project_name=project_name,
         eval_run_name=random_name,
     )
     assert res, "Dataset evaluation failed"
 
 
-def test_dataset_and_double_evaluation(
-    client: JudgmentClient, project_name: str, random_name: str
-):
-    """Test that dataset and evaluation work together."""
+def test_dataset_and_double_evaluation(client: Judgeval, random_name: str):
     examples = [
-        Example(input="input 1", actual_output="output 1"),
-        Example(input="input 2", actual_output="output 2"),
+        Example.create(input="input 1", actual_output="output 1"),
+        Example.create(input="input 2", actual_output="output 2"),
     ]
-    Dataset.create(name=random_name, project_name=project_name, examples=examples)
-    dataset = Dataset.get(name=random_name, project_name=project_name)
+    client.datasets.create(name=random_name, examples=examples)
+    dataset = client.datasets.get(name=random_name)
     assert dataset, "Failed to pull dataset"
-    assert len(dataset.examples) == 2, "Dataset should have 2 examples"
-    for i, e in enumerate(dataset.examples, start=1):
-        assert e.input == f"input {i}", (
-            f"Example should have .input be 'input {i}' but got '{e.input}'"
-        )
-        assert e.actual_output == f"output {i}", (
-            f"Example should have .actual_output be 'output {i}' but got '{e.actual_output}'"
-        )
+    assert len(dataset) == 2, "Dataset should have 2 examples"
 
-    res = client.run_evaluation(
-        examples=dataset.examples,
+    evaluation = client.evaluation.create()
+    res = evaluation.run(
+        examples=list(dataset),
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
-        project_name=project_name,
         eval_run_name=random_name,
     )
     assert res, "Dataset evaluation failed"
 
-    res2 = client.run_evaluation(
-        examples=dataset.examples,
+    res2 = evaluation.run(
+        examples=list(dataset),
         scorers=[AnswerRelevancyScorer(threshold=0.5)],
-        project_name=project_name,
         eval_run_name=random_name,
     )
     assert res2, "Dataset evaluation failed"

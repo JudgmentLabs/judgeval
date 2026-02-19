@@ -26,7 +26,7 @@ def test_faithfulness_with_model():
 
 def test_faithfulness_required_params():
     scorer = FaithfulnessScorer()
-    assert scorer._required_params == ["context", "actual_output"]
+    assert scorer._required_params == ["retrieval_context", "actual_output"]
 
 
 def test_faithfulness_score_type():

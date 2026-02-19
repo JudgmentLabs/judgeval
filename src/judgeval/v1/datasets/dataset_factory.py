@@ -39,24 +39,23 @@ class DatasetFactory:
             if isinstance(e, dict):
                 judgeval_logger.debug(f"Raw example keys: {e.keys()}")
 
-                data_obj = e.get("data", {})
-                if isinstance(data_obj, dict):
-                    example_id = data_obj.get("example_id", "")
-                    created_at = data_obj.get("created_at", "")
-                    name_field = data_obj.get("name")
+                data_obj = e
+                example_id = data_obj.get("example_id", "")
+                created_at = data_obj.get("created_at", "")
+                name_field = data_obj.get("name")
 
-                    example = Example(
-                        example_id=example_id, created_at=created_at, name=name_field
-                    )
+                example = Example(
+                    example_id=example_id, created_at=created_at, name=name_field
+                )
 
-                    for key, value in data_obj.items():
-                        if key not in ["example_id", "created_at", "name"]:
-                            example.set_property(key, value)
+                for key, value in data_obj.items():
+                    if key not in ["example_id", "created_at", "name"]:
+                        example.set_property(key, value)
 
-                    examples.append(example)
-                    judgeval_logger.debug(
-                        f"Created example with name={name_field}, properties={list(example.properties.keys())}"
-                    )
+                examples.append(example)
+                judgeval_logger.debug(
+                    f"Created example with name={name_field}, properties={list(example.properties.keys())}"
+                )
 
         judgeval_logger.info(f"Retrieved dataset {name} with {len(examples)} examples")
         return Dataset(

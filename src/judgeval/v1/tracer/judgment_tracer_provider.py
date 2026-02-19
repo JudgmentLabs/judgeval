@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Callable, Optional
 
+from opentelemetry.context import Context
 from opentelemetry.context.contextvars_context import ContextVarsRuntimeContext
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.trace import Tracer, NoOpTracer
@@ -34,7 +35,7 @@ class JudgmentTracerProvider(TracerProvider):
             ContextVarsRuntimeContext()
         )  # Only used for isolated tracers
 
-    def get_isolated_current_context(self):
+    def get_isolated_current_context(self) -> Context:
         return self._runtime_context.get_current()
 
     def get_tracer(

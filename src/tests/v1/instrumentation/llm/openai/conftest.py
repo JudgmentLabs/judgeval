@@ -58,7 +58,7 @@ def mock_processor():
 def tracer(mock_processor):
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.trace import set_tracer_provider
-    from judgeval.tracer.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
+    from judgeval.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
     from judgeval.version import get_version
 
     provider = TracerProvider()
