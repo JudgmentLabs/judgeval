@@ -202,11 +202,7 @@ class InsertPromptResponse(TypedDict):
 
 class LocalScorerResult(TypedDict):
     scorers_data: List[Dict[str, Any]]
-    name: NotRequired[Optional[str]]
     data_object: Example
-    trace_id: NotRequired[Optional[str]]
-    run_duration: NotRequired[Optional[float]]
-    evaluation_cost: NotRequired[Optional[float]]
 
 
 class LogEvalResultsExamplesRequest(TypedDict):
