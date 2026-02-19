@@ -17,8 +17,8 @@ def create_project(project_name: str):
 
 
 def retrieve_trace(project_name: str, trace_id: str):
-    return client_v1.post_e2e_fetch_trace(
-        payload={"project_name": project_name, "trace_id": trace_id}
+    return client_v1.get_e2e_fetch_trace(
+        project_name=project_name, trace_id=trace_id
     )
 
 
