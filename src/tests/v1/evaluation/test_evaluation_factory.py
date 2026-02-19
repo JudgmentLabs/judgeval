@@ -38,9 +38,12 @@ def test_factory_create(evaluation_factory, mock_client):
     evaluation = evaluation_factory.create()
 
     assert isinstance(evaluation, Evaluation)
-    assert evaluation._client == mock_client
-    assert evaluation._project_id == "test_project_id"
-    assert evaluation._project_name == "test_project"
+    assert evaluation._local._project_id == "test_project_id"
+    assert evaluation._local._project_name == "test_project"
+    assert evaluation._hosted._project_id == "test_project_id"
+    assert evaluation._hosted._project_name == "test_project"
+    assert evaluation._local._client == mock_client
+    assert evaluation._hosted._client == mock_client
 
 
 def test_factory_run(evaluation_factory, mock_client, sample_examples, sample_scorers):
@@ -89,4 +92,5 @@ def test_factory_create_with_no_project_id(mock_client):
     evaluation = factory.create()
 
     assert isinstance(evaluation, Evaluation)
-    assert evaluation._project_id is None
+    assert evaluation._local._project_id is None
+    assert evaluation._hosted._project_id is None

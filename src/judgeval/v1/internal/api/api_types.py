@@ -200,6 +200,20 @@ class InsertPromptResponse(TypedDict):
     created_at: str
 
 
+class LocalScorerResult(TypedDict):
+    scorers_data: List[Dict[str, Any]]
+    data_object: Example
+
+
+class LogEvalResultsExamplesRequest(TypedDict):
+    results: List[LocalScorerResult]
+    run: ExampleEvaluationRun
+
+
+class LogEvalResultsExamplesResponse(TypedDict):
+    ui_results_url: str
+
+
 class LogEvalResultsRequest(TypedDict):
     results: List[ScoringResult]
     run: ExampleEvaluationRun
