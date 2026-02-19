@@ -19,7 +19,7 @@ from typing import (
     overload,
 )
 from opentelemetry.context import set_value
-from opentelemetry.trace import Span, Status, StatusCode
+from opentelemetry.trace import Span, Status, StatusCode, Tracer as OTELTracer
 from opentelemetry.sdk.trace import TracerProvider
 
 from judgeval.logger import judgeval_logger
@@ -188,18 +188,44 @@ class BaseTracer(ABC):
         proxy.add_instrumentation(instrumentor)
 
     # ------------------------------------------------------------------ #
-    #  Static: Span Context Manager                                      #
+    #  Static: Span Creation                                             #
     # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _get_otel_tracer() -> OTELTracer:
+        proxy = BaseTracer._get_proxy_provider()
+        return proxy.get_tracer(JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME)
+
+    @staticmethod
+    def start_span(
+        name: str,
+        attributes: Optional[Dict[str, Any]] = None,
+    ) -> Span:
+        """Start a span that requires manual .end() call.
+        Use BaseTracer.span() context manager when possible."""
+        span = BaseTracer._get_otel_tracer().start_span(name, attributes=attributes)
+        BaseTracer._emit_partial()
+        return span
+
+    @staticmethod
+    @contextmanager
+    def start_as_current_span(
+        name: str,
+        attributes: Optional[Dict[str, Any]] = None,
+    ) -> Iterator[Span]:
+        """Start a span and set it as current in the context."""
+        with BaseTracer._get_otel_tracer().start_as_current_span(
+            name, attributes=attributes
+        ) as span:
+            BaseTracer._emit_partial()
+            yield span
 
     @staticmethod
     @contextmanager
     def span(span_name: str) -> Iterator[Span]:
         """Open a child span under the current trace context.
         Exceptions propagate after being recorded on the span."""
-        proxy = BaseTracer._get_proxy_provider()
-        tracer = proxy.get_tracer(JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME)
-        with tracer.start_as_current_span(span_name) as span:
-            BaseTracer._emit_partial()
+        with BaseTracer.start_as_current_span(span_name) as span:
             try:
                 yield span
             except Exception as e:

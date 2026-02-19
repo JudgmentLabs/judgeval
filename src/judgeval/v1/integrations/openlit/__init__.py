@@ -1,8 +1,7 @@
 from abc import ABC
-from judgeval.v1.tracer import Tracer
+from judgeval.v1.trace import Tracer
 from judgeval.logger import judgeval_logger
 from judgeval.utils.url import url_for
-from judgeval.v1.utils import resolve_project_id
 
 
 try:
@@ -19,16 +18,30 @@ class Openlit(ABC):
         tracer: Tracer,
         **kwargs,
     ):
-        api_key = tracer.api_client.api_key
-        organization_id = tracer.api_client.organization_id
+        api_key = tracer.api_key
+        organization_id = tracer.organization_id
         project_name = tracer.project_name
 
-        project_id = resolve_project_id(tracer.api_client, project_name)
-        if not project_id:
+        if not project_name:
             judgeval_logger.warning(
-                f"Project {project_name} not found. Please create it first at https://app.judgmentlabs.ai/org/{organization_id}/projects."
+                "Project name not provided. Openlit will not be initialized."
             )
             return
+
+        if not tracer._client:
+            judgeval_logger.warning(
+                "Tracer client not configured. Openlit will not be initialized."
+            )
+            return
+
+        project_id = tracer.project_id
+        if not project_id:
+            judgeval_logger.warning(
+                f"Project {project_name} failed to resolve. Openlit will not be initialized."
+            )
+            return
+
+        from judgeval.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
 
         openlit.init(
             service_name=project_name,
@@ -38,7 +51,9 @@ class Openlit(ABC):
                 "X-Organization-Id": organization_id,
                 "X-Project-Id": project_id,
             },
-            tracer=tracer.get_tracer(),
+            otel_tracer=tracer._tracer_provider.get_tracer(
+                JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
+            ),
             disable_metrics=True,
             **kwargs,
         )

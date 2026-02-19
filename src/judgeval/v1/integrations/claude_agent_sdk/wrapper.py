@@ -21,7 +21,7 @@ from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.utils.serialize import safe_serialize
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer.tracer import BaseTracer
+    from judgeval.v1.trace import BaseTracer
 
 # Thread-local storage to propagate parent span context to tool handlers
 # Claude Agent SDK breaks OpenTelemetry's automatic context propagation

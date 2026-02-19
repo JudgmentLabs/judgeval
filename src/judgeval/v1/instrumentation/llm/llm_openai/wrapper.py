@@ -22,37 +22,36 @@ from judgeval.v1.instrumentation.llm.llm_openai.with_streaming_response import (
 )
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer import BaseTracer
     from openai import OpenAI, AsyncOpenAI
 
     TClient = Union[OpenAI, AsyncOpenAI]
 
 
-def wrap_openai_client_sync(tracer: BaseTracer, client: OpenAI) -> OpenAI:
-    wrap_chat_completions_create_sync(tracer, client)
-    wrap_responses_create_sync(tracer, client)
-    wrap_beta_chat_completions_parse_sync(tracer, client)
-    wrap_chat_with_streaming_response_sync(tracer, client)
-    wrap_responses_with_streaming_response_sync(tracer, client)
+def wrap_openai_client_sync(client: OpenAI) -> OpenAI:
+    wrap_chat_completions_create_sync(client)
+    wrap_responses_create_sync(client)
+    wrap_beta_chat_completions_parse_sync(client)
+    wrap_chat_with_streaming_response_sync(client)
+    wrap_responses_with_streaming_response_sync(client)
     return client
 
 
-def wrap_openai_client_async(tracer: BaseTracer, client: AsyncOpenAI) -> AsyncOpenAI:
-    wrap_chat_completions_create_async(tracer, client)
-    wrap_responses_create_async(tracer, client)
-    wrap_beta_chat_completions_parse_async(tracer, client)
-    wrap_chat_with_streaming_response_async(tracer, client)
-    wrap_responses_with_streaming_response_async(tracer, client)
+def wrap_openai_client_async(client: AsyncOpenAI) -> AsyncOpenAI:
+    wrap_chat_completions_create_async(client)
+    wrap_responses_create_async(client)
+    wrap_beta_chat_completions_parse_async(client)
+    wrap_chat_with_streaming_response_async(client)
+    wrap_responses_with_streaming_response_async(client)
     return client
 
 
 @typing.overload
-def wrap_openai_client(tracer: BaseTracer, client: OpenAI) -> OpenAI: ...
+def wrap_openai_client(client: OpenAI) -> OpenAI: ...
 @typing.overload
-def wrap_openai_client(tracer: BaseTracer, client: AsyncOpenAI) -> AsyncOpenAI: ...
+def wrap_openai_client(client: AsyncOpenAI) -> AsyncOpenAI: ...
 
 
-def wrap_openai_client(tracer: BaseTracer, client: TClient) -> TClient:
+def wrap_openai_client(client: TClient) -> TClient:
     from judgeval.v1.instrumentation.llm.llm_openai.config import HAS_OPENAI
     from judgeval.logger import judgeval_logger
 
@@ -66,8 +65,8 @@ def wrap_openai_client(tracer: BaseTracer, client: TClient) -> TClient:
     from openai import OpenAI, AsyncOpenAI
 
     if isinstance(client, AsyncOpenAI):
-        return wrap_openai_client_async(tracer, client)
+        return wrap_openai_client_async(client)
     elif isinstance(client, OpenAI):
-        return wrap_openai_client_sync(tracer, client)
+        return wrap_openai_client_sync(client)
     else:
         raise TypeError(f"Invalid client type: {type(client)}")

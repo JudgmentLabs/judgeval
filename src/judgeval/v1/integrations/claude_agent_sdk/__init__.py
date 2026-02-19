@@ -4,7 +4,7 @@ import sys
 from judgeval.logger import judgeval_logger
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer.base_tracer import BaseTracer
+    from judgeval.v1.trace import BaseTracer
 
 __all__ = ["setup_claude_agent_sdk"]
 

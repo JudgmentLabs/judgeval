@@ -68,10 +68,10 @@ async def handle_request(
     tags: list[str],
     **kwargs,
 ):
-    Tracer.init(project_name=name)
+    Tracer.init(project_name="chat")
     with Tracer.span("handle"):
         Tracer.set_customer_id(customer_id)
-        Tracer.set_session_id(session_id)
+        # Tracer.set_session_id(session_id)
         Tracer.tag(tags)
 
         if name == "fibonacci":

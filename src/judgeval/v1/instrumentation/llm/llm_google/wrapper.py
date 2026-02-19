@@ -6,11 +6,10 @@ from judgeval.v1.instrumentation.llm.llm_google.generate_content import (
 )
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer import BaseTracer
     from google.genai import Client
 
 
-def wrap_google_client(tracer: BaseTracer, client: Client) -> Client:
+def wrap_google_client(client: Client) -> Client:
     from judgeval.v1.instrumentation.llm.llm_google.config import HAS_GOOGLE_GENAI
     from judgeval.logger import judgeval_logger
 
@@ -24,7 +23,7 @@ def wrap_google_client(tracer: BaseTracer, client: Client) -> Client:
     from google.genai import Client
 
     if isinstance(client, Client):
-        wrap_generate_content_sync(tracer, client)
+        wrap_generate_content_sync(client)
         return client
     else:
         raise TypeError(f"Invalid client type: {type(client)}")

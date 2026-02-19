@@ -12,35 +12,30 @@ from judgeval.v1.instrumentation.llm.llm_anthropic.messages_stream import (
 )
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer import BaseTracer
     from anthropic import Anthropic, AsyncAnthropic
 
     TClient = Union[Anthropic, AsyncAnthropic]
 
 
-def wrap_anthropic_client_sync(tracer: BaseTracer, client: Anthropic) -> Anthropic:
-    wrap_messages_create_sync(tracer, client)
-    wrap_messages_stream_sync(tracer, client)
+def wrap_anthropic_client_sync(client: Anthropic) -> Anthropic:
+    wrap_messages_create_sync(client)
+    wrap_messages_stream_sync(client)
     return client
 
 
-def wrap_anthropic_client_async(
-    tracer: BaseTracer, client: AsyncAnthropic
-) -> AsyncAnthropic:
-    wrap_messages_create_async(tracer, client)
-    wrap_messages_stream_async(tracer, client)
+def wrap_anthropic_client_async(client: AsyncAnthropic) -> AsyncAnthropic:
+    wrap_messages_create_async(client)
+    wrap_messages_stream_async(client)
     return client
 
 
 @typing.overload
-def wrap_anthropic_client(tracer: BaseTracer, client: Anthropic) -> Anthropic: ...
+def wrap_anthropic_client(client: Anthropic) -> Anthropic: ...
 @typing.overload
-def wrap_anthropic_client(
-    tracer: BaseTracer, client: AsyncAnthropic
-) -> AsyncAnthropic: ...
+def wrap_anthropic_client(client: AsyncAnthropic) -> AsyncAnthropic: ...
 
 
-def wrap_anthropic_client(tracer: BaseTracer, client: TClient) -> TClient:
+def wrap_anthropic_client(client: TClient) -> TClient:
     from judgeval.v1.instrumentation.llm.llm_anthropic.config import HAS_ANTHROPIC
     from judgeval.logger import judgeval_logger
 
@@ -54,8 +49,8 @@ def wrap_anthropic_client(tracer: BaseTracer, client: TClient) -> TClient:
     from anthropic import Anthropic, AsyncAnthropic
 
     if isinstance(client, AsyncAnthropic):
-        return wrap_anthropic_client_async(tracer, client)
+        return wrap_anthropic_client_async(client)
     elif isinstance(client, Anthropic):
-        return wrap_anthropic_client_sync(tracer, client)
+        return wrap_anthropic_client_sync(client)
     else:
         raise TypeError(f"Invalid client type: {type(client)}")

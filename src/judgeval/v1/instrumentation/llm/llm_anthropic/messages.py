@@ -23,9 +23,9 @@ from judgeval.utils.wrappers import (
     immutable_wrap_sync_iterator,
     immutable_wrap_async_iterator,
 )
+from judgeval.v1.trace import BaseTracer
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer import BaseTracer
     from anthropic import Anthropic, AsyncAnthropic
     from anthropic.types import (
         Message,
@@ -71,23 +71,23 @@ def _extract_anthropic_chunk_usage(
     return None
 
 
-def wrap_messages_create_sync(tracer: BaseTracer, client: Anthropic) -> None:
+def wrap_messages_create_sync(client: Anthropic) -> None:
     original_func = client.messages.create
 
     def dispatcher(*args: Any, **kwargs: Any) -> Any:
         if kwargs.get("stream", False):
-            return _wrap_streaming_sync(tracer, original_func)(*args, **kwargs)
-        return _wrap_non_streaming_sync(tracer, original_func)(*args, **kwargs)
+            return _wrap_streaming_sync(original_func)(*args, **kwargs)
+        return _wrap_non_streaming_sync(original_func)(*args, **kwargs)
 
     setattr(client.messages, "create", dispatcher)
 
 
 def _wrap_non_streaming_sync(
-    tracer: BaseTracer, original_func: Callable[..., Message]
+    original_func: Callable[..., Message],
 ) -> Callable[..., Message]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
-        ctx["span"] = tracer.get_tracer().start_span(
-            "ANTHROPIC_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+        ctx["span"] = BaseTracer.start_span(
+            "ANTHROPIC_API_CALL", {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
@@ -148,11 +148,11 @@ def _wrap_non_streaming_sync(
 
 
 def _wrap_streaming_sync(
-    tracer: BaseTracer, original_func: Callable[..., Iterator[RawMessageStreamEvent]]
+    original_func: Callable[..., Iterator[RawMessageStreamEvent]],
 ) -> Callable[..., Iterator[RawMessageStreamEvent]]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
-        ctx["span"] = tracer.get_tracer().start_span(
-            "ANTHROPIC_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+        ctx["span"] = BaseTracer.start_span(
+            "ANTHROPIC_API_CALL", {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
@@ -242,23 +242,23 @@ def _wrap_streaming_sync(
     )
 
 
-def wrap_messages_create_async(tracer: BaseTracer, client: AsyncAnthropic) -> None:
+def wrap_messages_create_async(client: AsyncAnthropic) -> None:
     original_func = client.messages.create
 
     async def dispatcher(*args: Any, **kwargs: Any) -> Any:
         if kwargs.get("stream", False):
-            return await _wrap_streaming_async(tracer, original_func)(*args, **kwargs)
-        return await _wrap_non_streaming_async(tracer, original_func)(*args, **kwargs)
+            return await _wrap_streaming_async(original_func)(*args, **kwargs)
+        return await _wrap_non_streaming_async(original_func)(*args, **kwargs)
 
     setattr(client.messages, "create", dispatcher)
 
 
 def _wrap_non_streaming_async(
-    tracer: BaseTracer, original_func: Callable[..., Awaitable[Message]]
+    original_func: Callable[..., Awaitable[Message]],
 ) -> Callable[..., Awaitable[Message]]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
-        ctx["span"] = tracer.get_tracer().start_span(
-            "ANTHROPIC_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+        ctx["span"] = BaseTracer.start_span(
+            "ANTHROPIC_API_CALL", {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
@@ -319,12 +319,11 @@ def _wrap_non_streaming_async(
 
 
 def _wrap_streaming_async(
-    tracer: BaseTracer,
     original_func: Callable[..., Awaitable[AsyncIterator[RawMessageStreamEvent]]],
 ) -> Callable[..., Awaitable[AsyncIterator[RawMessageStreamEvent]]]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
-        ctx["span"] = tracer.get_tracer().start_span(
-            "ANTHROPIC_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+        ctx["span"] = BaseTracer.start_span(
+            "ANTHROPIC_API_CALL", {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
