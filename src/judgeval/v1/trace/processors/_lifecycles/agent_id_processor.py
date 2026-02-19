@@ -5,8 +5,8 @@ from typing import Optional
 from opentelemetry.context import Context, get_value
 from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
 
-from judgeval.v1.tracer.processors._lifecycles.registry import register
-from judgeval.v1.tracer.processors._lifecycles.context_keys import (
+from judgeval.v1.trace.processors._lifecycles.registry import register
+from judgeval.v1.trace.processors._lifecycles.context_keys import (
     AGENT_ID_KEY,
     PARENT_AGENT_ID_KEY,
     AGENT_CLASS_NAME_KEY,

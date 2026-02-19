@@ -1,17 +1,19 @@
-from opentelemetry.sdk.trace import Span, ReadableSpan
-from opentelemetry.context import Context
+from __future__ import annotations
+
 from typing import Any, Optional
 
-from opentelemetry.trace import SpanContext
+from opentelemetry.context import Context
+from opentelemetry.sdk.trace import ReadableSpan, Span
+from opentelemetry.trace.span import SpanContext
 
-from judgeval.v1.tracer.processors.judgment_span_processor import JudgmentSpanProcessor
+from judgeval.v1.trace.processors.judgment_span_processor import JudgmentSpanProcessor
 
 
-class NoOpJudgmentSpanProcessor(JudgmentSpanProcessor):
-    __slots__ = ("resource_attributes",)
+class NoOpSpanProcessor(JudgmentSpanProcessor):
+    __slots__ = ()
 
     def __init__(self):
-        self.resource_attributes = {}
+        pass
 
     def on_start(self, span: Span, parent_context: Optional[Context] = None) -> None:
         pass
@@ -37,6 +39,3 @@ class NoOpJudgmentSpanProcessor(JudgmentSpanProcessor):
         self, span_context: SpanContext, key: str, default: Any = None
     ) -> Any:
         return default
-
-    def increment_update_id(self, span_context: SpanContext) -> int:
-        return 0

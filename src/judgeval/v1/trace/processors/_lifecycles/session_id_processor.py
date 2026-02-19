@@ -5,8 +5,8 @@ from typing import Optional
 from opentelemetry.context import Context, get_value
 from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
 
-from judgeval.v1.tracer.processors._lifecycles.registry import register
-from judgeval.v1.tracer.processors._lifecycles.context_keys import SESSION_ID_KEY
+from judgeval.v1.trace.processors._lifecycles.registry import register
+from judgeval.v1.trace.processors._lifecycles.context_keys import SESSION_ID_KEY
 from judgeval.judgment_attribute_keys import AttributeKeys
 
 

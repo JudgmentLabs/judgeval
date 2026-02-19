@@ -4,12 +4,15 @@ from typing import Sequence
 
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.trace import ReadableSpan
-from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
+from opentelemetry.sdk.trace.export import (
+    SpanExporter as BaseSpanExporter,
+    SpanExportResult,
+)
 
 from judgeval.logger import judgeval_logger
 
 
-class JudgmentSpanExporter(SpanExporter):
+class JudgmentSpanExporter(BaseSpanExporter):
     __slots__ = ("_delegate",)
 
     def __init__(
