@@ -1,5 +1,6 @@
 # mypy: ignore-errors
 from typing import Dict, Any, Mapping, Literal, Optional
+from urllib.parse import quote
 import httpx
 from httpx import Response
 from judgeval.exceptions import JudgmentAPIError
