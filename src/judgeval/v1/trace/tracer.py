@@ -24,7 +24,6 @@ from judgeval.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
 class Tracer(BaseTracer):
     __slots__ = (
         "__weakref__",
-        "_client",
         "_span_exporter",
         "_span_processor",
         "_enable_monitoring",
@@ -54,9 +53,9 @@ class Tracer(BaseTracer):
             environment=environment,
             serializer=serializer,
             tracer_provider=tracer_provider,
+            client=client,
         )
         self._enable_monitoring = enable_monitoring
-        self._client = client
         self._span_exporter: Optional[JudgmentSpanExporter] = None
         self._span_processor: Optional[JudgmentSpanProcessor] = None
 

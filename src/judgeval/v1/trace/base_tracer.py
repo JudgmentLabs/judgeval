@@ -45,6 +45,7 @@ if TYPE_CHECKING:
         JudgeExampleEvaluationRun,
         JudgeTraceEvaluationRun,
     )
+    from judgeval.v1.internal.api import JudgmentSyncClient
     from judgeval.v1.trace.processors.judgment_span_processor import (
         JudgmentSpanProcessor,
     )
@@ -80,6 +81,7 @@ class BaseTracer(ABC):
         "environment",
         "serializer",
         "_tracer_provider",
+        "_client",
     )
 
     # ------------------------------------------------------------------ #
@@ -96,6 +98,7 @@ class BaseTracer(ABC):
         environment: Optional[str],
         serializer: Callable[[Any], str],
         tracer_provider: TracerProvider,
+        client: Optional[JudgmentSyncClient],
     ):
         self.project_name = project_name
         self.project_id = project_id
@@ -105,6 +108,7 @@ class BaseTracer(ABC):
         self.environment = environment
         self.serializer = serializer
         self._tracer_provider = tracer_provider
+        self._client = client
 
     # ------------------------------------------------------------------ #
     #  Abstract Lifecycle                                                #
