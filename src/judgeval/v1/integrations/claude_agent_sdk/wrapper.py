@@ -17,8 +17,7 @@ from typing import (
 
 from opentelemetry.trace import set_span_in_context
 
-from judgeval.tracer.keys import AttributeKeys
-from judgeval.tracer.utils import set_span_attribute
+from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.utils.serialize import safe_serialize
 
 if TYPE_CHECKING:
@@ -42,7 +41,7 @@ class LLMSpanTracker:
     start time to ensure sequential timing (no overlapping LLM spans).
     """
 
-    def __init__(self, tracer: "BaseTracer", query_start_time: Optional[float] = None):
+    def __init__(self, tracer: BaseTracer, query_start_time: Optional[float] = None):
         self.tracer = tracer
         self.current_span: Optional[Any] = None
         self.current_span_context: Optional[Any] = None
@@ -81,7 +80,7 @@ class LLMSpanTracker:
         """Log usage metrics to the current LLM span."""
         if self.current_span and usage_metrics:
             for key, value in usage_metrics.items():
-                set_span_attribute(self.current_span, key, value)
+                self.tracer.set_span_attribute(self.current_span, key, value)
 
     def cleanup(self) -> None:
         """End any unclosed spans."""
@@ -130,10 +129,10 @@ def _create_client_wrapper_class(
 
             # Record input
             if self.__last_prompt:
-                set_span_attribute(
+                tracer.set_span_attribute(
                     agent_span,
                     AttributeKeys.JUDGMENT_INPUT,
-                    safe_serialize(self.__last_prompt),
+                    self.__last_prompt,
                 )
 
             # Store the parent span context in thread-local storage
@@ -180,16 +179,18 @@ def _create_client_wrapper_class(
                         }
                         if result_metadata:
                             for key, value in result_metadata.items():
-                                set_span_attribute(agent_span, f"agent.{key}", value)
+                                tracer.set_span_attribute(
+                                    agent_span, f"agent.{key}", value
+                                )
 
                     yield message
 
                 # Record output
                 if final_results:
-                    set_span_attribute(
+                    tracer.set_span_attribute(
                         agent_span,
                         AttributeKeys.JUDGMENT_OUTPUT,
-                        safe_serialize(final_results[-1] if final_results else None),
+                        final_results[-1] if final_results else None,
                     )
 
             except Exception as e:
@@ -245,9 +246,7 @@ def _wrap_query_function(
         # Capture prompt if available
         prompt = kwargs.get("prompt") or (args[0] if args else None)
         if prompt and isinstance(prompt, str):
-            set_span_attribute(
-                agent_span, AttributeKeys.JUDGMENT_INPUT, safe_serialize(prompt)
-            )
+            tracer.set_span_attribute(agent_span, AttributeKeys.JUDGMENT_INPUT, prompt)
 
         # Store parent context for tool tracing
         parent_context = set_span_in_context(agent_span, tracer.get_context())
@@ -292,16 +291,16 @@ def _wrap_query_function(
                     }
                     if result_metadata:
                         for key, value in result_metadata.items():
-                            set_span_attribute(agent_span, f"agent.{key}", value)
+                            tracer.set_span_attribute(agent_span, f"agent.{key}", value)
 
                 yield message
 
             # Record output
             if final_results:
-                set_span_attribute(
+                tracer.set_span_attribute(
                     agent_span,
                     AttributeKeys.JUDGMENT_OUTPUT,
-                    safe_serialize(final_results[-1] if final_results else None),
+                    final_results[-1] if final_results else None,
                 )
 
         except Exception as e:
@@ -334,9 +333,11 @@ def _wrap_tool_factory(tool_fn: Any, tracer: "BaseTracer") -> Callable[..., Any]
             # Now we have the actual tool definition, wrap its handler
             if tool_def and hasattr(tool_def, "handler"):
                 tool_name = getattr(tool_def, "name", "unknown")
-                original_handler = tool_def.handler
-                tool_def.handler = _wrap_tool_handler(
-                    tracer, original_handler, tool_name
+                original_handler = getattr(tool_def, "handler")
+                setattr(
+                    tool_def,
+                    "handler",
+                    _wrap_tool_handler(tracer, original_handler, tool_name),
                 )
 
             return tool_def
@@ -347,7 +348,7 @@ def _wrap_tool_factory(tool_fn: Any, tracer: "BaseTracer") -> Callable[..., Any]
 
 
 def _wrap_tool_handler(
-    tracer: "BaseTracer", handler: Any, tool_name: Any
+    tracer: "BaseTracer", handler: Callable[..., Any], tool_name: Any
 ) -> Callable[..., Any]:
     """Wraps a tool handler to add tracing.
 
@@ -380,15 +381,13 @@ def _wrap_tool_handler(
         # Set this span as active in the context
         with tracer.use_span(span, end_on_exit=True):
             # Record input
-            set_span_attribute(span, AttributeKeys.JUDGMENT_INPUT, safe_serialize(args))
+            tracer.set_span_attribute(span, AttributeKeys.JUDGMENT_INPUT, args)
 
             try:
                 result = await handler(args)
 
                 # Record output
-                set_span_attribute(
-                    span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(result)
-                )
+                tracer.set_span_attribute(span, AttributeKeys.JUDGMENT_OUTPUT, result)
 
                 return result
             except Exception as e:
@@ -441,19 +440,21 @@ def _create_llm_span_for_messages(
 
     # Record attributes
     if model:
-        set_span_attribute(llm_span, AttributeKeys.JUDGMENT_LLM_MODEL_NAME, model)
+        tracer.set_span_attribute(
+            llm_span, AttributeKeys.JUDGMENT_LLM_MODEL_NAME, model
+        )
         # Set provider to anthropic for cost calculation
-        set_span_attribute(llm_span, AttributeKeys.JUDGMENT_LLM_PROVIDER, "anthropic")
+        tracer.set_span_attribute(
+            llm_span, AttributeKeys.JUDGMENT_LLM_PROVIDER, "anthropic"
+        )
 
     if input_messages:
-        set_span_attribute(
-            llm_span, AttributeKeys.JUDGMENT_INPUT, safe_serialize(input_messages)
+        tracer.set_span_attribute(
+            llm_span, AttributeKeys.JUDGMENT_INPUT, input_messages
         )
 
     if outputs:
-        set_span_attribute(
-            llm_span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(outputs)
-        )
+        tracer.set_span_attribute(llm_span, AttributeKeys.JUDGMENT_OUTPUT, outputs)
 
     # Return final message content for conversation history and the span
     if hasattr(last_message, "content"):

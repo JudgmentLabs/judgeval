@@ -663,7 +663,7 @@ def wrap_responses_with_streaming_response_sync(
             def __getattr__(self, name: str) -> Any:
                 return getattr(self._cm, name)
 
-        def _wrap_response(context: Dict[str, Any], response: Any) -> Any:
+        def _wrap_response(context: Dict[str, Any], response: APIResponse[Any]) -> Any:
             original_iter_lines = response.iter_lines
 
             def traced_iter_lines() -> Generator[str, None, None]:
@@ -687,7 +687,7 @@ def wrap_responses_with_streaming_response_sync(
             )
 
             class WrappedAPIResponse:
-                def __init__(self, resp: Any) -> None:
+                def __init__(self, resp: APIResponse[Any]) -> None:
                     self._response = resp
 
                 def __getattr__(self, name: str) -> Any:
@@ -817,7 +817,9 @@ def wrap_responses_with_streaming_response_async(
             def __getattr__(self, name: str) -> Any:
                 return getattr(self._cm, name)
 
-        def _wrap_response(context: Dict[str, Any], response: Any) -> Any:
+        def _wrap_response(
+            context: Dict[str, Any], response: AsyncAPIResponse[Any]
+        ) -> Any:
             original_iter_lines = response.iter_lines
 
             async def traced_iter_lines() -> AsyncGenerator[str, None]:
@@ -841,7 +843,7 @@ def wrap_responses_with_streaming_response_async(
             )
 
             class WrappedAsyncAPIResponse:
-                def __init__(self, resp: Any) -> None:
+                def __init__(self, resp: AsyncAPIResponse[Any]) -> None:
                     self._response = resp
 
                 def __getattr__(self, name: str) -> Any:

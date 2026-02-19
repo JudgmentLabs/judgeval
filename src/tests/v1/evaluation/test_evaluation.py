@@ -85,7 +85,6 @@ def test_evaluation_run_success(
         examples=sample_examples,
         scorers=sample_scorers,
         eval_run_name="test_run",
-        model="gpt-4o-mini",
         timeout_seconds=10,
     )
 

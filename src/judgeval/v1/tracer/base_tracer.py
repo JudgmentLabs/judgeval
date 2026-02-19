@@ -44,6 +44,7 @@ from judgeval.v1.internal.api.api_types import (
     TraceEvaluationRun,
 )
 from judgeval.v1.scorers.base_scorer import BaseScorer
+from judgeval.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
 from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.v1.scorers.custom_scorer.custom_scorer import CustomScorer
 from judgeval.v1.tracer.exporters.judgment_span_exporter import JudgmentSpanExporter
@@ -76,10 +77,11 @@ class BaseTracer(ABC):
         "serializer",
         "project_id",
         "_tracer_provider",
+        "_judgment_span_exporter",
         "_judgment_span_processor",
     )
 
-    TRACER_NAME = "judgeval"
+    TRACER_NAME = JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
     _tracers: list[BaseTracer] = []
 
     def __init__(
@@ -99,6 +101,7 @@ class BaseTracer(ABC):
         self.api_client = api_client
         self.serializer = serializer
         self._tracer_provider = tracer_provider
+        self._judgment_span_exporter: Optional[SpanExporter] = None
         self._judgment_span_processor: Optional[JudgmentSpanProcessor] = None
 
         BaseTracer._tracers.append(self)
@@ -112,24 +115,32 @@ class BaseTracer(ABC):
         pass
 
     def get_span_exporter(self) -> SpanExporter:
+        if self._judgment_span_exporter is not None:
+            return self._judgment_span_exporter
+
         if not self.project_id:
-            return NoOpSpanExporter()
-        return JudgmentSpanExporter(
-            endpoint=self._build_endpoint(self.api_client.base_url),
-            api_key=self.api_client.api_key,
-            organization_id=self.api_client.organization_id,
-            project_id=self.project_id,
-        )
+            self._judgment_span_exporter = NoOpSpanExporter()
+        else:
+            self._judgment_span_exporter = JudgmentSpanExporter(
+                endpoint=self._build_endpoint(self.api_client.base_url),
+                api_key=self.api_client.api_key,
+                organization_id=self.api_client.organization_id,
+                project_id=self.project_id,
+            )
+        return self._judgment_span_exporter
 
     def get_span_processor(self) -> JudgmentSpanProcessor:
+        if self._judgment_span_processor is not None:
+            return self._judgment_span_processor
+
         if not self.project_id:
-            return NoOpJudgmentSpanProcessor()
-        processor = JudgmentSpanProcessor(
-            self,
-            self.get_span_exporter(),
-        )
-        self._judgment_span_processor = processor
-        return processor
+            self._judgment_span_processor = NoOpJudgmentSpanProcessor()
+        else:
+            self._judgment_span_processor = JudgmentSpanProcessor(
+                self,
+                self.get_span_exporter(),
+            )
+        return self._judgment_span_processor
 
     def get_tracer(self) -> trace.Tracer:
         return self._tracer_provider.get_tracer(self.TRACER_NAME)
@@ -181,9 +192,9 @@ class BaseTracer(ABC):
                 set_status_on_exception=set_status_on_exception,
             )
 
-    def _get_current_span(self) -> Optional[Span]:
-        if self._is_isolated():
-            tracer = cast(JudgmentIsolatedTracer, self.get_tracer())
+    def get_current_span(self) -> Span:
+        tracer = self.get_tracer()
+        if isinstance(tracer, JudgmentIsolatedTracer):
             return tracer.get_current_span()
         return trace.get_current_span()
 
@@ -209,24 +220,30 @@ class BaseTracer(ABC):
     def set_span_kind(self, kind: str) -> None:
         if kind is None:
             return
-        current_span = self._get_current_span()
+        current_span = self.get_current_span()
         if current_span is not None:
             current_span.set_attribute(AttributeKeys.JUDGMENT_SPAN_KIND, kind)
 
     @dont_throw
-    def set_attribute(self, key: str, value: Any) -> None:
+    def set_span_attribute(self, span: Span, key: str, value: Any) -> None:
         if not self._is_valid_key(key):
             return
         if value is None:
             return
-        current_span = self._get_current_span()
-        if current_span is not None:
+        if span is not None:
             serialized_value = (
                 self.serializer(value)
                 if not isinstance(value, (str, int, float, bool))
                 else value
             )
-            current_span.set_attribute(key, serialized_value)
+            span.set_attribute(key, serialized_value)
+
+    @dont_throw
+    def set_attribute(self, key: str, value: Any) -> None:
+        current_span = self.get_current_span()
+        if current_span is None:
+            return
+        self.set_span_attribute(current_span, key, value)
 
     def set_attributes(self, attributes: Dict[str, Any]) -> None:
         if attributes is None:
@@ -235,7 +252,7 @@ class BaseTracer(ABC):
             self.set_attribute(key, value)
 
     def set_customer_id(self, customer_id: str) -> None:
-        current_span = self._get_current_span()
+        current_span = self.get_current_span()
         if current_span is None:
             return
         current_span.set_attribute(AttributeKeys.JUDGMENT_CUSTOMER_ID, customer_id)
@@ -251,7 +268,7 @@ class BaseTracer(ABC):
         self._attach_context(ctx)
 
     def override_project(self, project_name: str) -> None:
-        current_span = self._get_current_span()
+        current_span = self.get_current_span()
         if current_span is None or not current_span.is_recording():
             judgeval_logger.error(
                 "override_project() called outside of a span context. Ignoring."
@@ -499,7 +516,7 @@ class BaseTracer(ABC):
             judgeval_logger.error(f"Failed to enqueue evaluation run: {e}")
 
     def _get_sampled_span_context(self) -> Optional[SpanContext]:
-        current_span = self._get_current_span()
+        current_span = self.get_current_span()
         if current_span is None:
             return None
         span_context = current_span.get_span_context()
@@ -508,7 +525,7 @@ class BaseTracer(ABC):
         return span_context
 
     def _get_sampled_span(self) -> Optional[Span]:
-        current_span = self._get_current_span()
+        current_span = self.get_current_span()
         if current_span is None:
             return None
         span_context = current_span.get_span_context()

@@ -41,13 +41,11 @@ def test_dataset_get(factory, mock_client, sample_examples):
         "dataset_kind": "example",
         "examples": [
             {
-                "data": {
-                    "example_id": "1",
-                    "created_at": "2024-01-01",
-                    "name": "example1",
-                    "input": "input1",
-                    "output": "output1",
-                }
+                "example_id": "1",
+                "created_at": "2024-01-01",
+                "name": "example1",
+                "input": "input1",
+                "output": "output1",
             }
         ],
     }

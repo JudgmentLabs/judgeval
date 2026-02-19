@@ -50,6 +50,17 @@ class AttributeKeys(str, Enum):
     GEN_AI_RESPONSE_FINISH_REASONS = "gen_ai.response.finish_reasons"
 
 
+class InternalAttributeKeys(str, Enum):
+    """
+    Internal attribute keys used for temporary state management in span processors.
+    These are NOT exported and are used only for internal span lifecycle management.
+    """
+
+    DISABLE_PARTIAL_EMIT = "disable_partial_emit"
+    CANCELLED = "cancelled"
+    IS_CUSTOMER_CONTEXT_OWNER = "is_customer_context_owner"
+
+
 class ResourceKeys(str, Enum):
     SERVICE_NAME = "service.name"
     TELEMETRY_SDK_LANGUAGE = "telemetry.sdk.language"
