@@ -1,5 +1,6 @@
 # mypy: ignore-errors
 from typing import Dict, Any, Mapping, Literal, Optional
+from urllib.parse import quote
 import httpx
 from httpx import Response
 from judgeval.exceptions import JudgmentAPIError
@@ -314,13 +315,18 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def post_e2e_fetch_trace(
-        self, payload: E2EFetchTraceRequest
+    def get_e2e_fetch_trace(
+        self, project_name: str, trace_id: str
     ) -> E2EFetchTraceResponse:
+        url_encoded_project_name = quote(project_name, safe="")
+        url_encoded_trace_id = quote(trace_id, safe="")
         return self._request(
-            "POST",
-            url_for("/v1/e2e_fetch_trace/", self.base_url),
-            payload,
+            "GET",
+            url_for(
+                f"/v1/e2e_fetch_trace/{url_encoded_project_name}/{url_encoded_trace_id}",
+                self.base_url,
+            ),
+            {},
         )
 
     def post_e2e_fetch_span_score(
@@ -621,14 +627,25 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def post_e2e_fetch_trace(
-        self, payload: E2EFetchTraceRequest
+    async def get_e2e_fetch_trace(
+        self, project_name: str, trace_id: str
     ) -> E2EFetchTraceResponse:
-        return await self._request(
-            "POST",
-            url_for("/v1/e2e_fetch_trace/", self.base_url),
-            payload,
+        url_encoded_project_name = quote(project_name, safe="")
+        url_encoded_trace_id = quote(trace_id, safe="")
+        get_url = url_for(
+            f"/v1/e2e_fetch_trace/{url_encoded_project_name}/{url_encoded_trace_id}",
+            self.base_url,
         )
+        try:
+            return await self._request("GET", get_url, {})
+        except JudgmentAPIError as e:
+            if e.status_code == 404:
+                return await self._request(
+                    "POST",
+                    url_for("/v1/e2e_fetch_trace/", self.base_url),
+                    {"project_name": project_name, "trace_id": trace_id},
+                )
+            raise
 
     async def post_e2e_fetch_span_score(
         self, payload: E2EFetchSpanScoreRequest

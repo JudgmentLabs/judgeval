@@ -90,11 +90,6 @@ class E2EFetchSpanScoreRequest(TypedDict):
 E2EFetchSpanScoreResponse = List[Dict[str, Any]]
 
 
-class E2EFetchTraceRequest(TypedDict):
-    project_name: str
-    trace_id: str
-
-
 E2EFetchTraceResponse = List[Dict[str, Any]]
 
 
