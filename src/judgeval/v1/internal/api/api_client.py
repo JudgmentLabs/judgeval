@@ -317,9 +317,14 @@ class JudgmentSyncClient:
     def get_e2e_fetch_trace(
         self, project_name: str, trace_id: str
     ) -> E2EFetchTraceResponse:
+        url_encoded_project_name = quote(project_name, safe="")
+        safe_trace_id = quote(trace_id, safe="")
         return self._request(
             "GET",
-            url_for(f"/v1/e2e_fetch_trace/{project_name}/{trace_id}", self.base_url),
+            url_for(
+                f"/v1/e2e_fetch_trace/{url_encoded_project_name}/{safe_trace_id}",
+                self.base_url,
+            ),
             {},
         )
 
@@ -624,9 +629,14 @@ class JudgmentAsyncClient:
     async def get_e2e_fetch_trace(
         self, project_name: str, trace_id: str
     ) -> E2EFetchTraceResponse:
+        url_encoded_project_name = quote(project_name, safe="")
+        safe_trace_id = quote(trace_id, safe="")
         return await self._request(
             "GET",
-            url_for(f"/v1/e2e_fetch_trace/{project_name}/{trace_id}", self.base_url),
+            url_for(
+                f"/v1/e2e_fetch_trace/{url_encoded_project_name}/{safe_trace_id}",
+                self.base_url,
+            ),
             {},
         )
 
