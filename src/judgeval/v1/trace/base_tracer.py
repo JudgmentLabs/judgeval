@@ -176,6 +176,7 @@ class BaseTracer(ABC):
         proxy.shutdown()
 
     @staticmethod
+    @dont_throw
     def registerOTELInstrumentation(instrumentor) -> None:
         """Register a third-party OTel instrumentor so its spans are
         routed through the Judgment trace pipeline."""
@@ -438,6 +439,7 @@ class BaseTracer(ABC):
     # ------------------------------------------------------------------ #
 
     @staticmethod
+    @dont_throw
     def set_span_kind(kind: str) -> None:
         """Set the ``judgment.span_kind`` attribute on the current span."""
         if kind is None:

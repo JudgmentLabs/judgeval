@@ -80,3 +80,6 @@ def enqueue(fn: Callable[[], Any]) -> bool:
 
 def flush(timeout_ms: int = 30000) -> bool:
     return BackgroundQueue.get_instance().force_flush(timeout_ms)
+
+
+__all__ = ["BackgroundQueue", "enqueue", "flush"]

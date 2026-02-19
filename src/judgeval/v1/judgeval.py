@@ -58,16 +58,6 @@ class Judgeval:
             )
 
     @property
-    def tracer(self):
-        from judgeval.v1.tracer.tracer_factory import TracerFactory
-
-        return TracerFactory(
-            client=self._internal_client,
-            project_name=self._project_name,
-            project_id=self._project_id,
-        )
-
-    @property
     def scorers(self):
         from judgeval.v1.scorers.scorers_factory import ScorersFactory
 

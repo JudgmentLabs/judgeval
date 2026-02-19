@@ -1,5 +1,6 @@
 import asyncio
 import os
+import uuid
 from openai import AsyncOpenAI
 from opentelemetry.instrumentation.openai import OpenAIInstrumentor
 from judgeval.v1.trace import Tracer
@@ -86,101 +87,33 @@ async def handle_request(
 
 
 async def main():
-    results = await asyncio.gather(
-        handle_request(
-            "fibonacci",
-            customer_id="cust_001",
-            session_id="sess_01",
-            tags=["math", "recursive"],
-            n=5,
-        ),
-        handle_request(
-            "long_running_task",
-            customer_id="cust_001",
-            session_id="sess_02",
-            tags=["long"],
-            duration=10,
-        ),
-        handle_request(
-            "fibonacci",
-            customer_id="cust_001",
-            session_id="sess_02",
-            tags=["math", "recursive"],
-            n=24,
-        ),
-        handle_request(
-            "chat",
-            customer_id="cust_003",
-            session_id="sess_03",
-            tags=["llm", "research"],
-            message="whats the latest anthropic model?",
-        ),
-        handle_request(
-            "fibonacci",
-            customer_id="cust_001",
-            session_id="sess_04",
-            tags=["math", "recursive"],
-            n=8,
-        ),
-        handle_request(
-            "fizzbuzz",
-            customer_id="cust_003",
-            session_id="sess_05",
-            tags=["math"],
-            n=30,
-        ),
-        handle_request(
-            "chat",
-            customer_id="cust_002",
-            session_id="sess_06",
-            tags=["llm"],
-            message="explain quantum computing in one sentence",
-        ),
-        handle_request(
-            "fibonacci",
-            customer_id="cust_002",
-            session_id="sess_07",
-            tags=["math", "recursive"],
-            n=3,
-        ),
-        handle_request(
-            "fizzbuzz",
-            customer_id="cust_001",
-            session_id="sess_08",
-            tags=["math", "iterative"],
-            n=20,
-        ),
-        handle_request(
-            "chat",
-            customer_id="cust_001",
-            session_id="sess_09",
-            tags=["llm", "research"],
-            message="what is RLHF?",
-        ),
-        handle_request(
-            "fibonacci",
-            customer_id="cust_003",
-            session_id="sess_10",
-            tags=["math"],
-            n=6,
-        ),
-        handle_request(
-            "fizzbuzz",
-            customer_id="cust_002",
-            session_id="sess_11",
-            tags=["math"],
-            n=10,
-        ),
-        handle_request(
-            "chat",
-            customer_id="cust_003",
-            session_id="sess_12",
-            tags=["llm"],
-            message="summarize transformers architecture",
-        ),
+    session_id = str(uuid.uuid4())
+
+    await handle_request(
+        "chat",
+        customer_id="cust_001",
+        session_id=session_id,
+        tags=["llm"],
+        message="whats the latest anthropic model?",
     )
-    for r in results:
-        print(r)
+
+    await asyncio.sleep(3)
+    await handle_request(
+        "chat",
+        customer_id="cust_001",
+        session_id=session_id,
+        tags=["llm"],
+        message="explain quantum computing in one sentence",
+    )
+
+    await asyncio.sleep(3)
+    await handle_request(
+        "chat",
+        customer_id="cust_001",
+        session_id=session_id,
+        tags=["llm"],
+        message="what is RLHF?",
+    )
 
 
 if __name__ == "__main__":
