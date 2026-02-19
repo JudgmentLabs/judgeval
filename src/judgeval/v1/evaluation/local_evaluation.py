@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, Generator, List, Tuple, Union
+from typing import Any, Dict, Generator, List, Tuple
 
 from rich.console import Console
 from rich.progress import Progress
@@ -48,15 +48,15 @@ class LocalEvaluatorRunner(EvaluatorRunner[ExampleCustomScorer]):
     ) -> None:
         total_jobs = len(examples) * len(scorers)
         results_by_example: List[
-            List[Tuple[str, Union[ScorerResponse, BaseException]]]
+            List[Tuple[str, ScorerResponse | None, Exception | None]]
         ] = [[] for _ in examples]
 
         task = progress.add_task("Running local scorers...", total=None)
         completed = 0
         start_time = time.time()
 
-        for idx, name, result in self._run_local_scorers(examples, scorers):
-            results_by_example[idx].append((name, result))
+        for idx, name, result, exc in self._run_local_scorers(examples, scorers):
+            results_by_example[idx].append((name, result, exc))
             completed += 1
             progress.update(
                 task,
@@ -72,17 +72,17 @@ class LocalEvaluatorRunner(EvaluatorRunner[ExampleCustomScorer]):
         api_results: List[LocalScorerResult] = []
         for i, example in enumerate(examples):
             scorer_entries: List[Dict[str, Any]] = []
-            for scorer_name, res in results_by_example[i]:
-                if isinstance(res, BaseException):
+            for scorer_name, res, exc in results_by_example[i]:
+                if exc is not None:
                     scorer_entries.append(
                         {
                             "scorer_name": scorer_name,
                             "value": 0,
                             "reason": "",
-                            "error": str(res),
+                            "error": str(exc),
                         }
                     )
-                else:
+                elif res is not None:
                     entry: Dict[str, Any] = {
                         "scorer_name": scorer_name,
                         "value": res.value,
@@ -111,7 +111,7 @@ class LocalEvaluatorRunner(EvaluatorRunner[ExampleCustomScorer]):
         examples: List[Example],
         scorers: List[ExampleCustomScorer],
     ) -> Generator[
-        Tuple[int, str, ScorerResponse, None] | Tuple[int, str, None, BaseException],
+        Tuple[int, str, ScorerResponse, None] | Tuple[int, str, None, Exception],
         None,
         None,
     ]:
@@ -137,7 +137,8 @@ class LocalEvaluatorRunner(EvaluatorRunner[ExampleCustomScorer]):
             for future in as_completed(futures):
                 idx, name = futures[future]
                 try:
-                    result: Union[ScorerResponse, BaseException] = future.result()
+                    res = future.result()
                 except Exception as exc:
-                    result = exc
-                yield (idx, name, result)
+                    yield (idx, name, None, exc)
+                else:
+                    yield (idx, name, res, None)
