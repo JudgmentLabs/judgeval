@@ -318,11 +318,11 @@ class JudgmentSyncClient:
         self, project_name: str, trace_id: str
     ) -> E2EFetchTraceResponse:
         url_encoded_project_name = quote(project_name, safe="")
-        safe_trace_id = quote(trace_id, safe="")
+        url_encoded_trace_id = quote(trace_id, safe="")
         return self._request(
             "GET",
             url_for(
-                f"/v1/e2e_fetch_trace/{url_encoded_project_name}/{safe_trace_id}",
+                f"/v1/e2e_fetch_trace/{url_encoded_project_name}/{url_encoded_trace_id}",
                 self.base_url,
             ),
             {},
@@ -630,15 +630,21 @@ class JudgmentAsyncClient:
         self, project_name: str, trace_id: str
     ) -> E2EFetchTraceResponse:
         url_encoded_project_name = quote(project_name, safe="")
-        safe_trace_id = quote(trace_id, safe="")
-        return await self._request(
-            "GET",
-            url_for(
-                f"/v1/e2e_fetch_trace/{url_encoded_project_name}/{safe_trace_id}",
-                self.base_url,
-            ),
-            {},
+        url_encoded_trace_id = quote(trace_id, safe="")
+        get_url = url_for(
+            f"/v1/e2e_fetch_trace/{url_encoded_project_name}/{url_encoded_trace_id}",
+            self.base_url,
         )
+        try:
+            return await self._request("GET", get_url, {})
+        except JudgmentAPIError as e:
+            if e.status_code == 404:
+                return await self._request(
+                    "POST",
+                    url_for("/v1/e2e_fetch_trace/", self.base_url),
+                    {"project_name": project_name, "trace_id": trace_id},
+                )
+            raise
 
     async def post_e2e_fetch_span_score(
         self, payload: E2EFetchSpanScoreRequest
