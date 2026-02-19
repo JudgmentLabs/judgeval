@@ -1,3 +1,5 @@
+> **Base branch:** This PR should target **`staging`** (not `main`).
+
 ## 📝 Summary
 
 <!-- Add your list of changes, make it a list to improve the PR reviewers' experience. Ie:
