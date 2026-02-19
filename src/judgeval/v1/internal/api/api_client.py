@@ -319,9 +319,7 @@ class JudgmentSyncClient:
     ) -> E2EFetchTraceResponse:
         return self._request(
             "GET",
-            url_for(
-                f"/v1/e2e_fetch_trace/{project_name}/{trace_id}", self.base_url
-            ),
+            url_for(f"/v1/e2e_fetch_trace/{project_name}/{trace_id}", self.base_url),
             {},
         )
 
@@ -628,9 +626,7 @@ class JudgmentAsyncClient:
     ) -> E2EFetchTraceResponse:
         return await self._request(
             "GET",
-            url_for(
-                f"/v1/e2e_fetch_trace/{project_name}/{trace_id}", self.base_url
-            ),
+            url_for(f"/v1/e2e_fetch_trace/{project_name}/{trace_id}", self.base_url),
             {},
         )
 
