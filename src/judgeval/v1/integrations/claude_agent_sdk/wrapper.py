@@ -468,6 +468,29 @@ def _wrap_tool_factory(tool_fn: Any, tracer: "BaseTracer") -> Callable[..., Any]
     return wrapped_tool
 
 
+def _wrap_create_sdk_mcp_server(
+    original_fn: Callable[..., Any], tracer: "BaseTracer"
+) -> Callable[..., Any]:
+    """Wraps create_sdk_mcp_server to ensure all tools get traced handlers.
+
+    Tools created before setup_claude_agent_sdk() won't have wrapped handlers.
+    This wrapper retroactively wraps any unwrapped tool handlers so that every
+    SDK-registered tool gets proper span tracking regardless of creation order.
+    """
+
+    def wrapped_create_sdk_mcp_server(*args: Any, **kwargs: Any) -> Any:
+        tools = kwargs.get("tools") or (args[2] if len(args) > 2 else None)
+        if tools:
+            for tool_def in tools:
+                handler = getattr(tool_def, "handler", None)
+                if handler and not getattr(handler, "_judgeval_wrapped", False):
+                    tool_name = getattr(tool_def, "name", "unknown")
+                    tool_def.handler = _wrap_tool_handler(tracer, handler, tool_name)
+        return original_fn(*args, **kwargs)
+
+    return wrapped_create_sdk_mcp_server
+
+
 def _wrap_tool_handler(
     tracer: "BaseTracer", handler: Callable[..., Any], tool_name: Any
 ) -> Callable[..., Any]:

@@ -44,6 +44,7 @@ def setup_claude_agent_sdk(
         _create_tool_wrapper_class,
         _wrap_tool_factory,
         _wrap_query_function,
+        _wrap_create_sdk_mcp_server,
     )
 
     try:
@@ -63,6 +64,11 @@ def setup_claude_agent_sdk(
         )
         original_query_fn = (
             claude_agent_sdk.query if hasattr(claude_agent_sdk, "query") else None
+        )
+        original_create_server_fn = (
+            claude_agent_sdk.create_sdk_mcp_server
+            if hasattr(claude_agent_sdk, "create_sdk_mcp_server")
+            else None
         )
 
         # Patch ClaudeSDKClient
@@ -110,6 +116,24 @@ def setup_claude_agent_sdk(
                 if module and hasattr(module, "query"):
                     if getattr(module, "query", None) is original_query_fn:
                         setattr(module, "query", wrapped_query_fn)
+
+        # Patch create_sdk_mcp_server() to wrap tool handlers that were
+        # created before setup_claude_agent_sdk() was called
+        if original_create_server_fn:
+            wrapped_create_server_fn = _wrap_create_sdk_mcp_server(
+                original_create_server_fn, tracer
+            )
+            claude_agent_sdk.create_sdk_mcp_server = wrapped_create_server_fn  # type: ignore
+
+            for module in list(sys.modules.values()):
+                if module and hasattr(module, "create_sdk_mcp_server"):
+                    if (
+                        getattr(module, "create_sdk_mcp_server", None)
+                        is original_create_server_fn
+                    ):
+                        setattr(
+                            module, "create_sdk_mcp_server", wrapped_create_server_fn
+                        )
 
         judgeval_logger.info("Claude Agent SDK integration setup successful")
         return True

@@ -19,6 +19,7 @@ from judgeval.v1.integrations.claude_agent_sdk.wrapper import (
     _wrap_tool_handler,
     _create_tool_wrapper_class,
     _wrap_tool_factory,
+    _wrap_create_sdk_mcp_server,
     _parent_context_var,
     _sdk_tool_names,
     LLMSpanTracker,
@@ -819,6 +820,78 @@ class TestEmitPartial:
 # ---------------------------------------------------------------------------
 # Cleanup contextvar and SDK tool names after each test
 # ---------------------------------------------------------------------------
+
+
+class TestWrapCreateSdkMcpServer:
+    """Tests for _wrap_create_sdk_mcp_server."""
+
+    @pytest.mark.asyncio
+    async def test_wraps_unwrapped_tool_handlers(self):
+        """Tools created before patching get their handlers wrapped."""
+        collector = InMemoryCollector()
+        tracer = _make_tracer(collector)
+
+        async def my_handler(args):
+            return {"content": [{"type": "text", "text": "ok"}]}
+
+        tool_def = FakeSdkMcpTool(
+            name="pre_patch_tool",
+            description="created before setup",
+            input_schema={"q": str},
+            handler=my_handler,
+        )
+
+        assert not getattr(tool_def.handler, "_judgeval_wrapped", False)
+
+        def fake_create(name, version="1.0.0", tools=None):
+            return {"name": name, "tools": tools}
+
+        wrapped_create = _wrap_create_sdk_mcp_server(fake_create, tracer)
+        result = wrapped_create("my_server", tools=[tool_def])
+
+        assert getattr(tool_def.handler, "_judgeval_wrapped", False)
+        assert result["name"] == "my_server"
+        assert "pre_patch_tool" in _sdk_tool_names
+
+    @pytest.mark.asyncio
+    async def test_does_not_double_wrap(self):
+        """Already-wrapped handlers are left untouched."""
+        collector = InMemoryCollector()
+        tracer = _make_tracer(collector)
+
+        async def my_handler(args):
+            return {"content": [{"type": "text", "text": "ok"}]}
+
+        wrapped = _wrap_tool_handler(tracer, my_handler, "already_wrapped")
+        tool_def = FakeSdkMcpTool(
+            name="already_wrapped",
+            description="already wrapped",
+            input_schema={},
+            handler=wrapped,
+        )
+
+        original_handler = tool_def.handler
+
+        def fake_create(name, version="1.0.0", tools=None):
+            return {"name": name}
+
+        wrapped_create = _wrap_create_sdk_mcp_server(fake_create, tracer)
+        wrapped_create("srv", tools=[tool_def])
+
+        assert tool_def.handler is original_handler
+
+    @pytest.mark.asyncio
+    async def test_no_tools_passes_through(self):
+        """Calling without tools still works."""
+        collector = InMemoryCollector()
+        tracer = _make_tracer(collector)
+
+        def fake_create(name, version="1.0.0", tools=None):
+            return {"name": name}
+
+        wrapped_create = _wrap_create_sdk_mcp_server(fake_create, tracer)
+        result = wrapped_create("empty_server")
+        assert result["name"] == "empty_server"
 
 
 @pytest.fixture(autouse=True)
