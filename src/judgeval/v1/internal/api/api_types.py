@@ -98,6 +98,17 @@ class E2EFetchTraceRequest(TypedDict):
 E2EFetchTraceResponse = List[Dict[str, Any]]
 
 
+class E2ETracesPerProjectResponse(TypedDict):
+    data: E2ETracesPerProjectRow
+    total_spans: float
+    total_traces: float
+    limit: float
+    offset: float
+
+
+E2ETracesPerProjectRow = List[Dict[str, Any]]
+
+
 class ErrorResponse(TypedDict):
     error: str
     message: NotRequired[Optional[str]]
@@ -363,14 +374,8 @@ class UntagPromptResponse(TypedDict):
 
 
 class UploadCustomScorerRequest(TypedDict):
-    scorer_name: str
-    scorer_code: str
-    requirements_text: str
-    class_name: str
-    overwrite: bool
-    scorer_type: NotRequired[Optional[str]]
-    response_type: str
-    version: NotRequired[Optional[float]]
+    metadata: str
+    bundle: bytes
 
 
 class UploadCustomScorerResponse(TypedDict):

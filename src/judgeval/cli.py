@@ -64,10 +64,13 @@ def load_otel_env(
 
 @app.command()
 def upload_scorer(
-    scorer_file_path: str = typer.Argument(help="Path to scorer Python file"),
+    entrypoint_path: str = typer.Argument(help="Path to scorer entrypoint Python file"),
     project_name: str = typer.Option(..., "--project", "-p", help="Project name"),
     requirements_file_path: str = typer.Option(
         None, "--requirements", "-r", help="Path to requirements.txt file"
+    ),
+    included_files_paths: list[str] = typer.Option(
+        [], "--included-files", "-i", help="Path to included files"
     ),
     unique_name: str = typer.Option(
         None,
@@ -82,16 +85,14 @@ def upload_scorer(
     organization_id: str = typer.Option(None, envvar="JUDGMENT_ORG_ID"),
 ):
     """Upload custom scorer to Judgment."""
-    scorer_path = Path(scorer_file_path)
-
+    scorer_path = Path(entrypoint_path)
     if not scorer_path.exists():
-        raise typer.BadParameter(f"Scorer file not found: {scorer_file_path}")
-
+        raise typer.BadParameter(f"Scorer file not found: {entrypoint_path}")
     client = Judgeval(project_name, api_key=api_key, organization_id=organization_id)
-
     try:
         result = client.scorers.custom_scorer.upload(
-            scorer_file_path=scorer_file_path,
+            entrypoint_path=entrypoint_path,
+            included_files_paths=included_files_paths,
             requirements_file_path=requirements_file_path,
             unique_name=unique_name,
             overwrite=overwrite,

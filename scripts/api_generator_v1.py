@@ -417,6 +417,8 @@ def get_python_type(
     schema_type = schema.get("type", "object")
 
     if schema_type == "string":
+        if schema.get("format") == "binary":
+            return "bytes"
         return "str"
     elif schema_type == "integer":
         return "int"
@@ -566,12 +568,21 @@ def get_request_schema(operation: Dict[str, Any]) -> Optional[str]:
         return None
 
     content = request_body.get("content", {})
-    if "application/json" in content:
-        schema = content["application/json"].get("schema", {})
-        if schema:
-            return get_schema_name_from_id(schema)
+    for content_type in ("application/json", "multipart/form-data"):
+        if content_type in content:
+            schema = content[content_type].get("schema", {})
+            if schema:
+                return get_schema_name_from_id(schema)
 
     return None
+
+
+def is_multipart_request(operation: Dict[str, Any]) -> bool:
+    request_body = operation.get("requestBody", {})
+    if not request_body:
+        return False
+    content = request_body.get("content", {})
+    return "multipart/form-data" in content and "application/json" not in content
 
 
 def get_response_schema(operation: Dict[str, Any]) -> Optional[str]:
@@ -640,6 +651,7 @@ def generate_method_body(
     path_params: List[Dict[str, Any]],
     query_params: List[Dict[str, Any]],
     is_async: bool = False,
+    is_multipart: bool = False,
 ) -> str:
     async_prefix = "await " if is_async else ""
 
@@ -674,6 +686,8 @@ def generate_method_body(
             return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            {query_param},\n        )'
         else:
             return f'return {async_prefix}self._request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            {{}},\n        )'
+    elif is_multipart and request_type:
+        return f'return {async_prefix}self._multipart_request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            payload,\n        )'
     else:
         if request_type:
             if query_setup:
@@ -736,6 +750,42 @@ def generate_client_class(
     lines.append("        return _handle_response(r)")
     lines.append("")
 
+    # _multipart_request helper
+    multipart_method = (
+        "async def _multipart_request" if is_async else "def _multipart_request"
+    )
+    lines.append(f"    {multipart_method}(")
+    lines.append(
+        '        self, method: Literal["POST", "PATCH", "PUT"], url: str, payload: Any'
+    )
+    lines.append("    ) -> Any:")
+    lines.append('        logger.debug(f"HTTP {method} (multipart) {url}")')
+    lines.append("        data = {}")
+    lines.append("        files = {}")
+    lines.append("        for key, value in payload.items():")
+    lines.append("            if isinstance(value, (bytes, bytearray)):")
+    lines.append(
+        '                files[key] = (key, value, "application/octet-stream")'
+    )
+    lines.append("            else:")
+    lines.append("                data[key] = value")
+    lines.append("        r = self.client.request(")
+    lines.append("            method,")
+    lines.append("            url,")
+    lines.append("            data=data,")
+    lines.append("            files=files,")
+    lines.append(
+        "            headers=_multipart_headers(self.api_key, self.organization_id),"
+    )
+    lines.append("        )")
+    if is_async:
+        lines.append("        r = await r")
+    lines.append(
+        '        logger.debug(f"HTTP {method} (multipart) {url} -> {r.status_code}")'
+    )
+    lines.append("        return _handle_response(r)")
+    lines.append("")
+
     for method_info in methods:
         method_name = method_info["name"]
         path = method_info["path"]
@@ -744,6 +794,7 @@ def generate_client_class(
         path_params = method_info["path_params"]
         query_params = method_info["query_params"]
         response_type = method_info["response_type"]
+        multipart = method_info.get("is_multipart", False)
 
         signature = generate_method_signature(
             method_name,
@@ -763,6 +814,7 @@ def generate_client_class(
             path_params,
             query_params,
             is_async,
+            is_multipart=multipart,
         )
         lines.append(f"        {body}")
         lines.append("")
@@ -799,6 +851,13 @@ def generate_api_file() -> str:
         "            detail = r.text",
         "        raise JudgmentAPIError(r.status_code, detail, r)",
         "    return r.json()",
+        "",
+        "",
+        "def _multipart_headers(api_key: str, organization_id: str) -> Mapping[str, str]:",
+        "    return {",
+        '        "Authorization": f"Bearer {api_key}",',
+        '        "X-Organization-Id": organization_id,',
+        "    }",
         "",
         "",
     ]
@@ -845,6 +904,7 @@ def generate_api_file() -> str:
 
                 request_type = request_schema if request_schema else None
                 response_type = response_schema if response_schema else "Any"
+                multipart = is_multipart_request(operation)
 
                 method_info = {
                     "name": method_name,
@@ -854,6 +914,7 @@ def generate_api_file() -> str:
                     "path_params": path_params,
                     "query_params": query_params,
                     "response_type": response_type,
+                    "is_multipart": multipart,
                 }
 
                 sync_methods.append(method_info)
