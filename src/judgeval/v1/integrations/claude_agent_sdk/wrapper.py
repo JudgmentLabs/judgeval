@@ -28,30 +28,27 @@ class TracingState:
 
     Passed through closures to all wrapper functions, providing:
     - parent_context: The current agent span context for tool span nesting.
-      Set by receive_response/wrapped_query, read by tool handlers and
-      BuiltInToolSpanTracker. This works even when tool handlers run in
-      a separate asyncio Task (as the Claude Agent SDK's MCP server does)
-      because all closures share the same TracingState instance.
-    - sdk_tool_names: Set of SDK-defined tool names to avoid duplicate spans
-      between _wrap_tool_handler and BuiltInToolSpanTracker.
+      Set by receive_response/wrapped_query, read by ToolSpanTracker.
+      This works even when tool handlers run in a separate asyncio Task
+      (as the Claude Agent SDK's MCP server does) because all closures
+      share the same TracingState instance.
     """
 
     def __init__(self) -> None:
         self.parent_context: Any = None
-        self.sdk_tool_names: set = set()
 
 
-class BuiltInToolSpanTracker:
-    """Captures tool call spans from the message stream for built-in tools.
+class ToolSpanTracker:
+    """Captures tool call spans from the message stream for ALL tools.
 
-    Built-in tools (file edit, bash, etc.) are handled by the Claude Code CLI
-    and appear in the message stream as ToolUseBlock in AssistantMessage content
-    followed by ToolResultBlock in UserMessage content. SDK-defined tools already
-    get spans from _wrap_tool_handler, so this tracker skips tools it knows are
-    handled by the SDK to avoid duplicate spans.
+    Every tool call — built-in (Bash, file_edit) and SDK-defined MCP tools —
+    appears in the message stream as ToolUseBlock in AssistantMessage content
+    followed by ToolResultBlock in UserMessage content. This tracker creates
+    spans for all of them uniformly, eliminating the need for separate handler
+    wrapping or name-based deduplication.
 
     Flow:
-    1. AssistantMessage contains ToolUseBlock → open a tool span
+    1. AssistantMessage contains ToolUseBlock → open a tool span, emit_partial
     2. UserMessage contains ToolResultBlock → match by tool_use_id, record output, close span
     """
 
@@ -77,16 +74,6 @@ class BuiltInToolSpanTracker:
             if not tool_name or not tool_use_id:
                 continue
 
-            # SDK tools are registered with their base name (e.g. "get_weather"),
-            # but appear in the message stream with MCP prefix
-            # (e.g. "mcp__server__get_weather"). Check both forms.
-            base_name = _extract_base_tool_name(tool_name)
-            if (
-                tool_name in self.state.sdk_tool_names
-                or base_name in self.state.sdk_tool_names
-            ):
-                continue
-
             ctx = self.state.parent_context
 
             span = self.tracer.get_tracer().start_span(
@@ -102,6 +89,10 @@ class BuiltInToolSpanTracker:
             )
 
             self._pending_spans[tool_use_id] = (span, tool_name)
+
+        # Emit partial after processing all tool blocks for real-time visibility
+        if self._pending_spans:
+            self.tracer.emit_partial()
 
     def on_user_message(self, message: Any) -> None:
         """Match ToolResultBlock entries to pending spans and close them."""
@@ -257,7 +248,7 @@ def _create_client_wrapper_class(
             llm_tracker = LLMSpanTracker(
                 tracer, query_start_time=self.__query_start_time
             )
-            tool_tracker = BuiltInToolSpanTracker(tracer, state=state)
+            tool_tracker = ToolSpanTracker(tracer, state=state)
 
             try:
                 async for message in generator:
@@ -322,29 +313,6 @@ def _create_client_wrapper_class(
     return WrappedClaudeSDKClient
 
 
-def _create_tool_wrapper_class(
-    original_tool_class: Any, tracer: "BaseTracer", state: TracingState
-) -> Any:
-    """Creates a wrapper class for SdkMcpTool that wraps handlers."""
-
-    class WrappedSdkMcpTool(original_tool_class):  # type: ignore
-        def __init__(
-            self,
-            name: Any,
-            description: Any,
-            input_schema: Any,
-            handler: Any,
-            **kwargs: Any,
-        ):
-            wrapped_handler = _wrap_tool_handler(tracer, handler, name, state)
-            super().__init__(name, description, input_schema, wrapped_handler, **kwargs)
-
-        # Preserve generic typing support
-        __class_getitem__ = classmethod(lambda cls, params: cls)  # type: ignore
-
-    return WrappedSdkMcpTool
-
-
 def _wrap_query_function(
     original_query_fn: Any, tracer: "BaseTracer", state: TracingState
 ) -> Callable[..., Any]:
@@ -373,7 +341,7 @@ def _wrap_query_function(
 
         final_results: List[Dict[str, Any]] = []
         llm_tracker = LLMSpanTracker(tracer, query_start_time=time.time())
-        tool_tracker = BuiltInToolSpanTracker(tracer, state=state)
+        tool_tracker = ToolSpanTracker(tracer, state=state)
 
         try:
             # Call original query function
@@ -437,134 +405,6 @@ def _wrap_query_function(
             state.parent_context = None
 
     return wrapped_query
-
-
-def _wrap_tool_factory(
-    tool_fn: Any, tracer: "BaseTracer", state: TracingState
-) -> Callable[..., Any]:
-    """Wraps the tool() factory function to return wrapped tools."""
-
-    def wrapped_tool(*args: Any, **kwargs: Any) -> Any:
-        result = tool_fn(*args, **kwargs)
-
-        # The tool() function returns a decorator, not a tool definition
-        # We need to wrap the decorator to intercept the final tool definition
-        if not callable(result):
-            return result
-
-        def wrapped_decorator(handler_fn: Any) -> Any:
-            tool_def = result(handler_fn)
-
-            # Now we have the actual tool definition, wrap its handler
-            if tool_def and hasattr(tool_def, "handler"):
-                tool_name = getattr(tool_def, "name", "unknown")
-                original_handler = getattr(tool_def, "handler")
-                setattr(
-                    tool_def,
-                    "handler",
-                    _wrap_tool_handler(tracer, original_handler, tool_name, state),
-                )
-
-            return tool_def
-
-        return wrapped_decorator
-
-    return wrapped_tool
-
-
-def _wrap_create_sdk_mcp_server(
-    original_fn: Callable[..., Any], tracer: "BaseTracer", state: TracingState
-) -> Callable[..., Any]:
-    """Wraps create_sdk_mcp_server to ensure all tools get traced handlers.
-
-    Tools created before setup_claude_agent_sdk() won't have wrapped handlers.
-    This wrapper retroactively wraps any unwrapped tool handlers so that every
-    SDK-registered tool gets proper span tracking regardless of creation order.
-    """
-
-    def wrapped_create_sdk_mcp_server(*args: Any, **kwargs: Any) -> Any:
-        tools = kwargs.get("tools") or (args[2] if len(args) > 2 else None)
-        if tools:
-            for tool_def in tools:
-                handler = getattr(tool_def, "handler", None)
-                if handler and not getattr(handler, "_judgeval_wrapped", False):
-                    tool_name = getattr(tool_def, "name", "unknown")
-                    tool_def.handler = _wrap_tool_handler(
-                        tracer, handler, tool_name, state
-                    )
-        return original_fn(*args, **kwargs)
-
-    return wrapped_create_sdk_mcp_server
-
-
-def _wrap_tool_handler(
-    tracer: "BaseTracer",
-    handler: Callable[..., Any],
-    tool_name: Any,
-    state: TracingState,
-) -> Callable[..., Any]:
-    """Wraps a tool handler to add tracing.
-
-    Reads the parent span context from the shared TracingState instance.
-    This works across asyncio Task boundaries because all closures from the
-    same setup_claude_agent_sdk() call share the same TracingState reference.
-    """
-    # Check if already wrapped to prevent double-wrapping
-    if hasattr(handler, "_judgeval_wrapped"):
-        return handler
-
-    state.sdk_tool_names.add(str(tool_name))
-
-    async def wrapped_handler(args: Any) -> Any:
-        # Read parent context from shared state — works even when this handler
-        # runs in a separate asyncio Task (MCP server) because all wrappers
-        # share the same TracingState instance via closure.
-        ctx = state.parent_context
-
-        # Create tool span with explicit parent context to ensure proper nesting
-        tracer_obj = tracer.get_tracer()
-        span = tracer_obj.start_span(
-            str(tool_name),
-            context=ctx,
-            attributes={
-                AttributeKeys.JUDGMENT_SPAN_KIND: "tool",
-            },
-        )
-
-        # Set this span as active in the context
-        with tracer.use_span(span, end_on_exit=True):
-            # Record input
-            tracer.set_span_attribute(span, AttributeKeys.JUDGMENT_INPUT, args)
-            tracer.emit_partial()
-
-            try:
-                result = await handler(args)
-
-                # Record output
-                tracer.set_span_attribute(span, AttributeKeys.JUDGMENT_OUTPUT, result)
-
-                return result
-            except Exception as e:
-                span.record_exception(e)
-                raise
-
-    # Mark as wrapped to prevent double-wrapping
-    wrapped_handler._judgeval_wrapped = True  # type: ignore
-    return wrapped_handler
-
-
-def _extract_base_tool_name(full_name: str) -> str:
-    """Extract the base tool name from an MCP-prefixed name.
-
-    MCP tools appear in the message stream as ``mcp__<server>__<tool_name>``.
-    Returns the ``<tool_name>`` portion, or the original name if it's not
-    MCP-prefixed.
-    """
-    if full_name.startswith("mcp__"):
-        parts = full_name.split("__")
-        if len(parts) >= 3:
-            return parts[-1]
-    return full_name
 
 
 def _create_llm_span_for_messages(
