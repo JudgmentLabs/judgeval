@@ -379,8 +379,8 @@ class TestEdgeCases(BaseOpenAIChatCompletionsTest):
         """Test multiple wrapped clients don't interfere with tracing verification"""
         from openai import OpenAI
 
-        client1 = wrap_openai_client_sync(tracer, OpenAI(api_key=openai_api_key))
-        client2 = wrap_openai_client_sync(tracer, OpenAI(api_key=openai_api_key))
+        client1 = wrap_openai_client_sync(OpenAI(api_key=openai_api_key))
+        client2 = wrap_openai_client_sync(OpenAI(api_key=openai_api_key))
 
         initial_span_count = len(mock_processor.ended_spans)
 
@@ -474,7 +474,7 @@ class TestSafetyGuarantees(BaseOpenAIChatCompletionsTest):
 
         monkeypatch.setattr(serialize, "safe_serialize", broken_serialize)
 
-        wrapped_client = wrap_openai_client_sync(tracer, sync_client)
+        wrapped_client = wrap_openai_client_sync(sync_client)
         response = wrapped_client.chat.completions.create(
             model="gpt-5-nano",
             messages=[{"role": "user", "content": "say test"}],
@@ -504,7 +504,7 @@ class TestSafetyGuarantees(BaseOpenAIChatCompletionsTest):
         from openai import OpenAI
 
         unwrapped = OpenAI(api_key=openai_api_key)
-        wrapped = wrap_openai_client_sync(tracer, OpenAI(api_key=openai_api_key))
+        wrapped = wrap_openai_client_sync(OpenAI(api_key=openai_api_key))
 
         unwrapped_response = unwrapped.chat.completions.create(
             model="gpt-5-nano",

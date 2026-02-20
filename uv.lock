@@ -1136,7 +1136,7 @@ name = "exceptiongroup"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/50/79/66800aadf48771f6b62f7eb014e352e5d06856655206165d775e675a02c9/exceptiongroup-1.3.1.tar.gz", hash = "sha256:8b412432c6055b0b7d14c310000ae93352ed6754f70fa8f7c34141f91c4e3219", size = 30371, upload-time = "2025-11-21T23:01:54.787Z" }
 wheels = [
@@ -2024,7 +2024,7 @@ dev = [
     { name = "langgraph", specifier = ">=0.6.4" },
     { name = "mypy", specifier = ">=1.17.1" },
     { name = "openai", specifier = ">=1.92.0" },
-    { name = "openlit", specifier = ">=1.35.5" },
+    { name = "openlit", specifier = ">=1.35.5,<1.36.8" },
     { name = "opentelemetry-instrumentation-openai", specifier = ">=0.44.1" },
     { name = "pre-commit", specifier = ">=4.2.0" },
     { name = "pytest", specifier = ">=8.4.1" },
@@ -3001,7 +3001,7 @@ wheels = [
 
 [[package]]
 name = "openlit"
-version = "1.36.8"
+version = "1.36.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anthropic" },
@@ -3032,9 +3032,9 @@ dependencies = [
     { name = "schedule" },
     { name = "xmltodict" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/88/e0/f92401ed734822d3c7d9ff4343b5af64230b594360a28d6b7f1c50a588f7/openlit-1.36.8.tar.gz", hash = "sha256:8b3e18257e647105892f569aa694b734815504d4a7a03a521d61e75055c3d77a", size = 282381, upload-time = "2026-02-06T06:48:35.113Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0a/92/ddebfab7e8feb519f5a96c0bb5410bd57f336528300c37d051d9e10bb3ce/openlit-1.36.7.tar.gz", hash = "sha256:553f533daf37fd9612df4a19f1da84a1c00a737253ef7580dd63f8c6353d19ec", size = 281884, upload-time = "2026-01-27T07:35:25.812Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/32/31/f0efbf5a7b1c1ee5dd5d6c0d61cc4c5cdec903cb6e1f50eab166fc440478/openlit-1.36.8-py3-none-any.whl", hash = "sha256:3c4b068450e4d471fa6c244ff9df195a06d8a6c054a7894ba694e10ae2958217", size = 432228, upload-time = "2026-02-06T06:48:33.243Z" },
+    { url = "https://files.pythonhosted.org/packages/5e/04/bfe4fa48ce1e88ae12e0abcf726f688e55861d7341d3b5b00d991dce3490/openlit-1.36.7-py3-none-any.whl", hash = "sha256:090f9c5545e8d9a57a25d572067beff1daf40eb4f485e2fbdd32020bcc07d0bd", size = 431693, upload-time = "2026-01-27T07:35:23.991Z" },
 ]
 
 [[package]]

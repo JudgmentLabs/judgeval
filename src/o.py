@@ -1,22 +1,24 @@
+from anthropic.types import TextBlock
 from judgeval import Tracer
 from judgeval.v1.integrations.openlit import Openlit
-from openai import OpenAI
+from anthropic import Anthropic
 
 tracer = Tracer.init(project_name="openlit")
-Openlit.initialize(tracer)
+Openlit.initialize(disabled_instrumentors=["agno"])
 
-
-openai = OpenAI()
+client = Anthropic()
 
 
 @Tracer.observe()
-def main():
-    response = openai.chat.completions.create(
-        model="gpt-5-nano",
+def run():
+    response = client.messages.create(
+        model="claude-sonnet-4-20250514",
+        max_tokens=256,
         messages=[{"role": "user", "content": "Hello, how are you?"}],
     )
-    return response.choices[0].message.content
+    assert isinstance(response.content[0], TextBlock)
+    return response.content[0].text
 
 
 if __name__ == "__main__":
-    main()
+    run()

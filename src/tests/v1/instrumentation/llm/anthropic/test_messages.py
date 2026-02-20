@@ -466,12 +466,8 @@ class TestEdgeCases(BaseAnthropicTest):
         """Test multiple wrapped clients don't interfere with tracing verification"""
         from anthropic import Anthropic
 
-        client1 = wrap_anthropic_client_sync(
-            tracer, Anthropic(api_key=anthropic_api_key)
-        )
-        client2 = wrap_anthropic_client_sync(
-            tracer, Anthropic(api_key=anthropic_api_key)
-        )
+        client1 = wrap_anthropic_client_sync(Anthropic(api_key=anthropic_api_key))
+        client2 = wrap_anthropic_client_sync(Anthropic(api_key=anthropic_api_key))
 
         # Track initial span count
         initial_span_count = len(mock_processor.ended_spans)
@@ -532,7 +528,7 @@ class TestSafetyGuarantees(BaseAnthropicTest):
 
         monkeypatch.setattr(serialize, "safe_serialize", broken_serialize)
 
-        wrapped_client = wrap_anthropic_client_sync(tracer, sync_client)
+        wrapped_client = wrap_anthropic_client_sync(sync_client)
         response = wrapped_client.messages.create(
             model="claude-3-haiku-20240307",
             max_tokens=1024,
@@ -562,9 +558,7 @@ class TestSafetyGuarantees(BaseAnthropicTest):
         from anthropic import Anthropic
 
         unwrapped = Anthropic(api_key=anthropic_api_key)
-        wrapped = wrap_anthropic_client_sync(
-            tracer, Anthropic(api_key=anthropic_api_key)
-        )
+        wrapped = wrap_anthropic_client_sync(Anthropic(api_key=anthropic_api_key))
 
         unwrapped_response = unwrapped.messages.create(
             model="claude-3-haiku-20240307",
@@ -649,7 +643,7 @@ class TestSafetyGuarantees(BaseAnthropicTest):
 
         monkeypatch.setattr(BaseTracer, "set_span_attribute", broken_set_attribute)
 
-        wrapped_client = wrap_anthropic_client_sync(tracer, sync_client)
+        wrapped_client = wrap_anthropic_client_sync(sync_client)
         response = wrapped_client.messages.create(
             model="claude-3-haiku-20240307",
             max_tokens=1024,
