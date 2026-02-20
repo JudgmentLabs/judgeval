@@ -14,7 +14,8 @@ from typing import (
     Tuple,
 )
 
-from opentelemetry.trace import set_span_in_context
+from opentelemetry.context import Context
+from opentelemetry.trace import Span, set_span_in_context
 
 from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.utils.serialize import safe_serialize
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
     from judgeval.v1.tracer.tracer import BaseTracer
 
 
+@dataclasses.dataclass(slots=True)
 class TracingState:
     """Shared mutable state for a single setup_claude_agent_sdk() call.
 
@@ -34,8 +36,7 @@ class TracingState:
       share the same TracingState instance.
     """
 
-    def __init__(self) -> None:
-        self.parent_context: Any = None
+    parent_context: Optional[Context] = None
 
 
 class ToolSpanTracker:
@@ -55,7 +56,7 @@ class ToolSpanTracker:
     def __init__(self, tracer: "BaseTracer", state: TracingState):
         self.tracer = tracer
         self.state = state
-        self._pending_spans: Dict[str, Tuple[Any, Any]] = {}
+        self._pending_spans: Dict[str, Tuple[Span, str]] = {}
 
     def on_assistant_message(self, message: Any) -> None:
         """Extract ToolUseBlock entries and open tool spans."""
@@ -145,12 +146,17 @@ class LLMSpanTracker:
 
     def __init__(self, tracer: BaseTracer, query_start_time: Optional[float] = None):
         self.tracer = tracer
-        self.current_span: Optional[Any] = None
-        self.current_span_context: Optional[Any] = None
+        self.current_span: Optional[Span] = None
+        self.current_span_context: Optional[Any] = (
+            None  # context manager, no public type
+        )
         self.next_start_time: Optional[float] = query_start_time
 
     def start_llm_span(
-        self, message: Any, prompt: Any, conversation_history: List[Dict[str, Any]]
+        self,
+        message: Any,
+        prompt: Optional[str],
+        conversation_history: List[Dict[str, Any]],
     ) -> Optional[Dict[str, Any]]:
         """Start a new LLM span, ending the previous one if it exists."""
         # Use the marked start time, or current time as fallback
