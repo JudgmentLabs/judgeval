@@ -248,7 +248,7 @@ def _create_client_wrapper_class(
             # Claude Agent SDK breaks OpenTelemetry's context propagation when executing tools,
             # so we need to explicitly store the context for tool handlers to access
             parent_context = set_span_in_context(agent_span, tracer.get_context())
-            _parent_context_var.set(parent_context)
+            parent_context_token = _parent_context_var.set(parent_context)
 
             final_results: List[Dict[str, Any]] = []
             llm_tracker = LLMSpanTracker(
@@ -316,7 +316,7 @@ def _create_client_wrapper_class(
                 tool_tracker.cleanup()
                 llm_tracker.cleanup()
                 agent_span_context.__exit__(None, None, None)
-                _parent_context_var.set(None)
+                _parent_context_var.reset(parent_context_token)
 
     return WrappedClaudeSDKClient
 
@@ -367,7 +367,7 @@ def _wrap_query_function(
 
         # Store parent context for tool tracing
         parent_context = set_span_in_context(agent_span, tracer.get_context())
-        _parent_context_var.set(parent_context)
+        parent_context_token = _parent_context_var.set(parent_context)
 
         final_results: List[Dict[str, Any]] = []
         llm_tracker = LLMSpanTracker(tracer, query_start_time=time.time())
@@ -432,7 +432,7 @@ def _wrap_query_function(
             tool_tracker.cleanup()
             llm_tracker.cleanup()
             agent_span_context.__exit__(None, None, None)
-            _parent_context_var.set(None)
+            _parent_context_var.reset(parent_context_token)
 
     return wrapped_query
 
