@@ -189,16 +189,8 @@ class LLMSpanTracker:
         self.current_span_context = None
 
 
-_sdk_tool_names: set = set()
-
-
-def _register_sdk_tool_name(name: str) -> None:
-    """Register a tool name as an SDK-defined tool to avoid duplicate spans."""
-    _sdk_tool_names.add(name)
-
-
 def _create_client_wrapper_class(
-    original_client_class: Any, tracer: "BaseTracer"
+    original_client_class: Any, tracer: "BaseTracer", sdk_tool_names: set
 ) -> Any:
     """Creates a wrapper class for ClaudeSDKClient that wraps query and receive_response."""
 
@@ -254,9 +246,7 @@ def _create_client_wrapper_class(
             llm_tracker = LLMSpanTracker(
                 tracer, query_start_time=self.__query_start_time
             )
-            tool_tracker = BuiltInToolSpanTracker(
-                tracer, sdk_tool_names=_sdk_tool_names
-            )
+            tool_tracker = BuiltInToolSpanTracker(tracer, sdk_tool_names=sdk_tool_names)
 
             try:
                 async for message in generator:
@@ -321,7 +311,9 @@ def _create_client_wrapper_class(
     return WrappedClaudeSDKClient
 
 
-def _create_tool_wrapper_class(original_tool_class: Any, tracer: "BaseTracer") -> Any:
+def _create_tool_wrapper_class(
+    original_tool_class: Any, tracer: "BaseTracer", sdk_tool_names: set
+) -> Any:
     """Creates a wrapper class for SdkMcpTool that wraps handlers."""
 
     class WrappedSdkMcpTool(original_tool_class):  # type: ignore
@@ -333,7 +325,7 @@ def _create_tool_wrapper_class(original_tool_class: Any, tracer: "BaseTracer") -
             handler: Any,
             **kwargs: Any,
         ):
-            wrapped_handler = _wrap_tool_handler(tracer, handler, name)
+            wrapped_handler = _wrap_tool_handler(tracer, handler, name, sdk_tool_names)
             super().__init__(name, description, input_schema, wrapped_handler, **kwargs)
 
         # Preserve generic typing support
@@ -343,7 +335,7 @@ def _create_tool_wrapper_class(original_tool_class: Any, tracer: "BaseTracer") -
 
 
 def _wrap_query_function(
-    original_query_fn: Any, tracer: "BaseTracer"
+    original_query_fn: Any, tracer: "BaseTracer", sdk_tool_names: set
 ) -> Callable[..., Any]:
     """Wraps the standalone query() function to add tracing."""
 
@@ -371,7 +363,7 @@ def _wrap_query_function(
 
         final_results: List[Dict[str, Any]] = []
         llm_tracker = LLMSpanTracker(tracer, query_start_time=time.time())
-        tool_tracker = BuiltInToolSpanTracker(tracer, sdk_tool_names=_sdk_tool_names)
+        tool_tracker = BuiltInToolSpanTracker(tracer, sdk_tool_names=sdk_tool_names)
 
         try:
             # Call original query function
@@ -437,7 +429,9 @@ def _wrap_query_function(
     return wrapped_query
 
 
-def _wrap_tool_factory(tool_fn: Any, tracer: "BaseTracer") -> Callable[..., Any]:
+def _wrap_tool_factory(
+    tool_fn: Any, tracer: "BaseTracer", sdk_tool_names: set
+) -> Callable[..., Any]:
     """Wraps the tool() factory function to return wrapped tools."""
 
     def wrapped_tool(*args: Any, **kwargs: Any) -> Any:
@@ -458,7 +452,9 @@ def _wrap_tool_factory(tool_fn: Any, tracer: "BaseTracer") -> Callable[..., Any]
                 setattr(
                     tool_def,
                     "handler",
-                    _wrap_tool_handler(tracer, original_handler, tool_name),
+                    _wrap_tool_handler(
+                        tracer, original_handler, tool_name, sdk_tool_names
+                    ),
                 )
 
             return tool_def
@@ -469,7 +465,7 @@ def _wrap_tool_factory(tool_fn: Any, tracer: "BaseTracer") -> Callable[..., Any]
 
 
 def _wrap_create_sdk_mcp_server(
-    original_fn: Callable[..., Any], tracer: "BaseTracer"
+    original_fn: Callable[..., Any], tracer: "BaseTracer", sdk_tool_names: set
 ) -> Callable[..., Any]:
     """Wraps create_sdk_mcp_server to ensure all tools get traced handlers.
 
@@ -485,14 +481,19 @@ def _wrap_create_sdk_mcp_server(
                 handler = getattr(tool_def, "handler", None)
                 if handler and not getattr(handler, "_judgeval_wrapped", False):
                     tool_name = getattr(tool_def, "name", "unknown")
-                    tool_def.handler = _wrap_tool_handler(tracer, handler, tool_name)
+                    tool_def.handler = _wrap_tool_handler(
+                        tracer, handler, tool_name, sdk_tool_names
+                    )
         return original_fn(*args, **kwargs)
 
     return wrapped_create_sdk_mcp_server
 
 
 def _wrap_tool_handler(
-    tracer: "BaseTracer", handler: Callable[..., Any], tool_name: Any
+    tracer: "BaseTracer",
+    handler: Callable[..., Any],
+    tool_name: Any,
+    sdk_tool_names: set,
 ) -> Callable[..., Any]:
     """Wraps a tool handler to add tracing.
 
@@ -504,7 +505,7 @@ def _wrap_tool_handler(
     if hasattr(handler, "_judgeval_wrapped"):
         return handler
 
-    _register_sdk_tool_name(str(tool_name))
+    sdk_tool_names.add(str(tool_name))
 
     async def wrapped_handler(args: Any) -> Any:
         # Get parent context from a contextvar

@@ -21,7 +21,6 @@ from judgeval.v1.integrations.claude_agent_sdk.wrapper import (
     _wrap_tool_factory,
     _wrap_create_sdk_mcp_server,
     _parent_context_var,
-    _sdk_tool_names,
     LLMSpanTracker,
     BuiltInToolSpanTracker,
 )
@@ -166,7 +165,8 @@ class TestWrapToolHandler:
         async def my_tool(args):
             return {"content": [{"type": "text", "text": f"Result: {args['x']}"}]}
 
-        wrapped = _wrap_tool_handler(tracer, my_tool, "calculator")
+        sdk_tool_names: set = set()
+        wrapped = _wrap_tool_handler(tracer, my_tool, "calculator", sdk_tool_names)
 
         # Create a parent span context to simulate the agent span
         with tracer.get_tracer().start_as_current_span("test_parent") as parent_span:
@@ -196,7 +196,10 @@ class TestWrapToolHandler:
         async def failing_tool(args):
             raise ValueError("tool failed")
 
-        wrapped = _wrap_tool_handler(tracer, failing_tool, "broken_tool")
+        sdk_tool_names: set = set()
+        wrapped = _wrap_tool_handler(
+            tracer, failing_tool, "broken_tool", sdk_tool_names
+        )
 
         with tracer.get_tracer().start_as_current_span("test_parent") as parent_span:
             from opentelemetry.trace import set_span_in_context
@@ -220,8 +223,11 @@ class TestWrapToolHandler:
         async def my_tool(args):
             return {"result": "ok"}
 
-        wrapped_once = _wrap_tool_handler(tracer, my_tool, "tool1")
-        wrapped_twice = _wrap_tool_handler(tracer, wrapped_once, "tool1")
+        sdk_tool_names: set = set()
+        wrapped_once = _wrap_tool_handler(tracer, my_tool, "tool1", sdk_tool_names)
+        wrapped_twice = _wrap_tool_handler(
+            tracer, wrapped_once, "tool1", sdk_tool_names
+        )
 
         assert wrapped_once is wrapped_twice
 
@@ -234,7 +240,8 @@ class TestWrapToolHandler:
         async def my_tool(args):
             return {"result": "ok"}
 
-        wrapped = _wrap_tool_handler(tracer, my_tool, "nested_tool")
+        sdk_tool_names: set = set()
+        wrapped = _wrap_tool_handler(tracer, my_tool, "nested_tool", sdk_tool_names)
 
         with tracer.get_tracer().start_as_current_span("agent_span") as agent_span:
             from opentelemetry.trace import set_span_in_context
@@ -271,7 +278,8 @@ class TestCreateToolWrapperClass:
         collector = InMemoryCollector()
         tracer = _make_tracer(collector)
 
-        WrappedTool = _create_tool_wrapper_class(FakeSdkMcpTool, tracer)
+        sdk_tool_names: set = set()
+        WrappedTool = _create_tool_wrapper_class(FakeSdkMcpTool, tracer, sdk_tool_names)
 
         async def my_handler(args):
             return {"content": [{"type": "text", "text": "hello"}]}
@@ -328,7 +336,8 @@ class TestWrapToolFactory:
 
             return decorator
 
-        wrapped_tool_fn = _wrap_tool_factory(fake_tool_fn, tracer)
+        sdk_tool_names: set = set()
+        wrapped_tool_fn = _wrap_tool_factory(fake_tool_fn, tracer, sdk_tool_names)
 
         @wrapped_tool_fn("add", "Add numbers", {"a": float, "b": float})
         async def add(args):
@@ -413,8 +422,9 @@ class TestMessageStreamToolSpans:
         async def tool_b(args):
             return {"result": "b"}
 
-        wrapped_a = _wrap_tool_handler(tracer, tool_a, "tool_a")
-        wrapped_b = _wrap_tool_handler(tracer, tool_b, "tool_b")
+        sdk_tool_names: set = set()
+        wrapped_a = _wrap_tool_handler(tracer, tool_a, "tool_a", sdk_tool_names)
+        wrapped_b = _wrap_tool_handler(tracer, tool_b, "tool_b", sdk_tool_names)
 
         with tracer.get_tracer().start_as_current_span("agent") as agent_span:
             from opentelemetry.trace import set_span_in_context
@@ -449,7 +459,8 @@ class TestMessageStreamToolSpans:
         async def echo_tool(args):
             return {"echo": args["message"]}
 
-        wrapped = _wrap_tool_handler(tracer, echo_tool, "echo")
+        sdk_tool_names: set = set()
+        wrapped = _wrap_tool_handler(tracer, echo_tool, "echo", sdk_tool_names)
 
         with tracer.get_tracer().start_as_current_span("parent") as parent:
             from opentelemetry.trace import set_span_in_context
@@ -743,7 +754,8 @@ class TestEmitPartial:
         async def my_tool(args):
             return {"result": "done"}
 
-        wrapped = _wrap_tool_handler(tracer, my_tool, "traced_tool")
+        sdk_tool_names: set = set()
+        wrapped = _wrap_tool_handler(tracer, my_tool, "traced_tool", sdk_tool_names)
 
         with tracer.get_tracer().start_as_current_span("parent") as parent:
             from opentelemetry.trace import set_span_in_context
@@ -846,12 +858,15 @@ class TestWrapCreateSdkMcpServer:
         def fake_create(name, version="1.0.0", tools=None):
             return {"name": name, "tools": tools}
 
-        wrapped_create = _wrap_create_sdk_mcp_server(fake_create, tracer)
+        sdk_tool_names: set = set()
+        wrapped_create = _wrap_create_sdk_mcp_server(
+            fake_create, tracer, sdk_tool_names
+        )
         result = wrapped_create("my_server", tools=[tool_def])
 
         assert getattr(tool_def.handler, "_judgeval_wrapped", False)
         assert result["name"] == "my_server"
-        assert "pre_patch_tool" in _sdk_tool_names
+        assert "pre_patch_tool" in sdk_tool_names
 
     @pytest.mark.asyncio
     async def test_does_not_double_wrap(self):
@@ -862,7 +877,10 @@ class TestWrapCreateSdkMcpServer:
         async def my_handler(args):
             return {"content": [{"type": "text", "text": "ok"}]}
 
-        wrapped = _wrap_tool_handler(tracer, my_handler, "already_wrapped")
+        sdk_tool_names: set = set()
+        wrapped = _wrap_tool_handler(
+            tracer, my_handler, "already_wrapped", sdk_tool_names
+        )
         tool_def = FakeSdkMcpTool(
             name="already_wrapped",
             description="already wrapped",
@@ -875,7 +893,9 @@ class TestWrapCreateSdkMcpServer:
         def fake_create(name, version="1.0.0", tools=None):
             return {"name": name}
 
-        wrapped_create = _wrap_create_sdk_mcp_server(fake_create, tracer)
+        wrapped_create = _wrap_create_sdk_mcp_server(
+            fake_create, tracer, sdk_tool_names
+        )
         wrapped_create("srv", tools=[tool_def])
 
         assert tool_def.handler is original_handler
@@ -889,7 +909,10 @@ class TestWrapCreateSdkMcpServer:
         def fake_create(name, version="1.0.0", tools=None):
             return {"name": name}
 
-        wrapped_create = _wrap_create_sdk_mcp_server(fake_create, tracer)
+        sdk_tool_names: set = set()
+        wrapped_create = _wrap_create_sdk_mcp_server(
+            fake_create, tracer, sdk_tool_names
+        )
         result = wrapped_create("empty_server")
         assert result["name"] == "empty_server"
 
@@ -898,4 +921,3 @@ class TestWrapCreateSdkMcpServer:
 def cleanup_thread_local():
     yield
     _parent_context_var.set(None)
-    _sdk_tool_names.clear()
