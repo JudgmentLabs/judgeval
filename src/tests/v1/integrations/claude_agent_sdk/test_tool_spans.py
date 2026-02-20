@@ -13,14 +13,16 @@ from unittest.mock import MagicMock
 import pytest
 
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.trace import set_span_in_context
 
 from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.v1.integrations.claude_agent_sdk.wrapper import (
+    TracingState,
     _wrap_tool_handler,
     _create_tool_wrapper_class,
     _wrap_tool_factory,
     _wrap_create_sdk_mcp_server,
-    _parent_context_var,
+    _extract_base_tool_name,
     LLMSpanTracker,
     BuiltInToolSpanTracker,
 )
@@ -149,6 +151,13 @@ def _make_tracer(collector: InMemoryCollector):
     return tracer
 
 
+def _make_state_with_parent(tracer, parent_span) -> TracingState:
+    """Create a TracingState with parent_context set from the given span."""
+    state = TracingState()
+    state.parent_context = set_span_in_context(parent_span, tracer.get_context())
+    return state
+
+
 # ---------------------------------------------------------------------------
 # Tests for _wrap_tool_handler
 # ---------------------------------------------------------------------------
@@ -165,16 +174,9 @@ class TestWrapToolHandler:
         async def my_tool(args):
             return {"content": [{"type": "text", "text": f"Result: {args['x']}"}]}
 
-        sdk_tool_names: set = set()
-        wrapped = _wrap_tool_handler(tracer, my_tool, "calculator", sdk_tool_names)
-
-        # Create a parent span context to simulate the agent span
         with tracer.get_tracer().start_as_current_span("test_parent") as parent_span:
-            from opentelemetry.trace import set_span_in_context
-
-            parent_ctx = set_span_in_context(parent_span, tracer.get_context())
-            _parent_context_var.set(parent_ctx)
-
+            state = _make_state_with_parent(tracer, parent_span)
+            wrapped = _wrap_tool_handler(tracer, my_tool, "calculator", state)
             result = await wrapped({"x": 42})
 
         assert result == {"content": [{"type": "text", "text": "Result: 42"}]}
@@ -196,17 +198,9 @@ class TestWrapToolHandler:
         async def failing_tool(args):
             raise ValueError("tool failed")
 
-        sdk_tool_names: set = set()
-        wrapped = _wrap_tool_handler(
-            tracer, failing_tool, "broken_tool", sdk_tool_names
-        )
-
         with tracer.get_tracer().start_as_current_span("test_parent") as parent_span:
-            from opentelemetry.trace import set_span_in_context
-
-            _parent_context_var.set(
-                set_span_in_context(parent_span, tracer.get_context())
-            )
+            state = _make_state_with_parent(tracer, parent_span)
+            wrapped = _wrap_tool_handler(tracer, failing_tool, "broken_tool", state)
 
             with pytest.raises(ValueError, match="tool failed"):
                 await wrapped({"input": "data"})
@@ -223,32 +217,24 @@ class TestWrapToolHandler:
         async def my_tool(args):
             return {"result": "ok"}
 
-        sdk_tool_names: set = set()
-        wrapped_once = _wrap_tool_handler(tracer, my_tool, "tool1", sdk_tool_names)
-        wrapped_twice = _wrap_tool_handler(
-            tracer, wrapped_once, "tool1", sdk_tool_names
-        )
+        state = TracingState()
+        wrapped_once = _wrap_tool_handler(tracer, my_tool, "tool1", state)
+        wrapped_twice = _wrap_tool_handler(tracer, wrapped_once, "tool1", state)
 
         assert wrapped_once is wrapped_twice
 
     @pytest.mark.asyncio
     async def test_tool_handler_nests_under_parent(self):
-        """Tool spans should be children of the agent span via thread-local context."""
+        """Tool spans should be children of the agent span via shared state."""
         collector = InMemoryCollector()
         tracer = _make_tracer(collector)
 
         async def my_tool(args):
             return {"result": "ok"}
 
-        sdk_tool_names: set = set()
-        wrapped = _wrap_tool_handler(tracer, my_tool, "nested_tool", sdk_tool_names)
-
         with tracer.get_tracer().start_as_current_span("agent_span") as agent_span:
-            from opentelemetry.trace import set_span_in_context
-
-            _parent_context_var.set(
-                set_span_in_context(agent_span, tracer.get_context())
-            )
+            state = _make_state_with_parent(tracer, agent_span)
+            wrapped = _wrap_tool_handler(tracer, my_tool, "nested_tool", state)
             await wrapped({"a": 1})
 
         agent_spans = [s for s in collector.spans if s.name == "agent_span"]
@@ -278,28 +264,24 @@ class TestCreateToolWrapperClass:
         collector = InMemoryCollector()
         tracer = _make_tracer(collector)
 
-        sdk_tool_names: set = set()
-        WrappedTool = _create_tool_wrapper_class(FakeSdkMcpTool, tracer, sdk_tool_names)
+        with tracer.get_tracer().start_as_current_span("parent") as parent_span:
+            state = _make_state_with_parent(tracer, parent_span)
+            WrappedTool = _create_tool_wrapper_class(FakeSdkMcpTool, tracer, state)
 
-        async def my_handler(args):
-            return {"content": [{"type": "text", "text": "hello"}]}
+            async def my_handler(args):
+                return {"content": [{"type": "text", "text": "hello"}]}
 
-        tool = WrappedTool(
-            name="greet",
-            description="Greet someone",
-            input_schema={"name": str},
-            handler=my_handler,
-        )
+            tool = WrappedTool(
+                name="greet",
+                description="Greet someone",
+                input_schema={"name": str},
+                handler=my_handler,
+            )
 
-        assert tool.name == "greet"
-        assert tool.description == "Greet someone"
-        assert hasattr(tool.handler, "_judgeval_wrapped")
+            assert tool.name == "greet"
+            assert tool.description == "Greet someone"
+            assert hasattr(tool.handler, "_judgeval_wrapped")
 
-        # Call the wrapped handler
-        with tracer.get_tracer().start_as_current_span("parent") as parent:
-            from opentelemetry.trace import set_span_in_context
-
-            _parent_context_var.set(set_span_in_context(parent, tracer.get_context()))
             result = await tool.handler({"name": "World"})
 
         assert result == {"content": [{"type": "text", "text": "hello"}]}
@@ -336,8 +318,8 @@ class TestWrapToolFactory:
 
             return decorator
 
-        sdk_tool_names: set = set()
-        wrapped_tool_fn = _wrap_tool_factory(fake_tool_fn, tracer, sdk_tool_names)
+        state = TracingState()
+        wrapped_tool_fn = _wrap_tool_factory(fake_tool_fn, tracer, state)
 
         @wrapped_tool_fn("add", "Add numbers", {"a": float, "b": float})
         async def add(args):
@@ -348,10 +330,10 @@ class TestWrapToolFactory:
         assert add.name == "add"
         assert hasattr(add.handler, "_judgeval_wrapped")
 
-        with tracer.get_tracer().start_as_current_span("parent") as parent:
-            from opentelemetry.trace import set_span_in_context
-
-            _parent_context_var.set(set_span_in_context(parent, tracer.get_context()))
+        with tracer.get_tracer().start_as_current_span("parent") as parent_span:
+            state.parent_context = set_span_in_context(
+                parent_span, tracer.get_context()
+            )
             result = await add.handler({"a": 3.0, "b": 4.0})
 
         assert result == {"content": [{"type": "text", "text": "Sum: 7.0"}]}
@@ -422,16 +404,11 @@ class TestMessageStreamToolSpans:
         async def tool_b(args):
             return {"result": "b"}
 
-        sdk_tool_names: set = set()
-        wrapped_a = _wrap_tool_handler(tracer, tool_a, "tool_a", sdk_tool_names)
-        wrapped_b = _wrap_tool_handler(tracer, tool_b, "tool_b", sdk_tool_names)
-
         with tracer.get_tracer().start_as_current_span("agent") as agent_span:
-            from opentelemetry.trace import set_span_in_context
+            state = _make_state_with_parent(tracer, agent_span)
+            wrapped_a = _wrap_tool_handler(tracer, tool_a, "tool_a", state)
+            wrapped_b = _wrap_tool_handler(tracer, tool_b, "tool_b", state)
 
-            _parent_context_var.set(
-                set_span_in_context(agent_span, tracer.get_context())
-            )
             await wrapped_a({"input": "1"})
             await wrapped_b({"input": "2"})
 
@@ -459,13 +436,9 @@ class TestMessageStreamToolSpans:
         async def echo_tool(args):
             return {"echo": args["message"]}
 
-        sdk_tool_names: set = set()
-        wrapped = _wrap_tool_handler(tracer, echo_tool, "echo", sdk_tool_names)
-
-        with tracer.get_tracer().start_as_current_span("parent") as parent:
-            from opentelemetry.trace import set_span_in_context
-
-            _parent_context_var.set(set_span_in_context(parent, tracer.get_context()))
+        with tracer.get_tracer().start_as_current_span("parent") as parent_span:
+            state = _make_state_with_parent(tracer, parent_span)
+            wrapped = _wrap_tool_handler(tracer, echo_tool, "echo", state)
             result = await wrapped({"message": "hello world"})
 
         assert result == {"echo": "hello world"}
@@ -495,14 +468,9 @@ class TestBuiltInToolSpanTracker:
         collector = InMemoryCollector()
         tracer = _make_tracer(collector)
 
-        tracker = BuiltInToolSpanTracker(tracer)
-
         with tracer.get_tracer().start_as_current_span("agent") as agent_span:
-            from opentelemetry.trace import set_span_in_context
-
-            _parent_context_var.set(
-                set_span_in_context(agent_span, tracer.get_context())
-            )
+            state = _make_state_with_parent(tracer, agent_span)
+            tracker = BuiltInToolSpanTracker(tracer, state=state)
 
             # Simulate AssistantMessage with a ToolUseBlock
             assistant_msg = AssistantMessage(
@@ -544,14 +512,9 @@ class TestBuiltInToolSpanTracker:
         collector = InMemoryCollector()
         tracer = _make_tracer(collector)
 
-        tracker = BuiltInToolSpanTracker(tracer)
-
         with tracer.get_tracer().start_as_current_span("agent") as agent_span:
-            from opentelemetry.trace import set_span_in_context
-
-            _parent_context_var.set(
-                set_span_in_context(agent_span, tracer.get_context())
-            )
+            state = _make_state_with_parent(tracer, agent_span)
+            tracker = BuiltInToolSpanTracker(tracer, state=state)
 
             assistant_msg = AssistantMessage(
                 content=[
@@ -588,15 +551,11 @@ class TestBuiltInToolSpanTracker:
         collector = InMemoryCollector()
         tracer = _make_tracer(collector)
 
-        # "calculator" is an SDK-defined tool
-        tracker = BuiltInToolSpanTracker(tracer, sdk_tool_names={"calculator"})
-
         with tracer.get_tracer().start_as_current_span("agent") as agent_span:
-            from opentelemetry.trace import set_span_in_context
-
-            _parent_context_var.set(
-                set_span_in_context(agent_span, tracer.get_context())
-            )
+            state = _make_state_with_parent(tracer, agent_span)
+            # "calculator" is an SDK-defined tool
+            state.sdk_tool_names.add("calculator")
+            tracker = BuiltInToolSpanTracker(tracer, state=state)
 
             # SDK tool: should be skipped
             assistant_msg = AssistantMessage(
@@ -631,19 +590,60 @@ class TestBuiltInToolSpanTracker:
         assert len(bash_spans) == 1, "Built-in tool should create message-stream span"
 
     @pytest.mark.asyncio
+    async def test_mcp_prefixed_sdk_tools_are_skipped(self):
+        """SDK tools appearing with MCP prefix (mcp__server__tool) should not get duplicate spans."""
+        collector = InMemoryCollector()
+        tracer = _make_tracer(collector)
+
+        with tracer.get_tracer().start_as_current_span("agent") as agent_span:
+            state = _make_state_with_parent(tracer, agent_span)
+            # "get_weather" is the base name registered by _wrap_tool_handler
+            state.sdk_tool_names.add("get_weather")
+            tracker = BuiltInToolSpanTracker(tracer, state=state)
+
+            # Message stream uses MCP-prefixed name
+            assistant_msg = AssistantMessage(
+                content=[
+                    ToolUseBlock(
+                        id="tool_mcp",
+                        name="mcp__weather__get_weather",
+                        input={"city": "SF"},
+                    ),
+                    # Built-in tool: should still create a span
+                    ToolUseBlock(
+                        id="tool_bash",
+                        name="bash",
+                        input={"command": "echo hi"},
+                    ),
+                ]
+            )
+            tracker.on_assistant_message(assistant_msg)
+
+            user_msg = FakeUserMessage(
+                content=[
+                    ToolResultBlock(tool_use_id="tool_mcp", content="62F"),
+                    ToolResultBlock(tool_use_id="tool_bash", content="hi"),
+                ]
+            )
+            tracker.on_user_message(user_msg)
+
+        weather_spans = [s for s in collector.spans if "weather" in s.name.lower()]
+        bash_spans = [s for s in collector.spans if s.name == "bash"]
+
+        assert len(weather_spans) == 0, (
+            "MCP-prefixed SDK tool should not create message-stream span"
+        )
+        assert len(bash_spans) == 1, "Built-in tool should still create a span"
+
+    @pytest.mark.asyncio
     async def test_multiple_builtin_tools_in_same_message(self):
         """Multiple ToolUseBlocks in a single AssistantMessage."""
         collector = InMemoryCollector()
         tracer = _make_tracer(collector)
 
-        tracker = BuiltInToolSpanTracker(tracer)
-
         with tracer.get_tracer().start_as_current_span("agent") as agent_span:
-            from opentelemetry.trace import set_span_in_context
-
-            _parent_context_var.set(
-                set_span_in_context(agent_span, tracer.get_context())
-            )
+            state = _make_state_with_parent(tracer, agent_span)
+            tracker = BuiltInToolSpanTracker(tracer, state=state)
 
             assistant_msg = AssistantMessage(
                 content=[
@@ -673,14 +673,9 @@ class TestBuiltInToolSpanTracker:
         collector = InMemoryCollector()
         tracer = _make_tracer(collector)
 
-        tracker = BuiltInToolSpanTracker(tracer)
-
         with tracer.get_tracer().start_as_current_span("agent") as agent_span:
-            from opentelemetry.trace import set_span_in_context
-
-            _parent_context_var.set(
-                set_span_in_context(agent_span, tracer.get_context())
-            )
+            state = _make_state_with_parent(tracer, agent_span)
+            tracker = BuiltInToolSpanTracker(tracer, state=state)
 
             assistant_msg = AssistantMessage(
                 content=[
@@ -701,14 +696,9 @@ class TestBuiltInToolSpanTracker:
         collector = InMemoryCollector()
         tracer = _make_tracer(collector)
 
-        tracker = BuiltInToolSpanTracker(tracer)
-
         with tracer.get_tracer().start_as_current_span("agent") as agent_span:
-            from opentelemetry.trace import set_span_in_context
-
-            _parent_context_var.set(
-                set_span_in_context(agent_span, tracer.get_context())
-            )
+            state = _make_state_with_parent(tracer, agent_span)
+            tracker = BuiltInToolSpanTracker(tracer, state=state)
 
             assistant_msg = AssistantMessage(
                 content=[
@@ -754,13 +744,10 @@ class TestEmitPartial:
         async def my_tool(args):
             return {"result": "done"}
 
-        sdk_tool_names: set = set()
-        wrapped = _wrap_tool_handler(tracer, my_tool, "traced_tool", sdk_tool_names)
+        with tracer.get_tracer().start_as_current_span("parent") as parent_span:
+            state = _make_state_with_parent(tracer, parent_span)
+            wrapped = _wrap_tool_handler(tracer, my_tool, "traced_tool", state)
 
-        with tracer.get_tracer().start_as_current_span("parent") as parent:
-            from opentelemetry.trace import set_span_in_context
-
-            _parent_context_var.set(set_span_in_context(parent, tracer.get_context()))
             with patch.object(
                 BaseTracer, "emit_partial", wraps=tracer.emit_partial
             ) as mock_emit:
@@ -777,14 +764,9 @@ class TestEmitPartial:
         collector = InMemoryCollector()
         tracer = _make_tracer(collector)
 
-        tracker = BuiltInToolSpanTracker(tracer)
-
         with tracer.get_tracer().start_as_current_span("agent") as agent_span:
-            from opentelemetry.trace import set_span_in_context
-
-            _parent_context_var.set(
-                set_span_in_context(agent_span, tracer.get_context())
-            )
+            state = _make_state_with_parent(tracer, agent_span)
+            tracker = BuiltInToolSpanTracker(tracer, state=state)
 
             assistant_msg = AssistantMessage(
                 content=[
@@ -830,7 +812,7 @@ class TestEmitPartial:
 
 
 # ---------------------------------------------------------------------------
-# Cleanup contextvar and SDK tool names after each test
+# Tests for _wrap_create_sdk_mcp_server
 # ---------------------------------------------------------------------------
 
 
@@ -858,15 +840,13 @@ class TestWrapCreateSdkMcpServer:
         def fake_create(name, version="1.0.0", tools=None):
             return {"name": name, "tools": tools}
 
-        sdk_tool_names: set = set()
-        wrapped_create = _wrap_create_sdk_mcp_server(
-            fake_create, tracer, sdk_tool_names
-        )
+        state = TracingState()
+        wrapped_create = _wrap_create_sdk_mcp_server(fake_create, tracer, state)
         result = wrapped_create("my_server", tools=[tool_def])
 
         assert getattr(tool_def.handler, "_judgeval_wrapped", False)
         assert result["name"] == "my_server"
-        assert "pre_patch_tool" in sdk_tool_names
+        assert "pre_patch_tool" in state.sdk_tool_names
 
     @pytest.mark.asyncio
     async def test_does_not_double_wrap(self):
@@ -877,10 +857,8 @@ class TestWrapCreateSdkMcpServer:
         async def my_handler(args):
             return {"content": [{"type": "text", "text": "ok"}]}
 
-        sdk_tool_names: set = set()
-        wrapped = _wrap_tool_handler(
-            tracer, my_handler, "already_wrapped", sdk_tool_names
-        )
+        state = TracingState()
+        wrapped = _wrap_tool_handler(tracer, my_handler, "already_wrapped", state)
         tool_def = FakeSdkMcpTool(
             name="already_wrapped",
             description="already wrapped",
@@ -893,9 +871,7 @@ class TestWrapCreateSdkMcpServer:
         def fake_create(name, version="1.0.0", tools=None):
             return {"name": name}
 
-        wrapped_create = _wrap_create_sdk_mcp_server(
-            fake_create, tracer, sdk_tool_names
-        )
+        wrapped_create = _wrap_create_sdk_mcp_server(fake_create, tracer, state)
         wrapped_create("srv", tools=[tool_def])
 
         assert tool_def.handler is original_handler
@@ -909,15 +885,106 @@ class TestWrapCreateSdkMcpServer:
         def fake_create(name, version="1.0.0", tools=None):
             return {"name": name}
 
-        sdk_tool_names: set = set()
-        wrapped_create = _wrap_create_sdk_mcp_server(
-            fake_create, tracer, sdk_tool_names
-        )
+        state = TracingState()
+        wrapped_create = _wrap_create_sdk_mcp_server(fake_create, tracer, state)
         result = wrapped_create("empty_server")
         assert result["name"] == "empty_server"
 
 
-@pytest.fixture(autouse=True)
-def cleanup_thread_local():
-    yield
-    _parent_context_var.set(None)
+# ---------------------------------------------------------------------------
+# Tests for shared TracingState context propagation
+# ---------------------------------------------------------------------------
+
+
+class TestTracingStateContextPropagation:
+    """Test that tool spans use the shared TracingState for parent context."""
+
+    @pytest.mark.asyncio
+    async def test_tool_handler_uses_shared_state(self):
+        """Tool handlers read parent context from TracingState, not ContextVar."""
+        collector = InMemoryCollector()
+        tracer = _make_tracer(collector)
+
+        async def my_tool(args):
+            return {"content": [{"type": "text", "text": "ok"}]}
+
+        state = TracingState()
+        wrapped = _wrap_tool_handler(tracer, my_tool, "mcp_tool", state)
+
+        # Set parent context on state (simulates receive_response setting it)
+        with tracer.get_tracer().start_as_current_span("agent") as agent_span:
+            state.parent_context = set_span_in_context(agent_span, tracer.get_context())
+            result = await wrapped({"x": 1})
+
+        assert result == {"content": [{"type": "text", "text": "ok"}]}
+
+        agent_spans = [s for s in collector.spans if s.name == "agent"]
+        tool_spans = [s for s in collector.spans if s.name == "mcp_tool"]
+
+        assert len(agent_spans) == 1
+        assert len(tool_spans) == 1
+
+        # Tool span should be a child of the agent span
+        assert tool_spans[0].parent is not None
+        assert tool_spans[0].parent.span_id == agent_spans[0].context.span_id
+
+    @pytest.mark.asyncio
+    async def test_separate_states_are_independent(self):
+        """Two TracingState instances don't interfere with each other."""
+        collector = InMemoryCollector()
+        tracer = _make_tracer(collector)
+
+        async def my_tool(args):
+            return {"result": "ok"}
+
+        state_a = TracingState()
+        state_b = TracingState()
+
+        wrapped_a = _wrap_tool_handler(tracer, my_tool, "tool_a", state_a)
+
+        async def other_tool(args):
+            return {"result": "ok"}
+
+        wrapped_b = _wrap_tool_handler(tracer, other_tool, "tool_b", state_b)
+
+        with tracer.get_tracer().start_as_current_span("agent_a") as span_a:
+            state_a.parent_context = set_span_in_context(span_a, tracer.get_context())
+            await wrapped_a({"x": 1})
+
+        # state_b has no parent context set — tool_b should still work
+        await wrapped_b({"x": 2})
+
+        tool_a_spans = [s for s in collector.spans if s.name == "tool_a"]
+        tool_b_spans = [s for s in collector.spans if s.name == "tool_b"]
+
+        assert len(tool_a_spans) == 1
+        assert len(tool_b_spans) == 1
+
+        # tool_a should be parented under agent_a
+        assert tool_a_spans[0].parent is not None
+        # tool_b has no parent context — should still be created (no crash)
+
+
+# ---------------------------------------------------------------------------
+# Tests for _extract_base_tool_name
+# ---------------------------------------------------------------------------
+
+
+class TestExtractBaseToolName:
+    """Test MCP-prefixed tool name extraction."""
+
+    def test_mcp_prefixed_name(self):
+        assert _extract_base_tool_name("mcp__weather__get_weather") == "get_weather"
+
+    def test_mcp_prefixed_with_multiple_parts(self):
+        assert _extract_base_tool_name("mcp__my_server__my_tool") == "my_tool"
+
+    def test_plain_name_unchanged(self):
+        assert _extract_base_tool_name("calculator") == "calculator"
+
+    def test_non_mcp_prefix_unchanged(self):
+        assert _extract_base_tool_name("other__prefix__name") == "other__prefix__name"
+
+    def test_mcp_with_only_two_parts(self):
+        # "mcp__something" has only 2 parts when split by __, not enough
+        assert _extract_base_tool_name("mcp__something") == "mcp__something"

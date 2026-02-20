@@ -40,6 +40,7 @@ def setup_claude_agent_sdk(
         ```
     """
     from judgeval.v1.integrations.claude_agent_sdk.wrapper import (
+        TracingState,
         _create_client_wrapper_class,
         _create_tool_wrapper_class,
         _wrap_tool_factory,
@@ -48,7 +49,7 @@ def setup_claude_agent_sdk(
     )
 
     try:
-        sdk_tool_names: set = set()
+        state = TracingState()
 
         # Store original classes before patching
         original_client = (
@@ -76,7 +77,7 @@ def setup_claude_agent_sdk(
         # Patch ClaudeSDKClient
         if original_client:
             wrapped_client = _create_client_wrapper_class(
-                original_client, tracer, sdk_tool_names
+                original_client, tracer, state
             )
             claude_agent_sdk.ClaudeSDKClient = wrapped_client  # type: ignore
 
@@ -89,7 +90,7 @@ def setup_claude_agent_sdk(
         # Patch SdkMcpTool
         if original_tool_class:
             wrapped_tool_class = _create_tool_wrapper_class(
-                original_tool_class, tracer, sdk_tool_names
+                original_tool_class, tracer, state
             )
             claude_agent_sdk.SdkMcpTool = wrapped_tool_class  # type: ignore
 
@@ -101,9 +102,7 @@ def setup_claude_agent_sdk(
 
         # Patch tool() decorator
         if original_tool_fn:
-            wrapped_tool_fn = _wrap_tool_factory(
-                original_tool_fn, tracer, sdk_tool_names
-            )
+            wrapped_tool_fn = _wrap_tool_factory(original_tool_fn, tracer, state)
             claude_agent_sdk.tool = wrapped_tool_fn  # type: ignore
 
             # Update all modules that already imported tool
@@ -116,9 +115,7 @@ def setup_claude_agent_sdk(
         # Note: The standalone query() uses InternalClient, not ClaudeSDKClient,
         # so we need to wrap it separately to add tracing
         if original_query_fn:
-            wrapped_query_fn = _wrap_query_function(
-                original_query_fn, tracer, sdk_tool_names
-            )
+            wrapped_query_fn = _wrap_query_function(original_query_fn, tracer, state)
             claude_agent_sdk.query = wrapped_query_fn  # type: ignore
 
             # Update all modules that already imported query
@@ -131,7 +128,7 @@ def setup_claude_agent_sdk(
         # created before setup_claude_agent_sdk() was called
         if original_create_server_fn:
             wrapped_create_server_fn = _wrap_create_sdk_mcp_server(
-                original_create_server_fn, tracer, sdk_tool_names
+                original_create_server_fn, tracer, state
             )
             claude_agent_sdk.create_sdk_mcp_server = wrapped_create_server_fn  # type: ignore
 

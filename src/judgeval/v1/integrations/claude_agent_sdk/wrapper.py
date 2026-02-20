@@ -1,7 +1,6 @@
 """Wrapper implementation for Claude Agent SDK."""
 
 from __future__ import annotations
-import contextvars
 import dataclasses
 import time
 from typing import (
@@ -23,13 +22,23 @@ from judgeval.utils.serialize import safe_serialize
 if TYPE_CHECKING:
     from judgeval.v1.tracer.tracer import BaseTracer
 
-# Context-local storage to propagate parent span context to tool handlers.
-# Claude Agent SDK breaks OpenTelemetry's automatic context propagation
-# when executing tools, so we need to explicitly store and pass the context.
-# Using contextvars instead of threading.local() for async-safety.
-_parent_context_var: contextvars.ContextVar[Any] = contextvars.ContextVar(
-    "_parent_context", default=None
-)
+
+class TracingState:
+    """Shared mutable state for a single setup_claude_agent_sdk() call.
+
+    Passed through closures to all wrapper functions, providing:
+    - parent_context: The current agent span context for tool span nesting.
+      Set by receive_response/wrapped_query, read by tool handlers and
+      BuiltInToolSpanTracker. This works even when tool handlers run in
+      a separate asyncio Task (as the Claude Agent SDK's MCP server does)
+      because all closures share the same TracingState instance.
+    - sdk_tool_names: Set of SDK-defined tool names to avoid duplicate spans
+      between _wrap_tool_handler and BuiltInToolSpanTracker.
+    """
+
+    def __init__(self) -> None:
+        self.parent_context: Any = None
+        self.sdk_tool_names: set = set()
 
 
 class BuiltInToolSpanTracker:
@@ -46,11 +55,9 @@ class BuiltInToolSpanTracker:
     2. UserMessage contains ToolResultBlock → match by tool_use_id, record output, close span
     """
 
-    def __init__(self, tracer: "BaseTracer", sdk_tool_names: Optional[set] = None):
+    def __init__(self, tracer: "BaseTracer", state: TracingState):
         self.tracer = tracer
-        self.sdk_tool_names: set = (
-            sdk_tool_names if sdk_tool_names is not None else set()
-        )
+        self.state = state
         self._pending_spans: Dict[str, Tuple[Any, Any]] = {}
 
     def on_assistant_message(self, message: Any) -> None:
@@ -70,11 +77,17 @@ class BuiltInToolSpanTracker:
             if not tool_name or not tool_use_id:
                 continue
 
-            if tool_name in self.sdk_tool_names:
+            # SDK tools are registered with their base name (e.g. "get_weather"),
+            # but appear in the message stream with MCP prefix
+            # (e.g. "mcp__server__get_weather"). Check both forms.
+            base_name = _extract_base_tool_name(tool_name)
+            if (
+                tool_name in self.state.sdk_tool_names
+                or base_name in self.state.sdk_tool_names
+            ):
                 continue
 
-            parent_context = _parent_context_var.get()
-            ctx = parent_context if parent_context is not None else None
+            ctx = self.state.parent_context
 
             span = self.tracer.get_tracer().start_span(
                 str(tool_name),
@@ -192,7 +205,7 @@ class LLMSpanTracker:
 
 
 def _create_client_wrapper_class(
-    original_client_class: Any, tracer: "BaseTracer", sdk_tool_names: set
+    original_client_class: Any, tracer: "BaseTracer", state: TracingState
 ) -> Any:
     """Creates a wrapper class for ClaudeSDKClient that wraps query and receive_response."""
 
@@ -238,17 +251,16 @@ def _create_client_wrapper_class(
 
             tracer.emit_partial()
 
-            # Store the parent span context in a contextvar.
-            # Claude Agent SDK breaks OpenTelemetry's context propagation when executing tools,
-            # so we need to explicitly store the context for tool handlers to access
-            parent_context = set_span_in_context(agent_span, tracer.get_context())
-            parent_context_token = _parent_context_var.set(parent_context)
+            # Store the parent span context on the shared state so tool handlers
+            # can access it — even when they run in a separate asyncio Task
+            # (as the Claude Agent SDK's MCP server does).
+            state.parent_context = set_span_in_context(agent_span, tracer.get_context())
 
             final_results: List[Dict[str, Any]] = []
             llm_tracker = LLMSpanTracker(
                 tracer, query_start_time=self.__query_start_time
             )
-            tool_tracker = BuiltInToolSpanTracker(tracer, sdk_tool_names=sdk_tool_names)
+            tool_tracker = BuiltInToolSpanTracker(tracer, state=state)
 
             try:
                 async for message in generator:
@@ -308,13 +320,13 @@ def _create_client_wrapper_class(
                 tool_tracker.cleanup()
                 llm_tracker.cleanup()
                 agent_span_context.__exit__(None, None, None)
-                _parent_context_var.reset(parent_context_token)
+                state.parent_context = None
 
     return WrappedClaudeSDKClient
 
 
 def _create_tool_wrapper_class(
-    original_tool_class: Any, tracer: "BaseTracer", sdk_tool_names: set
+    original_tool_class: Any, tracer: "BaseTracer", state: TracingState
 ) -> Any:
     """Creates a wrapper class for SdkMcpTool that wraps handlers."""
 
@@ -327,7 +339,7 @@ def _create_tool_wrapper_class(
             handler: Any,
             **kwargs: Any,
         ):
-            wrapped_handler = _wrap_tool_handler(tracer, handler, name, sdk_tool_names)
+            wrapped_handler = _wrap_tool_handler(tracer, handler, name, state)
             super().__init__(name, description, input_schema, wrapped_handler, **kwargs)
 
         # Preserve generic typing support
@@ -337,7 +349,7 @@ def _create_tool_wrapper_class(
 
 
 def _wrap_query_function(
-    original_query_fn: Any, tracer: "BaseTracer", sdk_tool_names: set
+    original_query_fn: Any, tracer: "BaseTracer", state: TracingState
 ) -> Callable[..., Any]:
     """Wraps the standalone query() function to add tracing."""
 
@@ -359,13 +371,12 @@ def _wrap_query_function(
 
         tracer.emit_partial()
 
-        # Store parent context for tool tracing
-        parent_context = set_span_in_context(agent_span, tracer.get_context())
-        parent_context_token = _parent_context_var.set(parent_context)
+        # Store parent context on shared state for tool handlers
+        state.parent_context = set_span_in_context(agent_span, tracer.get_context())
 
         final_results: List[Dict[str, Any]] = []
         llm_tracker = LLMSpanTracker(tracer, query_start_time=time.time())
-        tool_tracker = BuiltInToolSpanTracker(tracer, sdk_tool_names=sdk_tool_names)
+        tool_tracker = BuiltInToolSpanTracker(tracer, state=state)
 
         try:
             # Call original query function
@@ -426,13 +437,13 @@ def _wrap_query_function(
             tool_tracker.cleanup()
             llm_tracker.cleanup()
             agent_span_context.__exit__(None, None, None)
-            _parent_context_var.reset(parent_context_token)
+            state.parent_context = None
 
     return wrapped_query
 
 
 def _wrap_tool_factory(
-    tool_fn: Any, tracer: "BaseTracer", sdk_tool_names: set
+    tool_fn: Any, tracer: "BaseTracer", state: TracingState
 ) -> Callable[..., Any]:
     """Wraps the tool() factory function to return wrapped tools."""
 
@@ -454,9 +465,7 @@ def _wrap_tool_factory(
                 setattr(
                     tool_def,
                     "handler",
-                    _wrap_tool_handler(
-                        tracer, original_handler, tool_name, sdk_tool_names
-                    ),
+                    _wrap_tool_handler(tracer, original_handler, tool_name, state),
                 )
 
             return tool_def
@@ -467,7 +476,7 @@ def _wrap_tool_factory(
 
 
 def _wrap_create_sdk_mcp_server(
-    original_fn: Callable[..., Any], tracer: "BaseTracer", sdk_tool_names: set
+    original_fn: Callable[..., Any], tracer: "BaseTracer", state: TracingState
 ) -> Callable[..., Any]:
     """Wraps create_sdk_mcp_server to ensure all tools get traced handlers.
 
@@ -484,7 +493,7 @@ def _wrap_create_sdk_mcp_server(
                 if handler and not getattr(handler, "_judgeval_wrapped", False):
                     tool_name = getattr(tool_def, "name", "unknown")
                     tool_def.handler = _wrap_tool_handler(
-                        tracer, handler, tool_name, sdk_tool_names
+                        tracer, handler, tool_name, state
                     )
         return original_fn(*args, **kwargs)
 
@@ -495,27 +504,25 @@ def _wrap_tool_handler(
     tracer: "BaseTracer",
     handler: Callable[..., Any],
     tool_name: Any,
-    sdk_tool_names: set,
+    state: TracingState,
 ) -> Callable[..., Any]:
     """Wraps a tool handler to add tracing.
 
-    Claude Agent SDK breaks OpenTelemetry's automatic context propagation,
-    so we retrieve the parent context from a contextvar and use it
-    explicitly when creating tool spans to ensure proper nesting.
+    Reads the parent span context from the shared TracingState instance.
+    This works across asyncio Task boundaries because all closures from the
+    same setup_claude_agent_sdk() call share the same TracingState reference.
     """
     # Check if already wrapped to prevent double-wrapping
     if hasattr(handler, "_judgeval_wrapped"):
         return handler
 
-    sdk_tool_names.add(str(tool_name))
+    state.sdk_tool_names.add(str(tool_name))
 
     async def wrapped_handler(args: Any) -> Any:
-        # Get parent context from a contextvar
-        # Claude Agent SDK breaks context propagation, so we stored it explicitly
-        parent_context = _parent_context_var.get()
-
-        # Use the parent context if available, otherwise use current context
-        ctx = parent_context if parent_context is not None else None
+        # Read parent context from shared state — works even when this handler
+        # runs in a separate asyncio Task (MCP server) because all wrappers
+        # share the same TracingState instance via closure.
+        ctx = state.parent_context
 
         # Create tool span with explicit parent context to ensure proper nesting
         tracer_obj = tracer.get_tracer()
@@ -547,6 +554,20 @@ def _wrap_tool_handler(
     # Mark as wrapped to prevent double-wrapping
     wrapped_handler._judgeval_wrapped = True  # type: ignore
     return wrapped_handler
+
+
+def _extract_base_tool_name(full_name: str) -> str:
+    """Extract the base tool name from an MCP-prefixed name.
+
+    MCP tools appear in the message stream as ``mcp__<server>__<tool_name>``.
+    Returns the ``<tool_name>`` portion, or the original name if it's not
+    MCP-prefixed.
+    """
+    if full_name.startswith("mcp__"):
+        parts = full_name.split("__")
+        if len(parts) >= 3:
+            return parts[-1]
+    return full_name
 
 
 def _create_llm_span_for_messages(
