@@ -723,6 +723,96 @@ class TestBuiltInToolSpanTracker:
 
 
 # ---------------------------------------------------------------------------
+# Tests for emit_partial integration
+# ---------------------------------------------------------------------------
+
+
+class TestEmitPartial:
+    """Test that emit_partial() is called at key points for real-time UI updates."""
+
+    @pytest.mark.asyncio
+    async def test_sdk_tool_handler_calls_emit_partial(self):
+        """SDK tool handler should call emit_partial after recording input."""
+        from unittest.mock import patch
+        from judgeval.v1.tracer.base_tracer import BaseTracer
+
+        collector = InMemoryCollector()
+        tracer = _make_tracer(collector)
+
+        async def my_tool(args):
+            return {"result": "done"}
+
+        wrapped = _wrap_tool_handler(tracer, my_tool, "traced_tool")
+
+        with tracer.get_tracer().start_as_current_span("parent") as parent:
+            from opentelemetry.trace import set_span_in_context
+
+            _thread_local.parent_context = set_span_in_context(
+                parent, tracer.get_context()
+            )
+            with patch.object(BaseTracer, "emit_partial", wraps=tracer.emit_partial) as mock_emit:
+                await wrapped({"x": 1})
+
+        assert mock_emit.call_count >= 1, "emit_partial should be called for tool spans"
+
+    @pytest.mark.asyncio
+    async def test_builtin_tool_tracker_calls_emit_partial(self):
+        """BuiltInToolSpanTracker should call emit_partial after opening a tool span."""
+        from unittest.mock import patch
+        from judgeval.v1.tracer.base_tracer import BaseTracer
+
+        collector = InMemoryCollector()
+        tracer = _make_tracer(collector)
+
+        tracker = BuiltInToolSpanTracker(tracer)
+
+        with tracer.get_tracer().start_as_current_span("agent") as agent_span:
+            from opentelemetry.trace import set_span_in_context
+
+            _thread_local.parent_context = set_span_in_context(
+                agent_span, tracer.get_context()
+            )
+
+            assistant_msg = AssistantMessage(
+                content=[
+                    ToolUseBlock(id="t1", name="bash", input={"cmd": "ls"}),
+                ]
+            )
+            with patch.object(BaseTracer, "emit_partial", wraps=tracer.emit_partial) as mock_emit:
+                tracker.on_assistant_message(assistant_msg)
+
+            tracker.cleanup()
+
+        assert mock_emit.call_count >= 1, (
+            "emit_partial should be called when opening built-in tool span"
+        )
+
+    @pytest.mark.asyncio
+    async def test_llm_span_calls_emit_partial(self):
+        """LLM span creation should call emit_partial after setting attributes."""
+        from unittest.mock import patch
+        from judgeval.v1.tracer.base_tracer import BaseTracer
+
+        collector = InMemoryCollector()
+        tracer = _make_tracer(collector)
+
+        tracker = LLMSpanTracker(tracer)
+        with tracer.get_tracer().start_as_current_span("agent"):
+            with patch.object(BaseTracer, "emit_partial", wraps=tracer.emit_partial) as mock_emit:
+                tracker.start_llm_span(
+                    AssistantMessage(
+                        content=[TextBlock(text="Hello")],
+                        model="claude-sonnet-4-20250514",
+                    ),
+                    "test prompt",
+                    [],
+                )
+            tracker.cleanup()
+
+        assert mock_emit.call_count >= 1, "emit_partial should be called for LLM spans"
+
+
+# ---------------------------------------------------------------------------
 # Cleanup thread-local storage and SDK tool names after each test
 # ---------------------------------------------------------------------------
 

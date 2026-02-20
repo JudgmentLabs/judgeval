@@ -80,6 +80,10 @@ class BuiltInToolSpanTracker:
             )
 
             self.tracer.set_span_attribute(span, AttributeKeys.JUDGMENT_INPUT, tool_input)
+
+            with self.tracer.use_span(span):
+                self.tracer.emit_partial()
+
             self._pending_spans[tool_use_id] = (span, tool_name)
 
     def on_user_message(self, message: Any) -> None:
@@ -233,6 +237,8 @@ def _create_client_wrapper_class(
                     self.__last_prompt,
                 )
 
+            tracer.emit_partial()
+
             # Store the parent span context in thread-local storage
             # Claude Agent SDK breaks OpenTelemetry's context propagation when executing tools,
             # so we need to explicitly store the context for tool handlers to access
@@ -353,6 +359,8 @@ def _wrap_query_function(
         prompt = kwargs.get("prompt") or (args[0] if args else None)
         if prompt and isinstance(prompt, str):
             tracer.set_span_attribute(agent_span, AttributeKeys.JUDGMENT_INPUT, prompt)
+
+        tracer.emit_partial()
 
         # Store parent context for tool tracing
         parent_context = set_span_in_context(agent_span, tracer.get_context())
@@ -498,6 +506,7 @@ def _wrap_tool_handler(
         with tracer.use_span(span, end_on_exit=True):
             # Record input
             tracer.set_span_attribute(span, AttributeKeys.JUDGMENT_INPUT, args)
+            tracer.emit_partial()
 
             try:
                 result = await handler(args)
@@ -571,6 +580,8 @@ def _create_llm_span_for_messages(
 
     if outputs:
         tracer.set_span_attribute(llm_span, AttributeKeys.JUDGMENT_OUTPUT, outputs)
+
+    tracer.emit_partial()
 
     # Return final message content for conversation history and the span
     if hasattr(last_message, "content"):
