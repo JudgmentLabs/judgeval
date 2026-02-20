@@ -1,8 +1,8 @@
 """Wrapper implementation for Claude Agent SDK."""
 
 from __future__ import annotations
+import contextvars
 import dataclasses
-import threading
 import time
 from typing import (
     TYPE_CHECKING,
@@ -23,10 +23,13 @@ from judgeval.utils.serialize import safe_serialize
 if TYPE_CHECKING:
     from judgeval.v1.tracer.tracer import BaseTracer
 
-# Thread-local storage to propagate parent span context to tool handlers
+# Context-local storage to propagate parent span context to tool handlers.
 # Claude Agent SDK breaks OpenTelemetry's automatic context propagation
-# when executing tools, so we need to explicitly store and pass the context
-_thread_local = threading.local()
+# when executing tools, so we need to explicitly store and pass the context.
+# Using contextvars instead of threading.local() for async-safety.
+_parent_context_var: contextvars.ContextVar[Any] = contextvars.ContextVar(
+    "_parent_context", default=None
+)
 
 
 class BuiltInToolSpanTracker:
@@ -68,7 +71,7 @@ class BuiltInToolSpanTracker:
             if tool_name in self.sdk_tool_names:
                 continue
 
-            parent_context = getattr(_thread_local, "parent_context", None)
+            parent_context = _parent_context_var.get()
             ctx = parent_context if parent_context is not None else None
 
             span = self.tracer.get_tracer().start_span(
@@ -80,7 +83,7 @@ class BuiltInToolSpanTracker:
             )
 
             self.tracer.set_span_attribute(
-                span, AttributeKeys.JUDGMENT_INPUT, tool_input
+                span, AttributeKeys.JUDGMENT_INPUT, safe_serialize(tool_input)
             )
 
             with self.tracer.use_span(span):
@@ -108,7 +111,7 @@ class BuiltInToolSpanTracker:
             is_error = getattr(block, "is_error", None)
 
             self.tracer.set_span_attribute(
-                span, AttributeKeys.JUDGMENT_OUTPUT, result_content
+                span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(result_content)
             )
 
             if is_error:
@@ -241,11 +244,11 @@ def _create_client_wrapper_class(
 
             tracer.emit_partial()
 
-            # Store the parent span context in thread-local storage
+            # Store the parent span context in a contextvar.
             # Claude Agent SDK breaks OpenTelemetry's context propagation when executing tools,
             # so we need to explicitly store the context for tool handlers to access
             parent_context = set_span_in_context(agent_span, tracer.get_context())
-            _thread_local.parent_context = parent_context
+            _parent_context_var.set(parent_context)
 
             final_results: List[Dict[str, Any]] = []
             llm_tracker = LLMSpanTracker(
@@ -313,9 +316,7 @@ def _create_client_wrapper_class(
                 tool_tracker.cleanup()
                 llm_tracker.cleanup()
                 agent_span_context.__exit__(None, None, None)
-                # Clean up thread-local storage
-                if hasattr(_thread_local, "parent_context"):
-                    delattr(_thread_local, "parent_context")
+                _parent_context_var.set(None)
 
     return WrappedClaudeSDKClient
 
@@ -366,7 +367,7 @@ def _wrap_query_function(
 
         # Store parent context for tool tracing
         parent_context = set_span_in_context(agent_span, tracer.get_context())
-        _thread_local.parent_context = parent_context
+        _parent_context_var.set(parent_context)
 
         final_results: List[Dict[str, Any]] = []
         llm_tracker = LLMSpanTracker(tracer, query_start_time=time.time())
@@ -431,9 +432,7 @@ def _wrap_query_function(
             tool_tracker.cleanup()
             llm_tracker.cleanup()
             agent_span_context.__exit__(None, None, None)
-            # Clean up thread-local storage
-            if hasattr(_thread_local, "parent_context"):
-                delattr(_thread_local, "parent_context")
+            _parent_context_var.set(None)
 
     return wrapped_query
 
@@ -475,7 +474,7 @@ def _wrap_tool_handler(
     """Wraps a tool handler to add tracing.
 
     Claude Agent SDK breaks OpenTelemetry's automatic context propagation,
-    so we retrieve the parent context from thread-local storage and use it
+    so we retrieve the parent context from a contextvar and use it
     explicitly when creating tool spans to ensure proper nesting.
     """
     # Check if already wrapped to prevent double-wrapping
@@ -485,9 +484,9 @@ def _wrap_tool_handler(
     _register_sdk_tool_name(str(tool_name))
 
     async def wrapped_handler(args: Any) -> Any:
-        # Get parent context from thread-local storage
+        # Get parent context from a contextvar
         # Claude Agent SDK breaks context propagation, so we stored it explicitly
-        parent_context = getattr(_thread_local, "parent_context", None)
+        parent_context = _parent_context_var.get()
 
         # Use the parent context if available, otherwise use current context
         ctx = parent_context if parent_context is not None else None

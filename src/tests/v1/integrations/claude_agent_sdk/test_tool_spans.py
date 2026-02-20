@@ -19,7 +19,7 @@ from judgeval.v1.integrations.claude_agent_sdk.wrapper import (
     _wrap_tool_handler,
     _create_tool_wrapper_class,
     _wrap_tool_factory,
-    _thread_local,
+    _parent_context_var,
     _sdk_tool_names,
     LLMSpanTracker,
     BuiltInToolSpanTracker,
@@ -172,7 +172,7 @@ class TestWrapToolHandler:
             from opentelemetry.trace import set_span_in_context
 
             parent_ctx = set_span_in_context(parent_span, tracer.get_context())
-            _thread_local.parent_context = parent_ctx
+            _parent_context_var.set(parent_ctx)
 
             result = await wrapped({"x": 42})
 
@@ -200,8 +200,8 @@ class TestWrapToolHandler:
         with tracer.get_tracer().start_as_current_span("test_parent") as parent_span:
             from opentelemetry.trace import set_span_in_context
 
-            _thread_local.parent_context = set_span_in_context(
-                parent_span, tracer.get_context()
+            _parent_context_var.set(
+                set_span_in_context(parent_span, tracer.get_context())
             )
 
             with pytest.raises(ValueError, match="tool failed"):
@@ -238,8 +238,8 @@ class TestWrapToolHandler:
         with tracer.get_tracer().start_as_current_span("agent_span") as agent_span:
             from opentelemetry.trace import set_span_in_context
 
-            _thread_local.parent_context = set_span_in_context(
-                agent_span, tracer.get_context()
+            _parent_context_var.set(
+                set_span_in_context(agent_span, tracer.get_context())
             )
             await wrapped({"a": 1})
 
@@ -290,9 +290,7 @@ class TestCreateToolWrapperClass:
         with tracer.get_tracer().start_as_current_span("parent") as parent:
             from opentelemetry.trace import set_span_in_context
 
-            _thread_local.parent_context = set_span_in_context(
-                parent, tracer.get_context()
-            )
+            _parent_context_var.set(set_span_in_context(parent, tracer.get_context()))
             result = await tool.handler({"name": "World"})
 
         assert result == {"content": [{"type": "text", "text": "hello"}]}
@@ -343,9 +341,7 @@ class TestWrapToolFactory:
         with tracer.get_tracer().start_as_current_span("parent") as parent:
             from opentelemetry.trace import set_span_in_context
 
-            _thread_local.parent_context = set_span_in_context(
-                parent, tracer.get_context()
-            )
+            _parent_context_var.set(set_span_in_context(parent, tracer.get_context()))
             result = await add.handler({"a": 3.0, "b": 4.0})
 
         assert result == {"content": [{"type": "text", "text": "Sum: 7.0"}]}
@@ -422,8 +418,8 @@ class TestMessageStreamToolSpans:
         with tracer.get_tracer().start_as_current_span("agent") as agent_span:
             from opentelemetry.trace import set_span_in_context
 
-            _thread_local.parent_context = set_span_in_context(
-                agent_span, tracer.get_context()
+            _parent_context_var.set(
+                set_span_in_context(agent_span, tracer.get_context())
             )
             await wrapped_a({"input": "1"})
             await wrapped_b({"input": "2"})
@@ -457,9 +453,7 @@ class TestMessageStreamToolSpans:
         with tracer.get_tracer().start_as_current_span("parent") as parent:
             from opentelemetry.trace import set_span_in_context
 
-            _thread_local.parent_context = set_span_in_context(
-                parent, tracer.get_context()
-            )
+            _parent_context_var.set(set_span_in_context(parent, tracer.get_context()))
             result = await wrapped({"message": "hello world"})
 
         assert result == {"echo": "hello world"}
@@ -494,8 +488,8 @@ class TestBuiltInToolSpanTracker:
         with tracer.get_tracer().start_as_current_span("agent") as agent_span:
             from opentelemetry.trace import set_span_in_context
 
-            _thread_local.parent_context = set_span_in_context(
-                agent_span, tracer.get_context()
+            _parent_context_var.set(
+                set_span_in_context(agent_span, tracer.get_context())
             )
 
             # Simulate AssistantMessage with a ToolUseBlock
@@ -543,8 +537,8 @@ class TestBuiltInToolSpanTracker:
         with tracer.get_tracer().start_as_current_span("agent") as agent_span:
             from opentelemetry.trace import set_span_in_context
 
-            _thread_local.parent_context = set_span_in_context(
-                agent_span, tracer.get_context()
+            _parent_context_var.set(
+                set_span_in_context(agent_span, tracer.get_context())
             )
 
             assistant_msg = AssistantMessage(
@@ -588,8 +582,8 @@ class TestBuiltInToolSpanTracker:
         with tracer.get_tracer().start_as_current_span("agent") as agent_span:
             from opentelemetry.trace import set_span_in_context
 
-            _thread_local.parent_context = set_span_in_context(
-                agent_span, tracer.get_context()
+            _parent_context_var.set(
+                set_span_in_context(agent_span, tracer.get_context())
             )
 
             # SDK tool: should be skipped
@@ -635,8 +629,8 @@ class TestBuiltInToolSpanTracker:
         with tracer.get_tracer().start_as_current_span("agent") as agent_span:
             from opentelemetry.trace import set_span_in_context
 
-            _thread_local.parent_context = set_span_in_context(
-                agent_span, tracer.get_context()
+            _parent_context_var.set(
+                set_span_in_context(agent_span, tracer.get_context())
             )
 
             assistant_msg = AssistantMessage(
@@ -672,8 +666,8 @@ class TestBuiltInToolSpanTracker:
         with tracer.get_tracer().start_as_current_span("agent") as agent_span:
             from opentelemetry.trace import set_span_in_context
 
-            _thread_local.parent_context = set_span_in_context(
-                agent_span, tracer.get_context()
+            _parent_context_var.set(
+                set_span_in_context(agent_span, tracer.get_context())
             )
 
             assistant_msg = AssistantMessage(
@@ -700,8 +694,8 @@ class TestBuiltInToolSpanTracker:
         with tracer.get_tracer().start_as_current_span("agent") as agent_span:
             from opentelemetry.trace import set_span_in_context
 
-            _thread_local.parent_context = set_span_in_context(
-                agent_span, tracer.get_context()
+            _parent_context_var.set(
+                set_span_in_context(agent_span, tracer.get_context())
             )
 
             assistant_msg = AssistantMessage(
@@ -753,9 +747,7 @@ class TestEmitPartial:
         with tracer.get_tracer().start_as_current_span("parent") as parent:
             from opentelemetry.trace import set_span_in_context
 
-            _thread_local.parent_context = set_span_in_context(
-                parent, tracer.get_context()
-            )
+            _parent_context_var.set(set_span_in_context(parent, tracer.get_context()))
             with patch.object(
                 BaseTracer, "emit_partial", wraps=tracer.emit_partial
             ) as mock_emit:
@@ -777,8 +769,8 @@ class TestEmitPartial:
         with tracer.get_tracer().start_as_current_span("agent") as agent_span:
             from opentelemetry.trace import set_span_in_context
 
-            _thread_local.parent_context = set_span_in_context(
-                agent_span, tracer.get_context()
+            _parent_context_var.set(
+                set_span_in_context(agent_span, tracer.get_context())
             )
 
             assistant_msg = AssistantMessage(
@@ -825,13 +817,12 @@ class TestEmitPartial:
 
 
 # ---------------------------------------------------------------------------
-# Cleanup thread-local storage and SDK tool names after each test
+# Cleanup contextvar and SDK tool names after each test
 # ---------------------------------------------------------------------------
 
 
 @pytest.fixture(autouse=True)
 def cleanup_thread_local():
     yield
-    if hasattr(_thread_local, "parent_context"):
-        delattr(_thread_local, "parent_context")
+    _parent_context_var.set(None)
     _sdk_tool_names.clear()
