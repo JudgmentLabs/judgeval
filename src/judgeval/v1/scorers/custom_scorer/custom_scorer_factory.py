@@ -40,7 +40,7 @@ def _get_base_name(node: ast.expr) -> Optional[str]:
     return None
 
 
-def parse_v2_scorer(
+def parse_judge(
     tree: ast.AST,
 ) -> Optional[
     Tuple[
@@ -119,7 +119,7 @@ class CustomScorerFactory:
         except SyntaxError as e:
             raise ValueError(f"Invalid Python syntax in {scorer_file_path}: {e}")
 
-        result = parse_v2_scorer(tree)
+        result = parse_judge(tree)
         if result is None:
             raise ValueError(
                 f"No Judge, TraceCustomScorer, or ExampleCustomScorer class found in {scorer_file_path}. "
@@ -161,7 +161,7 @@ class CustomScorerFactory:
             "overwrite": overwrite,
             "scorer_type": scorer_type,
             "response_type": response_type,
-            "version": 2,
+            "version": 3 if scorer_type is None else 2,
         }
         response = self._client.post_projects_scorers_custom(
             project_id=project_id,

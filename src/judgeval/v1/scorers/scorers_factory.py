@@ -52,9 +52,3 @@ class ScorersFactory:
             client=self._client,
             project_id=self._project_id,
         )
-
-    @property
-    def built_in(self):
-        from judgeval.v1.scorers.built_in.built_in_factory import BuiltInScorersFactory
-
-        return BuiltInScorersFactory()
