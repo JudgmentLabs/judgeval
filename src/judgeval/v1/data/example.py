@@ -53,8 +53,6 @@ class Example:
         return key in self._properties
 
     def set_property(self, key: str, value: Any) -> Example:
-        # priviledge: trace, golden_trace
-        # run_agent_testing, Upload (Example)
         self._properties[key] = value
         return self
 

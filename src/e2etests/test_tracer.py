@@ -1,6 +1,6 @@
 from judgeval.v1 import Judgeval
 from judgeval.v1.data import Example
-from judgeval.v1.scorers.built_in import AnswerRelevancyScorer
+from judgeval.v1.scorers.prompt_scorer.prompt_scorer import PromptScorer
 import time
 from openai import OpenAI, AsyncOpenAI
 from anthropic import Anthropic, AsyncAnthropic
@@ -51,7 +51,11 @@ PROMPT = "I need you to solve this math problem: 1 + 1 = ?"
 @judgment.observe(span_type="function")
 def scorer_span():
     judgment.async_evaluate(
-        scorer=AnswerRelevancyScorer(threshold=0.5),
+        scorer=PromptScorer(
+            name="relevancy",
+            prompt="Is the output relevant to the input?",
+            threshold=0.5,
+        ),
         example=Example.create(
             input="Tell me the weather in Paris.",
             actual_output="The weather in France is sunny and 72F.",

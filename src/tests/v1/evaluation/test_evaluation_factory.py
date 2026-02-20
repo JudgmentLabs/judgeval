@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 from judgeval.v1.evaluation.evaluation_factory import EvaluationFactory
 from judgeval.v1.evaluation.evaluation import Evaluation
 from judgeval.v1.data.example import Example
-from judgeval.v1.scorers.built_in.answer_relevancy import AnswerRelevancyScorer
+from judgeval.v1.scorers.prompt_scorer.prompt_scorer import PromptScorer
 
 
 @pytest.fixture
@@ -31,7 +31,7 @@ def sample_examples():
 
 @pytest.fixture
 def sample_scorers():
-    return [AnswerRelevancyScorer(threshold=0.5)]
+    return [PromptScorer(name="test_scorer", prompt="Is this relevant?", threshold=0.5)]
 
 
 def test_factory_create(evaluation_factory, mock_client):
