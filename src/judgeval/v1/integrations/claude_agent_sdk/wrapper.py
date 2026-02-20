@@ -48,7 +48,9 @@ class BuiltInToolSpanTracker:
 
     def __init__(self, tracer: "BaseTracer", sdk_tool_names: Optional[set] = None):
         self.tracer = tracer
-        self.sdk_tool_names: set = sdk_tool_names or set()
+        self.sdk_tool_names: set = (
+            sdk_tool_names if sdk_tool_names is not None else set()
+        )
         self._pending_spans: Dict[str, Tuple[Any, Any]] = {}
 
     def on_assistant_message(self, message: Any) -> None:
@@ -578,11 +580,13 @@ def _create_llm_span_for_messages(
             outputs.append({"content": content, "role": "assistant"})
 
     # Create LLM span
+    span_start_time = int(start_time * 1e9) if start_time is not None else None
     llm_span_context = tracer.get_tracer().start_as_current_span(
         "anthropic.messages.create",
         attributes={
             AttributeKeys.JUDGMENT_SPAN_KIND: "llm",
         },
+        start_time=span_start_time,
     )
     llm_span = llm_span_context.__enter__()
 
