@@ -1,6 +1,5 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
-import sys
 from judgeval.logger import judgeval_logger
 
 if TYPE_CHECKING:
@@ -81,12 +80,6 @@ def setup_claude_agent_sdk(
             )
             claude_agent_sdk.ClaudeSDKClient = wrapped_client  # type: ignore
 
-            # Update all modules that already imported ClaudeSDKClient
-            for module in list(sys.modules.values()):
-                if module and hasattr(module, "ClaudeSDKClient"):
-                    if getattr(module, "ClaudeSDKClient", None) is original_client:
-                        setattr(module, "ClaudeSDKClient", wrapped_client)
-
         # Patch SdkMcpTool
         if original_tool_class:
             wrapped_tool_class = _create_tool_wrapper_class(
@@ -94,22 +87,10 @@ def setup_claude_agent_sdk(
             )
             claude_agent_sdk.SdkMcpTool = wrapped_tool_class  # type: ignore
 
-            # Update all modules that already imported SdkMcpTool
-            for module in list(sys.modules.values()):
-                if module and hasattr(module, "SdkMcpTool"):
-                    if getattr(module, "SdkMcpTool", None) is original_tool_class:
-                        setattr(module, "SdkMcpTool", wrapped_tool_class)
-
         # Patch tool() decorator
         if original_tool_fn:
             wrapped_tool_fn = _wrap_tool_factory(original_tool_fn, tracer, state)
             claude_agent_sdk.tool = wrapped_tool_fn  # type: ignore
-
-            # Update all modules that already imported tool
-            for module in list(sys.modules.values()):
-                if module and hasattr(module, "tool"):
-                    if getattr(module, "tool", None) is original_tool_fn:
-                        setattr(module, "tool", wrapped_tool_fn)
 
         # Patch standalone query() function if it exists
         # Note: The standalone query() uses InternalClient, not ClaudeSDKClient,
@@ -118,12 +99,6 @@ def setup_claude_agent_sdk(
             wrapped_query_fn = _wrap_query_function(original_query_fn, tracer, state)
             claude_agent_sdk.query = wrapped_query_fn  # type: ignore
 
-            # Update all modules that already imported query
-            for module in list(sys.modules.values()):
-                if module and hasattr(module, "query"):
-                    if getattr(module, "query", None) is original_query_fn:
-                        setattr(module, "query", wrapped_query_fn)
-
         # Patch create_sdk_mcp_server() to wrap tool handlers that were
         # created before setup_claude_agent_sdk() was called
         if original_create_server_fn:
@@ -131,16 +106,6 @@ def setup_claude_agent_sdk(
                 original_create_server_fn, tracer, state
             )
             claude_agent_sdk.create_sdk_mcp_server = wrapped_create_server_fn  # type: ignore
-
-            for module in list(sys.modules.values()):
-                if module and hasattr(module, "create_sdk_mcp_server"):
-                    if (
-                        getattr(module, "create_sdk_mcp_server", None)
-                        is original_create_server_fn
-                    ):
-                        setattr(
-                            module, "create_sdk_mcp_server", wrapped_create_server_fn
-                        )
 
         judgeval_logger.info("Claude Agent SDK integration setup successful")
         return True

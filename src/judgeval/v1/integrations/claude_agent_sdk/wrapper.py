@@ -101,9 +101,6 @@ class BuiltInToolSpanTracker:
                 span, AttributeKeys.JUDGMENT_INPUT, safe_serialize(tool_input)
             )
 
-            with self.tracer.use_span(span):
-                self.tracer.emit_partial()
-
             self._pending_spans[tool_use_id] = (span, tool_name)
 
     def on_user_message(self, message: Any) -> None:

@@ -756,8 +756,11 @@ class TestEmitPartial:
         assert mock_emit.call_count >= 1, "emit_partial should be called for tool spans"
 
     @pytest.mark.asyncio
-    async def test_builtin_tool_tracker_calls_emit_partial(self):
-        """BuiltInToolSpanTracker should call emit_partial after opening a tool span."""
+    async def test_builtin_tool_tracker_does_not_call_emit_partial(self):
+        """BuiltInToolSpanTracker should NOT call emit_partial when opening a tool span.
+
+        The span is emitted when it ends (in on_user_message), not when opened.
+        """
         from unittest.mock import patch
         from judgeval.v1.tracer.base_tracer import BaseTracer
 
@@ -780,8 +783,8 @@ class TestEmitPartial:
 
             tracker.cleanup()
 
-        assert mock_emit.call_count >= 1, (
-            "emit_partial should be called when opening built-in tool span"
+        assert mock_emit.call_count == 0, (
+            "emit_partial should not be called when opening built-in tool span"
         )
 
     @pytest.mark.asyncio
