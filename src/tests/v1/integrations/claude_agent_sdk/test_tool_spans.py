@@ -23,7 +23,9 @@ from judgeval.v1.integrations.claude_agent_sdk.wrapper import (
     _create_tool_wrapper_class,
     _wrap_tool_factory,
     _thread_local,
+    _sdk_tool_names,
     LLMSpanTracker,
+    BuiltInToolSpanTracker,
 )
 
 
@@ -468,7 +470,260 @@ class TestMessageStreamToolSpans:
 
 
 # ---------------------------------------------------------------------------
-# Cleanup thread-local storage after each test
+# Tests for BuiltInToolSpanTracker (message-stream-based tool spans)
+# ---------------------------------------------------------------------------
+
+
+class TestBuiltInToolSpanTracker:
+    """Test that built-in tool calls from the message stream are captured as spans."""
+
+    @pytest.mark.asyncio
+    async def test_builtin_tool_creates_span_from_message_stream(self):
+        """A ToolUseBlock in AssistantMessage + ToolResultBlock in UserMessage = tool span."""
+        collector = InMemoryCollector()
+        tracer = _make_tracer(collector)
+
+        tracker = BuiltInToolSpanTracker(tracer)
+
+        with tracer.get_tracer().start_as_current_span("agent") as agent_span:
+            from opentelemetry.trace import set_span_in_context
+
+            _thread_local.parent_context = set_span_in_context(
+                agent_span, tracer.get_context()
+            )
+
+            # Simulate AssistantMessage with a ToolUseBlock
+            assistant_msg = AssistantMessage(
+                content=[
+                    TextBlock(text="I'll edit that file for you."),
+                    ToolUseBlock(
+                        id="tool_abc",
+                        name="file_edit",
+                        input={"path": "/tmp/test.py", "content": "print('hi')"},
+                    ),
+                ]
+            )
+            tracker.on_assistant_message(assistant_msg)
+
+            # Simulate UserMessage with matching ToolResultBlock
+            user_msg = FakeUserMessage(
+                content=[
+                    ToolResultBlock(
+                        tool_use_id="tool_abc",
+                        content="File written successfully",
+                    ),
+                ]
+            )
+            tracker.on_user_message(user_msg)
+
+        tool_spans = [s for s in collector.spans if s.name == "file_edit"]
+        assert len(tool_spans) == 1
+
+        attrs = dict(tool_spans[0].attributes)
+        assert attrs[AttributeKeys.JUDGMENT_SPAN_KIND] == "tool"
+        assert AttributeKeys.JUDGMENT_INPUT in attrs
+        assert AttributeKeys.JUDGMENT_OUTPUT in attrs
+        assert "/tmp/test.py" in str(attrs[AttributeKeys.JUDGMENT_INPUT])
+        assert "File written" in str(attrs[AttributeKeys.JUDGMENT_OUTPUT])
+
+    @pytest.mark.asyncio
+    async def test_builtin_tool_error_sets_error_status(self):
+        """Tool results with is_error=True should set error status on the span."""
+        collector = InMemoryCollector()
+        tracer = _make_tracer(collector)
+
+        tracker = BuiltInToolSpanTracker(tracer)
+
+        with tracer.get_tracer().start_as_current_span("agent") as agent_span:
+            from opentelemetry.trace import set_span_in_context
+
+            _thread_local.parent_context = set_span_in_context(
+                agent_span, tracer.get_context()
+            )
+
+            assistant_msg = AssistantMessage(
+                content=[
+                    ToolUseBlock(
+                        id="tool_err",
+                        name="bash",
+                        input={"command": "rm -rf /"},
+                    ),
+                ]
+            )
+            tracker.on_assistant_message(assistant_msg)
+
+            user_msg = FakeUserMessage(
+                content=[
+                    ToolResultBlock(
+                        tool_use_id="tool_err",
+                        content="Permission denied",
+                        is_error=True,
+                    ),
+                ]
+            )
+            tracker.on_user_message(user_msg)
+
+        tool_spans = [s for s in collector.spans if s.name == "bash"]
+        assert len(tool_spans) == 1
+
+        from opentelemetry.trace import StatusCode
+
+        assert tool_spans[0].status.status_code == StatusCode.ERROR
+
+    @pytest.mark.asyncio
+    async def test_sdk_tools_are_skipped(self):
+        """SDK-defined tools should not get duplicate spans from the message stream."""
+        collector = InMemoryCollector()
+        tracer = _make_tracer(collector)
+
+        # "calculator" is an SDK-defined tool
+        tracker = BuiltInToolSpanTracker(tracer, sdk_tool_names={"calculator"})
+
+        with tracer.get_tracer().start_as_current_span("agent") as agent_span:
+            from opentelemetry.trace import set_span_in_context
+
+            _thread_local.parent_context = set_span_in_context(
+                agent_span, tracer.get_context()
+            )
+
+            # SDK tool: should be skipped
+            assistant_msg = AssistantMessage(
+                content=[
+                    ToolUseBlock(
+                        id="tool_sdk",
+                        name="calculator",
+                        input={"expression": "2+2"},
+                    ),
+                    # Built-in tool: should create a span
+                    ToolUseBlock(
+                        id="tool_builtin",
+                        name="bash",
+                        input={"command": "echo hello"},
+                    ),
+                ]
+            )
+            tracker.on_assistant_message(assistant_msg)
+
+            user_msg = FakeUserMessage(
+                content=[
+                    ToolResultBlock(tool_use_id="tool_sdk", content="4"),
+                    ToolResultBlock(tool_use_id="tool_builtin", content="hello"),
+                ]
+            )
+            tracker.on_user_message(user_msg)
+
+        calc_spans = [s for s in collector.spans if s.name == "calculator"]
+        bash_spans = [s for s in collector.spans if s.name == "bash"]
+
+        assert len(calc_spans) == 0, "SDK tool should not create message-stream span"
+        assert len(bash_spans) == 1, "Built-in tool should create message-stream span"
+
+    @pytest.mark.asyncio
+    async def test_multiple_builtin_tools_in_same_message(self):
+        """Multiple ToolUseBlocks in a single AssistantMessage."""
+        collector = InMemoryCollector()
+        tracer = _make_tracer(collector)
+
+        tracker = BuiltInToolSpanTracker(tracer)
+
+        with tracer.get_tracer().start_as_current_span("agent") as agent_span:
+            from opentelemetry.trace import set_span_in_context
+
+            _thread_local.parent_context = set_span_in_context(
+                agent_span, tracer.get_context()
+            )
+
+            assistant_msg = AssistantMessage(
+                content=[
+                    ToolUseBlock(id="t1", name="read_file", input={"path": "a.py"}),
+                    ToolUseBlock(id="t2", name="write_file", input={"path": "b.py"}),
+                ]
+            )
+            tracker.on_assistant_message(assistant_msg)
+
+            user_msg = FakeUserMessage(
+                content=[
+                    ToolResultBlock(tool_use_id="t1", content="file contents"),
+                    ToolResultBlock(tool_use_id="t2", content="written"),
+                ]
+            )
+            tracker.on_user_message(user_msg)
+
+        read_spans = [s for s in collector.spans if s.name == "read_file"]
+        write_spans = [s for s in collector.spans if s.name == "write_file"]
+
+        assert len(read_spans) == 1
+        assert len(write_spans) == 1
+
+    @pytest.mark.asyncio
+    async def test_cleanup_ends_unclosed_spans(self):
+        """Cleanup should end spans that never got a matching ToolResultBlock."""
+        collector = InMemoryCollector()
+        tracer = _make_tracer(collector)
+
+        tracker = BuiltInToolSpanTracker(tracer)
+
+        with tracer.get_tracer().start_as_current_span("agent") as agent_span:
+            from opentelemetry.trace import set_span_in_context
+
+            _thread_local.parent_context = set_span_in_context(
+                agent_span, tracer.get_context()
+            )
+
+            assistant_msg = AssistantMessage(
+                content=[
+                    ToolUseBlock(id="orphan", name="abandoned_tool", input={"x": 1}),
+                ]
+            )
+            tracker.on_assistant_message(assistant_msg)
+
+            # No matching UserMessage - force cleanup
+            tracker.cleanup()
+
+        orphan_spans = [s for s in collector.spans if s.name == "abandoned_tool"]
+        assert len(orphan_spans) == 1
+
+    @pytest.mark.asyncio
+    async def test_builtin_tool_nests_under_agent(self):
+        """Built-in tool spans should be children of the agent span."""
+        collector = InMemoryCollector()
+        tracer = _make_tracer(collector)
+
+        tracker = BuiltInToolSpanTracker(tracer)
+
+        with tracer.get_tracer().start_as_current_span("agent") as agent_span:
+            from opentelemetry.trace import set_span_in_context
+
+            _thread_local.parent_context = set_span_in_context(
+                agent_span, tracer.get_context()
+            )
+
+            assistant_msg = AssistantMessage(
+                content=[
+                    ToolUseBlock(id="t1", name="bash", input={"cmd": "ls"}),
+                ]
+            )
+            tracker.on_assistant_message(assistant_msg)
+
+            user_msg = FakeUserMessage(
+                content=[
+                    ToolResultBlock(tool_use_id="t1", content="file1\nfile2"),
+                ]
+            )
+            tracker.on_user_message(user_msg)
+
+        agent_spans = [s for s in collector.spans if s.name == "agent"]
+        tool_spans = [s for s in collector.spans if s.name == "bash"]
+
+        assert len(agent_spans) == 1
+        assert len(tool_spans) == 1
+
+        assert tool_spans[0].parent is not None
+        assert tool_spans[0].parent.span_id == agent_spans[0].context.span_id
+
+
+# ---------------------------------------------------------------------------
+# Cleanup thread-local storage and SDK tool names after each test
 # ---------------------------------------------------------------------------
 
 
@@ -477,3 +732,4 @@ def cleanup_thread_local():
     yield
     if hasattr(_thread_local, "parent_context"):
         delattr(_thread_local, "parent_context")
+    _sdk_tool_names.clear()

@@ -29,6 +29,96 @@ if TYPE_CHECKING:
 _thread_local = threading.local()
 
 
+class BuiltInToolSpanTracker:
+    """Captures tool call spans from the message stream for built-in tools.
+
+    Built-in tools (file edit, bash, etc.) are handled by the Claude Code CLI
+    and appear in the message stream as ToolUseBlock in AssistantMessage content
+    followed by ToolResultBlock in UserMessage content. SDK-defined tools already
+    get spans from _wrap_tool_handler, so this tracker skips tools it knows are
+    handled by the SDK to avoid duplicate spans.
+
+    Flow:
+    1. AssistantMessage contains ToolUseBlock → open a tool span
+    2. UserMessage contains ToolResultBlock → match by tool_use_id, record output, close span
+    """
+
+    def __init__(self, tracer: "BaseTracer", sdk_tool_names: Optional[set] = None):
+        self.tracer = tracer
+        self.sdk_tool_names: set = sdk_tool_names or set()
+        self._pending_spans: Dict[str, Tuple[Any, Any]] = {}
+
+    def on_assistant_message(self, message: Any) -> None:
+        """Extract ToolUseBlock entries and open tool spans."""
+        content = getattr(message, "content", None)
+        if not isinstance(content, list):
+            return
+
+        for block in content:
+            if type(block).__name__ != "ToolUseBlock":
+                continue
+
+            tool_name = getattr(block, "name", None)
+            tool_use_id = getattr(block, "id", None)
+            tool_input = getattr(block, "input", None)
+
+            if not tool_name or not tool_use_id:
+                continue
+
+            if tool_name in self.sdk_tool_names:
+                continue
+
+            parent_context = getattr(_thread_local, "parent_context", None)
+            ctx = parent_context if parent_context is not None else None
+
+            span = self.tracer.get_tracer().start_span(
+                str(tool_name),
+                context=ctx,
+                attributes={
+                    AttributeKeys.JUDGMENT_SPAN_KIND: "tool",
+                },
+            )
+
+            self.tracer.set_span_attribute(span, AttributeKeys.JUDGMENT_INPUT, tool_input)
+            self._pending_spans[tool_use_id] = (span, tool_name)
+
+    def on_user_message(self, message: Any) -> None:
+        """Match ToolResultBlock entries to pending spans and close them."""
+        content = getattr(message, "content", None)
+        if not isinstance(content, list):
+            return
+
+        for block in content:
+            if type(block).__name__ != "ToolResultBlock":
+                continue
+
+            tool_use_id = getattr(block, "tool_use_id", None)
+            if not tool_use_id or tool_use_id not in self._pending_spans:
+                continue
+
+            span, _ = self._pending_spans.pop(tool_use_id)
+
+            result_content = getattr(block, "content", None)
+            is_error = getattr(block, "is_error", None)
+
+            self.tracer.set_span_attribute(
+                span, AttributeKeys.JUDGMENT_OUTPUT, result_content
+            )
+
+            if is_error:
+                from opentelemetry.trace import Status, StatusCode
+
+                span.set_status(Status(StatusCode.ERROR, "Tool returned an error"))
+
+            span.end()
+
+    def cleanup(self) -> None:
+        """End any unclosed tool spans."""
+        for span, _ in self._pending_spans.values():
+            span.end()
+        self._pending_spans.clear()
+
+
 class LLMSpanTracker:
     """Manages LLM span lifecycle for Claude Agent SDK message streams.
 
@@ -90,6 +180,14 @@ class LLMSpanTracker:
         self.current_span_context = None
 
 
+_sdk_tool_names: set = set()
+
+
+def _register_sdk_tool_name(name: str) -> None:
+    """Register a tool name as an SDK-defined tool to avoid duplicate spans."""
+    _sdk_tool_names.add(name)
+
+
 def _create_client_wrapper_class(
     original_client_class: Any, tracer: "BaseTracer"
 ) -> Any:
@@ -145,6 +243,9 @@ def _create_client_wrapper_class(
             llm_tracker = LLMSpanTracker(
                 tracer, query_start_time=self.__query_start_time
             )
+            tool_tracker = BuiltInToolSpanTracker(
+                tracer, sdk_tool_names=_sdk_tool_names
+            )
 
             try:
                 async for message in generator:
@@ -157,7 +258,11 @@ def _create_client_wrapper_class(
                         if final_content:
                             final_results.append(final_content)
 
+                        tool_tracker.on_assistant_message(message)
+
                     elif message_type == "UserMessage":
+                        tool_tracker.on_user_message(message)
+
                         if hasattr(message, "content"):
                             content = _serialize_content_blocks(message.content)
                             final_results.append({"content": content, "role": "user"})
@@ -197,6 +302,7 @@ def _create_client_wrapper_class(
                 agent_span.record_exception(e)
                 raise
             finally:
+                tool_tracker.cleanup()
                 llm_tracker.cleanup()
                 agent_span_context.__exit__(None, None, None)
                 # Clean up thread-local storage
@@ -254,6 +360,9 @@ def _wrap_query_function(
 
         final_results: List[Dict[str, Any]] = []
         llm_tracker = LLMSpanTracker(tracer, query_start_time=time.time())
+        tool_tracker = BuiltInToolSpanTracker(
+            tracer, sdk_tool_names=_sdk_tool_names
+        )
 
         try:
             # Call original query function
@@ -269,7 +378,11 @@ def _wrap_query_function(
                     if final_content:
                         final_results.append(final_content)
 
+                    tool_tracker.on_assistant_message(message)
+
                 elif message_type == "UserMessage":
+                    tool_tracker.on_user_message(message)
+
                     if hasattr(message, "content"):
                         content = _serialize_content_blocks(message.content)
                         final_results.append({"content": content, "role": "user"})
@@ -307,6 +420,7 @@ def _wrap_query_function(
             agent_span.record_exception(e)
             raise
         finally:
+            tool_tracker.cleanup()
             llm_tracker.cleanup()
             agent_span_context.__exit__(None, None, None)
             # Clean up thread-local storage
@@ -359,6 +473,8 @@ def _wrap_tool_handler(
     # Check if already wrapped to prevent double-wrapping
     if hasattr(handler, "_judgeval_wrapped"):
         return handler
+
+    _register_sdk_tool_name(str(tool_name))
 
     async def wrapped_handler(args: Any) -> Any:
         # Get parent context from thread-local storage
