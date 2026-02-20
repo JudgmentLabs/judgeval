@@ -79,7 +79,9 @@ class BuiltInToolSpanTracker:
                 },
             )
 
-            self.tracer.set_span_attribute(span, AttributeKeys.JUDGMENT_INPUT, tool_input)
+            self.tracer.set_span_attribute(
+                span, AttributeKeys.JUDGMENT_INPUT, tool_input
+            )
 
             with self.tracer.use_span(span):
                 self.tracer.emit_partial()
@@ -368,9 +370,7 @@ def _wrap_query_function(
 
         final_results: List[Dict[str, Any]] = []
         llm_tracker = LLMSpanTracker(tracer, query_start_time=time.time())
-        tool_tracker = BuiltInToolSpanTracker(
-            tracer, sdk_tool_names=_sdk_tool_names
-        )
+        tool_tracker = BuiltInToolSpanTracker(tracer, sdk_tool_names=_sdk_tool_names)
 
         try:
             # Call original query function

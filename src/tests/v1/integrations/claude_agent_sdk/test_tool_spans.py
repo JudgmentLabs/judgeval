@@ -6,15 +6,12 @@ when using SdkMcpTool, @tool decorator, and built-in tools from the message stre
 
 from __future__ import annotations
 
-import asyncio
-import dataclasses
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from unittest.mock import MagicMock
 
 import pytest
 
-from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
 from judgeval.judgment_attribute_keys import AttributeKeys
@@ -181,9 +178,7 @@ class TestWrapToolHandler:
 
         assert result == {"content": [{"type": "text", "text": "Result: 42"}]}
 
-        tool_spans = [
-            s for s in collector.spans if s.name == "calculator"
-        ]
+        tool_spans = [s for s in collector.spans if s.name == "calculator"]
         assert len(tool_spans) == 1
 
         tool_span = tool_spans[0]
@@ -304,7 +299,9 @@ class TestCreateToolWrapperClass:
 
         tool_spans = [s for s in collector.spans if s.name == "greet"]
         assert len(tool_spans) == 1
-        assert dict(tool_spans[0].attributes)[AttributeKeys.JUDGMENT_SPAN_KIND] == "tool"
+        assert (
+            dict(tool_spans[0].attributes)[AttributeKeys.JUDGMENT_SPAN_KIND] == "tool"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -329,13 +326,16 @@ class TestWrapToolFactory:
                     handler=handler,
                     annotations=annotations,
                 )
+
             return decorator
 
         wrapped_tool_fn = _wrap_tool_factory(fake_tool_fn, tracer)
 
         @wrapped_tool_fn("add", "Add numbers", {"a": float, "b": float})
         async def add(args):
-            return {"content": [{"type": "text", "text": f"Sum: {args['a'] + args['b']}"}]}
+            return {
+                "content": [{"type": "text", "text": f"Sum: {args['a'] + args['b']}"}]
+            }
 
         assert add.name == "add"
         assert hasattr(add.handler, "_judgeval_wrapped")
@@ -352,7 +352,9 @@ class TestWrapToolFactory:
 
         tool_spans = [s for s in collector.spans if s.name == "add"]
         assert len(tool_spans) == 1
-        assert dict(tool_spans[0].attributes)[AttributeKeys.JUDGMENT_SPAN_KIND] == "tool"
+        assert (
+            dict(tool_spans[0].attributes)[AttributeKeys.JUDGMENT_SPAN_KIND] == "tool"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -390,10 +392,14 @@ class TestMessageStreamToolSpans:
         content_list = final_content.get("content", [])
 
         # Verify ToolUseBlock was serialized with proper type
-        has_tool_use = any(
-            isinstance(item, dict) and item.get("type") == "tool_use"
-            for item in content_list
-        ) if isinstance(content_list, list) else False
+        has_tool_use = (
+            any(
+                isinstance(item, dict) and item.get("type") == "tool_use"
+                for item in content_list
+            )
+            if isinstance(content_list, list)
+            else False
+        )
         assert has_tool_use, (
             f"Expected tool_use block in serialized content, got: {content_list}"
         )
@@ -750,7 +756,9 @@ class TestEmitPartial:
             _thread_local.parent_context = set_span_in_context(
                 parent, tracer.get_context()
             )
-            with patch.object(BaseTracer, "emit_partial", wraps=tracer.emit_partial) as mock_emit:
+            with patch.object(
+                BaseTracer, "emit_partial", wraps=tracer.emit_partial
+            ) as mock_emit:
                 await wrapped({"x": 1})
 
         assert mock_emit.call_count >= 1, "emit_partial should be called for tool spans"
@@ -778,7 +786,9 @@ class TestEmitPartial:
                     ToolUseBlock(id="t1", name="bash", input={"cmd": "ls"}),
                 ]
             )
-            with patch.object(BaseTracer, "emit_partial", wraps=tracer.emit_partial) as mock_emit:
+            with patch.object(
+                BaseTracer, "emit_partial", wraps=tracer.emit_partial
+            ) as mock_emit:
                 tracker.on_assistant_message(assistant_msg)
 
             tracker.cleanup()
@@ -798,7 +808,9 @@ class TestEmitPartial:
 
         tracker = LLMSpanTracker(tracer)
         with tracer.get_tracer().start_as_current_span("agent"):
-            with patch.object(BaseTracer, "emit_partial", wraps=tracer.emit_partial) as mock_emit:
+            with patch.object(
+                BaseTracer, "emit_partial", wraps=tracer.emit_partial
+            ) as mock_emit:
                 tracker.start_llm_span(
                     AssistantMessage(
                         content=[TextBlock(text="Hello")],
