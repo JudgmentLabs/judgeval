@@ -376,7 +376,7 @@ class UntagPromptResponse(TypedDict):
 class UploadCustomScorerMetadata(TypedDict):
     scorer_name: str
     entrypoint_path: str
-    requirements_path: str
+    requirements_path: NotRequired[Optional[str]]
     class_name: str
     scorer_type: NotRequired[Optional[str]]
     response_type: str

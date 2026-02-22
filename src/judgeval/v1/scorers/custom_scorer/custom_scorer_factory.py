@@ -8,7 +8,10 @@ from typing import Literal, Optional, Tuple
 
 from judgeval.logger import judgeval_logger
 from judgeval.v1.internal.api import JudgmentSyncClient
-from judgeval.v1.internal.api.api_types import UploadCustomScorerRequest
+from judgeval.v1.internal.api.api_types import (
+    UploadCustomScorerMetadata,
+    UploadCustomScorerRequest,
+)
 from judgeval.v1.scorers.custom_scorer.custom_scorer import CustomScorer
 from judgeval.utils.guards import expect_project_id
 from judgeval.exceptions import JudgmentAPIError
@@ -205,15 +208,17 @@ class CustomScorerFactory:
             else None
         )
 
-        metadata = {
+        metadata: UploadCustomScorerMetadata = {
             "scorer_name": unique_name,
             "entrypoint_path": entrypoint_arcname,
-            "requirements_path": requirements_arcname,
             "class_name": class_name,
             "scorer_type": scorer_type,
             "response_type": response_type,
             "version": 2,
         }
+
+        if requirements_arcname:
+            metadata["requirements_path"] = requirements_arcname
 
         payload: UploadCustomScorerRequest = {
             "metadata": metadata,
