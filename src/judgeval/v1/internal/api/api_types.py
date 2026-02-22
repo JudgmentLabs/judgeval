@@ -373,8 +373,18 @@ class UntagPromptResponse(TypedDict):
     commit_ids: List[str]
 
 
+class UploadCustomScorerMetadata(TypedDict):
+    scorer_name: str
+    entrypoint_path: str
+    requirements_path: str
+    class_name: str
+    scorer_type: NotRequired[Optional[str]]
+    response_type: str
+    version: NotRequired[Optional[float]]
+
+
 class UploadCustomScorerRequest(TypedDict):
-    metadata: str
+    metadata: UploadCustomScorerMetadata
     bundle: bytes
 
 

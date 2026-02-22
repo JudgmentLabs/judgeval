@@ -78,9 +78,6 @@ def upload_scorer(
         "-n",
         help="Custom scorer name (auto-detected if not provided)",
     ),
-    overwrite: bool = typer.Option(
-        False, "--overwrite", "-o", help="Overwrite if exists"
-    ),
     api_key: str = typer.Option(None, envvar="JUDGMENT_API_KEY"),
     organization_id: str = typer.Option(None, envvar="JUDGMENT_ORG_ID"),
 ):
@@ -95,7 +92,6 @@ def upload_scorer(
             included_files_paths=included_files_paths,
             requirements_file_path=requirements_file_path,
             unique_name=unique_name,
-            overwrite=overwrite,
         )
         if not result:
             raise typer.Abort()

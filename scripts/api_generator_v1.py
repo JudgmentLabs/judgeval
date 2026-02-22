@@ -768,7 +768,10 @@ def generate_client_class(
         '                files[key] = (key, value, "application/octet-stream")'
     )
     lines.append("            else:")
-    lines.append("                data[key] = value")
+    lines.append("                if isinstance(value, dict):")
+    lines.append("                    data[key] = json.dumps(value)")
+    lines.append("                else:")
+    lines.append("                    data[key] = value")
     lines.append("        r = self.client.request(")
     lines.append("            method,")
     lines.append("            url,")
@@ -826,6 +829,7 @@ def generate_api_file() -> str:
     lines = [
         "# mypy: ignore-errors",
         "from typing import Dict, Any, Mapping, Literal, Optional",
+        "import json",
         "import httpx",
         "from httpx import Response",
         "from judgeval.exceptions import JudgmentAPIError",

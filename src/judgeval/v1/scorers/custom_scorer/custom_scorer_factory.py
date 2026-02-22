@@ -3,7 +3,6 @@ from __future__ import annotations
 import ast
 import io
 import os
-import json
 import tarfile
 from typing import Literal, Optional, Tuple
 
@@ -13,6 +12,7 @@ from judgeval.v1.internal.api.api_types import UploadCustomScorerRequest
 from judgeval.v1.scorers.custom_scorer.custom_scorer import CustomScorer
 from judgeval.utils.guards import expect_project_id
 from judgeval.exceptions import JudgmentAPIError
+import typer
 
 RESPONSE_TYPE_MAP: dict[str, Literal["binary", "categorical", "numeric"]] = {
     "BinaryResponse": "binary",
@@ -130,7 +130,6 @@ class CustomScorerFactory:
         included_files_paths: list[str],
         requirements_file_path: str | None = None,
         unique_name: str | None = None,
-        overwrite: bool = False,
     ) -> bool:
         project_id = expect_project_id(self._project_id)
         if not project_id:
@@ -182,20 +181,14 @@ class CustomScorerFactory:
             unique_name = class_name
             judgeval_logger.info(f"Auto-detected scorer name: '{unique_name}'")
 
-        if not overwrite:
-            try:
-                exists_resp = self._client.get_projects_scorers_custom_by_name_exists(
-                    project_id=project_id, name=unique_name
-                )
-                if exists_resp.get("exists"):
-                    raise JudgmentAPIError(
-                        status_code=409,
-                        detail=f"Scorer '{unique_name}' already exists. Use --overwrite to replace.",
-                        response=None,
-                    )
-            except JudgmentAPIError as e:
-                if e.status_code == 409:
-                    raise
+        exists_resp = self._client.get_projects_scorers_custom_by_name_exists(
+            project_id=project_id, name=unique_name
+        )
+        if exists_resp.get("exists"):
+            typer.confirm(
+                f"Scorer '{unique_name}' already exists. Upload a new version?",
+                abort=True,
+            )
 
         bundle = _build_bundle(
             entrypoint_path, included_files_paths, requirements_file_path
@@ -206,21 +199,27 @@ class CustomScorerFactory:
         base_dirs = [os.path.dirname(p) if os.path.isfile(p) else p for p in all_abs]
         common = os.path.commonpath(base_dirs)
         entrypoint_arcname = os.path.relpath(os.path.abspath(entrypoint_path), common)
+        requirements_arcname = (
+            os.path.relpath(os.path.abspath(requirements_file_path), common)
+            if requirements_file_path
+            else None
+        )
 
         metadata = {
             "scorer_name": unique_name,
             "entrypoint_path": entrypoint_arcname,
+            "requirements_path": requirements_arcname,
             "class_name": class_name,
-            "overwrite": overwrite,
             "scorer_type": scorer_type,
             "response_type": response_type,
             "version": 2,
         }
 
         payload: UploadCustomScorerRequest = {
-            "metadata": json.dumps(metadata),
+            "metadata": metadata,
             "bundle": bundle,
         }
+
         response = self._client.post_projects_scorers_custom(
             project_id=project_id,
             payload=payload,

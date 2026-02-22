@@ -1,5 +1,6 @@
 # mypy: ignore-errors
 from typing import Dict, Any, Mapping, Literal, Optional
+import json
 import httpx
 from httpx import Response
 from judgeval.exceptions import JudgmentAPIError
@@ -79,7 +80,10 @@ class JudgmentSyncClient:
             if isinstance(value, (bytes, bytearray)):
                 files[key] = (key, value, "application/octet-stream")
             else:
-                data[key] = value
+                if isinstance(value, dict):
+                    data[key] = json.dumps(value)
+                else:
+                    data[key] = value
         r = self.client.request(
             method,
             url,
@@ -421,7 +425,10 @@ class JudgmentAsyncClient:
             if isinstance(value, (bytes, bytearray)):
                 files[key] = (key, value, "application/octet-stream")
             else:
-                data[key] = value
+                if isinstance(value, dict):
+                    data[key] = json.dumps(value)
+                else:
+                    data[key] = value
         r = self.client.request(
             method,
             url,
