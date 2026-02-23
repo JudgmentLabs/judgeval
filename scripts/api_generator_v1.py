@@ -643,13 +643,17 @@ def generate_method_body(
 ) -> str:
     async_prefix = "await " if is_async else ""
 
-    # Build URL with path parameter interpolation
+    # Build URL with path parameter interpolation (URL-encoded for safety)
+    path_setup = ""
     if path_params:
+        encoding_lines = []
         url_path = path
         for param in path_params:
             snake_name = to_snake_case(param["name"])
-            # Replace {paramName} with Python f-string interpolation
-            url_path = url_path.replace(f"{{{param['name']}}}", f"{{{snake_name}}}")
+            encoded_name = f"url_encoded_{snake_name}"
+            encoding_lines.append(f'{encoded_name} = quote({snake_name}, safe="")')
+            url_path = url_path.replace(f"{{{param['name']}}}", f"{{{encoded_name}}}")
+        path_setup = "\n        ".join(encoding_lines)
         url_expr = f'f"{url_path}"'
     else:
         url_expr = f'"{path}"'
@@ -669,22 +673,22 @@ def generate_method_body(
         query_setup = ""
         query_param = "{}"
 
+    setup_parts = [p for p in [path_setup, query_setup] if p]
+    setup_prefix = "\n        ".join(setup_parts) + "\n        " if setup_parts else ""
+
     if method == "GET":
-        if query_setup:
-            return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            {query_param},\n        )'
-        else:
-            return f'return {async_prefix}self._request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            {{}},\n        )'
+        if setup_prefix:
+            return f'{setup_prefix}return {async_prefix}self._request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            {query_param},\n        )'
+        return f'return {async_prefix}self._request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            {{}},\n        )'
     else:
         if request_type:
-            if query_setup:
-                return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            payload,\n            params={query_param},\n        )'
-            else:
-                return f'return {async_prefix}self._request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            payload,\n        )'
+            if setup_prefix:
+                return f'{setup_prefix}return {async_prefix}self._request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            payload,\n            params={query_param},\n        )'
+            return f'return {async_prefix}self._request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            payload,\n        )'
         else:
-            if query_setup:
-                return f'{query_setup}\n        return {async_prefix}self._request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            {{}},\n            params={query_param},\n        )'
-            else:
-                return f'return {async_prefix}self._request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            {{}},\n        )'
+            if setup_prefix:
+                return f'{setup_prefix}return {async_prefix}self._request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            {{}},\n            params={query_param},\n        )'
+            return f'return {async_prefix}self._request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            {{}},\n        )'
 
 
 def generate_client_class(
@@ -774,6 +778,7 @@ def generate_api_file() -> str:
     lines = [
         "# mypy: ignore-errors",
         "from typing import Dict, Any, Mapping, Literal, Optional",
+        "from urllib.parse import quote",
         "import httpx",
         "from httpx import Response",
         "from judgeval.exceptions import JudgmentAPIError",
