@@ -72,7 +72,7 @@ class TestNonStreamingSyncWrapper(BaseAnthropicTest):
         )
 
         response2 = sync_client_maybe_wrapped.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-3-5-haiku-20241022",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Say 'second'"}],
         )
@@ -106,7 +106,7 @@ class TestNonStreamingSyncWrapper(BaseAnthropicTest):
                 span=span2,
                 attrs=attrs2,
                 expected_span_name="ANTHROPIC_API_CALL",
-                expected_model_name="claude-3-haiku-20240307",
+                expected_model_name="claude-3-5-haiku-20241022",
             )
 
 

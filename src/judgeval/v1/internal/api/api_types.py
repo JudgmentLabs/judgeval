@@ -7,24 +7,30 @@ from typing_extensions import NotRequired
 class AddProjectRequest(TypedDict):
     project_name: str
 
+
 class AddProjectResponse(TypedDict):
     project_id: str
+
 
 class AddToRunEvalQueueExamplesResponse(TypedDict):
     success: bool
     status: str
     message: str
 
+
 class AddToRunEvalQueueTracesResponse(TypedDict):
     success: bool
     status: str
     message: str
 
+
 class AddTraceTagsRequest(TypedDict):
     tags: List[str]
 
+
 class AddTraceTagsResponse(TypedDict):
     success: bool
+
 
 class BaseScorer(TypedDict):
     score_type: str
@@ -45,17 +51,21 @@ class BaseScorer(TypedDict):
     required_params: NotRequired[Optional[List[str]]]
     strict_mode: NotRequired[Optional[bool]]
 
+
 class CreateDatasetRequest(TypedDict):
     name: str
     dataset_kind: str
     examples: List[Example]
     overwrite: bool
 
+
 class CreateDatasetResponse(TypedDict):
     detail: str
 
+
 class CustomScorerExistsResponse(TypedDict):
     exists: bool
+
 
 class DatasetInfo(TypedDict):
     dataset_id: str
@@ -65,31 +75,33 @@ class DatasetInfo(TypedDict):
     entries: float
     creator: str
 
+
 class DeleteProjectResponse(TypedDict):
     status: str
     message: str
+
 
 class E2EFetchSpanScoreRequest(TypedDict):
     project_name: str
     trace_id: str
     span_id: str
 
+
 E2EFetchSpanScoreResponse = List[Dict[str, Any]]
 
-class E2EFetchTraceRequest(TypedDict):
-    project_name: str
-    trace_id: str
-
 E2EFetchTraceResponse = List[Dict[str, Any]]
+
 
 class ErrorResponse(TypedDict):
     error: str
     message: NotRequired[Optional[str]]
 
+
 class Example(TypedDict):
     example_id: str
     created_at: str
     name: NotRequired[Optional[str]]
+
 
 class ExampleEvaluationRun(TypedDict):
     id: NotRequired[Optional[str]]
@@ -105,6 +117,7 @@ class ExampleEvaluationRun(TypedDict):
     trace_span_id: NotRequired[Optional[str]]
     trace_id: NotRequired[Optional[str]]
 
+
 class ExampleScoringResult(TypedDict):
     scorers_data: List[Dict[str, Any]]
     name: NotRequired[Optional[str]]
@@ -112,6 +125,7 @@ class ExampleScoringResult(TypedDict):
     trace_id: NotRequired[Optional[str]]
     run_duration: NotRequired[Optional[float]]
     evaluation_cost: NotRequired[Optional[float]]
+
 
 class ExperimentRunItem(TypedDict):
     organization_id: str
@@ -121,6 +135,7 @@ class ExperimentRunItem(TypedDict):
     name: NotRequired[Optional[str]]
     created_at: str
     scorers: List[ExperimentScorer]
+
 
 class ExperimentScorer(TypedDict):
     scorer_data_id: str
@@ -136,56 +151,71 @@ class ExperimentScorer(TypedDict):
     minimum_score_range: float
     maximum_score_range: float
 
+
 class FetchExperimentRunResponse(TypedDict):
     results: NotRequired[Optional[List[ExperimentRunItem]]]
     ui_results_url: NotRequired[Optional[str]]
 
+
 class FetchPromptResponse(TypedDict):
     commit: NotRequired[Optional[PromptCommitInfo]]
+
 
 class FetchPromptScorersResponse(TypedDict):
     scorers: List[PromptScorer]
 
+
 class GetPromptVersionsResponse(TypedDict):
     versions: List[PromptCommitInfo]
+
 
 class HealthResponse(TypedDict):
     status: str
     timestamp: str
 
+
 class InsertExamplesRequest(TypedDict):
     examples: List[Example]
 
+
 class InsertExamplesResponse(TypedDict):
     detail: str
+
 
 class InsertPromptRequest(TypedDict):
     name: str
     prompt: str
     tags: NotRequired[Optional[List[str]]]
 
+
 class InsertPromptResponse(TypedDict):
     commit_id: str
     parent_commit_id: NotRequired[Optional[str]]
     created_at: str
 
+
 class LocalScorerResult(TypedDict):
     scorers_data: List[Dict[str, Any]]
     data_object: Example
+
 
 class LogEvalResultsExamplesRequest(TypedDict):
     results: List[LocalScorerResult]
     run: ExampleEvaluationRun
 
+
 class LogEvalResultsExamplesResponse(TypedDict):
     ui_results_url: str
+
 
 class LogEvalResultsRequest(TypedDict):
     results: List[ScoringResult]
     run: ExampleEvaluationRun
 
+
 class LogEvalResultsResponse(TypedDict):
     ui_results_url: str
+
 
 class PromptCommitInfo(TypedDict):
     name: str
@@ -197,6 +227,7 @@ class PromptCommitInfo(TypedDict):
     first_name: str
     last_name: str
     user_email: str
+
 
 class PromptScorer(TypedDict):
     id: str
@@ -212,7 +243,9 @@ class PromptScorer(TypedDict):
     updated_at: NotRequired[Optional[str]]
     is_trace: NotRequired[Optional[bool]]
 
+
 PullAllDatasetsResponse = List[DatasetInfo]
+
 
 class PullDatasetResponse(TypedDict):
     name: str
@@ -220,11 +253,14 @@ class PullDatasetResponse(TypedDict):
     dataset_kind: str
     examples: List[Example]
 
+
 class ResolveProjectRequest(TypedDict):
     project_name: str
 
+
 class ResolveProjectResponse(TypedDict):
     project_id: str
+
 
 class ScorerConfig(TypedDict):
     score_type: str
@@ -235,18 +271,23 @@ class ScorerConfig(TypedDict):
     kwargs: NotRequired[Optional[Dict[str, Any]]]
     result_type: NotRequired[Optional[str]]
 
+
 class ScorerExistsResponse(TypedDict):
     exists: bool
 
+
 class ScoringResult(TypedDict):
     pass
+
 
 class TagPromptRequest(TypedDict):
     commit_id: str
     tags: List[str]
 
+
 class TagPromptResponse(TypedDict):
     commit_id: str
+
 
 class TraceEvaluationRun(TypedDict):
     id: NotRequired[Optional[str]]
@@ -262,9 +303,11 @@ class TraceEvaluationRun(TypedDict):
     is_offline: bool
     is_behavior: bool
 
+
 class TraceInfo(TypedDict):
     trace_id: str
     span_id: str
+
 
 class TraceScoringResult(TypedDict):
     scorers_data: List[Dict[str, Any]]
@@ -273,6 +316,7 @@ class TraceScoringResult(TypedDict):
     trace_id: NotRequired[Optional[str]]
     run_duration: NotRequired[Optional[float]]
     evaluation_cost: NotRequired[Optional[float]]
+
 
 class TraceSpan(TypedDict):
     organization_id: str
@@ -294,18 +338,23 @@ class TraceSpan(TypedDict):
     events: List[Dict[str, Any]]
     links: NotRequired[Optional[str]]
 
+
 class TriggerRootSpanRulesRequest(TypedDict):
     traces: List[TraceInfo]
+
 
 class TriggerRootSpanRulesResponse(TypedDict):
     success: bool
     queued_traces: float
 
+
 class UntagPromptRequest(TypedDict):
     tags: List[str]
 
+
 class UntagPromptResponse(TypedDict):
     commit_ids: List[str]
+
 
 class UploadCustomScorerRequest(TypedDict):
     scorer_name: str
@@ -317,10 +366,12 @@ class UploadCustomScorerRequest(TypedDict):
     response_type: str
     version: NotRequired[Optional[float]]
 
+
 class UploadCustomScorerResponse(TypedDict):
     scorer_name: str
     status: str
     message: str
+
 
 class WelcomeResponse(TypedDict):
     pass

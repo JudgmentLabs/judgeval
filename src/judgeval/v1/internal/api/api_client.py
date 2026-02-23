@@ -1,6 +1,5 @@
 # mypy: ignore-errors
 from typing import Dict, Any, Mapping, Literal, Optional
-from urllib.parse import quote
 import httpx
 from httpx import Response
 from judgeval.exceptions import JudgmentAPIError
@@ -38,7 +37,11 @@ class JudgmentSyncClient:
         self.client = httpx.Client(timeout=30)
 
     def _request(
-        self, method: Literal["POST", "PATCH", "GET", "DELETE"], url: str, payload: Any, params: Optional[Dict[str, Any]] = None
+        self,
+        method: Literal["POST", "PATCH", "GET", "DELETE"],
+        url: str,
+        payload: Any,
+        params: Optional[Dict[str, Any]] = None,
     ) -> Any:
         logger.debug(f"HTTP {method} {url}")
         if method == "GET":
@@ -66,14 +69,18 @@ class JudgmentSyncClient:
             {},
         )
 
-    def post_otel_trigger_root_span_rules(self, payload: TriggerRootSpanRulesRequest) -> TriggerRootSpanRulesResponse:
+    def post_otel_trigger_root_span_rules(
+        self, payload: TriggerRootSpanRulesRequest
+    ) -> TriggerRootSpanRulesResponse:
         return self._request(
             "POST",
             url_for("/otel/trigger_root_span_rules", self.base_url),
             payload,
         )
 
-    def post_projects_resolve(self, payload: ResolveProjectRequest) -> ResolveProjectResponse:
+    def post_projects_resolve(
+        self, payload: ResolveProjectRequest
+    ) -> ResolveProjectResponse:
         return self._request(
             "POST",
             url_for("/v1/projects/resolve/", self.base_url),
@@ -88,229 +95,244 @@ class JudgmentSyncClient:
         )
 
     def delete_projects(self, project_id: str) -> DeleteProjectResponse:
-        url_encoded_project_id = quote(project_id, safe="")
         return self._request(
             "DELETE",
-            url_for(f"/v1/projects/{url_encoded_project_id}", self.base_url),
+            url_for(f"/v1/projects/{project_id}", self.base_url),
             {},
-            params={},
         )
 
-    def post_projects_datasets(self, project_id: str, payload: CreateDatasetRequest) -> CreateDatasetResponse:
-        url_encoded_project_id = quote(project_id, safe="")
+    def post_projects_datasets(
+        self, project_id: str, payload: CreateDatasetRequest
+    ) -> CreateDatasetResponse:
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/datasets", self.base_url),
+            url_for(f"/v1/projects/{project_id}/datasets", self.base_url),
             payload,
-            params={},
         )
 
     def get_projects_datasets(self, project_id: str) -> PullAllDatasetsResponse:
-        url_encoded_project_id = quote(project_id, safe="")
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{url_encoded_project_id}/datasets", self.base_url),
+            url_for(f"/v1/projects/{project_id}/datasets", self.base_url),
             {},
         )
 
-    def post_projects_datasets_by_dataset_name_examples(self, project_id: str, dataset_name: str, payload: InsertExamplesRequest) -> InsertExamplesResponse:
-        url_encoded_project_id = quote(project_id, safe="")
-        url_encoded_dataset_name = quote(dataset_name, safe="")
+    def post_projects_datasets_by_dataset_name_examples(
+        self, project_id: str, dataset_name: str, payload: InsertExamplesRequest
+    ) -> InsertExamplesResponse:
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/datasets/{url_encoded_dataset_name}/examples", self.base_url),
+            url_for(
+                f"/v1/projects/{project_id}/datasets/{dataset_name}/examples",
+                self.base_url,
+            ),
             payload,
-            params={},
         )
 
-    def get_projects_datasets_by_dataset_name(self, project_id: str, dataset_name: str) -> PullDatasetResponse:
-        url_encoded_project_id = quote(project_id, safe="")
-        url_encoded_dataset_name = quote(dataset_name, safe="")
+    def get_projects_datasets_by_dataset_name(
+        self, project_id: str, dataset_name: str
+    ) -> PullDatasetResponse:
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{url_encoded_project_id}/datasets/{url_encoded_dataset_name}", self.base_url),
+            url_for(
+                f"/v1/projects/{project_id}/datasets/{dataset_name}", self.base_url
+            ),
             {},
         )
 
-    def post_projects_evaluate_examples(self, project_id: str, payload: ExampleEvaluationRun) -> Any:
-        url_encoded_project_id = quote(project_id, safe="")
+    def post_projects_evaluate_examples(
+        self, project_id: str, payload: ExampleEvaluationRun
+    ) -> Any:
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/evaluate/examples", self.base_url),
+            url_for(f"/v1/projects/{project_id}/evaluate/examples", self.base_url),
+            payload,
+        )
+
+    def post_projects_evaluate_traces(
+        self, project_id: str, payload: TraceEvaluationRun
+    ) -> Any:
+        return self._request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/evaluate/traces", self.base_url),
+            payload,
+        )
+
+    def post_projects_eval_results(
+        self, project_id: str, payload: LogEvalResultsRequest
+    ) -> LogEvalResultsResponse:
+        return self._request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/eval-results", self.base_url),
             payload,
             params={},
         )
 
-    def post_projects_evaluate_traces(self, project_id: str, payload: TraceEvaluationRun) -> Any:
-        url_encoded_project_id = quote(project_id, safe="")
+    def post_projects_eval_results_examples(
+        self, project_id: str, payload: LogEvalResultsExamplesRequest
+    ) -> LogEvalResultsExamplesResponse:
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/evaluate/traces", self.base_url),
+            url_for(f"/v1/projects/{project_id}/eval-results/examples", self.base_url),
             payload,
             params={},
         )
 
-    def post_projects_eval_results(self, project_id: str, payload: LogEvalResultsRequest) -> LogEvalResultsResponse:
-        url_encoded_project_id = quote(project_id, safe="")
-        return self._request(
-            "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/eval-results", self.base_url),
-            payload,
-            params={},
-        )
-
-    def post_projects_eval_results_examples(self, project_id: str, payload: LogEvalResultsExamplesRequest) -> LogEvalResultsExamplesResponse:
-        url_encoded_project_id = quote(project_id, safe="")
-        return self._request(
-            "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/eval-results/examples", self.base_url),
-            payload,
-            params={},
-        )
-
-    def get_projects_experiments_by_run_id(self, project_id: str, run_id: str) -> FetchExperimentRunResponse:
-        url_encoded_project_id = quote(project_id, safe="")
-        url_encoded_run_id = quote(run_id, safe="")
+    def get_projects_experiments_by_run_id(
+        self, project_id: str, run_id: str
+    ) -> FetchExperimentRunResponse:
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{url_encoded_project_id}/experiments/{url_encoded_run_id}", self.base_url),
+            url_for(f"/v1/projects/{project_id}/experiments/{run_id}", self.base_url),
             {},
         )
 
-    def post_projects_eval_queue_examples(self, project_id: str, payload: ExampleEvaluationRun) -> AddToRunEvalQueueExamplesResponse:
-        url_encoded_project_id = quote(project_id, safe="")
+    def post_projects_eval_queue_examples(
+        self, project_id: str, payload: ExampleEvaluationRun
+    ) -> AddToRunEvalQueueExamplesResponse:
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/eval-queue/examples", self.base_url),
+            url_for(f"/v1/projects/{project_id}/eval-queue/examples", self.base_url),
             payload,
-            params={},
         )
 
-    def post_projects_eval_queue_traces(self, project_id: str, payload: TraceEvaluationRun) -> AddToRunEvalQueueTracesResponse:
-        url_encoded_project_id = quote(project_id, safe="")
+    def post_projects_eval_queue_traces(
+        self, project_id: str, payload: TraceEvaluationRun
+    ) -> AddToRunEvalQueueTracesResponse:
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/eval-queue/traces", self.base_url),
+            url_for(f"/v1/projects/{project_id}/eval-queue/traces", self.base_url),
             payload,
-            params={},
         )
 
-    def get_projects_prompts_by_name(self, project_id: str, name: str, commit_id: Optional[str] = None, tag: Optional[str] = None) -> FetchPromptResponse:
-        url_encoded_project_id = quote(project_id, safe="")
-        url_encoded_name = quote(name, safe="")
+    def get_projects_prompts_by_name(
+        self,
+        project_id: str,
+        name: str,
+        commit_id: Optional[str] = None,
+        tag: Optional[str] = None,
+    ) -> FetchPromptResponse:
         query_params = {}
         if commit_id is not None:
-            query_params['commit_id'] = commit_id
+            query_params["commit_id"] = commit_id
         if tag is not None:
-            query_params['tag'] = tag
+            query_params["tag"] = tag
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{url_encoded_project_id}/prompts/{url_encoded_name}", self.base_url),
+            url_for(f"/v1/projects/{project_id}/prompts/{name}", self.base_url),
             query_params,
         )
 
-    def post_projects_prompts(self, project_id: str, payload: InsertPromptRequest) -> InsertPromptResponse:
-        url_encoded_project_id = quote(project_id, safe="")
+    def post_projects_prompts(
+        self, project_id: str, payload: InsertPromptRequest
+    ) -> InsertPromptResponse:
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/prompts", self.base_url),
+            url_for(f"/v1/projects/{project_id}/prompts", self.base_url),
             payload,
-            params={},
         )
 
-    def post_projects_prompts_by_name_tags(self, project_id: str, name: str, payload: TagPromptRequest) -> TagPromptResponse:
-        url_encoded_project_id = quote(project_id, safe="")
-        url_encoded_name = quote(name, safe="")
+    def post_projects_prompts_by_name_tags(
+        self, project_id: str, name: str, payload: TagPromptRequest
+    ) -> TagPromptResponse:
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/prompts/{url_encoded_name}/tags", self.base_url),
+            url_for(f"/v1/projects/{project_id}/prompts/{name}/tags", self.base_url),
             payload,
-            params={},
         )
 
-    def delete_projects_prompts_by_name_tags(self, project_id: str, name: str, payload: UntagPromptRequest) -> UntagPromptResponse:
-        url_encoded_project_id = quote(project_id, safe="")
-        url_encoded_name = quote(name, safe="")
+    def delete_projects_prompts_by_name_tags(
+        self, project_id: str, name: str, payload: UntagPromptRequest
+    ) -> UntagPromptResponse:
         return self._request(
             "DELETE",
-            url_for(f"/v1/projects/{url_encoded_project_id}/prompts/{url_encoded_name}/tags", self.base_url),
+            url_for(f"/v1/projects/{project_id}/prompts/{name}/tags", self.base_url),
             payload,
-            params={},
         )
 
-    def get_projects_prompts_by_name_versions(self, project_id: str, name: str) -> GetPromptVersionsResponse:
-        url_encoded_project_id = quote(project_id, safe="")
-        url_encoded_name = quote(name, safe="")
+    def get_projects_prompts_by_name_versions(
+        self, project_id: str, name: str
+    ) -> GetPromptVersionsResponse:
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{url_encoded_project_id}/prompts/{url_encoded_name}/versions", self.base_url),
+            url_for(
+                f"/v1/projects/{project_id}/prompts/{name}/versions", self.base_url
+            ),
             {},
         )
 
-    def get_projects_scorers(self, project_id: str, names: Optional[str] = None, is_trace: Optional[str] = None) -> FetchPromptScorersResponse:
-        url_encoded_project_id = quote(project_id, safe="")
+    def get_projects_scorers(
+        self,
+        project_id: str,
+        names: Optional[str] = None,
+        is_trace: Optional[str] = None,
+    ) -> FetchPromptScorersResponse:
         query_params = {}
         if names is not None:
-            query_params['names'] = names
+            query_params["names"] = names
         if is_trace is not None:
-            query_params['is_trace'] = is_trace
+            query_params["is_trace"] = is_trace
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{url_encoded_project_id}/scorers", self.base_url),
+            url_for(f"/v1/projects/{project_id}/scorers", self.base_url),
             query_params,
         )
 
-    def get_projects_scorers_by_name_exists(self, project_id: str, name: str) -> ScorerExistsResponse:
-        url_encoded_project_id = quote(project_id, safe="")
-        url_encoded_name = quote(name, safe="")
+    def get_projects_scorers_by_name_exists(
+        self, project_id: str, name: str
+    ) -> ScorerExistsResponse:
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{url_encoded_project_id}/scorers/{url_encoded_name}/exists", self.base_url),
+            url_for(f"/v1/projects/{project_id}/scorers/{name}/exists", self.base_url),
             {},
         )
 
-    def post_projects_scorers_custom(self, project_id: str, payload: UploadCustomScorerRequest) -> UploadCustomScorerResponse:
-        url_encoded_project_id = quote(project_id, safe="")
+    def post_projects_scorers_custom(
+        self, project_id: str, payload: UploadCustomScorerRequest
+    ) -> UploadCustomScorerResponse:
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/scorers/custom", self.base_url),
+            url_for(f"/v1/projects/{project_id}/scorers/custom", self.base_url),
             payload,
-            params={},
         )
 
-    def get_projects_scorers_custom_by_name_exists(self, project_id: str, name: str) -> CustomScorerExistsResponse:
-        url_encoded_project_id = quote(project_id, safe="")
-        url_encoded_name = quote(name, safe="")
+    def get_projects_scorers_custom_by_name_exists(
+        self, project_id: str, name: str
+    ) -> CustomScorerExistsResponse:
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{url_encoded_project_id}/scorers/custom/{url_encoded_name}/exists", self.base_url),
+            url_for(
+                f"/v1/projects/{project_id}/scorers/custom/{name}/exists", self.base_url
+            ),
             {},
         )
 
-    def post_projects_traces_by_trace_id_tags(self, project_id: str, trace_id: str, payload: AddTraceTagsRequest) -> AddTraceTagsResponse:
-        url_encoded_project_id = quote(project_id, safe="")
-        url_encoded_trace_id = quote(trace_id, safe="")
+    def post_projects_traces_by_trace_id_tags(
+        self, project_id: str, trace_id: str, payload: AddTraceTagsRequest
+    ) -> AddTraceTagsResponse:
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/traces/{url_encoded_trace_id}/tags", self.base_url),
-            payload,
-            params={},
-        )
-
-    def post_e2e_fetch_trace(self, payload: E2EFetchTraceRequest) -> E2EFetchTraceResponse:
-        return self._request(
-            "POST",
-            url_for("/v1/e2e_fetch_trace/", self.base_url),
+            url_for(f"/v1/projects/{project_id}/traces/{trace_id}/tags", self.base_url),
             payload,
         )
 
-    def post_e2e_fetch_span_score(self, payload: E2EFetchSpanScoreRequest) -> E2EFetchSpanScoreResponse:
+    def get_e2e_fetch_trace(
+        self, project_name: str, trace_id: str
+    ) -> E2EFetchTraceResponse:
+        return self._request(
+            "GET",
+            url_for(f"/v1/e2e_fetch_trace/{project_name}/{trace_id}", self.base_url),
+            {},
+        )
+
+    def post_e2e_fetch_span_score(
+        self, payload: E2EFetchSpanScoreRequest
+    ) -> E2EFetchSpanScoreResponse:
         return self._request(
             "POST",
             url_for("/v1/e2e_fetch_span_score/", self.base_url),
             payload,
         )
-
 
 
 class JudgmentAsyncClient:
@@ -323,9 +345,12 @@ class JudgmentAsyncClient:
         self.client = httpx.AsyncClient(timeout=30)
 
     async def _request(
-        self, method: Literal["POST", "PATCH", "GET", "DELETE"], url: str, payload: Any, params: Optional[Dict[str, Any]] = None
+        self,
+        method: Literal["POST", "PATCH", "GET", "DELETE"],
+        url: str,
+        payload: Any,
+        params: Optional[Dict[str, Any]] = None,
     ) -> Any:
-        logger.debug(f"HTTP {method} {url}")
         if method == "GET":
             r = self.client.request(
                 method,
@@ -352,14 +377,18 @@ class JudgmentAsyncClient:
             {},
         )
 
-    async def post_otel_trigger_root_span_rules(self, payload: TriggerRootSpanRulesRequest) -> TriggerRootSpanRulesResponse:
+    async def post_otel_trigger_root_span_rules(
+        self, payload: TriggerRootSpanRulesRequest
+    ) -> TriggerRootSpanRulesResponse:
         return await self._request(
             "POST",
             url_for("/otel/trigger_root_span_rules", self.base_url),
             payload,
         )
 
-    async def post_projects_resolve(self, payload: ResolveProjectRequest) -> ResolveProjectResponse:
+    async def post_projects_resolve(
+        self, payload: ResolveProjectRequest
+    ) -> ResolveProjectResponse:
         return await self._request(
             "POST",
             url_for("/v1/projects/resolve/", self.base_url),
@@ -374,229 +403,242 @@ class JudgmentAsyncClient:
         )
 
     async def delete_projects(self, project_id: str) -> DeleteProjectResponse:
-        url_encoded_project_id = quote(project_id, safe="")
         return await self._request(
             "DELETE",
-            url_for(f"/v1/projects/{url_encoded_project_id}", self.base_url),
+            url_for(f"/v1/projects/{project_id}", self.base_url),
             {},
-            params={},
         )
 
-    async def post_projects_datasets(self, project_id: str, payload: CreateDatasetRequest) -> CreateDatasetResponse:
-        url_encoded_project_id = quote(project_id, safe="")
+    async def post_projects_datasets(
+        self, project_id: str, payload: CreateDatasetRequest
+    ) -> CreateDatasetResponse:
         return await self._request(
             "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/datasets", self.base_url),
+            url_for(f"/v1/projects/{project_id}/datasets", self.base_url),
             payload,
-            params={},
         )
 
     async def get_projects_datasets(self, project_id: str) -> PullAllDatasetsResponse:
-        url_encoded_project_id = quote(project_id, safe="")
         return await self._request(
             "GET",
-            url_for(f"/v1/projects/{url_encoded_project_id}/datasets", self.base_url),
+            url_for(f"/v1/projects/{project_id}/datasets", self.base_url),
             {},
         )
 
-    async def post_projects_datasets_by_dataset_name_examples(self, project_id: str, dataset_name: str, payload: InsertExamplesRequest) -> InsertExamplesResponse:
-        url_encoded_project_id = quote(project_id, safe="")
-        url_encoded_dataset_name = quote(dataset_name, safe="")
+    async def post_projects_datasets_by_dataset_name_examples(
+        self, project_id: str, dataset_name: str, payload: InsertExamplesRequest
+    ) -> InsertExamplesResponse:
         return await self._request(
             "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/datasets/{url_encoded_dataset_name}/examples", self.base_url),
+            url_for(
+                f"/v1/projects/{project_id}/datasets/{dataset_name}/examples",
+                self.base_url,
+            ),
             payload,
-            params={},
         )
 
-    async def get_projects_datasets_by_dataset_name(self, project_id: str, dataset_name: str) -> PullDatasetResponse:
-        url_encoded_project_id = quote(project_id, safe="")
-        url_encoded_dataset_name = quote(dataset_name, safe="")
+    async def get_projects_datasets_by_dataset_name(
+        self, project_id: str, dataset_name: str
+    ) -> PullDatasetResponse:
         return await self._request(
             "GET",
-            url_for(f"/v1/projects/{url_encoded_project_id}/datasets/{url_encoded_dataset_name}", self.base_url),
+            url_for(
+                f"/v1/projects/{project_id}/datasets/{dataset_name}", self.base_url
+            ),
             {},
         )
 
-    async def post_projects_evaluate_examples(self, project_id: str, payload: ExampleEvaluationRun) -> Any:
-        url_encoded_project_id = quote(project_id, safe="")
+    async def post_projects_evaluate_examples(
+        self, project_id: str, payload: ExampleEvaluationRun
+    ) -> Any:
         return await self._request(
             "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/evaluate/examples", self.base_url),
+            url_for(f"/v1/projects/{project_id}/evaluate/examples", self.base_url),
             payload,
-            params={},
         )
 
-    async def post_projects_evaluate_traces(self, project_id: str, payload: TraceEvaluationRun) -> Any:
-        url_encoded_project_id = quote(project_id, safe="")
+    async def post_projects_evaluate_traces(
+        self, project_id: str, payload: TraceEvaluationRun
+    ) -> Any:
         return await self._request(
             "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/evaluate/traces", self.base_url),
+            url_for(f"/v1/projects/{project_id}/evaluate/traces", self.base_url),
             payload,
-            params={},
         )
 
-    async def post_projects_eval_results(self, project_id: str, payload: LogEvalResultsRequest) -> LogEvalResultsResponse:
-        url_encoded_project_id = quote(project_id, safe="")
+    async def post_projects_eval_results(
+        self, project_id: str, payload: LogEvalResultsRequest
+    ) -> LogEvalResultsResponse:
         return await self._request(
             "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/eval-results", self.base_url),
+            url_for(f"/v1/projects/{project_id}/eval-results", self.base_url),
             payload,
-            params={},
         )
 
-    async def post_projects_eval_results_examples(self, project_id: str, payload: LogEvalResultsExamplesRequest) -> LogEvalResultsExamplesResponse:
-        url_encoded_project_id = quote(project_id, safe="")
+    async def post_projects_eval_results_examples(
+        self, project_id: str, payload: LogEvalResultsExamplesRequest
+    ) -> LogEvalResultsExamplesResponse:
         return await self._request(
             "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/eval-results/examples", self.base_url),
+            url_for(f"/v1/projects/{project_id}/eval-results/examples", self.base_url),
             payload,
-            params={},
         )
 
-    async def get_projects_experiments_by_run_id(self, project_id: str, run_id: str) -> FetchExperimentRunResponse:
-        url_encoded_project_id = quote(project_id, safe="")
-        url_encoded_run_id = quote(run_id, safe="")
+    async def get_projects_experiments_by_run_id(
+        self, project_id: str, run_id: str
+    ) -> FetchExperimentRunResponse:
         return await self._request(
             "GET",
-            url_for(f"/v1/projects/{url_encoded_project_id}/experiments/{url_encoded_run_id}", self.base_url),
+            url_for(f"/v1/projects/{project_id}/experiments/{run_id}", self.base_url),
             {},
         )
 
-    async def post_projects_eval_queue_examples(self, project_id: str, payload: ExampleEvaluationRun) -> AddToRunEvalQueueExamplesResponse:
-        url_encoded_project_id = quote(project_id, safe="")
+    async def post_projects_eval_queue_examples(
+        self, project_id: str, payload: ExampleEvaluationRun
+    ) -> AddToRunEvalQueueExamplesResponse:
         return await self._request(
             "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/eval-queue/examples", self.base_url),
+            url_for(f"/v1/projects/{project_id}/eval-queue/examples", self.base_url),
             payload,
-            params={},
         )
 
-    async def post_projects_eval_queue_traces(self, project_id: str, payload: TraceEvaluationRun) -> AddToRunEvalQueueTracesResponse:
-        url_encoded_project_id = quote(project_id, safe="")
+    async def post_projects_eval_queue_traces(
+        self, project_id: str, payload: TraceEvaluationRun
+    ) -> AddToRunEvalQueueTracesResponse:
         return await self._request(
             "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/eval-queue/traces", self.base_url),
+            url_for(f"/v1/projects/{project_id}/eval-queue/traces", self.base_url),
             payload,
-            params={},
         )
 
-    async def get_projects_prompts_by_name(self, project_id: str, name: str, commit_id: Optional[str] = None, tag: Optional[str] = None) -> FetchPromptResponse:
-        url_encoded_project_id = quote(project_id, safe="")
-        url_encoded_name = quote(name, safe="")
+    async def get_projects_prompts_by_name(
+        self,
+        project_id: str,
+        name: str,
+        commit_id: Optional[str] = None,
+        tag: Optional[str] = None,
+    ) -> FetchPromptResponse:
         query_params = {}
         if commit_id is not None:
-            query_params['commit_id'] = commit_id
+            query_params["commit_id"] = commit_id
         if tag is not None:
-            query_params['tag'] = tag
+            query_params["tag"] = tag
         return await self._request(
             "GET",
-            url_for(f"/v1/projects/{url_encoded_project_id}/prompts/{url_encoded_name}", self.base_url),
+            url_for(f"/v1/projects/{project_id}/prompts/{name}", self.base_url),
             query_params,
         )
 
-    async def post_projects_prompts(self, project_id: str, payload: InsertPromptRequest) -> InsertPromptResponse:
-        url_encoded_project_id = quote(project_id, safe="")
+    async def post_projects_prompts(
+        self, project_id: str, payload: InsertPromptRequest
+    ) -> InsertPromptResponse:
         return await self._request(
             "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/prompts", self.base_url),
+            url_for(f"/v1/projects/{project_id}/prompts", self.base_url),
             payload,
-            params={},
         )
 
-    async def post_projects_prompts_by_name_tags(self, project_id: str, name: str, payload: TagPromptRequest) -> TagPromptResponse:
-        url_encoded_project_id = quote(project_id, safe="")
-        url_encoded_name = quote(name, safe="")
+    async def post_projects_prompts_by_name_tags(
+        self, project_id: str, name: str, payload: TagPromptRequest
+    ) -> TagPromptResponse:
         return await self._request(
             "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/prompts/{url_encoded_name}/tags", self.base_url),
+            url_for(f"/v1/projects/{project_id}/prompts/{name}/tags", self.base_url),
             payload,
-            params={},
         )
 
-    async def delete_projects_prompts_by_name_tags(self, project_id: str, name: str, payload: UntagPromptRequest) -> UntagPromptResponse:
-        url_encoded_project_id = quote(project_id, safe="")
-        url_encoded_name = quote(name, safe="")
+    async def delete_projects_prompts_by_name_tags(
+        self, project_id: str, name: str, payload: UntagPromptRequest
+    ) -> UntagPromptResponse:
         return await self._request(
             "DELETE",
-            url_for(f"/v1/projects/{url_encoded_project_id}/prompts/{url_encoded_name}/tags", self.base_url),
+            url_for(f"/v1/projects/{project_id}/prompts/{name}/tags", self.base_url),
             payload,
-            params={},
         )
 
-    async def get_projects_prompts_by_name_versions(self, project_id: str, name: str) -> GetPromptVersionsResponse:
-        url_encoded_project_id = quote(project_id, safe="")
-        url_encoded_name = quote(name, safe="")
+    async def get_projects_prompts_by_name_versions(
+        self, project_id: str, name: str
+    ) -> GetPromptVersionsResponse:
         return await self._request(
             "GET",
-            url_for(f"/v1/projects/{url_encoded_project_id}/prompts/{url_encoded_name}/versions", self.base_url),
+            url_for(
+                f"/v1/projects/{project_id}/prompts/{name}/versions", self.base_url
+            ),
             {},
         )
 
-    async def get_projects_scorers(self, project_id: str, names: Optional[str] = None, is_trace: Optional[str] = None) -> FetchPromptScorersResponse:
-        url_encoded_project_id = quote(project_id, safe="")
+    async def get_projects_scorers(
+        self,
+        project_id: str,
+        names: Optional[str] = None,
+        is_trace: Optional[str] = None,
+    ) -> FetchPromptScorersResponse:
         query_params = {}
         if names is not None:
-            query_params['names'] = names
+            query_params["names"] = names
         if is_trace is not None:
-            query_params['is_trace'] = is_trace
+            query_params["is_trace"] = is_trace
         return await self._request(
             "GET",
-            url_for(f"/v1/projects/{url_encoded_project_id}/scorers", self.base_url),
+            url_for(f"/v1/projects/{project_id}/scorers", self.base_url),
             query_params,
         )
 
-    async def get_projects_scorers_by_name_exists(self, project_id: str, name: str) -> ScorerExistsResponse:
-        url_encoded_project_id = quote(project_id, safe="")
-        url_encoded_name = quote(name, safe="")
+    async def get_projects_scorers_by_name_exists(
+        self, project_id: str, name: str
+    ) -> ScorerExistsResponse:
         return await self._request(
             "GET",
-            url_for(f"/v1/projects/{url_encoded_project_id}/scorers/{url_encoded_name}/exists", self.base_url),
+            url_for(f"/v1/projects/{project_id}/scorers/{name}/exists", self.base_url),
             {},
         )
 
-    async def post_projects_scorers_custom(self, project_id: str, payload: UploadCustomScorerRequest) -> UploadCustomScorerResponse:
-        url_encoded_project_id = quote(project_id, safe="")
+    async def post_projects_scorers_custom(
+        self, project_id: str, payload: UploadCustomScorerRequest
+    ) -> UploadCustomScorerResponse:
         return await self._request(
             "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/scorers/custom", self.base_url),
+            url_for(f"/v1/projects/{project_id}/scorers/custom", self.base_url),
             payload,
-            params={},
         )
 
-    async def get_projects_scorers_custom_by_name_exists(self, project_id: str, name: str) -> CustomScorerExistsResponse:
-        url_encoded_project_id = quote(project_id, safe="")
-        url_encoded_name = quote(name, safe="")
+    async def get_projects_scorers_custom_by_name_exists(
+        self, project_id: str, name: str
+    ) -> CustomScorerExistsResponse:
         return await self._request(
             "GET",
-            url_for(f"/v1/projects/{url_encoded_project_id}/scorers/custom/{url_encoded_name}/exists", self.base_url),
+            url_for(
+                f"/v1/projects/{project_id}/scorers/custom/{name}/exists", self.base_url
+            ),
             {},
         )
 
-    async def post_projects_traces_by_trace_id_tags(self, project_id: str, trace_id: str, payload: AddTraceTagsRequest) -> AddTraceTagsResponse:
-        url_encoded_project_id = quote(project_id, safe="")
-        url_encoded_trace_id = quote(trace_id, safe="")
+    async def post_projects_traces_by_trace_id_tags(
+        self, project_id: str, trace_id: str, payload: AddTraceTagsRequest
+    ) -> AddTraceTagsResponse:
         return await self._request(
             "POST",
-            url_for(f"/v1/projects/{url_encoded_project_id}/traces/{url_encoded_trace_id}/tags", self.base_url),
-            payload,
-            params={},
-        )
-
-    async def post_e2e_fetch_trace(self, payload: E2EFetchTraceRequest) -> E2EFetchTraceResponse:
-        return await self._request(
-            "POST",
-            url_for("/v1/e2e_fetch_trace/", self.base_url),
+            url_for(f"/v1/projects/{project_id}/traces/{trace_id}/tags", self.base_url),
             payload,
         )
 
-    async def post_e2e_fetch_span_score(self, payload: E2EFetchSpanScoreRequest) -> E2EFetchSpanScoreResponse:
+    async def get_e2e_fetch_trace(
+        self, project_name: str, trace_id: str
+    ) -> E2EFetchTraceResponse:
+        return await self._request(
+            "GET",
+            url_for(f"/v1/e2e_fetch_trace/{project_name}/{trace_id}", self.base_url),
+            {},
+        )
+
+    async def post_e2e_fetch_span_score(
+        self, payload: E2EFetchSpanScoreRequest
+    ) -> E2EFetchSpanScoreResponse:
         return await self._request(
             "POST",
             url_for("/v1/e2e_fetch_span_score/", self.base_url),
             payload,
         )
-
 
 
 __all__ = [
