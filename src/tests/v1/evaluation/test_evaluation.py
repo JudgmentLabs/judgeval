@@ -23,14 +23,13 @@ def evaluation(mock_client):
 
 @pytest.fixture
 def sample_examples():
-    return [
-        Example(name="ex1")
-        .set_property("input", "What is 2+2?")
-        .set_property("actual_output", "4"),
-        Example(name="ex2")
-        .set_property("input", "What is 3+3?")
-        .set_property("actual_output", "6"),
-    ]
+    ex1 = Example(name="ex1")
+    ex1._properties["input"] = "What is 2+2?"
+    ex1._properties["actual_output"] = "4"
+    ex2 = Example(name="ex2")
+    ex2._properties["input"] = "What is 3+3?"
+    ex2._properties["actual_output"] = "6"
+    return [ex1, ex2]
 
 
 @pytest.fixture

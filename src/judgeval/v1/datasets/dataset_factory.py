@@ -50,7 +50,7 @@ class DatasetFactory:
 
                 for key, value in data_obj.items():
                     if key not in ["example_id", "created_at", "name"]:
-                        example.set_property(key, value)
+                        example._properties[key] = value
 
                 examples.append(example)
                 judgeval_logger.debug(

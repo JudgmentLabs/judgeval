@@ -22,11 +22,10 @@ def evaluation_factory(mock_client):
 
 @pytest.fixture
 def sample_examples():
-    return [
-        Example(name="ex1")
-        .set_property("input", "test")
-        .set_property("actual_output", "result"),
-    ]
+    ex1 = Example(name="ex1")
+    ex1._properties["input"] = "test"
+    ex1._properties["actual_output"] = "result"
+    return [ex1]
 
 
 @pytest.fixture
