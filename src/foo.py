@@ -71,7 +71,7 @@ async def handle_request(
     Tracer.init(project_name="chat")
     with Tracer.span("handle"):
         Tracer.set_customer_id(customer_id)
-        # Tracer.set_session_id(session_id)
+        Tracer.set_session_id(session_id)
         Tracer.tag(tags)
 
         if name == "fibonacci":
@@ -89,6 +89,14 @@ async def handle_request(
 async def main():
     session_id = str(uuid.uuid4())
 
+    await handle_request(
+        "chat",
+        customer_id="cust_001",
+        session_id=session_id,
+        tags=["good"],
+        message="What is 1 + 1.",
+    )
+    await asyncio.sleep(3)
     await handle_request(
         "chat",
         customer_id="cust_001",
