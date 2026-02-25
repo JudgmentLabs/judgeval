@@ -91,6 +91,12 @@ class Dataset:
         if not self.client:
             return
 
+        if isinstance(examples, Example):
+            raise TypeError(
+                "examples must be a list of Example objects, not a single Example. "
+                "Use add_examples([example]) instead."
+            )
+
         batches = _batch_examples(examples, batch_size)
         total_uploaded = 0
 
