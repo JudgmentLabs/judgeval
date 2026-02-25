@@ -65,7 +65,7 @@ class Dataset:
                 example = Example(name=name)
                 for key, value in e.items():
                     if key != "name":
-                        example.set_property(key, value)
+                        example._properties[key] = value
                 examples.append(example)
             else:
                 examples.append(e)
@@ -81,7 +81,7 @@ class Dataset:
                 example = Example(name=name)
                 for key, value in e.items():
                     if key != "name":
-                        example.set_property(key, value)
+                        example._properties[key] = value
                 examples.append(example)
             else:
                 examples.append(e)
@@ -90,6 +90,12 @@ class Dataset:
     def add_examples(self, examples: Iterable[Example], batch_size: int = 100) -> None:
         if not self.client:
             return
+
+        if isinstance(examples, Example):
+            raise TypeError(
+                "examples must be a list of Example objects, not a single Example. "
+                "Use add_examples([example]) instead."
+            )
 
         batches = _batch_examples(examples, batch_size)
         total_uploaded = 0
@@ -196,7 +202,7 @@ class Dataset:
             for i, example in enumerate(self.examples[:display_count]):
                 row = [str(i + 1), example.name or "—"]
                 for key in property_keys[:3]:
-                    value = str(example.get_property(key) or "")
+                    value = str(example._properties.get(key) or "")
                     if len(value) > 30:
                         value = value[:27] + "..."
                     row.append(value)

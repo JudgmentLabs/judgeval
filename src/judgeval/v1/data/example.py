@@ -3,9 +3,12 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from judgeval.v1.internal.api.api_types import Example as APIExample
+
+if TYPE_CHECKING:
+    from judgeval.v1.data.trace import Trace
 
 
 @dataclass(slots=True)
@@ -14,19 +17,19 @@ class Example:
     created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     name: Optional[str] = None
     _properties: Dict[str, Any] = field(default_factory=dict)
+    trace: Optional[Trace] = None
 
-    def set_property(self, key: str, value: Any) -> Example:
-        self._properties[key] = value
-        return self
+    def __getitem__(self, key: str) -> Any:
+        return self._properties[key]
 
-    def get_property(self, key: str) -> Any:
-        return self._properties.get(key)
+    def __contains__(self, key: object) -> bool:
+        return key in self._properties
 
     @classmethod
     def create(cls, **kwargs: Any) -> Example:
         example = cls()
         for key, value in kwargs.items():
-            example.set_property(key, value)
+            example._properties[key] = value
         return example
 
     def to_dict(self) -> APIExample:
