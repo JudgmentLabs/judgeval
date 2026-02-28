@@ -4,7 +4,7 @@ from judgeval.v1.evaluation.evaluation import Evaluation
 from judgeval.v1.data.example import Example
 from judgeval.v1.data.scoring_result import ScoringResult
 from judgeval.v1.data.scorer_data import ScorerData
-from judgeval.v1.scorers.built_in.answer_relevancy import AnswerRelevancyScorer
+from judgeval.v1.scorers.prompt_scorer.prompt_scorer import PromptScorer
 
 
 @pytest.fixture
@@ -23,19 +23,18 @@ def evaluation(mock_client):
 
 @pytest.fixture
 def sample_examples():
-    return [
-        Example(name="ex1")
-        .set_property("input", "What is 2+2?")
-        .set_property("actual_output", "4"),
-        Example(name="ex2")
-        .set_property("input", "What is 3+3?")
-        .set_property("actual_output", "6"),
-    ]
+    ex1 = Example(name="ex1")
+    ex1._properties["input"] = "What is 2+2?"
+    ex1._properties["actual_output"] = "4"
+    ex2 = Example(name="ex2")
+    ex2._properties["input"] = "What is 3+3?"
+    ex2._properties["actual_output"] = "6"
+    return [ex1, ex2]
 
 
 @pytest.fixture
 def sample_scorers():
-    return [AnswerRelevancyScorer(threshold=0.5)]
+    return [PromptScorer(name="test_scorer", prompt="Is this relevant?", threshold=0.5)]
 
 
 def test_evaluation_run_success(
@@ -85,7 +84,6 @@ def test_evaluation_run_success(
         examples=sample_examples,
         scorers=sample_scorers,
         eval_run_name="test_run",
-        model="gpt-4o-mini",
         timeout_seconds=10,
     )
 

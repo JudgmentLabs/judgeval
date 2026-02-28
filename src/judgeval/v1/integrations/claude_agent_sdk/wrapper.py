@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 import dataclasses
-import threading
 import time
 from typing import (
     TYPE_CHECKING,
@@ -15,7 +14,8 @@ from typing import (
     Tuple,
 )
 
-from opentelemetry.trace import set_span_in_context
+from opentelemetry.context import Context
+from opentelemetry.trace import Span, set_span_in_context
 
 from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.utils.serialize import safe_serialize, serialize_attribute
@@ -23,10 +23,87 @@ from judgeval.v1.trace.proxy_tracer_provider import ProxyTracerProvider
 
 if TYPE_CHECKING:
     from judgeval.v1.trace import BaseTracer
-# Thread-local storage to propagate parent span context to tool handlers
-# Claude Agent SDK breaks OpenTelemetry's automatic context propagation
-# when executing tools, so we need to explicitly store and pass the context
-_thread_local = threading.local()
+
+
+@dataclasses.dataclass(slots=True)
+class TracingState:
+    parent_context: Optional[Context] = None
+
+
+class ToolSpanTracker:
+    def __init__(self, tracer: "BaseTracer", state: TracingState):
+        self.tracer = tracer
+        self.state = state
+        self._pending_spans: Dict[str, Tuple[Span, str]] = {}
+
+    def on_assistant_message(self, message: Any) -> None:
+        content = getattr(message, "content", None)
+        if not isinstance(content, list):
+            return
+
+        for block in content:
+            if type(block).__name__ != "ToolUseBlock":
+                continue
+
+            tool_name = getattr(block, "name", None)
+            tool_use_id = getattr(block, "id", None)
+            tool_input = getattr(block, "input", None)
+
+            if not tool_name or not tool_use_id:
+                continue
+
+            span = (
+                ProxyTracerProvider.get_instance()
+                .get_tracer(__name__)
+                .start_span(
+                    str(tool_name),
+                    context=self.state.parent_context,
+                    attributes={
+                        AttributeKeys.JUDGMENT_SPAN_KIND: "tool",
+                    },
+                )
+            )
+
+            span.set_attribute(AttributeKeys.JUDGMENT_INPUT, safe_serialize(tool_input))
+
+            self._pending_spans[tool_use_id] = (span, tool_name)
+
+        if self._pending_spans:
+            self.tracer._emit_partial()
+
+    def on_user_message(self, message: Any) -> None:
+        content = getattr(message, "content", None)
+        if not isinstance(content, list):
+            return
+
+        for block in content:
+            if type(block).__name__ != "ToolResultBlock":
+                continue
+
+            tool_use_id = getattr(block, "tool_use_id", None)
+            if not tool_use_id or tool_use_id not in self._pending_spans:
+                continue
+
+            span, _ = self._pending_spans.pop(tool_use_id)
+
+            result_content = getattr(block, "content", None)
+            is_error = getattr(block, "is_error", None)
+
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(result_content)
+            )
+
+            if is_error:
+                from opentelemetry.trace import Status, StatusCode
+
+                span.set_status(Status(StatusCode.ERROR, "Tool returned an error"))
+
+            span.end()
+
+    def cleanup(self) -> None:
+        for span, _ in self._pending_spans.values():
+            span.end()
+        self._pending_spans.clear()
 
 
 class LLMSpanTracker:
@@ -43,12 +120,17 @@ class LLMSpanTracker:
 
     def __init__(self, tracer: BaseTracer, query_start_time: Optional[float] = None):
         self.tracer = tracer
-        self.current_span: Optional[Any] = None
-        self.current_span_context: Optional[Any] = None
+        self.current_span: Optional[Span] = None
+        self.current_span_context: Optional[Any] = (
+            None  # context manager, no public type
+        )
         self.next_start_time: Optional[float] = query_start_time
 
     def start_llm_span(
-        self, message: Any, prompt: Any, conversation_history: List[Dict[str, Any]]
+        self,
+        message: Any,
+        prompt: Optional[str],
+        conversation_history: List[Dict[str, Any]],
     ) -> Optional[Dict[str, Any]]:
         """Start a new LLM span, ending the previous one if it exists."""
         # Use the marked start time, or current time as fallback
@@ -93,7 +175,7 @@ class LLMSpanTracker:
 
 
 def _create_client_wrapper_class(
-    original_client_class: Any, tracer: "BaseTracer"
+    original_client_class: Any, tracer: "BaseTracer", state: TracingState
 ) -> Any:
     """Creates a wrapper class for ClaudeSDKClient that wraps query and receive_response."""
 
@@ -139,15 +221,17 @@ def _create_client_wrapper_class(
                     serialize_attribute(self.__last_prompt, safe_serialize),
                 )
 
-            parent_context = set_span_in_context(
+            tracer._emit_partial()
+
+            state.parent_context = set_span_in_context(
                 agent_span, ProxyTracerProvider.get_instance().get_current_context()
             )
-            _thread_local.parent_context = parent_context
 
             final_results: List[Dict[str, Any]] = []
             llm_tracker = LLMSpanTracker(
                 tracer, query_start_time=self.__query_start_time
             )
+            tool_tracker = ToolSpanTracker(tracer, state=state)
 
             try:
                 async for message in generator:
@@ -160,7 +244,11 @@ def _create_client_wrapper_class(
                         if final_content:
                             final_results.append(final_content)
 
+                        tool_tracker.on_assistant_message(message)
+
                     elif message_type == "UserMessage":
+                        tool_tracker.on_user_message(message)
+
                         if hasattr(message, "content"):
                             content = _serialize_content_blocks(message.content)
                             final_results.append({"content": content, "role": "user"})
@@ -201,37 +289,16 @@ def _create_client_wrapper_class(
                 agent_span.record_exception(e)
                 raise
             finally:
+                tool_tracker.cleanup()
                 llm_tracker.cleanup()
                 agent_span_context.__exit__(None, None, None)
-                if hasattr(_thread_local, "parent_context"):
-                    delattr(_thread_local, "parent_context")
+                state.parent_context = None
 
     return WrappedClaudeSDKClient
 
 
-def _create_tool_wrapper_class(original_tool_class: Any, tracer: "BaseTracer") -> Any:
-    """Creates a wrapper class for SdkMcpTool that wraps handlers."""
-
-    class WrappedSdkMcpTool(original_tool_class):  # type: ignore
-        def __init__(
-            self,
-            name: Any,
-            description: Any,
-            input_schema: Any,
-            handler: Any,
-            **kwargs: Any,
-        ):
-            wrapped_handler = _wrap_tool_handler(tracer, handler, name)
-            super().__init__(name, description, input_schema, wrapped_handler, **kwargs)
-
-        # Preserve generic typing support
-        __class_getitem__ = classmethod(lambda cls, params: cls)  # type: ignore
-
-    return WrappedSdkMcpTool
-
-
 def _wrap_query_function(
-    original_query_fn: Any, tracer: "BaseTracer"
+    original_query_fn: Any, tracer: "BaseTracer", state: TracingState
 ) -> Callable[..., Any]:
     """Wraps the standalone query() function to add tracing."""
 
@@ -256,13 +323,15 @@ def _wrap_query_function(
                 serialize_attribute(prompt, safe_serialize),
             )
 
-        parent_context = set_span_in_context(
+        tracer._emit_partial()
+
+        state.parent_context = set_span_in_context(
             agent_span, ProxyTracerProvider.get_instance().get_current_context()
         )
-        _thread_local.parent_context = parent_context
 
         final_results: List[Dict[str, Any]] = []
         llm_tracker = LLMSpanTracker(tracer, query_start_time=time.time())
+        tool_tracker = ToolSpanTracker(tracer, state=state)
 
         try:
             # Call original query function
@@ -278,7 +347,11 @@ def _wrap_query_function(
                     if final_content:
                         final_results.append(final_content)
 
+                    tool_tracker.on_assistant_message(message)
+
                 elif message_type == "UserMessage":
+                    tool_tracker.on_user_message(message)
+
                     if hasattr(message, "content"):
                         content = _serialize_content_blocks(message.content)
                         final_results.append({"content": content, "role": "user"})
@@ -319,95 +392,12 @@ def _wrap_query_function(
             agent_span.record_exception(e)
             raise
         finally:
+            tool_tracker.cleanup()
             llm_tracker.cleanup()
             agent_span_context.__exit__(None, None, None)
-            if hasattr(_thread_local, "parent_context"):
-                delattr(_thread_local, "parent_context")
+            state.parent_context = None
 
     return wrapped_query
-
-
-def _wrap_tool_factory(tool_fn: Any, tracer: "BaseTracer") -> Callable[..., Any]:
-    """Wraps the tool() factory function to return wrapped tools."""
-
-    def wrapped_tool(*args: Any, **kwargs: Any) -> Any:
-        result = tool_fn(*args, **kwargs)
-
-        # The tool() function returns a decorator, not a tool definition
-        # We need to wrap the decorator to intercept the final tool definition
-        if not callable(result):
-            return result
-
-        def wrapped_decorator(handler_fn: Any) -> Any:
-            tool_def = result(handler_fn)
-
-            # Now we have the actual tool definition, wrap its handler
-            if tool_def and hasattr(tool_def, "handler"):
-                tool_name = getattr(tool_def, "name", "unknown")
-                original_handler = getattr(tool_def, "handler")
-                setattr(
-                    tool_def,
-                    "handler",
-                    _wrap_tool_handler(tracer, original_handler, tool_name),
-                )
-
-            return tool_def
-
-        return wrapped_decorator
-
-    return wrapped_tool
-
-
-def _wrap_tool_handler(
-    tracer: "BaseTracer", handler: Callable[..., Any], tool_name: Any
-) -> Callable[..., Any]:
-    """Wraps a tool handler to add tracing.
-
-    Claude Agent SDK breaks OpenTelemetry's automatic context propagation,
-    so we retrieve the parent context from thread-local storage and use it
-    explicitly when creating tool spans to ensure proper nesting.
-    """
-    # Check if already wrapped to prevent double-wrapping
-    if hasattr(handler, "_judgeval_wrapped"):
-        return handler
-
-    async def wrapped_handler(args: Any) -> Any:
-        # Get parent context from thread-local storage
-        # Claude Agent SDK breaks context propagation, so we stored it explicitly
-        parent_context = getattr(_thread_local, "parent_context", None)
-
-        ctx = parent_context if parent_context is not None else None
-
-        proxy = ProxyTracerProvider.get_instance()
-        span = proxy.get_tracer(__name__).start_span(
-            str(tool_name),
-            context=ctx,
-            attributes={
-                AttributeKeys.JUDGMENT_SPAN_KIND: "tool",
-            },
-        )
-
-        with proxy.use_span(span, end_on_exit=True):
-            span.set_attribute(
-                AttributeKeys.JUDGMENT_INPUT, serialize_attribute(args, safe_serialize)
-            )
-
-            try:
-                result = await handler(args)
-
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_OUTPUT,
-                    serialize_attribute(result, safe_serialize),
-                )
-
-                return result
-            except Exception as e:
-                span.record_exception(e)
-                raise
-
-    # Mark as wrapped to prevent double-wrapping
-    wrapped_handler._judgeval_wrapped = True  # type: ignore
-    return wrapped_handler
 
 
 def _create_llm_span_for_messages(
@@ -440,6 +430,7 @@ def _create_llm_span_for_messages(
             content = _serialize_content_blocks(msg.content)
             outputs.append({"content": content, "role": "assistant"})
 
+    span_start_time = int(start_time * 1e9) if start_time is not None else None
     llm_span_context = (
         ProxyTracerProvider.get_instance()
         .get_tracer(__name__)
@@ -448,6 +439,7 @@ def _create_llm_span_for_messages(
             attributes={
                 AttributeKeys.JUDGMENT_SPAN_KIND: "llm",
             },
+            start_time=span_start_time,
         )
     )
     llm_span = llm_span_context.__enter__()
@@ -472,6 +464,8 @@ def _create_llm_span_for_messages(
         llm_span.set_attribute(
             AttributeKeys.JUDGMENT_OUTPUT, serialize_attribute(outputs, safe_serialize)
         )
+
+    tracer._emit_partial()
 
     # Return final message content for conversation history and the span
     if hasattr(last_message, "content"):

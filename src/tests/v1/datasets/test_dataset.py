@@ -23,17 +23,16 @@ def factory(mock_client):
 
 @pytest.fixture
 def sample_examples():
-    return [
-        Example(name="example1")
-        .set_property("input", "input1")
-        .set_property("output", "output1"),
-        Example(name="example2")
-        .set_property("input", "input2")
-        .set_property("output", "output2"),
-        Example(name="example3")
-        .set_property("input", "input3")
-        .set_property("output", "output3"),
-    ]
+    ex1 = Example(name="example1")
+    ex1._properties["input"] = "input1"
+    ex1._properties["output"] = "output1"
+    ex2 = Example(name="example2")
+    ex2._properties["input"] = "input2"
+    ex2._properties["output"] = "output2"
+    ex3 = Example(name="example3")
+    ex3._properties["input"] = "input3"
+    ex3._properties["output"] = "output3"
+    return [ex1, ex2, ex3]
 
 
 def test_dataset_get(factory, mock_client, sample_examples):
@@ -56,8 +55,8 @@ def test_dataset_get(factory, mock_client, sample_examples):
     assert dataset.project_id == "test_project_id"
     assert dataset.dataset_kind == "example"
     assert len(dataset.examples) == 1
-    assert dataset.examples[0].get_property("input") == "input1"
-    assert dataset.examples[0].get_property("output") == "output1"
+    assert dataset.examples[0]._properties["input"] == "input1"
+    assert dataset.examples[0]._properties["output"] == "output1"
     mock_client.get_projects_datasets_by_dataset_name.assert_called_once_with(
         project_id="test_project_id",
         dataset_name="test_dataset",
@@ -127,9 +126,9 @@ def test_dataset_add_examples(mock_client, sample_examples):
         client=mock_client,
     )
 
-    new_examples = [
-        Example(name="example4").set_property("input", "input4"),
-    ]
+    ex4 = Example(name="example4")
+    ex4._properties["input"] = "input4"
+    new_examples = [ex4]
 
     dataset.add_examples(new_examples)
 

@@ -167,6 +167,15 @@ class JudgmentSyncClient:
             payload,
         )
 
+    def post_projects_eval_results_examples(
+        self, project_id: str, payload: LogEvalResultsExamplesRequest
+    ) -> LogEvalResultsExamplesResponse:
+        return self._request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/eval-results/examples", self.base_url),
+            payload,
+        )
+
     def get_projects_experiments_by_run_id(
         self, project_id: str, run_id: str
     ) -> FetchExperimentRunResponse:
@@ -194,25 +203,12 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def post_projects_eval_queue_judge_examples(
-        self, project_id: str, payload: JudgeExampleEvaluationRun
-    ) -> JudgeEvalQueueExamplesResponse:
+    def post_projects_eval_queue(
+        self, project_id: str, payload: JudgeEvaluationRun
+    ) -> AddToJudgeEvalQueueResponse:
         return self._request(
             "POST",
-            url_for(
-                f"/v1/projects/{project_id}/eval-queue/judge/examples", self.base_url
-            ),
-            payload,
-        )
-
-    def post_projects_eval_queue_judge_traces(
-        self, project_id: str, payload: JudgeTraceEvaluationRun
-    ) -> JudgeEvalQueueTracesResponse:
-        return self._request(
-            "POST",
-            url_for(
-                f"/v1/projects/{project_id}/eval-queue/judge/traces", self.base_url
-            ),
+            url_for(f"/v1/projects/{project_id}/eval-queue", self.base_url),
             payload,
         )
 
@@ -327,13 +323,27 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def post_e2e_fetch_trace(
-        self, payload: E2EFetchTraceRequest
+    def get_e2e_fetch_trace_by_project_name_by_trace_id(
+        self, project_name: str, trace_id: str
     ) -> E2EFetchTraceResponse:
         return self._request(
-            "POST",
-            url_for("/v1/e2e_fetch_trace/", self.base_url),
-            payload,
+            "GET",
+            url_for(f"/v1/e2e_fetch_trace/{project_name}/{trace_id}", self.base_url),
+            {},
+        )
+
+    def get_e2e_traces_per_project(
+        self, project_id: str, limit: Optional[str] = None, offset: Optional[str] = None
+    ) -> E2ETracesPerProjectResponse:
+        query_params = {}
+        if limit is not None:
+            query_params["limit"] = limit
+        if offset is not None:
+            query_params["offset"] = offset
+        return self._request(
+            "GET",
+            url_for(f"/v1/e2e_traces_per_project/{project_id}", self.base_url),
+            query_params,
         )
 
     def post_e2e_fetch_span_score(
@@ -487,6 +497,15 @@ class JudgmentAsyncClient:
             payload,
         )
 
+    async def post_projects_eval_results_examples(
+        self, project_id: str, payload: LogEvalResultsExamplesRequest
+    ) -> LogEvalResultsExamplesResponse:
+        return await self._request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/eval-results/examples", self.base_url),
+            payload,
+        )
+
     async def get_projects_experiments_by_run_id(
         self, project_id: str, run_id: str
     ) -> FetchExperimentRunResponse:
@@ -514,25 +533,12 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def post_projects_eval_queue_judge_examples(
-        self, project_id: str, payload: JudgeExampleEvaluationRun
-    ) -> JudgeEvalQueueExamplesResponse:
+    async def post_projects_eval_queue(
+        self, project_id: str, payload: JudgeEvaluationRun
+    ) -> AddToJudgeEvalQueueResponse:
         return await self._request(
             "POST",
-            url_for(
-                f"/v1/projects/{project_id}/eval-queue/judge/examples", self.base_url
-            ),
-            payload,
-        )
-
-    async def post_projects_eval_queue_judge_traces(
-        self, project_id: str, payload: JudgeTraceEvaluationRun
-    ) -> JudgeEvalQueueTracesResponse:
-        return await self._request(
-            "POST",
-            url_for(
-                f"/v1/projects/{project_id}/eval-queue/judge/traces", self.base_url
-            ),
+            url_for(f"/v1/projects/{project_id}/eval-queue", self.base_url),
             payload,
         )
 
@@ -647,13 +653,27 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def post_e2e_fetch_trace(
-        self, payload: E2EFetchTraceRequest
+    async def get_e2e_fetch_trace_by_project_name_by_trace_id(
+        self, project_name: str, trace_id: str
     ) -> E2EFetchTraceResponse:
         return await self._request(
-            "POST",
-            url_for("/v1/e2e_fetch_trace/", self.base_url),
-            payload,
+            "GET",
+            url_for(f"/v1/e2e_fetch_trace/{project_name}/{trace_id}", self.base_url),
+            {},
+        )
+
+    async def get_e2e_traces_per_project(
+        self, project_id: str, limit: Optional[str] = None, offset: Optional[str] = None
+    ) -> E2ETracesPerProjectResponse:
+        query_params = {}
+        if limit is not None:
+            query_params["limit"] = limit
+        if offset is not None:
+            query_params["offset"] = offset
+        return await self._request(
+            "GET",
+            url_for(f"/v1/e2e_traces_per_project/{project_id}", self.base_url),
+            query_params,
         )
 
     async def post_e2e_fetch_span_score(

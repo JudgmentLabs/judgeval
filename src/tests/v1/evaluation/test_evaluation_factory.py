@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 from judgeval.v1.evaluation.evaluation_factory import EvaluationFactory
 from judgeval.v1.evaluation.evaluation import Evaluation
 from judgeval.v1.data.example import Example
-from judgeval.v1.scorers.built_in.answer_relevancy import AnswerRelevancyScorer
+from judgeval.v1.scorers.prompt_scorer.prompt_scorer import PromptScorer
 
 
 @pytest.fixture
@@ -22,25 +22,27 @@ def evaluation_factory(mock_client):
 
 @pytest.fixture
 def sample_examples():
-    return [
-        Example(name="ex1")
-        .set_property("input", "test")
-        .set_property("actual_output", "result"),
-    ]
+    ex1 = Example(name="ex1")
+    ex1._properties["input"] = "test"
+    ex1._properties["actual_output"] = "result"
+    return [ex1]
 
 
 @pytest.fixture
 def sample_scorers():
-    return [AnswerRelevancyScorer(threshold=0.5)]
+    return [PromptScorer(name="test_scorer", prompt="Is this relevant?", threshold=0.5)]
 
 
 def test_factory_create(evaluation_factory, mock_client):
     evaluation = evaluation_factory.create()
 
     assert isinstance(evaluation, Evaluation)
-    assert evaluation._client == mock_client
-    assert evaluation._project_id == "test_project_id"
-    assert evaluation._project_name == "test_project"
+    assert evaluation._local._project_id == "test_project_id"
+    assert evaluation._local._project_name == "test_project"
+    assert evaluation._hosted._project_id == "test_project_id"
+    assert evaluation._hosted._project_name == "test_project"
+    assert evaluation._local._client == mock_client
+    assert evaluation._hosted._client == mock_client
 
 
 def test_factory_run(evaluation_factory, mock_client, sample_examples, sample_scorers):
@@ -89,4 +91,5 @@ def test_factory_create_with_no_project_id(mock_client):
     evaluation = factory.create()
 
     assert isinstance(evaluation, Evaluation)
-    assert evaluation._project_id is None
+    assert evaluation._local._project_id is None
+    assert evaluation._hosted._project_id is None
