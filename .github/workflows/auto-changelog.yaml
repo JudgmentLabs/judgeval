@@ -1,0 +1,486 @@
+name: Auto Changelog (prod)
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve latest prod release commit
+        id: latest
+        run: |
+          git fetch origin main --prune
+
+          LATEST=$(git log -1 --pretty=%H --author=release-bot origin/main)
+          if [ -z "$LATEST" ]; then
+            echo "No release-bot commit found on origin/main" >&2
+            exit 1
+          fi
+
+          echo "latest=$LATEST" >> $GITHUB_OUTPUT
+
+          # Only run changelog when this push IS the release-bot merge (prod merge), not on every push to main
+          if [ "$LATEST" = "$GITHUB_SHA" ]; then
+            echo "run_changelog=true" >> $GITHUB_OUTPUT
+            echo "Push is the prod merge (release-bot commit); running changelog."
+          else 
+            echo "run_changelog=false" >> $GITHUB_OUTPUT
+            echo "Skipping changelog: push commit $GITHUB_SHA is not the latest release-bot merge ($LATEST)."
+          fi
+
+      - name: Build changelog inputs from latest release commit
+        if: steps.latest.outputs.run_changelog == 'true'
+        id: inputs
+        run: | 
+          LATEST="${{ steps.latest.outputs.latest }}"
+
+          TITLE="$(git log -1 --pretty=%s "$LATEST")"
+          BODY="$(git log -1 --pretty=%b "$LATEST")"
+
+          # Find previous release-bot commit to get full range of changes
+          PREV=$(git log -1 --skip=1 --pretty=%H --author=release-bot origin/main "$LATEST")
+
+          if [ -n "$PREV" ]; then
+            echo "Previous release: $PREV"
+            git diff --name-status "$PREV" "$LATEST" > /tmp/name_status.txt
+            git diff "$PREV" "$LATEST" > /tmp/patch.txt
+            # Append commit log summaries for extra context
+            COMMIT_LOG="$(git log --oneline "$PREV".."$LATEST")"
+            BODY="$BODY
+
+          Commits in this release:
+          $COMMIT_LOG"
+          else
+            echo "No previous release found, using single merge commit diff"
+            git show -m "$LATEST" > /tmp/patch.txt
+            git show --name-status --pretty="" -m "$LATEST" > /tmp/name_status.txt
+          fi
+
+          echo "title<<EOF" >> $GITHUB_OUTPUT
+          echo "$TITLE" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "$BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "latest=$LATEST" >> $GITHUB_OUTPUT
+
+          head -c 180000 /tmp/patch.txt > /tmp/patch_trunc.txt
+
+          echo "name_status_path=/tmp/name_status.txt" >> $GITHUB_OUTPUT
+          echo "patch_path=/tmp/patch_trunc.txt" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog with Claude
+        if: steps.latest.outputs.run_changelog == 'true'
+        id: claude
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          python3 - << 'PY'
+          import json, os, urllib.request, textwrap
+
+          repo_full = os.environ.get("GITHUB_REPOSITORY", "")
+          repo_short = repo_full.split("/")[-1] if repo_full else "repo"
+          sha = """${{ steps.inputs.outputs.latest }}""".strip()
+          title = """${{ steps.inputs.outputs.title }}""".strip()
+          body = """${{ steps.inputs.outputs.body }}""".strip()
+
+          with open("${{ steps.inputs.outputs.name_status_path }}", "r", encoding="utf-8") as f:
+            name_status = f.read().strip()
+          with open("${{ steps.inputs.outputs.patch_path }}", "r", encoding="utf-8", errors="replace") as f:
+            patch_trunc = f.read().strip()
+
+          commit_url = f"https://github.com/{repo_full}/commit/{sha}"
+
+          prompt = textwrap.dedent(f"""
+          You are writing release notes for Judgeval, an open-source Python SDK for LLM evaluation. Output will be rendered as a PDF. Use plain text only.
+
+          Output exactly TWO sections in this order:
+
+          SECTION 1 — What's new for users
+          - First line: *What's new for users*
+          - Then one blank line, then 3-6 bullets covering meaningful user-facing or SDK-impacting changes.
+          - Focus on: new scorers, API changes, new features, bug fixes, and dependency updates that affect SDK users.
+          - Phrase in terms of user/developer impact, not file changes. Skip internal refactors.
+
+          SECTION 2 — Migration guide
+          - First line: *Migration guide*
+          - Then one blank line, then bullets ONLY if there are breaking changes, renamed functions/classes, changed method signatures, removed/deprecated APIs, changed config fields, or altered default behaviors.
+          - Each bullet: what changed, what to do, and a short before/after code snippet if inferable from the diff.
+          - If there are NO breaking or migration-relevant changes, write a single bullet: "No migration steps required for this release."
+
+          Formatting rules (apply to both sections):
+          - Do NOT use any emojis (no :sparkles:, :package:, or other :word: style tokens).
+          - Use *bold* for feature names, API names, scorer names, or key terms.
+          - Put code, function names, class names, or config names in triple backticks.
+          - Each bullet 1-2 lines max. Keep it concise and scannable.
+          - No blank lines between bullets within a section. One blank line between sections.
+
+          Context:
+          - Commit: {commit_url}
+          - {sha} — title: {title}
+          - body: {body}
+
+          Files changed (name-status):
+          {name_status}
+
+          Patch (truncated):
+          {patch_trunc}
+          """).strip()
+
+          payload = {
+            "model": "claude-opus-4-6",
+            "max_tokens": 1200,
+            "messages": [{"role": "user", "content": prompt}],
+          }
+
+          req = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+              "Content-Type": "application/json",
+              "x-api-key": os.environ["ANTHROPIC_API_KEY"],
+              "anthropic-version": "2023-06-01",
+            },
+            method="POST",
+          )
+
+          with urllib.request.urlopen(req, timeout=90) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+
+          text = ""
+          for block in data.get("content", []):
+            if block.get("type") == "text":
+              text += block.get("text", "")
+
+          text = text.strip()
+          if not text:
+            raise SystemExit("Claude returned empty output")
+
+          with open("changelog.txt", "w", encoding="utf-8") as f:
+            f.write(text + "\n")
+
+          print("----- BEGIN CHANGELOG -----")
+          print(text)
+          print("----- END CHANGELOG -----")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+            out.write("changelog<<EOF\n")
+            out.write(text + "\n")
+            out.write("EOF\n")
+          PY
+
+      - name: Install PDF and Slack dependencies
+        if: steps.latest.outputs.run_changelog == 'true'
+        run: pip install reportlab slack-sdk
+
+      - name: Install Poppins font
+        if: steps.latest.outputs.run_changelog == 'true'
+        run: |
+          sudo mkdir -p /usr/share/fonts/truetype/google-fonts
+          cd /usr/share/fonts/truetype/google-fonts
+          sudo wget -q https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Regular.ttf
+          sudo wget -q https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Bold.ttf
+          sudo wget -q https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Medium.ttf
+          sudo wget -q https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Light.ttf
+          sudo fc-cache -f
+
+      - name: Build PDF changelog
+        if: steps.latest.outputs.run_changelog == 'true'
+        run: |
+          python3 - << 'PY'
+          import re, os, datetime, tempfile, urllib.request
+          from reportlab.lib import colors
+          from reportlab.lib.pagesizes import letter
+          from reportlab.lib.styles import ParagraphStyle
+          from reportlab.lib.units import inch
+          from reportlab.lib.enums import TA_LEFT
+          from reportlab.platypus import (
+              SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table, TableStyle
+          )
+          from reportlab.pdfbase import pdfmetrics
+          from reportlab.pdfbase.ttfonts import TTFont
+
+          # ── Download & register Poppins fonts ──────────────────────────
+          FONT_SPEC = {
+              "Poppins": {
+                  "local": [
+                      "/usr/share/fonts/truetype/google-fonts/Poppins-Regular.ttf",
+                  ],
+                  "url": "https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Regular.ttf",
+              },
+              "Poppins-Bold": {
+                  "local": [
+                      "/usr/share/fonts/truetype/google-fonts/Poppins-Bold.ttf",
+                  ],
+                  "url": "https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Bold.ttf",
+              },
+              "Poppins-Medium": {
+                  "local": [
+                      "/usr/share/fonts/truetype/google-fonts/Poppins-Medium.ttf",
+                  ],
+                  "url": "https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Medium.ttf",
+              },
+              "Poppins-Light": {
+                  "local": [
+                      "/usr/share/fonts/truetype/google-fonts/Poppins-Light.ttf",
+                  ],
+                  "url": "https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Light.ttf",
+              },
+          }
+
+          font_dir = tempfile.mkdtemp()
+          for name, spec in FONT_SPEC.items():
+              resolved = None
+              for local_path in spec["local"]:
+                  if os.path.exists(local_path):
+                      resolved = local_path
+                      break
+              if not resolved:
+                  resolved = os.path.join(font_dir, f"{name}.ttf")
+                  print(f"Downloading {name}...")
+                  urllib.request.urlretrieve(spec["url"], resolved)
+              pdfmetrics.registerFont(TTFont(name, resolved))
+          pdfmetrics.registerFontFamily("Poppins", normal="Poppins", bold="Poppins-Bold")
+
+          # ── Colors ─────────────────────────────────────────────────────
+          ACCENT     = colors.HexColor("#6C5CE7")
+          DARK       = colors.HexColor("#1a1a2e")
+          BODY_COLOR = colors.HexColor("#374151")
+          MUTED      = colors.HexColor("#6b7280")
+          LIGHT_BG   = colors.HexColor("#f8f7ff")
+          RULE_COLOR = colors.HexColor("#e5e7eb")
+
+          # ── Styles ─────────────────────────────────────────────────────
+          title_style = ParagraphStyle(
+              name="Title", fontName="Poppins-Bold", fontSize=22,
+              leading=28, textColor=DARK, spaceAfter=2,
+          )
+          date_style = ParagraphStyle(
+              name="DateLine", fontName="Poppins-Light", fontSize=10,
+              leading=14, textColor=MUTED, spaceAfter=6,
+          )
+          section_style = ParagraphStyle(
+              name="Section", fontName="Poppins-Medium", fontSize=13,
+              leading=18, textColor=ACCENT, spaceBefore=16, spaceAfter=10,
+          )
+          bullet_style = ParagraphStyle(
+              name="Bullet", fontName="Poppins", fontSize=10,
+              leading=15, textColor=BODY_COLOR, leftIndent=0,
+              spaceBefore=0, spaceAfter=0, alignment=TA_LEFT,
+          )
+
+          # ── Helpers ────────────────────────────────────────────────────
+          def strip_emojis(s):
+              return re.sub(r":[a-zA-Z0-9_+-]+:", "", s).strip()
+
+          def mrkdwn_to_reportlab(s):
+              s = strip_emojis(s)
+              s = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+              s = re.sub(
+                  r"```([^`]+)```",
+                  r'<font name="Courier" size="9" color="#6C5CE7">\1</font>',
+                  s,
+              )
+              s = re.sub(r"\*([^*]+)\*", r"<b>\1</b>", s)
+              s = s.replace("\n", "<br/>\n")
+              return s
+
+          def accent_bar():
+              return HRFlowable(
+                  width="100%", thickness=2, color=ACCENT,
+                  spaceBefore=4, spaceAfter=12,
+              )
+
+          def light_rule():
+              return HRFlowable(
+                  width="100%", thickness=0.5, color=RULE_COLOR,
+                  spaceBefore=8, spaceAfter=8,
+              )
+
+          def build_bullet_row(text_markup):
+              dot = Paragraph(
+                  '<font color="#6C5CE7" size="14">\u2022</font>',
+                  ParagraphStyle("dot", fontName="Poppins", fontSize=14, leading=15),
+              )
+              body = Paragraph(text_markup, bullet_style)
+              t = Table(
+                  [[dot, body]],
+                  colWidths=[18, None],
+                  style=TableStyle([
+                      ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+                      ("TOPPADDING",    (0, 0), (-1, -1), 8),
+                      ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                      ("LEFTPADDING",   (0, 0), (0, 0),   4),
+                      ("LEFTPADDING",   (1, 0), (1, 0),   6),
+                      ("RIGHTPADDING",  (-1, -1), (-1, -1), 4),
+                      ("BACKGROUND",    (0, 0), (-1, -1), LIGHT_BG),
+                  ]),
+              )
+              t.hAlign = "LEFT"
+              return t
+
+          SECTION_HEADERS = {
+              "*What's new for users*": "What\u2019s new for users",
+              "What's new for users": "What\u2019s new for users",
+              "*Migration guide*": "Migration guide",
+              "Migration guide": "Migration guide",
+          }
+
+          def is_section_header(line):
+              stripped = strip_emojis(line).strip()
+              return stripped in SECTION_HEADERS
+
+          def get_section_title(line):
+              stripped = strip_emojis(line).strip()
+              return SECTION_HEADERS.get(stripped)
+
+          # ── Read changelog.txt ─────────────────────────────────────────
+          with open("changelog.txt", "r", encoding="utf-8") as f:
+              raw = f.read().strip()
+
+          # ── Parse into sections ─────────────────────────────────────────
+          sections = []
+          current_bullets = []
+          current_title = None
+
+          for line in raw.splitlines():
+              line = line.strip()
+              if not line:
+                  continue
+              if is_section_header(line):
+                  if current_title is not None:
+                      sections.append((current_title, current_bullets))
+                  current_title = get_section_title(line)
+                  current_bullets = []
+              elif line.startswith("- ") or line.startswith("\u2022 "):
+                  current_bullets.append(line[2:])
+              elif current_bullets:
+                  current_bullets[-1] += " " + line
+              elif current_title is not None:
+                  current_bullets.append(line)
+
+          if current_title is not None:
+              sections.append((current_title, current_bullets))
+
+          # Fallback if Claude didn't use section headers
+          if not sections:
+              all_bullets = []
+              for line in raw.splitlines():
+                  line = line.strip()
+                  if not line:
+                      continue
+                  if line.startswith("- ") or line.startswith("\u2022 "):
+                      all_bullets.append(line[2:])
+                  elif all_bullets:
+                      all_bullets[-1] += " " + line
+                  else:
+                      all_bullets.append(line)
+              sections = [("What\u2019s new for users", all_bullets)]
+
+          # ── Build PDF ──────────────────────────────────────────────────
+          doc = SimpleDocTemplate(
+              "changelog.pdf", pagesize=letter,
+              rightMargin=0.9 * inch, leftMargin=0.9 * inch,
+              topMargin=0.8 * inch, bottomMargin=0.8 * inch,
+          )
+
+          story = []
+          story.append(Paragraph("Judgeval", title_style))
+          story.append(Spacer(1, 2))
+          story.append(Paragraph(
+              f"Production Release \u2014 {datetime.date.today().strftime('%B %d, %Y')}",
+              date_style,
+          ))
+          story.append(accent_bar())
+
+          bullets_added = 0
+          for section_title, bullets in sections:
+              story.append(Paragraph(section_title, section_style))
+              for bullet in bullets:
+                  story.append(build_bullet_row(mrkdwn_to_reportlab(bullet)))
+                  story.append(Spacer(1, 3))
+                  bullets_added += 1
+
+          story.append(Spacer(1, 16))
+          story.append(light_rule())
+          story.append(Paragraph(
+              f"Auto-generated changelog  \u00b7  {datetime.date.today().isoformat()}",
+              ParagraphStyle(
+                  "Footer", fontName="Poppins-Light", fontSize=8,
+                  textColor=MUTED, alignment=TA_LEFT,
+              ),
+          ))
+
+          doc.build(story)
+          print(f"changelog.pdf built with {bullets_added} bullet(s)")
+          PY
+
+      - name: Upload changelog artifact
+        if: steps.latest.outputs.run_changelog == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog
+          path: |
+            changelog.txt
+            changelog.pdf
+
+      - name: Post to Slack (message + PDF)
+        if: steps.latest.outputs.run_changelog == 'true'
+        env:
+          CHANGELOG_SLACK_WEBHOOK_URL: ${{ secrets.CHANGELOG_SLACK_WEBHOOK_URL }}
+          CHANGELOG_SLACK_BOT_TOKEN: ${{ secrets.CHANGELOG_SLACK_BOT_TOKEN }}
+          CHANGELOG_SLACK_CHANNEL_ID: ${{ secrets.CHANGELOG_SLACK_CHANNEL_ID }}
+        run: |
+          python3 - << 'PY'
+          import json, os, urllib.request
+
+          repo_full = os.environ.get("GITHUB_REPOSITORY", "")
+          repo_short = repo_full.split("/")[-1] if repo_full else "repo"
+          latest = "${{ steps.inputs.outputs.latest }}"
+          commit_url = f"https://github.com/{repo_full}/commit/{latest}"
+
+          # 1) Post short message via webhook
+          blocks = [
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": f"*{repo_short}* (prod)\n<{commit_url}|View release commit>\n\nChangelog attached as PDF below."
+              }
+            },
+          ]
+          req = urllib.request.Request(
+            os.environ["CHANGELOG_SLACK_WEBHOOK_URL"],
+            data=json.dumps({"blocks": blocks}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+          )
+          with urllib.request.urlopen(req, timeout=30) as resp:
+            resp.read()
+
+          # 2) Upload PDF to channel via Slack API (bot token)
+          token = os.environ.get("CHANGELOG_SLACK_BOT_TOKEN", "").strip()
+          channel_id = os.environ.get("CHANGELOG_SLACK_CHANNEL_ID", "").strip()
+          if not token or not channel_id:
+            raise SystemExit(
+              "CHANGELOG_SLACK_BOT_TOKEN and CHANGELOG_SLACK_CHANNEL_ID must be set in repo secrets for PDF upload. "
+              "Use a Slack app with files:write scope; channel ID is the channel where the webhook posts (e.g. C01234567)."
+            )
+          from slack_sdk import WebClient
+          client = WebClient(token=token)
+          client.files_upload_v2(
+            channel=channel_id,
+            file="changelog.pdf",
+            filename="changelog.pdf",
+            title=f"{repo_short} prod changelog",
+          )
+          PY
