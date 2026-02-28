@@ -10,7 +10,7 @@ from typing import List
 def test_basic_custom_scorer(client: Judgeval, random_name: str):
     class HappinessScorer(ExampleScorer):
         def score(self, data: Example) -> CustomScorerResult:
-            actual_output = data.get_property("actual_output") or ""
+            actual_output = data._properties.get("actual_output") or ""
             if "happy" in actual_output:
                 return CustomScorerResult(score=1.0, reason="happy detected")
             elif "sad" in actual_output:

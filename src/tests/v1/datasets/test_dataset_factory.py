@@ -19,10 +19,11 @@ def dataset_factory(mock_client):
 
 @pytest.fixture
 def sample_examples():
-    return [
-        Example(name="example1").set_property("input", "input1"),
-        Example(name="example2").set_property("input", "input2"),
-    ]
+    ex1 = Example(name="example1")
+    ex1._properties["input"] = "input1"
+    ex2 = Example(name="example2")
+    ex2._properties["input"] = "input2"
+    return [ex1, ex2]
 
 
 def test_factory_get(dataset_factory, mock_client):

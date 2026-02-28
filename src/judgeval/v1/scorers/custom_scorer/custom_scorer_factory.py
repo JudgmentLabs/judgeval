@@ -24,6 +24,7 @@ RESPONSE_TYPE_MAP: dict[str, Literal["binary", "categorical", "numeric"]] = {
 }
 
 V2_SCORER_BASES = {"TraceCustomScorer", "ExampleCustomScorer"}
+V3_SCORER_BASES = {"Judge"}
 
 
 def _extract_generic_arg(node: ast.expr) -> Optional[str]:
@@ -45,21 +46,27 @@ def _get_base_name(node: ast.expr) -> Optional[str]:
     return None
 
 
-def parse_v2_scorer(
+def parse_judge(
     tree: ast.AST,
 ) -> Optional[
-    Tuple[str, Literal["trace", "example"], Literal["binary", "categorical", "numeric"]]
+    Tuple[
+        str,
+        Optional[Literal["trace", "example"]],
+        Literal["binary", "categorical", "numeric"],
+    ]
 ]:
     for node in ast.walk(tree):
         if not isinstance(node, ast.ClassDef):
             continue
         for base in node.bases:
             base_name = _get_base_name(base)
-            if base_name not in V2_SCORER_BASES:
+            if base_name not in V2_SCORER_BASES and base_name not in V3_SCORER_BASES:
                 continue
             generic_arg = _extract_generic_arg(base)
             if generic_arg not in RESPONSE_TYPE_MAP:
                 continue
+            if base_name in V3_SCORER_BASES:
+                return (node.name, None, RESPONSE_TYPE_MAP[generic_arg])
             scorer_type: Literal["trace", "example"] = (
                 "trace" if base_name == "TraceCustomScorer" else "example"
             )
@@ -151,11 +158,12 @@ class CustomScorerFactory:
         except SyntaxError as e:
             raise ValueError(f"Invalid Python syntax in {entrypoint_path}: {e}")
 
-        result = parse_v2_scorer(tree)
+        result = parse_judge(tree)
         if result is None:
             raise ValueError(
-                f"No TraceCustomScorer or ExampleCustomScorer class found in {entrypoint_path}. "
-                "Ensure the class inherits from TraceCustomScorer[ResponseType] or ExampleCustomScorer[ResponseType]."
+                f"No Judge, TraceCustomScorer, or ExampleCustomScorer class found in {entrypoint_path}. "
+                "Ensure the class inherits from Judge[ResponseType], TraceCustomScorer[ResponseType], "
+                "or ExampleCustomScorer[ResponseType]."
             )
 
         py_files: list[str] = []
@@ -214,7 +222,7 @@ class CustomScorerFactory:
             "class_name": class_name,
             "scorer_type": scorer_type,
             "response_type": response_type,
-            "version": 2,
+            "version": 3 if scorer_type is None else 2,
         }
 
         if requirements_arcname:
