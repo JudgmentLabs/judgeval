@@ -18,48 +18,25 @@ from opentelemetry.context import Context
 from opentelemetry.trace import Span, set_span_in_context
 
 from judgeval.judgment_attribute_keys import AttributeKeys
-from judgeval.utils.serialize import safe_serialize
+from judgeval.utils.serialize import safe_serialize, serialize_attribute
+from judgeval.v1.trace.proxy_tracer_provider import ProxyTracerProvider
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer.tracer import BaseTracer
+    from judgeval.v1.trace import BaseTracer
 
 
 @dataclasses.dataclass(slots=True)
 class TracingState:
-    """Shared mutable state for a single setup_claude_agent_sdk() call.
-
-    Passed through closures to all wrapper functions, providing:
-    - parent_context: The current agent span context for tool span nesting.
-      Set by receive_response/wrapped_query, read by ToolSpanTracker.
-      This works even when tool handlers run in a separate asyncio Task
-      (as the Claude Agent SDK's MCP server does) because all closures
-      share the same TracingState instance.
-    """
-
     parent_context: Optional[Context] = None
 
 
 class ToolSpanTracker:
-    """Captures tool call spans from the message stream for ALL tools.
-
-    Every tool call — built-in (Bash, file_edit) and SDK-defined MCP tools —
-    appears in the message stream as ToolUseBlock in AssistantMessage content
-    followed by ToolResultBlock in UserMessage content. This tracker creates
-    spans for all of them uniformly, eliminating the need for separate handler
-    wrapping or name-based deduplication.
-
-    Flow:
-    1. AssistantMessage contains ToolUseBlock → open a tool span, emit_partial
-    2. UserMessage contains ToolResultBlock → match by tool_use_id, record output, close span
-    """
-
     def __init__(self, tracer: "BaseTracer", state: TracingState):
         self.tracer = tracer
         self.state = state
         self._pending_spans: Dict[str, Tuple[Span, str]] = {}
 
     def on_assistant_message(self, message: Any) -> None:
-        """Extract ToolUseBlock entries and open tool spans."""
         content = getattr(message, "content", None)
         if not isinstance(content, list):
             return
@@ -75,28 +52,26 @@ class ToolSpanTracker:
             if not tool_name or not tool_use_id:
                 continue
 
-            ctx = self.state.parent_context
-
-            span = self.tracer.get_tracer().start_span(
-                str(tool_name),
-                context=ctx,
-                attributes={
-                    AttributeKeys.JUDGMENT_SPAN_KIND: "tool",
-                },
+            span = (
+                ProxyTracerProvider.get_instance()
+                .get_tracer(__name__)
+                .start_span(
+                    str(tool_name),
+                    context=self.state.parent_context,
+                    attributes={
+                        AttributeKeys.JUDGMENT_SPAN_KIND: "tool",
+                    },
+                )
             )
 
-            self.tracer.set_span_attribute(
-                span, AttributeKeys.JUDGMENT_INPUT, safe_serialize(tool_input)
-            )
+            span.set_attribute(AttributeKeys.JUDGMENT_INPUT, safe_serialize(tool_input))
 
             self._pending_spans[tool_use_id] = (span, tool_name)
 
-        # Emit partial after processing all tool blocks for real-time visibility
         if self._pending_spans:
-            self.tracer.emit_partial()
+            self.tracer._emit_partial()
 
     def on_user_message(self, message: Any) -> None:
-        """Match ToolResultBlock entries to pending spans and close them."""
         content = getattr(message, "content", None)
         if not isinstance(content, list):
             return
@@ -114,8 +89,8 @@ class ToolSpanTracker:
             result_content = getattr(block, "content", None)
             is_error = getattr(block, "is_error", None)
 
-            self.tracer.set_span_attribute(
-                span, AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(result_content)
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(result_content)
             )
 
             if is_error:
@@ -126,7 +101,6 @@ class ToolSpanTracker:
             span.end()
 
     def cleanup(self) -> None:
-        """End any unclosed tool spans."""
         for span, _ in self._pending_spans.values():
             span.end()
         self._pending_spans.clear()
@@ -188,7 +162,9 @@ class LLMSpanTracker:
         """Log usage metrics to the current LLM span."""
         if self.current_span and usage_metrics:
             for key, value in usage_metrics.items():
-                self.tracer.set_span_attribute(self.current_span, key, value)
+                self.current_span.set_attribute(
+                    key, serialize_attribute(value, safe_serialize)
+                )
 
     def cleanup(self) -> None:
         """End any unclosed spans."""
@@ -227,28 +203,29 @@ def _create_client_wrapper_class(
             generator = super().receive_response()
 
             # Create TASK span for the entire agent conversation
-            agent_span_context = tracer.get_tracer().start_as_current_span(
-                "Claude_Agent",
-                attributes={
-                    AttributeKeys.JUDGMENT_SPAN_KIND: "agent",
-                },
+            agent_span_context = (
+                ProxyTracerProvider.get_instance()
+                .get_tracer(__name__)
+                .start_as_current_span(
+                    "Claude_Agent",
+                    attributes={
+                        AttributeKeys.JUDGMENT_SPAN_KIND: "agent",
+                    },
+                )
             )
             agent_span = agent_span_context.__enter__()
 
-            # Record input
             if self.__last_prompt:
-                tracer.set_span_attribute(
-                    agent_span,
+                agent_span.set_attribute(
                     AttributeKeys.JUDGMENT_INPUT,
-                    self.__last_prompt,
+                    serialize_attribute(self.__last_prompt, safe_serialize),
                 )
 
-            tracer.emit_partial()
+            tracer._emit_partial()
 
-            # Store the parent span context on the shared state so tool handlers
-            # can access it — even when they run in a separate asyncio Task
-            # (as the Claude Agent SDK's MCP server does).
-            state.parent_context = set_span_in_context(agent_span, tracer.get_context())
+            state.parent_context = set_span_in_context(
+                agent_span, ProxyTracerProvider.get_instance().get_current_context()
+            )
 
             final_results: List[Dict[str, Any]] = []
             llm_tracker = LLMSpanTracker(
@@ -291,20 +268,21 @@ def _create_client_wrapper_class(
                             }.items()
                             if v is not None
                         }
-                        if result_metadata:
-                            for key, value in result_metadata.items():
-                                tracer.set_span_attribute(
-                                    agent_span, f"agent.{key}", value
-                                )
+                    if result_metadata:
+                        for key, value in result_metadata.items():
+                            agent_span.set_attribute(
+                                f"agent.{key}",
+                                serialize_attribute(value, safe_serialize),
+                            )
 
                     yield message
 
-                # Record output
                 if final_results:
-                    tracer.set_span_attribute(
-                        agent_span,
+                    agent_span.set_attribute(
                         AttributeKeys.JUDGMENT_OUTPUT,
-                        final_results[-1] if final_results else None,
+                        serialize_attribute(
+                            final_results[-1] if final_results else None, safe_serialize
+                        ),
                     )
 
             except Exception as e:
@@ -326,24 +304,30 @@ def _wrap_query_function(
 
     async def wrapped_query(*args: Any, **kwargs: Any) -> Any:
         """Wrapped query function with automatic tracing."""
-        # Create agent span for the query
-        agent_span_context = tracer.get_tracer().start_as_current_span(
-            "Claude_Agent_Query",
-            attributes={
-                AttributeKeys.JUDGMENT_SPAN_KIND: "agent",
-            },
+        agent_span_context = (
+            ProxyTracerProvider.get_instance()
+            .get_tracer(__name__)
+            .start_as_current_span(
+                "Claude_Agent_Query",
+                attributes={
+                    AttributeKeys.JUDGMENT_SPAN_KIND: "agent",
+                },
+            )
         )
         agent_span = agent_span_context.__enter__()
 
-        # Capture prompt if available
         prompt = kwargs.get("prompt") or (args[0] if args else None)
         if prompt and isinstance(prompt, str):
-            tracer.set_span_attribute(agent_span, AttributeKeys.JUDGMENT_INPUT, prompt)
+            agent_span.set_attribute(
+                AttributeKeys.JUDGMENT_INPUT,
+                serialize_attribute(prompt, safe_serialize),
+            )
 
-        tracer.emit_partial()
+        tracer._emit_partial()
 
-        # Store parent context on shared state for tool handlers
-        state.parent_context = set_span_in_context(agent_span, tracer.get_context())
+        state.parent_context = set_span_in_context(
+            agent_span, ProxyTracerProvider.get_instance().get_current_context()
+        )
 
         final_results: List[Dict[str, Any]] = []
         llm_tracker = LLMSpanTracker(tracer, query_start_time=time.time())
@@ -389,16 +373,19 @@ def _wrap_query_function(
                     }
                     if result_metadata:
                         for key, value in result_metadata.items():
-                            tracer.set_span_attribute(agent_span, f"agent.{key}", value)
+                            agent_span.set_attribute(
+                                f"agent.{key}",
+                                serialize_attribute(value, safe_serialize),
+                            )
 
                 yield message
 
-            # Record output
             if final_results:
-                tracer.set_span_attribute(
-                    agent_span,
+                agent_span.set_attribute(
                     AttributeKeys.JUDGMENT_OUTPUT,
-                    final_results[-1] if final_results else None,
+                    serialize_attribute(
+                        final_results[-1] if final_results else None, safe_serialize
+                    ),
                 )
 
         except Exception as e:
@@ -443,36 +430,42 @@ def _create_llm_span_for_messages(
             content = _serialize_content_blocks(msg.content)
             outputs.append({"content": content, "role": "assistant"})
 
-    # Create LLM span
     span_start_time = int(start_time * 1e9) if start_time is not None else None
-    llm_span_context = tracer.get_tracer().start_as_current_span(
-        "anthropic.messages.create",
-        attributes={
-            AttributeKeys.JUDGMENT_SPAN_KIND: "llm",
-        },
-        start_time=span_start_time,
+    llm_span_context = (
+        ProxyTracerProvider.get_instance()
+        .get_tracer(__name__)
+        .start_as_current_span(
+            "anthropic.messages.create",
+            attributes={
+                AttributeKeys.JUDGMENT_SPAN_KIND: "llm",
+            },
+            start_time=span_start_time,
+        )
     )
     llm_span = llm_span_context.__enter__()
 
-    # Record attributes
     if model:
-        tracer.set_span_attribute(
-            llm_span, AttributeKeys.JUDGMENT_LLM_MODEL_NAME, model
+        llm_span.set_attribute(
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME,
+            serialize_attribute(model, safe_serialize),
         )
-        # Set provider to anthropic for cost calculation
-        tracer.set_span_attribute(
-            llm_span, AttributeKeys.JUDGMENT_LLM_PROVIDER, "anthropic"
+        llm_span.set_attribute(
+            AttributeKeys.JUDGMENT_LLM_PROVIDER,
+            serialize_attribute("anthropic", safe_serialize),
         )
 
     if input_messages:
-        tracer.set_span_attribute(
-            llm_span, AttributeKeys.JUDGMENT_INPUT, input_messages
+        llm_span.set_attribute(
+            AttributeKeys.JUDGMENT_INPUT,
+            serialize_attribute(input_messages, safe_serialize),
         )
 
     if outputs:
-        tracer.set_span_attribute(llm_span, AttributeKeys.JUDGMENT_OUTPUT, outputs)
+        llm_span.set_attribute(
+            AttributeKeys.JUDGMENT_OUTPUT, serialize_attribute(outputs, safe_serialize)
+        )
 
-    tracer.emit_partial()
+    tracer._emit_partial()
 
     # Return final message content for conversation history and the span
     if hasattr(last_message, "content"):

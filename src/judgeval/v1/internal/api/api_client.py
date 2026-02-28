@@ -165,7 +165,6 @@ class JudgmentSyncClient:
             "POST",
             url_for(f"/v1/projects/{project_id}/eval-results", self.base_url),
             payload,
-            params={},
         )
 
     def post_projects_eval_results_examples(
@@ -175,7 +174,6 @@ class JudgmentSyncClient:
             "POST",
             url_for(f"/v1/projects/{project_id}/eval-results/examples", self.base_url),
             payload,
-            params={},
         )
 
     def get_projects_experiments_by_run_id(
@@ -202,6 +200,15 @@ class JudgmentSyncClient:
         return self._request(
             "POST",
             url_for(f"/v1/projects/{project_id}/eval-queue/traces", self.base_url),
+            payload,
+        )
+
+    def post_projects_eval_queue(
+        self, project_id: str, payload: JudgeEvaluationRun
+    ) -> AddToJudgeEvalQueueResponse:
+        return self._request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/eval-queue", self.base_url),
             payload,
         )
 
@@ -316,13 +323,27 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def get_e2e_fetch_trace(
+    def get_e2e_fetch_trace_by_project_name_by_trace_id(
         self, project_name: str, trace_id: str
     ) -> E2EFetchTraceResponse:
         return self._request(
             "GET",
             url_for(f"/v1/e2e_fetch_trace/{project_name}/{trace_id}", self.base_url),
             {},
+        )
+
+    def get_e2e_traces_per_project(
+        self, project_id: str, limit: Optional[str] = None, offset: Optional[str] = None
+    ) -> E2ETracesPerProjectResponse:
+        query_params = {}
+        if limit is not None:
+            query_params["limit"] = limit
+        if offset is not None:
+            query_params["offset"] = offset
+        return self._request(
+            "GET",
+            url_for(f"/v1/e2e_traces_per_project/{project_id}", self.base_url),
+            query_params,
         )
 
     def post_e2e_fetch_span_score(
@@ -351,6 +372,7 @@ class JudgmentAsyncClient:
         payload: Any,
         params: Optional[Dict[str, Any]] = None,
     ) -> Any:
+        logger.debug(f"HTTP {method} {url}")
         if method == "GET":
             r = self.client.request(
                 method,
@@ -511,6 +533,15 @@ class JudgmentAsyncClient:
             payload,
         )
 
+    async def post_projects_eval_queue(
+        self, project_id: str, payload: JudgeEvaluationRun
+    ) -> AddToJudgeEvalQueueResponse:
+        return await self._request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/eval-queue", self.base_url),
+            payload,
+        )
+
     async def get_projects_prompts_by_name(
         self,
         project_id: str,
@@ -622,13 +653,27 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def get_e2e_fetch_trace(
+    async def get_e2e_fetch_trace_by_project_name_by_trace_id(
         self, project_name: str, trace_id: str
     ) -> E2EFetchTraceResponse:
         return await self._request(
             "GET",
             url_for(f"/v1/e2e_fetch_trace/{project_name}/{trace_id}", self.base_url),
             {},
+        )
+
+    async def get_e2e_traces_per_project(
+        self, project_id: str, limit: Optional[str] = None, offset: Optional[str] = None
+    ) -> E2ETracesPerProjectResponse:
+        query_params = {}
+        if limit is not None:
+            query_params["limit"] = limit
+        if offset is not None:
+            query_params["offset"] = offset
+        return await self._request(
+            "GET",
+            url_for(f"/v1/e2e_traces_per_project/{project_id}", self.base_url),
+            query_params,
         )
 
     async def post_e2e_fetch_span_score(

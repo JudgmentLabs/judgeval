@@ -12,6 +12,12 @@ class AddProjectResponse(TypedDict):
     project_id: str
 
 
+class AddToJudgeEvalQueueResponse(TypedDict):
+    success: bool
+    status: str
+    message: str
+
+
 class AddToRunEvalQueueExamplesResponse(TypedDict):
     success: bool
     status: str
@@ -34,7 +40,7 @@ class AddTraceTagsResponse(TypedDict):
 
 class BaseScorer(TypedDict):
     score_type: str
-    name: NotRequired[Optional[str]]
+    name: str
     class_name: NotRequired[Optional[str]]
     score: NotRequired[Optional[float]]
     minimum_score_range: NotRequired[Optional[float]]
@@ -92,6 +98,17 @@ E2EFetchSpanScoreResponse = List[Dict[str, Any]]
 E2EFetchTraceResponse = List[Dict[str, Any]]
 
 
+class E2ETracesPerProjectResponse(TypedDict):
+    data: E2ETracesPerProjectRow
+    total_spans: float
+    total_traces: float
+    limit: float
+    offset: float
+
+
+E2ETracesPerProjectRow = List[Dict[str, Any]]
+
+
 class ErrorResponse(TypedDict):
     error: str
     message: NotRequired[Optional[str]]
@@ -101,6 +118,8 @@ class Example(TypedDict):
     example_id: str
     created_at: str
     name: NotRequired[Optional[str]]
+    trace_id: NotRequired[Optional[str]]
+    span_id: NotRequired[Optional[str]]
 
 
 class ExampleEvaluationRun(TypedDict):
@@ -194,6 +213,16 @@ class InsertPromptResponse(TypedDict):
     created_at: str
 
 
+class JudgeEvaluationRun(TypedDict):
+    id: NotRequired[Optional[str]]
+    eval_name: str
+    created_at: NotRequired[Optional[str]]
+    judges: List[Dict[str, Any]]
+    examples: List[Example]
+    is_offline: bool
+    is_behavior: bool
+
+
 class LocalScorerResult(TypedDict):
     scorers_data: List[Dict[str, Any]]
     data_object: Example
@@ -264,7 +293,7 @@ class ResolveProjectResponse(TypedDict):
 
 class ScorerConfig(TypedDict):
     score_type: str
-    name: NotRequired[Optional[str]]
+    name: str
     threshold: float
     model: NotRequired[Optional[str]]
     required_params: NotRequired[Optional[List[str]]]

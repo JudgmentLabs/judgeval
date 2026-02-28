@@ -89,13 +89,11 @@ def client(google_api_key):
 
 @pytest.fixture
 def client_wrapped(tracer, client):
-    """Wrapped Google client with tracer"""
-    return wrap_google_client(tracer, client)
+    return wrap_google_client(client)
 
 
 @pytest.fixture(params=["wrapped", "unwrapped"], ids=["with_tracer", "without_tracer"])
 def client_maybe_wrapped(request, tracer, client):
-    """Parametrized fixture that returns wrapped or unwrapped client"""
     if request.param == "wrapped":
-        return wrap_google_client(tracer, client)
+        return wrap_google_client(client)
     return client

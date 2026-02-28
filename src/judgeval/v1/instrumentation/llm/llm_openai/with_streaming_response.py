@@ -21,19 +21,14 @@ from judgeval.v1.instrumentation.llm.llm_openai.utils import (
     openai_tokens_converter,
     set_cost_attribute,
 )
+from judgeval.v1.trace import BaseTracer
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer import BaseTracer
     from openai import OpenAI, AsyncOpenAI
     from openai._response import APIResponse, AsyncAPIResponse
     from opentelemetry.trace import Span
 
 
-# ============================================================================
-# Common utilities
-# ============================================================================
-
-# Token field configurations for different APIs
 _CHAT_TOKEN_FIELDS = {
     "input": "prompt_tokens",
     "output": "completion_tokens",
@@ -55,7 +50,6 @@ def _set_usage_attributes(
     total_tokens: int,
     usage_data: Any,
 ) -> None:
-    """Set token usage attributes on a span after conversion."""
     prompt_tokens, completion_tokens, cache_read, _ = openai_tokens_converter(
         prompt_tokens, completion_tokens, cache_read, 0, total_tokens
     )
@@ -75,14 +69,6 @@ def _finalize_span(
     error: BaseException | None,
     token_fields: Dict[str, str],
 ) -> None:
-    """Finalize span for OpenAI API calls.
-
-    Args:
-        context: The context dictionary containing span, usage, etc.
-        error: Any exception that occurred.
-        token_fields: Dict mapping generic keys to API-specific field names.
-            Expected keys: "input", "output", "details"
-    """
     span = context.get("span")
     if not span:
         return
@@ -136,24 +122,16 @@ def _finalize_span(
 
 
 def _finalize_chat_span(context: Dict[str, Any], error: BaseException | None) -> None:
-    """Finalize span for chat completions API."""
     _finalize_span(context, error, _CHAT_TOKEN_FIELDS)
 
 
 def _finalize_responses_span(
     context: Dict[str, Any], error: BaseException | None
 ) -> None:
-    """Finalize span for responses API."""
     _finalize_span(context, error, _RESPONSES_TOKEN_FIELDS)
 
 
-# ============================================================================
-# Chat Completions with_streaming_response - Helper functions
-# ============================================================================
-
-
 def _process_chat_chunk_dict(context: Dict[str, Any], data: Dict[str, Any]) -> None:
-    """Process a chat completion chunk from raw JSON data."""
     model = data.get("model")
     if model:
         context["model"] = model
@@ -171,7 +149,6 @@ def _process_chat_chunk_dict(context: Dict[str, Any], data: Dict[str, Any]) -> N
 
 
 def _process_chat_chunk(context: Dict[str, Any], chunk: Any) -> None:
-    """Process a chat completion chunk object."""
     if hasattr(chunk, "model") and chunk.model:
         context["model"] = chunk.model
     if hasattr(chunk, "choices") and chunk.choices:
@@ -185,7 +162,6 @@ def _process_chat_chunk(context: Dict[str, Any], chunk: Any) -> None:
 
 
 def _process_chat_completion(context: Dict[str, Any], result: Any) -> None:
-    """Process a non-streaming chat completion result."""
     if hasattr(result, "model") and result.model:
         context["model"] = result.model
     if hasattr(result, "choices") and result.choices:
@@ -197,7 +173,6 @@ def _process_chat_completion(context: Dict[str, Any], result: Any) -> None:
 
 
 def _process_chat_json(context: Dict[str, Any], data: Dict[str, Any]) -> None:
-    """Process chat completion JSON response."""
     model = data.get("model")
     if model:
         context["model"] = model
@@ -212,17 +187,12 @@ def _process_chat_json(context: Dict[str, Any], data: Dict[str, Any]) -> None:
         context["usage_dict"] = usage
 
 
-# ============================================================================
-# Chat Completions with_streaming_response - Wrappers
-# ============================================================================
-
-
-def wrap_chat_with_streaming_response_sync(tracer: BaseTracer, client: OpenAI) -> None:
+def wrap_chat_with_streaming_response_sync(client: OpenAI) -> None:
     original_func = client.chat.completions.with_streaming_response.create
 
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
-        ctx["span"] = tracer.get_tracer().start_span(
-            "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+        ctx["span"] = BaseTracer.start_span(
+            "OPENAI_API_CALL", {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
@@ -368,14 +338,12 @@ def wrap_chat_with_streaming_response_sync(tracer: BaseTracer, client: OpenAI) -
     setattr(client.chat.completions.with_streaming_response, "create", wrapped)
 
 
-def wrap_chat_with_streaming_response_async(
-    tracer: BaseTracer, client: AsyncOpenAI
-) -> None:
+def wrap_chat_with_streaming_response_async(client: AsyncOpenAI) -> None:
     original_func = client.chat.completions.with_streaming_response.create
 
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
-        ctx["span"] = tracer.get_tracer().start_span(
-            "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+        ctx["span"] = BaseTracer.start_span(
+            "OPENAI_API_CALL", {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
@@ -533,15 +501,9 @@ def wrap_chat_with_streaming_response_async(
     setattr(client.chat.completions.with_streaming_response, "create", wrapped)
 
 
-# ============================================================================
-# Responses API with_streaming_response - Helper functions
-# ============================================================================
-
-
 def _process_responses_chunk_dict(
     context: Dict[str, Any], data: Dict[str, Any]
 ) -> None:
-    """Process a responses API chunk from raw JSON data."""
     chunk_type = data.get("type")
 
     if chunk_type == "response.output_text.delta":
@@ -563,7 +525,6 @@ def _process_responses_chunk_dict(
 
 
 def _process_responses_chunk(context: Dict[str, Any], chunk: Any) -> None:
-    """Process a responses API chunk object."""
     if hasattr(chunk, "type"):
         if chunk.type == "response.output_text.delta":
             delta = getattr(chunk, "delta", None)
@@ -581,11 +542,9 @@ def _process_responses_chunk(context: Dict[str, Any], chunk: Any) -> None:
 
 
 def _process_responses_completion(context: Dict[str, Any], result: Any) -> None:
-    """Process a non-streaming responses API result."""
     if hasattr(result, "model") and result.model:
         context["model"] = result.model
     if hasattr(result, "output") and result.output:
-        # Try to extract text content from output
         for item in result.output:
             if hasattr(item, "type") and item.type == "message":
                 if hasattr(item, "content"):
@@ -601,7 +560,6 @@ def _process_responses_completion(context: Dict[str, Any], result: Any) -> None:
 
 
 def _process_responses_json(context: Dict[str, Any], data: Dict[str, Any]) -> None:
-    """Process responses API JSON response."""
     model = data.get("model")
     if model:
         context["model"] = model
@@ -621,20 +579,12 @@ def _process_responses_json(context: Dict[str, Any], data: Dict[str, Any]) -> No
         context["usage_dict"] = usage
 
 
-# ============================================================================
-# Responses API with_streaming_response - Wrappers
-# ============================================================================
-
-
-def wrap_responses_with_streaming_response_sync(
-    tracer: BaseTracer, client: OpenAI
-) -> None:
-    """Wrap client.responses.with_streaming_response.create for sync client."""
+def wrap_responses_with_streaming_response_sync(client: OpenAI) -> None:
     original_func = client.responses.with_streaming_response.create
 
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
-        ctx["span"] = tracer.get_tracer().start_span(
-            "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+        ctx["span"] = BaseTracer.start_span(
+            "OPENAI_API_CALL", {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
@@ -780,15 +730,12 @@ def wrap_responses_with_streaming_response_sync(
     setattr(client.responses.with_streaming_response, "create", wrapped)
 
 
-def wrap_responses_with_streaming_response_async(
-    tracer: BaseTracer, client: AsyncOpenAI
-) -> None:
-    """Wrap client.responses.with_streaming_response.create for async client."""
+def wrap_responses_with_streaming_response_async(client: AsyncOpenAI) -> None:
     original_func = client.responses.with_streaming_response.create
 
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
-        ctx["span"] = tracer.get_tracer().start_span(
-            "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+        ctx["span"] = BaseTracer.start_span(
+            "OPENAI_API_CALL", {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")

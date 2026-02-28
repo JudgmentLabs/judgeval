@@ -11,9 +11,9 @@ from opentelemetry.trace import Status, StatusCode
 from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.utils.serialize import safe_serialize
 from judgeval.utils.wrappers import immutable_wrap_sync
+from judgeval.v1.trace import BaseTracer
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer import BaseTracer
     from google.genai import Client
     from google.genai.types import (
         GenerateContentResponse,
@@ -50,12 +50,12 @@ def _format_google_output(
     return response.text, response.usage_metadata
 
 
-def wrap_generate_content_sync(tracer: BaseTracer, client: Client) -> None:
+def wrap_generate_content_sync(client: Client) -> None:
     original_func = client.models.generate_content
 
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
-        ctx["span"] = tracer.get_tracer().start_span(
-            "GOOGLE_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+        ctx["span"] = BaseTracer.start_span(
+            "GOOGLE_API_CALL", {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")

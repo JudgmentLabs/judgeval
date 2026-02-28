@@ -93,23 +93,23 @@ def async_client(openai_api_key):
 
 @pytest.fixture
 def wrapped_sync_client(tracer, sync_client):
-    return wrap_openai_client_sync(tracer, sync_client)
+    return wrap_openai_client_sync(sync_client)
 
 
 @pytest.fixture
 def wrapped_async_client(tracer, async_client):
-    return wrap_openai_client_async(tracer, async_client)
+    return wrap_openai_client_async(async_client)
 
 
 @pytest.fixture(params=["wrapped", "unwrapped"], ids=["with_tracer", "without_tracer"])
 def sync_client_maybe_wrapped(request, tracer, sync_client):
     if request.param == "wrapped":
-        return wrap_openai_client_sync(tracer, sync_client)
+        return wrap_openai_client_sync(sync_client)
     return sync_client
 
 
 @pytest.fixture(params=["wrapped", "unwrapped"], ids=["with_tracer", "without_tracer"])
 def async_client_maybe_wrapped(request, tracer, async_client):
     if request.param == "wrapped":
-        return wrap_openai_client_async(tracer, async_client)
+        return wrap_openai_client_async(async_client)
     return async_client

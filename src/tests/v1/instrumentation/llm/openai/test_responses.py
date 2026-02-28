@@ -286,8 +286,8 @@ class TestEdgeCases(BaseOpenAIResponsesTest):
         """Test multiple wrapped clients don't interfere with tracing verification"""
         from openai import OpenAI
 
-        client1 = wrap_openai_client_sync(tracer, OpenAI(api_key=openai_api_key))
-        client2 = wrap_openai_client_sync(tracer, OpenAI(api_key=openai_api_key))
+        client1 = wrap_openai_client_sync(OpenAI(api_key=openai_api_key))
+        client2 = wrap_openai_client_sync(OpenAI(api_key=openai_api_key))
 
         # Track initial span count
         initial_span_count = len(mock_processor.ended_spans)
@@ -586,7 +586,7 @@ class TestSafetyGuarantees(BaseOpenAIResponsesTest):
 
         monkeypatch.setattr(serialize, "safe_serialize", broken_serialize)
 
-        wrapped_client = wrap_openai_client_sync(tracer, sync_client)
+        wrapped_client = wrap_openai_client_sync(sync_client)
         response = wrapped_client.responses.create(
             model="gpt-5-nano",
             temperature=1,
@@ -614,7 +614,7 @@ class TestSafetyGuarantees(BaseOpenAIResponsesTest):
         from openai import OpenAI
 
         unwrapped = OpenAI(api_key=openai_api_key)
-        wrapped = wrap_openai_client_sync(tracer, OpenAI(api_key=openai_api_key))
+        wrapped = wrap_openai_client_sync(OpenAI(api_key=openai_api_key))
 
         unwrapped_response = unwrapped.responses.create(
             model="gpt-5-nano",
@@ -657,7 +657,7 @@ class TestSafetyGuarantees(BaseOpenAIResponsesTest):
 
         monkeypatch.setattr(BaseTracer, "set_span_attribute", broken_set_attribute)
 
-        wrapped_client = wrap_openai_client_sync(tracer, sync_client)
+        wrapped_client = wrap_openai_client_sync(sync_client)
         response = wrapped_client.responses.create(
             model="gpt-5-nano",
             temperature=1,

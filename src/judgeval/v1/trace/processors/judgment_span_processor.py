@@ -6,27 +6,20 @@ from weakref import finalize
 
 from opentelemetry.context import Context
 from opentelemetry.sdk.trace import ReadableSpan, Span
-from opentelemetry.trace import get_current_span
 from opentelemetry.trace.span import SpanContext
-from opentelemetry.sdk.trace.export import (
-    BatchSpanProcessor,
-    SpanExporter,
-)
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter
 
-from judgeval.judgment_attribute_keys import AttributeKeys
-from judgeval.judgment_attribute_keys import InternalAttributeKeys
+from judgeval.judgment_attribute_keys import AttributeKeys, InternalAttributeKeys
 from judgeval.utils.decorators.dont_throw import dont_throw
-from judgeval.v1.tracer.processors._lifecycles import get_all
-
+from judgeval.v1.trace.processors._lifecycles import get_all
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer import BaseTracer
+    from judgeval.v1.trace.base_tracer import BaseTracer
 
 
 class JudgmentSpanProcessor(BatchSpanProcessor):
     __slots__ = (
         "tracer",
-        "resource_attributes",
         "_span_finalizers",
         "_internal_attributes",
         "_lock",
@@ -44,7 +37,6 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
         export_timeout_millis: float | None = None,
     ):
         self.tracer = tracer
-
         super().__init__(
             exporter,
             max_queue_size=max_queue_size,
@@ -52,7 +44,6 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             max_export_batch_size=max_export_batch_size,
             export_timeout_millis=export_timeout_millis,
         )
-
         self._lock = threading.RLock()
         self._span_finalizers: dict[tuple[int, int], finalize] = {}
         self._internal_attributes: dict[tuple[int, int], dict[str, Any]] = {}
@@ -65,9 +56,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
     def _register_span(self, span: Span) -> None:
         if not span.context:
             return
-
         span_key = (span.context.trace_id, span.context.span_id)
-
         with self._lock:
             self._span_finalizers[span_key] = finalize(
                 span, self._cleanup_span_state, span_key
@@ -92,9 +81,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
     def _emit_span(self, span: ReadableSpan) -> None:
         if not span.context:
             return
-
         span_key = (span.context.trace_id, span.context.span_id)
-
         with self._lock:
             internal_attrs = self._internal_attributes.setdefault(span_key, {})
             curr_id = internal_attrs.get(AttributeKeys.JUDGMENT_UPDATE_ID, 0)
@@ -118,12 +105,14 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             end_time=span.end_time or span.start_time,
             instrumentation_scope=span.instrumentation_scope,
         )
-
         super().on_end(emitted_span)
 
     @dont_throw
     def emit_partial(self) -> None:
-        span = get_current_span()
+        from judgeval.v1.trace.proxy_tracer_provider import ProxyTracerProvider
+
+        proxy = ProxyTracerProvider.get_instance()
+        span = proxy.get_current_span()
         if (
             not span.is_recording()
             or not isinstance(span, ReadableSpan)
@@ -133,31 +122,25 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             )
         ):
             return
-
         self._emit_span(span=span)
 
     @dont_throw
     def on_start(self, span: Span, parent_context: Optional[Context] = None) -> None:
         for processor in get_all():
             processor.on_start(span, parent_context)
-
-        # Register span for weak reference tracking with cleanup callback
         self._register_span(span)
 
     @dont_throw
     def on_end(self, span: ReadableSpan) -> None:
         for processor in get_all():
             processor.on_end(span)
-
         if not span.context:
             super().on_end(span)
             return
-
         is_cancelled = self.get_internal_attribute(
             span.context, InternalAttributeKeys.CANCELLED, False
         )
         if not is_cancelled:
             self._emit_span(span=span)
-
         span_key = (span.context.trace_id, span.context.span_id)
         self._cleanup_span_state(span_key)

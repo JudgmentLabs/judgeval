@@ -281,9 +281,8 @@ class TestIdempotency(BaseTogetherTest):
     """Test that wrapping is idempotent and doesn't affect unwrapped clients"""
 
     def test_double_wrap_sync(self, tracer, sync_client, mock_processor):
-        """Test that double wrapping doesn't break the client with tracing verification"""
-        wrapped_once = wrap_together_client(tracer, sync_client)
-        wrapped_twice = wrap_together_client(tracer, wrapped_once)
+        wrapped_once = wrap_together_client(sync_client)
+        wrapped_twice = wrap_together_client(wrapped_once)
 
         response = wrapped_twice.chat.completions.create(
             model="meta-llama/Llama-3.2-3B-Instruct-Turbo",
@@ -299,9 +298,8 @@ class TestIdempotency(BaseTogetherTest):
 
     @pytest.mark.asyncio
     async def test_double_wrap_async(self, tracer, async_client, mock_processor):
-        """Test that double wrapping async client doesn't break it with tracing verification"""
-        wrapped_once = wrap_together_client(tracer, async_client)
-        wrapped_twice = wrap_together_client(tracer, wrapped_once)
+        wrapped_once = wrap_together_client(async_client)
+        wrapped_twice = wrap_together_client(wrapped_once)
 
         response = await wrapped_twice.chat.completions.create(
             model="meta-llama/Llama-3.2-3B-Instruct-Turbo",

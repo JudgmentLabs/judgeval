@@ -113,9 +113,8 @@ class TestWrapper(BaseGoogleTest):
 
 class TestWrapperIdempotency(BaseGoogleTest):
     def test_double_wrapping(self, tracer, client, mock_processor):
-        """Test that wrapping the same client twice doesn't break anything with tracing verification"""
-        client1 = wrap_google_client(tracer, client)
-        client2 = wrap_google_client(tracer, client1)
+        client1 = wrap_google_client(client)
+        client2 = wrap_google_client(client1)
 
         response = client2.models.generate_content(
             model="gemini-2.5-flash",
