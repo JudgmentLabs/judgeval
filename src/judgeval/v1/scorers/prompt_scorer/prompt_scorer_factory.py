@@ -14,17 +14,15 @@ from judgeval.utils.guards import expect_project_id
 
 
 class PromptScorerFactory:
-    __slots__ = ("_client", "_is_trace", "_project_id")
-    _cache: Dict[Tuple[str, str, str, str, bool], APIPromptScorer] = {}
+    __slots__ = ("_client", "_project_id")
+    _cache: Dict[Tuple[str, str, str, str], APIPromptScorer] = {}
 
     def __init__(
         self,
         client: JudgmentSyncClient,
-        is_trace: bool,
         project_id: Optional[str],
     ):
         self._client = client
-        self._is_trace = is_trace
         self._project_id = project_id
 
     def get(
@@ -40,7 +38,6 @@ class PromptScorerFactory:
             self._client.organization_id,
             self._client.api_key,
             project_id,
-            self._is_trace,
         )
         cached = self._cache.get(cache_key)
 
@@ -50,9 +47,6 @@ class PromptScorerFactory:
                     self._client.get_projects_scorers(
                         project_id=project_id,
                         names=name,
-                        is_trace=str(self._is_trace).lower()
-                        if self._is_trace is not None
-                        else None,
                     )
                 )
                 scorers = response.get("scorers", [])
@@ -62,24 +56,8 @@ class PromptScorerFactory:
                         404, f"Failed to fetch prompt scorer '{name}': not found", None
                     )
 
-                scorer = scorers[0]
-                scorer_is_trace = scorer.get("is_trace", False)
-
-                if scorer_is_trace != self._is_trace:
-                    expected_type = (
-                        "TracePromptScorer" if self._is_trace else "PromptScorer"
-                    )
-                    actual_type = (
-                        "TracePromptScorer" if scorer_is_trace else "PromptScorer"
-                    )
-                    raise JudgmentAPIError(
-                        400,
-                        f"Scorer with name {name} is a {actual_type}, not a {expected_type}",
-                        None,
-                    )
-
-                self._cache[cache_key] = scorer
-                cached = scorer
+                self._cache[cache_key] = scorers[0]
+                cached = scorers[0]
             except JudgmentAPIError:
                 judgeval_logger.error(
                     f"Failed to fetch prompt scorer '{name}' : prompt scorer '{name}' not found in the organization."
@@ -96,6 +74,5 @@ class PromptScorerFactory:
             options=cached.get("options"),
             model=cached.get("model"),
             description=cached.get("description"),
-            is_trace=self._is_trace,
             project_id=project_id,
         )
