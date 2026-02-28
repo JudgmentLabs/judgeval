@@ -51,7 +51,6 @@ class Evaluation:
             judgeval_logger.warning(
                 "ExampleCustomScorer is deprecated. Please use Judge instead."
             )
-            return []
         if len(local_scorers) > 0:
             return self._local.run(
                 examples,
