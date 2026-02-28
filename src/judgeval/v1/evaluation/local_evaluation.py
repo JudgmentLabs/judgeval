@@ -14,9 +14,10 @@ from judgeval.v1.judges import Judge
 from judgeval.v1.hosted.responses import ScorerResponse
 from judgeval.v1.internal.api.api_types import ExampleEvaluationRun, LocalScorerResult
 from judgeval.v1.evaluation.evaluation_base import EvaluatorRunner
+from judgeval.v1.hosted.example_custom_scorer import ExampleCustomScorer
 
 
-class LocalEvaluatorRunner(EvaluatorRunner[Judge]):
+class LocalEvaluatorRunner(EvaluatorRunner[Judge | ExampleCustomScorer]):
     def _build_payload(
         self,
         eval_id: str,
@@ -24,7 +25,7 @@ class LocalEvaluatorRunner(EvaluatorRunner[Judge]):
         eval_run_name: str,
         created_at: str,
         examples: List[Example],
-        scorers: List[Judge],
+        scorers: List[Judge | ExampleCustomScorer],
     ) -> ExampleEvaluationRun:
         return {
             "id": eval_id,
@@ -42,7 +43,7 @@ class LocalEvaluatorRunner(EvaluatorRunner[Judge]):
         project_id: str,
         eval_id: str,
         examples: List[Example],
-        scorers: List[Judge],
+        scorers: List[Judge | ExampleCustomScorer],
         payload: ExampleEvaluationRun,
         progress: Progress,
     ) -> None:
@@ -109,7 +110,7 @@ class LocalEvaluatorRunner(EvaluatorRunner[Judge]):
     def _run_local_scorers(
         self,
         examples: List[Example],
-        scorers: List[Judge],
+        scorers: List[Judge | ExampleCustomScorer],
     ) -> Generator[
         Tuple[int, str, ScorerResponse, None] | Tuple[int, str, None, Exception],
         None,
@@ -121,7 +122,7 @@ class LocalEvaluatorRunner(EvaluatorRunner[Judge]):
         """
 
         def _run_one(
-            scorer: Judge,
+            scorer: Judge | ExampleCustomScorer,
             example: Example,
         ) -> ScorerResponse:
             result: ScorerResponse = asyncio.run(scorer.score(example))
