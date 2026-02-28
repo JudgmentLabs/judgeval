@@ -1,6 +1,4 @@
 from judgeval.v1 import Judgeval
-from judgeval.v1.data import Example
-from judgeval.v1.scorers.built_in import AnswerRelevancyScorer
 import time
 from openai import OpenAI, AsyncOpenAI
 from anthropic import Anthropic, AsyncAnthropic
@@ -8,7 +6,6 @@ from together import Together, AsyncTogether  # type: ignore[import-untyped]
 from google import genai
 from e2etests.utils import (
     retrieve_trace,
-    retrieve_score,
     create_project,
     delete_project,
 )
@@ -46,19 +43,6 @@ together_client_async = judgment.wrap(
 
 QUERY_RETRY = 60
 PROMPT = "I need you to solve this math problem: 1 + 1 = ?"
-
-
-@judgment.observe(span_type="function")
-def scorer_span():
-    judgment.async_evaluate(
-        scorer=AnswerRelevancyScorer(threshold=0.5),
-        example=Example.create(
-            input="Tell me the weather in Paris.",
-            actual_output="The weather in France is sunny and 72F.",
-        ),
-    )
-
-    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
 
 
 @judgment.observe(span_type="function")
@@ -399,30 +383,3 @@ async def test_anthropic_async_streaming_llm_cost():
 async def test_together_async_streaming_llm_cost():
     trace_id = await together_async_streaming_llm_call()
     retrieve_streaming_trace_helper(trace_id)
-
-
-def test_online_span_scoring():
-    trace_id = scorer_span()
-    trace_spans = retrieve_trace_helper(trace_id, 1)
-    span_id = trace_spans[0].get("span_id")
-
-    query_count = 0
-    scorer_data = None
-    while query_count < QUERY_RETRY:
-        try:
-            scorer_data = retrieve_score(project_name, span_id, trace_id)
-        except Exception:
-            pass
-
-        if scorer_data:
-            break
-        query_count += 1
-        time.sleep(1)
-
-    if query_count == QUERY_RETRY:
-        assert False, "No score found"
-
-    score = scorer_data[0]
-    assert score.get("judge_name") == "Answer Relevancy"
-    assert score.get("bool_value") is not None
-    assert score.get("num_value") is not None

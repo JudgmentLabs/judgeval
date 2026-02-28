@@ -77,15 +77,15 @@ def test_pull_dataset(client: Judgeval):
     assert dataset1.name == random_name1
     assert len(dataset1) == 3, "Dataset should have 3 examples"
     for i, e in enumerate(dataset1, start=1):
-        assert e.get_property("input") == f"input {i}"
-        assert e.get_property("actual_output") == f"output {i}"
+        assert e._properties.get("input") == f"input {i}"
+        assert e._properties.get("actual_output") == f"output {i}"
 
     assert dataset2, "Failed to pull dataset"
     assert dataset2.name == random_name2
     assert len(dataset2) == 2, "Dataset should have 2 examples"
     for i, e in enumerate(dataset2, start=4):
-        assert e.get_property("input") == f"input {i}"
-        assert e.get_property("actual_output") == f"output {i}"
+        assert e._properties.get("input") == f"input {i}"
+        assert e._properties.get("actual_output") == f"output {i}"
 
 
 def test_append_dataset(client: Judgeval, random_name: str):
@@ -109,8 +109,8 @@ def test_append_dataset(client: Judgeval, random_name: str):
     assert dataset, "Failed to pull dataset"
     assert len(dataset) == initial_example_count + 3
     for i, e in enumerate(dataset, start=1):
-        assert e.get_property("input") == f"input {i}"
-        assert e.get_property("actual_output") == f"output {i}"
+        assert e._properties.get("input") == f"input {i}"
+        assert e._properties.get("actual_output") == f"output {i}"
 
 
 def test_add_examples_error(client: Judgeval, random_name: str):

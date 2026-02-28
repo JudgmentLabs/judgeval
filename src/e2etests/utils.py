@@ -24,9 +24,7 @@ def create_project(project_name: str):
 
 
 def retrieve_trace(project_name: str, trace_id: str):
-    return client.post_e2e_fetch_trace(
-        payload={"project_name": project_name, "trace_id": trace_id}
-    )
+    return client.get_e2e_fetch_trace(project_name=project_name, trace_id=trace_id)
 
 
 def retrieve_score(project_name: str, span_id: str, trace_id: str):

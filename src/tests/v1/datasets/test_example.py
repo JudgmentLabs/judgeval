@@ -16,30 +16,24 @@ def test_example_with_name():
 
 def test_set_property():
     example = Example()
-    example.set_property("input", "test input")
-    assert example.get_property("input") == "test input"
+    example._properties["input"] = "test input"
+    assert example._properties["input"] == "test input"
 
 
 def test_set_multiple_properties():
     example = Example()
-    example.set_property("input", "test input")
-    example.set_property("output", "test output")
-    example.set_property("expected", "expected output")
+    example._properties["input"] = "test input"
+    example._properties["output"] = "test output"
+    example._properties["expected"] = "expected output"
 
-    assert example.get_property("input") == "test input"
-    assert example.get_property("output") == "test output"
-    assert example.get_property("expected") == "expected output"
+    assert example._properties["input"] == "test input"
+    assert example._properties["output"] == "test output"
+    assert example._properties["expected"] == "expected output"
 
 
 def test_get_property_nonexistent():
     example = Example()
-    assert example.get_property("nonexistent") is None
-
-
-def test_set_property_returns_self():
-    example = Example()
-    result = example.set_property("key", "value")
-    assert result is example
+    assert example._properties.get("nonexistent") is None
 
 
 def test_create_method():
@@ -48,15 +42,15 @@ def test_create_method():
     )
 
     assert isinstance(example, Example)
-    assert example.get_property("input") == "test input"
-    assert example.get_property("output") == "test output"
-    assert example.get_property("context") == "test context"
+    assert example._properties["input"] == "test input"
+    assert example._properties["output"] == "test output"
+    assert example._properties["context"] == "test context"
 
 
 def test_to_dict():
     example = Example(name="test_example")
-    example.set_property("input", "test input")
-    example.set_property("output", "test output")
+    example._properties["input"] = "test input"
+    example._properties["output"] = "test output"
 
     result = example.to_dict()
 
@@ -69,19 +63,19 @@ def test_to_dict():
 
 def test_properties_returns_copy():
     example = Example()
-    example.set_property("key", "value")
+    example._properties["key"] = "value"
 
     props = example.properties
     props["key"] = "modified"
 
-    assert example.get_property("key") == "value"
+    assert example._properties["key"] == "value"
 
 
 def test_properties_dict_contains_all_properties():
     example = Example()
-    example.set_property("a", 1)
-    example.set_property("b", 2)
-    example.set_property("c", 3)
+    example._properties["a"] = 1
+    example._properties["b"] = 2
+    example._properties["c"] = 3
 
     props = example.properties
     assert len(props) == 3
@@ -92,19 +86,19 @@ def test_properties_dict_contains_all_properties():
 
 def test_example_with_complex_data_types():
     example = Example()
-    example.set_property("list_data", [1, 2, 3])
-    example.set_property("dict_data", {"key": "value"})
-    example.set_property("nested", {"list": [1, 2], "dict": {"a": "b"}})
+    example._properties["list_data"] = [1, 2, 3]
+    example._properties["dict_data"] = {"key": "value"}
+    example._properties["nested"] = {"list": [1, 2], "dict": {"a": "b"}}
 
-    assert example.get_property("list_data") == [1, 2, 3]
-    assert example.get_property("dict_data") == {"key": "value"}
-    assert example.get_property("nested") == {"list": [1, 2], "dict": {"a": "b"}}
+    assert example._properties["list_data"] == [1, 2, 3]
+    assert example._properties["dict_data"] == {"key": "value"}
+    assert example._properties["nested"] == {"list": [1, 2], "dict": {"a": "b"}}
 
 
 def test_to_dict_with_complex_data():
     example = Example(name="complex_example")
-    example.set_property("list_data", [1, 2, 3])
-    example.set_property("dict_data", {"key": "value"})
+    example._properties["list_data"] = [1, 2, 3]
+    example._properties["dict_data"] = {"key": "value"}
 
     result = example.to_dict()
     assert result["list_data"] == [1, 2, 3]
