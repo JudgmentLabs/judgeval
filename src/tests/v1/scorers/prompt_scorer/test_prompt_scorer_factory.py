@@ -22,14 +22,11 @@ class TestPromptScorerFactoryGet:
                     "options": None,
                     "model": "gpt-4",
                     "description": "Test description",
-                    "is_trace": False,
                 }
             ]
         }
 
-        factory = PromptScorerFactory(
-            client=mock_client, is_trace=False, project_id="test_project_id"
-        )
+        factory = PromptScorerFactory(client=mock_client, project_id="test_project_id")
         PromptScorerFactory._cache.clear()
         scorer = factory.get("TestScorer")
 
@@ -41,9 +38,7 @@ class TestPromptScorerFactoryGet:
     def test_get_returns_none_when_not_found(self, mock_client):
         mock_client.get_projects_scorers.return_value = {"scorers": []}
 
-        factory = PromptScorerFactory(
-            client=mock_client, is_trace=False, project_id="test_project_id"
-        )
+        factory = PromptScorerFactory(client=mock_client, project_id="test_project_id")
         PromptScorerFactory._cache.clear()
         scorer = factory.get("NonExistentScorer")
 
@@ -52,9 +47,7 @@ class TestPromptScorerFactoryGet:
     def test_get_returns_none_when_project_id_missing(self, mock_client, caplog):
         import logging
 
-        factory = PromptScorerFactory(
-            client=mock_client, is_trace=False, project_id=None
-        )
+        factory = PromptScorerFactory(client=mock_client, project_id=None)
 
         with caplog.at_level(logging.ERROR):
             scorer = factory.get("TestScorer")
@@ -73,14 +66,11 @@ class TestPromptScorerFactoryGet:
                     "options": None,
                     "model": None,
                     "description": None,
-                    "is_trace": False,
                 }
             ]
         }
 
-        factory = PromptScorerFactory(
-            client=mock_client, is_trace=False, project_id="test_project_id"
-        )
+        factory = PromptScorerFactory(client=mock_client, project_id="test_project_id")
         PromptScorerFactory._cache.clear()
 
         scorer1 = factory.get("TestScorer")
