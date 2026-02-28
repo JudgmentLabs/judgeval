@@ -12,7 +12,6 @@ from typing import (
     Dict,
     Iterator,
     Optional,
-    Sequence,
     TypedDict,
     TypeVar,
     cast,
@@ -22,13 +21,11 @@ from opentelemetry.context import set_value
 from opentelemetry.trace import Span, Status, StatusCode, Tracer as OTELTracer
 from opentelemetry.sdk.trace import TracerProvider
 
-from judgeval.logger import judgeval_logger
 from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.utils.decorators.debug_time import debug_time
 from judgeval.utils.decorators.dont_throw import dont_throw
 from judgeval.utils.serialize import serialize_attribute, safe_serialize
 from judgeval.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
-from judgeval.v1.data import Example
 from judgeval.v1.trace.proxy_tracer_provider import ProxyTracerProvider
 from judgeval.v1.trace.processors._lifecycles import (
     CUSTOMER_ID_KEY,
@@ -41,10 +38,6 @@ from judgeval.v1.trace.generators import (
 from judgeval.v1.background_queue import enqueue as bg_enqueue
 
 if TYPE_CHECKING:
-    from judgeval.v1.internal.api.api_types import (
-        JudgeExampleEvaluationRun,
-        JudgeTraceEvaluationRun,
-    )
     from judgeval.v1.internal.api import JudgmentSyncClient
     from judgeval.v1.trace.processors.judgment_span_processor import (
         JudgmentSpanProcessor,
@@ -395,74 +388,6 @@ class BaseTracer(ABC):
         if func is None:
             return decorator
         return decorator(func)
-
-    # ------------------------------------------------------------------ #
-    #  Static API: Async Evaluation                                      #
-    # ------------------------------------------------------------------ #
-
-    @staticmethod
-    @debug_time
-    @dont_throw
-    def asyncEvaluate(
-        judge: str,
-        examples: Sequence[Example],
-        /,
-    ) -> None:
-        """Enqueue example-level evaluation against *judge* on the background queue.
-
-        Requires an active tracer with a configured client and project, and a
-        currently recording span to bind the evaluation to.
-        """
-        proxy = BaseTracer._get_proxy_provider()
-        tracer = proxy.get_active_tracer()
-        if not tracer or not tracer._client or not tracer.project_id:
-            judgeval_logger.warning("asyncEvaluate: no active tracer or not configured")
-            return
-        ids = BaseTracer._get_current_trace_and_span_id()
-        if not ids:
-            judgeval_logger.warning("asyncEvaluate: no active span")
-            return
-        client = tracer._client
-        project_id = tracer.project_id
-        payload: JudgeExampleEvaluationRun = {
-            "eval_name": f"async_evaluate_{ids[1]}",
-            "judge_names": [judge],
-            "examples": [example.to_dict() for example in examples],
-        }
-        bg_enqueue(
-            lambda: client.post_projects_eval_queue_judge_examples(project_id, payload)
-        )
-
-    @staticmethod
-    @debug_time
-    @dont_throw
-    def asyncTraceEvaluate(judge: str, /) -> None:
-        """Enqueue trace-level evaluation against *judge* on the background queue.
-
-        Binds to the current trace and span IDs so the backend can locate the
-        full trace for judgment.
-        """
-        proxy = BaseTracer._get_proxy_provider()
-        tracer = proxy.get_active_tracer()
-        if not tracer or not tracer._client or not tracer.project_id:
-            judgeval_logger.warning(
-                "asyncTraceEvaluate: no active tracer or not configured"
-            )
-            return
-        ids = BaseTracer._get_current_trace_and_span_id()
-        if not ids:
-            judgeval_logger.warning("asyncTraceEvaluate: no active span")
-            return
-        client = tracer._client
-        project_id = tracer.project_id
-        payload: JudgeTraceEvaluationRun = {
-            "eval_name": f"async_trace_evaluate_{ids[1]}",
-            "judge_names": [judge],
-            "trace_and_span_ids": [[ids[0], ids[1]]],
-        }
-        bg_enqueue(
-            lambda: client.post_projects_eval_queue_judge_traces(project_id, payload)
-        )
 
     # ------------------------------------------------------------------ #
     #  Static: Span Kind                                                 #
