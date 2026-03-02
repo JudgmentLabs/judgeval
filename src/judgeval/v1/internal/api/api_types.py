@@ -22,6 +22,9 @@ class AddToRunEvalQueueExamplesResponse(TypedDict):
     success: bool
     status: str
     message: str
+    ui_results_url: NotRequired[Optional[str]]
+    example_ids: NotRequired[Optional[List[str]]]
+    unique_example_count: NotRequired[Optional[int]]
 
 
 class AddToRunEvalQueueTracesResponse(TypedDict):

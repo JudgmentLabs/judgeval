@@ -60,9 +60,10 @@ class EvaluatorRunner(ABC, Generic[S]):
         scorers: List[S],
         payload: ExampleEvaluationRun,
         progress: Progress,
-    ) -> None:
+    ) -> int:
         """
         Run the evaluation and save the results to the server.
+        Returns the number of unique examples to expect results for.
         """
         pass
 
@@ -71,7 +72,7 @@ class EvaluatorRunner(ABC, Generic[S]):
         console: Console,
         project_id: str,
         eval_id: str,
-        examples: List[Example],
+        expected_count: int,
         timeout_seconds: int,
         progress: Progress,
     ) -> tuple[list[ExperimentRunItem], str]:
@@ -95,17 +96,16 @@ class EvaluatorRunner(ABC, Generic[S]):
             poll_count += 1
 
             completed = len(results_data)
-            total = len(examples)
 
             progress.update(
                 task,
-                description=f"Evals completed and saved: ({completed}/{total} completed)",
+                description=f"Evals completed and saved: ({completed}/{expected_count} completed)",
             )
             judgeval_logger.info(
-                f"Poll {poll_count}: {completed}/{total} results ready"
+                f"Poll {poll_count}: {completed}/{expected_count} results ready"
             )
 
-            if completed == total:
+            if completed == expected_count:
                 break
             time.sleep(2)
 
@@ -253,7 +253,7 @@ class EvaluatorRunner(ABC, Generic[S]):
             TimeElapsedColumn(),
             console=console,
         ) as progress:
-            self._submit(
+            expected_count = self._submit(
                 console,
                 project_id,
                 eval_id,
@@ -266,7 +266,7 @@ class EvaluatorRunner(ABC, Generic[S]):
                 console,
                 project_id,
                 eval_id,
-                examples,
+                expected_count,
                 timeout_seconds,
                 progress,
             )

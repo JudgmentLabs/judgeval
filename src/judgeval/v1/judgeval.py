@@ -68,6 +68,15 @@ class Judgeval:
         )
 
     @property
+    def judges(self):
+        from judgeval.v1.judges.judges_factory import JudgesFactory
+
+        return JudgesFactory(
+            client=self._internal_client,
+            project_id=self._project_id,
+        )
+
+    @property
     def evaluation(self):
         from judgeval.v1.evaluation.evaluation_factory import EvaluationFactory
 

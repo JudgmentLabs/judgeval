@@ -45,7 +45,7 @@ class LocalEvaluatorRunner(EvaluatorRunner[ExampleCustomScorer]):
         scorers: List[ExampleCustomScorer],
         payload: ExampleEvaluationRun,
         progress: Progress,
-    ) -> None:
+    ) -> int:
         total_jobs = len(examples) * len(scorers)
         results_by_example: List[
             List[Tuple[str, ScorerResponse | None, Exception | None]]
@@ -105,6 +105,7 @@ class LocalEvaluatorRunner(EvaluatorRunner[ExampleCustomScorer]):
             payload={"results": api_results, "run": payload},
         )
         judgeval_logger.info("Local scorer results logged to backend")
+        return len(examples)
 
     def _run_local_scorers(
         self,
