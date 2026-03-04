@@ -18,9 +18,9 @@ from judgeval.v1.judges import Judge
 from judgeval.v1.hosted.example_custom_scorer import ExampleCustomScorer
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.internal.api.models import ExampleEvaluationRun, ExperimentRunItem
-from judgeval.v1.scorers.base_scorer import BaseScorer
+from judgeval.v1.judges.base_judge import BaseJudge
 
-S = TypeVar("S", (Judge | ExampleCustomScorer), BaseScorer)
+S = TypeVar("S", (Judge | ExampleCustomScorer), BaseJudge)
 
 
 class EvaluatorRunner(ABC, Generic[S]):

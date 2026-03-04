@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
-from judgeval.v1.scorers.custom_scorer.custom_scorer_factory import CustomScorerFactory
-from judgeval.v1.scorers.custom_scorer.custom_scorer import CustomScorer
+from judgeval.v1.judges.custom_judge_factory import CustomJudgeFactory
+from judgeval.v1.judges.custom_judge import CustomJudge
 from judgeval.exceptions import JudgmentAPIError
 
 
@@ -10,41 +10,41 @@ def mock_client():
     return MagicMock()
 
 
-class TestCustomScorerFactoryGet:
-    def test_get_returns_scorer_when_exists(self, mock_client):
+class TestCustomJudgeFactoryGet:
+    def test_get_returns_judge_when_exists(self, mock_client):
         mock_client.get_projects_scorers_custom_by_name_exists.return_value = {
             "exists": True
         }
 
-        factory = CustomScorerFactory(client=mock_client, project_id="test_project_id")
-        scorer = factory.get("TestScorer")
+        factory = CustomJudgeFactory(client=mock_client, project_id="test_project_id")
+        judge = factory.get("TestJudge")
 
-        assert isinstance(scorer, CustomScorer)
-        assert scorer._name == "TestScorer"
-        assert scorer._project_id == "test_project_id"
+        assert isinstance(judge, CustomJudge)
+        assert judge._name == "TestJudge"
+        assert judge._project_id == "test_project_id"
 
-    def test_get_raises_when_scorer_not_exists(self, mock_client):
+    def test_get_raises_when_judge_not_exists(self, mock_client):
         mock_client.get_projects_scorers_custom_by_name_exists.return_value = {
             "exists": False
         }
 
-        factory = CustomScorerFactory(client=mock_client, project_id="test_project_id")
+        factory = CustomJudgeFactory(client=mock_client, project_id="test_project_id")
 
         with pytest.raises(JudgmentAPIError) as exc_info:
-            factory.get("NonExistentScorer")
+            factory.get("NonExistentJudge")
 
         assert exc_info.value.status_code == 404
-        assert "NonExistentScorer" in str(exc_info.value)
+        assert "NonExistentJudge" in str(exc_info.value)
 
     def test_get_returns_none_when_project_id_missing(self, mock_client, caplog):
         import logging
 
-        factory = CustomScorerFactory(client=mock_client, project_id=None)
+        factory = CustomJudgeFactory(client=mock_client, project_id=None)
 
         with caplog.at_level(logging.ERROR):
-            scorer = factory.get("TestScorer")
+            judge = factory.get("TestJudge")
 
-        assert scorer is None
+        assert judge is None
         assert "project_id is not set" in caplog.text
         assert "get()" in caplog.text
         mock_client.get_projects_scorers_custom_by_name_exists.assert_not_called()
@@ -54,13 +54,13 @@ class TestCustomScorerFactoryGet:
             "API Error"
         )
 
-        factory = CustomScorerFactory(client=mock_client, project_id="test_project_id")
+        factory = CustomJudgeFactory(client=mock_client, project_id="test_project_id")
 
         with pytest.raises(Exception, match="API Error"):
-            factory.get("TestScorer")
+            factory.get("TestJudge")
 
 
-class TestCustomScorerFactoryUpload:
+class TestCustomJudgeFactoryUpload:
     def test_upload_returns_false_when_project_id_missing(
         self, mock_client, caplog, tmp_path
     ):
@@ -69,14 +69,14 @@ class TestCustomScorerFactoryUpload:
         scorer_file = tmp_path / "scorer.py"
         scorer_file.write_text(
             """
-from judgeval.v1.scorers.base_scorer import ExampleScorer
+from judgeval.v1.judges import Judge
 
-class TestScorer(ExampleScorer):
+class TestJudge(Judge):
     pass
 """
         )
 
-        factory = CustomScorerFactory(client=mock_client, project_id=None)
+        factory = CustomJudgeFactory(client=mock_client, project_id=None)
 
         with caplog.at_level(logging.ERROR):
             result = factory.upload(str(scorer_file))

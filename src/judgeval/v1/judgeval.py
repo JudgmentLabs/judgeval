@@ -58,16 +58,6 @@ class Judgeval:
             )
 
     @property
-    def scorers(self):
-        from judgeval.v1.scorers.scorers_factory import ScorersFactory
-
-        return ScorersFactory(
-            client=self._internal_client,
-            project_id=self._project_id,
-            project_name=self._project_name,
-        )
-
-    @property
     def judges(self):
         from judgeval.v1.judges.judges_factory import JudgesFactory
 
@@ -84,14 +74,6 @@ class Judgeval:
             client=self._internal_client,
             project_id=self._project_id,
             project_name=self._project_name,
-        )
-
-    @property
-    def trainers(self):
-        from judgeval.v1.trainers.trainers_factory import TrainersFactory
-
-        return TrainersFactory(
-            client=self._internal_client,
         )
 
     @property

@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
-from judgeval.v1.scorers.prompt_scorer.prompt_scorer_factory import PromptScorerFactory
-from judgeval.v1.scorers.prompt_scorer.prompt_scorer import PromptScorer
+from judgeval.v1.judges.prompt_judge_factory import PromptJudgeFactory
+from judgeval.v1.judges.prompt_judge import PromptJudge
 
 
 @pytest.fixture
@@ -12,8 +12,8 @@ def mock_client():
     return client
 
 
-class TestPromptScorerFactoryGet:
-    def test_get_returns_scorer_when_exists(self, mock_client):
+class TestPromptJudgeFactoryGet:
+    def test_get_returns_judge_when_exists(self, mock_client):
         mock_client.get_projects_scorers.return_value = {
             "scorers": [
                 {
@@ -26,33 +26,33 @@ class TestPromptScorerFactoryGet:
             ]
         }
 
-        factory = PromptScorerFactory(client=mock_client, project_id="test_project_id")
-        PromptScorerFactory._cache.clear()
-        scorer = factory.get("TestScorer")
+        factory = PromptJudgeFactory(client=mock_client, project_id="test_project_id")
+        PromptJudgeFactory._cache.clear()
+        judge = factory.get("TestJudge")
 
-        assert isinstance(scorer, PromptScorer)
-        assert scorer._name == "TestScorer"
-        assert scorer._prompt == "Test prompt"
-        assert scorer._threshold == 0.7
+        assert isinstance(judge, PromptJudge)
+        assert judge._name == "TestJudge"
+        assert judge._prompt == "Test prompt"
+        assert judge._threshold == 0.7
 
     def test_get_returns_none_when_not_found(self, mock_client):
         mock_client.get_projects_scorers.return_value = {"scorers": []}
 
-        factory = PromptScorerFactory(client=mock_client, project_id="test_project_id")
-        PromptScorerFactory._cache.clear()
-        scorer = factory.get("NonExistentScorer")
+        factory = PromptJudgeFactory(client=mock_client, project_id="test_project_id")
+        PromptJudgeFactory._cache.clear()
+        judge = factory.get("NonExistentJudge")
 
-        assert scorer is None
+        assert judge is None
 
     def test_get_returns_none_when_project_id_missing(self, mock_client, caplog):
         import logging
 
-        factory = PromptScorerFactory(client=mock_client, project_id=None)
+        factory = PromptJudgeFactory(client=mock_client, project_id=None)
 
         with caplog.at_level(logging.ERROR):
-            scorer = factory.get("TestScorer")
+            judge = factory.get("TestJudge")
 
-        assert scorer is None
+        assert judge is None
         assert "project_id is not set" in caplog.text
         assert "get()" in caplog.text
         mock_client.get_projects_scorers.assert_not_called()
@@ -70,12 +70,12 @@ class TestPromptScorerFactoryGet:
             ]
         }
 
-        factory = PromptScorerFactory(client=mock_client, project_id="test_project_id")
-        PromptScorerFactory._cache.clear()
+        factory = PromptJudgeFactory(client=mock_client, project_id="test_project_id")
+        PromptJudgeFactory._cache.clear()
 
-        scorer1 = factory.get("TestScorer")
-        scorer2 = factory.get("TestScorer")
+        judge1 = factory.get("TestJudge")
+        judge2 = factory.get("TestJudge")
 
-        assert scorer1 is not None
-        assert scorer2 is not None
+        assert judge1 is not None
+        assert judge2 is not None
         assert mock_client.get_projects_scorers.call_count == 1
