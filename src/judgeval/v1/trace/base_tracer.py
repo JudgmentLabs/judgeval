@@ -568,6 +568,7 @@ class BaseTracer(ABC):
     _pending_evals: Dict[str, List[Dict[str, Any]]] = {}
 
     @staticmethod
+    @debug_time
     @dont_throw
     def async_evaluate(judge: str, example: Optional[Dict[str, Any]] = None) -> None:
         proxy = BaseTracer._get_proxy_provider()
