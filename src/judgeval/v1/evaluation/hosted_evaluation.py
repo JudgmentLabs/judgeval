@@ -65,4 +65,7 @@ class HostedEvaluatorRunner(EvaluatorRunner[BaseScorer]):
         )
         judgeval_logger.info(f"Evaluation submitted: {eval_id}")
         progress.update(task, description="Running evaluation...")
-        return response.get("unique_example_count") or len(examples)
+        if "unique_example_count" in response:
+            return int(response["unique_example_count"])
+        else:
+            return len(examples)

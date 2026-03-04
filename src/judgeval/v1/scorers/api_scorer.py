@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from judgeval.v1.internal.api.api_types import ScorerConfig
+from judgeval.v1.internal.api.models import ScorerConfig
 from judgeval.v1.scorers.base_scorer import BaseScorer
 
 

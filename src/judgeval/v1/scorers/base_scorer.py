@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from judgeval.v1.internal.api.api_types import ScorerConfig
+from judgeval.v1.internal.api.models import ScorerConfig
 
 
 class BaseScorer(ABC):

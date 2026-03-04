@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Dict, Optional, Tuple
 
 from judgeval.v1.internal.api import JudgmentSyncClient
-from judgeval.v1.internal.api.api_types import (
+from judgeval.v1.internal.api.models import (
     FetchPromptScorersResponse,
     PromptScorer as APIPromptScorer,
 )

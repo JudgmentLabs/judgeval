@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from judgeval.constants import APIScorerType
 
 if TYPE_CHECKING:
-    from judgeval.v1.internal.api.api_types import (
+    from judgeval.v1.internal.api.models import (
         BaseScorer as BaseScorerDict,
         ScorerConfig,
     )
