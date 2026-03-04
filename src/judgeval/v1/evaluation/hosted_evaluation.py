@@ -59,13 +59,10 @@ class HostedEvaluatorRunner(EvaluatorRunner[BaseScorer]):
             self._validate_scorer_project(scorer)
 
         task = progress.add_task("Submitting evaluation...", total=None)
-        response = self._client.post_projects_eval_queue_examples(
+        self._client.post_projects_eval_queue_examples(
             project_id=project_id,
             payload=payload,
         )
         judgeval_logger.info(f"Evaluation submitted: {eval_id}")
         progress.update(task, description="Running evaluation...")
-        if "unique_example_count" in response:
-            return int(response["unique_example_count"])
-        else:
-            return len(examples)
+        return len(examples)
