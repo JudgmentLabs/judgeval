@@ -20,6 +20,14 @@ from judgeval.v1.instrumentation.llm.llm_openai.with_streaming_response import (
     wrap_responses_with_streaming_response_sync,
     wrap_responses_with_streaming_response_async,
 )
+from judgeval.v1.instrumentation.llm.llm_openai.images import (
+    wrap_images_generate_sync,
+    wrap_images_generate_async,
+    wrap_images_edit_sync,
+    wrap_images_edit_async,
+    wrap_images_create_variation_sync,
+    wrap_images_create_variation_async,
+)
 
 if TYPE_CHECKING:
     from judgeval.v1.tracer import BaseTracer
@@ -34,6 +42,9 @@ def wrap_openai_client_sync(tracer: BaseTracer, client: OpenAI) -> OpenAI:
     wrap_beta_chat_completions_parse_sync(tracer, client)
     wrap_chat_with_streaming_response_sync(tracer, client)
     wrap_responses_with_streaming_response_sync(tracer, client)
+    wrap_images_generate_sync(tracer, client)
+    wrap_images_edit_sync(tracer, client)
+    wrap_images_create_variation_sync(tracer, client)
     return client
 
 
@@ -43,6 +54,9 @@ def wrap_openai_client_async(tracer: BaseTracer, client: AsyncOpenAI) -> AsyncOp
     wrap_beta_chat_completions_parse_async(tracer, client)
     wrap_chat_with_streaming_response_async(tracer, client)
     wrap_responses_with_streaming_response_async(tracer, client)
+    wrap_images_generate_async(tracer, client)
+    wrap_images_edit_async(tracer, client)
+    wrap_images_create_variation_async(tracer, client)
     return client
 
 

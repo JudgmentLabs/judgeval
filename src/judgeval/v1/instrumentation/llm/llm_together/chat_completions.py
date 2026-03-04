@@ -62,7 +62,9 @@ def _wrap_non_streaming_sync(
         ctx["span"] = tracer.get_tracer().start_span(
             "TOGETHER_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_PROMPT, safe_serialize(kwargs)
+        )
         ctx["model_name"] = kwargs.get("model", "")
         prefixed_model_name = (
             f"together_ai/{ctx['model_name']}" if ctx["model_name"] else ""
@@ -77,7 +79,9 @@ def _wrap_non_streaming_sync(
         if not span:
             return
 
-        span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, safe_serialize(result))
+        span.set_attribute(
+            AttributeKeys.JUDGMENT_LLM_COMPLETION, safe_serialize(result)
+        )
 
         if result.usage:
             prompt_tokens, completion_tokens, _, _ = _extract_together_tokens(
@@ -124,7 +128,9 @@ def _wrap_streaming_sync(
         ctx["span"] = tracer.get_tracer().start_span(
             "TOGETHER_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_PROMPT, safe_serialize(kwargs)
+        )
         ctx["model_name"] = kwargs.get("model", "")
         prefixed_model_name = (
             f"together_ai/{ctx['model_name']}" if ctx["model_name"] else ""
@@ -174,7 +180,7 @@ def _wrap_streaming_sync(
             span = ctx.get("span")
             if span:
                 accumulated = ctx.get("accumulated_content", "")
-                span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, accumulated)
+                span.set_attribute(AttributeKeys.JUDGMENT_LLM_COMPLETION, accumulated)
 
         def error_hook_inner(inner_ctx: Dict[str, Any], error: Exception) -> None:
             span = ctx.get("span")
@@ -231,7 +237,9 @@ def _wrap_non_streaming_async(
         ctx["span"] = tracer.get_tracer().start_span(
             "TOGETHER_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_PROMPT, safe_serialize(kwargs)
+        )
         ctx["model_name"] = kwargs.get("model", "")
         prefixed_model_name = (
             f"together_ai/{ctx['model_name']}" if ctx["model_name"] else ""
@@ -246,7 +254,9 @@ def _wrap_non_streaming_async(
         if not span:
             return
 
-        span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, safe_serialize(result))
+        span.set_attribute(
+            AttributeKeys.JUDGMENT_LLM_COMPLETION, safe_serialize(result)
+        )
 
         if result.usage:
             prompt_tokens, completion_tokens, _, _ = _extract_together_tokens(
@@ -294,7 +304,9 @@ def _wrap_streaming_async(
         ctx["span"] = tracer.get_tracer().start_span(
             "TOGETHER_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_PROMPT, safe_serialize(kwargs)
+        )
         ctx["model_name"] = kwargs.get("model", "")
         prefixed_model_name = (
             f"together_ai/{ctx['model_name']}" if ctx["model_name"] else ""
@@ -344,7 +356,7 @@ def _wrap_streaming_async(
             span = ctx.get("span")
             if span:
                 accumulated = ctx.get("accumulated_content", "")
-                span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, accumulated)
+                span.set_attribute(AttributeKeys.JUDGMENT_LLM_COMPLETION, accumulated)
 
         def error_hook_inner(inner_ctx: Dict[str, Any], error: Exception) -> None:
             span = ctx.get("span")

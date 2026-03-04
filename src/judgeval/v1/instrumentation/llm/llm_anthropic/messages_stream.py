@@ -37,7 +37,9 @@ def wrap_messages_stream_sync(tracer: BaseTracer, client: Anthropic) -> None:
         ctx["span"] = tracer.get_tracer().start_span(
             "ANTHROPIC_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_PROMPT, safe_serialize(kwargs)
+        )
 
         ctx["model_name"] = kwargs.get("model", "")
         ctx["span"].set_attribute(
@@ -107,7 +109,7 @@ def wrap_messages_stream_sync(tracer: BaseTracer, client: Anthropic) -> None:
             span = ctx.get("span")
             if span:
                 accumulated = ctx.get("accumulated_content", "")
-                span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, accumulated)
+                span.set_attribute(AttributeKeys.JUDGMENT_LLM_COMPLETION, accumulated)
 
                 stream: MessageStream | None = ctx.get("stream")
                 if stream:
@@ -175,7 +177,9 @@ def wrap_messages_stream_async(tracer: BaseTracer, client: AsyncAnthropic) -> No
             "ANTHROPIC_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
 
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_PROMPT, safe_serialize(kwargs)
+        )
 
         ctx["model_name"] = kwargs.get("model", "")
         ctx["span"].set_attribute(
@@ -245,7 +249,7 @@ def wrap_messages_stream_async(tracer: BaseTracer, client: AsyncAnthropic) -> No
             span = ctx.get("span")
             if span:
                 accumulated = ctx.get("accumulated_content", "")
-                span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, accumulated)
+                span.set_attribute(AttributeKeys.JUDGMENT_LLM_COMPLETION, accumulated)
 
                 stream: AsyncMessageStream | None = ctx.get("stream")
                 if stream:

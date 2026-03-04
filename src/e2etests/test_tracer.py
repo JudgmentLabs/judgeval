@@ -290,7 +290,7 @@ def retrieve_streaming_trace_helper(trace_id):
     if isinstance(span_attributes, str):
         span_attributes = orjson.loads(span_attributes)
 
-    completion = span_attributes.get("gen_ai.completion")
+    completion = span_attributes.get("judgment.llm.completion")
     if not completion:
         assert False, "No completion content found in streaming span"
 

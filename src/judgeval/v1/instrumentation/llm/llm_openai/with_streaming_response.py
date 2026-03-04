@@ -89,7 +89,7 @@ def _finalize_span(
 
     accumulated = context.get("accumulated_content", "")
     if accumulated:
-        span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, accumulated)
+        span.set_attribute(AttributeKeys.JUDGMENT_LLM_COMPLETION, accumulated)
 
     model = context.get("model")
     if model:
@@ -224,7 +224,9 @@ def wrap_chat_with_streaming_response_sync(tracer: BaseTracer, client: OpenAI) -
         ctx["span"] = tracer.get_tracer().start_span(
             "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_PROMPT, safe_serialize(kwargs)
+        )
         ctx["model_name"] = kwargs.get("model", "")
         ctx["span"].set_attribute(
             AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
@@ -377,7 +379,9 @@ def wrap_chat_with_streaming_response_async(
         ctx["span"] = tracer.get_tracer().start_span(
             "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_PROMPT, safe_serialize(kwargs)
+        )
         ctx["model_name"] = kwargs.get("model", "")
         ctx["span"].set_attribute(
             AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
@@ -636,7 +640,9 @@ def wrap_responses_with_streaming_response_sync(
         ctx["span"] = tracer.get_tracer().start_span(
             "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_PROMPT, safe_serialize(kwargs)
+        )
         ctx["model_name"] = kwargs.get("model", "")
         ctx["span"].set_attribute(
             AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
@@ -790,7 +796,9 @@ def wrap_responses_with_streaming_response_async(
         ctx["span"] = tracer.get_tracer().start_span(
             "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_PROMPT, safe_serialize(kwargs)
+        )
         ctx["model_name"] = kwargs.get("model", "")
         ctx["span"].set_attribute(
             AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]

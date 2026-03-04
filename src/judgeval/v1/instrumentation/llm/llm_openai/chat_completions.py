@@ -74,7 +74,9 @@ def _wrap_non_streaming_sync(
         ctx["span"] = tracer.get_tracer().start_span(
             "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_PROMPT, safe_serialize(kwargs)
+        )
         ctx["model_name"] = kwargs.get("model", "")
         ctx["span"].set_attribute(
             AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
@@ -85,7 +87,9 @@ def _wrap_non_streaming_sync(
         if not span:
             return
 
-        span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, safe_serialize(result))
+        span.set_attribute(
+            AttributeKeys.JUDGMENT_LLM_COMPLETION, safe_serialize(result)
+        )
 
         usage_data = result.usage
         if usage_data:
@@ -158,7 +162,9 @@ def _wrap_streaming_sync(
         ctx["span"] = tracer.get_tracer().start_span(
             "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_PROMPT, safe_serialize(kwargs)
+        )
         ctx["model_name"] = kwargs.get("model", "")
         ctx["span"].set_attribute(
             AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
@@ -232,7 +238,7 @@ def _wrap_streaming_sync(
             span = ctx.get("span")
             if span:
                 accumulated = ctx.get("accumulated_content", "")
-                span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, accumulated)
+                span.set_attribute(AttributeKeys.JUDGMENT_LLM_COMPLETION, accumulated)
 
         def error_hook_inner(inner_ctx: Dict[str, Any], error: Exception) -> None:
             span = ctx.get("span")
@@ -296,7 +302,9 @@ def _wrap_non_streaming_async(
         ctx["span"] = tracer.get_tracer().start_span(
             "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_PROMPT, safe_serialize(kwargs)
+        )
         ctx["model_name"] = kwargs.get("model", "")
         ctx["span"].set_attribute(
             AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
@@ -307,7 +315,9 @@ def _wrap_non_streaming_async(
         if not span:
             return
 
-        span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, safe_serialize(result))
+        span.set_attribute(
+            AttributeKeys.JUDGMENT_LLM_COMPLETION, safe_serialize(result)
+        )
 
         usage_data = result.usage
         if usage_data:
@@ -381,7 +391,9 @@ def _wrap_streaming_async(
         ctx["span"] = tracer.get_tracer().start_span(
             "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_PROMPT, safe_serialize(kwargs)
+        )
         ctx["model_name"] = kwargs.get("model", "")
         ctx["span"].set_attribute(
             AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
@@ -455,7 +467,7 @@ def _wrap_streaming_async(
             span = ctx.get("span")
             if span:
                 accumulated = ctx.get("accumulated_content", "")
-                span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, accumulated)
+                span.set_attribute(AttributeKeys.JUDGMENT_LLM_COMPLETION, accumulated)
 
         def error_hook_inner(inner_ctx: Dict[str, Any], error: Exception) -> None:
             span = ctx.get("span")

@@ -57,7 +57,9 @@ def wrap_generate_content_sync(tracer: BaseTracer, client: Client) -> None:
         ctx["span"] = tracer.get_tracer().start_span(
             "GOOGLE_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
-        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_PROMPT, safe_serialize(kwargs)
+        )
         ctx["model_name"] = kwargs.get("model", "")
         ctx["span"].set_attribute(
             AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
@@ -69,7 +71,7 @@ def wrap_generate_content_sync(tracer: BaseTracer, client: Client) -> None:
             return
 
         output, usage_data = _format_google_output(result)
-        span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, output)
+        span.set_attribute(AttributeKeys.JUDGMENT_LLM_COMPLETION, output)
 
         if usage_data:
             prompt_tokens, completion_tokens, cache_read, cache_creation = (

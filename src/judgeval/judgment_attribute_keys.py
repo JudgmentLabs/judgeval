@@ -31,23 +31,11 @@ class AttributeKeys(str, Enum):
     JUDGMENT_USAGE_OUTPUT_TOKENS = "judgment.usage.output_tokens"
     JUDGMENT_USAGE_TOTAL_COST_USD = "judgment.usage.total_cost_usd"
 
+    JUDGMENT_LLM_PROMPT = "judgment.llm.prompt"
+    JUDGMENT_LLM_COMPLETION = "judgment.llm.completion"
+
     JUDGMENT_SESSION_ID = "judgment.session_id"
     JUDGMENT_PROJECT_ID_OVERRIDE = "judgment.project_id_override"
-
-    GEN_AI_PROMPT = "gen_ai.prompt"
-    GEN_AI_COMPLETION = "gen_ai.completion"
-    GEN_AI_REQUEST_MODEL = "gen_ai.request.model"
-    GEN_AI_RESPONSE_MODEL = "gen_ai.response.model"
-    GEN_AI_SYSTEM = "gen_ai.system"
-    GEN_AI_USAGE_INPUT_TOKENS = "gen_ai.usage.input_tokens"
-    GEN_AI_USAGE_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
-    GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS = (
-        "gen_ai.usage.cache_creation_input_tokens"
-    )
-    GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS = "gen_ai.usage.cache_read_input_tokens"
-    GEN_AI_REQUEST_TEMPERATURE = "gen_ai.request.temperature"
-    GEN_AI_REQUEST_MAX_TOKENS = "gen_ai.request.max_tokens"
-    GEN_AI_RESPONSE_FINISH_REASONS = "gen_ai.response.finish_reasons"
 
 
 class InternalAttributeKeys(str, Enum):

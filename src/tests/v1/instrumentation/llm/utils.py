@@ -27,8 +27,8 @@ def verify_span_attributes_comprehensive(
         attrs: Span attributes dictionary
         expected_span_name: Expected span name (e.g., "ANTHROPIC_API_CALL")
         expected_model_name: Expected model name (optional)
-        check_prompt: Whether to verify GEN_AI_PROMPT is present
-        check_completion: Whether to verify GEN_AI_COMPLETION is present
+        check_prompt: Whether to verify JUDGMENT_LLM_PROMPT is present
+        check_completion: Whether to verify JUDGMENT_LLM_COMPLETION is present
         check_usage: Whether to verify usage tokens are present and > 0
         check_cache: Whether to verify cache token attributes are present
         check_cache_read_value: Whether to verify cache read token values are > 0
@@ -50,11 +50,11 @@ def verify_span_attributes_comprehensive(
 
     # Verify prompt was captured
     if check_prompt:
-        assert AttributeKeys.GEN_AI_PROMPT in attrs
+        assert AttributeKeys.JUDGMENT_LLM_PROMPT in attrs
 
     # Verify completion was captured
     if check_completion:
-        assert AttributeKeys.GEN_AI_COMPLETION in attrs
+        assert AttributeKeys.JUDGMENT_LLM_COMPLETION in attrs
 
     # Verify usage tokens
     if check_usage:
