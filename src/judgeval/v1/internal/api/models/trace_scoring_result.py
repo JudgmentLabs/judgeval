@@ -1,0 +1,15 @@
+from __future__ import annotations
+
+from typing import TypedDict, Optional, List, Any, Dict
+from typing_extensions import NotRequired
+
+from .trace_span import TraceSpan
+
+
+class TraceScoringResult(TypedDict):
+    scorers_data: List[Dict[str, Any]]
+    name: NotRequired[Optional[str]]
+    data_object: TraceSpan
+    trace_id: NotRequired[Optional[str]]
+    run_duration: NotRequired[Optional[float]]
+    evaluation_cost: NotRequired[Optional[float]]

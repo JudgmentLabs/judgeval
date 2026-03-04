@@ -1,0 +1,12 @@
+from __future__ import annotations
+
+from typing import TypedDict, List
+
+from .example import Example
+
+
+class PullDatasetResponse(TypedDict):
+    name: str
+    project_id: str
+    dataset_kind: str
+    examples: List[Example]

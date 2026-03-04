@@ -7,7 +7,7 @@ from rich.progress import Progress
 
 from judgeval.logger import judgeval_logger
 from judgeval.v1.data.example import Example
-from judgeval.v1.internal.api.api_types import ExampleEvaluationRun
+from judgeval.v1.internal.api.models import ExampleEvaluationRun
 from judgeval.v1.scorers.base_scorer import BaseScorer
 from judgeval.v1.evaluation.evaluation_base import EvaluatorRunner
 

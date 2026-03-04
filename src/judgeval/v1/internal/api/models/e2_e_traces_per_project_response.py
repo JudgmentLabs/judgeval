@@ -1,0 +1,13 @@
+from __future__ import annotations
+
+from typing import TypedDict
+
+from .e2_e_traces_per_project_row import E2ETracesPerProjectRow
+
+
+class E2ETracesPerProjectResponse(TypedDict):
+    data: E2ETracesPerProjectRow
+    total_spans: float
+    total_traces: float
+    limit: float
+    offset: float

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
-from judgeval.v1.internal.api.api_types import Example as APIExample
+from judgeval.v1.internal.api.models import Example as APIExample
 
 if TYPE_CHECKING:
     from judgeval.v1.data.trace import Trace

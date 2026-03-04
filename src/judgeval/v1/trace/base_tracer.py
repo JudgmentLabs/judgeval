@@ -3,20 +3,24 @@ from __future__ import annotations
 import contextvars
 import functools
 import inspect
+import json
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
     Dict,
     Iterator,
+    List,
     Optional,
     TypedDict,
     TypeVar,
     cast,
     overload,
 )
+from uuid import uuid4
 from opentelemetry.context import set_value
 from opentelemetry.trace import Span, Status, StatusCode, Tracer as OTELTracer
 from opentelemetry.sdk.trace import TracerProvider
@@ -48,6 +52,8 @@ C = TypeVar("C", bound=Callable[..., Any])
 
 
 class LLMMetadata(TypedDict, total=False):
+    model: str
+    provider: str
     non_cached_input_tokens: int
     output_tokens: int
     cache_read_input_tokens: int
@@ -458,6 +464,15 @@ class BaseTracer(ABC):
         if current_span is None or not current_span.is_recording():
             return
 
+        if "model" in metadata:
+            current_span.set_attribute(
+                AttributeKeys.JUDGMENT_LLM_MODEL_NAME, metadata["model"]
+            )
+        if "provider" in metadata:
+            current_span.set_attribute(
+                AttributeKeys.JUDGMENT_LLM_PROVIDER, metadata["provider"]
+            )
+
         if "non_cached_input_tokens" in metadata:
             current_span.set_attribute(
                 AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
@@ -544,6 +559,54 @@ class BaseTracer(ABC):
                 trace_id=trace_id,
                 payload={"tags": tag_list},
             )
+        )
+
+    # ------------------------------------------------------------------ #
+    #  Static API: Async Evaluation                                      #
+    # ------------------------------------------------------------------ #
+
+    _pending_evals: Dict[str, List[Dict[str, Any]]] = {}
+
+    @staticmethod
+    @dont_throw
+    def async_evaluate(judge: str, example: Optional[Dict[str, Any]] = None) -> None:
+        proxy = BaseTracer._get_proxy_provider()
+        tracer = proxy.get_active_tracer()
+        if not tracer or not tracer.project_id:
+            return
+        current_span = proxy.get_current_span()
+        if current_span is None or not current_span.is_recording():
+            return
+
+        ctx = current_span.get_span_context()
+        trace_id = format(ctx.trace_id, "032x")
+        span_id = format(ctx.span_id, "016x")
+        span_key = f"{trace_id}:{span_id}"
+        payloads = BaseTracer._pending_evals.get(span_key, [])
+
+        payload = {
+            "project_id": tracer.project_id,
+            "eval_name": f"async_evaluate_{judge}_{len(payloads)}",
+            "judges": [{"name": judge}],
+            "examples": [
+                {
+                    **(example or {}),
+                    "example_id": str(uuid4()),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "trace_id": trace_id,
+                    "span_id": span_id,
+                },
+            ],
+            "is_offline": False,
+            "is_behavior": False,
+        }
+
+        payloads.append(payload)
+        BaseTracer._pending_evals[span_key] = payloads
+
+        current_span.set_attribute(
+            AttributeKeys.JUDGMENT_PENDING_TRACE_EVAL,
+            json.dumps(payloads),
         )
 
 

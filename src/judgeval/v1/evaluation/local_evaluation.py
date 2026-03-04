@@ -12,7 +12,7 @@ from judgeval.logger import judgeval_logger
 from judgeval.v1.data.example import Example
 from judgeval.v1.hosted.example_custom_scorer import ExampleCustomScorer
 from judgeval.v1.hosted.responses import ScorerResponse
-from judgeval.v1.internal.api.api_types import ExampleEvaluationRun, LocalScorerResult
+from judgeval.v1.internal.api.models import ExampleEvaluationRun, LocalScorerResult
 from judgeval.v1.evaluation.evaluation_base import EvaluatorRunner
 
 

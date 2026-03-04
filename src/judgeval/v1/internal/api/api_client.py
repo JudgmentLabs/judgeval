@@ -5,7 +5,7 @@ from httpx import Response
 from judgeval.exceptions import JudgmentAPIError
 from judgeval.utils.url import url_for
 from judgeval.utils.serialize import json_encoder
-from judgeval.v1.internal.api.api_types import *
+from judgeval.v1.internal.api.models import *
 from judgeval.logger import judgeval_logger as logger
 
 
@@ -200,15 +200,6 @@ class JudgmentSyncClient:
         return self._request(
             "POST",
             url_for(f"/v1/projects/{project_id}/eval-queue/traces", self.base_url),
-            payload,
-        )
-
-    def post_projects_eval_queue(
-        self, project_id: str, payload: JudgeEvaluationRun
-    ) -> AddToJudgeEvalQueueResponse:
-        return self._request(
-            "POST",
-            url_for(f"/v1/projects/{project_id}/eval-queue", self.base_url),
             payload,
         )
 
@@ -530,15 +521,6 @@ class JudgmentAsyncClient:
         return await self._request(
             "POST",
             url_for(f"/v1/projects/{project_id}/eval-queue/traces", self.base_url),
-            payload,
-        )
-
-    async def post_projects_eval_queue(
-        self, project_id: str, payload: JudgeEvaluationRun
-    ) -> AddToJudgeEvalQueueResponse:
-        return await self._request(
-            "POST",
-            url_for(f"/v1/projects/{project_id}/eval-queue", self.base_url),
             payload,
         )
 

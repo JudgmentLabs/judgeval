@@ -16,7 +16,7 @@ from judgeval.v1.data.scorer_data import ScorerData
 from judgeval.v1.data.scoring_result import ScoringResult
 from judgeval.v1.hosted.example_custom_scorer import ExampleCustomScorer
 from judgeval.v1.internal.api import JudgmentSyncClient
-from judgeval.v1.internal.api.api_types import ExampleEvaluationRun, ExperimentRunItem
+from judgeval.v1.internal.api.models import ExampleEvaluationRun, ExperimentRunItem
 from judgeval.v1.scorers.base_scorer import BaseScorer
 
 S = TypeVar("S", ExampleCustomScorer, BaseScorer)

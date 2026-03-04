@@ -1,0 +1,19 @@
+from __future__ import annotations
+
+from typing import TypedDict, Optional, Any, Dict
+from typing_extensions import NotRequired
+
+
+class ExperimentScorer(TypedDict):
+    scorer_data_id: str
+    name: str
+    score: float
+    success: float
+    reason: NotRequired[Optional[str]]
+    evaluation_model: NotRequired[Optional[str]]
+    threshold: float
+    created_at: str
+    error: NotRequired[Optional[str]]
+    additional_metadata: NotRequired[Optional[Dict[str, Any]]]
+    minimum_score_range: float
+    maximum_score_range: float
