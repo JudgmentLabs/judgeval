@@ -26,19 +26,6 @@ class ScorersFactory:
 
         return PromptScorerFactory(
             client=self._client,
-            is_trace=False,
-            project_id=self._project_id,
-        )
-
-    @property
-    def trace_prompt_scorer(self):
-        from judgeval.v1.scorers.prompt_scorer.prompt_scorer_factory import (
-            PromptScorerFactory,
-        )
-
-        return PromptScorerFactory(
-            client=self._client,
-            is_trace=True,
             project_id=self._project_id,
         )
 
