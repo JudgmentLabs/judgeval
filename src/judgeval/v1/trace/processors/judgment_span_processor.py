@@ -109,9 +109,9 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
 
     @dont_throw
     def emit_partial(self) -> None:
-        from judgeval.v1.trace.proxy_tracer_provider import ProxyTracerProvider
+        from judgeval.v1.trace.judgment_tracer_provider import JudgmentTracerProvider
 
-        proxy = ProxyTracerProvider.get_instance()
+        proxy = JudgmentTracerProvider.get_instance()
         span = proxy.get_current_span()
         if (
             not span.is_recording()

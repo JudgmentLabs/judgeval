@@ -27,7 +27,7 @@ _active_tracer_var: ContextVar[Optional[JudgmentTracer]] = ContextVar(
 class ProxyTracer(Tracer):
     __slots__ = ("_provider",)
 
-    def __init__(self, provider: ProxyTracerProvider):
+    def __init__(self, provider: JudgmentTracerProvider):
         self._provider = provider
 
     def start_span(
@@ -89,8 +89,8 @@ class ProxyTracer(Tracer):
             yield s
 
 
-class ProxyTracerProvider(TracerProvider):
-    _instance: ClassVar[Optional[ProxyTracerProvider]] = None
+class JudgmentTracerProvider(TracerProvider):
+    _instance: ClassVar[Optional[JudgmentTracerProvider]] = None
 
     __slots__ = (
         "_runtime_context",
@@ -106,10 +106,15 @@ class ProxyTracerProvider(TracerProvider):
         self._tracers: WeakSet[JudgmentTracer] = WeakSet()
 
     @classmethod
-    def get_instance(cls) -> ProxyTracerProvider:
+    def get_instance(cls) -> JudgmentTracerProvider:
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
+
+    @classmethod
+    def install_as_global_tracer_provider(cls) -> bool:
+        trace_api.set_tracer_provider(cls.get_instance())
+        return True
 
     def register(self, tracer: JudgmentTracer) -> None:
         self._tracers.add(tracer)

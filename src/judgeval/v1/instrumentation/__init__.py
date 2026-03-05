@@ -10,7 +10,7 @@ T = TypeVar("T", bound=ApiClient)
 
 def wrap(client: T) -> T:
     """Wrap an API client to add tracing capabilities.
-    Uses the active tracer via ProxyTracerProvider."""
+    Uses the active tracer via JudgmentTracerProvider."""
     return wrap_provider(client)
 
 

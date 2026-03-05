@@ -30,7 +30,7 @@ from judgeval.utils.decorators.debug_time import debug_time
 from judgeval.utils.decorators.dont_throw import dont_throw
 from judgeval.utils.serialize import serialize_attribute, safe_serialize
 from judgeval.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
-from judgeval.v1.trace.proxy_tracer_provider import ProxyTracerProvider
+from judgeval.v1.trace.judgment_tracer_provider import JudgmentTracerProvider
 from judgeval.v1.trace.processors._lifecycles import (
     CUSTOMER_ID_KEY,
     SESSION_ID_KEY,
@@ -126,8 +126,8 @@ class BaseTracer(ABC):
     # ------------------------------------------------------------------ #
 
     @staticmethod
-    def _get_proxy_provider() -> ProxyTracerProvider:
-        return ProxyTracerProvider.get_instance()
+    def _get_proxy_provider() -> JudgmentTracerProvider:
+        return JudgmentTracerProvider.get_instance()
 
     @staticmethod
     def _get_serializer() -> Callable[[Any], str]:

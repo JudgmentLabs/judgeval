@@ -51,7 +51,7 @@ def wrap_provider(client: T) -> T:
     """
     Wraps an API client to add tracing capabilities.
     Supports OpenAI, Together, Anthropic, and Google GenAI clients.
-    Uses the active tracer via ProxyTracerProvider.
+    Uses the active tracer via JudgmentTracerProvider.
     """
     provider_type = _detect_provider(client)
 

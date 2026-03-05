@@ -15,10 +15,10 @@ class Openlit(ABC):
         **kwargs,
     ):
         from judgeval.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
-        from judgeval.v1.trace.proxy_tracer_provider import ProxyTracerProvider
+        from judgeval.v1.trace.judgment_tracer_provider import JudgmentTracerProvider
 
         openlit.init(
-            tracer=ProxyTracerProvider.get_instance().get_tracer(
+            tracer=JudgmentTracerProvider.get_instance().get_tracer(
                 JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
             ),
             disable_metrics=True,

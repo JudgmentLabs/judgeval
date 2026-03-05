@@ -19,7 +19,7 @@ from opentelemetry.trace import Span, set_span_in_context
 
 from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.utils.serialize import safe_serialize, serialize_attribute
-from judgeval.v1.trace.proxy_tracer_provider import ProxyTracerProvider
+from judgeval.v1.trace.judgment_tracer_provider import JudgmentTracerProvider
 
 if TYPE_CHECKING:
     from judgeval.v1.trace import BaseTracer
@@ -53,7 +53,7 @@ class ToolSpanTracker:
                 continue
 
             span = (
-                ProxyTracerProvider.get_instance()
+                JudgmentTracerProvider.get_instance()
                 .get_tracer(__name__)
                 .start_span(
                     str(tool_name),
@@ -204,7 +204,7 @@ def _create_client_wrapper_class(
 
             # Create TASK span for the entire agent conversation
             agent_span_context = (
-                ProxyTracerProvider.get_instance()
+                JudgmentTracerProvider.get_instance()
                 .get_tracer(__name__)
                 .start_as_current_span(
                     "Claude_Agent",
@@ -224,7 +224,7 @@ def _create_client_wrapper_class(
             tracer._emit_partial()
 
             state.parent_context = set_span_in_context(
-                agent_span, ProxyTracerProvider.get_instance().get_current_context()
+                agent_span, JudgmentTracerProvider.get_instance().get_current_context()
             )
 
             final_results: List[Dict[str, Any]] = []
@@ -305,7 +305,7 @@ def _wrap_query_function(
     async def wrapped_query(*args: Any, **kwargs: Any) -> Any:
         """Wrapped query function with automatic tracing."""
         agent_span_context = (
-            ProxyTracerProvider.get_instance()
+            JudgmentTracerProvider.get_instance()
             .get_tracer(__name__)
             .start_as_current_span(
                 "Claude_Agent_Query",
@@ -326,7 +326,7 @@ def _wrap_query_function(
         tracer._emit_partial()
 
         state.parent_context = set_span_in_context(
-            agent_span, ProxyTracerProvider.get_instance().get_current_context()
+            agent_span, JudgmentTracerProvider.get_instance().get_current_context()
         )
 
         final_results: List[Dict[str, Any]] = []
@@ -432,7 +432,7 @@ def _create_llm_span_for_messages(
 
     span_start_time = int(start_time * 1e9) if start_time is not None else None
     llm_span_context = (
-        ProxyTracerProvider.get_instance()
+        JudgmentTracerProvider.get_instance()
         .get_tracer(__name__)
         .start_as_current_span(
             "anthropic.messages.create",

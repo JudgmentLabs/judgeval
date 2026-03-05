@@ -9,7 +9,7 @@ from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
 from judgeval.logger import judgeval_logger
 from judgeval.utils.serialize import safe_serialize
 from judgeval.v1.trace.base_tracer import BaseTracer
-from judgeval.v1.trace.proxy_tracer_provider import ProxyTracerProvider
+from judgeval.v1.trace.judgment_tracer_provider import JudgmentTracerProvider
 from judgeval.v1.trace.exporters.judgment_span_exporter import JudgmentSpanExporter
 from judgeval.v1.trace.exporters.noop_span_exporter import NoOpSpanExporter
 from judgeval.v1.trace.processors.judgment_span_processor import JudgmentSpanProcessor
@@ -150,7 +150,7 @@ class Tracer(BaseTracer):
         if enable_monitoring:
             tracer_provider.add_span_processor(tracer.get_span_processor())
 
-        proxy = ProxyTracerProvider.get_instance()
+        proxy = JudgmentTracerProvider.get_instance()
         proxy.register(tracer)
 
         if set_active:
@@ -159,7 +159,7 @@ class Tracer(BaseTracer):
         return tracer
 
     def set_active(self) -> bool:
-        proxy = ProxyTracerProvider.get_instance()
+        proxy = JudgmentTracerProvider.get_instance()
         return proxy.set_active(self)
 
     def get_span_exporter(self) -> JudgmentSpanExporter:
