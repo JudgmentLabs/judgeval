@@ -22,9 +22,9 @@ from judgeval.utils.wrappers import (
     immutable_wrap_sync_iterator,
     immutable_wrap_async_iterator,
 )
+from judgeval.v1.trace import BaseTracer
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer import BaseTracer
     from together import Together, AsyncTogether  # type: ignore[import-untyped]
     from together.types import ChatCompletionResponse, ChatCompletionChunk, UsageData  # type: ignore[import-untyped]
 
@@ -44,23 +44,23 @@ def _extract_together_tokens(usage: UsageData) -> tuple[int, int, int, int]:
     )
 
 
-def wrap_chat_completions_create_sync(tracer: BaseTracer, client: Together) -> None:
+def wrap_chat_completions_create_sync(client: Together) -> None:
     original_func = client.chat.completions.create
 
     def dispatcher(*args: Any, **kwargs: Any) -> Any:
         if kwargs.get("stream", False):
-            return _wrap_streaming_sync(tracer, original_func)(*args, **kwargs)  # type: ignore[arg-type]
-        return _wrap_non_streaming_sync(tracer, original_func)(*args, **kwargs)  # type: ignore[arg-type]
+            return _wrap_streaming_sync(original_func)(*args, **kwargs)  # type: ignore[arg-type]
+        return _wrap_non_streaming_sync(original_func)(*args, **kwargs)  # type: ignore[arg-type]
 
     setattr(client.chat.completions, "create", dispatcher)
 
 
 def _wrap_non_streaming_sync(
-    tracer: BaseTracer, original_func: Callable[..., ChatCompletionResponse]
+    original_func: Callable[..., ChatCompletionResponse],
 ) -> Callable[..., ChatCompletionResponse]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
-        ctx["span"] = tracer.get_tracer().start_span(
-            "TOGETHER_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+        ctx["span"] = BaseTracer.start_span(
+            "TOGETHER_API_CALL", {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
@@ -118,11 +118,11 @@ def _wrap_non_streaming_sync(
 
 
 def _wrap_streaming_sync(
-    tracer: BaseTracer, original_func: Callable[..., Iterator[ChatCompletionChunk]]
+    original_func: Callable[..., Iterator[ChatCompletionChunk]],
 ) -> Callable[..., Iterator[ChatCompletionChunk]]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
-        ctx["span"] = tracer.get_tracer().start_span(
-            "TOGETHER_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+        ctx["span"] = BaseTracer.start_span(
+            "TOGETHER_API_CALL", {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
@@ -211,25 +211,23 @@ def _wrap_streaming_sync(
     )
 
 
-def wrap_chat_completions_create_async(
-    tracer: BaseTracer, client: AsyncTogether
-) -> None:
+def wrap_chat_completions_create_async(client: AsyncTogether) -> None:
     original_func = client.chat.completions.create
 
     async def dispatcher(*args: Any, **kwargs: Any) -> Any:
         if kwargs.get("stream", False):
-            return await _wrap_streaming_async(tracer, original_func)(*args, **kwargs)  # type: ignore[arg-type]
-        return await _wrap_non_streaming_async(tracer, original_func)(*args, **kwargs)  # type: ignore[arg-type]
+            return await _wrap_streaming_async(original_func)(*args, **kwargs)  # type: ignore[arg-type]
+        return await _wrap_non_streaming_async(original_func)(*args, **kwargs)  # type: ignore[arg-type]
 
     setattr(client.chat.completions, "create", dispatcher)
 
 
 def _wrap_non_streaming_async(
-    tracer: BaseTracer, original_func: Callable[..., Awaitable[ChatCompletionResponse]]
+    original_func: Callable[..., Awaitable[ChatCompletionResponse]],
 ) -> Callable[..., Awaitable[ChatCompletionResponse]]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
-        ctx["span"] = tracer.get_tracer().start_span(
-            "TOGETHER_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+        ctx["span"] = BaseTracer.start_span(
+            "TOGETHER_API_CALL", {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
@@ -287,12 +285,11 @@ def _wrap_non_streaming_async(
 
 
 def _wrap_streaming_async(
-    tracer: BaseTracer,
     original_func: Callable[..., Awaitable[AsyncIterator[ChatCompletionChunk]]],
 ) -> Callable[..., Awaitable[AsyncIterator[ChatCompletionChunk]]]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
-        ctx["span"] = tracer.get_tracer().start_span(
-            "TOGETHER_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+        ctx["span"] = BaseTracer.start_span(
+            "TOGETHER_API_CALL", {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")

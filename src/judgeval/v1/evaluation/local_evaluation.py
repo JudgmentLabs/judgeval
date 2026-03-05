@@ -12,7 +12,7 @@ from judgeval.logger import judgeval_logger
 from judgeval.v1.data.example import Example
 from judgeval.v1.judges import Judge
 from judgeval.v1.hosted.responses import ScorerResponse
-from judgeval.v1.internal.api.api_types import ExampleEvaluationRun, LocalScorerResult
+from judgeval.v1.internal.api.models import ExampleEvaluationRun, LocalScorerResult
 from judgeval.v1.evaluation.evaluation_base import EvaluatorRunner
 from judgeval.v1.hosted.example_custom_scorer import ExampleCustomScorer
 
@@ -46,7 +46,7 @@ class LocalEvaluatorRunner(EvaluatorRunner[Judge | ExampleCustomScorer]):
         scorers: List[Judge | ExampleCustomScorer],
         payload: ExampleEvaluationRun,
         progress: Progress,
-    ) -> None:
+    ) -> int:
         total_jobs = len(examples) * len(scorers)
         results_by_example: List[
             List[Tuple[str, ScorerResponse | None, Exception | None]]
@@ -106,6 +106,7 @@ class LocalEvaluatorRunner(EvaluatorRunner[Judge | ExampleCustomScorer]):
             payload={"results": api_results, "run": payload},
         )
         judgeval_logger.info("Local scorer results logged to backend")
+        return len(examples)
 
     def _run_local_scorers(
         self,

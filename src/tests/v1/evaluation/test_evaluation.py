@@ -4,7 +4,7 @@ from judgeval.v1.evaluation.evaluation import Evaluation
 from judgeval.v1.data.example import Example
 from judgeval.v1.data.scoring_result import ScoringResult
 from judgeval.v1.data.scorer_data import ScorerData
-from judgeval.v1.scorers.prompt_scorer.prompt_scorer import PromptScorer
+from judgeval.v1.judges.base_judge import BaseJudge
 
 
 @pytest.fixture
@@ -34,7 +34,7 @@ def sample_examples():
 
 @pytest.fixture
 def sample_scorers():
-    return [PromptScorer(name="test_scorer", prompt="Is this relevant?", threshold=0.5)]
+    return [BaseJudge(name="test_scorer", prompt="Is this relevant?", threshold=0.5)]
 
 
 def test_evaluation_run_success(

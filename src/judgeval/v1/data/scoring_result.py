@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union, cast
 
-from judgeval.v1.internal.api.api_types import (
+from judgeval.v1.internal.api.models import (
     TraceSpan,
     ExampleScoringResult,
     TraceScoringResult,

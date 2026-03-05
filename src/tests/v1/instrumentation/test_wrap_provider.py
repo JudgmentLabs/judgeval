@@ -10,11 +10,6 @@ from judgeval.v1.instrumentation.llm.providers import (
 )
 
 
-@pytest.fixture
-def mock_tracer():
-    return MagicMock()
-
-
 @pytest.mark.skipif(not HAS_OPENAI, reason="OpenAI not installed")
 def test_detect_openai_provider():
     from openai import OpenAI
@@ -57,7 +52,7 @@ def test_detect_unknown_provider():
     assert provider == ProviderType.DEFAULT
 
 
-def test_wrap_provider_with_mock_detect(mock_tracer):
+def test_wrap_provider_with_mock_detect():
     with patch(
         "judgeval.v1.instrumentation.llm.config._detect_provider"
     ) as mock_detect:
@@ -67,5 +62,5 @@ def test_wrap_provider_with_mock_detect(mock_tracer):
             mock_detect.return_value = ProviderType.OPENAI
             client = MagicMock()
 
-            wrap_provider(mock_tracer, client)
-            mock_wrap.assert_called_once_with(mock_tracer, client)
+            wrap_provider(client)
+            mock_wrap.assert_called_once_with(client)

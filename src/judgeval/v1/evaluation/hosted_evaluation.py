@@ -7,13 +7,13 @@ from rich.progress import Progress
 
 from judgeval.logger import judgeval_logger
 from judgeval.v1.data.example import Example
-from judgeval.v1.internal.api.api_types import ExampleEvaluationRun
-from judgeval.v1.scorers.base_scorer import BaseScorer
+from judgeval.v1.internal.api.models import ExampleEvaluationRun
+from judgeval.v1.judges.base_judge import BaseJudge
 from judgeval.v1.evaluation.evaluation_base import EvaluatorRunner
 
 
-class HostedEvaluatorRunner(EvaluatorRunner[BaseScorer]):
-    def _validate_scorer_project(self, scorer: BaseScorer) -> None:
+class HostedEvaluatorRunner(EvaluatorRunner[BaseJudge]):
+    def _validate_scorer_project(self, scorer: BaseJudge) -> None:
         scorer_project_id = getattr(scorer, "_project_id", None)
         if scorer_project_id is not None and scorer_project_id != self._project_id:
             judgeval_logger.warning(
@@ -33,7 +33,7 @@ class HostedEvaluatorRunner(EvaluatorRunner[BaseScorer]):
         eval_run_name: str,
         created_at: str,
         examples: List[Example],
-        scorers: List[BaseScorer],
+        scorers: List[BaseJudge],
     ) -> ExampleEvaluationRun:
         return {
             "id": eval_id,
@@ -51,10 +51,10 @@ class HostedEvaluatorRunner(EvaluatorRunner[BaseScorer]):
         project_id: str,
         eval_id: str,
         examples: List[Example],
-        scorers: List[BaseScorer],
+        scorers: List[BaseJudge],
         payload: ExampleEvaluationRun,
         progress: Progress,
-    ) -> None:
+    ) -> int:
         for scorer in scorers:
             self._validate_scorer_project(scorer)
 
@@ -65,3 +65,4 @@ class HostedEvaluatorRunner(EvaluatorRunner[BaseScorer]):
         )
         judgeval_logger.info(f"Evaluation submitted: {eval_id}")
         progress.update(task, description="Running evaluation...")
+        return len(examples)

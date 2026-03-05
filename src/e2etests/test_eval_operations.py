@@ -2,7 +2,7 @@ import pytest
 
 from judgeval.v1 import Judgeval
 from judgeval.v1.data import Example
-from judgeval.v1.scorers.prompt_scorer.prompt_scorer import PromptScorer
+from judgeval.v1.judges import BaseJudge
 
 
 def run_eval_helper(client: Judgeval, eval_run_name: str):
@@ -18,12 +18,12 @@ def run_eval_helper(client: Judgeval, eval_run_name: str):
         retrieval_context="GreenEnergy Solutions won 2023 sustainability award. New solar technology 30% more efficient. Planning European market expansion.",
     )
 
-    scorer = PromptScorer(
+    scorer = BaseJudge(
         name="faithfulness",
         prompt="Is the output faithful to the retrieval context?",
         threshold=0.5,
     )
-    scorer2 = PromptScorer(
+    scorer2 = BaseJudge(
         name="relevancy", prompt="Is the output relevant to the input?", threshold=0.5
     )
 
@@ -46,7 +46,7 @@ def test_basic_eval(client: Judgeval, random_name: str):
             )
         ],
         scorers=[
-            PromptScorer(
+            BaseJudge(
                 name="relevancy",
                 prompt="Is the output relevant to the input?",
                 threshold=0.5,
@@ -82,7 +82,7 @@ def test_assert_test(client: Judgeval):
         actual_output="No, the room is too small.",
     )
 
-    scorer = PromptScorer(
+    scorer = BaseJudge(
         name="relevancy", prompt="Is the output relevant to the input?", threshold=0.5
     )
 
@@ -114,7 +114,7 @@ def test_evaluate_dataset(client: Judgeval, random_name: str):
     res = evaluation.run(
         examples=list(dataset),
         scorers=[
-            PromptScorer(
+            BaseJudge(
                 name="faithfulness",
                 prompt="Is the output faithful to the retrieval context?",
                 threshold=0.5,
@@ -139,7 +139,7 @@ def test_dataset_and_evaluation(client: Judgeval, random_name: str):
     res = evaluation.run(
         examples=examples,
         scorers=[
-            PromptScorer(
+            BaseJudge(
                 name="relevancy",
                 prompt="Is the output relevant to the input?",
                 threshold=0.5,
@@ -164,7 +164,7 @@ def test_dataset_and_double_evaluation(client: Judgeval, random_name: str):
     res = evaluation.run(
         examples=list(dataset),
         scorers=[
-            PromptScorer(
+            BaseJudge(
                 name="relevancy",
                 prompt="Is the output relevant to the input?",
                 threshold=0.5,
@@ -177,7 +177,7 @@ def test_dataset_and_double_evaluation(client: Judgeval, random_name: str):
     res2 = evaluation.run(
         examples=list(dataset),
         scorers=[
-            PromptScorer(
+            BaseJudge(
                 name="relevancy",
                 prompt="Is the output relevant to the input?",
                 threshold=0.5,

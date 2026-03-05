@@ -95,27 +95,23 @@ def async_client(together_api_key):
 
 @pytest.fixture
 def wrapped_sync_client(tracer, sync_client):
-    """Wrapped sync Together client with tracer"""
-    return wrap_together_client(tracer, sync_client)
+    return wrap_together_client(sync_client)
 
 
 @pytest.fixture
 def wrapped_async_client(tracer, async_client):
-    """Wrapped async Together client with tracer"""
-    return wrap_together_client(tracer, async_client)
+    return wrap_together_client(async_client)
 
 
 @pytest.fixture(params=["wrapped", "unwrapped"], ids=["with_tracer", "without_tracer"])
 def sync_client_maybe_wrapped(request, tracer, sync_client):
-    """Parametrized fixture that yields both wrapped and unwrapped sync clients"""
     if request.param == "wrapped":
-        return wrap_together_client(tracer, sync_client)
+        return wrap_together_client(sync_client)
     return sync_client
 
 
 @pytest.fixture(params=["wrapped", "unwrapped"], ids=["with_tracer", "without_tracer"])
 def async_client_maybe_wrapped(request, tracer, async_client):
-    """Parametrized fixture that yields both wrapped and unwrapped async clients"""
     if request.param == "wrapped":
-        return wrap_together_client(tracer, async_client)
+        return wrap_together_client(async_client)
     return async_client

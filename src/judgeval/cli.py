@@ -90,7 +90,7 @@ def upload_scorer(
     client = Judgeval(project_name, api_key=api_key, organization_id=organization_id)
 
     try:
-        result = client.scorers.custom_scorer.upload(
+        result = client.judges.upload(
             scorer_file_path=scorer_file_path,
             requirements_file_path=requirements_file_path,
             unique_name=unique_name,

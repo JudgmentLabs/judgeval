@@ -9,8 +9,6 @@ from typing import (
     AsyncIterator,
     Generator,
     AsyncGenerator,
-    ParamSpec,
-    TypeVar,
 )
 
 from opentelemetry.trace import Status, StatusCode
@@ -28,21 +26,17 @@ from judgeval.v1.instrumentation.llm.llm_openai.utils import (
     openai_tokens_converter,
     set_cost_attribute,
 )
+from judgeval.v1.trace import BaseTracer
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer import BaseTracer
     from openai import OpenAI, AsyncOpenAI
     from openai.types.responses import Response
 
-P = ParamSpec("P")
-T = TypeVar("T")
 
-
-def wrap_responses_create_sync(tracer: BaseTracer, client: OpenAI) -> None:
+def wrap_responses_create_sync(client: OpenAI) -> None:
     original_func = client.responses.create
 
     def dispatcher(*args: Any, **kwargs: Any) -> Any:
-        # Check if this is a with_streaming_response call - bypass our wrapper
         extra_headers = kwargs.get("extra_headers") or {}
         if (
             isinstance(extra_headers, dict)
@@ -51,22 +45,18 @@ def wrap_responses_create_sync(tracer: BaseTracer, client: OpenAI) -> None:
             return original_func(*args, **kwargs)
 
         if kwargs.get("stream", False):
-            return _wrap_responses_streaming_sync(tracer, original_func)(
-                *args, **kwargs
-            )
-        return _wrap_responses_non_streaming_sync(tracer, original_func)(
-            *args, **kwargs
-        )
+            return _wrap_responses_streaming_sync(original_func)(*args, **kwargs)
+        return _wrap_responses_non_streaming_sync(original_func)(*args, **kwargs)
 
     setattr(client.responses, "create", dispatcher)
 
 
 def _wrap_responses_non_streaming_sync(
-    tracer: BaseTracer, original_func: Callable[..., Response]
+    original_func: Callable[..., Response],
 ) -> Callable[..., Response]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
-        ctx["span"] = tracer.get_tracer().start_span(
-            "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+        ctx["span"] = BaseTracer.start_span(
+            "OPENAI_API_CALL", {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
@@ -143,11 +133,11 @@ def _wrap_responses_non_streaming_sync(
 
 
 def _wrap_responses_streaming_sync(
-    tracer: BaseTracer, original_func: Callable[..., Iterator[Any]]
+    original_func: Callable[..., Iterator[Any]],
 ) -> Callable[..., Iterator[Any]]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
-        ctx["span"] = tracer.get_tracer().start_span(
-            "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+        ctx["span"] = BaseTracer.start_span(
+            "OPENAI_API_CALL", {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
@@ -182,7 +172,6 @@ def _wrap_responses_streaming_sync(
                 ):
                     prompt_tokens = chunk.response.usage.input_tokens or 0
                     completion_tokens = chunk.response.usage.output_tokens or 0
-                    # Safely access nested cached_tokens
                     input_tokens_details = getattr(
                         chunk.response.usage, "input_tokens_details", None
                     )
@@ -262,11 +251,10 @@ def _wrap_responses_streaming_sync(
     )
 
 
-def wrap_responses_create_async(tracer: BaseTracer, client: AsyncOpenAI) -> None:
+def wrap_responses_create_async(client: AsyncOpenAI) -> None:
     original_func = client.responses.create
 
     async def dispatcher(*args: Any, **kwargs: Any) -> Any:
-        # Check if this is a with_streaming_response call - bypass our wrapper
         extra_headers = kwargs.get("extra_headers") or {}
         if (
             isinstance(extra_headers, dict)
@@ -275,22 +263,18 @@ def wrap_responses_create_async(tracer: BaseTracer, client: AsyncOpenAI) -> None
             return await original_func(*args, **kwargs)
 
         if kwargs.get("stream", False):
-            return await _wrap_responses_streaming_async(tracer, original_func)(
-                *args, **kwargs
-            )
-        return await _wrap_responses_non_streaming_async(tracer, original_func)(
-            *args, **kwargs
-        )
+            return await _wrap_responses_streaming_async(original_func)(*args, **kwargs)
+        return await _wrap_responses_non_streaming_async(original_func)(*args, **kwargs)
 
     setattr(client.responses, "create", dispatcher)
 
 
 def _wrap_responses_non_streaming_async(
-    tracer: BaseTracer, original_func: Callable[..., Awaitable[Response]]
+    original_func: Callable[..., Awaitable[Response]],
 ) -> Callable[..., Awaitable[Response]]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
-        ctx["span"] = tracer.get_tracer().start_span(
-            "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+        ctx["span"] = BaseTracer.start_span(
+            "OPENAI_API_CALL", {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
@@ -367,11 +351,11 @@ def _wrap_responses_non_streaming_async(
 
 
 def _wrap_responses_streaming_async(
-    tracer: BaseTracer, original_func: Callable[..., Awaitable[AsyncIterator[Any]]]
+    original_func: Callable[..., Awaitable[AsyncIterator[Any]]],
 ) -> Callable[..., Awaitable[AsyncIterator[Any]]]:
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
-        ctx["span"] = tracer.get_tracer().start_span(
-            "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+        ctx["span"] = BaseTracer.start_span(
+            "OPENAI_API_CALL", {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
         ctx["model_name"] = kwargs.get("model", "")
@@ -408,7 +392,6 @@ def _wrap_responses_streaming_async(
                 ):
                     prompt_tokens = chunk.response.usage.input_tokens or 0
                     completion_tokens = chunk.response.usage.output_tokens or 0
-                    # Safely access nested cached_tokens
                     input_tokens_details = getattr(
                         chunk.response.usage, "input_tokens_details", None
                     )

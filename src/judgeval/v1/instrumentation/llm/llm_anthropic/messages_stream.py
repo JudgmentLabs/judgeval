@@ -18,9 +18,9 @@ from judgeval.utils.wrappers import (
 from judgeval.v1.instrumentation.llm.llm_anthropic.messages import (
     _extract_anthropic_tokens,
 )
+from judgeval.v1.trace import BaseTracer
 
 if TYPE_CHECKING:
-    from judgeval.v1.tracer import BaseTracer
     from anthropic import Anthropic, AsyncAnthropic
     from anthropic.lib.streaming import (
         MessageStreamManager,
@@ -30,12 +30,12 @@ if TYPE_CHECKING:
     )
 
 
-def wrap_messages_stream_sync(tracer: BaseTracer, client: Anthropic) -> None:
+def wrap_messages_stream_sync(client: Anthropic) -> None:
     original_func = client.messages.stream
 
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
-        ctx["span"] = tracer.get_tracer().start_span(
-            "ANTHROPIC_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+        ctx["span"] = BaseTracer.start_span(
+            "ANTHROPIC_API_CALL", {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
 
@@ -167,12 +167,12 @@ def wrap_messages_stream_sync(tracer: BaseTracer, client: Anthropic) -> None:
     setattr(client.messages, "stream", wrapped)
 
 
-def wrap_messages_stream_async(tracer: BaseTracer, client: AsyncAnthropic) -> None:
+def wrap_messages_stream_async(client: AsyncAnthropic) -> None:
     original_func = client.messages.stream
 
     def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
-        ctx["span"] = tracer.get_tracer().start_span(
-            "ANTHROPIC_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+        ctx["span"] = BaseTracer.start_span(
+            "ANTHROPIC_API_CALL", {AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
         )
 
         ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
