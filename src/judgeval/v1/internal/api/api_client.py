@@ -197,7 +197,6 @@ class JudgmentSyncClient:
             "POST",
             url_for(f"/v1/projects/{project_id}/eval-results", self.base_url),
             payload,
-            params={},
         )
 
     def post_projects_eval_results_examples(
@@ -207,7 +206,6 @@ class JudgmentSyncClient:
             "POST",
             url_for(f"/v1/projects/{project_id}/eval-results/examples", self.base_url),
             payload,
-            params={},
         )
 
     def get_projects_experiments_by_run_id(
@@ -322,9 +320,18 @@ class JudgmentSyncClient:
     def post_projects_scorers_custom(
         self, project_id: str, payload: UploadCustomScorerRequest
     ) -> UploadCustomScorerResponse:
-        return self._multipart_request(
+        return self._request(
             "POST",
             url_for(f"/v1/projects/{project_id}/scorers/custom", self.base_url),
+            payload,
+        )
+
+    def post_projects_scorers_custom_bundle(
+        self, project_id: str, payload: UploadCustomScorerBundleRequest
+    ) -> UploadCustomScorerBundleResponse:
+        return self._multipart_request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/scorers/custom/bundle", self.base_url),
             payload,
         )
 
@@ -348,7 +355,7 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def get_e2e_fetch_trace(
+    def get_e2e_fetch_trace_by_project_name_by_trace_id(
         self, project_name: str, trace_id: str
     ) -> E2EFetchTraceResponse:
         return self._request(
@@ -397,6 +404,7 @@ class JudgmentAsyncClient:
         payload: Any,
         params: Optional[Dict[str, Any]] = None,
     ) -> Any:
+        logger.debug(f"HTTP {method} {url}")
         if method == "GET":
             r = self.client.request(
                 method,
@@ -667,9 +675,18 @@ class JudgmentAsyncClient:
     async def post_projects_scorers_custom(
         self, project_id: str, payload: UploadCustomScorerRequest
     ) -> UploadCustomScorerResponse:
-        return await self._multipart_request(
+        return await self._request(
             "POST",
             url_for(f"/v1/projects/{project_id}/scorers/custom", self.base_url),
+            payload,
+        )
+
+    async def post_projects_scorers_custom_bundle(
+        self, project_id: str, payload: UploadCustomScorerBundleRequest
+    ) -> UploadCustomScorerBundleResponse:
+        return await self._multipart_request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/scorers/custom/bundle", self.base_url),
             payload,
         )
 
@@ -693,7 +710,7 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def get_e2e_fetch_trace(
+    async def get_e2e_fetch_trace_by_project_name_by_trace_id(
         self, project_name: str, trace_id: str
     ) -> E2EFetchTraceResponse:
         return await self._request(

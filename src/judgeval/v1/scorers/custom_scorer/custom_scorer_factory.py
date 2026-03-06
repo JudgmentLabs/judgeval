@@ -9,8 +9,8 @@ from typing import Literal, Optional, Tuple
 from judgeval.logger import judgeval_logger
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.internal.api.api_types import (
-    UploadCustomScorerMetadata,
-    UploadCustomScorerRequest,
+    UploadCustomScorerBundleMetadata,
+    UploadCustomScorerBundleRequest,
 )
 from judgeval.v1.scorers.custom_scorer.custom_scorer import CustomScorer
 from judgeval.utils.guards import expect_project_id
@@ -216,7 +216,7 @@ class CustomScorerFactory:
             else None
         )
 
-        metadata: UploadCustomScorerMetadata = {
+        metadata: UploadCustomScorerBundleMetadata = {
             "scorer_name": unique_name,
             "entrypoint_path": entrypoint_arcname,
             "class_name": class_name,
@@ -228,12 +228,12 @@ class CustomScorerFactory:
         if requirements_arcname:
             metadata["requirements_path"] = requirements_arcname
 
-        payload: UploadCustomScorerRequest = {
+        payload: UploadCustomScorerBundleRequest = {
             "metadata": metadata,
             "bundle": bundle,
         }
 
-        response = self._client.post_projects_scorers_custom(
+        response = self._client.post_projects_scorers_custom_bundle(
             project_id=project_id,
             payload=payload,
         )
