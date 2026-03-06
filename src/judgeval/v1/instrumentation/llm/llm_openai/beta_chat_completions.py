@@ -98,6 +98,10 @@ def _wrap_beta_non_streaming_sync(
                 AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
             )
             span.set_attribute(
+                AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_IMAGE_TOKENS, 0
+            )
+            span.set_attribute(AttributeKeys.JUDGMENT_USAGE_OUTPUT_IMAGE_TOKENS, 0)
+            span.set_attribute(
                 AttributeKeys.JUDGMENT_USAGE_METADATA,
                 safe_serialize(usage_data),
             )
