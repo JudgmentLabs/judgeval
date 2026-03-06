@@ -45,41 +45,6 @@ _IMAGE_COMPLETED_TYPES = frozenset(
 )
 
 
-def _serialize_image_completion(result: ImagesResponse) -> Dict[str, Any]:
-    completion: Dict[str, Any] = {}
-    if result.data:
-        images = []
-        for img in result.data:
-            entry: Dict[str, Any] = {}
-            if img.url:
-                entry["url"] = img.url
-            if img.b64_json:
-                entry["b64_json"] = img.b64_json
-            if img.revised_prompt:
-                entry["revised_prompt"] = img.revised_prompt
-            images.append(entry)
-        completion["data"] = images
-    if result.background is not None:
-        completion["background"] = result.background
-    if result.output_format is not None:
-        completion["output_format"] = result.output_format
-    if result.quality is not None:
-        completion["quality"] = result.quality
-    if result.size is not None:
-        completion["size"] = result.size
-    return completion
-
-
-def _serialize_stream_completion(chunk: ImageStreamEvent) -> Dict[str, Any]:
-    return {
-        "data": [{"b64_json": chunk.b64_json}],
-        "background": chunk.background,
-        "output_format": chunk.output_format,
-        "quality": chunk.quality,
-        "size": chunk.size,
-    }
-
-
 def _set_image_usage(span: Span, usage_data: ImageUsage) -> None:
     input_text_tokens = usage_data.input_tokens_details.text_tokens or 0
     input_image_tokens = usage_data.input_tokens_details.image_tokens or 0
@@ -106,9 +71,6 @@ def _set_image_usage(span: Span, usage_data: ImageUsage) -> None:
     span.set_attribute(
         AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS, input_text_tokens
     )
-    span.set_attribute(AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, 0)
-    span.set_attribute(AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, 0)
-    span.set_attribute(AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0)
     span.set_attribute(
         AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_IMAGE_TOKENS, input_image_tokens
     )
@@ -140,7 +102,7 @@ def _wrap_images_non_streaming_sync(
 
         span.set_attribute(
             AttributeKeys.GEN_AI_COMPLETION,
-            safe_serialize(_serialize_image_completion(result)),
+            safe_serialize(result),
         )
 
         usage_data = result.usage
@@ -187,7 +149,7 @@ def _wrap_images_non_streaming_async(
 
         span.set_attribute(
             AttributeKeys.GEN_AI_COMPLETION,
-            safe_serialize(_serialize_image_completion(result)),
+            safe_serialize(result),
         )
 
         usage_data = result.usage
@@ -240,7 +202,7 @@ def _wrap_images_streaming_sync(
                 return
 
             if chunk.type in _IMAGE_COMPLETED_TYPES:
-                ctx["completion_data"] = _serialize_stream_completion(chunk)
+                ctx["completion_data"] = chunk
 
                 if hasattr(chunk, "usage") and chunk.usage:
                     _set_image_usage(span, chunk.usage)
@@ -315,7 +277,7 @@ def _wrap_images_streaming_async(
                 return
 
             if chunk.type in _IMAGE_COMPLETED_TYPES:
-                ctx["completion_data"] = _serialize_stream_completion(chunk)
+                ctx["completion_data"] = chunk
 
                 if hasattr(chunk, "usage") and chunk.usage:
                     _set_image_usage(span, chunk.usage)

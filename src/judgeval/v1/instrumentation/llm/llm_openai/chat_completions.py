@@ -126,13 +126,6 @@ def _wrap_non_streaming_sync(
                 AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
             )
             span.set_attribute(
-                AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
-            )
-            span.set_attribute(
-                AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_IMAGE_TOKENS, 0
-            )
-            span.set_attribute(AttributeKeys.JUDGMENT_USAGE_OUTPUT_IMAGE_TOKENS, 0)
-            span.set_attribute(
                 AttributeKeys.JUDGMENT_USAGE_METADATA,
                 safe_serialize(usage_data),
             )
@@ -238,13 +231,6 @@ def _wrap_streaming_sync(
                 span.set_attribute(
                     AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
                 )
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
-                )
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_IMAGE_TOKENS, 0
-                )
-                span.set_attribute(AttributeKeys.JUDGMENT_USAGE_OUTPUT_IMAGE_TOKENS, 0)
                 span.set_attribute(
                     AttributeKeys.JUDGMENT_USAGE_METADATA,
                     safe_serialize(chunk.usage),
@@ -370,13 +356,6 @@ def _wrap_non_streaming_async(
                 AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
             )
             span.set_attribute(
-                AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
-            )
-            span.set_attribute(
-                AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_IMAGE_TOKENS, 0
-            )
-            span.set_attribute(AttributeKeys.JUDGMENT_USAGE_OUTPUT_IMAGE_TOKENS, 0)
-            span.set_attribute(
                 AttributeKeys.JUDGMENT_USAGE_METADATA,
                 safe_serialize(usage_data),
             )
@@ -483,13 +462,6 @@ def _wrap_streaming_async(
                 span.set_attribute(
                     AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
                 )
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
-                )
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_IMAGE_TOKENS, 0
-                )
-                span.set_attribute(AttributeKeys.JUDGMENT_USAGE_OUTPUT_IMAGE_TOKENS, 0)
                 span.set_attribute(
                     AttributeKeys.JUDGMENT_USAGE_METADATA,
                     safe_serialize(chunk.usage),
