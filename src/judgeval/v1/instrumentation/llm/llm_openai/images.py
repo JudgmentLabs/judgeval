@@ -1,0 +1,389 @@
+from __future__ import annotations
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    Iterator,
+    AsyncIterator,
+    Generator,
+    AsyncGenerator,
+    Union,
+)
+
+from opentelemetry.trace import Span, Status, StatusCode
+from judgeval.judgment_attribute_keys import AttributeKeys
+from judgeval.utils.serialize import safe_serialize
+from judgeval.utils.wrappers import (
+    immutable_wrap_sync,
+    immutable_wrap_async,
+    mutable_wrap_sync,
+    mutable_wrap_async,
+    immutable_wrap_sync_iterator,
+    immutable_wrap_async_iterator,
+)
+from judgeval.v1.instrumentation.llm.llm_openai.utils import (
+    openai_tokens_converter,
+    set_cost_attribute,
+)
+
+if TYPE_CHECKING:
+    from judgeval.v1.tracer import BaseTracer
+    from openai import OpenAI, AsyncOpenAI
+    from openai.types.image_edit_completed_event import Usage as ImageEditUsage
+    from openai.types.image_gen_completed_event import Usage as ImageGenUsage
+    from openai.types.image_edit_stream_event import ImageEditStreamEvent
+    from openai.types.image_gen_stream_event import ImageGenStreamEvent
+    from openai.types.images_response import ImagesResponse, Usage
+
+    ImageStreamEvent = Union[ImageGenStreamEvent, ImageEditStreamEvent]
+    ImageUsage = Union[Usage, ImageGenUsage, ImageEditUsage]
+
+_IMAGE_COMPLETED_TYPES = frozenset(
+    {"image_generation.completed", "image_edit.completed"}
+)
+
+
+def _serialize_image_completion(result: ImagesResponse) -> Dict[str, Any]:
+    completion: Dict[str, Any] = {}
+    if result.data:
+        images = []
+        for img in result.data:
+            entry: Dict[str, Any] = {}
+            if img.url:
+                entry["url"] = img.url
+            if img.b64_json:
+                entry["b64_json"] = img.b64_json
+            if img.revised_prompt:
+                entry["revised_prompt"] = img.revised_prompt
+            images.append(entry)
+        completion["data"] = images
+    if result.background is not None:
+        completion["background"] = result.background
+    if result.output_format is not None:
+        completion["output_format"] = result.output_format
+    if result.quality is not None:
+        completion["quality"] = result.quality
+    if result.size is not None:
+        completion["size"] = result.size
+    return completion
+
+
+def _serialize_stream_completion(chunk: ImageStreamEvent) -> Dict[str, Any]:
+    return {
+        "data": [{"b64_json": chunk.b64_json}],
+        "background": chunk.background,
+        "output_format": chunk.output_format,
+        "quality": chunk.quality,
+        "size": chunk.size,
+    }
+
+
+def _set_image_usage(span: Span, usage_data: ImageUsage) -> None:
+    prompt_tokens = usage_data.input_tokens or 0
+    completion_tokens = usage_data.output_tokens or 0
+
+    set_cost_attribute(span, usage_data)
+    prompt_tokens, completion_tokens, cache_read, cache_creation = (
+        openai_tokens_converter(
+            prompt_tokens,
+            completion_tokens,
+            0,
+            0,
+            usage_data.total_tokens,
+        )
+    )
+
+    span.set_attribute(
+        AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS, prompt_tokens
+    )
+    span.set_attribute(AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens)
+    span.set_attribute(AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, 0)
+    span.set_attribute(AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0)
+    span.set_attribute(
+        AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(usage_data)
+    )
+
+
+def _wrap_images_non_streaming_sync(
+    tracer: BaseTracer, original_func: Callable[..., ImagesResponse]
+) -> Callable[..., ImagesResponse]:
+    def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
+        ctx["span"] = tracer.get_tracer().start_span(
+            "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+        )
+        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
+        ctx["model_name"] = kwargs.get("model", "")
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
+        )
+
+    def post_hook(ctx: Dict[str, Any], result: ImagesResponse) -> None:
+        span = ctx.get("span")
+        if not span:
+            return
+
+        span.set_attribute(
+            AttributeKeys.GEN_AI_COMPLETION,
+            safe_serialize(_serialize_image_completion(result)),
+        )
+
+        usage_data = result.usage
+        if usage_data:
+            _set_image_usage(span, usage_data)
+
+    def error_hook(ctx: Dict[str, Any], error: Exception) -> None:
+        span = ctx.get("span")
+        if span:
+            span.record_exception(error)
+            span.set_status(Status(StatusCode.ERROR))
+
+    def finally_hook(ctx: Dict[str, Any]) -> None:
+        span = ctx.get("span")
+        if span:
+            span.end()
+
+    return immutable_wrap_sync(
+        original_func,
+        pre_hook=pre_hook,
+        post_hook=post_hook,
+        error_hook=error_hook,
+        finally_hook=finally_hook,
+    )
+
+
+def _wrap_images_non_streaming_async(
+    tracer: BaseTracer, original_func: Callable[..., Awaitable[ImagesResponse]]
+) -> Callable[..., Awaitable[ImagesResponse]]:
+    def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
+        ctx["span"] = tracer.get_tracer().start_span(
+            "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+        )
+        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
+        ctx["model_name"] = kwargs.get("model", "")
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
+        )
+
+    def post_hook(ctx: Dict[str, Any], result: ImagesResponse) -> None:
+        span = ctx.get("span")
+        if not span:
+            return
+
+        span.set_attribute(
+            AttributeKeys.GEN_AI_COMPLETION,
+            safe_serialize(_serialize_image_completion(result)),
+        )
+
+        usage_data = result.usage
+        if usage_data:
+            _set_image_usage(span, usage_data)
+
+    def error_hook(ctx: Dict[str, Any], error: Exception) -> None:
+        span = ctx.get("span")
+        if span:
+            span.record_exception(error)
+            span.set_status(Status(StatusCode.ERROR))
+
+    def finally_hook(ctx: Dict[str, Any]) -> None:
+        span = ctx.get("span")
+        if span:
+            span.end()
+
+    return immutable_wrap_async(
+        original_func,
+        pre_hook=pre_hook,
+        post_hook=post_hook,
+        error_hook=error_hook,
+        finally_hook=finally_hook,
+    )
+
+
+def _wrap_images_streaming_sync(
+    tracer: BaseTracer, original_func: Callable[..., Iterator[ImageStreamEvent]]
+) -> Callable[..., Iterator[ImageStreamEvent]]:
+    def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
+        ctx["span"] = tracer.get_tracer().start_span(
+            "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+        )
+        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
+        ctx["model_name"] = kwargs.get("model", "")
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
+        )
+
+    def mutate_hook(
+        ctx: Dict[str, Any], result: Iterator[ImageStreamEvent]
+    ) -> Iterator[ImageStreamEvent]:
+        def traced_generator() -> Generator[ImageStreamEvent, None, None]:
+            for chunk in result:
+                yield chunk
+
+        def yield_hook(inner_ctx: Dict[str, Any], chunk: ImageStreamEvent) -> None:
+            span = ctx.get("span")
+            if not span:
+                return
+
+            if chunk.type in _IMAGE_COMPLETED_TYPES:
+                ctx["completion_data"] = _serialize_stream_completion(chunk)
+
+                if hasattr(chunk, "usage") and chunk.usage:
+                    _set_image_usage(span, chunk.usage)
+
+        def post_hook_inner(inner_ctx: Dict[str, Any]) -> None:
+            span = ctx.get("span")
+            if span:
+                completion = ctx.get("completion_data", {})
+                span.set_attribute(
+                    AttributeKeys.GEN_AI_COMPLETION, safe_serialize(completion)
+                )
+
+        def error_hook_inner(inner_ctx: Dict[str, Any], error: Exception) -> None:
+            span = ctx.get("span")
+            if span:
+                span.record_exception(error)
+                span.set_status(Status(StatusCode.ERROR))
+
+        def finally_hook_inner(inner_ctx: Dict[str, Any]) -> None:
+            span = ctx.get("span")
+            if span:
+                span.end()
+
+        wrapped_generator = immutable_wrap_sync_iterator(
+            traced_generator,
+            yield_hook=yield_hook,
+            post_hook=post_hook_inner,
+            error_hook=error_hook_inner,
+            finally_hook=finally_hook_inner,
+        )
+
+        return wrapped_generator()
+
+    def error_hook(ctx: Dict[str, Any], error: Exception) -> None:
+        span = ctx.get("span")
+        if span:
+            span.record_exception(error)
+            span.set_status(Status(StatusCode.ERROR))
+
+    return mutable_wrap_sync(
+        original_func,
+        pre_hook=pre_hook,
+        mutate_hook=mutate_hook,
+        error_hook=error_hook,
+    )
+
+
+def _wrap_images_streaming_async(
+    tracer: BaseTracer,
+    original_func: Callable[..., Awaitable[AsyncIterator[ImageStreamEvent]]],
+) -> Callable[..., Awaitable[AsyncIterator[ImageStreamEvent]]]:
+    def pre_hook(ctx: Dict[str, Any], *args: Any, **kwargs: Any) -> None:
+        ctx["span"] = tracer.get_tracer().start_span(
+            "OPENAI_API_CALL", attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"}
+        )
+        ctx["span"].set_attribute(AttributeKeys.GEN_AI_PROMPT, safe_serialize(kwargs))
+        ctx["model_name"] = kwargs.get("model", "")
+        ctx["span"].set_attribute(
+            AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
+        )
+
+    def mutate_hook(
+        ctx: Dict[str, Any], result: AsyncIterator[ImageStreamEvent]
+    ) -> AsyncIterator[ImageStreamEvent]:
+        async def traced_generator() -> AsyncGenerator[ImageStreamEvent, None]:
+            async for chunk in result:
+                yield chunk
+
+        def yield_hook(inner_ctx: Dict[str, Any], chunk: ImageStreamEvent) -> None:
+            span = ctx.get("span")
+            if not span:
+                return
+
+            if chunk.type in _IMAGE_COMPLETED_TYPES:
+                ctx["completion_data"] = _serialize_stream_completion(chunk)
+
+                if hasattr(chunk, "usage") and chunk.usage:
+                    _set_image_usage(span, chunk.usage)
+
+        def post_hook_inner(inner_ctx: Dict[str, Any]) -> None:
+            span = ctx.get("span")
+            if span:
+                completion = ctx.get("completion_data", {})
+                span.set_attribute(
+                    AttributeKeys.GEN_AI_COMPLETION, safe_serialize(completion)
+                )
+
+        def error_hook_inner(inner_ctx: Dict[str, Any], error: Exception) -> None:
+            span = ctx.get("span")
+            if span:
+                span.record_exception(error)
+                span.set_status(Status(StatusCode.ERROR))
+
+        def finally_hook_inner(inner_ctx: Dict[str, Any]) -> None:
+            span = ctx.get("span")
+            if span:
+                span.end()
+
+        wrapped_generator = immutable_wrap_async_iterator(
+            traced_generator,
+            yield_hook=yield_hook,
+            post_hook=post_hook_inner,
+            error_hook=error_hook_inner,
+            finally_hook=finally_hook_inner,
+        )
+
+        return wrapped_generator()
+
+    def error_hook(ctx: Dict[str, Any], error: Exception) -> None:
+        span = ctx.get("span")
+        if span:
+            span.record_exception(error)
+            span.set_status(Status(StatusCode.ERROR))
+
+    return mutable_wrap_async(
+        original_func,
+        pre_hook=pre_hook,
+        mutate_hook=mutate_hook,
+        error_hook=error_hook,
+    )
+
+
+def wrap_images_generate_sync(tracer: BaseTracer, client: OpenAI) -> None:
+    original_func = client.images.generate
+
+    def dispatcher(*args: Any, **kwargs: Any) -> Any:
+        extra_headers = kwargs.get("extra_headers") or {}
+        if (
+            isinstance(extra_headers, dict)
+            and extra_headers.get("X-Stainless-Raw-Response") == "stream"
+        ):
+            return original_func(*args, **kwargs)
+
+        if kwargs.get("stream", False):
+            return _wrap_images_streaming_sync(tracer, original_func)(*args, **kwargs)
+        return _wrap_images_non_streaming_sync(tracer, original_func)(*args, **kwargs)
+
+    setattr(client.images, "generate", dispatcher)
+
+
+def wrap_images_generate_async(tracer: BaseTracer, client: AsyncOpenAI) -> None:
+    original_func = client.images.generate
+
+    async def dispatcher(*args: Any, **kwargs: Any) -> Any:
+        extra_headers = kwargs.get("extra_headers") or {}
+        if (
+            isinstance(extra_headers, dict)
+            and extra_headers.get("X-Stainless-Raw-Response") == "stream"
+        ):
+            return await original_func(*args, **kwargs)
+
+        if kwargs.get("stream", False):
+            return await _wrap_images_streaming_async(tracer, original_func)(
+                *args, **kwargs
+            )
+        return await _wrap_images_non_streaming_async(tracer, original_func)(
+            *args, **kwargs
+        )
+
+    setattr(client.images, "generate", dispatcher)
