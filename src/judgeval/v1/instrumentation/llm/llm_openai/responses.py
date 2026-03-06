@@ -88,14 +88,21 @@ def _wrap_responses_non_streaming_sync(
             cache_read = usage_data.input_tokens_details.cached_tokens or 0
 
             set_cost_attribute(span, usage_data)
-            prompt_tokens, completion_tokens, cache_read, cache_creation = (
-                openai_tokens_converter(
-                    prompt_tokens,
-                    completion_tokens,
-                    cache_read,
-                    0,
-                    usage_data.total_tokens,
-                )
+            (
+                prompt_tokens,
+                completion_tokens,
+                cache_read,
+                cache_creation,
+                input_image_tokens,
+                output_image_tokens,
+            ) = openai_tokens_converter(
+                prompt_tokens,
+                completion_tokens,
+                cache_read,
+                0,
+                0,
+                0,
+                usage_data.total_tokens,
             )
 
             span.set_attribute(
@@ -193,14 +200,21 @@ def _wrap_responses_streaming_sync(
                     )
 
                     set_cost_attribute(span, chunk.response.usage)
-                    prompt_tokens, completion_tokens, cache_read, cache_creation = (
-                        openai_tokens_converter(
-                            prompt_tokens,
-                            completion_tokens,
-                            cache_read,
-                            0,
-                            chunk.response.usage.total_tokens,
-                        )
+                    (
+                        prompt_tokens,
+                        completion_tokens,
+                        cache_read,
+                        cache_creation,
+                        input_image_tokens,
+                        output_image_tokens,
+                    ) = openai_tokens_converter(
+                        prompt_tokens,
+                        completion_tokens,
+                        cache_read,
+                        0,
+                        0,
+                        0,
+                        chunk.response.usage.total_tokens,
                     )
 
                     span.set_attribute(
@@ -312,14 +326,21 @@ def _wrap_responses_non_streaming_async(
             cache_read = usage_data.input_tokens_details.cached_tokens or 0
 
             set_cost_attribute(span, usage_data)
-            prompt_tokens, completion_tokens, cache_read, cache_creation = (
-                openai_tokens_converter(
-                    prompt_tokens,
-                    completion_tokens,
-                    cache_read,
-                    0,
-                    usage_data.total_tokens,
-                )
+            (
+                prompt_tokens,
+                completion_tokens,
+                cache_read,
+                cache_creation,
+                input_image_tokens,
+                output_image_tokens,
+            ) = openai_tokens_converter(
+                prompt_tokens,
+                completion_tokens,
+                cache_read,
+                0,
+                0,
+                0,
+                usage_data.total_tokens,
             )
 
             span.set_attribute(
@@ -419,14 +440,21 @@ def _wrap_responses_streaming_async(
                     )
 
                     set_cost_attribute(span, chunk.response.usage)
-                    prompt_tokens, completion_tokens, cache_read, cache_creation = (
-                        openai_tokens_converter(
-                            prompt_tokens,
-                            completion_tokens,
-                            cache_read,
-                            0,
-                            chunk.response.usage.total_tokens,
-                        )
+                    (
+                        prompt_tokens,
+                        completion_tokens,
+                        cache_read,
+                        cache_creation,
+                        input_image_tokens,
+                        output_image_tokens,
+                    ) = openai_tokens_converter(
+                        prompt_tokens,
+                        completion_tokens,
+                        cache_read,
+                        0,
+                        0,
+                        0,
+                        chunk.response.usage.total_tokens,
                     )
 
                     span.set_attribute(

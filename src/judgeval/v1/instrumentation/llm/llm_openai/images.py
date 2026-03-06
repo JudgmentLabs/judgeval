@@ -81,18 +81,26 @@ def _serialize_stream_completion(chunk: ImageStreamEvent) -> Dict[str, Any]:
 
 
 def _set_image_usage(span: Span, usage_data: ImageUsage) -> None:
-    prompt_tokens = usage_data.input_tokens or 0
-    completion_tokens = usage_data.output_tokens or 0
+    input_text_tokens = usage_data.input_tokens_details.text_tokens or 0
+    input_image_tokens = usage_data.input_tokens_details.image_tokens or 0
+    output_tokens = usage_data.output_tokens or 0
 
     set_cost_attribute(span, usage_data)
-    prompt_tokens, completion_tokens, cache_read, cache_creation = (
-        openai_tokens_converter(
-            prompt_tokens,
-            completion_tokens,
-            0,
-            0,
-            usage_data.total_tokens,
-        )
+    (
+        prompt_tokens,
+        completion_tokens,
+        cache_read,
+        cache_creation,
+        input_image_tokens,
+        output_image_tokens,
+    ) = openai_tokens_converter(
+        input_text_tokens,
+        0,
+        0,
+        0,
+        input_image_tokens,
+        output_tokens,
+        usage_data.total_tokens,
     )
 
     span.set_attribute(
@@ -101,6 +109,15 @@ def _set_image_usage(span: Span, usage_data: ImageUsage) -> None:
     span.set_attribute(AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens)
     span.set_attribute(AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, 0)
     span.set_attribute(AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0)
+    span.set_attribute(
+        AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_IMAGE_TOKENS, input_image_tokens
+    )
+    span.set_attribute(
+        AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS, input_text_tokens
+    )
+    span.set_attribute(
+        AttributeKeys.JUDGMENT_USAGE_OUTPUT_IMAGE_TOKENS, output_image_tokens
+    )
     span.set_attribute(
         AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(usage_data)
     )
