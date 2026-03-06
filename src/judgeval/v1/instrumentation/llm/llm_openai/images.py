@@ -87,10 +87,10 @@ def _set_image_usage(span: Span, usage_data: ImageUsage) -> None:
 
     set_cost_attribute(span, usage_data)
     (
-        prompt_tokens,
-        completion_tokens,
-        cache_read,
-        cache_creation,
+        input_text_tokens,
+        _,
+        _,
+        _,
         input_image_tokens,
         output_image_tokens,
     ) = openai_tokens_converter(
@@ -104,16 +104,13 @@ def _set_image_usage(span: Span, usage_data: ImageUsage) -> None:
     )
 
     span.set_attribute(
-        AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS, prompt_tokens
+        AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS, input_text_tokens
     )
-    span.set_attribute(AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens)
+    span.set_attribute(AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, 0)
     span.set_attribute(AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, 0)
     span.set_attribute(AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0)
     span.set_attribute(
         AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_IMAGE_TOKENS, input_image_tokens
-    )
-    span.set_attribute(
-        AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS, input_text_tokens
     )
     span.set_attribute(
         AttributeKeys.JUDGMENT_USAGE_OUTPUT_IMAGE_TOKENS, output_image_tokens

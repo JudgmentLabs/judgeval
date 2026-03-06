@@ -71,9 +71,9 @@ def _wrap_beta_non_streaming_sync(
                 prompt_tokens,
                 completion_tokens,
                 cache_read,
-                cache_creation,
-                input_image_tokens,
-                output_image_tokens,
+                _,
+                _,
+                _,
             ) = openai_tokens_converter(
                 prompt_tokens,
                 completion_tokens,
@@ -170,9 +170,9 @@ def _wrap_beta_non_streaming_async(
                 prompt_tokens,
                 completion_tokens,
                 cache_read,
-                cache_creation,
-                input_image_tokens,
-                output_image_tokens,
+                _,
+                _,
+                _,
             ) = openai_tokens_converter(
                 prompt_tokens,
                 completion_tokens,
@@ -196,6 +196,10 @@ def _wrap_beta_non_streaming_async(
             span.set_attribute(
                 AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
             )
+            span.set_attribute(
+                AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_IMAGE_TOKENS, 0
+            )
+            span.set_attribute(AttributeKeys.JUDGMENT_USAGE_OUTPUT_IMAGE_TOKENS, 0)
             span.set_attribute(
                 AttributeKeys.JUDGMENT_USAGE_METADATA,
                 safe_serialize(usage_data),

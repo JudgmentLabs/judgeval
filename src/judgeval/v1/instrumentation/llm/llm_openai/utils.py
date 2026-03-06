@@ -17,7 +17,7 @@ def openai_tokens_converter(
 ) -> tuple[int, int, int, int, int, int]:
     """
     Returns:
-        tuple[int, int, int, int, int, int, int]:
+        tuple[int, int, int, int, int, int]:
             - judgment.usage.non_cached_input
             - judgment.usage.output_tokens
             - judgment.usage.cached_input_tokens

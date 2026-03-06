@@ -72,6 +72,8 @@ def _set_usage_attributes(
     span.set_attribute(AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens)
     span.set_attribute(AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read)
     span.set_attribute(AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0)
+    span.set_attribute(AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_IMAGE_TOKENS, 0)
+    span.set_attribute(AttributeKeys.JUDGMENT_USAGE_OUTPUT_IMAGE_TOKENS, 0)
     span.set_attribute(
         AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(usage_data)
     )
