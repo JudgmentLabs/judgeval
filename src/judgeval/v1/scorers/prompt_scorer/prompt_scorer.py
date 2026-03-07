@@ -15,7 +15,6 @@ class PromptScorer(APIScorer):
         "_judgment_api_key",
         "_organization_id",
         "_project_id",
-        "_is_trace",
     )
 
     def __init__(
@@ -29,15 +28,9 @@ class PromptScorer(APIScorer):
         judgment_api_key: str = "",
         organization_id: str = "",
         project_id: Optional[str] = None,
-        is_trace: bool = False,
     ):
-        score_type = (
-            APIScorerType.TRACE_PROMPT_SCORER
-            if is_trace
-            else APIScorerType.PROMPT_SCORER
-        )
         super().__init__(
-            score_type=score_type,
+            score_type=APIScorerType.PROMPT_SCORER,
             threshold=threshold,
             name=name,
             model=model,
@@ -48,7 +41,6 @@ class PromptScorer(APIScorer):
         self._judgment_api_key = judgment_api_key
         self._organization_id = organization_id
         self._project_id = project_id
-        self._is_trace = is_trace
 
     def get_prompt(self) -> str:
         return self._prompt

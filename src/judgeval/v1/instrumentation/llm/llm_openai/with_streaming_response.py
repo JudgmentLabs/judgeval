@@ -56,15 +56,21 @@ def _set_usage_attributes(
     usage_data: Any,
 ) -> None:
     """Set token usage attributes on a span after conversion."""
-    prompt_tokens, completion_tokens, cache_read, _ = openai_tokens_converter(
-        prompt_tokens, completion_tokens, cache_read, 0, total_tokens
+    (
+        prompt_tokens,
+        completion_tokens,
+        cache_read,
+        _,
+        _,
+        _,
+    ) = openai_tokens_converter(
+        prompt_tokens, completion_tokens, cache_read, 0, 0, 0, total_tokens
     )
     span.set_attribute(
         AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS, prompt_tokens
     )
     span.set_attribute(AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens)
     span.set_attribute(AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read)
-    span.set_attribute(AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0)
     span.set_attribute(
         AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(usage_data)
     )

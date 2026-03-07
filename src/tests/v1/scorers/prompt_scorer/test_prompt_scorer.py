@@ -9,7 +9,6 @@ def test_prompt_scorer_initialization():
     assert scorer._options is None
     assert scorer._model is None
     assert scorer._description is None
-    assert scorer._is_trace is False
 
 
 def test_prompt_scorer_with_options():
@@ -33,11 +32,6 @@ def test_prompt_scorer_with_description():
         name="TestPrompt", prompt="Test", description="Test description"
     )
     assert scorer._description == "Test description"
-
-
-def test_prompt_scorer_trace_mode():
-    scorer = PromptScorer(name="TestPrompt", prompt="Test", is_trace=True)
-    assert scorer._is_trace is True
 
 
 def test_prompt_scorer_get_name():
@@ -138,13 +132,6 @@ def test_prompt_scorer_get_scorer_config():
     assert config["kwargs"]["options"] == {"yes": 1.0, "no": 0.0}
     assert config["kwargs"]["model"] == "gpt-4"
     assert config["kwargs"]["description"] == "Test description"
-
-
-def test_prompt_scorer_get_scorer_config_trace_mode():
-    scorer = PromptScorer(name="TraceScorer", prompt="Test", is_trace=True)
-
-    config = scorer.get_scorer_config()
-    assert config["score_type"] == "Trace Prompt Scorer"
 
 
 def test_prompt_scorer_get_scorer_config_minimal():

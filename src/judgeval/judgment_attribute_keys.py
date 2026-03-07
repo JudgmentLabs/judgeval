@@ -24,11 +24,15 @@ class AttributeKeys(str, Enum):
     JUDGMENT_LLM_PROVIDER = "judgment.llm.provider"
     JUDGMENT_LLM_MODEL_NAME = "judgment.llm.model"
     JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS = "judgment.usage.non_cached_input_tokens"
+    JUDGMENT_USAGE_NON_CACHED_INPUT_IMAGE_TOKENS = (
+        "judgment.usage.non_cached_input_image_tokens"
+    )
     JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS = (
         "judgment.usage.cache_creation_input_tokens"
     )
     JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS = "judgment.usage.cache_read_input_tokens"
     JUDGMENT_USAGE_OUTPUT_TOKENS = "judgment.usage.output_tokens"
+    JUDGMENT_USAGE_OUTPUT_IMAGE_TOKENS = "judgment.usage.output_image_tokens"
     JUDGMENT_USAGE_TOTAL_COST_USD = "judgment.usage.total_cost_usd"
 
     JUDGMENT_SESSION_ID = "judgment.session_id"
