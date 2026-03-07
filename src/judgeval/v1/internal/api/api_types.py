@@ -34,7 +34,7 @@ class AddTraceTagsResponse(TypedDict):
 
 class BaseScorer(TypedDict):
     score_type: str
-    name: NotRequired[Optional[str]]
+    name: str
     class_name: NotRequired[Optional[str]]
     score: NotRequired[Optional[float]]
     minimum_score_range: NotRequired[Optional[float]]
@@ -92,6 +92,17 @@ E2EFetchSpanScoreResponse = List[Dict[str, Any]]
 E2EFetchTraceResponse = List[Dict[str, Any]]
 
 
+class E2ETracesPerProjectResponse(TypedDict):
+    data: E2ETracesPerProjectRow
+    total_spans: float
+    total_traces: float
+    limit: float
+    offset: float
+
+
+E2ETracesPerProjectRow = List[Dict[str, Any]]
+
+
 class ErrorResponse(TypedDict):
     error: str
     message: NotRequired[Optional[str]]
@@ -101,6 +112,8 @@ class Example(TypedDict):
     example_id: str
     created_at: str
     name: NotRequired[Optional[str]]
+    trace_id: NotRequired[Optional[str]]
+    span_id: NotRequired[Optional[str]]
 
 
 class ExampleEvaluationRun(TypedDict):
@@ -217,6 +230,15 @@ class LogEvalResultsResponse(TypedDict):
     ui_results_url: str
 
 
+class PendingEvalPayload(TypedDict):
+    project_id: str
+    eval_name: str
+    judges: List[Dict[str, Any]]
+    examples: List[Dict[str, Any]]
+    is_offline: bool
+    is_behavior: bool
+
+
 class PromptCommitInfo(TypedDict):
     name: str
     prompt: str
@@ -241,6 +263,7 @@ class PromptScorer(TypedDict):
     description: NotRequired[Optional[str]]
     created_at: NotRequired[Optional[str]]
     updated_at: NotRequired[Optional[str]]
+    is_trace: NotRequired[Optional[bool]]
 
 
 PullAllDatasetsResponse = List[DatasetInfo]
@@ -263,7 +286,7 @@ class ResolveProjectResponse(TypedDict):
 
 class ScorerConfig(TypedDict):
     score_type: str
-    name: NotRequired[Optional[str]]
+    name: str
     threshold: float
     model: NotRequired[Optional[str]]
     required_params: NotRequired[Optional[List[str]]]
@@ -353,6 +376,28 @@ class UntagPromptRequest(TypedDict):
 
 class UntagPromptResponse(TypedDict):
     commit_ids: List[str]
+
+
+class UploadCustomScorerBundleMetadata(TypedDict):
+    scorer_name: str
+    entrypoint_path: str
+    requirements_path: NotRequired[Optional[str]]
+    class_name: str
+    scorer_type: NotRequired[Optional[str]]
+    response_type: str
+    version: NotRequired[Optional[float]]
+    bump_major: NotRequired[Optional[bool]]
+
+
+class UploadCustomScorerBundleRequest(TypedDict):
+    metadata: UploadCustomScorerBundleMetadata
+    bundle: bytes
+
+
+class UploadCustomScorerBundleResponse(TypedDict):
+    scorer_name: str
+    status: str
+    message: str
 
 
 class UploadCustomScorerRequest(TypedDict):

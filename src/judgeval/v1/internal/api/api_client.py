@@ -1,5 +1,6 @@
 # mypy: ignore-errors
 from typing import Dict, Any, Mapping, Literal, Optional
+import json
 import httpx
 from httpx import Response
 from judgeval.exceptions import JudgmentAPIError
@@ -25,6 +26,13 @@ def _handle_response(r: Response) -> Any:
             detail = r.text
         raise JudgmentAPIError(r.status_code, detail, r)
     return r.json()
+
+
+def _multipart_headers(api_key: str, organization_id: str) -> Mapping[str, str]:
+    return {
+        "Authorization": f"Bearer {api_key}",
+        "X-Organization-Id": organization_id,
+    }
 
 
 class JudgmentSyncClient:
@@ -60,6 +68,35 @@ class JudgmentSyncClient:
                 headers=_headers(self.api_key, self.organization_id),
             )
         logger.debug(f"HTTP {method} {url} -> {r.status_code}")
+        return _handle_response(r)
+
+    def _multipart_request(
+        self,
+        method: Literal["POST", "PATCH", "PUT"],
+        url: str,
+        payload: Any,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        logger.debug(f"HTTP {method} (multipart) {url}")
+        data = {}
+        files = {}
+        for key, value in payload.items():
+            if isinstance(value, (bytes, bytearray)):
+                files[key] = (key, value, "application/octet-stream")
+            else:
+                if isinstance(value, dict):
+                    data[key] = json.dumps(value)
+                else:
+                    data[key] = value
+        r = self.client.request(
+            method,
+            url,
+            data=data,
+            files=files,
+            params=params,
+            headers=_multipart_headers(self.api_key, self.organization_id),
+        )
+        logger.debug(f"HTTP {method} (multipart) {url} -> {r.status_code}")
         return _handle_response(r)
 
     def post_otel_v1_traces(self) -> Any:
@@ -165,7 +202,6 @@ class JudgmentSyncClient:
             "POST",
             url_for(f"/v1/projects/{project_id}/eval-results", self.base_url),
             payload,
-            params={},
         )
 
     def post_projects_eval_results_examples(
@@ -175,7 +211,6 @@ class JudgmentSyncClient:
             "POST",
             url_for(f"/v1/projects/{project_id}/eval-results/examples", self.base_url),
             payload,
-            params={},
         )
 
     def get_projects_experiments_by_run_id(
@@ -265,10 +300,13 @@ class JudgmentSyncClient:
         self,
         project_id: str,
         names: Optional[str] = None,
+        is_trace: Optional[str] = None,
     ) -> FetchPromptScorersResponse:
         query_params = {}
         if names is not None:
             query_params["names"] = names
+        if is_trace is not None:
+            query_params["is_trace"] = is_trace
         return self._request(
             "GET",
             url_for(f"/v1/projects/{project_id}/scorers", self.base_url),
@@ -293,6 +331,15 @@ class JudgmentSyncClient:
             payload,
         )
 
+    def post_projects_scorers_custom_bundle(
+        self, project_id: str, payload: UploadCustomScorerBundleRequest
+    ) -> UploadCustomScorerBundleResponse:
+        return self._multipart_request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/scorers/custom/bundle", self.base_url),
+            payload,
+        )
+
     def get_projects_scorers_custom_by_name_exists(
         self, project_id: str, name: str
     ) -> CustomScorerExistsResponse:
@@ -313,13 +360,27 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def get_e2e_fetch_trace(
+    def get_e2e_fetch_trace_by_project_name_by_trace_id(
         self, project_name: str, trace_id: str
     ) -> E2EFetchTraceResponse:
         return self._request(
             "GET",
             url_for(f"/v1/e2e_fetch_trace/{project_name}/{trace_id}", self.base_url),
             {},
+        )
+
+    def get_e2e_traces_per_project(
+        self, project_id: str, limit: Optional[str] = None, offset: Optional[str] = None
+    ) -> E2ETracesPerProjectResponse:
+        query_params = {}
+        if limit is not None:
+            query_params["limit"] = limit
+        if offset is not None:
+            query_params["offset"] = offset
+        return self._request(
+            "GET",
+            url_for(f"/v1/e2e_traces_per_project/{project_id}", self.base_url),
+            query_params,
         )
 
     def post_e2e_fetch_span_score(
@@ -348,6 +409,7 @@ class JudgmentAsyncClient:
         payload: Any,
         params: Optional[Dict[str, Any]] = None,
     ) -> Any:
+        logger.debug(f"HTTP {method} {url}")
         if method == "GET":
             r = self.client.request(
                 method,
@@ -365,6 +427,36 @@ class JudgmentAsyncClient:
             )
         r = await r
         logger.debug(f"HTTP {method} {url} -> {r.status_code}")
+        return _handle_response(r)
+
+    async def _multipart_request(
+        self,
+        method: Literal["POST", "PATCH", "PUT"],
+        url: str,
+        payload: Any,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        logger.debug(f"HTTP {method} (multipart) {url}")
+        data = {}
+        files = {}
+        for key, value in payload.items():
+            if isinstance(value, (bytes, bytearray)):
+                files[key] = (key, value, "application/octet-stream")
+            else:
+                if isinstance(value, dict):
+                    data[key] = json.dumps(value)
+                else:
+                    data[key] = value
+        r = self.client.request(
+            method,
+            url,
+            data=data,
+            files=files,
+            params=params,
+            headers=_multipart_headers(self.api_key, self.organization_id),
+        )
+        r = await r
+        logger.debug(f"HTTP {method} (multipart) {url} -> {r.status_code}")
         return _handle_response(r)
 
     async def post_otel_v1_traces(self) -> Any:
@@ -568,10 +660,13 @@ class JudgmentAsyncClient:
         self,
         project_id: str,
         names: Optional[str] = None,
+        is_trace: Optional[str] = None,
     ) -> FetchPromptScorersResponse:
         query_params = {}
         if names is not None:
             query_params["names"] = names
+        if is_trace is not None:
+            query_params["is_trace"] = is_trace
         return await self._request(
             "GET",
             url_for(f"/v1/projects/{project_id}/scorers", self.base_url),
@@ -596,6 +691,15 @@ class JudgmentAsyncClient:
             payload,
         )
 
+    async def post_projects_scorers_custom_bundle(
+        self, project_id: str, payload: UploadCustomScorerBundleRequest
+    ) -> UploadCustomScorerBundleResponse:
+        return await self._multipart_request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/scorers/custom/bundle", self.base_url),
+            payload,
+        )
+
     async def get_projects_scorers_custom_by_name_exists(
         self, project_id: str, name: str
     ) -> CustomScorerExistsResponse:
@@ -616,13 +720,27 @@ class JudgmentAsyncClient:
             payload,
         )
 
-    async def get_e2e_fetch_trace(
+    async def get_e2e_fetch_trace_by_project_name_by_trace_id(
         self, project_name: str, trace_id: str
     ) -> E2EFetchTraceResponse:
         return await self._request(
             "GET",
             url_for(f"/v1/e2e_fetch_trace/{project_name}/{trace_id}", self.base_url),
             {},
+        )
+
+    async def get_e2e_traces_per_project(
+        self, project_id: str, limit: Optional[str] = None, offset: Optional[str] = None
+    ) -> E2ETracesPerProjectResponse:
+        query_params = {}
+        if limit is not None:
+            query_params["limit"] = limit
+        if offset is not None:
+            query_params["offset"] = offset
+        return await self._request(
+            "GET",
+            url_for(f"/v1/e2e_traces_per_project/{project_id}", self.base_url),
+            query_params,
         )
 
     async def post_e2e_fetch_span_score(

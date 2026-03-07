@@ -79,9 +79,9 @@ class TestScorer(ExampleScorer):
         factory = CustomScorerFactory(client=mock_client, project_id=None)
 
         with caplog.at_level(logging.ERROR):
-            result = factory.upload(str(scorer_file))
+            result = factory.upload(str(scorer_file), [])
 
         assert result is False
         assert "project_id is not set" in caplog.text
         assert "upload()" in caplog.text
-        mock_client.post_projects_scorers_custom.assert_not_called()
+        mock_client.post_projects_scorers_custom_bundle.assert_not_called()
