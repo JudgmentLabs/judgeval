@@ -11,22 +11,47 @@ def openai_tokens_converter(
     completion_tokens: int,
     cache_read: int,
     cache_creation: int,
+    input_image_tokens: int,
+    output_image_tokens: int,
     total_tokens: int,
-) -> tuple[int, int, int, int]:
+) -> tuple[int, int, int, int, int, int]:
     """
     Returns:
-        tuple[int, int, int, int]:
+        tuple[int, int, int, int, int, int]:
             - judgment.usage.non_cached_input
             - judgment.usage.output_tokens
             - judgment.usage.cached_input_tokens
             - judgment.usage.cache_creation_tokens
+            - judgment.usage.non_cached_input_image_tokens
+            - judgment.usage.output_image_tokens
     """
-    manual_tokens = prompt_tokens + completion_tokens + cache_read + cache_creation
+    manual_tokens = (
+        prompt_tokens
+        + completion_tokens
+        + cache_read
+        + cache_creation
+        + input_image_tokens
+        + output_image_tokens
+    )
 
     if manual_tokens > total_tokens:
-        return prompt_tokens - cache_read, completion_tokens, cache_read, cache_creation
+        return (
+            prompt_tokens - cache_read,
+            completion_tokens,
+            cache_read,
+            cache_creation,
+            input_image_tokens,
+            output_image_tokens,
+        )
     else:
-        return prompt_tokens, completion_tokens, cache_read, cache_creation
+        return (
+            prompt_tokens,
+            completion_tokens,
+            cache_read,
+            cache_creation,
+            input_image_tokens,
+            output_image_tokens,
+        )
 
 
 @dont_throw

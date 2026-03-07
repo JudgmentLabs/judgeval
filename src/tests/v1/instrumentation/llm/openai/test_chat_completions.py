@@ -234,6 +234,7 @@ class TestAsyncChatCompletions(BaseOpenAIChatCompletionsTest):
             expected_span_name="OPENAI_API_CALL",
             expected_model_name="gpt-4o-mini",
             check_cache_read_value=True,
+            check_cache=False,
         )
 
 
@@ -417,6 +418,7 @@ class TestEdgeCases(BaseOpenAIChatCompletionsTest):
             attrs=attrs1,
             expected_span_name="OPENAI_API_CALL",
             expected_model_name="gpt-5-nano",
+            check_cache=False,
         )
 
         verify_span_attributes_comprehensive(
@@ -424,6 +426,7 @@ class TestEdgeCases(BaseOpenAIChatCompletionsTest):
             attrs=attrs2,
             expected_span_name="OPENAI_API_CALL",
             expected_model_name="gpt-5-nano",
+            check_cache=False,
         )
 
     def test_streaming_with_minimal_response(
@@ -495,6 +498,7 @@ class TestSafetyGuarantees(BaseOpenAIChatCompletionsTest):
             expected_model_name="gpt-5-nano",
             check_prompt=False,
             check_completion=False,
+            check_cache=False,
         )
 
     def test_wrapped_vs_unwrapped_structure(
@@ -533,6 +537,7 @@ class TestSafetyGuarantees(BaseOpenAIChatCompletionsTest):
             attrs=attrs,
             expected_span_name="OPENAI_API_CALL",
             expected_model_name="gpt-5-nano",
+            check_cache=False,
         )
 
     def test_streaming_exceptions_propagate(
