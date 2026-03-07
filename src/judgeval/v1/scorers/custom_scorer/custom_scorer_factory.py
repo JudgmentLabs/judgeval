@@ -15,7 +15,6 @@ from judgeval.v1.internal.api.api_types import (
 from judgeval.v1.scorers.custom_scorer.custom_scorer import CustomScorer
 from judgeval.utils.guards import expect_project_id
 from judgeval.exceptions import JudgmentAPIError
-import typer
 
 RESPONSE_TYPE_MAP: dict[str, Literal["binary", "categorical", "numeric"]] = {
     "BinaryResponse": "binary",
@@ -140,6 +139,7 @@ class CustomScorerFactory:
         included_files_paths: list[str],
         requirements_file_path: str | None = None,
         unique_name: str | None = None,
+        bump_major: bool = False,
     ) -> bool:
         project_id = expect_project_id(self._project_id)
         if not project_id:
@@ -192,15 +192,6 @@ class CustomScorerFactory:
             unique_name = class_name
             judgeval_logger.info(f"Auto-detected scorer name: '{unique_name}'")
 
-        exists_resp = self._client.get_projects_scorers_custom_by_name_exists(
-            project_id=project_id, name=unique_name
-        )
-        if exists_resp.get("exists"):
-            typer.confirm(
-                f"Scorer '{unique_name}' already exists. Upload a new version?",
-                abort=True,
-            )
-
         bundle = _build_bundle(
             entrypoint_path, included_files_paths, requirements_file_path
         )
@@ -223,6 +214,7 @@ class CustomScorerFactory:
             "scorer_type": scorer_type,
             "response_type": response_type,
             "version": 3 if scorer_type is None else 2,
+            "bump_major": bump_major,
         }
 
         if requirements_arcname:

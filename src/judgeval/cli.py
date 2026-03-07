@@ -78,6 +78,9 @@ def upload_scorer(
         "-n",
         help="Custom scorer name (auto-detected if not provided)",
     ),
+    bump_major: bool = typer.Option(
+        False, "--bump-major", "-m", help="Bump major version"
+    ),
     api_key: str = typer.Option(None, envvar="JUDGMENT_API_KEY"),
     organization_id: str = typer.Option(None, envvar="JUDGMENT_ORG_ID"),
 ):
@@ -92,6 +95,7 @@ def upload_scorer(
             included_files_paths=included_files_paths,
             requirements_file_path=requirements_file_path,
             unique_name=unique_name,
+            bump_major=bump_major,
         )
         if not result:
             raise typer.Abort()

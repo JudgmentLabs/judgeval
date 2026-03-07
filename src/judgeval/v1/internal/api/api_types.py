@@ -386,6 +386,7 @@ class UploadCustomScorerBundleMetadata(TypedDict):
     scorer_type: NotRequired[Optional[str]]
     response_type: str
     version: NotRequired[Optional[float]]
+    bump_major: NotRequired[Optional[bool]]
 
 
 class UploadCustomScorerBundleRequest(TypedDict):
