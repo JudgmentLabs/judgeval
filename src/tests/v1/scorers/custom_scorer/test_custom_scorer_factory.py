@@ -79,7 +79,7 @@ class TestScorer(ExampleScorer):
         factory = CustomScorerFactory(client=mock_client, project_id=None)
 
         with caplog.at_level(logging.ERROR):
-            result = factory.upload(str(scorer_file))
+            result = factory.upload(str(scorer_file), [])
 
         assert result is False
         assert "project_id is not set" in caplog.text

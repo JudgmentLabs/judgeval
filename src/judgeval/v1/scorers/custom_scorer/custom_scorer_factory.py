@@ -77,11 +77,11 @@ def _build_bundle(
     entrypoint_path: str,
     included_files_paths: list[str],
     requirements_file_path: str | None,
-) -> bytes:
+) -> tuple[bytes, str, str | None]:
     all_abs: list[str] = [os.path.abspath(entrypoint_path)]
     for p in included_files_paths:
         all_abs.append(os.path.abspath(p))
-    if requirements_file_path and os.path.exists(requirements_file_path):
+    if requirements_file_path:
         all_abs.append(os.path.abspath(requirements_file_path))
 
     base_dirs = [os.path.dirname(p) if os.path.isfile(p) else p for p in all_abs]
@@ -101,7 +101,14 @@ def _build_bundle(
             arcname = os.path.relpath(abs_path, common)
             tar.add(abs_path, arcname=arcname, filter=dedup_filter)
 
-    return buf.getvalue()
+    entrypoint_arcname = os.path.relpath(os.path.abspath(entrypoint_path), common)
+    requirements_arcname = (
+        os.path.relpath(os.path.abspath(requirements_file_path), common)
+        if requirements_file_path
+        else None
+    )
+
+    return buf.getvalue(), entrypoint_arcname, requirements_arcname
 
 
 class CustomScorerFactory:
@@ -150,6 +157,11 @@ class CustomScorerFactory:
                 f"Scorer entrypoint file not found: {entrypoint_path}"
             )
 
+        if requirements_file_path and not os.path.exists(requirements_file_path):
+            raise FileNotFoundError(
+                f"Specified requirements file not found: {requirements_file_path}"
+            )
+
         with open(entrypoint_path, "r") as f:
             scorer_code = f.read()
 
@@ -192,19 +204,8 @@ class CustomScorerFactory:
             unique_name = class_name
             judgeval_logger.info(f"Auto-detected scorer name: '{unique_name}'")
 
-        bundle = _build_bundle(
+        bundle, entrypoint_arcname, requirements_arcname = _build_bundle(
             entrypoint_path, included_files_paths, requirements_file_path
-        )
-
-        all_abs = [os.path.abspath(entrypoint_path)]
-        all_abs.extend(os.path.abspath(p) for p in included_files_paths)
-        base_dirs = [os.path.dirname(p) if os.path.isfile(p) else p for p in all_abs]
-        common = os.path.commonpath(base_dirs)
-        entrypoint_arcname = os.path.relpath(os.path.abspath(entrypoint_path), common)
-        requirements_arcname = (
-            os.path.relpath(os.path.abspath(requirements_file_path), common)
-            if requirements_file_path
-            else None
         )
 
         metadata: UploadCustomScorerBundleMetadata = {
