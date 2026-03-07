@@ -687,7 +687,10 @@ def generate_method_body(
         else:
             return f'return {async_prefix}self._request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            {{}},\n        )'
     elif is_multipart and request_type:
-        return f'return {async_prefix}self._multipart_request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            payload,\n        )'
+        if query_setup:
+            return f'{query_setup}\n        return {async_prefix}self._multipart_request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            payload,\n            params={query_param},\n        )'
+        else:
+            return f'return {async_prefix}self._multipart_request(\n            "{method}",\n            url_for({url_expr}, self.base_url),\n            payload,\n        )'
     else:
         if request_type:
             if query_setup:
@@ -756,7 +759,7 @@ def generate_client_class(
     )
     lines.append(f"    {multipart_method}(")
     lines.append(
-        '        self, method: Literal["POST", "PATCH", "PUT"], url: str, payload: Any'
+        '        self, method: Literal["POST", "PATCH", "PUT"], url: str, payload: Any, params: Optional[Dict[str, Any]] = None'
     )
     lines.append("    ) -> Any:")
     lines.append('        logger.debug(f"HTTP {method} (multipart) {url}")')
@@ -777,6 +780,7 @@ def generate_client_class(
     lines.append("            url,")
     lines.append("            data=data,")
     lines.append("            files=files,")
+    lines.append("            params=params,")
     lines.append(
         "            headers=_multipart_headers(self.api_key, self.organization_id),"
     )

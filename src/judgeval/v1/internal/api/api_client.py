@@ -71,7 +71,11 @@ class JudgmentSyncClient:
         return _handle_response(r)
 
     def _multipart_request(
-        self, method: Literal["POST", "PATCH", "PUT"], url: str, payload: Any
+        self,
+        method: Literal["POST", "PATCH", "PUT"],
+        url: str,
+        payload: Any,
+        params: Optional[Dict[str, Any]] = None,
     ) -> Any:
         logger.debug(f"HTTP {method} (multipart) {url}")
         data = {}
@@ -89,6 +93,7 @@ class JudgmentSyncClient:
             url,
             data=data,
             files=files,
+            params=params,
             headers=_multipart_headers(self.api_key, self.organization_id),
         )
         logger.debug(f"HTTP {method} (multipart) {url} -> {r.status_code}")
@@ -295,10 +300,13 @@ class JudgmentSyncClient:
         self,
         project_id: str,
         names: Optional[str] = None,
+        is_trace: Optional[str] = None,
     ) -> FetchPromptScorersResponse:
         query_params = {}
         if names is not None:
             query_params["names"] = names
+        if is_trace is not None:
+            query_params["is_trace"] = is_trace
         return self._request(
             "GET",
             url_for(f"/v1/projects/{project_id}/scorers", self.base_url),
@@ -422,7 +430,11 @@ class JudgmentAsyncClient:
         return _handle_response(r)
 
     async def _multipart_request(
-        self, method: Literal["POST", "PATCH", "PUT"], url: str, payload: Any
+        self,
+        method: Literal["POST", "PATCH", "PUT"],
+        url: str,
+        payload: Any,
+        params: Optional[Dict[str, Any]] = None,
     ) -> Any:
         logger.debug(f"HTTP {method} (multipart) {url}")
         data = {}
@@ -440,6 +452,7 @@ class JudgmentAsyncClient:
             url,
             data=data,
             files=files,
+            params=params,
             headers=_multipart_headers(self.api_key, self.organization_id),
         )
         r = await r
@@ -647,10 +660,13 @@ class JudgmentAsyncClient:
         self,
         project_id: str,
         names: Optional[str] = None,
+        is_trace: Optional[str] = None,
     ) -> FetchPromptScorersResponse:
         query_params = {}
         if names is not None:
             query_params["names"] = names
+        if is_trace is not None:
+            query_params["is_trace"] = is_trace
         return await self._request(
             "GET",
             url_for(f"/v1/projects/{project_id}/scorers", self.base_url),
