@@ -142,6 +142,24 @@ def run_agent(prompt: str) -> str:
 run_agent("What is the capital of the United States?")
 ```
 
+You can also use OpenAI-compatible routers like Forge by configuring the OpenAI
+client with a custom base URL:
+
+```python
+import os
+from openai import OpenAI
+from judgeval.tracer import wrap
+
+client = wrap(
+    OpenAI(
+        api_key=os.getenv("FORGE_API_KEY"),
+        base_url=os.getenv("FORGE_API_BASE", "https://api.forge.tensorblock.co/v1"),
+    )
+)
+
+# Forge models use Provider/model-name, e.g. "openai/gpt-4o-mini"
+```
+
 Running this code will deliver monitoring results to your [free platform account](https://app.judgmentlabs.ai/register) and should look like this:
 
 ![Judgment Platform Trajectory View](assets/quickstart_trajectory_ss.png)
