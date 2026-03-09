@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import ast
 import os
-from typing import Literal, Optional, Tuple
+from typing import Literal, Optional, Tuple, List
+from pydantic import TypeAdapter
 
 from judgeval.logger import judgeval_logger
 from judgeval.v1.internal.api import JudgmentSyncClient
@@ -10,6 +11,7 @@ from judgeval.v1.internal.api.api_types import UploadCustomScorerRequest
 from judgeval.v1.scorers.custom_scorer.custom_scorer import CustomScorer
 from judgeval.utils.guards import expect_project_id
 from judgeval.exceptions import JudgmentAPIError
+from judgeval.v1.hosted.responses import Category
 
 RESPONSE_TYPE_MAP: dict[str, Literal["binary", "categorical", "numeric"]] = {
     "BinaryResponse": "binary",
@@ -21,13 +23,52 @@ V2_SCORER_BASES = {"TraceCustomScorer", "ExampleCustomScorer"}
 V3_SCORER_BASES = {"Judge"}
 
 
-def _extract_generic_arg(node: ast.expr) -> Optional[str]:
+def _extract_generic_arg(
+    node: ast.expr,
+    tree: ast.AST,
+    source: str,
+) -> Tuple[Optional[str], Optional[List[Category]]]:
+    name = None
     if isinstance(node, ast.Subscript):
         if isinstance(node.slice, ast.Name):
-            return node.slice.id
-        if isinstance(node.slice, ast.Attribute):
-            return node.slice.attr
-    return None
+            name = node.slice.id
+        elif isinstance(node.slice, ast.Attribute):
+            name = node.slice.attr
+    if name is None:
+        return (None, None)
+
+    if name in RESPONSE_TYPE_MAP:
+        if name == "CategoricalResponse":
+            raise ValueError(
+                "Judge[CategoricalResponse] is not supported. "
+                "Define a CategoricalResponse subclass with categories."
+            )
+        return (name, None)
+
+    for resolved in ast.walk(tree):
+        if not isinstance(resolved, ast.ClassDef) or resolved.name != name:
+            continue
+        for base in resolved.bases:
+            base_name = _get_base_name(base)
+            if base_name not in RESPONSE_TYPE_MAP:
+                continue
+            if base_name != "CategoricalResponse":
+                return base_name, None
+            for item in resolved.body:
+                if not isinstance(item, ast.Assign):
+                    continue
+                for target in item.targets:
+                    if not (isinstance(target, ast.Name) and target.id == "categories"):
+                        continue
+                    expr_source = ast.get_source_segment(source, item.value)
+                    if expr_source is None:
+                        return (None, None)
+                    validated = TypeAdapter(List[Category]).validate_python(
+                        eval(expr_source, {"__builtins__": {}, "Category": Category})
+                    )
+                    return (base_name, validated)
+            return (base_name, None)
+    return (None, None)
 
 
 def _get_base_name(node: ast.expr) -> Optional[str]:
@@ -42,11 +83,13 @@ def _get_base_name(node: ast.expr) -> Optional[str]:
 
 def parse_judge(
     tree: ast.AST,
+    source: str,
 ) -> Optional[
     Tuple[
         str,
         Optional[Literal["trace", "example"]],
         Literal["binary", "categorical", "numeric"],
+        Optional[List[Category]],
     ]
 ]:
     for node in ast.walk(tree):
@@ -56,15 +99,15 @@ def parse_judge(
             base_name = _get_base_name(base)
             if base_name not in V2_SCORER_BASES and base_name not in V3_SCORER_BASES:
                 continue
-            generic_arg = _extract_generic_arg(base)
+            generic_arg, categories = _extract_generic_arg(base, tree, source)
             if generic_arg not in RESPONSE_TYPE_MAP:
                 continue
             if base_name in V3_SCORER_BASES:
-                return (node.name, None, RESPONSE_TYPE_MAP[generic_arg])
+                return (node.name, None, RESPONSE_TYPE_MAP[generic_arg], categories)
             scorer_type: Literal["trace", "example"] = (
                 "trace" if base_name == "TraceCustomScorer" else "example"
             )
-            return (node.name, scorer_type, RESPONSE_TYPE_MAP[generic_arg])
+            return (node.name, scorer_type, RESPONSE_TYPE_MAP[generic_arg], None)
     return None
 
 
@@ -119,7 +162,7 @@ class CustomScorerFactory:
         except SyntaxError as e:
             raise ValueError(f"Invalid Python syntax in {scorer_file_path}: {e}")
 
-        result = parse_judge(tree)
+        result = parse_judge(tree, scorer_code)
         if result is None:
             raise ValueError(
                 f"No Judge, TraceCustomScorer, or ExampleCustomScorer class found in {scorer_file_path}. "
@@ -127,7 +170,13 @@ class CustomScorerFactory:
                 "or ExampleCustomScorer[ResponseType]."
             )
 
-        class_name, scorer_type, response_type = result
+        class_name, scorer_type, response_type, categories = result
+
+        if response_type == "categorical" and categories is None:
+            raise ValueError(
+                f"Categorical response type requires categories to be defined in {scorer_file_path}. "
+                "Ensure the class defines a 'categories' class variable as a list of Category models."
+            )
 
         if unique_name is None:
             unique_name = class_name
@@ -162,7 +211,11 @@ class CustomScorerFactory:
             "scorer_type": scorer_type,
             "response_type": response_type,
             "version": 3 if scorer_type is None else 2,
+            "categories": [category.model_dump() for category in categories]
+            if categories
+            else None,
         }
+
         response = self._client.post_projects_scorers_custom(
             project_id=project_id,
             payload=payload,
