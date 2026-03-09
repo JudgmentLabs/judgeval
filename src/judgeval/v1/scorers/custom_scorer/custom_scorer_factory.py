@@ -56,12 +56,6 @@ def _find_gitignore_path(start_path: str) -> str | None:
     return None
 
 
-def _match_gitignore(gitignore_path: str, path_to_match: str) -> bool:
-    with open(gitignore_path, "r") as gitignore_file:
-        spec = PathSpec.from_lines("gitignore", gitignore_file)
-    return spec.match_file(path_to_match)
-
-
 def _extract_generic_arg(node: ast.expr) -> Optional[str]:
     if isinstance(node, ast.Subscript):
         if isinstance(node.slice, ast.Name):
@@ -123,12 +117,21 @@ def _build_bundle(
     base_dirs = [os.path.dirname(p) if os.path.isfile(p) else p for p in all_abs]
     common = os.path.commonpath(base_dirs)
     gitignore_path = _find_gitignore_path(common)
+    gitignore_spec = None
+    if gitignore_path:
+        with open(gitignore_path, "r") as f:
+            gitignore_spec = PathSpec.from_lines("gitignore", f)
 
     def should_exclude(path: str) -> bool:
         exclude_pattern_matches = EXCLUDE_SPEC.match_file(path)
-        gitignore_matches = (
-            _match_gitignore(gitignore_path, path) if gitignore_path else False
-        )
+        if gitignore_spec and gitignore_path:
+            abs_path = os.path.join(common, path)
+            rel_to_gitignore = os.path.relpath(
+                abs_path, os.path.dirname(gitignore_path)
+            )
+            gitignore_matches = gitignore_spec.match_file(rel_to_gitignore)
+        else:
+            gitignore_matches = False
         return exclude_pattern_matches or gitignore_matches
 
     seen: set[str] = set()

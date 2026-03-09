@@ -153,6 +153,8 @@ def init(
     if scorer_path.exists():
         raise typer.BadParameter(f"Scorer file already exists: {scorer_name}")
 
+    scorer_path.parent.mkdir(parents=True, exist_ok=True)
+
     if response_type == "binary":
         template = get_binary_scorer_template(scorer_name)
     elif response_type == "categorical":
@@ -161,10 +163,6 @@ def init(
         template = get_numeric_scorer_template(scorer_name)
     else:
         raise typer.BadParameter(f"Unsupported response type: {response_type}")
-
-    with open(scorer_path, "w") as f:
-        f.write(template)
-    typer.echo(f"Scorer initialized successfully: {scorer_path}")
 
     if include_requirements:
         requirements_path = Path(init_path, "requirements.txt")
@@ -175,6 +173,10 @@ def init(
         with open(requirements_path, "w") as f:
             f.write("")
         typer.echo(f"Requirements file initialized successfully: {requirements_path}")
+
+    with open(scorer_path, "w") as f:
+        f.write(template)
+    typer.echo(f"Scorer initialized successfully: {scorer_path}")
 
 
 @app.command()
