@@ -169,7 +169,7 @@ def init(
             )
         with open(requirements_path, "w") as f:
             f.write("")
-    typer.echo(f"Requirements file initialized successfully: {requirements_path}")
+        typer.echo(f"Requirements file initialized successfully: {requirements_path}")
 
 
 @app.command()
