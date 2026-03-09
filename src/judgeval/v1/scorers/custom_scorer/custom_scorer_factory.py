@@ -108,10 +108,20 @@ def _build_bundle(
     included_files_paths: list[str],
     requirements_file_path: str | None,
 ) -> tuple[bytes, str, str | None]:
+    if not os.path.exists(entrypoint_path):
+        raise FileNotFoundError(f"Scorer entrypoint file not found: {entrypoint_path}")
     all_abs: list[str] = [os.path.abspath(entrypoint_path)]
+
     for p in included_files_paths:
+        if not os.path.exists(p):
+            raise FileNotFoundError(f"Included path not found: {p}")
         all_abs.append(os.path.abspath(p))
+
     if requirements_file_path:
+        if not os.path.exists(requirements_file_path):
+            raise FileNotFoundError(
+                f"Specified requirements file not found: {requirements_file_path}"
+            )
         all_abs.append(os.path.abspath(requirements_file_path))
 
     base_dirs = [os.path.dirname(p) if os.path.isfile(p) else p for p in all_abs]
@@ -140,6 +150,15 @@ def _build_bundle(
         if tarinfo.name in seen or should_exclude(tarinfo.name):
             return None
         seen.add(tarinfo.name)
+        if tarinfo.isfile() and tarinfo.name.endswith(".py"):
+            full_path = os.path.join(common, tarinfo.name)
+            with open(full_path, "r") as f:
+                try:
+                    ast.parse(f.read(), filename=full_path)
+                except SyntaxError as e:
+                    raise ValueError(
+                        f"Invalid Python syntax in {full_path}: {e}"
+                    ) from e
         return tarinfo
 
     buf = io.BytesIO()
@@ -204,11 +223,6 @@ class CustomScorerFactory:
                 f"Scorer entrypoint file not found: {entrypoint_path}"
             )
 
-        if requirements_file_path and not os.path.exists(requirements_file_path):
-            raise FileNotFoundError(
-                f"Specified requirements file not found: {requirements_file_path}"
-            )
-
         with open(entrypoint_path, "r") as f:
             scorer_code = f.read()
 
@@ -224,26 +238,6 @@ class CustomScorerFactory:
                 "Ensure the class inherits from Judge[ResponseType], TraceCustomScorer[ResponseType], "
                 "or ExampleCustomScorer[ResponseType]."
             )
-
-        py_files: list[str] = []
-        for path in included_files_paths:
-            if not os.path.exists(path):
-                raise FileNotFoundError(f"Included path not found: {path}")
-            if os.path.isdir(path):
-                for root, _, files in os.walk(path):
-                    for fname in files:
-                        if fname.endswith(".py"):
-                            py_files.append(os.path.join(root, fname))
-            elif path.endswith(".py"):
-                py_files.append(path)
-
-        for file_path in py_files:
-            with open(file_path, "r") as f:
-                code = f.read()
-            try:
-                ast.parse(code, filename=file_path)
-            except SyntaxError as e:
-                raise ValueError(f"Invalid Python syntax in {file_path}: {e}")
 
         class_name, scorer_type, response_type = result
 
