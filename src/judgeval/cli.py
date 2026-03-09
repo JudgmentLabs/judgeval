@@ -139,12 +139,14 @@ def init(
     include_requirements: bool = typer.Option(
         False, "--include-requirements", "-r", help="Include requirements.txt file"
     ),
-    scorer_name: str = typer.Option(..., "--name", "-n", help="Scorer name"),
+    scorer_name: str = typer.Option(..., "--name", "-n", help="Scorer class name"),
     init_path: str = typer.Option(
         ".", "--init-path", "-p", help="Path to initialize the scorer"
     ),
 ):
     """Initialize skeleton code for a new custom scorer."""
+    if not scorer_name.isidentifier():
+        raise typer.BadParameter("Scorer name must be a valid Python identifier")
     scorer_path = Path(
         init_path, f"{re.sub(r'(?<!^)(?=[A-Z])', '_', scorer_name).lower()}.py"
     )
@@ -157,6 +159,9 @@ def init(
         template = get_categorical_scorer_template(scorer_name)
     elif response_type == "numeric":
         template = get_numeric_scorer_template(scorer_name)
+    else:
+        raise typer.BadParameter(f"Unsupported response type: {response_type}")
+
     with open(scorer_path, "w") as f:
         f.write(template)
     typer.echo(f"Scorer initialized successfully: {scorer_path}")

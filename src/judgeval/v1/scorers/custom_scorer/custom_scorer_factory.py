@@ -4,9 +4,9 @@ import ast
 import io
 import os
 import tarfile
-import fnmatch
 from pathlib import Path
 from typing import Literal, Optional, Tuple
+from pathspec import PathSpec
 
 from judgeval.logger import judgeval_logger
 from judgeval.v1.internal.api import JudgmentSyncClient
@@ -27,18 +27,21 @@ RESPONSE_TYPE_MAP: dict[str, Literal["binary", "categorical", "numeric"]] = {
 V2_SCORER_BASES = {"TraceCustomScorer", "ExampleCustomScorer"}
 V3_SCORER_BASES = {"Judge"}
 
-EXCLUDE_PATTERNS = [
-    "**/__pycache__",
-    "**/*.pyc",
-    "**/*.pyo",
-    "**/*.pyd",
-    "**/*.pyw",
-    "**/*.pyz",
-    "**/.venv",
-    "**/venv",
-    "**/.env",
-    "**/.env.*",
-]
+EXCLUDE_SPEC = PathSpec.from_lines(
+    "gitignore",
+    [
+        "__pycache__/",
+        "*.pyc",
+        "*.pyo",
+        "*.pyd",
+        "**/*.pyw",
+        "*.pyz",
+        ".venv/",
+        "venv/",
+        ".env",
+        ".env.*",
+    ],
+)
 
 
 def _find_gitignore_path(start_path: str) -> str | None:
@@ -54,8 +57,6 @@ def _find_gitignore_path(start_path: str) -> str | None:
 
 
 def _match_gitignore(gitignore_path: str, path_to_match: str) -> bool:
-    from pathspec import PathSpec
-
     with open(gitignore_path, "r") as gitignore_file:
         spec = PathSpec.from_lines("gitignore", gitignore_file)
     return spec.match_file(path_to_match)
@@ -124,9 +125,7 @@ def _build_bundle(
     gitignore_path = _find_gitignore_path(common)
 
     def should_exclude(path: str) -> bool:
-        exclude_pattern_matches = any(
-            fnmatch.fnmatch(path, pattern) for pattern in EXCLUDE_PATTERNS
-        )
+        exclude_pattern_matches = EXCLUDE_SPEC.match_file(path)
         gitignore_matches = (
             _match_gitignore(gitignore_path, path) if gitignore_path else False
         )
