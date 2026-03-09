@@ -4,6 +4,8 @@ import ast
 import io
 import os
 import tarfile
+import fnmatch
+from pathlib import Path
 from typing import Literal, Optional, Tuple
 
 from judgeval.logger import judgeval_logger
@@ -24,6 +26,39 @@ RESPONSE_TYPE_MAP: dict[str, Literal["binary", "categorical", "numeric"]] = {
 
 V2_SCORER_BASES = {"TraceCustomScorer", "ExampleCustomScorer"}
 V3_SCORER_BASES = {"Judge"}
+
+EXCLUDE_PATTERNS = [
+    "**/__pycache__",
+    "**/*.pyc",
+    "**/*.pyo",
+    "**/*.pyd",
+    "**/*.pyw",
+    "**/*.pyz",
+    "**/.venv",
+    "**/venv",
+    "**/.env",
+    "**/.env.*",
+]
+
+
+def _find_gitignore_path(start_path: str) -> str | None:
+    """Walk up from start_path to find directory containing .gitignore."""
+    current = Path(start_path).resolve()
+    if current.is_file():
+        current = current.parent
+    while current != current.parent:
+        if (current / ".gitignore").is_file():
+            return str(current / ".gitignore")
+        current = current.parent
+    return None
+
+
+def _match_gitignore(gitignore_path: str, path_to_match: str) -> bool:
+    from pathspec import PathSpec
+
+    with open(gitignore_path, "r") as gitignore_file:
+        spec = PathSpec.from_lines("gitignore", gitignore_file)
+    return spec.match_file(path_to_match)
 
 
 def _extract_generic_arg(node: ast.expr) -> Optional[str]:
@@ -86,11 +121,21 @@ def _build_bundle(
 
     base_dirs = [os.path.dirname(p) if os.path.isfile(p) else p for p in all_abs]
     common = os.path.commonpath(base_dirs)
+    gitignore_path = _find_gitignore_path(common)
+
+    def should_exclude(path: str) -> bool:
+        exclude_pattern_matches = any(
+            fnmatch.fnmatch(path, pattern) for pattern in EXCLUDE_PATTERNS
+        )
+        gitignore_matches = (
+            _match_gitignore(gitignore_path, path) if gitignore_path else False
+        )
+        return exclude_pattern_matches or gitignore_matches
 
     seen: set[str] = set()
 
     def dedup_filter(tarinfo: tarfile.TarInfo) -> tarfile.TarInfo | None:
-        if tarinfo.name in seen:
+        if tarinfo.name in seen or should_exclude(tarinfo.name):
             return None
         seen.add(tarinfo.name)
         return tarinfo
