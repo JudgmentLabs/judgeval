@@ -124,7 +124,9 @@ def _build_bundle(
             )
         all_abs.append(os.path.abspath(requirements_file_path))
 
-    base_dirs = [os.path.dirname(p) if os.path.isfile(p) else p for p in all_abs]
+    base_dirs = [os.path.dirname(p) if os.path.isfile(p) else p for p in all_abs] + [
+        os.path.abspath(os.path.curdir)
+    ]
     common = os.path.commonpath(base_dirs)
     gitignore_path = _find_gitignore_path(common)
     gitignore_spec = None
@@ -147,11 +149,13 @@ def _build_bundle(
     seen: set[str] = set()
 
     def dedup_filter(tarinfo: tarfile.TarInfo) -> tarfile.TarInfo | None:
-        if tarinfo.name in seen or should_exclude(tarinfo.name):
+        normalized = os.path.normpath(tarinfo.name)
+        tarinfo.name = normalized
+        if normalized in seen or should_exclude(normalized):
             return None
-        seen.add(tarinfo.name)
-        if tarinfo.isfile() and tarinfo.name.endswith(".py"):
-            full_path = os.path.join(common, tarinfo.name)
+        seen.add(normalized)
+        if tarinfo.isfile() and normalized.endswith(".py"):
+            full_path = os.path.join(common, normalized)
             with open(full_path, "r") as f:
                 try:
                     ast.parse(f.read(), filename=full_path)
