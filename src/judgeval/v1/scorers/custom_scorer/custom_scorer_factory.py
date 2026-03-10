@@ -151,7 +151,8 @@ def _build_bundle(
     def dedup_filter(tarinfo: tarfile.TarInfo) -> tarfile.TarInfo | None:
         normalized = os.path.normpath(tarinfo.name)
         tarinfo.name = normalized
-        if normalized in seen or should_exclude(normalized):
+        exclude_path = normalized + "/" if tarinfo.isdir() else normalized
+        if normalized in seen or should_exclude(exclude_path):
             return None
         seen.add(normalized)
         if tarinfo.isfile() and normalized.endswith(".py"):
