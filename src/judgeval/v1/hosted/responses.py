@@ -13,7 +13,7 @@ class Citation(BaseModel):
 
 class Category(BaseModel):
     name: str
-    description: str
+    description: str = ""
 
 
 class BaseResponse(BaseModel, ABC):
