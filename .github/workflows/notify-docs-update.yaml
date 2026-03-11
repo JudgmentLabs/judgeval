@@ -34,5 +34,6 @@ jobs:
               "sha": "${{ github.sha }}",
               "message": ${{ steps.commit.outputs.message }},
               "ref": "${{ github.ref_name }}",
-              "sdk_type": "python"
+              "sdk_type": "python",
+              "pr_author": "${{ github.event.head_commit.author.username }}"
             }

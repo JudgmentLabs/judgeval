@@ -10,6 +10,10 @@ from judgeval.v1.instrumentation.llm.llm_openai.responses import (
     wrap_responses_create_sync,
     wrap_responses_create_async,
 )
+from judgeval.v1.instrumentation.llm.llm_openai.images import (
+    wrap_images_generate_sync,
+    wrap_images_generate_async,
+)
 from judgeval.v1.instrumentation.llm.llm_openai.beta_chat_completions import (
     wrap_beta_chat_completions_parse_sync,
     wrap_beta_chat_completions_parse_async,
@@ -33,6 +37,7 @@ def wrap_openai_client_sync(client: OpenAI) -> OpenAI:
     wrap_beta_chat_completions_parse_sync(client)
     wrap_chat_with_streaming_response_sync(client)
     wrap_responses_with_streaming_response_sync(client)
+    wrap_images_generate_sync(client)
     return client
 
 
@@ -42,6 +47,7 @@ def wrap_openai_client_async(client: AsyncOpenAI) -> AsyncOpenAI:
     wrap_beta_chat_completions_parse_async(client)
     wrap_chat_with_streaming_response_async(client)
     wrap_responses_with_streaming_response_async(client)
+    wrap_images_generate_async(client)
     return client
 
 

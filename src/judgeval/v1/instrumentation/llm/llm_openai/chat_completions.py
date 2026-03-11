@@ -92,14 +92,21 @@ def _wrap_non_streaming_sync(
 
             set_cost_attribute(span, usage_data)
 
-            prompt_tokens, completion_tokens, cache_read, cache_creation = (
-                openai_tokens_converter(
-                    prompt_tokens,
-                    completion_tokens,
-                    cache_read,
-                    0,
-                    usage_data.total_tokens,
-                )
+            (
+                prompt_tokens,
+                completion_tokens,
+                cache_read,
+                _,
+                _,
+                _,
+            ) = openai_tokens_converter(
+                prompt_tokens,
+                completion_tokens,
+                cache_read,
+                0,
+                0,
+                0,
+                usage_data.total_tokens,
             )
 
             span.set_attribute(
@@ -111,9 +118,6 @@ def _wrap_non_streaming_sync(
             )
             span.set_attribute(
                 AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
-            )
-            span.set_attribute(
-                AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
             )
             span.set_attribute(
                 AttributeKeys.JUDGMENT_USAGE_METADATA,
@@ -194,14 +198,21 @@ def _wrap_streaming_sync(
 
                 set_cost_attribute(span, chunk.usage)
 
-                prompt_tokens, completion_tokens, cache_read, cache_creation = (
-                    openai_tokens_converter(
-                        prompt_tokens,
-                        completion_tokens,
-                        cache_read,
-                        0,
-                        chunk.usage.total_tokens,
-                    )
+                (
+                    prompt_tokens,
+                    completion_tokens,
+                    cache_read,
+                    _,
+                    _,
+                    _,
+                ) = openai_tokens_converter(
+                    prompt_tokens,
+                    completion_tokens,
+                    cache_read,
+                    0,
+                    0,
+                    0,
+                    chunk.usage.total_tokens,
                 )
 
                 span.set_attribute(
@@ -213,9 +224,6 @@ def _wrap_streaming_sync(
                 )
                 span.set_attribute(
                     AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
-                )
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
                 )
                 span.set_attribute(
                     AttributeKeys.JUDGMENT_USAGE_METADATA,
@@ -313,14 +321,21 @@ def _wrap_non_streaming_async(
 
             set_cost_attribute(span, usage_data)
 
-            prompt_tokens, completion_tokens, cache_read, cache_creation = (
-                openai_tokens_converter(
-                    prompt_tokens,
-                    completion_tokens,
-                    cache_read,
-                    0,
-                    usage_data.total_tokens,
-                )
+            (
+                prompt_tokens,
+                completion_tokens,
+                cache_read,
+                _,
+                _,
+                _,
+            ) = openai_tokens_converter(
+                prompt_tokens,
+                completion_tokens,
+                cache_read,
+                0,
+                0,
+                0,
+                usage_data.total_tokens,
             )
 
             span.set_attribute(
@@ -332,9 +347,6 @@ def _wrap_non_streaming_async(
             )
             span.set_attribute(
                 AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
-            )
-            span.set_attribute(
-                AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
             )
             span.set_attribute(
                 AttributeKeys.JUDGMENT_USAGE_METADATA,
@@ -415,14 +427,21 @@ def _wrap_streaming_async(
 
                 set_cost_attribute(span, chunk.usage)
 
-                prompt_tokens, completion_tokens, cache_read, cache_creation = (
-                    openai_tokens_converter(
-                        prompt_tokens,
-                        completion_tokens,
-                        cache_read,
-                        0,
-                        chunk.usage.total_tokens,
-                    )
+                (
+                    prompt_tokens,
+                    completion_tokens,
+                    cache_read,
+                    _,
+                    _,
+                    _,
+                ) = openai_tokens_converter(
+                    prompt_tokens,
+                    completion_tokens,
+                    cache_read,
+                    0,
+                    0,
+                    0,
+                    chunk.usage.total_tokens,
                 )
 
                 span.set_attribute(
@@ -434,9 +453,6 @@ def _wrap_streaming_async(
                 )
                 span.set_attribute(
                     AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
-                )
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, 0
                 )
                 span.set_attribute(
                     AttributeKeys.JUDGMENT_USAGE_METADATA,
