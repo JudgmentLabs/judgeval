@@ -59,6 +59,8 @@ class InternalAttributeKeys(str, Enum):
     DISABLE_PARTIAL_EMIT = "disable_partial_emit"
     CANCELLED = "cancelled"
     IS_CUSTOMER_CONTEXT_OWNER = "is_customer_context_owner"
+    PENDING_EVALS = "pending_evals"
+    PENDING_EVALS_COUNT = "pending_evals_count"
 
 
 class ResourceKeys(str, Enum):

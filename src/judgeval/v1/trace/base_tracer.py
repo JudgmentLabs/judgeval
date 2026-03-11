@@ -13,7 +13,6 @@ from typing import (
     Callable,
     Dict,
     Iterator,
-    List,
     Optional,
     TypedDict,
     TypeVar,
@@ -24,7 +23,7 @@ from uuid import uuid4
 from opentelemetry.trace import Span, Status, StatusCode, Tracer as OTELTracer
 from opentelemetry.sdk.trace import TracerProvider
 
-from judgeval.judgment_attribute_keys import AttributeKeys
+from judgeval.judgment_attribute_keys import AttributeKeys, InternalAttributeKeys
 from judgeval.utils.decorators.debug_time import debug_time
 from judgeval.utils.decorators.dont_throw import dont_throw
 from judgeval.utils.serialize import serialize_attribute, safe_serialize
@@ -61,7 +60,7 @@ class BaseTracer(ABC):
     """Abstract base for all Judgment tracers.
 
     Provides the core tracing surface: span creation, attribute recording,
-    the ``@observe`` and ``@agent`` decorators, context propagation for
+    the ``@observe`` decorators, context propagation for
     customer/session IDs, tagging, and async evaluation dispatch.
     Concrete subclasses supply the OTel TracerProvider, exporter, and
     processor wiring.
@@ -569,8 +568,6 @@ class BaseTracer(ABC):
     #  Static API: Async Evaluation                                      #
     # ------------------------------------------------------------------ #
 
-    _pending_evals: Dict[str, List[Dict[str, Any]]] = {}
-
     @staticmethod
     @debug_time
     @dont_throw
@@ -583,15 +580,16 @@ class BaseTracer(ABC):
         if current_span is None or not current_span.is_recording():
             return
 
+        processor = tracer.get_span_processor()
+
         ctx = current_span.get_span_context()
         trace_id = format(ctx.trace_id, "032x")
         span_id = format(ctx.span_id, "016x")
-        span_key = f"{trace_id}:{span_id}"
-        payloads = BaseTracer._pending_evals.get(span_key, [])
 
+        idx = processor.state_incr(ctx, InternalAttributeKeys.PENDING_EVALS_COUNT)
         payload = {
             "project_id": tracer.project_id,
-            "eval_name": f"async_evaluate_{judge}_{len(payloads)}",
+            "eval_name": f"async_evaluate_{judge}_{idx}",
             "judges": [{"name": judge}],
             "examples": [
                 {
@@ -605,13 +603,13 @@ class BaseTracer(ABC):
             "is_offline": False,
             "is_behavior": False,
         }
-
-        payloads.append(payload)
-        BaseTracer._pending_evals[span_key] = payloads
+        updated = processor.state_append(
+            ctx, InternalAttributeKeys.PENDING_EVALS, payload
+        )
 
         current_span.set_attribute(
             AttributeKeys.JUDGMENT_PENDING_TRACE_EVAL,
-            json.dumps(payloads),
+            json.dumps(updated),
         )
 
 

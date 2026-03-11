@@ -23,7 +23,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
     __slots__ = (
         "tracer",
         "_span_finalizers",
-        "_internal_attributes",
+        "_state",
         "_lock",
         "_baggage_processor",
     )
@@ -49,12 +49,12 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
         )
         self._lock = threading.RLock()
         self._span_finalizers: dict[tuple[int, int], finalize] = {}
-        self._internal_attributes: dict[tuple[int, int], dict[str, Any]] = {}
+        self._state: dict[tuple[int, int], dict[str, Any]] = {}
         self._baggage_processor = JudgmentBaggageProcessor()
 
     def _cleanup_span_state(self, span_key: tuple[int, int]) -> None:
         with self._lock:
-            self._internal_attributes.pop(span_key, None)
+            self._state.pop(span_key, None)
             self._span_finalizers.pop(span_key, None)
 
     def _register_span(self, span: Span) -> None:
@@ -66,31 +66,42 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
                 span, self._cleanup_span_state, span_key
             )
 
-    def set_internal_attribute(
-        self, span_context: SpanContext, key: str, value: Any
-    ) -> None:
+    def state_set(self, span_context: SpanContext, key: str, value: Any) -> None:
         span_key = (span_context.trace_id, span_context.span_id)
         with self._lock:
-            if span_key not in self._internal_attributes:
-                self._internal_attributes[span_key] = {}
-            self._internal_attributes[span_key][key] = value
+            self._state.setdefault(span_key, {})[key] = value
 
-    def get_internal_attribute(
+    def state_get(
         self, span_context: SpanContext, key: str, default: Any = None
     ) -> Any:
         span_key = (span_context.trace_id, span_context.span_id)
         with self._lock:
-            return self._internal_attributes.get(span_key, {}).get(key, default)
+            return self._state.get(span_key, {}).get(key, default)
+
+    def state_incr(self, span_context: SpanContext, key: str) -> int:
+        """Atomically increment a counter. Returns the value before increment."""
+        span_key = (span_context.trace_id, span_context.span_id)
+        with self._lock:
+            attrs = self._state.setdefault(span_key, {})
+            stored = attrs.get(key, 0)
+            prev: int = stored if isinstance(stored, int) else 0
+            attrs[key] = prev + 1
+            return prev
+
+    def state_append(self, span_context: SpanContext, key: str, item: Any) -> list[Any]:
+        """Atomically append to a list. Returns the new list."""
+        span_key = (span_context.trace_id, span_context.span_id)
+        with self._lock:
+            attrs = self._state.setdefault(span_key, {})
+            stored = attrs.get(key, [])
+            lst: list[Any] = [*(stored if isinstance(stored, list) else []), item]
+            attrs[key] = lst
+            return lst
 
     def _emit_span(self, span: ReadableSpan) -> None:
         if not span.context:
             return
-        span_key = (span.context.trace_id, span.context.span_id)
-        with self._lock:
-            internal_attrs = self._internal_attributes.setdefault(span_key, {})
-            curr_id = internal_attrs.get(AttributeKeys.JUDGMENT_UPDATE_ID, 0)
-            internal_attrs[AttributeKeys.JUDGMENT_UPDATE_ID] = curr_id + 1
-
+        curr_id = self.state_incr(span.context, AttributeKeys.JUDGMENT_UPDATE_ID)
         attributes = dict(span.attributes or {}) | {
             AttributeKeys.JUDGMENT_UPDATE_ID: curr_id
         }
@@ -121,7 +132,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             not span.is_recording()
             or not isinstance(span, ReadableSpan)
             or not span.context
-            or self.get_internal_attribute(
+            or self.state_get(
                 span.context, InternalAttributeKeys.DISABLE_PARTIAL_EMIT, False
             )
         ):
@@ -138,10 +149,12 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
         if not span.context:
             super().on_end(span)
             return
-        is_cancelled = self.get_internal_attribute(
-            span.context, InternalAttributeKeys.CANCELLED, False
-        )
-        if not is_cancelled:
-            self._emit_span(span=span)
         span_key = (span.context.trace_id, span.context.span_id)
-        self._cleanup_span_state(span_key)
+        try:
+            is_cancelled = self.state_get(
+                span.context, InternalAttributeKeys.CANCELLED, False
+            )
+            if not is_cancelled:
+                self._emit_span(span=span)
+        finally:
+            self._cleanup_span_state(span_key)
