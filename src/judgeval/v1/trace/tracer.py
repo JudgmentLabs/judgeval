@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, Sequence
 
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace import SpanLimits, TracerProvider
+from opentelemetry.sdk.trace.sampling import Sampler
+from opentelemetry.sdk.trace import SpanProcessor
 
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
 from judgeval.logger import judgeval_logger
@@ -70,6 +72,9 @@ class Tracer(BaseTracer):
         set_active: bool = True,
         serializer: Callable[[Any], str] = safe_serialize,
         resource_attributes: Optional[Dict[str, Any]] = None,
+        sampler: Optional[Sampler] = None,
+        span_limits: Optional[SpanLimits] = None,
+        span_processors: Optional[Sequence[SpanProcessor]] = None,
     ) -> Tracer:
         api_key = api_key or JUDGMENT_API_KEY
         organization_id = organization_id or JUDGMENT_ORG_ID
@@ -132,6 +137,8 @@ class Tracer(BaseTracer):
         tracer_provider = TracerProvider(
             resource=resource,
             id_generator=IsolatedRandomIdGenerator(),
+            sampler=sampler,
+            span_limits=span_limits,
         )
 
         tracer = cls(
@@ -149,6 +156,9 @@ class Tracer(BaseTracer):
 
         if enable_monitoring:
             tracer_provider.add_span_processor(tracer.get_span_processor())
+
+        for processor in span_processors or []:
+            tracer_provider.add_span_processor(processor)
 
         proxy = JudgmentTracerProvider.get_instance()
         proxy.register(tracer)

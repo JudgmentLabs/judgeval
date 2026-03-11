@@ -11,7 +11,9 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter
 
 from judgeval.judgment_attribute_keys import AttributeKeys, InternalAttributeKeys
 from judgeval.utils.decorators.dont_throw import dont_throw
-from judgeval.v1.trace.processors._lifecycles import get_all
+from judgeval.v1.trace.processors.judgment_baggage_processor import (
+    JudgmentBaggageProcessor,
+)
 
 if TYPE_CHECKING:
     from judgeval.v1.trace.base_tracer import BaseTracer
@@ -23,6 +25,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
         "_span_finalizers",
         "_internal_attributes",
         "_lock",
+        "_baggage_processor",
     )
 
     def __init__(
@@ -47,6 +50,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
         self._lock = threading.RLock()
         self._span_finalizers: dict[tuple[int, int], finalize] = {}
         self._internal_attributes: dict[tuple[int, int], dict[str, Any]] = {}
+        self._baggage_processor = JudgmentBaggageProcessor()
 
     def _cleanup_span_state(self, span_key: tuple[int, int]) -> None:
         with self._lock:
@@ -126,14 +130,11 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
 
     @dont_throw
     def on_start(self, span: Span, parent_context: Optional[Context] = None) -> None:
-        for processor in get_all():
-            processor.on_start(span, parent_context)
+        self._baggage_processor.on_start(span, parent_context)
         self._register_span(span)
 
     @dont_throw
     def on_end(self, span: ReadableSpan) -> None:
-        for processor in get_all():
-            processor.on_end(span)
         if not span.context:
             super().on_end(span)
             return
