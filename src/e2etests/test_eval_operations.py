@@ -2,7 +2,6 @@ import pytest
 
 from judgeval.v1 import Judgeval
 from judgeval.v1.data import Example
-from judgeval.v1.judges import BaseJudge
 
 
 def run_eval_helper(client: Judgeval, eval_run_name: str):
@@ -18,19 +17,10 @@ def run_eval_helper(client: Judgeval, eval_run_name: str):
         retrieval_context="GreenEnergy Solutions won 2023 sustainability award. New solar technology 30% more efficient. Planning European market expansion.",
     )
 
-    scorer = BaseJudge(
-        name="faithfulness",
-        prompt="Is the output faithful to the retrieval context?",
-        threshold=0.5,
-    )
-    scorer2 = BaseJudge(
-        name="relevancy", prompt="Is the output relevant to the input?", threshold=0.5
-    )
-
     evaluation = client.evaluation.create()
     res = evaluation.run(
         examples=[example1, example2],
-        scorers=[scorer, scorer2],
+        scorers=["faithfulness", "relevancy"],
         eval_run_name=eval_run_name,
     )
     return res
@@ -45,13 +35,7 @@ def test_basic_eval(client: Judgeval, random_name: str):
                 actual_output="The capital of France is Paris.",
             )
         ],
-        scorers=[
-            BaseJudge(
-                name="relevancy",
-                prompt="Is the output relevant to the input?",
-                threshold=0.5,
-            )
-        ],
+        scorers=["relevancy"],
         eval_run_name=random_name,
     )
 
@@ -82,16 +66,12 @@ def test_assert_test(client: Judgeval):
         actual_output="No, the room is too small.",
     )
 
-    scorer = BaseJudge(
-        name="relevancy", prompt="Is the output relevant to the input?", threshold=0.5
-    )
-
     evaluation = client.evaluation.create()
     with pytest.raises(AssertionError):
         evaluation.run(
             eval_run_name="test_eval",
             examples=[example, example1, example2],
-            scorers=[scorer],
+            scorers=["relevancy"],
             assert_test=True,
         )
 
@@ -113,13 +93,7 @@ def test_evaluate_dataset(client: Judgeval, random_name: str):
     evaluation = client.evaluation.create()
     res = evaluation.run(
         examples=list(dataset),
-        scorers=[
-            BaseJudge(
-                name="faithfulness",
-                prompt="Is the output faithful to the retrieval context?",
-                threshold=0.5,
-            )
-        ],
+        scorers=["faithfulness"],
         eval_run_name=random_name,
     )
     assert res, "Dataset evaluation failed"
@@ -138,13 +112,7 @@ def test_dataset_and_evaluation(client: Judgeval, random_name: str):
     evaluation = client.evaluation.create()
     res = evaluation.run(
         examples=examples,
-        scorers=[
-            BaseJudge(
-                name="relevancy",
-                prompt="Is the output relevant to the input?",
-                threshold=0.5,
-            )
-        ],
+        scorers=["relevancy"],
         eval_run_name=random_name,
     )
     assert res, "Dataset evaluation failed"
@@ -163,26 +131,14 @@ def test_dataset_and_double_evaluation(client: Judgeval, random_name: str):
     evaluation = client.evaluation.create()
     res = evaluation.run(
         examples=list(dataset),
-        scorers=[
-            BaseJudge(
-                name="relevancy",
-                prompt="Is the output relevant to the input?",
-                threshold=0.5,
-            )
-        ],
+        scorers=["relevancy"],
         eval_run_name=random_name,
     )
     assert res, "Dataset evaluation failed"
 
     res2 = evaluation.run(
         examples=list(dataset),
-        scorers=[
-            BaseJudge(
-                name="relevancy",
-                prompt="Is the output relevant to the input?",
-                threshold=0.5,
-            )
-        ],
+        scorers=["relevancy"],
         eval_run_name=random_name,
     )
     assert res2, "Dataset evaluation failed"

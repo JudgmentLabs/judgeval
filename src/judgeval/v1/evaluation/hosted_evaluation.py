@@ -8,24 +8,10 @@ from rich.progress import Progress
 from judgeval.logger import judgeval_logger
 from judgeval.v1.data.example import Example
 from judgeval.v1.internal.api.models import ExampleEvaluationRun
-from judgeval.v1.judges.base_judge import BaseJudge
 from judgeval.v1.evaluation.evaluation_base import EvaluatorRunner
 
 
-class HostedEvaluatorRunner(EvaluatorRunner[BaseJudge]):
-    def _validate_scorer_project(self, scorer: BaseJudge) -> None:
-        scorer_project_id = getattr(scorer, "_project_id", None)
-        if scorer_project_id is not None and scorer_project_id != self._project_id:
-            judgeval_logger.warning(
-                f"Rejecting scorer '{scorer.get_name()}' with different project_id: "
-                f"{scorer_project_id} != {self._project_id}"
-            )
-            raise ValueError(
-                f"Scorer '{scorer.get_name()}' belongs to project "
-                f"'{scorer_project_id}', but this evaluation is bound to project "
-                f"'{self._project_name}' ({self._project_id})"
-            )
-
+class HostedEvaluatorRunner(EvaluatorRunner[str]):
     def _build_payload(
         self,
         eval_id: str,
@@ -33,7 +19,7 @@ class HostedEvaluatorRunner(EvaluatorRunner[BaseJudge]):
         eval_run_name: str,
         created_at: str,
         examples: List[Example],
-        scorers: List[BaseJudge],
+        scorers: List[str],
     ) -> ExampleEvaluationRun:
         return {
             "id": eval_id,
@@ -41,7 +27,9 @@ class HostedEvaluatorRunner(EvaluatorRunner[BaseJudge]):
             "eval_name": eval_run_name,
             "created_at": created_at,
             "examples": [e.to_dict() for e in examples],
-            "judgment_scorers": [s.get_scorer_config() for s in scorers],
+            "judgment_scorers": [
+                {"name": name, "score_type": "", "threshold": 0.5} for name in scorers
+            ],
             "custom_scorers": [],
         }
 
@@ -51,13 +39,10 @@ class HostedEvaluatorRunner(EvaluatorRunner[BaseJudge]):
         project_id: str,
         eval_id: str,
         examples: List[Example],
-        scorers: List[BaseJudge],
+        scorers: List[str],
         payload: ExampleEvaluationRun,
         progress: Progress,
     ) -> int:
-        for scorer in scorers:
-            self._validate_scorer_project(scorer)
-
         task = progress.add_task("Submitting evaluation...", total=None)
         self._client.post_projects_eval_queue_examples(
             project_id=project_id,

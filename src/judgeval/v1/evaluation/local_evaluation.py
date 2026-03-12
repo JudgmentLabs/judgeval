@@ -14,10 +14,9 @@ from judgeval.v1.judges import Judge
 from judgeval.v1.hosted.responses import ScorerResponse
 from judgeval.v1.internal.api.models import ExampleEvaluationRun, LocalScorerResult
 from judgeval.v1.evaluation.evaluation_base import EvaluatorRunner
-from judgeval.v1.hosted.example_custom_scorer import ExampleCustomScorer
 
 
-class LocalEvaluatorRunner(EvaluatorRunner[Judge | ExampleCustomScorer]):
+class LocalEvaluatorRunner(EvaluatorRunner[Judge]):
     def _build_payload(
         self,
         eval_id: str,
@@ -25,7 +24,7 @@ class LocalEvaluatorRunner(EvaluatorRunner[Judge | ExampleCustomScorer]):
         eval_run_name: str,
         created_at: str,
         examples: List[Example],
-        scorers: List[Judge | ExampleCustomScorer],
+        scorers: List[Judge],
     ) -> ExampleEvaluationRun:
         return {
             "id": eval_id,
@@ -43,7 +42,7 @@ class LocalEvaluatorRunner(EvaluatorRunner[Judge | ExampleCustomScorer]):
         project_id: str,
         eval_id: str,
         examples: List[Example],
-        scorers: List[Judge | ExampleCustomScorer],
+        scorers: List[Judge],
         payload: ExampleEvaluationRun,
         progress: Progress,
     ) -> int:
@@ -111,21 +110,13 @@ class LocalEvaluatorRunner(EvaluatorRunner[Judge | ExampleCustomScorer]):
     def _run_local_scorers(
         self,
         examples: List[Example],
-        scorers: List[Judge | ExampleCustomScorer],
+        scorers: List[Judge],
     ) -> Generator[
         Tuple[int, str, ScorerResponse, None] | Tuple[int, str, None, Exception],
         None,
         None,
     ]:
-        """Run custom scorers in a thread pool, yielding results as they complete.
-
-        Exceptions are returned as values (like ``gather(return_exceptions=True)``).
-        """
-
-        def _run_one(
-            scorer: Judge | ExampleCustomScorer,
-            example: Example,
-        ) -> ScorerResponse:
+        def _run_one(scorer: Judge, example: Example) -> ScorerResponse:
             result: ScorerResponse = asyncio.run(scorer.score(example))
             return result
 

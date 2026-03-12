@@ -3,7 +3,6 @@ from unittest.mock import patch
 from judgeval.v1 import Judgeval
 from judgeval.v1.datasets.dataset_factory import DatasetFactory
 from judgeval.v1.evaluation.evaluation_factory import EvaluationFactory
-from judgeval.v1.judges.judges_factory import JudgesFactory
 
 
 @pytest.fixture
@@ -81,17 +80,6 @@ def test_client_api_url_default(monkeypatch, mock_resolve_project_id):
     assert client._api_url == "https://api.judgmentlabs.ai"
 
 
-def test_client_judges_factory_property(mock_resolve_project_id):
-    client = Judgeval(
-        project_name="test_project",
-        api_key="test_key",
-        organization_id="test_org",
-        api_url="http://test.com",
-    )
-    judges_factory = client.judges
-    assert isinstance(judges_factory, JudgesFactory)
-
-
 def test_client_evaluation_factory_property(mock_resolve_project_id):
     client = Judgeval(
         project_name="test_project",
@@ -141,6 +129,5 @@ def test_client_project_not_found_still_creates_factories():
         )
 
     assert client._project_id is None
-    assert isinstance(client.judges, JudgesFactory)
     assert isinstance(client.evaluation, EvaluationFactory)
     assert isinstance(client.datasets, DatasetFactory)

@@ -3,6 +3,7 @@
 import os
 import subprocess
 import sys
+
 import typer
 from pathlib import Path
 from dotenv import load_dotenv
@@ -11,7 +12,6 @@ from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.env import JUDGMENT_API_URL
 from judgeval.logger import judgeval_logger
 from judgeval.exceptions import JudgmentAPIError
-from judgeval import Judgeval
 from judgeval.version import get_version
 from judgeval.utils.url import url_for
 
@@ -82,15 +82,25 @@ def upload_scorer(
     organization_id: str = typer.Option(None, envvar="JUDGMENT_ORG_ID"),
 ):
     """Upload custom scorer to Judgment."""
+    from judgeval.cli.upload_judge import upload_judge
+
     scorer_path = Path(scorer_file_path)
 
     if not scorer_path.exists():
         raise typer.BadParameter(f"Scorer file not found: {scorer_file_path}")
 
-    client = Judgeval(project_name, api_key=api_key, organization_id=organization_id)
+    if not api_key or not organization_id:
+        raise typer.BadParameter("JUDGMENT_API_KEY and JUDGMENT_ORG_ID required")
+
+    client = JudgmentSyncClient(JUDGMENT_API_URL, api_key, organization_id)
+    project_id = resolve_project_id(client, project_name)
+    if not project_id:
+        raise typer.BadParameter(f"Project '{project_name}' not found")
 
     try:
-        result = client.judges.upload(
+        result = upload_judge(
+            client=client,
+            project_id=project_id,
             scorer_file_path=scorer_file_path,
             requirements_file_path=requirements_file_path,
             unique_name=unique_name,

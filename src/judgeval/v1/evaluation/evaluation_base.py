@@ -14,13 +14,11 @@ from judgeval.utils.guards import expect_project_id
 from judgeval.v1.data.example import Example
 from judgeval.v1.data.scorer_data import ScorerData
 from judgeval.v1.data.scoring_result import ScoringResult
-from judgeval.v1.judges import Judge
-from judgeval.v1.hosted.example_custom_scorer import ExampleCustomScorer
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.internal.api.models import ExampleEvaluationRun, ExperimentRunItem
-from judgeval.v1.judges.base_judge import BaseJudge
+from judgeval.v1.judges import Judge
 
-S = TypeVar("S", (Judge | ExampleCustomScorer), BaseJudge)
+S = TypeVar("S", str, Judge)
 
 
 class EvaluatorRunner(ABC, Generic[S]):
