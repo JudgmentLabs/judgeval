@@ -267,7 +267,9 @@ class BaseTracer(ABC):
         ctx = set_value(SESSION_ID_KEY, session_id, self.get_context())
         self._attach_context(ctx)
 
-    def override_project(self, project_name: str) -> None:
+    def override_project(
+        self, project_name: str, dangerously_allow_non_root_override: bool = False
+    ) -> None:
         current_span = self.get_current_span()
         if current_span is None or not current_span.is_recording():
             judgeval_logger.error(
@@ -276,11 +278,18 @@ class BaseTracer(ABC):
             return
         is_root = getattr(current_span, "parent", None) is None
         if not is_root:
-            judgeval_logger.error(
-                f"override_project('{project_name}') called on non-root span. "
-                "Project override only allowed on root spans. Ignoring."
-            )
-            return
+            if not dangerously_allow_non_root_override:
+                judgeval_logger.warning(
+                    f"override_project('{project_name}') called on non-root span. "
+                    "Project override only allowed on root spans. Ignoring."
+                )
+                return
+            else:
+                # JUD-4197: We dont want to return here. Generally this will break tracing
+                # and users should be careful to use this functionality. However for the case
+                # of a distributed service overriding the project id, this can still work,
+                # therefore we still allow overriding the project id on non-root spans.
+                pass
         resolved_id = resolve_project_id(self.api_client, project_name)
         if resolved_id is None:
             judgeval_logger.error(
