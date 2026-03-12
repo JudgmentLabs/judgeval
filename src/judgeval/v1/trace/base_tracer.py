@@ -29,7 +29,7 @@ from judgeval.utils.decorators.dont_throw import dont_throw
 from judgeval.utils.serialize import serialize_attribute, safe_serialize
 from judgeval.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
 from judgeval.v1.trace.judgment_tracer_provider import JudgmentTracerProvider
-import judgeval.v1.trace.baggage as judgment_baggage
+import judgeval.v1.trace.baggage as baggage
 from judgeval.v1.trace.generators import (
     _ObservedSyncGenerator,
     _ObservedAsyncGenerator,
@@ -505,7 +505,7 @@ class BaseTracer(ABC):
         if current_span is None or not current_span.is_recording():
             return
         current_span.set_attribute(AttributeKeys.JUDGMENT_CUSTOMER_ID, customer_id)
-        ctx = judgment_baggage.set_baggage(
+        ctx = baggage.set_baggage(
             AttributeKeys.JUDGMENT_CUSTOMER_ID.value,
             customer_id,
             proxy.get_current_context(),
@@ -525,7 +525,7 @@ class BaseTracer(ABC):
         if not span_ctx.is_valid or not span_ctx.trace_flags.sampled:
             return
         current_span.set_attribute(AttributeKeys.JUDGMENT_SESSION_ID, session_id)
-        ctx = judgment_baggage.set_baggage(
+        ctx = baggage.set_baggage(
             AttributeKeys.JUDGMENT_SESSION_ID.value,
             session_id,
             proxy.get_current_context(),

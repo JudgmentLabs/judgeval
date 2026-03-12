@@ -13,7 +13,7 @@ from opentelemetry.util.re import (
 
 from judgeval.v1.trace.baggage.propagator import JudgmentBaggagePropagator
 
-_JUDGMENT_BAGGAGE_KEY = create_key("judgment.baggage")
+_BAGGAGE_KEY = create_key("baggage")
 
 _KEY_PATTERN = compile(_KEY_FORMAT)
 _VALUE_PATTERN = compile(_VALUE_FORMAT)
@@ -29,7 +29,7 @@ def _resolve_context(context: Optional[Context]) -> Context:
 
 
 def _get_baggage_value(context: Optional[Context] = None) -> Dict[str, object]:
-    baggage = get_value(_JUDGMENT_BAGGAGE_KEY, context=context)
+    baggage = get_value(_BAGGAGE_KEY, context=context)
     if isinstance(baggage, dict):
         return baggage
     return {}
@@ -65,18 +65,18 @@ def set_baggage(name: str, value: object, context: Optional[Context] = None) -> 
     ctx = _resolve_context(context)
     baggage = _get_baggage_value(context=ctx).copy()
     baggage[name] = value
-    return set_value(_JUDGMENT_BAGGAGE_KEY, baggage, context=ctx)
+    return set_value(_BAGGAGE_KEY, baggage, context=ctx)
 
 
 def remove_baggage(name: str, context: Optional[Context] = None) -> Context:
     ctx = _resolve_context(context)
     baggage = _get_baggage_value(context=ctx).copy()
     baggage.pop(name, None)
-    return set_value(_JUDGMENT_BAGGAGE_KEY, baggage, context=ctx)
+    return set_value(_BAGGAGE_KEY, baggage, context=ctx)
 
 
 def clear(context: Optional[Context] = None) -> Context:
-    return set_value(_JUDGMENT_BAGGAGE_KEY, {}, context=_resolve_context(context))
+    return set_value(_BAGGAGE_KEY, {}, context=_resolve_context(context))
 
 
 __all__ = [

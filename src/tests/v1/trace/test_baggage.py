@@ -62,7 +62,7 @@ class TestBaggageValidation:
         assert baggage._is_valid_pair("key", "value") is True
 
 
-class TestBaggagePropagator:
+class TestJudgmentBaggagePropagator:
     def test_inject_and_extract_roundtrip(self):
         prop = JudgmentBaggagePropagator()
         ctx = Context()
@@ -71,7 +71,7 @@ class TestBaggagePropagator:
 
         carrier: dict[str, str] = {}
         prop.inject(carrier, ctx)
-        assert "judgment-baggage" in carrier
+        assert "baggage" in carrier
 
         extracted_ctx = prop.extract(carrier, Context())
         assert baggage.get_baggage("user-id", extracted_ctx) == "abc-123"
@@ -87,11 +87,11 @@ class TestBaggagePropagator:
         prop = JudgmentBaggagePropagator()
         carrier: dict[str, str] = {}
         prop.inject(carrier, Context())
-        assert "judgment-baggage" not in carrier
+        assert "baggage" not in carrier
 
     def test_extract_oversized_header_ignored(self):
         prop = JudgmentBaggagePropagator()
-        carrier = {"judgment-baggage": "k=" + "v" * 9000}
+        carrier = {"baggage": "k=" + "v" * 9000}
         ctx = prop.extract(carrier, Context())
         assert dict(baggage.get_all(ctx)) == {}
 
@@ -99,21 +99,21 @@ class TestBaggagePropagator:
         prop = JudgmentBaggagePropagator()
         long_pair = "longkey=" + "v" * 5000
         short_pair = "ok=fine"
-        carrier = {"judgment-baggage": f"{long_pair},{short_pair}"}
+        carrier = {"baggage": f"{long_pair},{short_pair}"}
         ctx = prop.extract(carrier, Context())
         assert baggage.get_baggage("ok", ctx) == "fine"
         assert baggage.get_baggage("longkey", ctx) is None
 
     def test_extract_malformed_entry_skipped(self):
         prop = JudgmentBaggagePropagator()
-        carrier = {"judgment-baggage": "good=val,badentry,also=ok"}
+        carrier = {"baggage": "good=val,badentry,also=ok"}
         ctx = prop.extract(carrier, Context())
         assert baggage.get_baggage("good", ctx) == "val"
         assert baggage.get_baggage("also", ctx) == "ok"
 
     def test_fields_property(self):
         prop = JudgmentBaggagePropagator()
-        assert prop.fields == {"judgment-baggage"}
+        assert prop.fields == {"baggage"}
 
     def test_url_encoding_roundtrip(self):
         prop = JudgmentBaggagePropagator()
@@ -123,7 +123,7 @@ class TestBaggagePropagator:
         carrier: dict[str, str] = {}
         prop.inject(carrier, ctx)
         # Should be URL-encoded in the header
-        assert "hello+world" in carrier["judgment-baggage"]
+        assert "hello+world" in carrier["baggage"]
 
         extracted = prop.extract(carrier, Context())
         assert baggage.get_baggage("key", extracted) == "hello world"

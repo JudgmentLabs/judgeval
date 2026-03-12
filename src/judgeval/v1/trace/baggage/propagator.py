@@ -18,7 +18,7 @@ from opentelemetry.util.re import _DELIMITER_PATTERN
 
 _logger = logging.getLogger(__name__)
 
-_JUDGMENT_BAGGAGE_HEADER = "judgment-baggage"
+_BAGGAGE_HEADER = "baggage"
 _default_getter = DefaultGetter()
 _default_setter = DefaultSetter()
 
@@ -62,7 +62,7 @@ class JudgmentBaggagePropagator(TextMapPropagator):
         entries = get_all(_resolve_context(context))
         if not entries:
             return
-        setter.set(carrier, _JUDGMENT_BAGGAGE_HEADER, _format_baggage(entries))
+        setter.set(carrier, _BAGGAGE_HEADER, _format_baggage(entries))
 
     def extract(
         self,
@@ -73,7 +73,7 @@ class JudgmentBaggagePropagator(TextMapPropagator):
         from judgeval.v1.trace.baggage import _is_valid_pair, set_baggage
 
         ctx = _resolve_context(context)
-        header = _extract_first_element(getter.get(carrier, _JUDGMENT_BAGGAGE_HEADER))
+        header = _extract_first_element(getter.get(carrier, _BAGGAGE_HEADER))
 
         if not header:
             return ctx
@@ -128,4 +128,4 @@ class JudgmentBaggagePropagator(TextMapPropagator):
 
     @property
     def fields(self) -> Set[str]:
-        return {_JUDGMENT_BAGGAGE_HEADER}
+        return {_BAGGAGE_HEADER}
