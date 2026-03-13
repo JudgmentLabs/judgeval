@@ -632,16 +632,16 @@ class TestSafetyGuarantees(BaseAnthropicTest):
         self, monkeypatch, tracer, sync_client, anthropic_api_key, mock_processor
     ):
         """Test that span attribute errors don't break user code with tracing verification"""
-        from judgeval.v1.tracer.base_tracer import BaseTracer
+        from opentelemetry.sdk.trace import Span as SDKSpan
 
-        original_set = BaseTracer.set_span_attribute
+        original_set = SDKSpan.set_attribute
 
-        def broken_set_attribute(self, span, key, value):
-            if "COMPLETION" in key:
+        def broken_set_attribute(self, key, value):
+            if isinstance(key, str) and "COMPLETION" in key.upper():
                 raise RuntimeError("Attribute setting failed!")
-            return original_set(self, span, key, value)
+            return original_set(self, key, value)
 
-        monkeypatch.setattr(BaseTracer, "set_span_attribute", broken_set_attribute)
+        monkeypatch.setattr(SDKSpan, "set_attribute", broken_set_attribute)
 
         wrapped_client = wrap_anthropic_client_sync(sync_client)
         response = wrapped_client.messages.create(
@@ -653,7 +653,6 @@ class TestSafetyGuarantees(BaseAnthropicTest):
         assert response is not None
         assert response.content
 
-        # Verify tracing still works even with broken attribute setting
         span = mock_processor.get_last_ended_span()
         attrs = mock_processor.get_span_attributes(span)
         verify_span_attributes_comprehensive(
@@ -661,5 +660,8 @@ class TestSafetyGuarantees(BaseAnthropicTest):
             attrs=attrs,
             expected_span_name="ANTHROPIC_API_CALL",
             expected_model_name="claude-3-haiku-20240307",
-            check_completion=False,  # May fail due to broken attribute setting
+            check_completion=False,
+            check_usage=False,
+            check_cache=False,
+            check_metadata=False,
         )

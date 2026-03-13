@@ -3,8 +3,11 @@
 import pytest
 import os
 from typing import Any, Optional
+from unittest.mock import patch
+
 from opentelemetry.context import Context
-from opentelemetry.sdk.trace import ReadableSpan, Span
+from opentelemetry.sdk.trace import ReadableSpan, Span, TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
 pytest.importorskip("anthropic")
 
@@ -13,6 +16,15 @@ from judgeval.v1.instrumentation.llm.llm_anthropic.wrapper import (
     wrap_anthropic_client_sync,
     wrap_anthropic_client_async,
 )
+from judgeval.v1.trace.tracer import Tracer
+from judgeval.v1.trace.judgment_tracer_provider import (
+    JudgmentTracerProvider,
+    _active_tracer_var,
+)
+from judgeval.v1.trace.processors.judgment_baggage_processor import (
+    JudgmentBaggageProcessor,
+)
+from judgeval.v1.trace.exporters.noop_span_exporter import NoOpSpanExporter
 
 
 class MockSpanProcessor:
@@ -40,15 +52,29 @@ class MockSpanProcessor:
         return dict(span.attributes or {})
 
 
-class MockTracer:
-    def __init__(self, tracer):
-        self.tracer = tracer
+class _BaggageAwareProcessor(SimpleSpanProcessor):
+    def __init__(self, exporter, mock_processor: MockSpanProcessor):
+        super().__init__(exporter)
+        self._baggage = JudgmentBaggageProcessor()
+        self._mock = mock_processor
 
-    def get_tracer(self):
-        return self.tracer
+    def on_start(self, span, parent_context=None):
+        self._baggage.on_start(span, parent_context)
+        self._mock.on_start(span, parent_context)
+        super().on_start(span, parent_context)
 
-    def _inject_judgment_context(self, span):
-        pass
+    def on_end(self, span):
+        self._mock.on_end(span)
+        super().on_end(span)
+
+
+@pytest.fixture(autouse=True)
+def _reset_provider():
+    JudgmentTracerProvider._instance = None
+    _active_tracer_var.set(None)
+    yield
+    _active_tracer_var.set(None)
+    JudgmentTracerProvider._instance = None
 
 
 @pytest.fixture
@@ -58,26 +84,23 @@ def mock_processor():
 
 @pytest.fixture
 def tracer(mock_processor):
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.trace import set_tracer_provider
-    from judgeval.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
-    from judgeval.version import get_version
-
-    provider = TracerProvider()
-    provider.add_span_processor(mock_processor)
-    set_tracer_provider(provider)
-
-    otel_tracer = provider.get_tracer(
-        JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME,
-        get_version(),
+    with patch("judgeval.v1.trace.tracer.resolve_project_id", return_value="proj-test"):
+        t = Tracer.init(
+            project_name="test-anthropic",
+            api_key="test-key",
+            organization_id="test-org",
+            api_url="http://localhost:9999",
+        )
+    provider: TracerProvider = t._tracer_provider
+    provider._active_span_processor._span_processors = ()  # type: ignore[attr-defined]
+    provider.add_span_processor(
+        _BaggageAwareProcessor(NoOpSpanExporter(), mock_processor)
     )
-
-    return MockTracer(otel_tracer)
+    return t
 
 
 @pytest.fixture
 def anthropic_api_key():
-    """Anthropic API key from environment"""
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         pytest.skip("ANTHROPIC_API_KEY environment variable not set")
@@ -86,13 +109,11 @@ def anthropic_api_key():
 
 @pytest.fixture
 def sync_client(anthropic_api_key):
-    """Unwrapped sync Anthropic client"""
     return Anthropic(api_key=anthropic_api_key)
 
 
 @pytest.fixture
 def async_client(anthropic_api_key):
-    """Unwrapped async Anthropic client"""
     return AsyncAnthropic(api_key=anthropic_api_key)
 
 

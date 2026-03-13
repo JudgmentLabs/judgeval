@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -16,6 +15,7 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.trace import set_span_in_context
 
 from judgeval.judgment_attribute_keys import AttributeKeys
+from judgeval.v1.trace.base_tracer import BaseTracer
 from judgeval.v1.integrations.claude_agent_sdk.wrapper import (
     TracingState,
     LLMSpanTracker,
@@ -111,34 +111,41 @@ class InMemoryCollector:
 
 
 def _make_tracer(collector: InMemoryCollector):
-    """Create a real BaseTracer backed by in-memory span collection."""
-    from judgeval.v1.tracer.tracer import Tracer
+    """Create a real Tracer backed by in-memory span collection."""
+    from unittest.mock import patch
+    from opentelemetry.sdk.trace import TracerProvider
 
-    mock_client = MagicMock()
-    mock_client.api_key = "test_key"
-    mock_client.organization_id = "test_org"
-    mock_client.base_url = "http://test.com"
-
-    tracer = Tracer(
-        project_name="test-claude-tool-spans",
-        project_id="test-project-id",
-        enable_evaluation=False,
-        enable_monitoring=True,
-        api_client=mock_client,
-        serializer=lambda x: str(x),
-        isolated=True,
-        use_default_span_processor=False,
+    from judgeval.v1.trace.tracer import Tracer
+    from judgeval.v1.trace.judgment_tracer_provider import (
+        JudgmentTracerProvider,
+        _active_tracer_var,
     )
 
+    JudgmentTracerProvider._instance = None
+    _active_tracer_var.set(None)
+
+    with patch("judgeval.v1.trace.tracer.resolve_project_id", return_value="proj-test"):
+        tracer = Tracer.init(
+            project_name="test-claude-tool-spans",
+            api_key="test-key",
+            organization_id="test-org",
+            api_url="http://localhost:9999",
+        )
+
+    provider: TracerProvider = tracer._tracer_provider
+    provider._active_span_processor._span_processors = ()  # type: ignore[attr-defined]
     processor = SimpleSpanProcessor(collector.get_exporter())
-    tracer._tracer_provider.add_span_processor(processor)
+    provider.add_span_processor(processor)
     return tracer
 
 
 def _make_state_with_parent(tracer, parent_span) -> TracingState:
     """Create a TracingState with parent_context set from the given span."""
+    from judgeval.v1.trace.judgment_tracer_provider import JudgmentTracerProvider
+
     state = TracingState()
-    state.parent_context = set_span_in_context(parent_span, tracer.get_context())
+    proxy = JudgmentTracerProvider.get_instance()
+    state.parent_context = set_span_in_context(parent_span, proxy.get_current_context())
     return state
 
 
@@ -156,7 +163,7 @@ class TestToolSpanTracker:
         collector = InMemoryCollector()
         tracer = _make_tracer(collector)
 
-        with tracer.get_tracer().start_as_current_span("agent") as agent_span:
+        with BaseTracer.start_as_current_span("agent") as agent_span:
             state = _make_state_with_parent(tracer, agent_span)
             tracker = ToolSpanTracker(tracer, state=state)
 
@@ -198,7 +205,7 @@ class TestToolSpanTracker:
         collector = InMemoryCollector()
         tracer = _make_tracer(collector)
 
-        with tracer.get_tracer().start_as_current_span("agent") as agent_span:
+        with BaseTracer.start_as_current_span("agent") as agent_span:
             state = _make_state_with_parent(tracer, agent_span)
             tracker = ToolSpanTracker(tracer, state=state)
 
@@ -239,7 +246,7 @@ class TestToolSpanTracker:
         collector = InMemoryCollector()
         tracer = _make_tracer(collector)
 
-        with tracer.get_tracer().start_as_current_span("agent") as agent_span:
+        with BaseTracer.start_as_current_span("agent") as agent_span:
             state = _make_state_with_parent(tracer, agent_span)
             tracker = ToolSpanTracker(tracer, state=state)
 
@@ -278,7 +285,7 @@ class TestToolSpanTracker:
         collector = InMemoryCollector()
         tracer = _make_tracer(collector)
 
-        with tracer.get_tracer().start_as_current_span("agent") as agent_span:
+        with BaseTracer.start_as_current_span("agent") as agent_span:
             state = _make_state_with_parent(tracer, agent_span)
             tracker = ToolSpanTracker(tracer, state=state)
 
@@ -310,7 +317,7 @@ class TestToolSpanTracker:
         collector = InMemoryCollector()
         tracer = _make_tracer(collector)
 
-        with tracer.get_tracer().start_as_current_span("agent") as agent_span:
+        with BaseTracer.start_as_current_span("agent") as agent_span:
             state = _make_state_with_parent(tracer, agent_span)
             tracker = ToolSpanTracker(tracer, state=state)
 
@@ -350,7 +357,7 @@ class TestToolSpanTracker:
         collector = InMemoryCollector()
         tracer = _make_tracer(collector)
 
-        with tracer.get_tracer().start_as_current_span("agent") as agent_span:
+        with BaseTracer.start_as_current_span("agent") as agent_span:
             state = _make_state_with_parent(tracer, agent_span)
             tracker = ToolSpanTracker(tracer, state=state)
 
@@ -373,7 +380,7 @@ class TestToolSpanTracker:
         collector = InMemoryCollector()
         tracer = _make_tracer(collector)
 
-        with tracer.get_tracer().start_as_current_span("agent") as agent_span:
+        with BaseTracer.start_as_current_span("agent") as agent_span:
             state = _make_state_with_parent(tracer, agent_span)
             tracker = ToolSpanTracker(tracer, state=state)
 
@@ -413,12 +420,11 @@ class TestEmitPartial:
     async def test_tool_tracker_calls_emit_partial(self):
         """ToolSpanTracker should call emit_partial after opening tool spans."""
         from unittest.mock import patch
-        from judgeval.v1.tracer.base_tracer import BaseTracer
 
         collector = InMemoryCollector()
         tracer = _make_tracer(collector)
 
-        with tracer.get_tracer().start_as_current_span("agent") as agent_span:
+        with BaseTracer.start_as_current_span("agent") as agent_span:
             state = _make_state_with_parent(tracer, agent_span)
             tracker = ToolSpanTracker(tracer, state=state)
 
@@ -428,7 +434,7 @@ class TestEmitPartial:
                 ]
             )
             with patch.object(
-                BaseTracer, "emit_partial", wraps=tracer.emit_partial
+                BaseTracer, "_emit_partial", wraps=BaseTracer._emit_partial
             ) as mock_emit:
                 tracker.on_assistant_message(assistant_msg)
 
@@ -442,15 +448,14 @@ class TestEmitPartial:
     async def test_llm_span_calls_emit_partial(self):
         """LLM span creation should call emit_partial after setting attributes."""
         from unittest.mock import patch
-        from judgeval.v1.tracer.base_tracer import BaseTracer
 
         collector = InMemoryCollector()
         tracer = _make_tracer(collector)
 
         tracker = LLMSpanTracker(tracer)
-        with tracer.get_tracer().start_as_current_span("agent"):
+        with BaseTracer.start_as_current_span("agent"):
             with patch.object(
-                BaseTracer, "emit_partial", wraps=tracer.emit_partial
+                BaseTracer, "_emit_partial", wraps=BaseTracer._emit_partial
             ) as mock_emit:
                 tracker.start_llm_span(
                     AssistantMessage(
@@ -492,7 +497,7 @@ class TestMessageStreamLLMSpans:
         )
 
         tracker = LLMSpanTracker(tracer)
-        with tracer.get_tracer().start_as_current_span("test_agent"):
+        with BaseTracer.start_as_current_span("test_agent"):
             final_content = tracker.start_llm_span(assistant_msg, "what is 2+2?", [])
             tracker.cleanup()
 
