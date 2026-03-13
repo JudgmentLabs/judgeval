@@ -120,9 +120,10 @@ def _build_bundle(
 
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz", format=tarfile.GNU_FORMAT) as tar:
+        tar_filter = TarFilter(common_base_dir)
         for abs_path in all_abs:
             arcname = os.path.relpath(abs_path, common_base_dir)
-            tar.add(abs_path, arcname=arcname, filter=TarFilter(common_base_dir))
+            tar.add(abs_path, arcname=arcname, filter=tar_filter)
 
     entrypoint_arcname = os.path.relpath(
         os.path.abspath(entrypoint_path), common_base_dir
