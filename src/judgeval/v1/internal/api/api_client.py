@@ -10,12 +10,16 @@ from judgeval.v1.internal.api.api_types import *
 from judgeval.logger import judgeval_logger as logger
 
 
-def _headers(api_key: str, organization_id: str) -> Mapping[str, str]:
-    return {
-        "Content-Type": "application/json",
+def _headers(
+    api_key: str, organization_id: str, is_multipart: bool = False
+) -> Mapping[str, str]:
+    headers = {
         "Authorization": f"Bearer {api_key}",
         "X-Organization-Id": organization_id,
     }
+    if not is_multipart:
+        headers["Content-Type"] = "application/json"
+    return headers
 
 
 def _handle_response(r: Response) -> Any:
@@ -26,13 +30,6 @@ def _handle_response(r: Response) -> Any:
             detail = r.text
         raise JudgmentAPIError(r.status_code, detail, r)
     return r.json()
-
-
-def _multipart_headers(api_key: str, organization_id: str) -> Mapping[str, str]:
-    return {
-        "Authorization": f"Bearer {api_key}",
-        "X-Organization-Id": organization_id,
-    }
 
 
 class JudgmentSyncClient:
@@ -74,7 +71,7 @@ class JudgmentSyncClient:
         self,
         method: Literal["POST", "PATCH", "PUT"],
         url: str,
-        payload: Any,
+        payload: Dict[str, Any],
         params: Optional[Dict[str, Any]] = None,
     ) -> Any:
         logger.debug(f"HTTP {method} (multipart) {url}")
@@ -94,7 +91,7 @@ class JudgmentSyncClient:
             data=data,
             files=files,
             params=params,
-            headers=_multipart_headers(self.api_key, self.organization_id),
+            headers=_headers(self.api_key, self.organization_id, True),
         )
         logger.debug(f"HTTP {method} (multipart) {url} -> {r.status_code}")
         return _handle_response(r)
@@ -322,13 +319,11 @@ class JudgmentSyncClient:
             {},
         )
 
-    def post_projects_scorers_custom(
-        self, project_id: str, payload: UploadCustomScorerRequest
-    ) -> UploadCustomScorerResponse:
+    def post_projects_scorers_custom(self, project_id: str) -> Any:
         return self._request(
             "POST",
             url_for(f"/v1/projects/{project_id}/scorers/custom", self.base_url),
-            payload,
+            {},
         )
 
     def post_projects_scorers_custom_bundle(
@@ -433,7 +428,7 @@ class JudgmentAsyncClient:
         self,
         method: Literal["POST", "PATCH", "PUT"],
         url: str,
-        payload: Any,
+        payload: Dict[str, Any],
         params: Optional[Dict[str, Any]] = None,
     ) -> Any:
         logger.debug(f"HTTP {method} (multipart) {url}")
@@ -453,7 +448,7 @@ class JudgmentAsyncClient:
             data=data,
             files=files,
             params=params,
-            headers=_multipart_headers(self.api_key, self.organization_id),
+            headers=_headers(self.api_key, self.organization_id, True),
         )
         r = await r
         logger.debug(f"HTTP {method} (multipart) {url} -> {r.status_code}")
@@ -682,13 +677,11 @@ class JudgmentAsyncClient:
             {},
         )
 
-    async def post_projects_scorers_custom(
-        self, project_id: str, payload: UploadCustomScorerRequest
-    ) -> UploadCustomScorerResponse:
+    async def post_projects_scorers_custom(self, project_id: str) -> Any:
         return await self._request(
             "POST",
             url_for(f"/v1/projects/{project_id}/scorers/custom", self.base_url),
-            payload,
+            {},
         )
 
     async def post_projects_scorers_custom_bundle(

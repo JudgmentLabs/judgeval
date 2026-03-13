@@ -104,6 +104,7 @@ def upload(
     ),
     api_key: str = typer.Option(None, envvar="JUDGMENT_API_KEY"),
     organization_id: str = typer.Option(None, envvar="JUDGMENT_ORG_ID"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ):
     """Upload custom scorer to Judgment."""
     scorer_path = Path(entrypoint_path)
@@ -117,10 +118,11 @@ def upload(
             requirements_file_path=requirements_file_path,
             unique_name=unique_name,
             bump_major=bump_major,
+            yes=yes,
         )
         if not result:
             raise typer.Abort()
-        judgeval_logger.info("Custom scorer uploaded successfully!")
+        typer.echo(f"Custom scorer uploaded successfully to project '{project_name}'!")
     except JudgmentAPIError as e:
         if e.status_code == 409:
             judgeval_logger.error(e.detail)
@@ -143,6 +145,7 @@ def init(
     init_path: str = typer.Option(
         ".", "--init-path", "-p", help="Path to initialize the scorer"
     ),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ):
     """Initialize skeleton code for a new custom scorer."""
     if not scorer_name.isidentifier():
@@ -170,13 +173,25 @@ def init(
             raise typer.BadParameter(
                 f"Requirements file already exists: {requirements_path}"
             )
+        if not yes:
+            typer.confirm(
+                f"Are you sure you want to initialize an empty requirements file at:\n{os.path.abspath(requirements_path)}?",
+                abort=True,
+            )
         with open(requirements_path, "w") as f:
             f.write("")
-        typer.echo(f"Requirements file initialized successfully: {requirements_path}")
+        typer.echo(
+            f"Requirements file initialized successfully:\n{os.path.abspath(requirements_path)}"
+        )
 
+    if not yes:
+        typer.confirm(
+            f"Are you sure you want to initialize a {response_type} judge file at:\n{os.path.abspath(scorer_path)}?",
+            abort=True,
+        )
     with open(scorer_path, "w") as f:
         f.write(template)
-    typer.echo(f"Scorer initialized successfully: {scorer_path}")
+    typer.echo(f"Scorer initialized successfully:\n{os.path.abspath(scorer_path)}")
 
 
 @app.command()

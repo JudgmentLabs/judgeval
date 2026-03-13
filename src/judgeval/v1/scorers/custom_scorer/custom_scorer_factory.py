@@ -4,9 +4,9 @@ import ast
 import io
 import os
 import tarfile
-from pathlib import Path
 from typing import Literal, Optional, Tuple
 from pathspec import PathSpec
+import typer
 
 from judgeval.logger import judgeval_logger
 from judgeval.v1.internal.api import JudgmentSyncClient
@@ -17,6 +17,7 @@ from judgeval.v1.internal.api.api_types import (
 from judgeval.v1.scorers.custom_scorer.custom_scorer import CustomScorer
 from judgeval.utils.guards import expect_project_id
 from judgeval.exceptions import JudgmentAPIError
+from judgeval.v1.scorers.custom_scorer.utils import TarFilter
 
 RESPONSE_TYPE_MAP: dict[str, Literal["binary", "categorical", "numeric"]] = {
     "BinaryResponse": "binary",
@@ -42,18 +43,6 @@ EXCLUDE_SPEC = PathSpec.from_lines(
         ".env.*",
     ],
 )
-
-
-def _find_gitignore_path(start_path: str) -> str | None:
-    """Walk up from start_path to find directory containing .gitignore."""
-    current = Path(start_path).resolve()
-    if current.is_file():
-        current = current.parent
-    while current != current.parent:
-        if (current / ".gitignore").is_file():
-            return str(current / ".gitignore")
-        current = current.parent
-    return None
 
 
 def _extract_generic_arg(node: ast.expr) -> Optional[str]:
@@ -127,54 +116,19 @@ def _build_bundle(
     base_dirs = [os.path.dirname(p) if os.path.isfile(p) else p for p in all_abs] + [
         os.path.abspath(os.path.curdir)
     ]
-    common = os.path.commonpath(base_dirs)
-    gitignore_path = _find_gitignore_path(common)
-    gitignore_spec = None
-    if gitignore_path:
-        with open(gitignore_path, "r") as f:
-            gitignore_spec = PathSpec.from_lines("gitignore", f)
-
-    def should_exclude(path: str) -> bool:
-        exclude_pattern_matches = EXCLUDE_SPEC.match_file(path)
-        if gitignore_spec and gitignore_path:
-            abs_path = os.path.join(common, path)
-            rel_to_gitignore = os.path.relpath(
-                abs_path, os.path.dirname(gitignore_path)
-            )
-            gitignore_matches = gitignore_spec.match_file(rel_to_gitignore)
-        else:
-            gitignore_matches = False
-        return exclude_pattern_matches or gitignore_matches
-
-    seen: set[str] = set()
-
-    def dedup_filter(tarinfo: tarfile.TarInfo) -> tarfile.TarInfo | None:
-        normalized = os.path.normpath(tarinfo.name)
-        tarinfo.name = normalized
-        exclude_path = normalized + "/" if tarinfo.isdir() else normalized
-        if normalized in seen or should_exclude(exclude_path):
-            return None
-        seen.add(normalized)
-        if tarinfo.isfile() and normalized.endswith(".py"):
-            full_path = os.path.join(common, normalized)
-            with open(full_path, "r") as f:
-                try:
-                    ast.parse(f.read(), filename=full_path)
-                except SyntaxError as e:
-                    raise ValueError(
-                        f"Invalid Python syntax in {full_path}: {e}"
-                    ) from e
-        return tarinfo
+    common_base_dir = os.path.commonpath(base_dirs)
 
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz", format=tarfile.GNU_FORMAT) as tar:
         for abs_path in all_abs:
-            arcname = os.path.relpath(abs_path, common)
-            tar.add(abs_path, arcname=arcname, filter=dedup_filter)
+            arcname = os.path.relpath(abs_path, common_base_dir)
+            tar.add(abs_path, arcname=arcname, filter=TarFilter(common_base_dir))
 
-    entrypoint_arcname = os.path.relpath(os.path.abspath(entrypoint_path), common)
+    entrypoint_arcname = os.path.relpath(
+        os.path.abspath(entrypoint_path), common_base_dir
+    )
     requirements_arcname = (
-        os.path.relpath(os.path.abspath(requirements_file_path), common)
+        os.path.relpath(os.path.abspath(requirements_file_path), common_base_dir)
         if requirements_file_path
         else None
     )
@@ -183,15 +137,17 @@ def _build_bundle(
 
 
 class CustomScorerFactory:
-    __slots__ = ("_client", "_project_id")
+    __slots__ = ("_client", "_project_id", "_project_name")
 
     def __init__(
         self,
         client: JudgmentSyncClient,
         project_id: Optional[str],
+        project_name: str,
     ):
         self._client = client
         self._project_id = project_id
+        self._project_name = project_name
 
     def get(self, name: str) -> Optional[CustomScorer]:
         project_id = expect_project_id(self._project_id)
@@ -218,6 +174,7 @@ class CustomScorerFactory:
         requirements_file_path: str | None = None,
         unique_name: str | None = None,
         bump_major: bool = False,
+        yes: bool = False,
     ) -> bool:
         project_id = expect_project_id(self._project_id)
         if not project_id:
@@ -253,6 +210,12 @@ class CustomScorerFactory:
         bundle, entrypoint_arcname, requirements_arcname = _build_bundle(
             entrypoint_path, included_files_paths, requirements_file_path
         )
+
+        if not yes:
+            typer.confirm(
+                f"Are you sure you want to upload {response_type} code judge '{unique_name}' to project '{self._project_name}'?\nIf this judge already exists, a new version will be created.",
+                abort=True,
+            )
 
         metadata: UploadCustomScorerBundleMetadata = {
             "scorer_name": unique_name,

@@ -38,4 +38,5 @@ class ScorersFactory:
         return CustomScorerFactory(
             client=self._client,
             project_id=self._project_id,
+            project_name=self._project_name,
         )

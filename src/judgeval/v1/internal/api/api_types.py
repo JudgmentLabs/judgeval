@@ -400,22 +400,5 @@ class UploadCustomScorerBundleResponse(TypedDict):
     message: str
 
 
-class UploadCustomScorerRequest(TypedDict):
-    scorer_name: str
-    scorer_code: str
-    requirements_text: str
-    class_name: str
-    overwrite: bool
-    scorer_type: NotRequired[Optional[str]]
-    response_type: str
-    version: NotRequired[Optional[float]]
-
-
-class UploadCustomScorerResponse(TypedDict):
-    scorer_name: str
-    status: str
-    message: str
-
-
 class WelcomeResponse(TypedDict):
     pass

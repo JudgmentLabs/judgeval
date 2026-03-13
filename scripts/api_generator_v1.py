@@ -759,7 +759,7 @@ def generate_client_class(
     )
     lines.append(f"    {multipart_method}(")
     lines.append(
-        '        self, method: Literal["POST", "PATCH", "PUT"], url: str, payload: Any, params: Optional[Dict[str, Any]] = None'
+        '        self, method: Literal["POST", "PATCH", "PUT"], url: str, payload: Dict[str, Any], params: Optional[Dict[str, Any]] = None'
     )
     lines.append("    ) -> Any:")
     lines.append('        logger.debug(f"HTTP {method} (multipart) {url}")')
@@ -782,7 +782,7 @@ def generate_client_class(
     lines.append("            files=files,")
     lines.append("            params=params,")
     lines.append(
-        "            headers=_multipart_headers(self.api_key, self.organization_id),"
+        "            headers=_headers(self.api_key, self.organization_id, True),"
     )
     lines.append("        )")
     if is_async:
@@ -843,12 +843,14 @@ def generate_api_file() -> str:
         "from judgeval.logger import judgeval_logger as logger",
         "",
         "",
-        "def _headers(api_key: str, organization_id: str) -> Mapping[str, str]:",
-        "    return {",
-        '        "Content-Type": "application/json",',
+        "def _headers(api_key: str, organization_id: str, is_multipart: bool = False) -> Mapping[str, str]:",
+        "    headers = {",
         '        "Authorization": f"Bearer {api_key}",',
         '        "X-Organization-Id": organization_id,',
         "    }",
+        "    if not is_multipart:",
+        '        headers["Content-Type"] = "application/json"',
+        "    return headers",
         "",
         "",
         "def _handle_response(r: Response) -> Any:",
@@ -859,13 +861,6 @@ def generate_api_file() -> str:
         "            detail = r.text",
         "        raise JudgmentAPIError(r.status_code, detail, r)",
         "    return r.json()",
-        "",
-        "",
-        "def _multipart_headers(api_key: str, organization_id: str) -> Mapping[str, str]:",
-        "    return {",
-        '        "Authorization": f"Bearer {api_key}",',
-        '        "X-Organization-Id": organization_id,',
-        "    }",
         "",
         "",
     ]
