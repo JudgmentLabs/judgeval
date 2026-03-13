@@ -5,7 +5,6 @@ import io
 import os
 import tarfile
 from typing import Literal, Optional, Tuple
-from pathspec import PathSpec
 import typer
 
 from judgeval.logger import judgeval_logger
@@ -27,22 +26,6 @@ RESPONSE_TYPE_MAP: dict[str, Literal["binary", "categorical", "numeric"]] = {
 
 V2_SCORER_BASES = {"TraceCustomScorer", "ExampleCustomScorer"}
 V3_SCORER_BASES = {"Judge"}
-
-EXCLUDE_SPEC = PathSpec.from_lines(
-    "gitignore",
-    [
-        "__pycache__/",
-        "*.pyc",
-        "*.pyo",
-        "*.pyd",
-        "**/*.pyw",
-        "*.pyz",
-        ".venv/",
-        "venv/",
-        ".env",
-        ".env.*",
-    ],
-)
 
 
 def _extract_generic_arg(node: ast.expr) -> Optional[str]:
