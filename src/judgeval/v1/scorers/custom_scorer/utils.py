@@ -54,6 +54,8 @@ class TarFilter:
             rel_to_gitignore = os.path.relpath(
                 abs_path, os.path.dirname(self.gitignore_path)
             )
+            if path.endswith("/"):
+                rel_to_gitignore += "/"
             return self.gitignore_spec.match_file(rel_to_gitignore)
         return False
 
