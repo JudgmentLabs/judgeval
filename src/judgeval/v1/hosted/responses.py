@@ -1,6 +1,6 @@
 from typing import ClassVar, List, Literal, Optional, Union
 from abc import ABC
-from pydantic import BaseModel, TypeAdapter, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError, model_validator
 from typing_extensions import final
 
 ReturnType = Literal["binary", "categorical", "numeric"]
@@ -12,7 +12,7 @@ class Citation(BaseModel):
 
 
 class Category(BaseModel):
-    name: str
+    value: str
     description: str = ""
 
 
@@ -44,6 +44,16 @@ class CategoricalResponse(BaseResponse, ABC):
                 f"{cls.__name__} must define a 'categories' class variable "
                 f"as a list of Category models"
             ) from e
+
+    @model_validator(mode="after")
+    def validate_value_in_categories(self):
+        valid_names = [c.value for c in self.categories]
+        if self.value not in valid_names:
+            raise ValueError(
+                f"value '{self.value}' is not a valid category. "
+                f"Must be one of: {valid_names}"
+            )
+        return self
 
 
 @final
