@@ -79,7 +79,7 @@ def _build_bundle(
     entrypoint_path: str,
     included_files_paths: list[str],
     requirements_file_path: str | None,
-) -> tuple[bytes, str, str | None]:
+) -> tuple[bytes, str, str | None, int]:
     if not os.path.exists(entrypoint_path):
         raise FileNotFoundError(f"Scorer entrypoint file not found: {entrypoint_path}")
     all_abs: list[str] = [os.path.abspath(entrypoint_path)]
@@ -117,7 +117,12 @@ def _build_bundle(
         else None
     )
 
-    return buf.getvalue(), entrypoint_arcname, requirements_arcname
+    return (
+        buf.getvalue(),
+        entrypoint_arcname,
+        requirements_arcname,
+        tar_filter.get_file_count(),
+    )
 
 
 class CustomScorerFactory:
@@ -191,13 +196,13 @@ class CustomScorerFactory:
             unique_name = class_name
             judgeval_logger.info(f"Auto-detected scorer name: '{unique_name}'")
 
-        bundle, entrypoint_arcname, requirements_arcname = _build_bundle(
+        bundle, entrypoint_arcname, requirements_arcname, file_count = _build_bundle(
             entrypoint_path, included_files_paths, requirements_file_path
         )
 
         if not yes:
             typer.confirm(
-                f"Are you sure you want to upload {response_type} code judge '{unique_name}' to project '{self._project_name}'?\nIf this judge already exists, a new version will be created.",
+                f"Are you sure you want to upload {response_type} code judge '{unique_name}' to project '{self._project_name}'? In total, {file_count} files will be uploaded.\nIf this judge already exists in the project, a new version will be created.",
                 abort=True,
             )
 

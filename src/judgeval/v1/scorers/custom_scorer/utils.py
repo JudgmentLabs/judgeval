@@ -42,6 +42,9 @@ class TarFilter:
             with open(self.gitignore_path, "r") as f:
                 self.gitignore_spec = PathSpec.from_lines("gitignore", f)
 
+    def get_file_count(self) -> int:
+        return len(self.seen_files)
+
     def is_excluded_by_default(self, path: str) -> bool:
         return DEFAULT_EXCLUDE_SPEC.match_file(path)
 
