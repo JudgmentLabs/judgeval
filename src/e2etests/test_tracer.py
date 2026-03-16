@@ -1,19 +1,23 @@
-from judgeval.v1 import Judgeval
 import time
+import os
+import random
+import string
+
+import pytest
+import orjson
 from openai import OpenAI, AsyncOpenAI
 from anthropic import Anthropic, AsyncAnthropic
 from together import Together, AsyncTogether  # type: ignore[import-untyped]
 from google import genai
+
+from judgeval.v1 import Tracer
+from judgeval.v1.trace.base_tracer import BaseTracer
+from judgeval.v1.instrumentation import wrap
 from e2etests.utils import (
     retrieve_trace,
     create_project,
     delete_project,
 )
-import os
-import random
-import pytest
-import string
-import orjson
 
 project_name = "e2e-tests-" + "".join(
     random.choices(string.ascii_letters + string.digits, k=12)
@@ -27,36 +31,33 @@ def teardown_module(module):
     delete_project(project_name=project_name)
 
 
-judgeval_client = Judgeval(project_name=project_name)
-judgment = judgeval_client.tracer.create()
+tracer = Tracer.init(project_name=project_name)
 
-openai_client = judgment.wrap(OpenAI())
-anthropic_client = judgment.wrap(Anthropic())
-together_client = judgment.wrap(Together(api_key=os.getenv("TOGETHER_API_KEY")))
-google_client = judgment.wrap(genai.Client(api_key=os.getenv("GOOGLE_API_KEY")))
+openai_client = wrap(OpenAI())
+anthropic_client = wrap(Anthropic())
+together_client = wrap(Together(api_key=os.getenv("TOGETHER_API_KEY")))
+google_client = wrap(genai.Client(api_key=os.getenv("GOOGLE_API_KEY")))
 
-openai_client_async = judgment.wrap(AsyncOpenAI())
-anthropic_client_async = judgment.wrap(AsyncAnthropic())
-together_client_async = judgment.wrap(
-    AsyncTogether(api_key=os.getenv("TOGETHER_API_KEY"))
-)
+openai_client_async = wrap(AsyncOpenAI())
+anthropic_client_async = wrap(AsyncAnthropic())
+together_client_async = wrap(AsyncTogether(api_key=os.getenv("TOGETHER_API_KEY")))
 
 QUERY_RETRY = 60
 PROMPT = "I need you to solve this math problem: 1 + 1 = ?"
 
 
-@judgment.observe(span_type="function")
+@BaseTracer.observe(span_type="function")
 def recursive_function(number: int):
     if number <= 1:
         trace_id = format(
-            judgment.get_current_span().get_span_context().trace_id, "032x"
+            BaseTracer.get_current_span().get_span_context().trace_id, "032x"
         )
         return trace_id
     else:
         return recursive_function(number - 1)
 
 
-@judgment.observe()
+@BaseTracer.observe()
 def openai_llm_call():
     openai_client.chat.completions.create(
         model="gpt-4o-mini",
@@ -65,21 +66,20 @@ def openai_llm_call():
             {"role": "user", "content": PROMPT},
         ],
     )
-    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+    return format(BaseTracer.get_current_span().get_span_context().trace_id, "032x")
 
 
-@judgment.observe()
+@BaseTracer.observe()
 def anthropic_llm_call():
     anthropic_client.messages.create(
         model="claude-3-haiku-20240307",
         messages=[{"role": "user", "content": PROMPT}],
         max_tokens=30,
     )
+    return format(BaseTracer.get_current_span().get_span_context().trace_id, "032x")
 
-    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
 
-
-@judgment.observe()
+@BaseTracer.observe()
 def together_llm_call():
     together_client.chat.completions.create(
         model="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
@@ -88,16 +88,16 @@ def together_llm_call():
             {"role": "user", "content": PROMPT},
         ],
     )
-    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+    return format(BaseTracer.get_current_span().get_span_context().trace_id, "032x")
 
 
-@judgment.observe()
+@BaseTracer.observe()
 def google_llm_call():
     google_client.models.generate_content(model="gemini-2.0-flash", contents=PROMPT)
-    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+    return format(BaseTracer.get_current_span().get_span_context().trace_id, "032x")
 
 
-@judgment.observe()
+@BaseTracer.observe()
 def openai_streaming_llm_call():
     stream = openai_client.chat.completions.create(
         model="gpt-4o-mini",
@@ -114,10 +114,10 @@ def openai_streaming_llm_call():
         if chunk.choices and chunk.choices[0].delta.content:
             accumulated_content += chunk.choices[0].delta.content
 
-    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+    return format(BaseTracer.get_current_span().get_span_context().trace_id, "032x")
 
 
-@judgment.observe()
+@BaseTracer.observe()
 def anthropic_streaming_llm_call():
     stream = anthropic_client.messages.create(
         model="claude-3-haiku-20240307",
@@ -131,10 +131,10 @@ def anthropic_streaming_llm_call():
         if hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
             accumulated_content += chunk.delta.text or ""
 
-    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+    return format(BaseTracer.get_current_span().get_span_context().trace_id, "032x")
 
 
-@judgment.observe()
+@BaseTracer.observe()
 def together_streaming_llm_call():
     stream = together_client.chat.completions.create(
         model="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
@@ -151,37 +151,37 @@ def together_streaming_llm_call():
         if chunk.choices and chunk.choices[0].delta.content:
             accumulated_content += chunk.choices[0].delta.content
 
-    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+    return format(BaseTracer.get_current_span().get_span_context().trace_id, "032x")
 
 
-@judgment.observe()
+@BaseTracer.observe()
 async def openai_async_llm_call():
     await openai_client_async.chat.completions.create(
         model="gpt-4o-mini", messages=[{"role": "user", "content": PROMPT}]
     )
-    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+    return format(BaseTracer.get_current_span().get_span_context().trace_id, "032x")
 
 
-@judgment.observe()
+@BaseTracer.observe()
 async def anthropic_async_llm_call():
     await anthropic_client_async.messages.create(
         model="claude-3-haiku-20240307",
         messages=[{"role": "user", "content": PROMPT}],
         max_tokens=30,
     )
-    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+    return format(BaseTracer.get_current_span().get_span_context().trace_id, "032x")
 
 
-@judgment.observe()
+@BaseTracer.observe()
 async def together_async_llm_call():
     await together_client_async.chat.completions.create(
         model="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
         messages=[{"role": "user", "content": PROMPT}],
     )
-    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+    return format(BaseTracer.get_current_span().get_span_context().trace_id, "032x")
 
 
-@judgment.observe()
+@BaseTracer.observe()
 async def openai_async_streaming_llm_call():
     stream = await openai_client_async.chat.completions.create(
         model="gpt-4o-mini",
@@ -198,10 +198,10 @@ async def openai_async_streaming_llm_call():
         if chunk.choices and chunk.choices[0].delta.content:
             accumulated_content += chunk.choices[0].delta.content
 
-    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+    return format(BaseTracer.get_current_span().get_span_context().trace_id, "032x")
 
 
-@judgment.observe()
+@BaseTracer.observe()
 async def anthropic_async_streaming_llm_call():
     stream = await anthropic_client_async.messages.create(
         model="claude-3-haiku-20240307",
@@ -215,10 +215,10 @@ async def anthropic_async_streaming_llm_call():
         if hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
             accumulated_content += chunk.delta.text or ""
 
-    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+    return format(BaseTracer.get_current_span().get_span_context().trace_id, "032x")
 
 
-@judgment.observe()
+@BaseTracer.observe()
 async def together_async_streaming_llm_call():
     stream = await together_client_async.chat.completions.create(
         model="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
@@ -235,7 +235,7 @@ async def together_async_streaming_llm_call():
         if chunk.choices and chunk.choices[0].delta.content:
             accumulated_content += chunk.choices[0].delta.content
 
-    return format(judgment.get_current_span().get_span_context().trace_id, "032x")
+    return format(BaseTracer.get_current_span().get_span_context().trace_id, "032x")
 
 
 def retrieve_trace_helper(trace_id, expected_span_amount):
