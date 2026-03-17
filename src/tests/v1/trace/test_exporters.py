@@ -1,4 +1,4 @@
-"""Tests for JudgmentSpanExporter and NoOpSpanExporter."""
+"""Tests for JudgmentSpanExporter and NoOpJudgmentSpanExporter."""
 
 from __future__ import annotations
 
@@ -7,20 +7,22 @@ from unittest.mock import MagicMock, patch
 from opentelemetry.sdk.trace.export import SpanExportResult
 
 from judgeval.v1.trace.exporters.judgment_span_exporter import JudgmentSpanExporter
-from judgeval.v1.trace.exporters.noop_span_exporter import NoOpSpanExporter
+from judgeval.v1.trace.exporters.noop_judgment_span_exporter import (
+    NoOpJudgmentSpanExporter,
+)
 
 
-class TestNoOpSpanExporter:
+class TestNoOpJudgmentSpanExporter:
     def test_export_returns_success(self):
-        exporter = NoOpSpanExporter()
+        exporter = NoOpJudgmentSpanExporter()
         assert exporter.export([]) == SpanExportResult.SUCCESS
 
     def test_shutdown_does_not_raise(self):
-        exporter = NoOpSpanExporter()
+        exporter = NoOpJudgmentSpanExporter()
         exporter.shutdown()
 
     def test_force_flush_returns_true(self):
-        exporter = NoOpSpanExporter()
+        exporter = NoOpJudgmentSpanExporter()
         assert exporter.force_flush() is True
 
 

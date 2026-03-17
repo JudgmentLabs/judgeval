@@ -7,8 +7,12 @@ from unittest.mock import MagicMock
 from opentelemetry.trace.span import SpanContext, TraceFlags
 
 from judgeval.v1.trace.processors.judgment_span_processor import JudgmentSpanProcessor
-from judgeval.v1.trace.processors.noop_span_processor import NoOpSpanProcessor
-from judgeval.v1.trace.exporters.noop_span_exporter import NoOpSpanExporter
+from judgeval.v1.trace.processors.noop_judgment_span_processor import (
+    NoOpJudgmentSpanProcessor,
+)
+from judgeval.v1.trace.exporters.noop_judgment_span_exporter import (
+    NoOpJudgmentSpanExporter,
+)
 
 
 def _make_span_context(trace_id=1, span_id=2):
@@ -23,7 +27,7 @@ def _make_span_context(trace_id=1, span_id=2):
 class TestSpanProcessorState:
     def _make_processor(self):
         mock_tracer = MagicMock()
-        return JudgmentSpanProcessor(mock_tracer, NoOpSpanExporter())
+        return JudgmentSpanProcessor(mock_tracer, NoOpJudgmentSpanExporter())
 
     def test_state_set_and_get(self):
         proc = self._make_processor()
@@ -72,17 +76,28 @@ class TestSpanProcessorState:
         assert proc.state_get(ctx, "key") is None
 
 
-class TestNoOpSpanProcessor:
+class TestNoOpJudgmentSpanProcessor:
     def test_noop_methods_dont_raise(self):
-        proc = NoOpSpanProcessor()
+        proc = NoOpJudgmentSpanProcessor()
         proc.on_start(MagicMock(), None)
         proc.on_end(MagicMock())
         proc.shutdown()
         assert proc.force_flush() is True
         proc.emit_partial()
 
-    def test_noop_get_internal_attribute_returns_default(self):
-        proc = NoOpSpanProcessor()
+    def test_noop_state_get_returns_default(self):
+        proc = NoOpJudgmentSpanProcessor()
         ctx = _make_span_context()
-        assert proc.get_internal_attribute(ctx, "key") is None
-        assert proc.get_internal_attribute(ctx, "key", "default") == "default"
+        assert proc.state_get(ctx, "key") is None
+        assert proc.state_get(ctx, "key", "default") == "default"
+
+    def test_noop_state_incr_returns_zero(self):
+        proc = NoOpJudgmentSpanProcessor()
+        ctx = _make_span_context()
+        assert proc.state_incr(ctx, "counter") == 0
+        assert proc.state_incr(ctx, "counter") == 0
+
+    def test_noop_state_append_returns_empty(self):
+        proc = NoOpJudgmentSpanProcessor()
+        ctx = _make_span_context()
+        assert proc.state_append(ctx, "items", "a") == []

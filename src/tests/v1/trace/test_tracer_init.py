@@ -5,9 +5,13 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from judgeval.v1.trace.tracer import Tracer
-from judgeval.v1.trace.exporters.noop_span_exporter import NoOpSpanExporter
+from judgeval.v1.trace.exporters.noop_judgment_span_exporter import (
+    NoOpJudgmentSpanExporter,
+)
 from judgeval.v1.trace.exporters.judgment_span_exporter import JudgmentSpanExporter
-from judgeval.v1.trace.processors.noop_span_processor import NoOpSpanProcessor
+from judgeval.v1.trace.processors.noop_judgment_span_processor import (
+    NoOpJudgmentSpanProcessor,
+)
 from judgeval.v1.trace.processors.judgment_span_processor import JudgmentSpanProcessor
 
 
@@ -20,8 +24,8 @@ class TestTracerInitValidation:
             api_url="http://x",
         )
         assert t._enable_monitoring is False
-        assert isinstance(t.get_span_exporter(), NoOpSpanExporter)
-        assert isinstance(t.get_span_processor(), NoOpSpanProcessor)
+        assert isinstance(t.get_span_exporter(), NoOpJudgmentSpanExporter)
+        assert isinstance(t.get_span_processor(), NoOpJudgmentSpanProcessor)
 
     def test_missing_api_key_disables_monitoring(self):
         t = Tracer.init(

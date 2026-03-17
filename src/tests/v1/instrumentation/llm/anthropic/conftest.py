@@ -24,7 +24,9 @@ from judgeval.v1.trace.judgment_tracer_provider import (
 from judgeval.v1.trace.processors.judgment_baggage_processor import (
     JudgmentBaggageProcessor,
 )
-from judgeval.v1.trace.exporters.noop_span_exporter import NoOpSpanExporter
+from judgeval.v1.trace.exporters.noop_judgment_span_exporter import (
+    NoOpJudgmentSpanExporter,
+)
 
 
 class MockSpanProcessor:
@@ -94,7 +96,7 @@ def tracer(mock_processor):
     provider: TracerProvider = t._tracer_provider
     provider._active_span_processor._span_processors = ()  # type: ignore[attr-defined]
     provider.add_span_processor(
-        _BaggageAwareProcessor(NoOpSpanExporter(), mock_processor)
+        _BaggageAwareProcessor(NoOpJudgmentSpanExporter(), mock_processor)
     )
     return t
 

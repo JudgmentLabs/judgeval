@@ -13,9 +13,13 @@ from judgeval.utils.serialize import safe_serialize
 from judgeval.v1.trace.base_tracer import BaseTracer
 from judgeval.v1.trace.judgment_tracer_provider import JudgmentTracerProvider
 from judgeval.v1.trace.exporters.judgment_span_exporter import JudgmentSpanExporter
-from judgeval.v1.trace.exporters.noop_span_exporter import NoOpSpanExporter
+from judgeval.v1.trace.exporters.noop_judgment_span_exporter import (
+    NoOpJudgmentSpanExporter,
+)
 from judgeval.v1.trace.processors.judgment_span_processor import JudgmentSpanProcessor
-from judgeval.v1.trace.processors.noop_span_processor import NoOpSpanProcessor
+from judgeval.v1.trace.processors.noop_judgment_span_processor import (
+    NoOpJudgmentSpanProcessor,
+)
 from judgeval.v1.trace.id_generator import IsolatedRandomIdGenerator
 from judgeval.v1.internal.api import JudgmentSyncClient
 from judgeval.v1.utils import resolve_project_id
@@ -183,7 +187,7 @@ class Tracer(BaseTracer):
             or not self.organization_id
             or not self.api_url
         ):
-            self._span_exporter = NoOpSpanExporter()
+            self._span_exporter = NoOpJudgmentSpanExporter()
         else:
             endpoint = (
                 self.api_url + "otel/v1/traces"
@@ -203,7 +207,7 @@ class Tracer(BaseTracer):
             return self._span_processor
 
         if not self._enable_monitoring:
-            self._span_processor = NoOpSpanProcessor()
+            self._span_processor = NoOpJudgmentSpanProcessor()
         else:
             self._span_processor = JudgmentSpanProcessor(
                 self,

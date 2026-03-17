@@ -8,7 +8,7 @@ from opentelemetry.sdk.trace.export import SpanExportResult
 from judgeval.v1.trace.exporters.judgment_span_exporter import JudgmentSpanExporter
 
 
-class NoOpSpanExporter(JudgmentSpanExporter):
+class NoOpJudgmentSpanExporter(JudgmentSpanExporter):
     __slots__ = ()
 
     def __init__(self):

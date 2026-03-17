@@ -11,13 +11,15 @@ from judgeval.v1.trace.judgment_tracer_provider import (
     JudgmentTracerProvider,
     _active_tracer_var,
 )
-from judgeval.v1.trace.exporters.noop_span_exporter import NoOpSpanExporter
+from judgeval.v1.trace.exporters.noop_judgment_span_exporter import (
+    NoOpJudgmentSpanExporter,
+)
 from judgeval.v1.trace.processors.judgment_baggage_processor import (
     JudgmentBaggageProcessor,
 )
 
 
-class CollectingExporter(NoOpSpanExporter):
+class CollectingExporter(NoOpJudgmentSpanExporter):
     """Captures exported spans in memory for assertion."""
 
     def __init__(self):

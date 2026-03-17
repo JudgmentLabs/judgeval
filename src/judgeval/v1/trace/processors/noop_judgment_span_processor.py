@@ -9,7 +9,7 @@ from opentelemetry.trace.span import SpanContext
 from judgeval.v1.trace.processors.judgment_span_processor import JudgmentSpanProcessor
 
 
-class NoOpSpanProcessor(JudgmentSpanProcessor):
+class NoOpJudgmentSpanProcessor(JudgmentSpanProcessor):
     __slots__ = ()
 
     def __init__(self):
@@ -30,12 +30,16 @@ class NoOpSpanProcessor(JudgmentSpanProcessor):
     def emit_partial(self) -> None:
         pass
 
-    def set_internal_attribute(
-        self, span_context: SpanContext, key: str, value: Any
-    ) -> None:
+    def state_set(self, span_context: SpanContext, key: str, value: Any) -> None:
         pass
 
-    def get_internal_attribute(
+    def state_get(
         self, span_context: SpanContext, key: str, default: Any = None
     ) -> Any:
         return default
+
+    def state_incr(self, span_context: SpanContext, key: str) -> int:
+        return 0
+
+    def state_append(self, span_context: SpanContext, key: str, item: Any) -> list[Any]:
+        return []

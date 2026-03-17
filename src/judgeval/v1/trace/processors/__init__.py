@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from judgeval.v1.trace.processors.judgment_span_processor import JudgmentSpanProcessor
-from judgeval.v1.trace.processors.noop_span_processor import NoOpSpanProcessor
+from judgeval.v1.trace.processors.noop_judgment_span_processor import (
+    NoOpJudgmentSpanProcessor,
+)
 from judgeval.v1.trace.processors.judgment_baggage_processor import (
     ALLOW_ALL_BAGGAGE_KEYS,
     JudgmentBaggageProcessor,
@@ -9,7 +11,7 @@ from judgeval.v1.trace.processors.judgment_baggage_processor import (
 
 __all__ = [
     "JudgmentSpanProcessor",
-    "NoOpSpanProcessor",
+    "NoOpJudgmentSpanProcessor",
     "JudgmentBaggageProcessor",
     "ALLOW_ALL_BAGGAGE_KEYS",
 ]
