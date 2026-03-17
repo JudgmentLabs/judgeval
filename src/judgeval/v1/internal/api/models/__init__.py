@@ -89,6 +89,15 @@ from .trigger_root_span_rules_response import (
 )
 from .untag_prompt_request import UntagPromptRequest as UntagPromptRequest
 from .untag_prompt_response import UntagPromptResponse as UntagPromptResponse
+from .upload_custom_scorer_bundle_metadata import (
+    UploadCustomScorerBundleMetadata as UploadCustomScorerBundleMetadata,
+)
+from .upload_custom_scorer_bundle_request import (
+    UploadCustomScorerBundleRequest as UploadCustomScorerBundleRequest,
+)
+from .upload_custom_scorer_bundle_response import (
+    UploadCustomScorerBundleResponse as UploadCustomScorerBundleResponse,
+)
 from .upload_custom_scorer_request import (
     UploadCustomScorerRequest as UploadCustomScorerRequest,
 )

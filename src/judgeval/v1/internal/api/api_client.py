@@ -2,6 +2,7 @@
 # DO NOT EDIT MANUALLY
 # mypy: ignore-errors
 from typing import Dict, Any, Mapping, Literal, Optional
+import json
 import httpx
 from httpx import Response
 from judgeval.exceptions import JudgmentAPIError
@@ -11,12 +12,16 @@ from judgeval.v1.internal.api.models import *
 from judgeval.logger import judgeval_logger as logger
 
 
-def _headers(api_key: str, organization_id: str) -> Mapping[str, str]:
-    return {
-        "Content-Type": "application/json",
+def _headers(
+    api_key: str, organization_id: str, is_multipart: bool = False
+) -> Mapping[str, str]:
+    headers = {
         "Authorization": f"Bearer {api_key}",
         "X-Organization-Id": organization_id,
     }
+    if not is_multipart:
+        headers["Content-Type"] = "application/json"
+    return headers
 
 
 def _handle_response(r: Response) -> Any:
@@ -62,6 +67,35 @@ class JudgmentSyncClient:
                 headers=_headers(self.api_key, self.organization_id),
             )
         logger.debug(f"HTTP {method} {url} -> {r.status_code}")
+        return _handle_response(r)
+
+    def _multipart_request(
+        self,
+        method: Literal["POST", "PATCH", "PUT"],
+        url: str,
+        payload: Dict[str, Any],
+        params: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        logger.debug(f"HTTP {method} (multipart) {url}")
+        data = {}
+        files = {}
+        for key, value in payload.items():
+            if isinstance(value, (bytes, bytearray)):
+                files[key] = (key, value, "application/octet-stream")
+            else:
+                if isinstance(value, dict):
+                    data[key] = json.dumps(value)
+                else:
+                    data[key] = value
+        r = self.client.request(
+            method,
+            url,
+            data=data,
+            files=files,
+            params=params,
+            headers=_headers(self.api_key, self.organization_id, True),
+        )
+        logger.debug(f"HTTP {method} (multipart) {url} -> {r.status_code}")
         return _handle_response(r)
 
     def post_otel_v1_traces(self) -> Any:
@@ -287,12 +321,19 @@ class JudgmentSyncClient:
             {},
         )
 
-    def post_projects_scorers_custom(
-        self, project_id: str, payload: UploadCustomScorerRequest
-    ) -> UploadCustomScorerResponse:
+    def post_projects_scorers_custom(self, project_id: str) -> Any:
         return self._request(
             "POST",
             url_for(f"/v1/projects/{project_id}/scorers/custom", self.base_url),
+            {},
+        )
+
+    def post_projects_scorers_custom_bundle(
+        self, project_id: str, payload: UploadCustomScorerBundleRequest
+    ) -> UploadCustomScorerBundleResponse:
+        return self._multipart_request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/scorers/custom/bundle", self.base_url),
             payload,
         )
 
@@ -383,6 +424,36 @@ class JudgmentAsyncClient:
             )
         r = await r
         logger.debug(f"HTTP {method} {url} -> {r.status_code}")
+        return _handle_response(r)
+
+    async def _multipart_request(
+        self,
+        method: Literal["POST", "PATCH", "PUT"],
+        url: str,
+        payload: Dict[str, Any],
+        params: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        logger.debug(f"HTTP {method} (multipart) {url}")
+        data = {}
+        files = {}
+        for key, value in payload.items():
+            if isinstance(value, (bytes, bytearray)):
+                files[key] = (key, value, "application/octet-stream")
+            else:
+                if isinstance(value, dict):
+                    data[key] = json.dumps(value)
+                else:
+                    data[key] = value
+        r = self.client.request(
+            method,
+            url,
+            data=data,
+            files=files,
+            params=params,
+            headers=_headers(self.api_key, self.organization_id, True),
+        )
+        r = await r
+        logger.debug(f"HTTP {method} (multipart) {url} -> {r.status_code}")
         return _handle_response(r)
 
     async def post_otel_v1_traces(self) -> Any:
@@ -608,12 +679,19 @@ class JudgmentAsyncClient:
             {},
         )
 
-    async def post_projects_scorers_custom(
-        self, project_id: str, payload: UploadCustomScorerRequest
-    ) -> UploadCustomScorerResponse:
+    async def post_projects_scorers_custom(self, project_id: str) -> Any:
         return await self._request(
             "POST",
             url_for(f"/v1/projects/{project_id}/scorers/custom", self.base_url),
+            {},
+        )
+
+    async def post_projects_scorers_custom_bundle(
+        self, project_id: str, payload: UploadCustomScorerBundleRequest
+    ) -> UploadCustomScorerBundleResponse:
+        return await self._multipart_request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/scorers/custom/bundle", self.base_url),
             payload,
         )
 
