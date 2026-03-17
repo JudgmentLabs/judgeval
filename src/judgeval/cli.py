@@ -4,7 +4,9 @@ import os
 import subprocess
 import sys
 import typer
+import re
 from pathlib import Path
+from typing import Literal
 from dotenv import load_dotenv
 from judgeval.v1.utils import resolve_project_id
 from judgeval.v1.internal.api import JudgmentSyncClient
@@ -14,6 +16,11 @@ from judgeval.exceptions import JudgmentAPIError
 from judgeval import Judgeval
 from judgeval.version import get_version
 from judgeval.utils.url import url_for
+from judgeval.v1.hosted.templates import (
+    get_binary_scorer_template,
+    get_categorical_scorer_template,
+    get_numeric_scorer_template,
+)
 
 load_dotenv()
 
@@ -25,6 +32,17 @@ app = typer.Typer(
     rich_help_panel=None,
     rich_markup_mode=None,
 )
+
+scorer_app = typer.Typer(
+    no_args_is_help=True,
+    pretty_exceptions_enable=False,
+    pretty_exceptions_show_locals=False,
+    pretty_exceptions_short=False,
+    rich_help_panel=None,
+    rich_markup_mode=None,
+)
+
+app.add_typer(scorer_app, name="scorer", help="Commands to manage custom scorers")
 
 
 @app.command(
@@ -62,12 +80,18 @@ def load_otel_env(
     sys.exit(result.returncode)
 
 
-@app.command()
-def upload_scorer(
-    scorer_file_path: str = typer.Argument(help="Path to scorer Python file"),
+@scorer_app.command()
+def upload(
+    entrypoint_path: str = typer.Argument(help="Path to scorer entrypoint Python file"),
     project_name: str = typer.Option(..., "--project", "-p", help="Project name"),
     requirements_file_path: str = typer.Option(
         None, "--requirements", "-r", help="Path to requirements.txt file"
+    ),
+    included_files_paths: list[str] = typer.Option(
+        [],
+        "--included-files",
+        "-i",
+        help="Path to included files or directories. If a directory is provided, all non-ignored files in the directory will be included.",
     ),
     unique_name: str = typer.Option(
         None,
@@ -75,30 +99,30 @@ def upload_scorer(
         "-n",
         help="Custom scorer name (auto-detected if not provided)",
     ),
-    overwrite: bool = typer.Option(
-        False, "--overwrite", "-o", help="Overwrite if exists"
+    bump_major: bool = typer.Option(
+        False, "--bump-major", "-m", help="Bump major version"
     ),
     api_key: str = typer.Option(None, envvar="JUDGMENT_API_KEY"),
     organization_id: str = typer.Option(None, envvar="JUDGMENT_ORG_ID"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ):
     """Upload custom scorer to Judgment."""
-    scorer_path = Path(scorer_file_path)
-
+    scorer_path = Path(entrypoint_path)
     if not scorer_path.exists():
-        raise typer.BadParameter(f"Scorer file not found: {scorer_file_path}")
-
+        raise typer.BadParameter(f"Scorer file not found: {entrypoint_path}")
     client = Judgeval(project_name, api_key=api_key, organization_id=organization_id)
-
     try:
         result = client.scorers.custom_scorer.upload(
-            scorer_file_path=scorer_file_path,
+            entrypoint_path=entrypoint_path,
+            included_files_paths=included_files_paths,
             requirements_file_path=requirements_file_path,
             unique_name=unique_name,
-            overwrite=overwrite,
+            bump_major=bump_major,
+            yes=yes,
         )
         if not result:
             raise typer.Abort()
-        judgeval_logger.info("Custom scorer uploaded successfully!")
+        typer.echo(f"Custom scorer uploaded successfully to project '{project_name}'!")
     except JudgmentAPIError as e:
         if e.status_code == 409:
             judgeval_logger.error(e.detail)
@@ -107,6 +131,67 @@ def upload_scorer(
     except ValueError as e:
         judgeval_logger.error(str(e))
         raise typer.Exit(1)
+
+
+@scorer_app.command()
+def init(
+    response_type: Literal["binary", "categorical", "numeric"] = typer.Option(
+        ..., "--response-type", "-t", help="Response type"
+    ),
+    include_requirements: bool = typer.Option(
+        False, "--include-requirements", "-r", help="Include requirements.txt file"
+    ),
+    scorer_name: str = typer.Option(..., "--name", "-n", help="Scorer class name"),
+    init_path: str = typer.Option(
+        ".", "--init-path", "-p", help="Path to initialize the scorer"
+    ),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+):
+    """Initialize skeleton code for a new custom scorer."""
+    if not scorer_name.isidentifier():
+        raise typer.BadParameter("Scorer name must be a valid Python identifier")
+    scorer_path = Path(
+        init_path, f"{re.sub(r'(?<!^)(?=[A-Z])', '_', scorer_name).lower()}.py"
+    )
+    if scorer_path.exists():
+        raise typer.BadParameter(f"Scorer file already exists: {scorer_name}")
+
+    scorer_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if response_type == "binary":
+        template = get_binary_scorer_template(scorer_name)
+    elif response_type == "categorical":
+        template = get_categorical_scorer_template(scorer_name)
+    elif response_type == "numeric":
+        template = get_numeric_scorer_template(scorer_name)
+    else:
+        raise typer.BadParameter(f"Unsupported response type: {response_type}")
+
+    if include_requirements:
+        requirements_path = Path(init_path, "requirements.txt")
+        if requirements_path.exists():
+            raise typer.BadParameter(
+                f"Requirements file already exists: {requirements_path}"
+            )
+        if not yes:
+            typer.confirm(
+                f"Are you sure you want to initialize an empty requirements file at:\n{os.path.abspath(requirements_path)}?",
+                abort=True,
+            )
+        with open(requirements_path, "w") as f:
+            f.write("")
+        typer.echo(
+            f"Requirements file initialized successfully:\n{os.path.abspath(requirements_path)}"
+        )
+
+    if not yes:
+        typer.confirm(
+            f"Are you sure you want to initialize a {response_type} judge file at:\n{os.path.abspath(scorer_path)}?",
+            abort=True,
+        )
+    with open(scorer_path, "w") as f:
+        f.write(template)
+    typer.echo(f"Scorer initialized successfully:\n{os.path.abspath(scorer_path)}")
 
 
 @app.command()

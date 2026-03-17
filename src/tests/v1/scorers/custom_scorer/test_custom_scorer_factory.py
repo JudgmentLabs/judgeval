@@ -16,7 +16,11 @@ class TestCustomScorerFactoryGet:
             "exists": True
         }
 
-        factory = CustomScorerFactory(client=mock_client, project_id="test_project_id")
+        factory = CustomScorerFactory(
+            client=mock_client,
+            project_id="test_project_id",
+            project_name="test_project_name",
+        )
         scorer = factory.get("TestScorer")
 
         assert isinstance(scorer, CustomScorer)
@@ -28,7 +32,11 @@ class TestCustomScorerFactoryGet:
             "exists": False
         }
 
-        factory = CustomScorerFactory(client=mock_client, project_id="test_project_id")
+        factory = CustomScorerFactory(
+            client=mock_client,
+            project_id="test_project_id",
+            project_name="test_project_name",
+        )
 
         with pytest.raises(JudgmentAPIError) as exc_info:
             factory.get("NonExistentScorer")
@@ -39,7 +47,9 @@ class TestCustomScorerFactoryGet:
     def test_get_returns_none_when_project_id_missing(self, mock_client, caplog):
         import logging
 
-        factory = CustomScorerFactory(client=mock_client, project_id=None)
+        factory = CustomScorerFactory(
+            client=mock_client, project_id=None, project_name="test_project_name"
+        )
 
         with caplog.at_level(logging.ERROR):
             scorer = factory.get("TestScorer")
@@ -54,7 +64,11 @@ class TestCustomScorerFactoryGet:
             "API Error"
         )
 
-        factory = CustomScorerFactory(client=mock_client, project_id="test_project_id")
+        factory = CustomScorerFactory(
+            client=mock_client,
+            project_id="test_project_id",
+            project_name="test_project_name",
+        )
 
         with pytest.raises(Exception, match="API Error"):
             factory.get("TestScorer")
@@ -76,12 +90,14 @@ class TestScorer(ExampleScorer):
 """
         )
 
-        factory = CustomScorerFactory(client=mock_client, project_id=None)
+        factory = CustomScorerFactory(
+            client=mock_client, project_id=None, project_name="test_project_name"
+        )
 
         with caplog.at_level(logging.ERROR):
-            result = factory.upload(str(scorer_file))
+            result = factory.upload(str(scorer_file), [])
 
         assert result is False
         assert "project_id is not set" in caplog.text
         assert "upload()" in caplog.text
-        mock_client.post_projects_scorers_custom.assert_not_called()
+        mock_client.post_projects_scorers_custom_bundle.assert_not_called()

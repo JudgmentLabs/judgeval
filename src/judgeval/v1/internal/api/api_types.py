@@ -378,19 +378,24 @@ class UntagPromptResponse(TypedDict):
     commit_ids: List[str]
 
 
-class UploadCustomScorerRequest(TypedDict):
+class UploadCustomScorerBundleMetadata(TypedDict):
     scorer_name: str
-    scorer_code: str
-    requirements_text: str
+    entrypoint_path: str
+    requirements_path: NotRequired[Optional[str]]
     class_name: str
-    overwrite: bool
     scorer_type: NotRequired[Optional[str]]
     response_type: str
     version: NotRequired[Optional[float]]
+    bump_major: NotRequired[Optional[bool]]
     categories: NotRequired[Optional[List[Dict[str, Any]]]]
 
 
-class UploadCustomScorerResponse(TypedDict):
+class UploadCustomScorerBundleRequest(TypedDict):
+    metadata: UploadCustomScorerBundleMetadata
+    bundle: bytes
+
+
+class UploadCustomScorerBundleResponse(TypedDict):
     scorer_name: str
     status: str
     message: str
