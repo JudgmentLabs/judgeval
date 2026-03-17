@@ -24,8 +24,8 @@ class {scorer_name}Response(CategoricalResponse):
     ]
 
 class {scorer_name}(Judge[{scorer_name}Response]):
-    async def score(self, data: Example) -> MyResponse:
-        return MyResponse(value="Category 1", reason="Test")
+    async def score(self, data: Example) -> {scorer_name}Response:
+        return {scorer_name}Response(value="Category 1", reason="Test")
 """
 
 
