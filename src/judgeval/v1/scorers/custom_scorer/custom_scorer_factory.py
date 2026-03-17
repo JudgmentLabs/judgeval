@@ -129,7 +129,7 @@ def parse_judge(
             scorer_type: Literal["trace", "example"] = (
                 "trace" if base_name == "TraceCustomScorer" else "example"
             )
-            return (node.name, scorer_type, RESPONSE_TYPE_MAP[generic_arg], None)
+            return (node.name, scorer_type, RESPONSE_TYPE_MAP[generic_arg], categories)
     return None
 
 
