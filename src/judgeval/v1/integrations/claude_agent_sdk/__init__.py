@@ -1,9 +1,6 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
-from judgeval.logger import judgeval_logger
 
-if TYPE_CHECKING:
-    from judgeval.v1.trace import BaseTracer
+from judgeval.logger import judgeval_logger
 
 __all__ = ["setup_claude_agent_sdk"]
 
@@ -15,14 +12,9 @@ except ImportError:
     )
 
 
-def setup_claude_agent_sdk(
-    tracer: "BaseTracer",
-) -> bool:
+def setup_claude_agent_sdk() -> bool:
     """
     Setup Judgeval integration with Claude Agent SDK. Will automatically patch the SDK for automatic tracing.
-
-    Args:
-        tracer: Judgeval Tracer instance
 
     Returns:
         bool: True if setup was successful, False otherwise.
@@ -32,8 +24,7 @@ def setup_claude_agent_sdk(
         import claude_agent_sdk
         from judgeval.v1.integrations.claude_agent_sdk import setup_claude_agent_sdk
 
-        tracer = Tracer(project_name="my-project")
-        setup_claude_agent_sdk(tracer=tracer)
+        setup_claude_agent_sdk()
 
         # Now use claude_agent_sdk normally - all calls automatically traced
         ```
@@ -59,16 +50,14 @@ def setup_claude_agent_sdk(
 
         # Patch ClaudeSDKClient
         if original_client:
-            wrapped_client = _create_client_wrapper_class(
-                original_client, tracer, state
-            )
+            wrapped_client = _create_client_wrapper_class(original_client, state)
             claude_agent_sdk.ClaudeSDKClient = wrapped_client  # type: ignore
 
         # Patch standalone query() function if it exists
         # Note: The standalone query() uses InternalClient, not ClaudeSDKClient,
         # so we need to wrap it separately to add tracing
         if original_query_fn:
-            wrapped_query_fn = _wrap_query_function(original_query_fn, tracer, state)
+            wrapped_query_fn = _wrap_query_function(original_query_fn, state)
             claude_agent_sdk.query = wrapped_query_fn  # type: ignore
 
         judgeval_logger.info("Claude Agent SDK integration setup successful")

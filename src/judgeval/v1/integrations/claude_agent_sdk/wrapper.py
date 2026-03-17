@@ -4,7 +4,6 @@ from __future__ import annotations
 import dataclasses
 import time
 from typing import (
-    TYPE_CHECKING,
     Any,
     AsyncGenerator,
     Callable,
@@ -20,9 +19,7 @@ from opentelemetry.trace import Span, set_span_in_context
 from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.utils.serialize import safe_serialize, serialize_attribute
 from judgeval.v1.trace.judgment_tracer_provider import JudgmentTracerProvider
-
-if TYPE_CHECKING:
-    from judgeval.v1.trace import BaseTracer
+from judgeval.v1.trace.tracer import Tracer
 
 
 @dataclasses.dataclass(slots=True)
@@ -31,8 +28,7 @@ class TracingState:
 
 
 class ToolSpanTracker:
-    def __init__(self, tracer: "BaseTracer", state: TracingState):
-        self.tracer = tracer
+    def __init__(self, state: TracingState):
         self.state = state
         self._pending_spans: Dict[str, Tuple[Span, str]] = {}
 
@@ -69,7 +65,7 @@ class ToolSpanTracker:
             self._pending_spans[tool_use_id] = (span, tool_name)
 
         if self._pending_spans:
-            self.tracer._emit_partial()
+            Tracer._emit_partial()
 
     def on_user_message(self, message: Any) -> None:
         content = getattr(message, "content", None)
@@ -118,8 +114,7 @@ class LLMSpanTracker:
     start time to ensure sequential timing (no overlapping LLM spans).
     """
 
-    def __init__(self, tracer: BaseTracer, query_start_time: Optional[float] = None):
-        self.tracer = tracer
+    def __init__(self, query_start_time: Optional[float] = None):
         self.current_span: Optional[Span] = None
         self.current_span_context: Optional[Any] = (
             None  # context manager, no public type
@@ -143,7 +138,6 @@ class LLMSpanTracker:
             self.current_span_context.__exit__(None, None, None)
 
         final_content, span, span_context = _create_llm_span_for_messages(
-            self.tracer,
             [message],
             prompt,
             conversation_history,
@@ -175,7 +169,7 @@ class LLMSpanTracker:
 
 
 def _create_client_wrapper_class(
-    original_client_class: Any, tracer: "BaseTracer", state: TracingState
+    original_client_class: Any, state: TracingState
 ) -> Any:
     """Creates a wrapper class for ClaudeSDKClient that wraps query and receive_response."""
 
@@ -221,17 +215,15 @@ def _create_client_wrapper_class(
                     serialize_attribute(self.__last_prompt, safe_serialize),
                 )
 
-            tracer._emit_partial()
+            Tracer._emit_partial()
 
             state.parent_context = set_span_in_context(
                 agent_span, JudgmentTracerProvider.get_instance().get_current_context()
             )
 
             final_results: List[Dict[str, Any]] = []
-            llm_tracker = LLMSpanTracker(
-                tracer, query_start_time=self.__query_start_time
-            )
-            tool_tracker = ToolSpanTracker(tracer, state=state)
+            llm_tracker = LLMSpanTracker(query_start_time=self.__query_start_time)
+            tool_tracker = ToolSpanTracker(state=state)
 
             try:
                 async for message in generator:
@@ -298,7 +290,7 @@ def _create_client_wrapper_class(
 
 
 def _wrap_query_function(
-    original_query_fn: Any, tracer: "BaseTracer", state: TracingState
+    original_query_fn: Any, state: TracingState
 ) -> Callable[..., Any]:
     """Wraps the standalone query() function to add tracing."""
 
@@ -323,15 +315,15 @@ def _wrap_query_function(
                 serialize_attribute(prompt, safe_serialize),
             )
 
-        tracer._emit_partial()
+        Tracer._emit_partial()
 
         state.parent_context = set_span_in_context(
             agent_span, JudgmentTracerProvider.get_instance().get_current_context()
         )
 
         final_results: List[Dict[str, Any]] = []
-        llm_tracker = LLMSpanTracker(tracer, query_start_time=time.time())
-        tool_tracker = ToolSpanTracker(tracer, state=state)
+        llm_tracker = LLMSpanTracker(query_start_time=time.time())
+        tool_tracker = ToolSpanTracker(state=state)
 
         try:
             # Call original query function
@@ -401,7 +393,6 @@ def _wrap_query_function(
 
 
 def _create_llm_span_for_messages(
-    tracer: "BaseTracer",
     messages: List[Any],  # List of AssistantMessage objects
     prompt: Any,
     conversation_history: List[Dict[str, Any]],
@@ -465,7 +456,7 @@ def _create_llm_span_for_messages(
             AttributeKeys.JUDGMENT_OUTPUT, serialize_attribute(outputs, safe_serialize)
         )
 
-    tracer._emit_partial()
+    Tracer._emit_partial()
 
     # Return final message content for conversation history and the span
     if hasattr(last_message, "content"):
