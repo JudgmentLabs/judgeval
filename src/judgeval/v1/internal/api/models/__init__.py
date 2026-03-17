@@ -98,10 +98,4 @@ from .upload_custom_scorer_bundle_request import (
 from .upload_custom_scorer_bundle_response import (
     UploadCustomScorerBundleResponse as UploadCustomScorerBundleResponse,
 )
-from .upload_custom_scorer_request import (
-    UploadCustomScorerRequest as UploadCustomScorerRequest,
-)
-from .upload_custom_scorer_response import (
-    UploadCustomScorerResponse as UploadCustomScorerResponse,
-)
 from .welcome_response import WelcomeResponse as WelcomeResponse

@@ -1,19 +1,17 @@
-"""Judge upload logic for the CLI.
-
-Parses a Python file containing a Judge subclass, validates it,
-and uploads it to the Judgment API.
-"""
-
 from __future__ import annotations
 
 import ast
+import io
 import os
+import tarfile
 from typing import Literal, Optional, Tuple
 
-from judgeval.exceptions import JudgmentAPIError
 from judgeval.logger import judgeval_logger
 from judgeval.v1.internal.api import JudgmentSyncClient
-from judgeval.v1.internal.api.models import UploadCustomScorerRequest
+from judgeval.v1.internal.api.models import (
+    UploadCustomScorerBundleMetadata,
+    UploadCustomScorerBundleRequest,
+)
 
 RESPONSE_TYPE_MAP: dict[str, Literal["binary", "categorical", "numeric"]] = {
     "BinaryResponse": "binary",
@@ -64,7 +62,7 @@ def upload_judge(
     scorer_file_path: str,
     requirements_file_path: str | None = None,
     unique_name: str | None = None,
-    overwrite: bool = False,
+    bump_major: bool = False,
 ) -> bool:
     if not os.path.exists(scorer_file_path):
         raise FileNotFoundError(f"Scorer file not found: {scorer_file_path}")
@@ -90,36 +88,38 @@ def upload_judge(
         unique_name = class_name
         judgeval_logger.info(f"Auto-detected judge name: '{unique_name}'")
 
-    requirements_text = ""
-    if requirements_file_path and os.path.exists(requirements_file_path):
-        with open(requirements_file_path, "r") as f:
-            requirements_text = f.read()
+    entrypoint_arcname = os.path.basename(scorer_file_path)
+    requirements_arcname = (
+        os.path.basename(requirements_file_path) if requirements_file_path else None
+    )
 
-    if not overwrite:
-        try:
-            exists_resp = client.get_projects_scorers_custom_by_name_exists(
-                project_id=project_id, name=unique_name
-            )
-            if exists_resp.get("exists"):
-                raise JudgmentAPIError(
-                    status_code=409,
-                    detail=f"Judge '{unique_name}' already exists. Use --overwrite to replace.",
-                    response=None,
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz", format=tarfile.GNU_FORMAT) as tar:
+        tar.add(scorer_file_path, arcname=entrypoint_arcname)
+        if requirements_file_path:
+            if not os.path.exists(requirements_file_path):
+                raise FileNotFoundError(
+                    f"Requirements file not found: {requirements_file_path}"
                 )
-        except JudgmentAPIError as e:
-            if e.status_code == 409:
-                raise
+            tar.add(requirements_file_path, arcname=requirements_arcname)
 
-    payload: UploadCustomScorerRequest = {
+    metadata: UploadCustomScorerBundleMetadata = {
         "scorer_name": unique_name,
+        "entrypoint_path": entrypoint_arcname,
         "class_name": class_name,
-        "scorer_code": scorer_code,
-        "requirements_text": requirements_text,
-        "overwrite": overwrite,
         "response_type": response_type,
         "version": 3,
+        "bump_major": bump_major,
     }
-    response = client.post_projects_scorers_custom(
+    if requirements_arcname:
+        metadata["requirements_path"] = requirements_arcname
+
+    payload: UploadCustomScorerBundleRequest = {
+        "metadata": metadata,
+        "bundle": buf.getvalue(),
+    }
+
+    response = client.post_projects_scorers_custom_bundle(
         project_id=project_id,
         payload=payload,
     )
