@@ -5,6 +5,7 @@ from judgeval.judgment_attribute_keys import AttributeKeys
 
 
 CUSTOMER_ID_KEY = create_key(AttributeKeys.JUDGMENT_CUSTOMER_ID)
+CUSTOMER_USER_ID_KEY = create_key(AttributeKeys.JUDGMENT_CUSTOMER_USER_ID)
 SESSION_ID_KEY = create_key(AttributeKeys.JUDGMENT_SESSION_ID)
 AGENT_ID_KEY = create_key(AttributeKeys.JUDGMENT_AGENT_ID)
 PARENT_AGENT_ID_KEY = create_key(AttributeKeys.JUDGMENT_PARENT_AGENT_ID)

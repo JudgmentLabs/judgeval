@@ -57,6 +57,7 @@ from judgeval.v1.tracer.processors._lifecycles import (
     AGENT_ID_KEY,
     PARENT_AGENT_ID_KEY,
     CUSTOMER_ID_KEY,
+    CUSTOMER_USER_ID_KEY,
     SESSION_ID_KEY,
     AGENT_CLASS_NAME_KEY,
     AGENT_INSTANCE_NAME_KEY,
@@ -257,6 +258,16 @@ class BaseTracer(ABC):
             return
         current_span.set_attribute(AttributeKeys.JUDGMENT_CUSTOMER_ID, customer_id)
         ctx = set_value(CUSTOMER_ID_KEY, customer_id, self.get_context())
+        self._attach_context(ctx)
+
+    def set_customer_user_id(self, customer_user_id: str) -> None:
+        current_span = self.get_current_span()
+        if current_span is None:
+            return
+        current_span.set_attribute(
+            AttributeKeys.JUDGMENT_CUSTOMER_USER_ID, customer_user_id
+        )
+        ctx = set_value(CUSTOMER_USER_ID_KEY, customer_user_id, self.get_context())
         self._attach_context(ctx)
 
     def set_session_id(self, session_id: str) -> None:
