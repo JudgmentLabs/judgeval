@@ -244,16 +244,17 @@ class CustomScorerFactory:
         if result is None:
             raise ValueError(
                 f"No valid Judge, TraceCustomScorer, or ExampleCustomScorer class found in {entrypoint_path}. "
-                "Ensure the class inherits from Judge[ResponseType], TraceCustomScorer[ResponseType],"
+                "Ensure the class inherits from Judge[ResponseType], TraceCustomScorer[ResponseType], "
                 "or ExampleCustomScorer[ResponseType].\n\n"
-                "For categorical response types, ensure ResponseType is a subclass of CategoricalResponse and defines a 'categories' class variable as a list of Category models. For example:\n\n"
-                "class CategoricalScorer(Judge[CategoricalResponse]):\n"
+                "For categorical response types, define a CategoricalResponse subclass with a 'categories' class variable as a list of Category models, then use it as the generic argument. For example:\n\n"
+                "class MyResponse(CategoricalResponse):\n"
                 "    categories = [\n"
                 "        Category(value='Passed', description='The agent passed the test'),\n"
                 "        Category(value='Not Passed', description='The agent failed the test'),\n"
-                "    ]\n"
-                "    async def score(self, example: Example) -> CategoricalResponse:\n "
-                "        return CategoricalResponse(value='Passed', reason='The agent passed the test')\n"
+                "    ]\n\n"
+                "class CategoricalScorer(Judge[MyResponse]):\n"
+                "    async def score(self, data: Example) -> MyResponse:\n "
+                "        return MyResponse(value='Passed', reason='The agent passed the test')\n"
             )
 
         class_name, scorer_type, response_type, categories = result
