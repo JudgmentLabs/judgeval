@@ -27,7 +27,7 @@ class HostedEvaluatorRunner(EvaluatorRunner[str]):
             "eval_name": eval_run_name,
             "created_at": created_at,
             "examples": [e.to_dict() for e in examples],
-            "judgment_scorers": [{"name": name, "score_type": ""} for name in scorers],
+            "judgment_scorers": [{"name": name} for name in scorers],
             "custom_scorers": [],
         }
 

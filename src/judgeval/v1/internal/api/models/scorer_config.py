@@ -7,7 +7,7 @@ from typing_extensions import NotRequired
 
 
 class ScorerConfig(TypedDict):
-    score_type: str
+    score_type: NotRequired[Optional[str]]
     name: str
     model: NotRequired[Optional[str]]
     required_params: NotRequired[Optional[List[str]]]
