@@ -13,6 +13,7 @@ on:
       patch_version:
         description: 'Patch version to release'
         required: true
+        type: number
 
 jobs:
   validate:
@@ -92,7 +93,7 @@ jobs:
 
       - name: Delete tag and release
         run: |
-          gh release delete "v$RELEASE_VERSION" --yes
-          git push --delete origin "v$RELEASE_VERSION"
+          gh release delete "v$RELEASE_VERSION" --yes || true
+          git push --delete origin "v$RELEASE_VERSION" || true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
