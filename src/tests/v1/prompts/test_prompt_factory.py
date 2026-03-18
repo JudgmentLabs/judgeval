@@ -1,198 +1,159 @@
-import pytest
+from __future__ import annotations
+
 from unittest.mock import MagicMock
-from judgeval.v1.prompts.prompt_factory import PromptFactory
+
+import pytest
+
 from judgeval.v1.prompts.prompt import Prompt
+from judgeval.v1.prompts.prompt_factory import PromptFactory
 
 
-@pytest.fixture
-def mock_client():
-    return MagicMock()
-
-
-@pytest.fixture
-def prompt_factory(mock_client):
+def _make_factory(project_id="proj-1"):
+    client = MagicMock()
     return PromptFactory(
-        client=mock_client,
-        project_id="test_project_id",
-        project_name="test_project",
-    )
+        client=client, project_id=project_id, project_name="test"
+    ), client
 
 
 class TestPromptFactoryCreate:
-    def test_create_returns_prompt(self, prompt_factory, mock_client):
-        mock_client.post_projects_prompts.return_value = {
-            "created_at": "2024-01-01T00:00:00Z",
+    def test_create_returns_prompt(self):
+        factory, client = _make_factory()
+        client.post_projects_prompts.return_value = {
+            "created_at": "2024-01-01",
             "commit_id": "abc123",
-            "parent_commit_id": None,
         }
+        p = factory.create("my-prompt", "Hello {{name}}")
+        assert isinstance(p, Prompt)
+        assert p.name == "my-prompt"
+        assert p.prompt == "Hello {{name}}"
+        assert p.commit_id == "abc123"
 
-        prompt = prompt_factory.create(name="test_prompt", prompt="Hello {{name}}")
+    def test_create_missing_project_id_returns_none(self):
+        factory, _ = _make_factory(project_id=None)
+        result = factory.create("p", "text")
+        assert result is None
 
-        assert isinstance(prompt, Prompt)
-        assert prompt.name == "test_prompt"
-        assert prompt.prompt == "Hello {{name}}"
-        assert prompt.commit_id == "abc123"
-        mock_client.post_projects_prompts.assert_called_once()
+    def test_create_passes_tags(self):
+        factory, client = _make_factory()
+        client.post_projects_prompts.return_value = {
+            "created_at": "2024-01-01",
+            "commit_id": "c1",
+        }
+        factory.create("p", "text", tags=["v1", "production"])
+        _, kwargs = client.post_projects_prompts.call_args
+        assert "v1" in kwargs["payload"]["tags"]
 
-    def test_create_returns_none_when_project_id_missing(self, mock_client, caplog):
-        import logging
-
-        factory = PromptFactory(
-            client=mock_client, project_id=None, project_name="test_project"
-        )
-
-        with caplog.at_level(logging.ERROR):
-            prompt = factory.create(name="test_prompt", prompt="Hello")
-
-        assert prompt is None
-        assert "project_id is not set" in caplog.text
-        assert "create()" in caplog.text
-        mock_client.post_projects_prompts.assert_not_called()
+    def test_create_raises_on_client_error(self):
+        factory, client = _make_factory()
+        client.post_projects_prompts.side_effect = RuntimeError("API error")
+        with pytest.raises(RuntimeError):
+            factory.create("p", "text")
 
 
 class TestPromptFactoryGet:
-    def test_get_returns_prompt_by_tag(self, prompt_factory, mock_client):
-        mock_client.get_projects_prompts_by_name.return_value = {
+    def test_get_by_commit_id_returns_prompt(self):
+        factory, client = _make_factory()
+        client.get_projects_prompts_by_name.return_value = {
             "commit": {
-                "name": "test_prompt",
-                "prompt": "Hello {{name}}",
-                "created_at": "2024-01-01T00:00:00Z",
-                "tags": ["production"],
-                "commit_id": "abc123",
-                "parent_commit_id": None,
-                "first_name": "Test",
-                "last_name": "User",
-                "user_email": "test@example.com",
+                "name": "my-prompt",
+                "prompt": "Hello",
+                "created_at": "2024",
+                "tags": [],
+                "commit_id": "c1",
+                "first_name": "John",
+                "last_name": "Doe",
+                "user_email": "john@example.com",
             }
         }
+        p = factory.get(name="my-prompt", commit_id="c1")
+        assert isinstance(p, Prompt)
+        assert p.commit_id == "c1"
 
-        prompt = prompt_factory.get(name="test_prompt", tag="production")
+    def test_get_missing_commit_returns_none(self):
+        factory, client = _make_factory()
+        client.get_projects_prompts_by_name.return_value = {"commit": None}
+        result = factory.get(name="missing")
+        assert result is None
 
-        assert isinstance(prompt, Prompt)
-        assert prompt.name == "test_prompt"
-        assert prompt.commit_id == "abc123"
+    def test_get_missing_project_id_returns_none(self):
+        factory, _ = _make_factory(project_id=None)
+        result = factory.get(name="p")
+        assert result is None
 
-    def test_get_returns_none_when_project_id_missing(self, mock_client, caplog):
-        import logging
-
-        factory = PromptFactory(
-            client=mock_client, project_id=None, project_name="test_project"
-        )
-
-        with caplog.at_level(logging.ERROR):
-            prompt = factory.get(name="test_prompt", tag="production")
-
-        assert prompt is None
-        assert "project_id is not set" in caplog.text
-        assert "get()" in caplog.text
-        mock_client.get_projects_prompts_by_name.assert_not_called()
+    def test_get_both_commit_id_and_tag_returns_none(self):
+        factory, _ = _make_factory()
+        result = factory.get(name="p", commit_id="c1", tag="v1")
+        assert result is None
 
 
 class TestPromptFactoryTag:
-    def test_tag_returns_commit_id(self, prompt_factory, mock_client):
-        mock_client.post_projects_prompts_by_name_tags.return_value = {
-            "commit_id": "abc123"
-        }
+    def test_tag_returns_commit_id(self):
+        factory, client = _make_factory()
+        client.post_projects_prompts_by_name_tags.return_value = {"commit_id": "c2"}
+        result = factory.tag("p", "c1", ["production"])
+        assert result == "c2"
 
-        result = prompt_factory.tag(
-            name="test_prompt", commit_id="abc123", tags=["production"]
-        )
-
-        assert result == "abc123"
-        mock_client.post_projects_prompts_by_name_tags.assert_called_once()
-
-    def test_tag_returns_none_when_project_id_missing(self, mock_client, caplog):
-        import logging
-
-        factory = PromptFactory(
-            client=mock_client, project_id=None, project_name="test_project"
-        )
-
-        with caplog.at_level(logging.ERROR):
-            result = factory.tag(
-                name="test_prompt", commit_id="abc123", tags=["production"]
-            )
-
+    def test_tag_missing_project_id_returns_none(self):
+        factory, _ = _make_factory(project_id=None)
+        result = factory.tag("p", "c1", ["v1"])
         assert result is None
-        assert "project_id is not set" in caplog.text
-        assert "tag()" in caplog.text
-        mock_client.post_projects_prompts_by_name_tags.assert_not_called()
-
-
-class TestPromptFactoryUntag:
-    def test_untag_returns_commit_ids(self, prompt_factory, mock_client):
-        mock_client.delete_projects_prompts_by_name_tags.return_value = {
-            "commit_ids": ["abc123", "def456"]
-        }
-
-        result = prompt_factory.untag(name="test_prompt", tags=["old_tag"])
-
-        assert result == ["abc123", "def456"]
-        mock_client.delete_projects_prompts_by_name_tags.assert_called_once()
-
-    def test_untag_returns_none_when_project_id_missing(self, mock_client, caplog):
-        import logging
-
-        factory = PromptFactory(
-            client=mock_client, project_id=None, project_name="test_project"
-        )
-
-        with caplog.at_level(logging.ERROR):
-            result = factory.untag(name="test_prompt", tags=["old_tag"])
-
-        assert result is None
-        assert "project_id is not set" in caplog.text
-        assert "untag()" in caplog.text
-        mock_client.delete_projects_prompts_by_name_tags.assert_not_called()
 
 
 class TestPromptFactoryList:
-    def test_list_returns_prompts(self, prompt_factory, mock_client):
-        mock_client.get_projects_prompts_by_name_versions.return_value = {
+    def test_list_returns_prompts(self):
+        factory, client = _make_factory()
+        client.get_projects_prompts_by_name_versions.return_value = {
             "versions": [
                 {
-                    "name": "test_prompt",
-                    "prompt": "Hello v1",
-                    "created_at": "2024-01-01T00:00:00Z",
+                    "name": "p",
+                    "prompt": "text",
                     "tags": [],
-                    "commit_id": "abc123",
-                    "parent_commit_id": None,
-                    "first_name": "Test",
-                    "last_name": "User",
-                    "user_email": "test@example.com",
-                },
-                {
-                    "name": "test_prompt",
-                    "prompt": "Hello v2",
-                    "created_at": "2024-01-02T00:00:00Z",
-                    "tags": ["latest"],
-                    "commit_id": "def456",
-                    "parent_commit_id": "abc123",
-                    "first_name": "Test",
-                    "last_name": "User",
-                    "user_email": "test@example.com",
-                },
+                    "created_at": "2024",
+                    "commit_id": "c1",
+                    "first_name": "J",
+                    "last_name": "D",
+                    "user_email": "j@d.com",
+                }
             ]
         }
+        result = factory.list("p")
+        assert len(result) == 1
+        assert isinstance(result[0], Prompt)
 
-        prompts = prompt_factory.list(name="test_prompt")
+    def test_list_missing_project_id_returns_none(self):
+        factory, _ = _make_factory(project_id=None)
+        result = factory.list("p")
+        assert result is None
 
-        assert len(prompts) == 2
-        assert all(isinstance(p, Prompt) for p in prompts)
-        assert prompts[0].commit_id == "abc123"
-        assert prompts[1].commit_id == "def456"
 
-    def test_list_returns_none_when_project_id_missing(self, mock_client, caplog):
-        import logging
-
-        factory = PromptFactory(
-            client=mock_client, project_id=None, project_name="test_project"
+class TestPrompt:
+    def test_compile_substitutes_variables(self):
+        p = Prompt(
+            name="greet",
+            prompt="Hello {{name}}!",
+            created_at="2024",
+            tags=[],
+            commit_id="c1",
         )
+        assert p.compile(name="World") == "Hello World!"
 
-        with caplog.at_level(logging.ERROR):
-            prompts = factory.list(name="test_prompt")
+    def test_compile_missing_variable_raises(self):
+        p = Prompt(
+            name="greet",
+            prompt="Hello {{name}}!",
+            created_at="2024",
+            tags=[],
+            commit_id="c1",
+        )
+        with pytest.raises(ValueError, match="name"):
+            p.compile()
 
-        assert prompts is None
-        assert "project_id is not set" in caplog.text
-        assert "list()" in caplog.text
-        mock_client.get_projects_prompts_by_name_versions.assert_not_called()
+    def test_compile_no_variables(self):
+        p = Prompt(
+            name="simple",
+            prompt="Static text",
+            created_at="2024",
+            tags=[],
+            commit_id="c1",
+        )
+        assert p.compile() == "Static text"

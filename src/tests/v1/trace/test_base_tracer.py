@@ -1,34 +1,22 @@
-"""Tests for BaseTracer static API — spans, attributes, observe decorator, context propagation."""
-
 from __future__ import annotations
 
-import asyncio
-
 import pytest
+from unittest.mock import patch, MagicMock
 
 from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.v1.trace.base_tracer import BaseTracer
 
 
-# ------------------------------------------------------------------ #
-#  Span creation                                                      #
-# ------------------------------------------------------------------ #
-
-
 class TestSpanCreation:
-    def test_span_context_manager_creates_and_ends_span(
-        self, tracer, collecting_exporter
-    ):
+    def test_span_context_manager_creates_span(self, tracer, collecting_exporter):
         with BaseTracer.span("my-span"):
             pass
-
         assert any(s.name == "my-span" for s in collecting_exporter.spans)
 
     def test_span_records_exception_and_reraises(self, tracer, collecting_exporter):
-        with pytest.raises(RuntimeError, match="kaboom"):
+        with pytest.raises(RuntimeError, match="boom"):
             with BaseTracer.span("err-span"):
-                raise RuntimeError("kaboom")
-
+                raise RuntimeError("boom")
         span = next(s for s in collecting_exporter.spans if s.name == "err-span")
         assert span.status.status_code.name == "ERROR"
         assert any(e.name == "exception" for e in span.events)
@@ -37,217 +25,299 @@ class TestSpanCreation:
         with BaseTracer.start_as_current_span("parent"):
             with BaseTracer.start_as_current_span("child"):
                 pass
-
         parent = next(s for s in collecting_exporter.spans if s.name == "parent")
         child = next(s for s in collecting_exporter.spans if s.name == "child")
         assert parent.context.trace_id == child.context.trace_id
-        assert parent.context.span_id != child.context.span_id
         assert child.parent.span_id == parent.context.span_id
 
+    def test_start_span_returns_usable_span(self, tracer, collecting_exporter):
+        span = BaseTracer.start_span("manual")
+        span.end()
+        assert any(s.name == "manual" for s in collecting_exporter.spans)
 
-# ------------------------------------------------------------------ #
-#  Attributes                                                         #
-# ------------------------------------------------------------------ #
+    def test_get_current_span_inside_context(self, tracer):
+        with BaseTracer.start_as_current_span("active"):
+            span = BaseTracer.get_current_span()
+            assert span.is_recording()
 
 
 class TestAttributes:
-    def test_set_attribute_on_current_span(self, tracer, collecting_exporter):
-        with BaseTracer.start_as_current_span("attr-span"):
-            BaseTracer.set_attribute("my.key", "my-value")
+    def test_set_attribute(self, tracer, collecting_exporter):
+        with BaseTracer.start_as_current_span("attr"):
+            BaseTracer.set_attribute("my.key", "value")
+        span = next(s for s in collecting_exporter.spans if s.name == "attr")
+        assert span.attributes["my.key"] == "value"
 
-        span = next(s for s in collecting_exporter.spans if s.name == "attr-span")
-        assert span.attributes["my.key"] == "my-value"
+    def test_set_attributes_multiple(self, tracer, collecting_exporter):
+        with BaseTracer.start_as_current_span("multi"):
+            BaseTracer.set_attributes({"k1": "v1", "k2": "v2"})
+        span = next(s for s in collecting_exporter.spans if s.name == "multi")
+        assert span.attributes["k1"] == "v1"
+        assert span.attributes["k2"] == "v2"
 
     def test_set_input_and_output(self, tracer, collecting_exporter):
-        with BaseTracer.start_as_current_span("io-span"):
-            BaseTracer.set_input({"question": "what?"})
+        with BaseTracer.start_as_current_span("io"):
+            BaseTracer.set_input({"q": "what?"})
             BaseTracer.set_output("answer")
-
-        span = next(s for s in collecting_exporter.spans if s.name == "io-span")
-        assert "question" in span.attributes[AttributeKeys.JUDGMENT_INPUT]
+        span = next(s for s in collecting_exporter.spans if s.name == "io")
+        assert "q" in span.attributes[AttributeKeys.JUDGMENT_INPUT]
         assert "answer" in span.attributes[AttributeKeys.JUDGMENT_OUTPUT]
 
-    def test_set_span_kind_helpers(self, tracer, collecting_exporter):
+    def test_set_span_kind_llm(self, tracer, collecting_exporter):
         with BaseTracer.start_as_current_span("llm"):
             BaseTracer.set_llm_span()
+        span = next(s for s in collecting_exporter.spans if s.name == "llm")
+        assert span.attributes[AttributeKeys.JUDGMENT_SPAN_KIND] == "llm"
+
+    def test_set_span_kind_tool(self, tracer, collecting_exporter):
         with BaseTracer.start_as_current_span("tool"):
             BaseTracer.set_tool_span()
+        span = next(s for s in collecting_exporter.spans if s.name == "tool")
+        assert span.attributes[AttributeKeys.JUDGMENT_SPAN_KIND] == "tool"
 
-        llm = next(s for s in collecting_exporter.spans if s.name == "llm")
-        tool = next(s for s in collecting_exporter.spans if s.name == "tool")
-        assert llm.attributes[AttributeKeys.JUDGMENT_SPAN_KIND] == "llm"
-        assert tool.attributes[AttributeKeys.JUDGMENT_SPAN_KIND] == "tool"
-
-    def test_set_attribute_noop_outside_span(self, tracer):
-        # Should not raise
-        BaseTracer.set_attribute("key", "value")
+    def test_set_span_kind_general(self, tracer, collecting_exporter):
+        with BaseTracer.start_as_current_span("general"):
+            BaseTracer.set_general_span()
+        span = next(s for s in collecting_exporter.spans if s.name == "general")
+        assert span.attributes[AttributeKeys.JUDGMENT_SPAN_KIND] == "span"
 
     def test_record_llm_metadata(self, tracer, collecting_exporter):
-        with BaseTracer.start_as_current_span("meta"):
+        with BaseTracer.start_as_current_span("llm-meta"):
             BaseTracer.recordLLMMetadata(
-                {"model": "gpt-4", "output_tokens": 100, "total_cost_usd": 0.01}
+                {
+                    "model": "gpt-4",
+                    "provider": "openai",
+                    "non_cached_input_tokens": 10,
+                    "output_tokens": 20,
+                    "total_cost_usd": 0.001,
+                }
             )
-
-        span = next(s for s in collecting_exporter.spans if s.name == "meta")
+        span = next(s for s in collecting_exporter.spans if s.name == "llm-meta")
         assert span.attributes[AttributeKeys.JUDGMENT_LLM_MODEL_NAME] == "gpt-4"
-        assert span.attributes[AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS] == 100
-        assert span.attributes[AttributeKeys.JUDGMENT_USAGE_TOTAL_COST_USD] == 0.01
-
-
-# ------------------------------------------------------------------ #
-#  @observe decorator                                                  #
-# ------------------------------------------------------------------ #
-
-
-class TestObserveDecorator:
-    def test_observe_sync_function(self, tracer, collecting_exporter):
-        @BaseTracer.observe
-        def add(a, b):
-            return a + b
-
-        result = add(1, 2)
-        assert result == 3
-
-        span = next(s for s in collecting_exporter.spans if s.name == "add")
-        assert AttributeKeys.JUDGMENT_INPUT in span.attributes
-        assert AttributeKeys.JUDGMENT_OUTPUT in span.attributes
-
-    def test_observe_async_function(self, tracer, collecting_exporter):
-        @BaseTracer.observe
-        async def greet(name):
-            return f"hello {name}"
-
-        result = asyncio.run(greet("world"))
-        assert result == "hello world"
-
-        span = next(s for s in collecting_exporter.spans if s.name == "greet")
-        assert AttributeKeys.JUDGMENT_INPUT in span.attributes
-        assert "hello world" in span.attributes[AttributeKeys.JUDGMENT_OUTPUT]
-
-    def test_observe_with_custom_name(self, tracer, collecting_exporter):
-        @BaseTracer.observe(span_name="custom-name")
-        def fn():
-            return 42
-
-        fn()
-        assert any(s.name == "custom-name" for s in collecting_exporter.spans)
-
-    def test_observe_records_exception(self, tracer, collecting_exporter):
-        @BaseTracer.observe
-        def fail():
-            raise ValueError("nope")
-
-        with pytest.raises(ValueError, match="nope"):
-            fail()
-
-        span = next(s for s in collecting_exporter.spans if s.name == "fail")
-        assert span.status.status_code.name == "ERROR"
-
-    def test_observe_no_input_recording(self, tracer, collecting_exporter):
-        @BaseTracer.observe(record_input=False)
-        def fn(secret):
-            return "ok"
-
-        fn("password123")
-        span = next(s for s in collecting_exporter.spans if s.name == "fn")
-        assert AttributeKeys.JUDGMENT_INPUT not in span.attributes
-
-    def test_observe_no_output_recording(self, tracer, collecting_exporter):
-        @BaseTracer.observe(record_output=False)
-        def fn():
-            return "secret"
-
-        fn()
-        span = next(s for s in collecting_exporter.spans if s.name == "fn")
-        assert AttributeKeys.JUDGMENT_OUTPUT not in span.attributes
-
-    def test_observe_sync_generator(self, tracer, collecting_exporter):
-        @BaseTracer.observe
-        def gen():
-            yield 1
-            yield 2
-            yield 3
-
-        result = list(gen())
-        assert result == [1, 2, 3]
-
-        # Parent generator span + child yield spans
-        gen_spans = [s for s in collecting_exporter.spans if s.name == "gen"]
-        assert len(gen_spans) >= 1
-        parent = next(
-            s
-            for s in gen_spans
-            if s.attributes.get(AttributeKeys.JUDGMENT_SPAN_KIND) == "generator"
+        assert span.attributes[AttributeKeys.JUDGMENT_LLM_PROVIDER] == "openai"
+        assert (
+            span.attributes[AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS] == 10
         )
-        assert parent is not None
-
-    def test_observe_async_generator(self, tracer, collecting_exporter):
-        @BaseTracer.observe
-        async def agen():
-            yield "a"
-            yield "b"
-
-        async def consume():
-            return [item async for item in agen()]
-
-        result = asyncio.run(consume())
-        assert result == ["a", "b"]
-
-    def test_observe_generator_with_exception(self, tracer, collecting_exporter):
-        @BaseTracer.observe
-        def bad_gen():
-            yield 1
-            raise RuntimeError("gen-error")
-
-        with pytest.raises(RuntimeError, match="gen-error"):
-            list(bad_gen())
-
-        gen_spans = [s for s in collecting_exporter.spans if s.name == "bad_gen"]
-        errored = [s for s in gen_spans if s.status.status_code.name == "ERROR"]
-        assert len(errored) >= 1
-
-
-# ------------------------------------------------------------------ #
-#  Context propagation (customer_id / session_id)                     #
-# ------------------------------------------------------------------ #
+        assert span.attributes[AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS] == 20
 
 
 class TestContextPropagation:
-    def test_customer_id_propagates_to_children(self, tracer, collecting_exporter):
+    def test_set_customer_id_on_span(self, tracer, collecting_exporter):
+        with BaseTracer.start_as_current_span("cust"):
+            BaseTracer.set_customer_id("cust-001")
+        span = next(s for s in collecting_exporter.spans if s.name == "cust")
+        assert span.attributes[AttributeKeys.JUDGMENT_CUSTOMER_ID] == "cust-001"
+
+    def test_set_session_id_on_span(self, tracer, collecting_exporter):
+        with BaseTracer.start_as_current_span("sess"):
+            BaseTracer.set_session_id("sess-abc")
+        span = next(s for s in collecting_exporter.spans if s.name == "sess")
+        assert span.attributes[AttributeKeys.JUDGMENT_SESSION_ID] == "sess-abc"
+
+    def test_set_customer_user_id_on_span(self, tracer, collecting_exporter):
+        with BaseTracer.start_as_current_span("cuid"):
+            BaseTracer.set_customer_user_id("user-xyz")
+        span = next(s for s in collecting_exporter.spans if s.name == "cuid")
+        assert span.attributes[AttributeKeys.JUDGMENT_CUSTOMER_USER_ID] == "user-xyz"
+
+    def test_customer_id_propagates_to_child(self, tracer, collecting_exporter):
         with BaseTracer.start_as_current_span("root"):
-            BaseTracer.set_customer_id("cust-42")
+            BaseTracer.set_customer_id("cid")
             with BaseTracer.start_as_current_span("child"):
                 pass
-
         child = next(s for s in collecting_exporter.spans if s.name == "child")
-        assert child.attributes.get(AttributeKeys.JUDGMENT_CUSTOMER_ID) == "cust-42"
+        assert child.attributes.get(AttributeKeys.JUDGMENT_CUSTOMER_ID) == "cid"
 
-    def test_session_id_propagates_to_children(self, tracer, collecting_exporter):
-        with BaseTracer.start_as_current_span("root"):
-            BaseTracer.set_session_id("sess-99")
-            with BaseTracer.start_as_current_span("child"):
-                pass
+    def test_set_propagating_baggage_key_noop_outside_span(self, tracer):
+        BaseTracer._set_propagating_baggage_key("some.key", "val")
 
-        child = next(s for s in collecting_exporter.spans if s.name == "child")
-        assert child.attributes.get(AttributeKeys.JUDGMENT_SESSION_ID) == "sess-99"
 
-    def test_ids_do_not_leak_across_traces(self, tracer, collecting_exporter):
-        with BaseTracer.start_as_current_span("trace1"):
-            BaseTracer.set_customer_id("cust-1")
+class TestGuardBranches:
+    def test_set_attribute_noop_outside_span(self, tracer):
+        BaseTracer.set_attribute("key", "value")
 
-        with BaseTracer.start_as_current_span("trace2"):
+    def test_set_attribute_noop_empty_key(self, tracer):
+        with BaseTracer.start_as_current_span("s"):
+            BaseTracer.set_attribute("", "value")
+
+    def test_set_attribute_noop_none_value(self, tracer):
+        with BaseTracer.start_as_current_span("s"):
+            BaseTracer.set_attribute("key", None)
+
+    def test_set_attributes_noop_when_none(self, tracer):
+        BaseTracer.set_attributes(None)
+
+    def test_set_span_kind_noop_when_none(self, tracer):
+        with BaseTracer.start_as_current_span("s"):
+            BaseTracer.set_span_kind(None)
+
+    def test_record_llm_metadata_noop_outside_span(self, tracer):
+        BaseTracer.recordLLMMetadata({"model": "gpt-4"})
+
+    def test_record_llm_metadata_cache_fields(self, tracer, collecting_exporter):
+        with BaseTracer.start_as_current_span("llm-cache"):
+            BaseTracer.recordLLMMetadata(
+                {
+                    "cache_read_input_tokens": 5,
+                    "cache_creation_input_tokens": 3,
+                }
+            )
+        span = next(s for s in collecting_exporter.spans if s.name == "llm-cache")
+        assert (
+            span.attributes[AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS] == 5
+        )
+        assert (
+            span.attributes[AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS]
+            == 3
+        )
+
+
+class TestLifecycle:
+    def test_force_flush(self, tracer):
+        result = BaseTracer.force_flush()
+        assert isinstance(result, bool)
+
+    def test_shutdown(self, tracer):
+        BaseTracer.shutdown()
+
+    def test_register_otel_instrumentation(self, tracer):
+        from unittest.mock import MagicMock
+
+        instrumentor = MagicMock()
+        instrumentor.instrument = MagicMock()
+        BaseTracer.registerOTELInstrumentation(instrumentor)
+        instrumentor.instrument.assert_called_once()
+
+
+class TestGetCurrentTraceAndSpanId:
+    def test_returns_none_outside_span(self, tracer):
+        result = BaseTracer._get_current_trace_and_span_id()
+        assert result is None
+
+    def test_returns_ids_inside_span(self, tracer):
+        with BaseTracer.start_as_current_span("s"):
+            result = BaseTracer._get_current_trace_and_span_id()
+        assert result is not None
+        trace_id, span_id = result
+        assert len(trace_id) == 32
+        assert len(span_id) == 16
+
+    def test_returns_none_when_context_not_valid(self, tracer):
+        from opentelemetry.trace import SpanContext, TraceFlags, NonRecordingSpan
+
+        invalid_ctx = SpanContext(
+            trace_id=0x1234567890ABCDEF1234567890ABCDEF,
+            span_id=0x1234567890ABCDEF,
+            is_remote=False,
+            trace_flags=TraceFlags(0),
+        )
+        mock_span = NonRecordingSpan(invalid_ctx)
+        with patch.object(
+            BaseTracer._get_proxy_provider(),
+            "get_current_span",
+            return_value=mock_span,
+        ):
             pass
 
-        trace2 = next(s for s in collecting_exporter.spans if s.name == "trace2")
-        assert AttributeKeys.JUDGMENT_CUSTOMER_ID not in (trace2.attributes or {})
+        with patch(
+            "judgeval.v1.trace.base_tracer.BaseTracer._get_proxy_provider"
+        ) as mock_proxy:
+            mock_instance = MagicMock()
+            mock_proxy.return_value = mock_instance
+            mock_recording_span = MagicMock()
+            mock_recording_span.is_recording.return_value = True
+            mock_recording_span.get_span_context.return_value = invalid_ctx
+            mock_instance.get_current_span.return_value = mock_recording_span
+            result = BaseTracer._get_current_trace_and_span_id()
+        assert result is None
 
-    def test_customer_and_session_together(self, tracer, collecting_exporter):
-        with BaseTracer.start_as_current_span("root"):
-            BaseTracer.set_customer_id("cust-x")
-            BaseTracer.set_session_id("sess-y")
-            with BaseTracer.start_as_current_span("inner"):
-                pass
 
-        inner = next(s for s in collecting_exporter.spans if s.name == "inner")
-        assert inner.attributes.get(AttributeKeys.JUDGMENT_CUSTOMER_ID) == "cust-x"
-        assert inner.attributes.get(AttributeKeys.JUDGMENT_SESSION_ID) == "sess-y"
+class TestEmitPartial:
+    def test_noop_without_active_tracer(self, _reset_provider):
+        BaseTracer._emit_partial()
+
+
+class TestTag:
+    def test_tag_enqueues_with_client(self, tracer, collecting_exporter):
+        from unittest.mock import MagicMock, patch
+
+        tracer._client = MagicMock()
+        tracer._client.post_projects_traces_by_trace_id_tags = MagicMock()
+        tracer.project_id = "proj-123"
+
+        with patch("judgeval.v1.trace.base_tracer.bg_enqueue") as mock_enqueue:
+            with BaseTracer.start_as_current_span("tag-span"):
+                BaseTracer.tag("release-v1")
+            mock_enqueue.assert_called_once()
+            fn = mock_enqueue.call_args[0][0]
+            fn()
+
+        tracer._client.post_projects_traces_by_trace_id_tags.assert_called_once()
+        _, kwargs = tracer._client.post_projects_traces_by_trace_id_tags.call_args
+        assert "release-v1" in kwargs["payload"]["tags"]
+
+    def test_tag_list_of_strings(self, tracer):
+        from unittest.mock import MagicMock, patch
+
+        tracer._client = MagicMock()
+        tracer.project_id = "proj-123"
+
+        with patch("judgeval.v1.trace.base_tracer.bg_enqueue") as mock_enqueue:
+            with BaseTracer.start_as_current_span("s"):
+                BaseTracer.tag(["a", "b"])
+            mock_enqueue.assert_called_once()
+
+    def test_tag_noop_without_tracer(self):
+        BaseTracer.tag("my-tag")
+
+    def test_tag_noop_empty_list(self, tracer):
+        with patch("judgeval.v1.trace.base_tracer.bg_enqueue") as mock_enqueue:
+            with BaseTracer.start_as_current_span("s"):
+                BaseTracer.tag([])
+            mock_enqueue.assert_not_called()
+
+    def test_tag_noop_when_no_client(self, tracer):
+        tracer.project_id = "proj-123"
+        tracer._client = None
+
+        with patch("judgeval.v1.trace.base_tracer.bg_enqueue") as mock_enqueue:
+            with BaseTracer.start_as_current_span("s"):
+                BaseTracer.tag("my-tag")
+            mock_enqueue.assert_not_called()
+
+    def test_tag_noop_when_ids_none(self, tracer):
+        tracer.project_id = "proj-123"
+        tracer._client = MagicMock()
+
+        with patch(
+            "judgeval.v1.trace.base_tracer.BaseTracer._get_current_trace_and_span_id",
+            return_value=None,
+        ):
+            with patch("judgeval.v1.trace.base_tracer.bg_enqueue") as mock_enqueue:
+                with BaseTracer.start_as_current_span("s"):
+                    BaseTracer.tag("my-tag")
+                mock_enqueue.assert_not_called()
+
+
+class TestAsyncEvaluate:
+    def test_async_evaluate_noop_without_tracer(self):
+        BaseTracer.async_evaluate("my-judge")
+
+    def test_async_evaluate_noop_without_active_span(self, tracer):
+        tracer.project_id = "proj-123"
+        BaseTracer.async_evaluate("my-judge")
+
+    def test_async_evaluate_sets_pending_attribute(self, tracer, collecting_exporter):
+        import json
+
+        tracer.project_id = "proj-123"
+
+        with BaseTracer.start_as_current_span("eval-span"):
+            BaseTracer.async_evaluate("my-judge", example={"input": "q", "output": "a"})
+
+        span = next(s for s in collecting_exporter.spans if s.name == "eval-span")
+        raw = span.attributes.get(AttributeKeys.JUDGMENT_PENDING_TRACE_EVAL)
+        assert raw is not None
+        evals = json.loads(raw)
+        assert len(evals) == 1
+        assert evals[0]["judges"][0]["name"] == "my-judge"

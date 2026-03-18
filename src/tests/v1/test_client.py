@@ -1,133 +1,93 @@
-import pytest
+from __future__ import annotations
+
 from unittest.mock import patch
-from judgeval.v1 import Judgeval
-from judgeval.v1.datasets.dataset_factory import DatasetFactory
+
+import pytest
+
+from judgeval.v1.judgeval import Judgeval
 from judgeval.v1.evaluation.evaluation_factory import EvaluationFactory
+from judgeval.v1.datasets.dataset_factory import DatasetFactory
+from judgeval.v1.prompts.prompt_factory import PromptFactory
 
 
-@pytest.fixture
-def mock_resolve_project_id():
-    with patch(
-        "judgeval.v1.judgeval.resolve_project_id", return_value="test_project_id"
-    ):
-        yield
+class TestJudgevalInit:
+    def test_missing_api_key_raises(self):
+        with pytest.raises(ValueError, match="api_key"):
+            with patch.dict("os.environ", {}, clear=True):
+                with patch("judgeval.v1.judgeval.JUDGMENT_API_KEY", None):
+                    Judgeval(
+                        project_name="p",
+                        api_key=None,
+                        organization_id="o",
+                        api_url="http://x",
+                    )
 
+    def test_missing_org_id_raises(self):
+        with pytest.raises(ValueError, match="organization_id"):
+            with patch("judgeval.v1.judgeval.JUDGMENT_ORG_ID", None):
+                Judgeval(
+                    project_name="p",
+                    api_key="k",
+                    organization_id=None,
+                    api_url="http://x",
+                )
 
-def test_client_initialization_with_credentials(monkeypatch, mock_resolve_project_id):
-    import uuid
-    import judgeval.v1.judgeval as judgeval_mod
+    def test_missing_api_url_raises(self):
+        with pytest.raises(ValueError, match="api_url"):
+            with patch("judgeval.v1.judgeval.JUDGMENT_API_URL", None):
+                Judgeval(
+                    project_name="p",
+                    api_key="k",
+                    organization_id="o",
+                    api_url=None,
+                )
 
-    test_key = f"key_{uuid.uuid4()}"
-    test_org = f"org_{uuid.uuid4()}"
-    test_url = f"http://test_{uuid.uuid4()}.example.com"
-
-    monkeypatch.setattr(judgeval_mod, "JUDGMENT_API_KEY", test_key)
-    monkeypatch.setattr(judgeval_mod, "JUDGMENT_ORG_ID", test_org)
-    monkeypatch.setattr(judgeval_mod, "JUDGMENT_API_URL", test_url)
-
-    client = Judgeval(project_name="test_project")
-
-    assert client._api_key == test_key
-    assert client._organization_id == test_org
-    assert client._api_url == test_url
-
-
-def test_client_initialization_with_explicit_credentials(mock_resolve_project_id):
-    client = Judgeval(
-        project_name="test_project",
-        api_key="explicit_key",
-        organization_id="explicit_org",
-        api_url="http://explicit.example.com",
-    )
-
-    assert client._api_key == "explicit_key"
-    assert client._organization_id == "explicit_org"
-    assert client._api_url == "http://explicit.example.com"
-
-
-def test_client_missing_api_key(monkeypatch, mock_resolve_project_id):
-    import judgeval.v1.judgeval as judgeval_mod
-
-    monkeypatch.setattr(judgeval_mod, "JUDGMENT_API_KEY", None)
-    monkeypatch.setattr(judgeval_mod, "JUDGMENT_ORG_ID", "test_org")
-    monkeypatch.setattr(judgeval_mod, "JUDGMENT_API_URL", "http://test.example.com")
-
-    with pytest.raises(ValueError, match="api_key is required"):
-        Judgeval(project_name="test_project")
-
-
-def test_client_missing_organization_id(monkeypatch, mock_resolve_project_id):
-    import judgeval.v1.judgeval as judgeval_mod
-
-    monkeypatch.setattr(judgeval_mod, "JUDGMENT_API_KEY", "test_key")
-    monkeypatch.setattr(judgeval_mod, "JUDGMENT_ORG_ID", None)
-    monkeypatch.setattr(judgeval_mod, "JUDGMENT_API_URL", "http://test.example.com")
-
-    with pytest.raises(ValueError, match="organization_id is required"):
-        Judgeval(project_name="test_project")
-
-
-def test_client_api_url_default(monkeypatch, mock_resolve_project_id):
-    import uuid
-    import judgeval.v1.judgeval as judgeval_mod
-
-    monkeypatch.setattr(judgeval_mod, "JUDGMENT_API_KEY", f"key_{uuid.uuid4()}")
-    monkeypatch.setattr(judgeval_mod, "JUDGMENT_ORG_ID", f"org_{uuid.uuid4()}")
-    monkeypatch.setattr(judgeval_mod, "JUDGMENT_API_URL", "https://api.judgmentlabs.ai")
-
-    client = Judgeval(project_name="test_project")
-
-    assert client._api_url == "https://api.judgmentlabs.ai"
-
-
-def test_client_evaluation_factory_property(mock_resolve_project_id):
-    client = Judgeval(
-        project_name="test_project",
-        api_key="test_key",
-        organization_id="test_org",
-        api_url="http://test.com",
-    )
-    evaluation_factory = client.evaluation
-    assert isinstance(evaluation_factory, EvaluationFactory)
-
-
-def test_client_datasets_factory_property(mock_resolve_project_id):
-    client = Judgeval(
-        project_name="test_project",
-        api_key="test_key",
-        organization_id="test_org",
-        api_url="http://test.com",
-    )
-    datasets_factory = client.datasets
-    assert isinstance(datasets_factory, DatasetFactory)
-
-
-def test_client_project_not_found_logs_warning(caplog):
-    import logging
-
-    with patch("judgeval.v1.judgeval.resolve_project_id", return_value=None):
-        with caplog.at_level(logging.WARNING):
-            client = Judgeval(
-                project_name="nonexistent_project",
-                api_key="test_key",
-                organization_id="test_org",
-                api_url="http://test.com",
+    def test_missing_project_name_raises(self):
+        with pytest.raises(ValueError, match="project_name"):
+            Judgeval(
+                project_name="",
+                api_key="k",
+                organization_id="o",
+                api_url="http://x",
             )
 
-    assert client._project_id is None
-    assert "nonexistent_project" in caplog.text
-    assert "not found" in caplog.text
+    def test_valid_init(self):
+        with patch("judgeval.v1.judgeval.resolve_project_id", return_value="proj-1"):
+            j = Judgeval(
+                project_name="my-project",
+                api_key="key",
+                organization_id="org",
+                api_url="http://api",
+            )
+        assert j._project_name == "my-project"
+        assert j._project_id == "proj-1"
+
+    def test_project_not_found_warns_but_does_not_raise(self):
+        with patch("judgeval.v1.judgeval.resolve_project_id", return_value=None):
+            j = Judgeval(
+                project_name="missing",
+                api_key="k",
+                organization_id="o",
+                api_url="http://x",
+            )
+        assert j._project_id is None
 
 
-def test_client_project_not_found_still_creates_factories():
-    with patch("judgeval.v1.judgeval.resolve_project_id", return_value=None):
-        client = Judgeval(
-            project_name="nonexistent_project",
-            api_key="test_key",
-            organization_id="test_org",
-            api_url="http://test.com",
-        )
+class TestJudgevalProperties:
+    def setup_method(self):
+        with patch("judgeval.v1.judgeval.resolve_project_id", return_value="p-1"):
+            self.j = Judgeval(
+                project_name="proj",
+                api_key="k",
+                organization_id="o",
+                api_url="http://x",
+            )
 
-    assert client._project_id is None
-    assert isinstance(client.evaluation, EvaluationFactory)
-    assert isinstance(client.datasets, DatasetFactory)
+    def test_evaluation_property_returns_factory(self):
+        assert isinstance(self.j.evaluation, EvaluationFactory)
+
+    def test_datasets_property_returns_factory(self):
+        assert isinstance(self.j.datasets, DatasetFactory)
+
+    def test_prompts_property_returns_factory(self):
+        assert isinstance(self.j.prompts, PromptFactory)

@@ -1,46 +1,48 @@
-"""Tests for IsolatedRandomIdGenerator."""
-
 from __future__ import annotations
 
 import random
 
-from opentelemetry import trace as trace_api
-from opentelemetry.sdk.trace.id_generator import RandomIdGenerator
+from opentelemetry.trace import INVALID_SPAN_ID, INVALID_TRACE_ID
 
 from judgeval.v1.trace.id_generator import IsolatedRandomIdGenerator
 
 
-def test_never_generates_invalid_ids():
+def test_generates_unique_span_ids():
     gen = IsolatedRandomIdGenerator()
-    for _ in range(500):
-        assert gen.generate_span_id() != trace_api.INVALID_SPAN_ID
-        assert gen.generate_trace_id() != trace_api.INVALID_TRACE_ID
+    ids = {gen.generate_span_id() for _ in range(1000)}
+    assert len(ids) == 1000
 
 
-def test_generates_unique_ids():
+def test_generates_unique_trace_ids():
     gen = IsolatedRandomIdGenerator()
-    span_ids = {gen.generate_span_id() for _ in range(500)}
-    trace_ids = {gen.generate_trace_id() for _ in range(500)}
-    assert len(span_ids) == 500
-    assert len(trace_ids) == 500
+    ids = {gen.generate_trace_id() for _ in range(1000)}
+    assert len(ids) == 1000
 
 
-def test_immune_to_global_random_seed():
+def test_span_id_never_invalid():
     gen = IsolatedRandomIdGenerator()
-    std = RandomIdGenerator()
+    for _ in range(1000):
+        assert gen.generate_span_id() != INVALID_SPAN_ID
 
-    random.seed(42)
-    isolated_ids = [gen.generate_trace_id() for _ in range(5)]
 
-    random.seed(42)
-    isolated_ids2 = [gen.generate_trace_id() for _ in range(5)]
+def test_trace_id_never_invalid():
+    gen = IsolatedRandomIdGenerator()
+    for _ in range(1000):
+        assert gen.generate_trace_id() != INVALID_TRACE_ID
 
-    # Isolated generator should NOT reproduce the same sequence after reseed
-    assert isolated_ids != isolated_ids2
 
-    # Standard generator DOES reproduce the same sequence
+def test_immune_to_global_seed():
+    gen = IsolatedRandomIdGenerator()
     random.seed(42)
-    std_ids = [std.generate_trace_id() for _ in range(5)]
+    ids_seeded = [gen.generate_span_id() for _ in range(10)]
     random.seed(42)
-    std_ids2 = [std.generate_trace_id() for _ in range(5)]
-    assert std_ids == std_ids2
+    ids_seeded_again = [gen.generate_span_id() for _ in range(10)]
+    assert ids_seeded != ids_seeded_again
+
+
+def test_different_instances_produce_different_sequences():
+    g1 = IsolatedRandomIdGenerator()
+    g2 = IsolatedRandomIdGenerator()
+    ids1 = [g1.generate_trace_id() for _ in range(10)]
+    ids2 = [g2.generate_trace_id() for _ in range(10)]
+    assert ids1 != ids2

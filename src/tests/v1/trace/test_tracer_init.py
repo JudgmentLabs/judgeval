@@ -1,5 +1,3 @@
-"""Tests for Tracer.init() — configuration validation and exporter/processor wiring."""
-
 from __future__ import annotations
 
 from unittest.mock import patch
@@ -15,46 +13,28 @@ from judgeval.v1.trace.processors.noop_judgment_span_processor import (
 from judgeval.v1.trace.processors.judgment_span_processor import JudgmentSpanProcessor
 
 
-class TestTracerInitValidation:
-    def test_missing_project_name_disables_monitoring(self):
-        t = Tracer.init(
-            project_name=None,
-            api_key="k",
-            organization_id="o",
-            api_url="http://x",
-        )
+class TestTracerInitDisabled:
+    def test_missing_project_name(self):
+        t = Tracer.init(api_key="k", organization_id="o", api_url="http://x")
         assert t._enable_monitoring is False
         assert isinstance(t.get_span_exporter(), NoOpJudgmentSpanExporter)
         assert isinstance(t.get_span_processor(), NoOpJudgmentSpanProcessor)
 
-    def test_missing_api_key_disables_monitoring(self):
+    def test_missing_api_key(self):
+        t = Tracer.init(project_name="p", organization_id="o", api_url="http://x")
+        assert t._enable_monitoring is False
+
+    def test_missing_org_id(self):
+        t = Tracer.init(project_name="p", api_key="k", api_url="http://x")
+        assert t._enable_monitoring is False
+
+    def test_missing_api_url(self):
         t = Tracer.init(
-            project_name="p",
-            api_key=None,
-            organization_id="o",
-            api_url="http://x",
+            project_name="p", api_key="k", organization_id="o", api_url=None
         )
         assert t._enable_monitoring is False
 
-    def test_missing_org_id_disables_monitoring(self):
-        t = Tracer.init(
-            project_name="p",
-            api_key="k",
-            organization_id=None,
-            api_url="http://x",
-        )
-        assert t._enable_monitoring is False
-
-    def test_missing_api_url_disables_monitoring(self):
-        t = Tracer.init(
-            project_name="p",
-            api_key="k",
-            organization_id="o",
-            api_url=None,
-        )
-        assert t._enable_monitoring is False
-
-    def test_project_not_found_disables_monitoring(self):
+    def test_project_not_found(self):
         with patch("judgeval.v1.trace.tracer.resolve_project_id", return_value=None):
             t = Tracer.init(
                 project_name="missing",
@@ -65,24 +45,22 @@ class TestTracerInitValidation:
         assert t._enable_monitoring is False
 
 
-class TestTracerInitSuccess:
-    def test_full_config_enables_monitoring(self):
-        with patch(
-            "judgeval.v1.trace.tracer.resolve_project_id", return_value="proj-abc"
-        ):
+class TestTracerInitEnabled:
+    def test_full_config(self):
+        with patch("judgeval.v1.trace.tracer.resolve_project_id", return_value="pid"):
             t = Tracer.init(
-                project_name="my-project",
+                project_name="proj",
                 api_key="key",
                 organization_id="org",
-                api_url="http://api.test/",
+                api_url="http://api/",
             )
         assert t._enable_monitoring is True
-        assert t.project_id == "proj-abc"
-        assert t.project_name == "my-project"
+        assert t.project_id == "pid"
+        assert t.project_name == "proj"
         assert isinstance(t.get_span_exporter(), JudgmentSpanExporter)
         assert isinstance(t.get_span_processor(), JudgmentSpanProcessor)
 
-    def test_exporter_endpoint_with_trailing_slash(self):
+    def test_endpoint_with_trailing_slash(self):
         with patch("judgeval.v1.trace.tracer.resolve_project_id", return_value="p"):
             t = Tracer.init(
                 project_name="x",
@@ -90,11 +68,12 @@ class TestTracerInitSuccess:
                 organization_id="o",
                 api_url="http://api.test/",
             )
-        exporter = t.get_span_exporter()
-        # The delegate OTLPSpanExporter was created with the correct endpoint
-        assert exporter._delegate._endpoint == "http://api.test/otel/v1/traces"
+        assert (
+            t.get_span_exporter()._delegate._endpoint
+            == "http://api.test/otel/v1/traces"
+        )
 
-    def test_exporter_endpoint_without_trailing_slash(self):
+    def test_endpoint_without_trailing_slash(self):
         with patch("judgeval.v1.trace.tracer.resolve_project_id", return_value="p"):
             t = Tracer.init(
                 project_name="x",
@@ -102,20 +81,24 @@ class TestTracerInitSuccess:
                 organization_id="o",
                 api_url="http://api.test",
             )
-        exporter = t.get_span_exporter()
-        assert exporter._delegate._endpoint == "http://api.test/otel/v1/traces"
+        assert (
+            t.get_span_exporter()._delegate._endpoint
+            == "http://api.test/otel/v1/traces"
+        )
 
-    def test_environment_added_to_resource(self):
+    def test_environment_in_resource(self):
         with patch("judgeval.v1.trace.tracer.resolve_project_id", return_value="p"):
             t = Tracer.init(
                 project_name="x",
                 api_key="k",
                 organization_id="o",
-                api_url="http://api.test",
+                api_url="http://api",
                 environment="staging",
             )
-        resource = t._tracer_provider.resource
-        assert resource.attributes.get("deployment.environment") == "staging"
+        assert (
+            t._tracer_provider.resource.attributes.get("deployment.environment")
+            == "staging"
+        )
 
     def test_custom_resource_attributes(self):
         with patch("judgeval.v1.trace.tracer.resolve_project_id", return_value="p"):
@@ -123,20 +106,21 @@ class TestTracerInitSuccess:
                 project_name="x",
                 api_key="k",
                 organization_id="o",
-                api_url="http://api.test",
-                resource_attributes={"custom.key": "custom.value"},
+                api_url="http://api",
+                resource_attributes={"custom.key": "val"},
             )
-        resource = t._tracer_provider.resource
-        assert resource.attributes.get("custom.key") == "custom.value"
+        assert t._tracer_provider.resource.attributes.get("custom.key") == "val"
 
-    def test_exporter_cached_on_second_call(self):
+    def test_exporter_cached(self):
         with patch("judgeval.v1.trace.tracer.resolve_project_id", return_value="p"):
             t = Tracer.init(
-                project_name="x",
-                api_key="k",
-                organization_id="o",
-                api_url="http://api.test",
+                project_name="x", api_key="k", organization_id="o", api_url="http://api"
             )
-        e1 = t.get_span_exporter()
-        e2 = t.get_span_exporter()
-        assert e1 is e2
+        assert t.get_span_exporter() is t.get_span_exporter()
+
+    def test_processor_cached(self):
+        with patch("judgeval.v1.trace.tracer.resolve_project_id", return_value="p"):
+            t = Tracer.init(
+                project_name="x", api_key="k", organization_id="o", api_url="http://api"
+            )
+        assert t.get_span_processor() is t.get_span_processor()

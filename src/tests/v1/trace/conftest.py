@@ -20,8 +20,6 @@ from judgeval.v1.trace.processors.judgment_baggage_processor import (
 
 
 class CollectingExporter(NoOpJudgmentSpanExporter):
-    """Captures exported spans in memory for assertion."""
-
     def __init__(self):
         self.spans: list[ReadableSpan] = []
 
@@ -34,9 +32,6 @@ class CollectingExporter(NoOpJudgmentSpanExporter):
 
 
 class CollectingProcessor(SimpleSpanProcessor):
-    """SimpleSpanProcessor that also runs JudgmentBaggageProcessor.on_start
-    so baggage attributes propagate to child spans in tests."""
-
     def __init__(self, exporter):
         super().__init__(exporter)
         self._baggage = JudgmentBaggageProcessor()
@@ -48,9 +43,8 @@ class CollectingProcessor(SimpleSpanProcessor):
 
 @pytest.fixture(autouse=True)
 def _reset_provider():
-    """Reset the singleton JudgmentTracerProvider between tests."""
     JudgmentTracerProvider._instance = None
-    _token = _active_tracer_var.set(None)
+    _active_tracer_var.set(None)
     yield
     _active_tracer_var.set(None)
     JudgmentTracerProvider._instance = None
@@ -63,10 +57,6 @@ def collecting_exporter():
 
 @pytest.fixture
 def tracer(collecting_exporter):
-    """Create a real Tracer wired to a CollectingExporter (no network).
-
-    Patches resolve_project_id so no API call is made.
-    """
     with patch("judgeval.v1.trace.tracer.resolve_project_id", return_value="proj-123"):
         t = Tracer.init(
             project_name="test-project",
@@ -74,7 +64,6 @@ def tracer(collecting_exporter):
             organization_id="test-org",
             api_url="http://localhost:1234",
         )
-    # Replace the real exporter/processor with our collector
     provider: TracerProvider = t._tracer_provider
     provider._active_span_processor._span_processors = ()  # type: ignore[attr-defined]
     provider.add_span_processor(CollectingProcessor(collecting_exporter))

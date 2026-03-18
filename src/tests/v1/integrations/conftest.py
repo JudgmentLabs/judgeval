@@ -24,9 +24,6 @@ class CollectingExporter(NoOpJudgmentSpanExporter):
         self.spans.extend(spans)
         return SpanExportResult.SUCCESS
 
-    def clear(self):
-        self.spans.clear()
-
 
 @pytest.fixture(autouse=True)
 def _reset_provider():

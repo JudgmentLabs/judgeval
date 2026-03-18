@@ -1,127 +1,71 @@
-"""Tests for Google wrapper."""
+from __future__ import annotations
 
+from unittest.mock import MagicMock
 import pytest
 
-pytest.importorskip("google.genai")
-
-from judgeval.v1.instrumentation.llm.llm_google.wrapper import wrap_google_client
-from ..utils import verify_span_attributes_comprehensive, assert_span_has_exception
-
-# All fixtures are imported automatically from conftest.py
-
-
-class BaseGoogleTest:
-    """Base class with helper methods for Google tests."""
-
-    def verify_tracing_if_wrapped(
-        self, client, mock_processor, expected_model_name="gemini-2.5-flash"
-    ):
-        """Helper method to verify tracing only if client is wrapped."""
-        if hasattr(client, "_judgment_tracer"):
-            span = mock_processor.get_last_ended_span()
-            attrs = mock_processor.get_span_attributes(span)
-            verify_span_attributes_comprehensive(
-                span=span,
-                attrs=attrs,
-                expected_span_name="GOOGLE_API_CALL",
-                expected_model_name=expected_model_name,
-            )
-
-    def verify_exception_if_wrapped(self, client, mock_processor):
-        """Helper method to verify exception tracing only if client is wrapped."""
-        if hasattr(client, "_judgment_tracer"):
-            span = mock_processor.get_last_ended_span()
-            assert_span_has_exception(span, "GOOGLE_API_CALL")
+from judgeval.judgment_attribute_keys import AttributeKeys
+from judgeval.v1.instrumentation.llm.llm_google.generate_content import (
+    wrap_generate_content_sync,
+)
+from tests.v1.instrumentation.llm.google.conftest import make_google_response
 
 
-class TestWrapper(BaseGoogleTest):
-    def test_generate_content(self, client_maybe_wrapped, mock_processor):
-        """Test generate_content with gemini-2.5-flash and tracing verification"""
-        response = client_maybe_wrapped.models.generate_content(
-            model="gemini-2.5-flash",
-            contents="Say 'test' and nothing else",
+class TestGoogleGenerateContent:
+    def test_creates_span(self, tracer, collecting_exporter, google_client):
+        response = make_google_response()
+        google_client.models.generate_content = MagicMock(return_value=response)
+        wrap_generate_content_sync(google_client)
+        google_client.models.generate_content(
+            model="gemini-2.0-flash", contents="hello"
         )
+        assert any(s.name == "GOOGLE_API_CALL" for s in collecting_exporter.spans)
 
-        assert response is not None
-        assert response.text
-        assert response.usage_metadata
-        assert response.usage_metadata.prompt_token_count > 0
-        assert response.usage_metadata.candidates_token_count > 0
-
-        # Verify tracing when wrapped
-        self.verify_tracing_if_wrapped(client_maybe_wrapped, mock_processor)
-
-    @pytest.mark.skip(reason="Skipping google client quotea")
-    def test_multiple_calls_same_client(self, client_maybe_wrapped, mock_processor):
-        """Test multiple calls to ensure context isolation with tracing verification"""
-        # Track initial span count
-        initial_span_count = len(mock_processor.ended_spans)
-
-        response1 = client_maybe_wrapped.models.generate_content(
-            model="gemini-2.5-flash",
-            contents="Say 'first'",
+    def test_span_has_llm_kind(self, tracer, collecting_exporter, google_client):
+        response = make_google_response()
+        google_client.models.generate_content = MagicMock(return_value=response)
+        wrap_generate_content_sync(google_client)
+        google_client.models.generate_content(
+            model="gemini-2.0-flash", contents="hello"
         )
+        span = next(s for s in collecting_exporter.spans if s.name == "GOOGLE_API_CALL")
+        assert span.attributes.get(AttributeKeys.JUDGMENT_SPAN_KIND) == "llm"
 
-        response2 = client_maybe_wrapped.models.generate_content(
-            model="gemini-2.5-flash",
-            contents="Say 'second'",
+    def test_records_token_usage(self, tracer, collecting_exporter, google_client):
+        response = make_google_response(prompt_tokens=20, completion_tokens=10)
+        google_client.models.generate_content = MagicMock(return_value=response)
+        wrap_generate_content_sync(google_client)
+        google_client.models.generate_content(
+            model="gemini-2.0-flash", contents="hello"
         )
-
-        assert response1 is not None
-        assert response2 is not None
-        assert response1.text != response2.text
-
-        # Verify tracing when wrapped - should have exactly 2 new spans
-        if hasattr(client_maybe_wrapped, "_judgment_tracer"):
-            assert len(mock_processor.ended_spans) == initial_span_count + 2
-
-            span1 = mock_processor.ended_spans[initial_span_count]
-            span2 = mock_processor.ended_spans[initial_span_count + 1]
-
-            # Verify spans have different contexts
-            assert span1.context.span_id != span2.context.span_id
-
-            # Verify both spans have correct attributes
-            attrs1 = mock_processor.get_span_attributes(span1)
-            attrs2 = mock_processor.get_span_attributes(span2)
-
-            verify_span_attributes_comprehensive(
-                span=span1,
-                attrs=attrs1,
-                expected_span_name="GOOGLE_API_CALL",
-                expected_model_name="gemini-2.5-flash",
-            )
-
-            verify_span_attributes_comprehensive(
-                span=span2,
-                attrs=attrs2,
-                expected_span_name="GOOGLE_API_CALL",
-                expected_model_name="gemini-2.5-flash",
-            )
-
-    def test_error_recorded_in_span(self, client_maybe_wrapped, mock_processor):
-        """Test that errors are properly recorded in spans with tracing verification"""
-        with pytest.raises(Exception):
-            client_maybe_wrapped.models.generate_content(
-                model="invalid-model-name",
-                contents="Test",
-            )
-
-        # Verify tracing when wrapped - should have exception recorded
-        self.verify_exception_if_wrapped(client_maybe_wrapped, mock_processor)
-
-
-class TestWrapperIdempotency(BaseGoogleTest):
-    def test_double_wrapping(self, tracer, client, mock_processor):
-        client1 = wrap_google_client(client)
-        client2 = wrap_google_client(client1)
-
-        response = client2.models.generate_content(
-            model="gemini-2.5-flash",
-            contents="Test",
+        span = next(s for s in collecting_exporter.spans if s.name == "GOOGLE_API_CALL")
+        assert (
+            span.attributes.get(AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS)
+            == 20
         )
+        assert span.attributes.get(AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS) == 10
 
-        assert response is not None
+    def test_error_sets_error_status(self, tracer, collecting_exporter, google_client):
+        google_client.models.generate_content = MagicMock(
+            side_effect=RuntimeError("fail")
+        )
+        wrap_generate_content_sync(google_client)
+        with pytest.raises(RuntimeError):
+            google_client.models.generate_content(
+                model="gemini-2.0-flash", contents="hello"
+            )
+        span = next(s for s in collecting_exporter.spans if s.name == "GOOGLE_API_CALL")
+        assert span.status.status_code.name == "ERROR"
 
-        # Verify tracing works with double-wrapped client
-        self.verify_tracing_if_wrapped(client2, mock_processor)
+    def test_returns_result(self, tracer, google_client):
+        response = make_google_response()
+        google_client.models.generate_content = MagicMock(return_value=response)
+        wrap_generate_content_sync(google_client)
+        result = google_client.models.generate_content(
+            model="gemini-2.0-flash", contents="hello"
+        )
+        assert result is response
+
+    def test_wrap_replaces_method(self, tracer, google_client):
+        original = google_client.models.generate_content
+        wrap_generate_content_sync(google_client)
+        assert google_client.models.generate_content is not original

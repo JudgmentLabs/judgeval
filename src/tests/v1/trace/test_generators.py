@@ -1,182 +1,214 @@
-"""Tests for _ObservedSyncGenerator and _ObservedAsyncGenerator."""
-
 from __future__ import annotations
 
-import asyncio
 import contextvars
-from unittest.mock import MagicMock
 
 import pytest
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExportResult
+from opentelemetry.sdk.trace import ReadableSpan
 
-from judgeval.utils.serialize import safe_serialize
+from judgeval.v1.trace.exporters.noop_judgment_span_exporter import (
+    NoOpJudgmentSpanExporter,
+)
 from judgeval.v1.trace.generators import _ObservedSyncGenerator, _ObservedAsyncGenerator
+from judgeval.utils.serialize import safe_serialize
 
 
-def _make_observed_sync(gen, *, disable_yield_span=False):
-    span = MagicMock()
-    span.is_recording.return_value = True
-    span.name = "test_gen"
-    tracer = MagicMock()
-    tracer.start_as_current_span.return_value.__enter__ = MagicMock(
-        return_value=MagicMock()
-    )
-    tracer.start_as_current_span.return_value.__exit__ = MagicMock(return_value=False)
-    ctx = contextvars.copy_context()
+class _CapturingExporter(NoOpJudgmentSpanExporter):
+    def __init__(self):
+        self.spans: list[ReadableSpan] = []
+
+    def export(self, spans):
+        self.spans.extend(spans)
+        return SpanExportResult.SUCCESS
+
+
+@pytest.fixture
+def otel_provider():
+    exp = _CapturingExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exp))
+    return provider, exp
+
+
+def _make_sync_generator(items, provider, *, disable_yield_span=False, raise_at=None):
+    otel_tracer = provider.get_tracer("test")
+    span = otel_tracer.start_span("root-gen")
+
+    def raw_gen():
+        for i, item in enumerate(items):
+            if raise_at is not None and i == raise_at:
+                raise ValueError(f"error at {i}")
+            yield item
+
     return _ObservedSyncGenerator(
-        gen, span, safe_serialize, tracer, ctx, disable_yield_span
-    ), span
+        raw_gen(),
+        span,
+        safe_serialize,
+        otel_tracer,
+        contextvars.copy_context(),
+        disable_yield_span,
+    )
+
+
+async def _make_async_generator(
+    items, provider, *, disable_yield_span=False, raise_at=None
+):
+    otel_tracer = provider.get_tracer("test")
+    span = otel_tracer.start_span("root-async-gen")
+
+    async def raw_agen():
+        for i, item in enumerate(items):
+            if raise_at is not None and i == raise_at:
+                raise ValueError(f"error at {i}")
+            yield item
+
+    return _ObservedAsyncGenerator(
+        raw_agen(),
+        span,
+        safe_serialize,
+        otel_tracer,
+        contextvars.copy_context(),
+        disable_yield_span,
+    )
 
 
 class TestSyncGenerator:
-    def test_yields_all_values(self):
-        def gen():
-            yield 1
-            yield 2
-            yield 3
+    def test_yields_all_items(self, otel_provider):
+        provider, _ = otel_provider
+        gen = _make_sync_generator([1, 2, 3], provider)
+        assert list(gen) == [1, 2, 3]
 
-        observed, span = _make_observed_sync(gen())
-        assert list(observed) == [1, 2, 3]
-        span.end.assert_called_once()
+    def test_span_ends_after_exhaustion(self, otel_provider):
+        provider, exp = otel_provider
+        gen = _make_sync_generator(["a", "b"], provider)
+        list(gen)
+        root = next(
+            (
+                s
+                for s in exp.spans
+                if s.name == "root-gen"
+                and s.attributes.get("judgment.span_kind") == "generator"
+            ),
+            None,
+        )
+        assert root is not None
+        assert root.end_time is not None
 
-    def test_close_ends_span(self):
-        def gen():
-            yield 1
-            yield 2
+    def test_emits_yield_spans(self, otel_provider):
+        provider, exp = otel_provider
+        gen = _make_sync_generator([1, 2], provider)
+        list(gen)
+        assert any(
+            s.name == "root-gen"
+            and s.attributes.get("judgment.span_kind") == "generator_item"
+            for s in exp.spans
+        )
 
-        observed, span = _make_observed_sync(gen())
-        next(observed)
-        observed.close()
-        span.end.assert_called_once()
+    def test_no_yield_spans_when_disabled(self, otel_provider):
+        provider, exp = otel_provider
+        gen = _make_sync_generator([1, 2], provider, disable_yield_span=True)
+        list(gen)
+        item_spans = [
+            s
+            for s in exp.spans
+            if s.attributes.get("judgment.span_kind") == "generator_item"
+        ]
+        assert len(item_spans) == 0
 
-    def test_send_after_close_raises_stop(self):
-        def gen():
-            yield 1
+    def test_exception_sets_error_status(self, otel_provider):
+        provider, exp = otel_provider
+        gen = _make_sync_generator([1, 2], provider, raise_at=1)
+        with pytest.raises(ValueError):
+            list(gen)
+        root = next(
+            (
+                s
+                for s in exp.spans
+                if s.name == "root-gen"
+                and s.attributes.get("judgment.span_kind") == "generator"
+            ),
+            None,
+        )
+        assert root is not None
+        assert root.status.status_code.name == "ERROR"
 
-        observed, _ = _make_observed_sync(gen())
-        observed.close()
+    def test_stop_iteration_after_close(self, otel_provider):
+        provider, _ = otel_provider
+        gen = _make_sync_generator([1], provider)
+        gen.close()
         with pytest.raises(StopIteration):
-            observed.send(None)
+            next(gen)
 
-    def test_exception_records_error(self):
-        def gen():
-            yield 1
-            raise RuntimeError("fail")
+    def test_send_value(self, otel_provider):
+        provider, _ = otel_provider
+        otel_tracer = provider.get_tracer("test")
+        span = otel_tracer.start_span("root")
 
-        observed, span = _make_observed_sync(gen())
-        assert next(observed) == 1
-        with pytest.raises(RuntimeError, match="fail"):
-            next(observed)
-        span.record_exception.assert_called_once()
-        span.end.assert_called_once()
+        def echo():
+            v = yield "start"
+            yield v
 
-    def test_throw_propagates(self):
-        def gen():
-            try:
-                yield 1
-            except ValueError:
-                yield "caught"
-
-        observed, _ = _make_observed_sync(gen())
-        next(observed)
-        result = observed.throw(ValueError, ValueError("test"))
-        assert result == "caught"
-
-    def test_disable_yield_span(self):
-        def gen():
-            yield 1
-
-        observed, span = _make_observed_sync(gen(), disable_yield_span=True)
-        list(observed)
-        # Tracer should not create child spans when disabled
+        gen = _ObservedSyncGenerator(
+            echo(), span, safe_serialize, otel_tracer, contextvars.copy_context()
+        )
+        first = next(gen)
+        assert first == "start"
+        second = gen.send("echo-back")
+        assert second == "echo-back"
 
 
 class TestAsyncGenerator:
-    def test_yields_all_values(self):
-        async def gen():
-            yield "a"
-            yield "b"
+    @pytest.mark.asyncio
+    async def test_yields_all_items(self, otel_provider):
+        provider, _ = otel_provider
+        gen = await _make_async_generator([10, 20, 30], provider)
+        result = []
+        async for item in gen:
+            result.append(item)
+        assert result == [10, 20, 30]
 
-        span = MagicMock()
-        span.is_recording.return_value = True
-        span.name = "async_gen"
-        tracer = MagicMock()
-        tracer.start_as_current_span.return_value.__enter__ = MagicMock(
-            return_value=MagicMock()
+    @pytest.mark.asyncio
+    async def test_span_ends_after_exhaustion(self, otel_provider):
+        provider, exp = otel_provider
+        gen = await _make_async_generator(["x"], provider)
+        async for _ in gen:
+            pass
+        root = next(
+            (
+                s
+                for s in exp.spans
+                if s.name == "root-async-gen"
+                and s.attributes.get("judgment.span_kind") == "generator"
+            ),
+            None,
         )
-        tracer.start_as_current_span.return_value.__exit__ = MagicMock(
-            return_value=False
+        assert root is not None
+        assert root.end_time is not None
+
+    @pytest.mark.asyncio
+    async def test_exception_sets_error_status(self, otel_provider):
+        provider, exp = otel_provider
+        gen = await _make_async_generator([1, 2], provider, raise_at=0)
+        with pytest.raises(ValueError):
+            async for _ in gen:
+                pass
+        root = next(
+            (
+                s
+                for s in exp.spans
+                if s.name == "root-async-gen"
+                and s.attributes.get("judgment.span_kind") == "generator"
+            ),
+            None,
         )
-        ctx = contextvars.copy_context()
-        observed = _ObservedAsyncGenerator(
-            gen(), span, safe_serialize, tracer, ctx, False
-        )
+        assert root is not None
+        assert root.status.status_code.name == "ERROR"
 
-        async def consume():
-            return [item async for item in observed]
-
-        result = asyncio.run(consume())
-        assert result == ["a", "b"]
-        span.end.assert_called_once()
-
-    def test_async_exception_records_error(self):
-        async def gen():
-            yield 1
-            raise ValueError("async-fail")
-
-        span = MagicMock()
-        span.is_recording.return_value = True
-        span.name = "async_gen"
-        tracer = MagicMock()
-        ctx = contextvars.copy_context()
-        observed = _ObservedAsyncGenerator(
-            gen(), span, safe_serialize, tracer, ctx, False
-        )
-
-        async def consume():
-            return [item async for item in observed]
-
-        with pytest.raises(ValueError, match="async-fail"):
-            asyncio.run(consume())
-
-        span.record_exception.assert_called_once()
-
-    def test_aclose_ends_span(self):
-        async def gen():
-            yield 1
-            yield 2
-
-        span = MagicMock()
-        span.is_recording.return_value = True
-        span.name = "async_gen"
-        tracer = MagicMock()
-        ctx = contextvars.copy_context()
-        observed = _ObservedAsyncGenerator(
-            gen(), span, safe_serialize, tracer, ctx, False
-        )
-
-        async def run():
-            await observed.__anext__()
-            await observed.aclose()
-
-        asyncio.run(run())
-        span.end.assert_called_once()
-
-    def test_send_after_close_raises_stop(self):
-        async def gen():
-            yield 1
-
-        span = MagicMock()
-        span.is_recording.return_value = True
-        span.name = "async_gen"
-        tracer = MagicMock()
-        ctx = contextvars.copy_context()
-        observed = _ObservedAsyncGenerator(
-            gen(), span, safe_serialize, tracer, ctx, False
-        )
-
-        async def run():
-            await observed.aclose()
-            with pytest.raises(StopAsyncIteration):
-                await observed.asend(None)
-
-        asyncio.run(run())
+    @pytest.mark.asyncio
+    async def test_stop_async_iteration_after_close(self, otel_provider):
+        provider, _ = otel_provider
+        gen = await _make_async_generator([1], provider)
+        await gen.aclose()
+        with pytest.raises(StopAsyncIteration):
+            await gen.__anext__()

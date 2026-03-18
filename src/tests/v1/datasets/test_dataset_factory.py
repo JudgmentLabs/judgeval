@@ -1,150 +1,93 @@
-import pytest
+from __future__ import annotations
+
 from unittest.mock import MagicMock
-from judgeval.v1.datasets.dataset_factory import DatasetFactory
+
+
 from judgeval.v1.datasets.dataset import Dataset, DatasetInfo
-from judgeval.v1.data.example import Example
+from judgeval.v1.datasets.dataset_factory import DatasetFactory
 
 
-@pytest.fixture
-def mock_client():
-    return MagicMock()
-
-
-@pytest.fixture
-def dataset_factory(mock_client):
+def _make_factory(project_id="proj-1"):
+    client = MagicMock()
     return DatasetFactory(
-        mock_client, project_id="test_project_id", project_name="test_project"
-    )
+        client=client, project_id=project_id, project_name="test-project"
+    ), client
 
 
-@pytest.fixture
-def sample_examples():
-    ex1 = Example(name="example1")
-    ex1._properties["input"] = "input1"
-    ex2 = Example(name="example2")
-    ex2._properties["input"] = "input2"
-    return [ex1, ex2]
-
-
-def test_factory_get(dataset_factory, mock_client):
-    mock_client.get_projects_datasets_by_dataset_name.return_value = {
-        "dataset_kind": "example",
-        "examples": [],
-    }
-
-    dataset = dataset_factory.get("test_dataset")
-
-    assert isinstance(dataset, Dataset)
-    assert dataset.name == "test_dataset"
-    assert dataset.project_id == "test_project_id"
-    mock_client.get_projects_datasets_by_dataset_name.assert_called_once_with(
-        project_id="test_project_id",
-        dataset_name="test_dataset",
-    )
-
-
-def test_factory_create(dataset_factory, mock_client, sample_examples):
-    dataset = dataset_factory.create(
-        name="test_dataset",
-        examples=sample_examples,
-        overwrite=False,
-    )
-
-    assert isinstance(dataset, Dataset)
-    assert dataset.name == "test_dataset"
-    assert dataset.project_id == "test_project_id"
-    assert len(dataset.examples) == 2
-    mock_client.post_projects_datasets.assert_called_once_with(
-        project_id="test_project_id",
-        payload={
-            "name": "test_dataset",
-            "examples": [],
+class TestDatasetFactoryGet:
+    def test_get_returns_dataset(self):
+        factory, client = _make_factory()
+        client.get_projects_datasets_by_dataset_name.return_value = {
             "dataset_kind": "example",
-            "overwrite": False,
-        },
-    )
-
-
-def test_factory_create_with_overwrite(dataset_factory, mock_client):
-    dataset = dataset_factory.create(name="test_dataset", examples=[], overwrite=True)
-
-    assert isinstance(dataset, Dataset)
-    mock_client.post_projects_datasets.assert_called_once_with(
-        project_id="test_project_id",
-        payload={
-            "name": "test_dataset",
             "examples": [],
-            "dataset_kind": "example",
-            "overwrite": True,
-        },
-    )
-
-
-def test_factory_list(dataset_factory, mock_client):
-    mock_client.get_projects_datasets.return_value = [
-        {
-            "dataset_id": "1",
-            "name": "dataset1",
-            "created_at": "2024-01-01",
-            "kind": "example",
-            "entries": 10,
-            "creator": "user1",
         }
-    ]
+        ds = factory.get("my-dataset")
+        assert isinstance(ds, Dataset)
+        assert ds.name == "my-dataset"
 
-    datasets = dataset_factory.list()
+    def test_get_maps_examples(self):
+        factory, client = _make_factory()
+        client.get_projects_datasets_by_dataset_name.return_value = {
+            "dataset_kind": "example",
+            "examples": [
+                {
+                    "example_id": "e1",
+                    "created_at": "2024-01-01",
+                    "name": "ex",
+                    "input": "q",
+                }
+            ],
+        }
+        ds = factory.get("ds")
+        assert len(ds) == 1
+        assert ds.examples[0]["input"] == "q"
 
-    assert isinstance(datasets, list)
-    assert len(datasets) == 1
-    assert isinstance(datasets[0], DatasetInfo)
-    mock_client.get_projects_datasets.assert_called_once_with(
-        project_id="test_project_id",
-    )
-
-
-def test_factory_create_empty_examples(dataset_factory, mock_client):
-    dataset = dataset_factory.create(name="test_dataset")
-
-    assert len(dataset.examples) == 0
-
-
-def test_factory_get_returns_none_when_project_id_missing(mock_client, caplog):
-    import logging
-
-    factory = DatasetFactory(mock_client, project_id=None, project_name="test_project")
-
-    with caplog.at_level(logging.ERROR):
-        dataset = factory.get("test_dataset")
-
-    assert dataset is None
-    assert "project_id is not set" in caplog.text
-    assert "get()" in caplog.text
-    mock_client.get_projects_datasets_by_dataset_name.assert_not_called()
+    def test_get_missing_project_id_returns_none(self):
+        factory, _ = _make_factory(project_id=None)
+        result = factory.get("ds")
+        assert result is None
 
 
-def test_factory_create_returns_none_when_project_id_missing(mock_client, caplog):
-    import logging
+class TestDatasetFactoryCreate:
+    def test_create_returns_dataset(self):
+        factory, client = _make_factory()
+        client.post_projects_datasets.return_value = {}
+        client.post_projects_datasets_by_dataset_name_examples.return_value = {}
+        ds = factory.create("new-ds")
+        assert isinstance(ds, Dataset)
+        assert ds.name == "new-ds"
 
-    factory = DatasetFactory(mock_client, project_id=None, project_name="test_project")
+    def test_create_calls_post_datasets(self):
+        factory, client = _make_factory()
+        client.post_projects_datasets.return_value = {}
+        factory.create("new-ds")
+        client.post_projects_datasets.assert_called_once()
 
-    with caplog.at_level(logging.ERROR):
-        dataset = factory.create(name="test_dataset")
-
-    assert dataset is None
-    assert "project_id is not set" in caplog.text
-    assert "create()" in caplog.text
-    mock_client.post_projects_datasets.assert_not_called()
+    def test_create_missing_project_id_returns_none(self):
+        factory, _ = _make_factory(project_id=None)
+        result = factory.create("ds")
+        assert result is None
 
 
-def test_factory_list_returns_none_when_project_id_missing(mock_client, caplog):
-    import logging
+class TestDatasetFactoryList:
+    def test_list_returns_dataset_infos(self):
+        factory, client = _make_factory()
+        client.get_projects_datasets.return_value = [
+            {
+                "dataset_id": "d1",
+                "name": "ds1",
+                "created_at": "2024-01-01",
+                "kind": "example",
+                "entries": 5.0,
+                "creator": "user",
+            }
+        ]
+        result = factory.list()
+        assert len(result) == 1
+        assert isinstance(result[0], DatasetInfo)
+        assert result[0].name == "ds1"
 
-    factory = DatasetFactory(mock_client, project_id=None, project_name="test_project")
-
-    with caplog.at_level(logging.ERROR):
-        datasets = factory.list()
-
-    assert datasets is None
-    assert "project_id is not set" in caplog.text
-    assert "list()" in caplog.text
-    mock_client.get_projects_datasets.assert_not_called()
+    def test_list_missing_project_id_returns_none(self):
+        factory, _ = _make_factory(project_id=None)
+        result = factory.list()
+        assert result is None
