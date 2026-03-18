@@ -497,40 +497,43 @@ class BaseTracer(ABC):
     # ------------------------------------------------------------------ #
 
     @staticmethod
-    def set_customer_id(customer_id: str) -> None:
-        """Set the customer ID on the current span and propagate it
-        through the OTel context so child spans inherit it."""
+    def _set_propagating_baggage_key(key: str, value: str) -> None:
+        """
+        Helper utility for the general practice of setting a key on the current span, and setting it on baggage,
+        such that it gets propagated to all child spans. This will also reattach the context to the new context
+        with updated baggage.
+        """
         proxy = BaseTracer._get_proxy_provider()
         current_span = proxy.get_current_span()
         if current_span is None or not current_span.is_recording():
             return
-        current_span.set_attribute(AttributeKeys.JUDGMENT_CUSTOMER_ID, customer_id)
-        ctx = baggage.set_baggage(
-            AttributeKeys.JUDGMENT_CUSTOMER_ID.value,
-            customer_id,
-            proxy.get_current_context(),
-        )
+        current_span.set_attribute(key, value)
+        ctx = baggage.set_baggage(key, value, proxy.get_current_context())
         proxy.attach_context(ctx)
+
+    @staticmethod
+    def set_customer_id(customer_id: str) -> None:
+        """Set the customer ID on the current span and propagate it
+        through the OTel context so child spans inherit it."""
+        BaseTracer._set_propagating_baggage_key(
+            AttributeKeys.JUDGMENT_CUSTOMER_ID.value, customer_id
+        )
+
+    @staticmethod
+    def set_customer_user_id(customer_user_id: str) -> None:
+        """Set the customer user ID on the current span and propagate it
+        through the OTel context so child spans inherit it."""
+        BaseTracer._set_propagating_baggage_key(
+            AttributeKeys.JUDGMENT_CUSTOMER_USER_ID.value, customer_user_id
+        )
 
     @staticmethod
     def set_session_id(session_id: str) -> None:
         """Set the session ID on the current span and propagate it
-        through the OTel context so child spans inherit it.
-        Only applies to valid, sampled spans."""
-        proxy = BaseTracer._get_proxy_provider()
-        current_span = proxy.get_current_span()
-        if current_span is None or not current_span.is_recording():
-            return
-        span_ctx = current_span.get_span_context()
-        if not span_ctx.is_valid or not span_ctx.trace_flags.sampled:
-            return
-        current_span.set_attribute(AttributeKeys.JUDGMENT_SESSION_ID, session_id)
-        ctx = baggage.set_baggage(
-            AttributeKeys.JUDGMENT_SESSION_ID.value,
-            session_id,
-            proxy.get_current_context(),
+        through the OTel context so child spans inherit it."""
+        BaseTracer._set_propagating_baggage_key(
+            AttributeKeys.JUDGMENT_SESSION_ID.value, session_id
         )
-        proxy.attach_context(ctx)
 
     # ------------------------------------------------------------------ #
     #  Static: Tags                                                      #
