@@ -15,10 +15,17 @@ def get_categorical_scorer_template(scorer_name: str) -> str:
 from judgeval.v1.judges import Judge
 from judgeval.v1.hosted.responses import CategoricalResponse
 from judgeval.v1.data.example import Example
+from judgeval.v1.hosted.responses import Category
 
-class {scorer_name}(Judge[CategoricalResponse]):
-    async def score(self, data: Example) -> CategoricalResponse:
-        return CategoricalResponse(value="Test", reason="Test")
+class {scorer_name}Response(CategoricalResponse):
+    categories = [
+        Category(value="Category 1", description="Description for Category 1"),
+        Category(value="Category 2", description="Description for Category 2"),
+    ]
+
+class {scorer_name}(Judge[{scorer_name}Response]):
+    async def score(self, data: Example) -> {scorer_name}Response:
+        return {scorer_name}Response(value="Category 1", reason="Test")
 """
 
 

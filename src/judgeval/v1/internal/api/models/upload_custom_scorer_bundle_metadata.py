@@ -2,7 +2,7 @@
 # DO NOT EDIT MANUALLY
 from __future__ import annotations
 
-from typing import TypedDict, Optional
+from typing import TypedDict, Optional, List, Any, Dict
 from typing_extensions import NotRequired
 
 
@@ -15,3 +15,4 @@ class UploadCustomScorerBundleMetadata(TypedDict):
     response_type: str
     version: NotRequired[Optional[float]]
     bump_major: NotRequired[Optional[bool]]
+    categories: NotRequired[Optional[List[Dict[str, Any]]]]

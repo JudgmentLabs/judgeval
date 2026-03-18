@@ -12,7 +12,6 @@ class PromptScorer(TypedDict):
     organization_id: str
     name: str
     prompt: str
-    threshold: float
     model: str
     options: NotRequired[Optional[Dict[str, Any]]]
     description: NotRequired[Optional[str]]

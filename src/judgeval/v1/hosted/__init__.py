@@ -5,6 +5,7 @@ from judgeval.v1.hosted.responses import (
     NumericResponse,
     ScorerResponse,
     ReturnType,
+    Category,
 )
 from judgeval.v1.hosted.trace_custom_scorer import TraceCustomScorer
 from judgeval.v1.hosted.example_custom_scorer import ExampleCustomScorer
@@ -16,6 +17,7 @@ __all__ = [
     "NumericResponse",
     "ScorerResponse",
     "ReturnType",
+    "Category",
     "TraceCustomScorer",
     "ExampleCustomScorer",
 ]

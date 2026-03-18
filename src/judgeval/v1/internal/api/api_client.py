@@ -330,7 +330,7 @@ class JudgmentSyncClient:
 
     def post_projects_scorers_custom_bundle(
         self, project_id: str, payload: UploadCustomScorerBundleRequest
-    ) -> UploadCustomScorerBundleResponse:
+    ) -> UploadCustomScorerResponse:
         return self._multipart_request(
             "POST",
             url_for(f"/v1/projects/{project_id}/scorers/custom/bundle", self.base_url),
@@ -688,7 +688,7 @@ class JudgmentAsyncClient:
 
     async def post_projects_scorers_custom_bundle(
         self, project_id: str, payload: UploadCustomScorerBundleRequest
-    ) -> UploadCustomScorerBundleResponse:
+    ) -> UploadCustomScorerResponse:
         return await self._multipart_request(
             "POST",
             url_for(f"/v1/projects/{project_id}/scorers/custom/bundle", self.base_url),
