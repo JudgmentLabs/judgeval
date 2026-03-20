@@ -2,10 +2,10 @@ import pytest
 
 from judgeval.v1 import Judgeval
 from judgeval.v1.data import Example
-from judgeval.v1.scorers.prompt_scorer.prompt_scorer import PromptScorer
+from e2etests.conftest import ScorerFactory
 
 
-def run_eval_helper(client: Judgeval, eval_run_name: str):
+def run_eval_helper(client: Judgeval, eval_run_name: str, local_scorer: ScorerFactory):
     example1 = Example.create(
         input="Generate a cold outreach email for TechCorp. Facts: They recently launched an AI-powered analytics platform. Their CEO Sarah Chen previously worked at Google. They have 50+ enterprise clients.",
         actual_output="Dear Ms. Chen,\n\nI noticed TechCorp's recent launch of your AI analytics platform and was impressed by its enterprise-focused approach. Your experience from Google clearly shines through in building scalable solutions, as evidenced by your impressive 50+ enterprise client base.\n\nWould you be open to a brief call to discuss how we could potentially collaborate?\n\nBest regards,\nAlex",
@@ -18,14 +18,8 @@ def run_eval_helper(client: Judgeval, eval_run_name: str):
         retrieval_context="GreenEnergy Solutions won 2023 sustainability award. New solar technology 30% more efficient. Planning European market expansion.",
     )
 
-    scorer = PromptScorer(
-        name="faithfulness",
-        prompt="Is the output faithful to the retrieval context?",
-        threshold=0.5,
-    )
-    scorer2 = PromptScorer(
-        name="relevancy", prompt="Is the output relevant to the input?", threshold=0.5
-    )
+    scorer = local_scorer("Is the output faithful to the retrieval context?")
+    scorer2 = local_scorer("Is the output relevant to the input?")
 
     evaluation = client.evaluation.create()
     res = evaluation.run(
@@ -36,7 +30,7 @@ def run_eval_helper(client: Judgeval, eval_run_name: str):
     return res
 
 
-def test_basic_eval(client: Judgeval, random_name: str):
+def test_basic_eval(client: Judgeval, random_name: str, local_scorer: ScorerFactory):
     evaluation = client.evaluation.create()
     res = evaluation.run(
         examples=[
@@ -45,28 +39,22 @@ def test_basic_eval(client: Judgeval, random_name: str):
                 actual_output="The capital of France is Paris.",
             )
         ],
-        scorers=[
-            PromptScorer(
-                name="relevancy",
-                prompt="Is the output relevant to the input?",
-                threshold=0.5,
-            )
-        ],
+        scorers=[local_scorer("Is the output relevant to the input?")],
         eval_run_name=random_name,
     )
 
     assert res, "No evaluation results found"
 
 
-def test_run_eval(client: Judgeval, random_name: str):
-    res = run_eval_helper(client, random_name)
+def test_run_eval(client: Judgeval, random_name: str, local_scorer: ScorerFactory):
+    res = run_eval_helper(client, random_name, local_scorer)
     assert res, f"No evaluation results found for {random_name}"
 
-    res2 = run_eval_helper(client, random_name)
+    res2 = run_eval_helper(client, random_name, local_scorer)
     assert res2, f"No evaluation results found for {random_name}"
 
 
-def test_assert_test(client: Judgeval):
+def test_assert_test(client: Judgeval, local_scorer: ScorerFactory):
     example = Example.create(
         input="What if these shoes don't fit?",
         actual_output="We offer a 30-day full refund at no extra cost.",
@@ -82,9 +70,7 @@ def test_assert_test(client: Judgeval):
         actual_output="No, the room is too small.",
     )
 
-    scorer = PromptScorer(
-        name="relevancy", prompt="Is the output relevant to the input?", threshold=0.5
-    )
+    scorer = local_scorer("Is the output relevant to the input?")
 
     evaluation = client.evaluation.create()
     with pytest.raises(AssertionError):
@@ -96,7 +82,9 @@ def test_assert_test(client: Judgeval):
         )
 
 
-def test_evaluate_dataset(client: Judgeval, random_name: str):
+def test_evaluate_dataset(
+    client: Judgeval, random_name: str, local_scorer: ScorerFactory
+):
     example1 = Example.create(
         input="What if these shoes don't fit?",
         actual_output="We offer a 30-day full refund at no extra cost.",
@@ -113,19 +101,15 @@ def test_evaluate_dataset(client: Judgeval, random_name: str):
     evaluation = client.evaluation.create()
     res = evaluation.run(
         examples=list(dataset),
-        scorers=[
-            PromptScorer(
-                name="faithfulness",
-                prompt="Is the output faithful to the retrieval context?",
-                threshold=0.5,
-            )
-        ],
+        scorers=[local_scorer("Is the output faithful to the retrieval context?")],
         eval_run_name=random_name,
     )
     assert res, "Dataset evaluation failed"
 
 
-def test_dataset_and_evaluation(client: Judgeval, random_name: str):
+def test_dataset_and_evaluation(
+    client: Judgeval, random_name: str, local_scorer: ScorerFactory
+):
     examples = [
         Example.create(input="input 1", actual_output="output 1"),
         Example.create(input="input 2", actual_output="output 2"),
@@ -138,19 +122,15 @@ def test_dataset_and_evaluation(client: Judgeval, random_name: str):
     evaluation = client.evaluation.create()
     res = evaluation.run(
         examples=examples,
-        scorers=[
-            PromptScorer(
-                name="relevancy",
-                prompt="Is the output relevant to the input?",
-                threshold=0.5,
-            )
-        ],
+        scorers=[local_scorer("Is the output relevant to the input?")],
         eval_run_name=random_name,
     )
     assert res, "Dataset evaluation failed"
 
 
-def test_dataset_and_double_evaluation(client: Judgeval, random_name: str):
+def test_dataset_and_double_evaluation(
+    client: Judgeval, random_name: str, local_scorer: ScorerFactory
+):
     examples = [
         Example.create(input="input 1", actual_output="output 1"),
         Example.create(input="input 2", actual_output="output 2"),
@@ -160,29 +140,19 @@ def test_dataset_and_double_evaluation(client: Judgeval, random_name: str):
     assert dataset, "Failed to pull dataset"
     assert len(dataset) == 2, "Dataset should have 2 examples"
 
+    scorer = local_scorer("Is the output relevant to the input?")
+
     evaluation = client.evaluation.create()
     res = evaluation.run(
         examples=list(dataset),
-        scorers=[
-            PromptScorer(
-                name="relevancy",
-                prompt="Is the output relevant to the input?",
-                threshold=0.5,
-            )
-        ],
+        scorers=[scorer],
         eval_run_name=random_name,
     )
     assert res, "Dataset evaluation failed"
 
     res2 = evaluation.run(
         examples=list(dataset),
-        scorers=[
-            PromptScorer(
-                name="relevancy",
-                prompt="Is the output relevant to the input?",
-                threshold=0.5,
-            )
-        ],
+        scorers=[scorer],
         eval_run_name=random_name,
     )
     assert res2, "Dataset evaluation failed"
