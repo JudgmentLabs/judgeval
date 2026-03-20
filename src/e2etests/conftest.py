@@ -50,10 +50,10 @@ def local_scorer() -> ScorerFactory:
     def _make(prompt: str) -> Judge[BinaryResponse]:
         class LLMScorer(Judge[BinaryResponse]):
             async def score(self, data: Example) -> BinaryResponse:
-                from openai import OpenAI
+                from openai import AsyncOpenAI
 
-                client = OpenAI()
-                response = client.beta.chat.completions.parse(
+                client = AsyncOpenAI()
+                response = await client.chat.completions.parse(
                     model="gpt-4o-mini",
                     messages=[
                         {"role": "system", "content": prompt},
