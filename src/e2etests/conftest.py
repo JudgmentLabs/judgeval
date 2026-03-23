@@ -2,10 +2,15 @@ import os
 import pytest
 import random
 import string
+from typing import Callable
 from dotenv import load_dotenv
 
 from judgeval.v1 import Judgeval
+from judgeval.v1.judges import Judge, BinaryResponse
 from e2etests.utils import delete_project, create_project
+from judgeval.v1.data.example import Example
+
+ScorerFactory = Callable[[str], Judge[BinaryResponse]]
 
 load_dotenv()
 
@@ -38,3 +43,33 @@ def client(project_name: str):
 @pytest.fixture
 def random_name() -> str:
     return "".join(random.choices(string.ascii_letters + string.digits, k=12))
+
+
+@pytest.fixture
+def local_scorer() -> ScorerFactory:
+    def _make(prompt: str) -> Judge[BinaryResponse]:
+        class LLMScorer(Judge[BinaryResponse]):
+            async def score(self, data: Example) -> BinaryResponse:
+                from openai import AsyncOpenAI
+
+                client = AsyncOpenAI()
+                response = await client.chat.completions.parse(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": prompt},
+                        {
+                            "role": "user",
+                            "content": (
+                                f"Input: {data['input']}\n"
+                                f"Output: {data['actual_output']}"
+                            ),
+                        },
+                    ],
+                    response_format=BinaryResponse,
+                )
+                result = response.choices[0].message.parsed
+                return result if result else BinaryResponse(value=False, reason="Error")
+
+        return LLMScorer()
+
+    return _make

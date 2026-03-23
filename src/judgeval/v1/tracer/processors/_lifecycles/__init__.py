@@ -3,6 +3,9 @@ from __future__ import annotations
 from judgeval.v1.tracer.processors._lifecycles.customer_id_processor import (
     CustomerIdProcessor,
 )
+from judgeval.v1.tracer.processors._lifecycles.customer_user_id_processor import (
+    CustomerUserIdProcessor,
+)
 from judgeval.v1.tracer.processors._lifecycles.session_id_processor import (
     SessionIdProcessor,
 )
@@ -15,6 +18,7 @@ from judgeval.v1.tracer.processors._lifecycles.project_id_override_processor imp
 from judgeval.v1.tracer.processors._lifecycles.registry import get_all, register
 from judgeval.v1.tracer.processors._lifecycles.context_keys import (
     CUSTOMER_ID_KEY,
+    CUSTOMER_USER_ID_KEY,
     SESSION_ID_KEY,
     AGENT_ID_KEY,
     PARENT_AGENT_ID_KEY,
@@ -25,12 +29,14 @@ from judgeval.v1.tracer.processors._lifecycles.context_keys import (
 
 __all__ = [
     "CustomerIdProcessor",
+    "CustomerUserIdProcessor",
     "SessionIdProcessor",
     "AgentIdProcessor",
     "ProjectIdOverrideProcessor",
     "get_all",
     "register",
     "CUSTOMER_ID_KEY",
+    "CUSTOMER_USER_ID_KEY",
     "SESSION_ID_KEY",
     "AGENT_ID_KEY",
     "PARENT_AGENT_ID_KEY",
