@@ -26,27 +26,6 @@ Track and judge any agent behavior in online and offline setups. Set up Sentry-s
 
 </table>
 
-## [NEW] 🎆 Agent Reinforcement Learning
-
-Train your agents with multi-turn reinforcement learning using judgeval and [Fireworks AI](https://fireworks.ai/)! Judgeval's ABM now integrates with Fireworks' Reinforcement Fine-Tuning (RFT) endpoint, supporting gpt-oss, qwen3, Kimi2, DeepSeek, and more.
-
-Judgeval's agent monitoring infra provides a simple harness for integrating GRPO into any Python agent, giving builders a quick method to **try RL with minimal code changes** to their existing agents!
-
-```python
-await trainer.train(
-    agent_function=your_agent_function,  # entry point to your agent
-    scorers=[RewardScorer()],  # Custom scorer you define based on task criteria, acts as reward
-    prompts=training_prompts  # Tasks
-)
-```
-
-**That's it!** Judgeval automatically manages trajectory collection and reward tagging - your agent can learn from production data with minimal code changes. 
-
-👉 Check out the [Wikipedia Racer notebook](https://colab.research.google.com/github/JudgmentLabs/judgment-cookbook/blob/main/rl/WikiRacingAgent_RL.ipynb), where an agent learns to navigate Wikipedia using RL, to see Judgeval in action.
-
-
-You can view and monitor training progress for free via the [Judgment Dashboard](https://app.judgmentlabs.ai/).
-
 
 ## Judgeval Overview
 
