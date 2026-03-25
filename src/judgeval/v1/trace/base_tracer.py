@@ -391,7 +391,8 @@ class BaseTracer(ABC):
             return decorator
         return decorator(func)
 
-    def wrap(self, client: TClient) -> TClient:
+    @staticmethod
+    def wrap(client: TClient) -> TClient:
         """
         Wrap a supported LLM client to add automatic tracing.
         """
