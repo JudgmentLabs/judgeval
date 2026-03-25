@@ -1,8 +1,8 @@
 """
-
 This is a modified version of https://docs.powertools.aws.dev/lambda/python/2.35.1/api/event_handler/openapi/encoders.html
-
 """
+
+from __future__ import annotations
 
 import dataclasses
 import datetime
@@ -12,12 +12,31 @@ from enum import Enum
 from pathlib import Path, PurePath
 from re import Pattern
 from types import GeneratorType
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+)
 from uuid import UUID
 
-from pydantic import BaseModel
-from pydantic.types import SecretBytes, SecretStr
 import orjson
+
+try:
+    from pydantic import BaseModel
+    from pydantic.types import SecretBytes, SecretStr
+
+    _HAS_PYDANTIC = True
+except ImportError:
+    _HAS_PYDANTIC = False
+    BaseModel = None  # type: ignore[assignment,misc]
+    SecretBytes = None  # type: ignore[assignment,misc]
+    SecretStr = None  # type: ignore[assignment,misc]
 
 from judgeval.logger import judgeval_logger
 
@@ -56,7 +75,7 @@ def json_encoder(
         The JSON serializable data types
     """
     # Pydantic models
-    if isinstance(obj, BaseModel):
+    if _HAS_PYDANTIC and isinstance(obj, BaseModel):
         return _dump_base_model(
             obj=obj,
         )
@@ -223,11 +242,13 @@ ENCODERS_BY_TYPE: Dict[Type[Any], Callable[[Any], Any]] = {
     GeneratorType: repr,
     Path: str,
     Pattern: lambda o: o.pattern,
-    SecretBytes: str,
-    SecretStr: str,
     set: list,
     UUID: str,
 }
+
+if _HAS_PYDANTIC:
+    ENCODERS_BY_TYPE[SecretBytes] = str
+    ENCODERS_BY_TYPE[SecretStr] = str
 
 
 # Generates a mapping of encoders to a tuple of classes that they can encode
