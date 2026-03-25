@@ -10,6 +10,7 @@ from judgeval.v1.trace.processors import (
 )
 from judgeval.v1.trace.id_generator import IsolatedRandomIdGenerator
 from judgeval.v1.trace import propagation
+from judgeval.v1.instrumentation.llm import wrap_provider as wrap
 
 __all__ = [
     "BaseTracer",
@@ -21,4 +22,5 @@ __all__ = [
     "NoOpJudgmentSpanProcessor",
     "IsolatedRandomIdGenerator",
     "propagation",
+    "wrap",
 ]
