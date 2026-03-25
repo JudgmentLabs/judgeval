@@ -3,7 +3,6 @@
 import os
 import subprocess
 import sys
-
 import typer
 import re
 from pathlib import Path
@@ -82,10 +81,16 @@ def load_otel_env(
 
 @scorer_app.command()
 def upload(
-    scorer_file_path: str = typer.Argument(help="Path to scorer Python file"),
+    entrypoint_path: str = typer.Argument(help="Path to scorer entrypoint Python file"),
     project_name: str = typer.Option(..., "--project", "-p", help="Project name"),
     requirements_file_path: str = typer.Option(
         None, "--requirements", "-r", help="Path to requirements.txt file"
+    ),
+    included_files_paths: list[str] = typer.Option(
+        [],
+        "--included-files",
+        "-i",
+        help="Path to included files or directories. If a directory is provided, all non-ignored files in the directory will be included.",
     ),
     unique_name: str = typer.Option(
         None,
@@ -98,13 +103,14 @@ def upload(
     ),
     api_key: str = typer.Option(None, envvar="JUDGMENT_API_KEY"),
     organization_id: str = typer.Option(None, envvar="JUDGMENT_ORG_ID"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ):
     """Upload custom scorer to Judgment."""
     from judgeval.cli.upload_judge import upload_judge
 
-    scorer_path = Path(scorer_file_path)
+    scorer_path = Path(entrypoint_path)
     if not scorer_path.exists():
-        raise typer.BadParameter(f"Scorer file not found: {scorer_file_path}")
+        raise typer.BadParameter(f"Scorer file not found: {entrypoint_path}")
 
     if not api_key or not organization_id:
         raise typer.BadParameter("JUDGMENT_API_KEY and JUDGMENT_ORG_ID required")
@@ -118,10 +124,13 @@ def upload(
         result = upload_judge(
             client=client,
             project_id=project_id,
-            scorer_file_path=scorer_file_path,
+            entrypoint_path=entrypoint_path,
+            included_files_paths=included_files_paths,
             requirements_file_path=requirements_file_path,
             unique_name=unique_name,
             bump_major=bump_major,
+            project_name=project_name,
+            yes=yes,
         )
         if not result:
             raise typer.Abort()
