@@ -1,11 +1,23 @@
-from judgeval import Tracer
+from judgeval import Tracer, wrap
+from openai import OpenAI
 
-tracer_a = Tracer.init(project_name="my-project")
+Tracer.init(project_name="my-project")
+client = wrap(OpenAI())
 
 
 @Tracer.observe()
 def add(a: int, b: int) -> int:
-    return a + b
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "user",
+                "content": f"What is the sum of {a} and {b}? Return the answer as an integer no extra text.",
+            }
+        ],
+        max_tokens=64,
+    )
+    return int(response.choices[0].message.content)
 
 
 if __name__ == "__main__":

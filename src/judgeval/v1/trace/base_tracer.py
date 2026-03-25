@@ -28,7 +28,6 @@ from judgeval.utils.decorators.debug_time import debug_time
 from judgeval.utils.decorators.dont_throw import dont_throw
 from judgeval.utils.serialize import serialize_attribute, safe_serialize
 from judgeval.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
-from judgeval.v1.instrumentation.llm import wrap_provider
 from judgeval.v1.trace.judgment_tracer_provider import JudgmentTracerProvider
 import judgeval.v1.trace.baggage as baggage
 from judgeval.v1.trace.generators import (
@@ -393,6 +392,11 @@ class BaseTracer(ABC):
         return decorator(func)
 
     def wrap(self, client: TClient) -> TClient:
+        """
+        Wrap a supported LLM client to add automatic tracing.
+        """
+        from judgeval.v1.instrumentation.llm import wrap_provider
+
         return wrap_provider(client)
 
     # ------------------------------------------------------------------ #
