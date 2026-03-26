@@ -8,16 +8,21 @@ client = wrap(OpenAI())
 @Tracer.observe()
 def add(a: int, b: int) -> int:
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-5-mini",
         messages=[
             {
                 "role": "user",
                 "content": f"What is the sum of {a} and {b}? Return the answer as an integer no extra text.",
             }
         ],
-        max_tokens=64,
+        max_completion_tokens=64,
     )
-    return int(response.choices[0].message.content)
+
+    result = response.choices[0].message.content or ""
+    if result and result.isdigit():
+        return int(result)
+    else:
+        raise ValueError(f"Invalid response: {result}")
 
 
 if __name__ == "__main__":

@@ -216,9 +216,29 @@ class EvaluatorRunner(ABC, Generic[S]):
         console.print(f"[dim]View full details:[/dim] [link={url}]{url}[/link]\n")
 
         if assert_test and not all(r.success for r in results):
-            raise AssertionError(
-                f"Evaluation failed: {failed}/{len(results)} tests failed"
-            )
+            lines = [f"Evaluation failed: {failed}/{len(results)} examples failed\n"]
+            for i, result in enumerate(results):
+                if not result.success:
+                    example_input = ""
+                    if isinstance(result.data_object, Example):
+                        example_input = result.data_object.get("input", "")
+                        if example_input and len(example_input) > 80:
+                            example_input = example_input[:80] + "..."
+                    header = f"  Example {i + 1}"
+                    if example_input:
+                        header += f': "{example_input}"'
+                    lines.append(header)
+                    for s in result.scorers_data:
+                        if not s.success:
+                            score_str = (
+                                f"{s.score:.3f}" if s.score is not None else "N/A"
+                            )
+                            lines.append(
+                                f"    {s.name}: {score_str} (threshold: {s.threshold})"
+                            )
+                            if s.reason:
+                                lines.append(f"      {s.reason}")
+            raise AssertionError("\n".join(lines))
 
         return results
 
