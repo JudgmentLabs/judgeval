@@ -9,229 +9,252 @@
 
 <br>
 
-## Agent Behavior Monitoring (ABM)
+## Agent Behavior Monitoring
 
-Track and judge any agent behavior in online and offline setups. Set up Sentry-style alerts and analyze agent behaviors / topic patterns at scale! 
+Track and judge agent behavior in online and offline setups. Set up Sentry-style alerts and analyze agent behaviors at scale.
 
+[![PyPI](https://img.shields.io/pypi/v/judgeval)](https://pypi.org/project/judgeval/)
 [![Docs](https://img.shields.io/badge/Documentation-blue)](https://docs.judgmentlabs.ai/documentation)
 [![Judgment Cloud](https://img.shields.io/badge/Judgment%20Cloud-brightgreen)](https://app.judgmentlabs.ai/register)
 [![Self-Host](https://img.shields.io/badge/Self--Host-orange)](https://docs.judgmentlabs.ai/documentation/self-hosting/get-started)
-
 
 [![X](https://img.shields.io/badge/-X/Twitter-000?logo=x&logoColor=white)](https://x.com/JudgmentLabs)
 [![LinkedIn](https://custom-icon-badges.demolab.com/badge/LinkedIn%20-0A66C2?logo=linkedin-white&logoColor=fff)](https://www.linkedin.com/company/judgmentlabs)
 
 </div>
 
+## Overview
 
-</table>
+Judgeval is an open-source Python SDK for agent behavior monitoring. It provides tracing, evaluation, and online monitoring for LLM-powered applications, enabling you to catch failures in real time and improve agents from production data.
 
-## [NEW] 🎆 Agent Reinforcement Learning
+To get started, try one of the [cookbooks](#cookbooks) below or dive into the [docs](https://docs.judgmentlabs.ai/documentation).
 
-Train your agents with multi-turn reinforcement learning using judgeval and [Fireworks AI](https://fireworks.ai/)! Judgeval's ABM now integrates with Fireworks' Reinforcement Fine-Tuning (RFT) endpoint, supporting gpt-oss, qwen3, Kimi2, DeepSeek, and more.
+## Why Judgeval
 
-Judgeval's agent monitoring infra provides a simple harness for integrating GRPO into any Python agent, giving builders a quick method to **try RL with minimal code changes** to their existing agents!
+**OpenTelemetry-based tracing** -- Instrument any function with `@Tracer.observe()`. Automatically captures inputs, outputs, and LLM token usage. Built on OpenTelemetry for full compatibility with existing observability stacks.
 
-```python
-await trainer.train(
-    agent_function=your_agent_function,  # entry point to your agent
-    scorers=[RewardScorer()],  # Custom scorer you define based on task criteria, acts as reward
-    prompts=training_prompts  # Tasks
-)
-```
+**Hosted and custom evaluation** -- Run evaluations against Judgment's hosted scorers (faithfulness, answer relevancy, instruction adherence, etc.) or define your own `Judge` classes with binary, numeric, or categorical response types.
 
-**That's it!** Judgeval automatically manages trajectory collection and reward tagging - your agent can learn from production data with minimal code changes. 
+**Online monitoring** -- Score live production traffic asynchronously with `Tracer.async_evaluate()`. Runs server-side with no latency impact. Configure Slack alerts for failures.
 
-👉 Check out the [Wikipedia Racer notebook](https://colab.research.google.com/github/JudgmentLabs/judgment-cookbook/blob/main/rl/WikiRacingAgent_RL.ipynb), where an agent learns to navigate Wikipedia using RL, to see Judgeval in action.
+**Custom scorer hosting** -- Upload arbitrary Python scorers to run in secure Firecracker microVMs. Any logic you can express in Python -- LLM-as-a-judge, code checks, multi-step pipelines -- can run as a hosted scorer.
 
+**Dataset management and prompt versioning** -- Store golden evaluation sets, version prompt templates with `{{variable}}` syntax, and tag versions for production/staging workflows.
 
-You can view and monitor training progress for free via the [Judgment Dashboard](https://app.judgmentlabs.ai/).
+**Broad integrations** -- Auto-instrumentation for OpenAI, Anthropic, Google GenAI, and Together AI. Framework support for LangGraph, OpenLit, and Claude Agent SDK.
 
+## Quickstart
 
-## Judgeval Overview
-
-Judgeval is an open-source framework for agent behavior monitoring. Judgeval offers a toolkit to track and judge agent behavior in online and offline setups, enabling you to convert interaction data from production/test environments into improved agents. To get started, try running one of the notebooks below or dive deeper in our [docs](https://docs.judgmentlabs.ai/documentation).
-
-Our mission is to unlock the power of production data for agent development, enabling teams to improve their apps by catching real-time failures and optimizing over their users' preferences.
-
-## 📚 Cookbooks
-
-| Try Out | Notebook | Description |
-|:---------|:-----|:------------|
-| RL | [Wikipedia Racer](https://colab.research.google.com/github/JudgmentLabs/judgment-cookbook/blob/main/rl/WikiRacingAgent_RL.ipynb) | Train agents with reinforcement learning |
-| Online ABM | [Research Agent](https://colab.research.google.com/github/JudgmentLabs/judgment-cookbook/blob/main/monitoring/Research_Agent_Online_Monitoring.ipynb) | Monitor agent behavior in production |
-| Custom Scorers | [HumanEval](https://colab.research.google.com/github/JudgmentLabs/judgment-cookbook/blob/main/custom_scorers/HumanEval_Custom_Scorer.ipynb) | Build custom evaluators for your agents |
-| Offline Testing | [Get Started For Free] | Compare how different prompts, models, or agent configs affect performance across ANY metric |
-
-You can access our [repo of cookbooks](https://github.com/JudgmentLabs/judgment-cookbook).
-
-You can find a list of [video tutorials for Judgeval use cases](https://www.youtube.com/@Alexshander-JL).
-
-## Why Judgeval?
-
-🤖 **Simple to run multi-turn RL**: Optimize your agents with multi-turn RL without managing compute infrastructure or data pipelines. Just add a few lines of code to your existing agent code and train!
-
-⚙️ **Custom Evaluators**: No restriction to only monitoring with prefab scorers. Judgeval provides simple abstractions for custom Python scorers, supporting any LLM-as-a-judge rubrics/models and code-based scorers that integrate to our live agent-tracking infrastructure. [Learn more](https://docs.judgmentlabs.ai/documentation/evaluation/custom-scorers)
-
-🚨 **Production Monitoring**: Run any custom scorer in a hosted, virtualized secure container to flag agent behaviors online in production. Get Slack alerts for failures and add custom hooks to address regressions before they impact users. [Learn more](https://docs.judgmentlabs.ai/documentation/performance/online-evals)
-
-📊 **Behavior/Topic Grouping**: Group agent runs by behavior type or topic for deeper analysis. Drill down into subsets of users, agents, or use cases to reveal patterns of agent behavior.
-<!-- Add link to Bucketing docs once we have it -->
-<!-- 
-TODO: Once we have trainer code docs, plug in here
--->
-
-🧪 **Run experiments on your agents**: Compare test different prompts, models, or agent configs across customer segments. Measure which changes improve agent performance and decrease bad agent behaviors.
-
-<!-- 
-Use this once we have AI PM features:
-
-**Run experiments on your agents**: A/B test different prompts, models, or agent configs across customer segments. Measure which changes improve agent performance and decrease bad agent behaviors. [Learn more]
-
--->
-
-## 🛠️ Quickstart
-
-Get started with Judgeval by installing our SDK using pip:
+Install the SDK:
 
 ```bash
 pip install judgeval
 ```
 
-Ensure you have your `JUDGMENT_API_KEY` and `JUDGMENT_ORG_ID` environment variables set to connect to the [Judgment Platform](https://app.judgmentlabs.ai/).
+Set your credentials ([create a free account](https://app.judgmentlabs.ai/register) if you don't have keys):
 
 ```bash
 export JUDGMENT_API_KEY=...
 export JUDGMENT_ORG_ID=...
 ```
 
-**If you don't have keys, [create an account for free](https://app.judgmentlabs.ai/register) on the platform!**
+### Tracing
 
-### Start monitoring with Judgeval
+Add observability to your agent with two lines of setup:
 
 ```python
-from judgeval.tracer import Tracer, wrap
-from judgeval.data import Example
-from judgeval.scorers import AnswerRelevancyScorer
+from judgeval import Tracer, wrap
 from openai import OpenAI
 
+Tracer.init(project_name="my-project")
+client = wrap(OpenAI())
 
-judgment = Tracer(project_name="default_project")
-client = wrap(OpenAI())  # tracks all LLM calls
+@Tracer.observe(span_type="tool")
+def search(query: str) -> str:
+    results = vector_db.search(query)
+    return results
 
-@judgment.observe(span_type="tool")
-def format_question(question: str) -> str:
-    # dummy tool
-    return f"Question : {question}"
-
-@judgment.observe(span_type="function")
-def run_agent(prompt: str) -> str:
-    task = format_question(prompt)
+@Tracer.observe(span_type="agent")
+def run_agent(question: str) -> str:
+    context = search(question)
     response = client.chat.completions.create(
-        model="gpt-5-mini",
-        messages=[{"role": "user", "content": task}]
-    )
-
-    judgment.async_evaluate(  # trigger online monitoring
-        scorer=AnswerRelevancyScorer(threshold=0.5),  # swap with any scorer
-        example=Example(input=task, actual_output=response),  # customize to your data
-        model="gpt-5",
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": f"{context}\n\n{question}"}],
     )
     return response.choices[0].message.content
 
 run_agent("What is the capital of the United States?")
 ```
 
-Running this code will deliver monitoring results to your [free platform account](https://app.judgmentlabs.ai/register) and should look like this:
+All traces are delivered to your [Judgment dashboard](https://app.judgmentlabs.ai/):
 
 ![Judgment Platform Trajectory View](assets/quickstart_trajectory_ss.png)
 
+### Online Monitoring
 
-### Customizable Scorers Over Agent Behavior
-
-Judgeval's strongest suit is the full customization over the types of scorers you can run online monitoring with. No restrictions to only single-prompt LLM judges or prefab scorers - if you can express your scorer
-in python code, judgeval can monitor it! Under the hood, judgeval hosts your scorer in a virtualized secure container, enabling online monitoring for any scorer.
-
-
-First, create a behavior scorer in a file called `helpfulness_scorer.py`:
+Score live traffic asynchronously inside any traced function. Evaluations run server-side after the span completes:
 
 ```python
-from judgeval.data import Example
-from judgeval.scorers.example_scorer import ExampleScorer
-
-# Define custom example class
-class QuestionAnswer(Example):
-    question: str
-    answer: str
-
-# Define a server-hosted custom scorer
-class HelpfulnessScorer(ExampleScorer):
-    name: str = "Helpfulness Scorer"
-    server_hosted: bool = True  # Enable server hosting
-    async def a_score_example(self, example: QuestionAnswer):
-        # Custom scoring logic for agent behavior
-        # Can be an arbitrary combination of code and LLM calls
-        if len(example.answer) > 10 and "?" not in example.answer:
-            self.reason = "Answer is detailed and provides helpful information"
-            return 1.0
-        else:
-            self.reason = "Answer is too brief or unclear"
-            return 0.0
-```
-
-Then deploy your scorer to Judgment's infrastructure:
-
-```bash
-echo "pydantic" > requirements.txt
-uv run judgeval upload_scorer helpfulness_scorer.py requirements.txt
-```
-
-Now you can instrument your agent with monitoring and online evaluation:
-
-```python
-from judgeval.tracer import Tracer, wrap
-from helpfulness_scorer import HelpfulnessScorer, QuestionAnswer
-from openai import OpenAI
-
-judgment = Tracer(project_name="default_project")
-client = wrap(OpenAI())  # tracks all LLM calls
-
-@judgment.observe(span_type="tool")
-def format_task(question: str) -> str:  # replace with your prompt engineering
-    return f"Please answer the following question: {question}"
-
-@judgment.observe(span_type="tool")
-def answer_question(prompt: str) -> str:  # replace with your LLM system calls
-    response = client.chat.completions.create(
-        model="gpt-5-mini",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return response.choices[0].message.content
-
-@judgment.observe(span_type="function")
+@Tracer.observe(span_type="agent")
 def run_agent(question: str) -> str:
-    task = format_task(question)
-    answer = answer_question(task)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": question}],
+    )
+    answer = response.choices[0].message.content
 
-    # Add online evaluation with server-hosted scorer
-    judgment.async_evaluate(
-        scorer=HelpfulnessScorer(),
-        example=QuestionAnswer(question=question, answer=answer),
-        sampling_rate=0.9  # Evaluate 90% of agent runs
+    Tracer.async_evaluate(
+        "answer_relevancy",
+        {"input": question, "actual_output": answer},
     )
 
     return answer
-
-if __name__ == "__main__":
-    result = run_agent("What is the capital of the United States?")
-    print(result)
 ```
-
-Congratulations! Your online eval result should look like this:
 
 ![Custom Scorer Online ABM](assets/custom_scorer_online_abm.png)
 
-You can now run any online scorer in a secure Firecracker microVMs with no latency impact on your applications.
+### Offline Evaluation
+
+Use the `Judgeval` client to run batch evaluations against hosted scorers:
+
+```python
+from judgeval import Judgeval
+from judgeval.data import Example
+
+client = Judgeval(project_name="my-project")
+evaluation = client.evaluation.create()
+
+results = evaluation.run(
+    examples=[
+        Example.create(
+            input="What is 2+2?",
+            actual_output="4",
+            expected_output="4",
+        ),
+    ],
+    scorers=["faithfulness", "answer_relevancy"],
+    eval_run_name="nightly-eval",
+)
+```
+
+Results are returned as `ScoringResult` objects and displayed in the dashboard.
+
+## Custom Judges
+
+Define your own evaluation logic by subclassing `Judge` with a response type:
+
+```python
+from judgeval.judges import Judge
+from judgeval.hosted.responses import BinaryResponse
+from judgeval.data import Example
+
+class CorrectnessJudge(Judge[BinaryResponse]):
+    async def score(self, data: Example) -> BinaryResponse:
+        correct = data["expected_output"].lower() in data["actual_output"].lower()
+        return BinaryResponse(
+            value=correct,
+            reason="Contains expected answer" if correct else "Missing expected answer",
+        )
+```
+
+Three response types are available:
+
+| Type | Value | Use case |
+|:-----|:------|:---------|
+| `BinaryResponse` | `bool` | Pass/fail checks |
+| `NumericResponse` | `float` | Continuous scores (0.0 -- 1.0) |
+| `CategoricalResponse` | `str` | Classification into defined categories |
+
+### Scaffold and upload via CLI
+
+```bash
+judgeval scorer init -t binary -n CorrectnessJudge
+judgeval scorer upload correctness_judge.py -p my-project
+```
+
+Once uploaded, your judge runs in a secure Firecracker microVM and can be used with `Tracer.async_evaluate()` for online monitoring.
+
+## Datasets
+
+Manage golden evaluation sets through the platform:
+
+```python
+from judgeval import Judgeval
+from judgeval.data import Example
+
+client = Judgeval(project_name="my-project")
+
+dataset = client.datasets.create(
+    name="golden-set",
+    examples=[
+        Example.create(input="What is 2+2?", expected_output="4"),
+        Example.create(input="Capital of France?", expected_output="Paris"),
+    ],
+)
+
+dataset = client.datasets.get(name="golden-set")
+```
+
+Datasets support import from JSON/YAML, batch appending, and export.
+
+## Prompt Versioning
+
+Version and tag prompt templates with `{{variable}}` placeholders:
+
+```python
+client = Judgeval(project_name="my-project")
+
+prompt = client.prompts.create(
+    name="system-prompt",
+    prompt="You are a helpful assistant for {{product}}. Answer in {{language}}.",
+    tags=["production"],
+)
+
+prompt = client.prompts.get(name="system-prompt", tag="production")
+compiled = prompt.compile(product="Acme Search", language="English")
+```
+
+## Integrations
+
+### LLM Providers
+
+Wrap any supported client with `wrap()` for automatic span creation and token/cost tracking:
+
+```python
+from judgeval import wrap
+
+client = wrap(OpenAI())          # OpenAI
+client = wrap(Anthropic())       # Anthropic
+client = wrap(genai.Client())    # Google GenAI
+client = wrap(Together())        # Together AI
+```
+
+### Frameworks
+
+| Framework | Setup |
+|:----------|:------|
+| LangGraph | `from judgeval.integrations import Langgraph; Langgraph.initialize()` |
+| OpenLit | `from judgeval.integrations import Openlit; Openlit.initialize()` |
+| Claude Agent SDK | `from judgeval.integrations import setup_claude_agent_sdk; setup_claude_agent_sdk()` |
+
+## Cookbooks
+
+| Topic | Notebook | Description |
+|:------|:---------|:------------|
+| Online ABM | [Research Agent](https://colab.research.google.com/github/JudgmentLabs/judgment-cookbook/blob/main/monitoring/Research_Agent_Online_Monitoring.ipynb) | Monitor agent behavior in production |
+| Custom Scorers | [HumanEval](https://colab.research.google.com/github/JudgmentLabs/judgment-cookbook/blob/main/custom_scorers/HumanEval_Custom_Scorer.ipynb) | Build custom evaluators for your agents |
+
+Browse the full [cookbook repository](https://github.com/JudgmentLabs/judgment-cookbook) or watch [video tutorials](https://www.youtube.com/@Alexshander-JL).
+
+## Links
+
+- [Documentation](https://docs.judgmentlabs.ai/documentation)
+- [Judgment Platform](https://app.judgmentlabs.ai/)
+- [Self-Hosting Guide](https://docs.judgmentlabs.ai/documentation/self-hosting/get-started)
+- [Custom Scorers Guide](https://docs.judgmentlabs.ai/documentation/evaluation/custom-scorers)
+- [Online Evaluation Guide](https://docs.judgmentlabs.ai/documentation/performance/online-evals)
+- [Cookbook Repository](https://github.com/JudgmentLabs/judgment-cookbook)
+- [Video Tutorials](https://www.youtube.com/@Alexshander-JL)
 
 ---
 
