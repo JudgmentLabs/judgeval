@@ -13,20 +13,24 @@ except ImportError:
 
 
 def setup_claude_agent_sdk() -> bool:
-    """
-    Setup Judgeval integration with Claude Agent SDK. Will automatically patch the SDK for automatic tracing.
+    """Patch the Claude Agent SDK for automatic tracing.
+
+    Monkey-patches ``ClaudeSDKClient`` and the standalone ``query()``
+    function so every agent turn, LLM call, and tool invocation is
+    recorded as a span. Call this once at startup, before any SDK usage.
 
     Returns:
-        bool: True if setup was successful, False otherwise.
+        True if patching succeeded, False on error.
 
-    Example:
+    Examples:
         ```python
-        import claude_agent_sdk
-        from judgeval.v1.integrations.claude_agent_sdk import setup_claude_agent_sdk
+        from judgeval import Tracer
+        from judgeval.integrations import setup_claude_agent_sdk
 
+        Tracer.init(project_name="my-agent")
         setup_claude_agent_sdk()
 
-        # Now use claude_agent_sdk normally - all calls automatically traced
+        # All Claude Agent SDK calls are now traced automatically
         ```
     """
     from judgeval.v1.integrations.claude_agent_sdk.wrapper import (

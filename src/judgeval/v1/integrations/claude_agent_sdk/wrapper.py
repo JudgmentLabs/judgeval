@@ -1,4 +1,4 @@
-"""Wrapper implementation for Claude Agent SDK."""
+"""Internal wrapper that patches the Claude Agent SDK for automatic tracing."""
 
 from __future__ import annotations
 import dataclasses
@@ -24,10 +24,14 @@ from judgeval.v1.trace.tracer import Tracer
 
 @dataclasses.dataclass(slots=True)
 class TracingState:
+    """Shared mutable state carrying the parent span context across turns."""
+
     parent_context: Optional[Context] = None
 
 
 class ToolSpanTracker:
+    """Creates and closes tool spans by matching ToolUseBlock / ToolResultBlock pairs."""
+
     def __init__(self, state: TracingState):
         self.state = state
         self._pending_spans: Dict[str, Tuple[Span, str]] = {}
