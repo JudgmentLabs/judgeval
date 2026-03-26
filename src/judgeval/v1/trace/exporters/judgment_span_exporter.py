@@ -13,6 +13,34 @@ from judgeval.logger import judgeval_logger
 
 
 class JudgmentSpanExporter(BaseSpanExporter):
+    """Exports completed spans to the Judgment platform over OTLP/HTTP.
+
+    This is the default exporter created by ``Tracer.init()``. It wraps the
+    OpenTelemetry ``OTLPSpanExporter`` and injects Judgment authentication
+    headers automatically.
+
+    You rarely need to instantiate this directly -- ``Tracer.init()`` wires
+    it up for you. Use it when building a custom ``TracerProvider``.
+
+    Args:
+        endpoint: The Judgment OTLP ingest URL.
+        api_key: Judgment API key for authentication.
+        organization_id: Your Judgment organization ID.
+        project_id: The resolved Judgment project ID.
+
+    Examples:
+        ```python
+        from judgeval.v1.trace import JudgmentSpanExporter
+
+        exporter = JudgmentSpanExporter(
+            endpoint="https://api.judgment.com/v1/traces",
+            api_key="jdg_...",
+            organization_id="org_123",
+            project_id="proj_456",
+        )
+        ```
+    """
+
     __slots__ = ("_delegate",)
 
     def __init__(
@@ -32,11 +60,14 @@ class JudgmentSpanExporter(BaseSpanExporter):
         )
 
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+        """Send a batch of spans to Judgment."""
         judgeval_logger.info(f"Exported {len(spans)} spans")
         return self._delegate.export(spans)
 
     def shutdown(self) -> None:
+        """Shut down the underlying OTLP exporter and release resources."""
         self._delegate.shutdown()
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
+        """Flush any queued spans within the given timeout."""
         return self._delegate.force_flush(timeout_millis)

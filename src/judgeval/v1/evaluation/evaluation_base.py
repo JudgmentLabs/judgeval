@@ -22,6 +22,13 @@ S = TypeVar("S", str, Judge)
 
 
 class EvaluatorRunner(ABC, Generic[S]):
+    """Abstract base for evaluation runners.
+
+    Concrete implementations handle either hosted (server-side) or local
+    (in-process) scorer execution.  The generic parameter ``S`` is ``str``
+    for hosted scorers or ``Judge`` for local scorers.
+    """
+
     __slots__ = ("_client", "_project_id", "_project_name")
 
     def __init__(
@@ -223,6 +230,19 @@ class EvaluatorRunner(ABC, Generic[S]):
         assert_test: bool = False,
         timeout_seconds: int = 300,
     ) -> List[ScoringResult]:
+        """Execute an evaluation run and return results.
+
+        Args:
+            examples: Examples to evaluate.
+            scorers: Scorers to run (strings or ``Judge`` instances).
+            eval_run_name: Name for this evaluation run.
+            assert_test: When True, raises ``AssertionError`` if any scorer
+                fails its threshold.
+            timeout_seconds: Maximum time to wait for results.
+
+        Returns:
+            A list of ``ScoringResult`` objects, one per example.
+        """
         project_id = expect_project_id(self._project_id)
         if project_id is None:
             return []

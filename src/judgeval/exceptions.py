@@ -19,10 +19,16 @@ class JudgmentAPIError(HTTPError):
 class JudgmentTestError(Exception): ...
 
 
-class JudgmentRuntimeError(RuntimeError): ...
+class JudgmentRuntimeError(RuntimeError):
+    """Raised when judgeval encounters an unrecoverable runtime error."""
+
+    ...
 
 
-class InvalidJudgeModelError(Exception): ...
+class InvalidJudgeModelError(Exception):
+    """Raised when a judge is configured with an unsupported model."""
+
+    ...
 
 
 __all__ = ("JudgmentAPIError", "JudgmentRuntimeError", "InvalidJudgeModelError")

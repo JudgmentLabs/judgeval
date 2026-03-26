@@ -48,6 +48,32 @@ C = TypeVar("C", bound=Callable[..., Any])
 
 
 class LLMMetadata(TypedDict, total=False):
+    """Token usage and cost metadata for an LLM call.
+
+    Pass to `Tracer.recordLLMMetadata()` to attach cost and token
+    breakdown to the current span. All fields are optional.
+
+    Attributes:
+        model: Model identifier, e.g. `"gpt-4o"` or `"claude-sonnet-4-20250514"`.
+        provider: Provider name, e.g. `"openai"` or `"anthropic"`.
+        non_cached_input_tokens: Input tokens that were not served from cache.
+        output_tokens: Tokens generated in the response.
+        cache_read_input_tokens: Input tokens served from prompt cache.
+        cache_creation_input_tokens: Input tokens used to create a new cache entry.
+        total_cost_usd: Total cost of the call in USD.
+
+    Examples:
+        ```python
+        Tracer.recordLLMMetadata({
+            "model": "gpt-4o",
+            "provider": "openai",
+            "non_cached_input_tokens": 150,
+            "output_tokens": 80,
+            "total_cost_usd": 0.003,
+        })
+        ```
+    """
+
     model: str
     provider: str
     non_cached_input_tokens: int
@@ -58,13 +84,11 @@ class LLMMetadata(TypedDict, total=False):
 
 
 class BaseTracer(ABC):
-    """Abstract base for all Judgment tracers.
+    """Base class providing the tracing API surface.
 
-    Provides the core tracing surface: span creation, attribute recording,
-    the ``@observe`` decorators, context propagation for
-    customer/session IDs, tagging, and async evaluation dispatch.
-    Concrete subclasses supply the OTel TracerProvider, exporter, and
-    processor wiring.
+    You don't instantiate this directly -- use `Tracer.init()` instead. The
+    static methods below (`observe`, `wrap`, `set_attribute`, `span`, etc.)
+    are the primary API you'll use after initializing a tracer.
     """
 
     __slots__ = (
@@ -159,26 +183,59 @@ class BaseTracer(ABC):
 
     @staticmethod
     def get_current_span() -> Span:
+        """Return the currently active span from the Judgment tracer provider.
+
+        Returns:
+            The active ``Span`` object.
+        """
         proxy = BaseTracer._get_proxy_provider()
         return proxy.get_current_span()
 
     @staticmethod
     def force_flush(timeout_millis: int = 30000) -> bool:
-        """Flush pending spans to the exporter within the given timeout."""
+        """Send all pending spans to Judgment immediately.
+
+        Call this before your process exits (e.g. in a serverless function)
+        to ensure no spans are lost. Does not shut down the tracer.
+
+        Args:
+            timeout_millis: Maximum wait time in milliseconds.
+
+        Returns:
+            True if all spans were flushed within the timeout.
+
+        Examples:
+            ```python
+            def lambda_handler(event, context):
+                result = process(event)
+                Tracer.force_flush()
+                return result
+            ```
+        """
         proxy = BaseTracer._get_proxy_provider()
         return proxy.force_flush(timeout_millis)
 
     @staticmethod
     def shutdown(timeout_millis: int = 30000) -> None:
-        """Shut down the active tracer provider and release resources."""
+        """Flush pending spans and shut down the tracer.
+
+        Call this on application exit to ensure all data is exported
+        before the process terminates.
+
+        Args:
+            timeout_millis: Maximum wait time in milliseconds.
+        """
         proxy = BaseTracer._get_proxy_provider()
         proxy.shutdown()
 
     @staticmethod
     @dont_throw
     def registerOTELInstrumentation(instrumentor) -> None:
-        """Register a third-party OTel instrumentor so its spans are
-        routed through the Judgment trace pipeline."""
+        """Register a third-party OpenTelemetry instrumentor with Judgment.
+
+        Use this to route spans from libraries like `opentelemetry-instrumentation-requests`
+        through the Judgment trace pipeline.
+        """
         proxy = BaseTracer._get_proxy_provider()
         proxy.add_instrumentation(instrumentor)
 
@@ -196,8 +253,17 @@ class BaseTracer(ABC):
         name: str,
         attributes: Optional[Dict[str, Any]] = None,
     ) -> Span:
-        """Start a span that requires manual .end() call.
-        Use BaseTracer.span() context manager when possible."""
+        """Start a new span that must be ended manually with ``span.end()``.
+
+        Prefer the ``span`` context manager for automatic lifecycle management.
+
+        Args:
+            name: Name for the new span.
+            attributes: Optional dictionary of initial span attributes.
+
+        Returns:
+            The newly started ``Span``.
+        """
         span = BaseTracer._get_otel_tracer().start_span(name, attributes=attributes)
         BaseTracer._emit_partial()
         return span
@@ -208,7 +274,15 @@ class BaseTracer(ABC):
         name: str,
         attributes: Optional[Dict[str, Any]] = None,
     ) -> Iterator[Span]:
-        """Start a span and set it as current in the context."""
+        """Start a span and set it as the current span in the context.
+
+        Args:
+            name: Name for the new span.
+            attributes: Optional dictionary of initial span attributes.
+
+        Yields:
+            The newly started ``Span``.
+        """
         with BaseTracer._get_otel_tracer().start_as_current_span(
             name, attributes=attributes
         ) as span:
@@ -218,8 +292,24 @@ class BaseTracer(ABC):
     @staticmethod
     @contextmanager
     def span(span_name: str) -> Iterator[Span]:
-        """Open a child span under the current trace context.
-        Exceptions propagate after being recorded on the span."""
+        """Open a child span using a `with` block.
+
+        Use this for tracing a section of code that isn't a standalone
+        function. Exceptions are automatically recorded on the span.
+
+        Args:
+            span_name: Name for this span (visible in the dashboard).
+
+        Yields:
+            The active `Span` object.
+
+        Examples:
+            ```python
+            with Tracer.span("process-results"):
+                results = parse(raw_data)
+                Tracer.set_attribute("result_count", len(results))
+            ```
+        """
         with BaseTracer.start_as_current_span(span_name) as span:
             try:
                 yield span
@@ -263,16 +353,49 @@ class BaseTracer(ABC):
         record_output: bool = True,
         disable_generator_yield_span: bool = False,
     ) -> C | Callable[[C], C]:
-        """
-        Wrap a sync or async function in an OTel span recording the input and output.
+        """Decorator that automatically traces a function call.
+
+        Wraps any sync or async function in a span. Inputs and outputs are
+        captured automatically. Works with or without parentheses.
 
         Args:
-            func: The function to wrap (provided implicitly for bare decorator usage).
-            span_type: Value set as the ``judgment.span_kind`` attribute.
-            span_name: Span name override; defaults to ``func.__name__``.
-            record_input: Whether to serialize and record function inputs.
-            record_output: Whether to serialize and record the return value.
-            disable_generator_yield_span: When True, suppresses per-yield child spans.
+            func: The function to wrap (set implicitly when used as
+                `@Tracer.observe` without parentheses).
+            span_type: The kind of span. Use `"tool"`, `"agent"`, `"llm"`,
+                or `"function"` to categorize work in the dashboard.
+                Defaults to `"span"`.
+            span_name: Override the span name (defaults to the function name).
+            record_input: Capture and store function arguments. Set to False
+                for functions with sensitive or very large inputs.
+            record_output: Capture and store the return value.
+            disable_generator_yield_span: Suppress per-yield child spans for
+                generator functions.
+
+        Examples:
+            Basic usage:
+
+            ```python
+            @Tracer.observe(span_type="tool")
+            def search(query: str) -> list[str]:
+                return vector_db.search(query)
+            ```
+
+            Async functions work the same way:
+
+            ```python
+            @Tracer.observe(span_type="agent")
+            async def answer(question: str) -> str:
+                context = search(question)
+                return await llm.generate(question, context)
+            ```
+
+            Without parentheses (uses default settings):
+
+            ```python
+            @Tracer.observe
+            def my_function():
+                ...
+            ```
         """
 
         def decorator(f: C) -> C:
@@ -393,8 +516,27 @@ class BaseTracer(ABC):
 
     @staticmethod
     def wrap(client: TClient) -> TClient:
-        """
-        Wrap a supported LLM client to add automatic tracing.
+        """Wrap an LLM client for automatic tracing of all API calls.
+
+        Supported providers: **OpenAI**, **Anthropic**, **Together AI**, and
+        **Google GenAI**. Once wrapped, every API call made through the client
+        is recorded as a span with model name, token counts, and cost.
+
+        Args:
+            client: An LLM provider client instance (e.g. `OpenAI()`,
+                `Anthropic()`).
+
+        Returns:
+            The same client instance, now instrumented with tracing.
+
+        Examples:
+            ```python
+            from openai import OpenAI
+            from anthropic import Anthropic
+
+            openai = Tracer.wrap(OpenAI())
+            anthropic = Tracer.wrap(Anthropic())
+            ```
         """
         from judgeval.v1.instrumentation.llm import wrap_provider
 
@@ -433,7 +575,22 @@ class BaseTracer(ABC):
     @staticmethod
     @dont_throw
     def set_attribute(key: str, value: Any) -> None:
-        """Set a single serialized attribute on the current span."""
+        """Attach a custom key-value pair to the current span.
+
+        Use this to record application-specific metadata that you want
+        to see in the Judgment dashboard. Non-primitive values (dicts,
+        lists, objects) are serialized to strings automatically.
+
+        Args:
+            key: Attribute name (e.g. `"user_tier"`, `"search_results_count"`).
+            value: The value to record.
+
+        Examples:
+            ```python
+            Tracer.set_attribute("user_tier", "premium")
+            Tracer.set_attribute("search_results_count", len(results))
+            ```
+        """
         current_span = BaseTracer._get_proxy_provider().get_current_span()
         if current_span is None or not current_span.is_recording():
             return
@@ -446,7 +603,11 @@ class BaseTracer(ABC):
 
     @staticmethod
     def set_attributes(attributes: Dict[str, Any]) -> None:
-        """Set multiple attributes on the current span."""
+        """Set multiple custom attributes on the current span at once.
+
+        Args:
+            attributes: Dictionary of key-value pairs to set.
+        """
         if attributes is None:
             return
         for key, value in attributes.items():
@@ -454,17 +615,55 @@ class BaseTracer(ABC):
 
     @staticmethod
     def set_input(input_data: Any) -> None:
-        """Set the ``judgment.input`` attribute on the current span."""
+        """Manually set the input for the current span.
+
+        Use when `@observe(record_input=False)` is set but you want to
+        record a sanitized or transformed version of the input.
+
+        Args:
+            input_data: The input value to record.
+        """
         BaseTracer.set_attribute(AttributeKeys.JUDGMENT_INPUT, input_data)
 
     @staticmethod
     def set_output(output_data: Any) -> None:
-        """Set the ``judgment.output`` attribute on the current span."""
+        """Manually set the output for the current span.
+
+        Use when `@observe(record_output=False)` is set but you want to
+        record a sanitized or transformed version of the output.
+
+        Args:
+            output_data: The output value to record.
+        """
         BaseTracer.set_attribute(AttributeKeys.JUDGMENT_OUTPUT, output_data)
 
     @staticmethod
     @dont_throw
     def recordLLMMetadata(metadata: LLMMetadata) -> None:
+        """Record model, token usage, and cost on the current span.
+
+        If you're using `Tracer.wrap()` this is called automatically. Use
+        this method when you need to record metadata for a custom LLM
+        integration.
+
+        Args:
+            metadata: A dict with keys like `model`, `provider`,
+                `non_cached_input_tokens`, `output_tokens`, and
+                `total_cost_usd`. All fields are optional.
+
+        Examples:
+            ```python
+            @Tracer.observe(span_type="llm")
+            def call_custom_model(prompt: str) -> str:
+                response = my_model.generate(prompt)
+                Tracer.recordLLMMetadata({
+                    "model": "my-model-v2",
+                    "output_tokens": response.usage.output,
+                    "total_cost_usd": response.usage.cost,
+                })
+                return response.text
+            ```
+        """
         current_span = BaseTracer._get_proxy_provider().get_current_span()
         if current_span is None or not current_span.is_recording():
             return
@@ -523,24 +722,57 @@ class BaseTracer(ABC):
 
     @staticmethod
     def set_customer_id(customer_id: str) -> None:
-        """Set the customer ID on the current span and propagate it
-        through the OTel context so child spans inherit it."""
+        """Associate the current trace with a customer.
+
+        Once set, this ID propagates to all child spans and enables
+        per-customer analytics in the Judgment dashboard. Call this
+        early in your request handler.
+
+        Args:
+            customer_id: Your internal customer identifier.
+
+        Examples:
+            ```python
+            @Tracer.observe(span_type="agent")
+            def handle_request(user_id: str, question: str):
+                Tracer.set_customer_id(user_id)
+                return answer(question)
+            ```
+        """
         BaseTracer._set_propagating_baggage_key(
             AttributeKeys.JUDGMENT_CUSTOMER_ID.value, customer_id
         )
 
     @staticmethod
     def set_customer_user_id(customer_user_id: str) -> None:
-        """Set the customer user ID on the current span and propagate it
-        through the OTel context so child spans inherit it."""
+        """Set the customer user ID on the current span and propagate to children.
+
+        Args:
+            customer_user_id: The customer user ID to associate with this
+                trace.
+        """
         BaseTracer._set_propagating_baggage_key(
             AttributeKeys.JUDGMENT_CUSTOMER_USER_ID.value, customer_user_id
         )
 
     @staticmethod
     def set_session_id(session_id: str) -> None:
-        """Set the session ID on the current span and propagate it
-        through the OTel context so child spans inherit it."""
+        """Associate the current trace with a conversation session.
+
+        Groups multiple requests into a session in the Judgment dashboard.
+        Propagates to all child spans. Call this early in your request handler.
+
+        Args:
+            session_id: Your session or conversation identifier.
+
+        Examples:
+            ```python
+            @Tracer.observe(span_type="agent")
+            def handle_message(session_id: str, message: str):
+                Tracer.set_session_id(session_id)
+                return chatbot.respond(message)
+            ```
+        """
         BaseTracer._set_propagating_baggage_key(
             AttributeKeys.JUDGMENT_SESSION_ID.value, session_id
         )
@@ -553,7 +785,20 @@ class BaseTracer(ABC):
     @debug_time
     @dont_throw
     def tag(tags: str | list[str]) -> None:
-        """Attach one or more tags to the current trace via the API."""
+        """Add tags to the current trace for filtering in the dashboard.
+
+        Tags are sent asynchronously and appear in the Judgment monitoring
+        view. Useful for marking traces by feature, experiment, or user segment.
+
+        Args:
+            tags: A single tag string or a list of tags.
+
+        Examples:
+            ```python
+            Tracer.tag("rag-pipeline")
+            Tracer.tag(["experiment-v2", "premium-user"])
+            ```
+        """
         if not tags or (isinstance(tags, list) and len(tags) == 0):
             return
         proxy = BaseTracer._get_proxy_provider()
@@ -585,6 +830,31 @@ class BaseTracer(ABC):
     @debug_time
     @dont_throw
     def async_evaluate(judge: str, example: Optional[Dict[str, Any]] = None) -> None:
+        """Run a hosted evaluation on this span when it completes.
+
+        The evaluation is queued and processed server-side by the Judgment
+        platform after the span ends. Use this to score live traffic
+        without blocking your application.
+
+        Args:
+            judge: Name of the hosted judge/scorer (e.g. `"faithfulness"`,
+                `"answer_relevancy"`).
+            example: Optional dict with evaluation data. Keys like `input`,
+                `actual_output`, `expected_output`, and `retrieval_context`
+                are commonly used.
+
+        Examples:
+            ```python
+            @Tracer.observe(span_type="agent")
+            def answer(question: str) -> str:
+                response = llm.generate(question)
+                Tracer.async_evaluate(
+                    "faithfulness",
+                    {"input": question, "actual_output": response},
+                )
+                return response
+            ```
+        """
         proxy = BaseTracer._get_proxy_provider()
         tracer = proxy.get_active_tracer()
         if not tracer or not tracer.project_id:

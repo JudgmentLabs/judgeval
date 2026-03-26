@@ -13,7 +13,7 @@ R = TypeVar("R", BinaryResponse, CategoricalResponse, NumericResponse)
 
 
 class TraceCustomScorer(ABC, Generic[R]):
-    """Deprecated: Use ``Judge[R]`` from ``judgeval.v1.judges`` instead."""
+    """**Deprecated.** Use `Judge[R]` from `judgeval.v1.judges` instead."""
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)

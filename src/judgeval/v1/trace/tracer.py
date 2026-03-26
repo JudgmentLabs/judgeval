@@ -28,6 +28,58 @@ from judgeval.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
 
 
 class Tracer(BaseTracer):
+    """Capture execution traces and LLM performance metrics for your application.
+
+    `Tracer` is the primary way to add observability to AI agents and LLM
+    pipelines. It records spans (units of work), automatically captures
+    inputs/outputs, and exports everything to the Judgment dashboard.
+
+    **Getting started:**
+
+    1. Call `Tracer.init()` to create and activate a tracer.
+    2. Decorate your functions with `@Tracer.observe()` to trace them.
+    3. Optionally wrap LLM clients with `Tracer.wrap()` for automatic
+       token/cost tracking.
+
+    Args:
+        project_name: Your Judgment project name.
+        project_id: Resolved project ID (set automatically by `init`).
+        api_key: Judgment API key.
+        organization_id: Organization ID.
+        api_url: Judgment API endpoint URL.
+        environment: Deployment environment label (e.g. `"production"`).
+        serializer: Function used to serialize span inputs/outputs.
+        tracer_provider: The OpenTelemetry TracerProvider backing this tracer.
+        enable_monitoring: Whether span export is enabled.
+        client: Internal API client for server-side operations.
+
+    Examples:
+        Basic setup and usage:
+
+        ```python
+        from judgeval import Tracer
+
+        tracer = Tracer.init(project_name="search-assistant")
+
+        @Tracer.observe(span_type="tool")
+        def search(query: str) -> str:
+            return vector_db.search(query)
+
+        @Tracer.observe(span_type="agent")
+        async def answer(question: str) -> str:
+            context = search(question)
+            return await llm.generate(question, context)
+        ```
+
+        Wrap an LLM client for automatic instrumentation:
+
+        ```python
+        from openai import OpenAI
+
+        openai = Tracer.wrap(OpenAI())
+        ```
+    """
+
     __slots__ = (
         "__weakref__",
         "_span_exporter",
@@ -80,6 +132,40 @@ class Tracer(BaseTracer):
         span_limits: Optional[SpanLimits] = None,
         span_processors: Optional[Sequence[SpanProcessor]] = None,
     ) -> Tracer:
+        """Create and activate a new Tracer.
+
+        This is the recommended way to initialize tracing. Credentials are
+        read from environment variables (`JUDGMENT_API_KEY`, `JUDGMENT_ORG_ID`,
+        `JUDGMENT_API_URL`) when not passed explicitly. If credentials are
+        missing, the tracer still works but spans won't be exported.
+
+        Args:
+            project_name: Your Judgment project name. Required for span export.
+            api_key: Judgment API key. Defaults to `JUDGMENT_API_KEY` env var.
+            organization_id: Organization ID. Defaults to `JUDGMENT_ORG_ID` env var.
+            api_url: API endpoint URL. Defaults to `JUDGMENT_API_URL` env var.
+            environment: Label for this deployment (e.g. `"staging"`,
+                `"production"`). Shows up in the Judgment dashboard.
+            set_active: If True (default), sets this as the global tracer so
+                `@Tracer.observe()` and other static methods use it.
+            serializer: Custom serializer for span inputs/outputs.
+            resource_attributes: Extra OpenTelemetry resource attributes.
+            sampler: Custom OpenTelemetry sampler.
+            span_limits: OpenTelemetry span limits.
+            span_processors: Additional span processors appended after the
+                default Judgment processor.
+
+        Returns:
+            A configured and active `Tracer` instance.
+
+        Examples:
+            ```python
+            tracer = Tracer.init(
+                project_name="search-assistant",
+                environment="production",
+            )
+            ```
+        """
         api_key = api_key or JUDGMENT_API_KEY
         organization_id = organization_id or JUDGMENT_ORG_ID
         api_url = api_url or JUDGMENT_API_URL
@@ -173,10 +259,22 @@ class Tracer(BaseTracer):
         return tracer
 
     def set_active(self) -> bool:
+        """Set this tracer as the globally active tracer.
+
+        Returns:
+            True if the tracer was successfully activated.
+        """
         proxy = JudgmentTracerProvider.get_instance()
         return proxy.set_active(self)
 
     def get_span_exporter(self) -> JudgmentSpanExporter:
+        """Return the span exporter for this tracer.
+
+        Returns a no-op exporter when monitoring is disabled.
+
+        Returns:
+            The ``JudgmentSpanExporter`` (or no-op variant) for this tracer.
+        """
         if self._span_exporter is not None:
             return self._span_exporter
 
@@ -203,6 +301,13 @@ class Tracer(BaseTracer):
         return self._span_exporter
 
     def get_span_processor(self) -> JudgmentSpanProcessor:
+        """Return the span processor for this tracer.
+
+        Returns a no-op processor when monitoring is disabled.
+
+        Returns:
+            The ``JudgmentSpanProcessor`` (or no-op variant) for this tracer.
+        """
         if self._span_processor is not None:
             return self._span_processor
 

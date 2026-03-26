@@ -21,10 +21,12 @@ _global_textmap: TextMapPropagator = CompositePropagator(
 
 
 def get_global_textmap() -> TextMapPropagator:
+    """Return the active composite propagator (W3C TraceContext + Judgment Baggage)."""
     return _global_textmap
 
 
 def set_global_textmap(propagator: TextMapPropagator) -> None:
+    """Replace the global text-map propagator."""
     global _global_textmap
     _global_textmap = propagator
 
@@ -42,6 +44,25 @@ def inject(
     context: Optional[Context] = None,
     setter: Setter = default_setter,
 ) -> None:
+    """Inject trace context and baggage into an outgoing carrier (e.g. HTTP headers).
+
+    Call this before making an outbound HTTP request to propagate the
+    current trace across service boundaries.
+
+    Args:
+        carrier: A mutable mapping (typically a ``dict``) to write
+            propagation headers into.
+        context: The OTel context to inject. Defaults to the current
+            Judgment context.
+        setter: Strategy for writing values into the carrier.
+
+    Examples:
+        ```python
+        headers = {}
+        propagation.inject(headers)
+        response = requests.get("https://api.example.com", headers=headers)
+        ```
+    """
     get_global_textmap().inject(
         carrier, context=_resolve_context(context), setter=setter
     )
@@ -52,6 +73,28 @@ def extract(
     context: Optional[Context] = None,
     getter: Getter = default_getter,
 ) -> Context:
+    """Extract trace context and baggage from an incoming carrier.
+
+    Call this when handling an inbound request to continue an existing
+    trace started by an upstream service.
+
+    Args:
+        carrier: A mapping containing propagation headers
+            (e.g. ``request.headers``).
+        context: Base context to merge into. Defaults to the current
+            Judgment context.
+        getter: Strategy for reading values from the carrier.
+
+    Returns:
+        A new ``Context`` with the extracted trace and baggage data.
+
+    Examples:
+        ```python
+        ctx = propagation.extract(request.headers)
+        with Tracer.start_as_current_span("handle-request", context=ctx):
+            ...
+        ```
+    """
     return get_global_textmap().extract(
         carrier, _resolve_context(context), getter=getter
     )

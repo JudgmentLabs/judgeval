@@ -47,6 +47,13 @@ def _extract_first_element(
 
 
 class JudgmentBaggagePropagator(TextMapPropagator):
+    """W3C Baggage propagator that uses the Judgment context.
+
+    Serializes and deserializes baggage entries to/from the ``baggage``
+    HTTP header. Respects size limits defined by the W3C Baggage
+    specification (8 KB header, 4 KB per entry, 180 entries max).
+    """
+
     _MAX_HEADER_LENGTH = 8192
     _MAX_PAIR_LENGTH = 4096
     _MAX_PAIRS = 180
@@ -57,6 +64,7 @@ class JudgmentBaggagePropagator(TextMapPropagator):
         context: Optional[Context] = None,
         setter: Setter = _default_setter,
     ) -> None:
+        """Write baggage entries into the carrier as a ``baggage`` header."""
         from judgeval.v1.trace.baggage import get_all
 
         entries = get_all(_resolve_context(context))
@@ -70,6 +78,7 @@ class JudgmentBaggagePropagator(TextMapPropagator):
         context: Optional[Context] = None,
         getter: Getter = _default_getter,
     ) -> Context:
+        """Parse the ``baggage`` header from the carrier into the context."""
         from judgeval.v1.trace.baggage import _is_valid_pair, set_baggage
 
         ctx = _resolve_context(context)

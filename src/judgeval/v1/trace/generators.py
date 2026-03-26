@@ -91,6 +91,8 @@ class _ObservedGeneratorBase:
 
 
 class _ObservedSyncGenerator(_ObservedGeneratorBase, ABCGenerator[Any, Any, Any]):
+    """Wraps a synchronous generator to emit a child span per yielded item."""
+
     __slots__ = ()
 
     def __iter__(self) -> _ObservedSyncGenerator:
@@ -159,6 +161,8 @@ class _ObservedSyncGenerator(_ObservedGeneratorBase, ABCGenerator[Any, Any, Any]
 
 
 class _ObservedAsyncGenerator(_ObservedGeneratorBase, ABCAsyncGenerator[Any, Any]):
+    """Wraps an asynchronous generator to emit a child span per yielded item."""
+
     __slots__ = ()
 
     def _create_task(self, coro: Coroutine[Any, Any, R]) -> asyncio.Task[R]:

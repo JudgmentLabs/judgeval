@@ -10,6 +10,12 @@ from judgeval.logger import judgeval_logger
 
 
 class BackgroundQueue:
+    """Thread-pool backed background task queue (singleton).
+
+    Used internally to dispatch non-blocking work such as tagging and
+    evaluation payloads without blocking the caller.
+    """
+
     _instance: BackgroundQueue | None = None
     _lock = threading.Lock()
 
@@ -26,6 +32,7 @@ class BackgroundQueue:
 
     @classmethod
     def get_instance(cls) -> BackgroundQueue:
+        """Return the singleton ``BackgroundQueue`` instance, creating it if needed."""
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
@@ -36,6 +43,14 @@ class BackgroundQueue:
         return cls._instance
 
     def enqueue(self, fn: Callable[[], Any]) -> bool:
+        """Submit a callable to run in the background.
+
+        Args:
+            fn: Zero-argument callable to execute.
+
+        Returns:
+            True if the job was accepted, False if the queue is full or shut down.
+        """
         if self._shutdown:
             return False
         if not self._semaphore.acquire(blocking=False):
@@ -54,6 +69,14 @@ class BackgroundQueue:
             judgeval_logger.error(f"[BackgroundQueue] Job failed: {repr(exc)}")
 
     def force_flush(self, timeout_ms: int = 30000) -> bool:
+        """Wait for all pending jobs to complete.
+
+        Args:
+            timeout_ms: Maximum time in milliseconds to wait.
+
+        Returns:
+            True if all jobs completed within the timeout.
+        """
         if self._shutdown:
             return False
         if not self._futures:
@@ -67,6 +90,11 @@ class BackgroundQueue:
         return True
 
     def shutdown(self, timeout_ms: int = 30000) -> None:
+        """Flush pending jobs and shut down the thread pool.
+
+        Args:
+            timeout_ms: Maximum time in milliseconds to wait for flush.
+        """
         if self._shutdown:
             return
         self._shutdown = True
@@ -75,10 +103,26 @@ class BackgroundQueue:
 
 
 def enqueue(fn: Callable[[], Any]) -> bool:
+    """Submit a callable to the global background queue.
+
+    Args:
+        fn: Zero-argument callable to execute.
+
+    Returns:
+        True if the job was accepted.
+    """
     return BackgroundQueue.get_instance().enqueue(fn)
 
 
 def flush(timeout_ms: int = 30000) -> bool:
+    """Flush the global background queue.
+
+    Args:
+        timeout_ms: Maximum time in milliseconds to wait.
+
+    Returns:
+        True if all jobs completed within the timeout.
+    """
     return BackgroundQueue.get_instance().force_flush(timeout_ms)
 
 

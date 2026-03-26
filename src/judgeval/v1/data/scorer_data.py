@@ -6,6 +6,26 @@ from typing import Any, Dict, Optional
 
 @dataclass(slots=True)
 class ScorerData:
+    """The result from a single scorer for one example.
+
+    Each `ScoringResult` contains a list of `ScorerData` -- one per scorer
+    that was run. Check `success` to see if the score met the threshold, and
+    `reason` for the scorer's explanation.
+
+    Attributes:
+        name: Scorer name (e.g. `"faithfulness"`).
+        threshold: Minimum score required for `success=True`.
+        success: Whether the score met or exceeded the threshold.
+        score: The numeric score (0.0 to 1.0 by default).
+        minimum_score_range: Lower bound of the scoring scale.
+        maximum_score_range: Upper bound of the scoring scale.
+        reason: The scorer's explanation for the score.
+        evaluation_model: The LLM used to produce the score.
+        error: Error message if scoring failed.
+        additional_metadata: Extra metadata from the scorer.
+        id: Unique identifier for this result.
+    """
+
     name: str
     threshold: float
     success: bool
@@ -19,6 +39,7 @@ class ScorerData:
     id: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialize to a dictionary, omitting None fields."""
         result: Dict[str, Any] = {
             "name": self.name,
             "threshold": self.threshold,

@@ -15,6 +15,34 @@ from judgeval.v1.data.scorer_data import ScorerData
 
 @dataclass(slots=True)
 class ScoringResult:
+    """The combined result of running scorers against a single example.
+
+    Returned by `Evaluation.run()`. Check `success` to see if **all**
+    scorers passed, or inspect `scorers_data` for per-scorer details.
+
+    Attributes:
+        success: True only if every scorer met its threshold.
+        scorers_data: Per-scorer results (see `ScorerData`).
+        data_object: The `Example` or `TraceSpan` that was scored.
+        name: The evaluation run name.
+        trace_id: Associated trace ID, if applicable.
+        run_duration: How long the evaluation took (seconds).
+        evaluation_cost: Total cost in USD.
+
+    Examples:
+        ```python
+        results = evaluation.run(
+            examples=examples,
+            scorers=["faithfulness", "answer_relevancy"],
+            eval_run_name="nightly",
+        )
+        for result in results:
+            if not result.success:
+                for scorer in result.scorers_data:
+                    print(f"{scorer.name}: {scorer.score} - {scorer.reason}")
+        ```
+    """
+
     success: bool
     scorers_data: List[ScorerData]
     data_object: Union[TraceSpan, Example]

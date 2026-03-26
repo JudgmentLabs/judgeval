@@ -20,6 +20,24 @@ if TYPE_CHECKING:
 
 
 class JudgmentSpanProcessor(BatchSpanProcessor):
+    """Span processor that manages span lifecycle, state, and batched export.
+
+    Extends the OpenTelemetry ``BatchSpanProcessor`` with per-span mutable
+    state (counters, lists), partial-span emission for streaming updates,
+    and automatic baggage propagation.
+
+    Created automatically by ``Tracer.init()``. Use it directly only when
+    building a custom tracing pipeline.
+
+    Args:
+        tracer: The ``BaseTracer`` instance that owns this processor.
+        exporter: The span exporter to send completed spans to.
+        max_queue_size: Maximum number of spans queued before dropping.
+        schedule_delay_millis: Delay between export batches in milliseconds.
+        max_export_batch_size: Maximum spans per export batch.
+        export_timeout_millis: Timeout for each export call in milliseconds.
+    """
+
     __slots__ = (
         "tracer",
         "_span_finalizers",
@@ -67,6 +85,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             )
 
     def state_set(self, span_context: SpanContext, key: str, value: Any) -> None:
+        """Store a value in the mutable state for a span."""
         span_key = (span_context.trace_id, span_context.span_id)
         with self._lock:
             self._state.setdefault(span_key, {})[key] = value
@@ -74,6 +93,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
     def state_get(
         self, span_context: SpanContext, key: str, default: Any = None
     ) -> Any:
+        """Retrieve a value from the mutable state for a span."""
         span_key = (span_context.trace_id, span_context.span_id)
         with self._lock:
             return self._state.get(span_key, {}).get(key, default)
@@ -124,6 +144,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
 
     @dont_throw
     def emit_partial(self) -> None:
+        """Export the current span's in-progress state for streaming updates."""
         from judgeval.v1.trace.judgment_tracer_provider import JudgmentTracerProvider
 
         proxy = JudgmentTracerProvider.get_instance()

@@ -10,6 +10,12 @@ from judgeval.v1.trace.processors.judgment_span_processor import JudgmentSpanPro
 
 
 class NoOpJudgmentSpanProcessor(JudgmentSpanProcessor):
+    """A span processor that silently discards all operations.
+
+    Used internally when monitoring is disabled. All state operations
+    return safe defaults and no spans are exported.
+    """
+
     __slots__ = ()
 
     def __init__(self):

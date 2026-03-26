@@ -9,6 +9,12 @@ from judgeval.v1.trace.exporters.judgment_span_exporter import JudgmentSpanExpor
 
 
 class NoOpJudgmentSpanExporter(JudgmentSpanExporter):
+    """A span exporter that silently discards all spans.
+
+    Used internally when monitoring is disabled (e.g. missing credentials).
+    All operations succeed immediately without performing any I/O.
+    """
+
     __slots__ = ()
 
     def __init__(self):

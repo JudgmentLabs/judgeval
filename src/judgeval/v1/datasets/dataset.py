@@ -38,6 +38,20 @@ def _batch_examples(
 
 @dataclass
 class DatasetInfo:
+    """Summary metadata returned when listing datasets.
+
+    Returned by `client.datasets.list()`. Use the `name` to fetch the
+    full dataset with `client.datasets.get(name=...)`.
+
+    Attributes:
+        dataset_id: Unique dataset identifier.
+        name: Dataset name.
+        created_at: ISO-8601 creation timestamp.
+        kind: Dataset kind (currently `"example"`).
+        entries: Number of examples in the dataset.
+        creator: Email of the user who created the dataset.
+    """
+
     dataset_id: str
     name: str
     created_at: str
@@ -48,14 +62,69 @@ class DatasetInfo:
 
 @dataclass
 class Dataset:
+    """A collection of `Example` objects stored on the Judgment platform.
+
+    Datasets are created and retrieved via `client.datasets`. Once you
+    have a `Dataset`, you can add examples, iterate over them, export to
+    JSON/YAML, or display a rich table preview.
+
+    Attributes:
+        name: Dataset name.
+        project_id: Owning project ID.
+        project_name: Project name.
+        dataset_kind: Kind of dataset (default `"example"`).
+        examples: The loaded examples (populated when using `.get()`).
+        client: Internal API client (set automatically).
+
+    Examples:
+        Create a dataset and add examples:
+
+        ```python
+        dataset = client.datasets.create(name="golden-set")
+        dataset.add_examples([
+            Example.create(input="What is AI?", expected_output="Artificial Intelligence"),
+            Example.create(input="What is ML?", expected_output="Machine Learning"),
+        ])
+        ```
+
+        Retrieve and iterate:
+
+        ```python
+        dataset = client.datasets.get(name="golden-set")
+        for example in dataset:
+            print(example["input"])
+        ```
+
+        Export to file:
+
+        ```python
+        dataset.save_as("json", dir_path="./exports", save_name="golden-set")
+        ```
+    """
+
     name: str
     project_id: str
-    project_name: str  # Display name from Judgeval client
+    project_name: str
     dataset_kind: str = "example"
     examples: Optional[List[Example]] = None
     client: Optional[JudgmentSyncClient] = None
 
     def add_from_json(self, file_path: str, batch_size: int = 100) -> None:
+        """Upload examples from a JSON file.
+
+        The file should contain a JSON array of objects, where each object
+        has the fields you want as example properties (e.g. `input`,
+        `actual_output`, `expected_output`).
+
+        Args:
+            file_path: Path to the JSON file.
+            batch_size: Number of examples uploaded per API call.
+
+        Examples:
+            ```python
+            dataset.add_from_json("./data/golden-set.json")
+            ```
+        """
         with open(file_path, "rb") as file:
             data = orjson.loads(file.read())
         examples = []
@@ -72,6 +141,14 @@ class Dataset:
         self.add_examples(examples, batch_size=batch_size)
 
     def add_from_yaml(self, file_path: str, batch_size: int = 100) -> None:
+        """Upload examples from a YAML file.
+
+        Same as `add_from_json` but reads YAML format.
+
+        Args:
+            file_path: Path to the YAML file.
+            batch_size: Number of examples uploaded per API call.
+        """
         with open(file_path, "r") as file:
             data = yaml.safe_load(file)
         examples = []
@@ -88,6 +165,18 @@ class Dataset:
         self.add_examples(examples, batch_size=batch_size)
 
     def add_examples(self, examples: Iterable[Example], batch_size: int = 100) -> None:
+        """Upload `Example` objects to this dataset.
+
+        Examples are uploaded in batches with a progress bar. Accepts any
+        iterable, including generators.
+
+        Args:
+            examples: A list (or iterable) of `Example` objects.
+            batch_size: Number of examples per upload batch.
+
+        Raises:
+            TypeError: If a single `Example` is passed instead of a list.
+        """
         if not self.client:
             return
 
@@ -144,6 +233,19 @@ class Dataset:
         dir_path: str,
         save_name: Optional[str] = None,
     ) -> None:
+        """Export the dataset to a local JSON or YAML file.
+
+        Args:
+            file_type: `"json"` or `"yaml"`.
+            dir_path: Directory to write into (created if it doesn't exist).
+            save_name: File name without extension. Defaults to a timestamp.
+
+        Examples:
+            ```python
+            dataset = client.datasets.get(name="golden-set")
+            dataset.save_as("json", dir_path="./exports")
+            ```
+        """
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
 
@@ -173,6 +275,11 @@ class Dataset:
         return f"Dataset(name={self.name}, examples={len(self.examples) if self.examples else 0})"
 
     def display(self, max_examples: int = 5) -> None:
+        """Print a formatted table preview to the terminal.
+
+        Args:
+            max_examples: Maximum number of examples to show.
+        """
         from rich.console import Console
         from rich.table import Table
 
