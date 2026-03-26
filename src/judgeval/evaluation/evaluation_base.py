@@ -219,15 +219,7 @@ class EvaluatorRunner(ABC, Generic[S]):
             lines = [f"Evaluation failed: {failed}/{len(results)} examples failed\n"]
             for i, result in enumerate(results):
                 if not result.success:
-                    example_input = ""
-                    if isinstance(result.data_object, Example):
-                        example_input = result.data_object.get("input", "")
-                        if example_input and len(example_input) > 80:
-                            example_input = example_input[:80] + "..."
-                    header = f"  Example {i + 1}"
-                    if example_input:
-                        header += f': "{example_input}"'
-                    lines.append(header)
+                    lines.append(f"  Example {i + 1}:")
                     for s in result.scorers_data:
                         if not s.success:
                             score_str = (
