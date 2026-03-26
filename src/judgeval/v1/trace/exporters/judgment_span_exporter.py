@@ -33,7 +33,7 @@ class JudgmentSpanExporter(BaseSpanExporter):
         from judgeval.v1.trace import JudgmentSpanExporter
 
         exporter = JudgmentSpanExporter(
-            endpoint="https://api.judgment.com/v1/traces",
+            endpoint="https://api.judgmentlabs.ai/otel/v1/traces",
             api_key="jdg_...",
             organization_id="org_123",
             project_id="proj_456",
