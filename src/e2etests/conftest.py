@@ -5,10 +5,10 @@ import string
 from typing import Callable
 from dotenv import load_dotenv
 
-from judgeval.v1 import Judgeval
-from judgeval.v1.judges import Judge, BinaryResponse
+from judgeval import Judgeval
+from judgeval.judges import Judge, BinaryResponse
 from e2etests.utils import delete_project, create_project
-from judgeval.v1.data.example import Example
+from judgeval.data.example import Example
 
 ScorerFactory = Callable[[str], Judge[BinaryResponse]]
 

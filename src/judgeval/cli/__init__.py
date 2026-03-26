@@ -8,14 +8,14 @@ import re
 from pathlib import Path
 from typing import Literal
 from dotenv import load_dotenv
-from judgeval.v1.utils import resolve_project_id
-from judgeval.v1.internal.api import JudgmentSyncClient
+from judgeval.utils import resolve_project_id
+from judgeval.internal.api import JudgmentSyncClient
 from judgeval.env import JUDGMENT_API_URL
 from judgeval.logger import judgeval_logger
 from judgeval.exceptions import JudgmentAPIError
 from judgeval.version import get_version
 from judgeval.utils.url import url_for
-from judgeval.v1.hosted.templates import (
+from judgeval.hosted.templates import (
     get_binary_scorer_template,
     get_categorical_scorer_template,
     get_numeric_scorer_template,

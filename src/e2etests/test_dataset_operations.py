@@ -1,10 +1,10 @@
 import random
 import string
 import pytest
-from judgeval.v1 import Judgeval
+from judgeval import Judgeval
 from judgeval.exceptions import JudgmentAPIError
-from judgeval.v1.data import Example
-from judgeval.v1.datasets.dataset import DatasetInfo
+from judgeval.data import Example
+from judgeval.datasets.dataset import DatasetInfo
 from e2etests.utils import create_project, delete_project
 
 

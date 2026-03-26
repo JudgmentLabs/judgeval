@@ -43,7 +43,7 @@ packages = ["src/judgeval"]
 include = [
     "/src/judgeval",
     "/src/judgeval/**/*.py",
-    "/src/judgeval/v1/py.typed",
+    "/src/judgeval/py.typed",
 ]
 
 [project.optional-dependencies]

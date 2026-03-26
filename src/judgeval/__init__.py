@@ -1,8 +1,18 @@
 from judgeval.utils.version_check import check_latest_version
-from judgeval.v1 import Judgeval, Tracer, JudgmentTracerProvider, wrap
-from judgeval.v1.trace import propagation
+from judgeval.judgeval import Judgeval
+from judgeval.trace import Tracer, JudgmentTracerProvider, wrap, propagation
+from judgeval.background_queue import BackgroundQueue, enqueue, flush
 
 check_latest_version()
 
 
-__all__ = ["Judgeval", "Tracer", "JudgmentTracerProvider", "propagation", "wrap"]
+__all__ = [
+    "Judgeval",
+    "Tracer",
+    "JudgmentTracerProvider",
+    "propagation",
+    "wrap",
+    "BackgroundQueue",
+    "enqueue",
+    "flush",
+]

@@ -8,9 +8,9 @@ from typing import List, Literal, Optional, Tuple
 
 from judgeval.cli.utils import TarFilter
 from judgeval.logger import judgeval_logger
-from judgeval.v1.hosted.responses import Category
-from judgeval.v1.internal.api import JudgmentSyncClient
-from judgeval.v1.internal.api.models import (
+from judgeval.hosted.responses import Category
+from judgeval.internal.api import JudgmentSyncClient
+from judgeval.internal.api.models import (
     UploadCustomScorerBundleMetadata,
     UploadCustomScorerBundleRequest,
 )

@@ -10,9 +10,9 @@ from anthropic import Anthropic, AsyncAnthropic
 from together import Together, AsyncTogether  # type: ignore[import-untyped]
 from google import genai
 
-from judgeval.v1 import Tracer
-from judgeval.v1.trace.base_tracer import BaseTracer
-from judgeval.v1.instrumentation import wrap
+from judgeval import Tracer
+from judgeval.trace.base_tracer import BaseTracer
+from judgeval.instrumentation import wrap
 from e2etests.utils import (
     retrieve_trace,
     create_project,

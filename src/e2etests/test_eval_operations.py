@@ -1,7 +1,7 @@
 import pytest
 
-from judgeval.v1 import Judgeval
-from judgeval.v1.data import Example
+from judgeval import Judgeval
+from judgeval.data import Example
 from e2etests.conftest import ScorerFactory
 
 

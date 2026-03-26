@@ -1,9 +1,9 @@
 import asyncio
 from typing import List
 
-from judgeval.v1 import Judgeval
-from judgeval.v1.data import Example
-from judgeval.v1.judges import Judge, NumericResponse
+from judgeval import Judgeval
+from judgeval.data import Example
+from judgeval.judges import Judge, NumericResponse
 
 
 def test_basic_custom_scorer(client: Judgeval, random_name: str):
