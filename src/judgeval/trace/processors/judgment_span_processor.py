@@ -118,13 +118,16 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             attrs[key] = lst
             return lst
 
-    def _emit_span(self, span: ReadableSpan) -> None:
+    def _emit_span(self, span: ReadableSpan, *, is_partial: bool = False) -> None:
         if not span.context:
             return
         curr_id = self.state_incr(span.context, AttributeKeys.JUDGMENT_UPDATE_ID)
         attributes = dict(span.attributes or {}) | {
             AttributeKeys.JUDGMENT_UPDATE_ID: curr_id
         }
+
+        if is_partial:
+            attributes.pop(AttributeKeys.JUDGMENT_PENDING_TRACE_EVAL, None)
 
         emitted_span = ReadableSpan(
             name=span.name,
@@ -158,7 +161,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             )
         ):
             return
-        self._emit_span(span=span)
+        self._emit_span(span=span, is_partial=True)
 
     @dont_throw
     def on_start(self, span: Span, parent_context: Optional[Context] = None) -> None:
