@@ -253,9 +253,8 @@ def upload_judge(
         "scorer_name": unique_name,
         "entrypoint_path": entrypoint_arcname,
         "class_name": class_name,
-        "scorer_type": scorer_type,
         "response_type": response_type,
-        "version": 3 if scorer_type is None else 2,
+        "version": 4,
         "categories": [category.model_dump() for category in categories]
         if categories
         else None,
