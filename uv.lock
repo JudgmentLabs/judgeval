@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -1957,6 +1957,7 @@ dependencies = [
     { name = "opentelemetry-exporter-otlp" },
     { name = "opentelemetry-sdk" },
     { name = "orjson" },
+    { name = "packaging" },
     { name = "pathspec" },
     { name = "typer" },
 ]
@@ -2009,6 +2010,7 @@ requires-dist = [
     { name = "opentelemetry-exporter-otlp", specifier = ">=1.36.0" },
     { name = "opentelemetry-sdk", specifier = ">=1.36.0" },
     { name = "orjson", specifier = ">=3.9.0" },
+    { name = "packaging", specifier = ">=25.0" },
     { name = "pathspec", specifier = ">=1.0.4" },
     { name = "typer", specifier = ">=0.9.0" },
 ]
