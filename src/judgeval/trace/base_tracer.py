@@ -14,13 +14,22 @@ from typing import (
     Dict,
     Iterator,
     Optional,
+    Sequence,
     TypedDict,
     TypeVar,
     cast,
     overload,
 )
 from uuid import uuid4
-from opentelemetry.trace import Span, Status, StatusCode, Tracer as OTELTracer
+from opentelemetry.context.context import Context
+from opentelemetry.trace import (
+    Link,
+    Span,
+    SpanKind,
+    Status,
+    StatusCode,
+    Tracer as OTELTracer,
+)
 from opentelemetry.sdk.trace import TracerProvider
 
 from judgeval.judgment_attribute_keys import AttributeKeys, InternalAttributeKeys
@@ -251,20 +260,43 @@ class BaseTracer(ABC):
     @staticmethod
     def start_span(
         name: str,
+        context: Optional[Context] = None,
+        kind: SpanKind = SpanKind.INTERNAL,
         attributes: Optional[Dict[str, Any]] = None,
+        links: Optional[Sequence[Link]] = None,
+        start_time: Optional[int] = None,
+        record_exception: bool = True,
+        set_status_on_exception: bool = True,
     ) -> Span:
         """Start a new span that must be ended manually with ``span.end()``.
 
-        Prefer the ``span`` context manager for automatic lifecycle management.
+        Accepts the same parameters as the underlying OpenTelemetry
+        ``Tracer.start_span`` so callers can specify parent context,
+        start time, etc.
 
         Args:
             name: Name for the new span.
+            context: Optional parent context. Defaults to the current context.
+            kind: The ``SpanKind`` for this span.
             attributes: Optional dictionary of initial span attributes.
+            links: Optional sequence of ``Link`` objects.
+            start_time: Span start time in nanoseconds since epoch.
+            record_exception: Whether to record exceptions on the span.
+            set_status_on_exception: Whether to set ERROR status on exceptions.
 
         Returns:
             The newly started ``Span``.
         """
-        span = BaseTracer._get_otel_tracer().start_span(name, attributes=attributes)
+        span = BaseTracer._get_otel_tracer().start_span(
+            name,
+            context=context,
+            kind=kind,
+            attributes=attributes,
+            links=links,
+            start_time=start_time,
+            record_exception=record_exception,
+            set_status_on_exception=set_status_on_exception,
+        )
         BaseTracer._emit_partial()
         return span
 
@@ -272,19 +304,44 @@ class BaseTracer(ABC):
     @contextmanager
     def start_as_current_span(
         name: str,
+        context: Optional[Context] = None,
+        kind: SpanKind = SpanKind.INTERNAL,
         attributes: Optional[Dict[str, Any]] = None,
+        links: Optional[Sequence[Link]] = None,
+        start_time: Optional[int] = None,
+        record_exception: bool = True,
+        set_status_on_exception: bool = True,
+        end_on_exit: bool = True,
     ) -> Iterator[Span]:
         """Start a span and set it as the current span in the context.
 
+        Accepts the same parameters as the underlying OpenTelemetry
+        ``Tracer.start_as_current_span``.
+
         Args:
             name: Name for the new span.
+            context: Optional parent context.
+            kind: The ``SpanKind`` for this span.
             attributes: Optional dictionary of initial span attributes.
+            links: Optional sequence of ``Link`` objects.
+            start_time: Span start time in nanoseconds since epoch.
+            record_exception: Whether to record exceptions on the span.
+            set_status_on_exception: Whether to set ERROR status on exceptions.
+            end_on_exit: Whether to end the span when exiting the context.
 
         Yields:
             The newly started ``Span``.
         """
         with BaseTracer._get_otel_tracer().start_as_current_span(
-            name, attributes=attributes
+            name,
+            context=context,
+            kind=kind,
+            attributes=attributes,
+            links=links,
+            start_time=start_time,
+            record_exception=record_exception,
+            set_status_on_exception=set_status_on_exception,
+            end_on_exit=end_on_exit,
         ) as span:
             BaseTracer._emit_partial()
             yield span
