@@ -1,7 +1,7 @@
 from judgeval import Tracer, wrap
 from openai import OpenAI
 
-Tracer.init(project_name="my-project")
+Tracer.init(project_name="default_project")
 client = wrap(OpenAI())
 
 

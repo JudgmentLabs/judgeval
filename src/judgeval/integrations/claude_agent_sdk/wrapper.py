@@ -1,7 +1,4 @@
-"""Wrapper that patches the Claude Agent SDK for automatic tracing.
-
-Uses ``judgeval.utils.wrappers`` to guarantee:
-"""
+"""Wrapper that patches the Claude Agent SDK for automatic tracing."""
 
 from __future__ import annotations
 
@@ -13,7 +10,7 @@ from opentelemetry.trace import Span, Status, StatusCode, set_span_in_context
 
 from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.trace.tracer import Tracer
-from judgeval.utils.serialize import safe_serialize
+from judgeval.utils.serialize import safe_serialize, serialize_attribute
 from judgeval.utils.wrappers import immutable_wrap_async, immutable_wrap_async_iterator
 
 
@@ -22,27 +19,20 @@ Ctx = Dict[str, Any]
 
 @dataclasses.dataclass(slots=True)
 class TracingState:
-    """Carries the parent span context so child spans nest correctly."""
+    """Shared mutable state carrying the parent span context across turns."""
 
     parent_context: Any = None
 
 
 @dataclasses.dataclass(slots=True)
 class _ClientTracingState:
-    """Per-client state bridging query() -> receive_response()."""
-
     last_prompt: Optional[str] = None
     query_start_time: Optional[float] = None
     conversation_history: List[Dict[str, Any]] = dataclasses.field(default_factory=list)
 
 
-# ---------------------------------------------------------------------------
-# Span trackers
-# ---------------------------------------------------------------------------
-
-
 class ToolSpanTracker:
-    """Matches ToolUseBlock / ToolResultBlock pairs into tool spans."""
+    """Creates and closes tool spans by matching ToolUseBlock / ToolResultBlock pairs."""
 
     def __init__(self, state: TracingState):
         self._state = state
@@ -96,13 +86,7 @@ class ToolSpanTracker:
 
 
 class LLMSpanTracker:
-    """Manages LLM span lifecycle across the message stream.
-
-    Flow per turn:
-      1. UserMessage  -> mark next LLM start time
-      2. AssistantMessage -> create span, record model/input/output
-      3. ResultMessage -> attach usage metrics via recordLLMMetadata
-    """
+    """Manages LLM span lifecycle for Claude Agent SDK message streams."""
 
     def __init__(self, query_start_time: Optional[float] = None):
         self._span: Optional[Span] = None
@@ -168,16 +152,14 @@ class LLMSpanTracker:
                 metadata[dst] = val
         if metadata:
             Tracer.recordLLMMetadata(metadata)  # type: ignore[arg-type]
+        self._span.set_attribute(
+            AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(usage)
+        )
 
     def cleanup(self) -> None:
         if self._span_ctx:
             self._span_ctx.__exit__(None, None, None)
         self._span = self._span_ctx = None
-
-
-# ---------------------------------------------------------------------------
-# Per-message processing
-# ---------------------------------------------------------------------------
 
 
 def _process_message(ctx: Ctx, message: Any) -> None:
@@ -223,11 +205,6 @@ def _process_message(ctx: Ctx, message: Any) -> None:
                 )
 
 
-# ---------------------------------------------------------------------------
-# Agent-span initialisation
-# ---------------------------------------------------------------------------
-
-
 def _init_agent_span(
     ctx: Ctx,
     ts: TracingState,
@@ -264,11 +241,6 @@ def _init_agent_span(
     ctx["tool_tracker"] = ToolSpanTracker(state=ts)
 
 
-# ---------------------------------------------------------------------------
-# Shared hooks
-# ---------------------------------------------------------------------------
-
-
 def _yield_hook(ctx: Ctx, message: Any) -> None:
     _process_message(ctx, message)
 
@@ -278,7 +250,10 @@ def _make_post_hook(cs: Optional[_ClientTracingState] = None) -> Callable[[Ctx],
         results: Optional[List[Dict[str, Any]]] = ctx.get("final_results")
         agent_span: Optional[Span] = ctx.get("agent_span")
         if agent_span and results:
-            Tracer.set_output(results[-1])
+            agent_span.set_attribute(
+                AttributeKeys.JUDGMENT_OUTPUT,
+                serialize_attribute(results[-1], safe_serialize),
+            )
         if cs is not None and results:
             prompt = ctx.get("prompt")
             if prompt:
@@ -308,11 +283,6 @@ def _make_finally_hook(ts: TracingState) -> Callable[[Ctx], None]:
     return hook
 
 
-# ---------------------------------------------------------------------------
-# Hook factories for ClaudeSDKClient.query()
-# ---------------------------------------------------------------------------
-
-
 def _make_query_pre_hook(cs: _ClientTracingState) -> Callable[[Ctx, Any], None]:
     def hook(ctx: Ctx, *args: Any, **kwargs: Any) -> None:
         cs.query_start_time = time.time()
@@ -324,15 +294,10 @@ def _make_query_pre_hook(cs: _ClientTracingState) -> Callable[[Ctx, Any], None]:
     return hook
 
 
-# ---------------------------------------------------------------------------
-# Public patching functions
-# ---------------------------------------------------------------------------
-
-
 def _create_client_wrapper_class(
     original_client_class: Any, state: TracingState
 ) -> Any:
-    """Creates a wrapper class that traces ClaudeSDKClient via immutable wrappers."""
+    """Creates a wrapper class that traces ClaudeSDKClient."""
     finally_hook = _make_finally_hook(state)
 
     class WrappedClaudeSDKClient(original_client_class):  # type: ignore
@@ -372,7 +337,7 @@ def _create_client_wrapper_class(
 def _wrap_query_function(
     original_query_fn: Any, state: TracingState
 ) -> Callable[..., Any]:
-    """Wraps the standalone query() function with tracing."""
+    """Wraps the standalone query() function."""
     finally_hook = _make_finally_hook(state)
 
     def pre_hook(ctx: Ctx, *args: Any, **kwargs: Any) -> None:
@@ -395,11 +360,6 @@ def _wrap_query_function(
         error_hook=_error_hook,
         finally_hook=finally_hook,
     )
-
-
-# ---------------------------------------------------------------------------
-# Serialisation helpers
-# ---------------------------------------------------------------------------
 
 
 def _serialize_content_blocks(content: Any) -> Any:
