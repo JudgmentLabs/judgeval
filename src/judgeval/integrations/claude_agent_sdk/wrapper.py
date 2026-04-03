@@ -1,16 +1,23 @@
-"""Wrapper that patches the Claude Agent SDK for automatic tracing."""
+"""Internal wrapper that patches the Claude Agent SDK for automatic tracing."""
 
 from __future__ import annotations
 
 import dataclasses
 import time
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+)
 
 from opentelemetry.trace import Span, Status, StatusCode, set_span_in_context
 
 from judgeval.judgment_attribute_keys import AttributeKeys
-from judgeval.trace.tracer import Tracer
 from judgeval.utils.serialize import safe_serialize, serialize_attribute
+from judgeval.trace.tracer import Tracer
 from judgeval.utils.wrappers import immutable_wrap_async, immutable_wrap_async_iterator
 
 
@@ -26,6 +33,8 @@ class TracingState:
 
 @dataclasses.dataclass(slots=True)
 class _ClientTracingState:
+    """Per-client state bridging query() -> receive_response()."""
+
     last_prompt: Optional[str] = None
     query_start_time: Optional[float] = None
     conversation_history: List[Dict[str, Any]] = dataclasses.field(default_factory=list)
@@ -35,90 +44,118 @@ class ToolSpanTracker:
     """Creates and closes tool spans by matching ToolUseBlock / ToolResultBlock pairs."""
 
     def __init__(self, state: TracingState):
-        self._state = state
-        self._pending: Dict[str, Tuple[Span, str]] = {}
+        self.state = state
+        self._pending_spans: Dict[str, Tuple[Span, str]] = {}
 
     def on_assistant_message(self, message: Any) -> None:
         content = getattr(message, "content", None)
         if not isinstance(content, list):
             return
+
         for block in content:
             if type(block).__name__ != "ToolUseBlock":
                 continue
-            name = getattr(block, "name", None)
-            uid = getattr(block, "id", None)
-            if not name or not uid:
+
+            tool_name = getattr(block, "name", None)
+            tool_use_id = getattr(block, "id", None)
+            tool_input = getattr(block, "input", None)
+
+            if not tool_name or not tool_use_id:
                 continue
+
             span = Tracer._get_otel_tracer().start_span(
-                str(name),
-                context=self._state.parent_context,
-                attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "tool"},
+                str(tool_name),
+                context=self.state.parent_context,
+                attributes={
+                    AttributeKeys.JUDGMENT_SPAN_KIND: "tool",
+                },
             )
-            span.set_attribute(
-                AttributeKeys.JUDGMENT_INPUT,
-                safe_serialize(getattr(block, "input", None)),
-            )
-            self._pending[uid] = (span, name)
+
+            span.set_attribute(AttributeKeys.JUDGMENT_INPUT, safe_serialize(tool_input))
+
+            self._pending_spans[tool_use_id] = (span, tool_name)
+
+        if self._pending_spans:
+            Tracer._emit_partial()
 
     def on_user_message(self, message: Any) -> None:
         content = getattr(message, "content", None)
         if not isinstance(content, list):
             return
+
         for block in content:
             if type(block).__name__ != "ToolResultBlock":
                 continue
-            uid = getattr(block, "tool_use_id", None)
-            if not uid or uid not in self._pending:
+
+            tool_use_id = getattr(block, "tool_use_id", None)
+            if not tool_use_id or tool_use_id not in self._pending_spans:
                 continue
-            span, _ = self._pending.pop(uid)
+
+            span, _ = self._pending_spans.pop(tool_use_id)
+
+            result_content = getattr(block, "content", None)
+            is_error = getattr(block, "is_error", None)
+
             span.set_attribute(
-                AttributeKeys.JUDGMENT_OUTPUT,
-                safe_serialize(getattr(block, "content", None)),
+                AttributeKeys.JUDGMENT_OUTPUT, safe_serialize(result_content)
             )
-            if getattr(block, "is_error", None):
+
+            if is_error:
                 span.set_status(Status(StatusCode.ERROR, "Tool returned an error"))
+
             span.end()
 
     def cleanup(self) -> None:
-        for span, _ in self._pending.values():
+        for span, _ in self._pending_spans.values():
             span.end()
-        self._pending.clear()
+        self._pending_spans.clear()
 
 
 class LLMSpanTracker:
-    """Manages LLM span lifecycle for Claude Agent SDK message streams."""
+    """Manages LLM span lifecycle for Claude Agent SDK message streams.
+
+    Message flow per turn:
+    1. UserMessage (tool results) -> mark the time when next LLM will start
+    2. AssistantMessage - LLM response arrives -> create span with the marked start time, ending previous span
+    3. ResultMessage - usage metrics -> log to span
+    """
 
     def __init__(self, query_start_time: Optional[float] = None):
-        self._span: Optional[Span] = None
-        self._span_ctx: Optional[Any] = None
-        self._next_start: Optional[float] = query_start_time
+        self.current_span: Optional[Span] = None
+        self.current_span_context: Optional[Any] = None
+        self.next_start_time: Optional[float] = query_start_time
 
     def start_llm_span(
         self,
         message: Any,
         prompt: Optional[str],
-        history: List[Dict[str, Any]],
+        conversation_history: List[Dict[str, Any]],
     ) -> Optional[Dict[str, Any]]:
-        start = self._next_start if self._next_start is not None else time.time()
+        """Start a new LLM span, ending the previous one if it exists."""
+        start_time = (
+            self.next_start_time if self.next_start_time is not None else time.time()
+        )
 
-        if self._span_ctx:
-            self._span_ctx.__exit__(None, None, None)
+        if self.current_span_context:
+            self.current_span_context.__exit__(None, None, None)
 
-        inputs = _build_llm_input(prompt, history)
+        input_messages = _build_llm_input(prompt, conversation_history)
         model = getattr(message, "model", None)
 
-        self._span_ctx = Tracer._get_otel_tracer().start_as_current_span(
+        self.current_span_context = Tracer._get_otel_tracer().start_as_current_span(
             "anthropic.messages.create",
-            attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"},
-            start_time=int(start * 1e9),
+            attributes={
+                AttributeKeys.JUDGMENT_SPAN_KIND: "llm",
+            },
+            start_time=int(start_time * 1e9),
         )
-        self._span = self._span_ctx.__enter__()
-        self._next_start = None
+        self.current_span = self.current_span_context.__enter__()
+        self.next_start_time = None
 
         Tracer.recordLLMMetadata({"model": model or "unknown", "provider": "anthropic"})
 
-        if inputs:
-            Tracer.set_input(inputs)
+        if input_messages:
+            Tracer.set_input(input_messages)
 
         if hasattr(message, "content"):
             content = _serialize_content_blocks(message.content)
@@ -130,12 +167,14 @@ class LLMSpanTracker:
         return None
 
     def mark_next_llm_start(self) -> None:
-        self._next_start = time.time()
+        """Mark when the next LLM call will start (after tool results)."""
+        self.next_start_time = time.time()
 
     def log_usage(self, usage: Any) -> None:
-        if not self._span or not usage:
+        """Log usage metrics to the current LLM span."""
+        if not self.current_span or not usage:
             return
-        get: Callable[[str], Any] = (
+        get_value: Callable[[str], Any] = (
             (lambda k: usage.get(k))
             if isinstance(usage, dict)
             else (lambda k: getattr(usage, k, None))
@@ -147,53 +186,53 @@ class LLMSpanTracker:
             ("cache_creation_input_tokens", "cache_creation_input_tokens"),
             ("cache_read_input_tokens", "cache_read_input_tokens"),
         ):
-            val = get(src)
+            val = get_value(src)
             if val is not None:
                 metadata[dst] = val
         if metadata:
             Tracer.recordLLMMetadata(metadata)  # type: ignore[arg-type]
-        self._span.set_attribute(
+        self.current_span.set_attribute(
             AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(usage)
         )
 
     def cleanup(self) -> None:
-        if self._span_ctx:
-            self._span_ctx.__exit__(None, None, None)
-        self._span = self._span_ctx = None
+        """End any unclosed spans."""
+        if self.current_span_context:
+            self.current_span_context.__exit__(None, None, None)
+        self.current_span = None
+        self.current_span_context = None
 
 
 def _process_message(ctx: Ctx, message: Any) -> None:
     agent_span: Optional[Span] = ctx.get("agent_span")
-    llm: Optional[LLMSpanTracker] = ctx.get("llm_tracker")
-    tools: Optional[ToolSpanTracker] = ctx.get("tool_tracker")
-    results: Optional[List[Dict[str, Any]]] = ctx.get("final_results")
-    if not agent_span or not llm or not tools or results is None:
+    llm_tracker: Optional[LLMSpanTracker] = ctx.get("llm_tracker")
+    tool_tracker: Optional[ToolSpanTracker] = ctx.get("tool_tracker")
+    final_results: Optional[List[Dict[str, Any]]] = ctx.get("final_results")
+    if not agent_span or not llm_tracker or not tool_tracker or final_results is None:
         return
 
-    kind = type(message).__name__
+    message_type = type(message).__name__
 
-    if kind == "AssistantMessage":
+    if message_type == "AssistantMessage":
         conv_history: List[Dict[str, Any]] = ctx.get("conversation_history", [])
-        content = llm.start_llm_span(message, ctx.get("prompt"), conv_history + results)
-        if content:
-            results.append(content)
-        tools.on_assistant_message(message)
+        final_content = llm_tracker.start_llm_span(
+            message, ctx.get("prompt"), conv_history + final_results
+        )
+        if final_content:
+            final_results.append(final_content)
+        tool_tracker.on_assistant_message(message)
 
-    elif kind == "UserMessage":
-        tools.on_user_message(message)
+    elif message_type == "UserMessage":
+        tool_tracker.on_user_message(message)
         if hasattr(message, "content"):
-            results.append(
-                {
-                    "content": _serialize_content_blocks(message.content),
-                    "role": "user",
-                }
-            )
-        llm.mark_next_llm_start()
+            content = _serialize_content_blocks(message.content)
+            final_results.append({"content": content, "role": "user"})
+        llm_tracker.mark_next_llm_start()
 
-    elif kind == "ResultMessage":
+    elif message_type == "ResultMessage":
         usage = getattr(message, "usage", None)
         if usage:
-            llm.log_usage(usage)
+            llm_tracker.log_usage(usage)
         for attr in ("num_turns", "session_id"):
             val = getattr(message, attr, None)
             if val is not None:
@@ -223,19 +262,19 @@ def _init_agent_span(
         conversation_history=conversation_history or [],
     )
 
-    span_ctx = Tracer.start_as_current_span(
+    agent_span_context = Tracer.start_as_current_span(
         span_name, attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "agent"}
     )
-    span = span_ctx.__enter__()
-    ctx["agent_span"] = span
-    ctx["agent_span_ctx"] = span_ctx
+    agent_span = agent_span_context.__enter__()
+    ctx["agent_span"] = agent_span
+    ctx["agent_span_ctx"] = agent_span_context
 
     if prompt:
         Tracer.set_input(prompt)
     Tracer._emit_partial()
 
     ts.parent_context = set_span_in_context(
-        span, Tracer._get_proxy_provider().get_current_context()
+        agent_span, Tracer._get_proxy_provider().get_current_context()
     )
     ctx["llm_tracker"] = LLMSpanTracker(query_start_time=start_time)
     ctx["tool_tracker"] = ToolSpanTracker(state=ts)
@@ -247,18 +286,18 @@ def _yield_hook(ctx: Ctx, message: Any) -> None:
 
 def _make_post_hook(cs: Optional[_ClientTracingState] = None) -> Callable[[Ctx], None]:
     def hook(ctx: Ctx) -> None:
-        results: Optional[List[Dict[str, Any]]] = ctx.get("final_results")
+        final_results: Optional[List[Dict[str, Any]]] = ctx.get("final_results")
         agent_span: Optional[Span] = ctx.get("agent_span")
-        if agent_span and results:
+        if agent_span and final_results:
             agent_span.set_attribute(
                 AttributeKeys.JUDGMENT_OUTPUT,
-                serialize_attribute(results[-1], safe_serialize),
+                serialize_attribute(final_results[-1], safe_serialize),
             )
-        if cs is not None and results:
+        if cs is not None and final_results:
             prompt = ctx.get("prompt")
             if prompt:
                 cs.conversation_history.append({"content": prompt, "role": "user"})
-            cs.conversation_history.extend(results)
+            cs.conversation_history.extend(final_results)
 
     return hook
 
@@ -275,9 +314,9 @@ def _make_finally_hook(ts: TracingState) -> Callable[[Ctx], None]:
             obj = ctx.get(key)
             if obj is not None:
                 obj.cleanup()
-        span_ctx = ctx.get("agent_span_ctx")
-        if span_ctx is not None:
-            span_ctx.__exit__(None, None, None)
+        agent_span_context = ctx.get("agent_span_ctx")
+        if agent_span_context is not None:
+            agent_span_context.__exit__(None, None, None)
         ts.parent_context = None
 
     return hook
@@ -297,7 +336,7 @@ def _make_query_pre_hook(cs: _ClientTracingState) -> Callable[[Ctx, Any], None]:
 def _create_client_wrapper_class(
     original_client_class: Any, state: TracingState
 ) -> Any:
-    """Creates a wrapper class that traces ClaudeSDKClient."""
+    """Creates a wrapper class for ClaudeSDKClient that wraps query and receive_response."""
     finally_hook = _make_finally_hook(state)
 
     class WrappedClaudeSDKClient(original_client_class):  # type: ignore
@@ -337,7 +376,7 @@ def _create_client_wrapper_class(
 def _wrap_query_function(
     original_query_fn: Any, state: TracingState
 ) -> Callable[..., Any]:
-    """Wraps the standalone query() function."""
+    """Wraps the standalone query() function to add tracing."""
     finally_hook = _make_finally_hook(state)
 
     def pre_hook(ctx: Ctx, *args: Any, **kwargs: Any) -> None:
@@ -363,42 +402,51 @@ def _wrap_query_function(
 
 
 def _serialize_content_blocks(content: Any) -> Any:
-    if not isinstance(content, list):
-        return content
-    result = []
-    for block in content:
-        if dataclasses.is_dataclass(block) and not isinstance(block, type):
-            s: Dict[str, Any] = dataclasses.asdict(block)  # type: ignore[arg-type]
-            name = type(block).__name__
-            if name == "TextBlock":
-                s["type"] = "text"
-            elif name == "ToolUseBlock":
-                s["type"] = "tool_use"
-            elif name == "ToolResultBlock":
-                s["type"] = "tool_result"
-                cv = s.get("content")
-                if isinstance(cv, list) and len(cv) == 1:
-                    item = cv[0]
-                    if (
-                        isinstance(item, dict)
-                        and item.get("type") == "text"
-                        and "text" in item
-                    ):
-                        s["content"] = item["text"]
-                if "is_error" in s and s["is_error"] is None:
-                    del s["is_error"]
-            elif name == "ThinkingBlock":
-                s["type"] = "thinking"
-            result.append(s)
-        else:
-            result.append(block)
-    return result
+    """Converts content blocks to a serializable format with proper type fields."""
+    if isinstance(content, list):
+        result = []
+        for block in content:
+            if dataclasses.is_dataclass(block) and not isinstance(block, type):
+                serialized = dataclasses.asdict(block)  # type: ignore
+
+                block_type = type(block).__name__
+                if block_type == "TextBlock":
+                    serialized["type"] = "text"
+                elif block_type == "ToolUseBlock":
+                    serialized["type"] = "tool_use"
+                elif block_type == "ToolResultBlock":
+                    serialized["type"] = "tool_result"
+
+                    content_value = serialized.get("content")
+                    if isinstance(content_value, list) and len(content_value) == 1:
+                        item = content_value[0]
+                        if (
+                            isinstance(item, dict)
+                            and item.get("type") == "text"
+                            and "text" in item
+                        ):
+                            serialized["content"] = item["text"]
+
+                    if "is_error" in serialized and serialized["is_error"] is None:
+                        del serialized["is_error"]
+                elif block_type == "ThinkingBlock":
+                    serialized["type"] = "thinking"
+            else:
+                serialized = block
+
+            result.append(serialized)
+        return result
+    return content
 
 
 def _build_llm_input(
-    prompt: Any, history: List[Dict[str, Any]]
+    prompt: Any, conversation_history: List[Dict[str, Any]]
 ) -> Optional[List[Dict[str, Any]]]:
+    """Builds the input array for an LLM span from the initial prompt and conversation history."""
     if isinstance(prompt, str):
-        msgs = [{"content": prompt, "role": "user"}]
-        return msgs + history if history else msgs
-    return history or None
+        if len(conversation_history) == 0:
+            return [{"content": prompt, "role": "user"}]
+        else:
+            return [{"content": prompt, "role": "user"}] + conversation_history
+
+    return conversation_history if conversation_history else None
