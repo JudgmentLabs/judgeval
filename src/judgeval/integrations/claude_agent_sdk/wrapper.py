@@ -13,6 +13,7 @@ from typing import (
     Tuple,
 )
 
+from opentelemetry.context import Context
 from opentelemetry.trace import Span, Status, StatusCode, set_span_in_context
 
 from judgeval.judgment_attribute_keys import AttributeKeys
@@ -28,7 +29,7 @@ Ctx = Dict[str, Any]
 class TracingState:
     """Shared mutable state carrying the parent span context across turns."""
 
-    parent_context: Any = None
+    parent_context: Optional[Context] = None
 
 
 @dataclasses.dataclass(slots=True)
@@ -139,8 +140,13 @@ class LLMSpanTracker:
         if self.current_span_context:
             self.current_span_context.__exit__(None, None, None)
 
-        input_messages = _build_llm_input(prompt, conversation_history)
         model = getattr(message, "model", None)
+        input_messages = _build_llm_input(prompt, conversation_history)
+
+        outputs: List[Dict[str, Any]] = []
+        if hasattr(message, "content"):
+            content = _serialize_content_blocks(message.content)
+            outputs.append({"content": content, "role": "assistant"})
 
         self.current_span_context = Tracer._get_otel_tracer().start_as_current_span(
             "anthropic.messages.create",
@@ -152,48 +158,43 @@ class LLMSpanTracker:
         self.current_span = self.current_span_context.__enter__()
         self.next_start_time = None
 
-        Tracer.recordLLMMetadata({"model": model or "unknown", "provider": "anthropic"})
+        if model:
+            self.current_span.set_attribute(
+                AttributeKeys.JUDGMENT_LLM_MODEL_NAME,
+                serialize_attribute(model, safe_serialize),
+            )
+            self.current_span.set_attribute(
+                AttributeKeys.JUDGMENT_LLM_PROVIDER,
+                serialize_attribute("anthropic", safe_serialize),
+            )
 
         if input_messages:
-            Tracer.set_input(input_messages)
+            self.current_span.set_attribute(
+                AttributeKeys.JUDGMENT_INPUT,
+                serialize_attribute(input_messages, safe_serialize),
+            )
 
-        if hasattr(message, "content"):
-            content = _serialize_content_blocks(message.content)
-            Tracer.set_output([{"content": content, "role": "assistant"}])
-            Tracer._emit_partial()
-            return {"content": content, "role": "assistant"}
+        if outputs:
+            self.current_span.set_attribute(
+                AttributeKeys.JUDGMENT_OUTPUT,
+                serialize_attribute(outputs, safe_serialize),
+            )
 
         Tracer._emit_partial()
-        return None
+
+        return outputs[0] if outputs else None
 
     def mark_next_llm_start(self) -> None:
         """Mark when the next LLM call will start (after tool results)."""
         self.next_start_time = time.time()
 
-    def log_usage(self, usage: Any) -> None:
+    def log_usage(self, usage_metrics: Dict[str, Any]) -> None:
         """Log usage metrics to the current LLM span."""
-        if not self.current_span or not usage:
-            return
-        get_value: Callable[[str], Any] = (
-            (lambda k: usage.get(k))
-            if isinstance(usage, dict)
-            else (lambda k: getattr(usage, k, None))
-        )
-        metadata: Dict[str, Any] = {}
-        for src, dst in (
-            ("input_tokens", "non_cached_input_tokens"),
-            ("output_tokens", "output_tokens"),
-            ("cache_creation_input_tokens", "cache_creation_input_tokens"),
-            ("cache_read_input_tokens", "cache_read_input_tokens"),
-        ):
-            val = get_value(src)
-            if val is not None:
-                metadata[dst] = val
-        if metadata:
-            Tracer.recordLLMMetadata(metadata)  # type: ignore[arg-type]
-        self.current_span.set_attribute(
-            AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(usage)
-        )
+        if self.current_span and usage_metrics:
+            for key, value in usage_metrics.items():
+                self.current_span.set_attribute(
+                    key, serialize_attribute(value, safe_serialize)
+                )
 
     def cleanup(self) -> None:
         """End any unclosed spans."""
@@ -214,9 +215,8 @@ def _process_message(ctx: Ctx, message: Any) -> None:
     message_type = type(message).__name__
 
     if message_type == "AssistantMessage":
-        conv_history: List[Dict[str, Any]] = ctx.get("conversation_history", [])
         final_content = llm_tracker.start_llm_span(
-            message, ctx.get("prompt"), conv_history + final_results
+            message, ctx.get("prompt"), final_results
         )
         if final_content:
             final_results.append(final_content)
@@ -230,17 +230,22 @@ def _process_message(ctx: Ctx, message: Any) -> None:
         llm_tracker.mark_next_llm_start()
 
     elif message_type == "ResultMessage":
-        usage = getattr(message, "usage", None)
-        if usage:
-            llm_tracker.log_usage(usage)
-        for attr in ("num_turns", "session_id"):
-            val = getattr(message, attr, None)
-            if val is not None:
+        if hasattr(message, "usage"):
+            usage_metrics = _extract_usage_from_result_message(message)
+            llm_tracker.log_usage(usage_metrics)
+        result_metadata = {
+            k: v
+            for k, v in {
+                "num_turns": getattr(message, "num_turns", None),
+                "session_id": getattr(message, "session_id", None),
+            }.items()
+            if v is not None
+        }
+        if result_metadata:
+            for key, value in result_metadata.items():
                 agent_span.set_attribute(
-                    f"agent.{attr}",
-                    val
-                    if isinstance(val, (str, int, float, bool))
-                    else safe_serialize(val),
+                    f"agent.{key}",
+                    serialize_attribute(value, safe_serialize),
                 )
 
 
@@ -270,7 +275,10 @@ def _init_agent_span(
     ctx["agent_span_ctx"] = agent_span_context
 
     if prompt:
-        Tracer.set_input(prompt)
+        agent_span.set_attribute(
+            AttributeKeys.JUDGMENT_INPUT,
+            serialize_attribute(prompt, safe_serialize),
+        )
     Tracer._emit_partial()
 
     ts.parent_context = set_span_in_context(
@@ -380,13 +388,11 @@ def _wrap_query_function(
     finally_hook = _make_finally_hook(state)
 
     def pre_hook(ctx: Ctx, *args: Any, **kwargs: Any) -> None:
-        prompt = kwargs.get("prompt") or (
-            args[0] if args and isinstance(args[0], str) else None
-        )
+        prompt = kwargs.get("prompt") or (args[0] if args else None)
         _init_agent_span(
             ctx,
             state,
-            str(prompt) if prompt else None,
+            prompt if isinstance(prompt, str) else None,
             time.time(),
             "Claude_Agent_Query",
         )
@@ -450,3 +456,45 @@ def _build_llm_input(
             return [{"content": prompt, "role": "user"}] + conversation_history
 
     return conversation_history if conversation_history else None
+
+
+def _extract_usage_from_result_message(result_message: Any) -> Dict[str, Any]:
+    """Extracts and normalizes usage metrics from a ResultMessage."""
+    if not hasattr(result_message, "usage"):
+        return {}
+
+    usage = result_message.usage
+    if not usage:
+        return {}
+
+    metrics: Dict[str, Any] = {}
+
+    # Handle both dict and object with attributes
+    def get_value(key: str) -> Any:
+        if isinstance(usage, dict):
+            return usage.get(key)
+        return getattr(usage, key, None)
+
+    input_tokens = get_value("input_tokens")
+    if input_tokens is not None:
+        metrics[AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS] = input_tokens
+
+    output_tokens = get_value("output_tokens")
+    if output_tokens is not None:
+        metrics[AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS] = output_tokens
+
+    cache_creation_input_tokens = get_value("cache_creation_input_tokens")
+    if cache_creation_input_tokens is not None:
+        metrics[AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS] = (
+            cache_creation_input_tokens
+        )
+
+    cache_read_input_tokens = get_value("cache_read_input_tokens")
+    if cache_read_input_tokens is not None:
+        metrics[AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS] = (
+            cache_read_input_tokens
+        )
+
+    metrics[AttributeKeys.JUDGMENT_USAGE_METADATA] = safe_serialize(usage)
+
+    return metrics
