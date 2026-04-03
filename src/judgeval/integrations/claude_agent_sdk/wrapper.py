@@ -49,7 +49,7 @@ class ToolSpanTracker:
             uid = getattr(block, "id", None)
             if not name or not uid:
                 continue
-            span = Tracer.start_span(
+            span = Tracer._get_otel_tracer().start_span(
                 str(name),
                 context=self._state.parent_context,
                 attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "tool"},
@@ -107,7 +107,7 @@ class LLMSpanTracker:
         inputs = _build_llm_input(prompt, history)
         model = getattr(message, "model", None)
 
-        self._span_ctx = Tracer.start_as_current_span(
+        self._span_ctx = Tracer._get_otel_tracer().start_as_current_span(
             "anthropic.messages.create",
             attributes={AttributeKeys.JUDGMENT_SPAN_KIND: "llm"},
             start_time=int(start * 1e9),
