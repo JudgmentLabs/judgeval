@@ -10,6 +10,7 @@ class AttributeKeys(str, Enum):
     JUDGMENT_OFFLINE_MODE = "judgment.offline_mode"
     JUDGMENT_UPDATE_ID = "judgment.update_id"
     JUDGMENT_CUSTOMER_ID = "judgment.customer_id"
+    JUDGMENT_CUSTOMER_USER_ID = "judgment.customer_user_id"
     JUDGMENT_AGENT_ID = "judgment.agent_id"
     JUDGMENT_PARENT_AGENT_ID = "judgment.parent_agent_id"
     JUDGMENT_AGENT_CLASS_NAME = "judgment.agent_class_name"
@@ -63,6 +64,8 @@ class InternalAttributeKeys(str, Enum):
     DISABLE_PARTIAL_EMIT = "disable_partial_emit"
     CANCELLED = "cancelled"
     IS_CUSTOMER_CONTEXT_OWNER = "is_customer_context_owner"
+    PENDING_EVALS = "pending_evals"
+    PENDING_EVALS_COUNT = "pending_evals_count"
 
 
 class ResourceKeys(str, Enum):

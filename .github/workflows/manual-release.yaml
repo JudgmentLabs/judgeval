@@ -1,0 +1,99 @@
+on:
+  workflow_dispatch:
+    inputs:
+      major_version:
+        description: 'Major version to release'
+        required: true
+        default: 0
+        type: number
+      minor_version:
+        description: 'Minor version to release'
+        required: true
+        type: number
+      patch_version:
+        description: 'Patch version to release'
+        required: true
+        type: number
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_VERSION: ${{ github.event.inputs.major_version }}.${{ github.event.inputs.minor_version }}.${{ github.event.inputs.patch_version }}
+    steps:
+      - name: Validate version is available on PyPI
+        run: |
+          status_code=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/judgeval/$RELEASE_VERSION/json")
+          if [ "$status_code" = "200" ]; then
+            echo "Error: Version $RELEASE_VERSION already exists on PyPI"
+            exit 1
+          fi
+          echo "Version $RELEASE_VERSION is available"
+
+  release:
+    needs: validate
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_VERSION: ${{ github.event.inputs.major_version }}.${{ github.event.inputs.minor_version }}.${{ github.event.inputs.patch_version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+
+      - name: Create new tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag "v$RELEASE_VERSION"
+          git push origin "v$RELEASE_VERSION"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.RELEASE_VERSION }}
+          generate_release_notes: true
+          body: |
+            You can find this package release on PyPI: https://pypi.org/project/judgeval/${{ env.RELEASE_VERSION }}/
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bump pyproject.toml and version.py version
+        run: python update_version.py "$RELEASE_VERSION"
+
+      - name: Build PyPI package
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+
+      - name: Create PyPI release
+        run: |
+          python -m pip install --upgrade twine
+          python -m twine upload --repository pypi -u ${{ secrets.PYPI_USERNAME }} -p ${{ secrets.PYPI_PASSWORD }} dist/*
+
+  cleanup:
+    needs: release
+    if: failure()
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_VERSION: ${{ github.event.inputs.major_version }}.${{ github.event.inputs.minor_version }}.${{ github.event.inputs.patch_version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Authenticate GitHub CLI
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+      - name: Delete tag and release
+        run: |
+          gh release delete "v$RELEASE_VERSION" --yes || true
+          git push --delete origin "v$RELEASE_VERSION" || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

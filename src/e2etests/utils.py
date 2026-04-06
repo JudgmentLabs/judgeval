@@ -1,4 +1,4 @@
-from judgeval.v1.internal.api import JudgmentSyncClient
+from judgeval.internal.api import JudgmentSyncClient
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_ORG_ID, JUDGMENT_API_URL
 
 assert JUDGMENT_API_KEY, "JUDGMENT_API_KEY must be set"

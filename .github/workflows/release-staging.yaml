@@ -42,12 +42,14 @@ jobs:
           latest_version=${{ steps.get_version.outputs.latest_version }}
           echo "Latest version: $latest_version"
 
-          # Extract version numbers
           IFS='.' read -r major minor patch <<< "$latest_version"
 
-          # Always bump patch version
-          patch=$((patch + 1))
-          new_version="$major.$minor.$patch"
+          if [ "$major" -lt 1 ]; then
+            new_version="1.0.0"
+          else
+            patch=$((patch + 1))
+            new_version="$major.$minor.$patch"
+          fi
 
           echo "New version: $new_version"
           echo "new_version=$new_version" >> $GITHUB_OUTPUT

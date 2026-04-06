@@ -1,6 +1,6 @@
 import uuid
 import pytest
-from judgeval.v1 import Judgeval
+from judgeval import Judgeval
 from judgeval.exceptions import JudgmentAPIError
 
 

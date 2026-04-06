@@ -50,7 +50,7 @@ jobs:
           IFS='.' read -r major minor patch <<< "$latest_version"
 
           # Set major version (manually modify this if you want to change the major version)
-          new_major_version=0
+          new_major_version=1
 
           # Validate that new major version is greater than current major version
           if [ "$new_major_version" -lt "$major" ]; then
