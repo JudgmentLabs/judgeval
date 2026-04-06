@@ -236,23 +236,12 @@ client = wrap(Together())        # Together AI
 | OpenLit | `from judgeval.integrations import Openlit; Openlit.initialize()` |
 | Claude Agent SDK | `from judgeval.integrations import setup_claude_agent_sdk; setup_claude_agent_sdk()` |
 
-## Cookbooks
-
-| Topic | Notebook | Description |
-|:------|:---------|:------------|
-| Online ABM | [Research Agent](https://colab.research.google.com/github/JudgmentLabs/judgment-cookbook/blob/main/monitoring/Research_Agent_Online_Monitoring.ipynb) | Monitor agent behavior in production |
-| Custom Scorers | [HumanEval](https://colab.research.google.com/github/JudgmentLabs/judgment-cookbook/blob/main/custom_scorers/HumanEval_Custom_Scorer.ipynb) | Build custom evaluators for your agents |
-
-Browse the full [cookbook repository](https://github.com/JudgmentLabs/judgment-cookbook) or watch [video tutorials](https://www.youtube.com/@Alexshander-JL).
+See full list [here](https://docs.judgmentlabs.ai/documentation/integrations/introduction)
 
 ## Links
 
 - [Documentation](https://docs.judgmentlabs.ai/documentation)
 - [Judgment Platform](https://app.judgmentlabs.ai/)
-- [Self-Hosting Guide](https://docs.judgmentlabs.ai/documentation/self-hosting/get-started)
-- [Custom Scorers Guide](https://docs.judgmentlabs.ai/documentation/evaluation/custom-scorers)
-- [Online Evaluation Guide](https://docs.judgmentlabs.ai/documentation/performance/online-evals)
-- [Cookbook Repository](https://github.com/JudgmentLabs/judgment-cookbook)
 - [Video Tutorials](https://www.youtube.com/@Alexshander-JL)
 
 ---
