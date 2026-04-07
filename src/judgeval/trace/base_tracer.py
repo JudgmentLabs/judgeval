@@ -36,7 +36,7 @@ from judgeval.utils.decorators.dont_throw import dont_throw
 from judgeval.utils.serialize import serialize_attribute, safe_serialize
 from judgeval.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
 from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
-from judgeval.trace.internal import LinkedSubagentSpans
+from judgeval.trace.internal import LinkedTraceSpans
 import judgeval.trace.baggage as baggage
 from judgeval.trace.generators import (
     _ObservedSyncGenerator,
@@ -151,14 +151,14 @@ class BaseTracer(ABC):
         """Return the span exporter for this tracer."""
 
     @abstractmethod
-    def _start_linked_root_span(
+    def _start_linked_trace(
         self,
         name: str,
         source_span: Span,
         attributes: Optional[Dict[str, Any]] = None,
         *,
         end_on_exit: bool = True,
-    ) -> ContextManager[LinkedSubagentSpans]:
+    ) -> ContextManager[LinkedTraceSpans]:
         """Start a linked root span in a new trace."""
 
     # ------------------------------------------------------------------ #
@@ -173,13 +173,6 @@ class BaseTracer(ABC):
     def _get_serializer() -> Callable[[Any], str]:
         tracer = BaseTracer._get_proxy_provider().get_active_tracer()
         return tracer.serializer if tracer else safe_serialize
-
-    @staticmethod
-    def _get_active_tracer() -> BaseTracer:
-        tracer = BaseTracer._get_proxy_provider().get_active_tracer()
-        if tracer is None:
-            raise RuntimeError("No active tracer configured.")
-        return tracer
 
     @staticmethod
     def _get_current_trace_and_span_id() -> Optional[tuple[str, str]]:
@@ -297,32 +290,32 @@ class BaseTracer(ABC):
 
     @staticmethod
     @contextmanager
-    def _start_subagent_spans_context(
+    def _start_linked_trace_context(
         name: str,
         attributes: Optional[Dict[str, Any]] = None,
         *,
         end_on_exit: bool = True,
-    ) -> Iterator[LinkedSubagentSpans]:
+    ) -> Iterator[LinkedTraceSpans]:
         proxy = BaseTracer._get_proxy_provider()
         tracer = proxy.get_active_tracer()
         if tracer is None:
             judgeval_logger.warning(
-                "start_subagent_span() called without an active tracer. "
-                "Continuing without subagent tracing."
+                "start_linked_trace() called without an active tracer. "
+                "Continuing without linked-trace tracing."
             )
-            yield LinkedSubagentSpans(trace_api.INVALID_SPAN, trace_api.INVALID_SPAN)
+            yield LinkedTraceSpans(trace_api.INVALID_SPAN, trace_api.INVALID_SPAN)
             return
 
         source_span = proxy.get_current_span()
         if source_span is None or not source_span.is_recording():
             judgeval_logger.warning(
-                "start_subagent_span() called without an active parent span. "
-                "Continuing without subagent tracing."
+                "start_linked_trace() called without an active parent span. "
+                "Continuing without linked-trace tracing."
             )
-            yield LinkedSubagentSpans(trace_api.INVALID_SPAN, trace_api.INVALID_SPAN)
+            yield LinkedTraceSpans(trace_api.INVALID_SPAN, trace_api.INVALID_SPAN)
             return
 
-        with tracer._start_linked_root_span(
+        with tracer._start_linked_trace(
             name,
             source_span,
             attributes=attributes,
@@ -353,27 +346,27 @@ class BaseTracer(ABC):
 
     @staticmethod
     @contextmanager
-    def start_subagent_span(
+    def start_linked_trace(
         name: str,
         attributes: Optional[Dict[str, Any]] = None,
     ) -> Iterator[Span]:
-        """Start a linked root span for a subagent execution.
+        """Start a linked trace rooted at a new span.
 
         The new span is the root of a fresh trace. It links back to the
         current span via an OpenTelemetry ``Link`` and stores explicit
-        cross-trace source/target IDs on the child and parent spans.
+        cross-trace source/target IDs on the linked root and invocation spans.
 
         Args:
-            name: Name for the subagent root span.
-            attributes: Optional dictionary of initial child-span attributes.
+            name: Name for the linked trace root span.
+            attributes: Optional dictionary of initial linked-root-span attributes.
 
         Yields:
-            The active subagent root ``Span``.
+            The active linked trace root ``Span``.
         """
-        with BaseTracer._start_subagent_spans_context(
+        with BaseTracer._start_linked_trace_context(
             name, attributes=attributes, end_on_exit=True
         ) as spans:
-            yield spans.child_span
+            yield spans.linked_root_span
 
     @staticmethod
     @contextmanager
@@ -602,7 +595,7 @@ class BaseTracer(ABC):
 
     @staticmethod
     @overload
-    def observe_subagent(
+    def observe_linked_trace(
         func: C,
         span_name: Optional[str] = None,
         record_input: bool = True,
@@ -612,7 +605,7 @@ class BaseTracer(ABC):
 
     @staticmethod
     @overload
-    def observe_subagent(
+    def observe_linked_trace(
         func: None = None,
         span_name: Optional[str] = None,
         record_input: bool = True,
@@ -621,21 +614,21 @@ class BaseTracer(ABC):
     ) -> Callable[[C], C]: ...
 
     @staticmethod
-    def observe_subagent(
+    def observe_linked_trace(
         func: Optional[C] = None,
         span_name: Optional[str] = None,
         record_input: bool = True,
         record_output: bool = True,
         disable_generator_yield_span: bool = False,
     ) -> C | Callable[[C], C]:
-        """Decorator that runs a function as a linked subagent trace.
+        """Decorator that runs a function in a linked trace.
 
         The decorated function call produces:
         1. a parent-trace invocation span, and
-        2. a child root span in a fresh trace linked back to that invocation.
+        2. a linked root span in a fresh trace linked back to that invocation.
 
         Inputs, outputs, and errors are mirrored onto the parent invocation span
-        so the parent trace remains readable without opening the child trace.
+        so the parent trace remains readable without opening the linked trace.
         """
 
         def decorator(f: C) -> C:
@@ -646,9 +639,9 @@ class BaseTracer(ABC):
 
                 @functools.wraps(f)
                 async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-                    spans_cm = BaseTracer._start_subagent_spans_context(name)
+                    spans_cm = BaseTracer._start_linked_trace_context(name)
                     with spans_cm as linked_spans:
-                        span = linked_spans.child_span
+                        linked_root_span = linked_spans.linked_root_span
                         invocation_span = linked_spans.invocation_span
                         try:
                             if record_input:
@@ -656,7 +649,7 @@ class BaseTracer(ABC):
                                     _format_inputs(f, args, kwargs),
                                     BaseTracer._get_serializer(),
                                 )
-                                span.set_attribute(
+                                linked_root_span.set_attribute(
                                     AttributeKeys.JUDGMENT_INPUT, serialized_input
                                 )
                                 invocation_span.set_attribute(
@@ -668,7 +661,7 @@ class BaseTracer(ABC):
                                 serialized_output = serialize_attribute(
                                     result, BaseTracer._get_serializer()
                                 )
-                                span.set_attribute(
+                                linked_root_span.set_attribute(
                                     AttributeKeys.JUDGMENT_OUTPUT, serialized_output
                                 )
                                 invocation_span.set_attribute(
@@ -677,8 +670,10 @@ class BaseTracer(ABC):
                                 )
                             return result
                         except Exception as e:
-                            span.record_exception(e)
-                            span.set_status(Status(StatusCode.ERROR, str(e)))
+                            linked_root_span.record_exception(e)
+                            linked_root_span.set_status(
+                                Status(StatusCode.ERROR, str(e))
+                            )
                             invocation_span.record_exception(e)
                             invocation_span.set_status(Status(StatusCode.ERROR, str(e)))
                             raise
@@ -687,11 +682,11 @@ class BaseTracer(ABC):
 
             @functools.wraps(f)
             def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-                spans_cm = BaseTracer._start_subagent_spans_context(
+                spans_cm = BaseTracer._start_linked_trace_context(
                     name, end_on_exit=False
                 )
                 with spans_cm as linked_spans:
-                    span = linked_spans.child_span
+                    linked_root_span = linked_spans.linked_root_span
                     invocation_span = linked_spans.invocation_span
                     try:
                         if record_input:
@@ -699,7 +694,7 @@ class BaseTracer(ABC):
                                 _format_inputs(f, args, kwargs),
                                 BaseTracer._get_serializer(),
                             )
-                            span.set_attribute(
+                            linked_root_span.set_attribute(
                                 AttributeKeys.JUDGMENT_INPUT, serialized_input
                             )
                             invocation_span.set_attribute(
@@ -708,18 +703,18 @@ class BaseTracer(ABC):
                         BaseTracer._emit_partial()
                         result = f(*args, **kwargs)
                     except Exception as e:
-                        span.record_exception(e)
-                        span.set_status(Status(StatusCode.ERROR, str(e)))
+                        linked_root_span.record_exception(e)
+                        linked_root_span.set_status(Status(StatusCode.ERROR, str(e)))
                         invocation_span.record_exception(e)
                         invocation_span.set_status(Status(StatusCode.ERROR, str(e)))
-                        span.end()
+                        linked_root_span.end()
                         raise
 
                     serializer = BaseTracer._get_serializer()
 
                     if inspect.isgenerator(result):
                         if record_output:
-                            span.set_attribute(
+                            linked_root_span.set_attribute(
                                 AttributeKeys.JUDGMENT_OUTPUT, "<generator>"
                             )
                             invocation_span.set_attribute(
@@ -727,7 +722,7 @@ class BaseTracer(ABC):
                             )
                         return _ObservedSyncGenerator(
                             result,
-                            span,
+                            linked_root_span,
                             serializer,
                             proxy.get_tracer(JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME),
                             contextvars.copy_context(),
@@ -735,7 +730,7 @@ class BaseTracer(ABC):
                         )
                     if inspect.isasyncgen(result):
                         if record_output:
-                            span.set_attribute(
+                            linked_root_span.set_attribute(
                                 AttributeKeys.JUDGMENT_OUTPUT,
                                 "<async_generator>",
                             )
@@ -745,7 +740,7 @@ class BaseTracer(ABC):
                             )
                         return _ObservedAsyncGenerator(
                             result,
-                            span,
+                            linked_root_span,
                             serializer,
                             proxy.get_tracer(JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME),
                             contextvars.copy_context(),
@@ -754,13 +749,13 @@ class BaseTracer(ABC):
 
                     if record_output:
                         serialized_output = serialize_attribute(result, serializer)
-                        span.set_attribute(
+                        linked_root_span.set_attribute(
                             AttributeKeys.JUDGMENT_OUTPUT, serialized_output
                         )
                         invocation_span.set_attribute(
                             AttributeKeys.JUDGMENT_OUTPUT, serialized_output
                         )
-                    span.end()
+                    linked_root_span.end()
                     return result
 
             return cast(C, sync_wrapper)

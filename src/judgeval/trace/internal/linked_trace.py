@@ -18,42 +18,42 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True, slots=True)
-class LinkedSubagentSpans:
+class LinkedTraceSpans:
     invocation_span: Span
-    child_span: Span
+    linked_root_span: Span
 
 
-def _noop_linked_spans(
+def _noop_linked_trace_spans(
     invocation_span: Span = trace_api.INVALID_SPAN,
-) -> LinkedSubagentSpans:
-    return LinkedSubagentSpans(
+) -> LinkedTraceSpans:
+    return LinkedTraceSpans(
         invocation_span=invocation_span,
-        child_span=trace_api.INVALID_SPAN,
+        linked_root_span=trace_api.INVALID_SPAN,
     )
 
 
-class SubagentManager:
+class LinkedTraceManager:
     __slots__ = ("_tracer",)
 
     def __init__(self, tracer: Tracer):
         self._tracer = tracer
 
     @contextmanager
-    def start_linked_root_span(
+    def start_linked_trace(
         self,
         name: str,
         source_span: Span,
         attributes: Attributes = None,
         *,
         end_on_exit: bool = True,
-    ) -> Iterator[LinkedSubagentSpans]:
+    ) -> Iterator[LinkedTraceSpans]:
         source_ctx = source_span.get_span_context()
         if not source_ctx.is_valid:
             judgeval_logger.warning(
-                "start_subagent_span() received an invalid parent span context. "
-                "Continuing without subagent tracing."
+                "start_linked_trace() received an invalid parent span context. "
+                "Continuing without linked-trace tracing."
             )
-            yield _noop_linked_spans()
+            yield _noop_linked_trace_spans()
             return
 
         proxy = JudgmentTracerProvider.get_instance()
@@ -64,24 +64,24 @@ class SubagentManager:
             invocation_ctx = invocation_span.get_span_context()
             if not invocation_ctx.is_valid:
                 judgeval_logger.warning(
-                    "Failed to create a valid parent-side subagent invocation span. "
-                    "Continuing without subagent tracing."
+                    "Failed to create a valid parent-side linked-trace invocation span. "
+                    "Continuing without linked-trace tracing."
                 )
-                yield _noop_linked_spans()
+                yield _noop_linked_trace_spans()
                 return
             invocation_span.set_attribute(AttributeKeys.JUDGMENT_SPAN_KIND, "agent")
 
-            child_attributes = dict(attributes or {})
-            child_attributes[AttributeKeys.JUDGMENT_SPAN_KIND] = "agent"
-            child_attributes[AttributeKeys.JUDGMENT_LINK_SOURCE_TRACE_ID] = format(
-                invocation_ctx.trace_id, "032x"
+            linked_root_attributes = dict(attributes or {})
+            linked_root_attributes[AttributeKeys.JUDGMENT_SPAN_KIND] = "agent"
+            linked_root_attributes[AttributeKeys.JUDGMENT_LINK_SOURCE_TRACE_ID] = (
+                format(invocation_ctx.trace_id, "032x")
             )
-            child_attributes[AttributeKeys.JUDGMENT_LINK_SOURCE_SPAN_ID] = format(
+            linked_root_attributes[AttributeKeys.JUDGMENT_LINK_SOURCE_SPAN_ID] = format(
                 invocation_ctx.span_id, "016x"
             )
 
             try:
-                child_span = proxy.get_tracer(
+                linked_root_span = proxy.get_tracer(
                     JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
                 ).start_span(
                     name,
@@ -89,48 +89,48 @@ class SubagentManager:
                         trace_api.INVALID_SPAN,
                         proxy.get_current_context(),
                     ),
-                    attributes=child_attributes,
+                    attributes=linked_root_attributes,
                     links=[trace_api.Link(invocation_ctx)],
                 )
             except Exception as e:
                 judgeval_logger.warning(
-                    "Failed to create linked subagent child span '%s': %s. "
-                    "Continuing without subagent tracing.",
+                    "Failed to create linked-trace root span '%s': %s. "
+                    "Continuing without linked-trace tracing.",
                     name,
                     e,
                 )
-                yield _noop_linked_spans(invocation_span)
+                yield _noop_linked_trace_spans(invocation_span)
                 return
 
-            child_ctx = child_span.get_span_context()
-            if not child_ctx.is_valid:
+            linked_root_ctx = linked_root_span.get_span_context()
+            if not linked_root_ctx.is_valid:
                 judgeval_logger.warning(
-                    "Failed to create a valid linked subagent child span for '%s'. "
-                    "Continuing without subagent tracing.",
+                    "Failed to create a valid linked-trace root span for '%s'. "
+                    "Continuing without linked-trace tracing.",
                     name,
                 )
-                yield _noop_linked_spans(invocation_span)
+                yield _noop_linked_trace_spans(invocation_span)
                 return
 
             if (
                 invocation_span.is_recording()
-                and child_span.is_recording()
-                and child_ctx.is_valid
+                and linked_root_span.is_recording()
+                and linked_root_ctx.is_valid
             ):
                 invocation_span.set_attribute(
                     AttributeKeys.JUDGMENT_LINK_TARGET_TRACE_ID,
-                    format(child_ctx.trace_id, "032x"),
+                    format(linked_root_ctx.trace_id, "032x"),
                 )
                 invocation_span.set_attribute(
                     AttributeKeys.JUDGMENT_LINK_TARGET_SPAN_ID,
-                    format(child_ctx.span_id, "016x"),
+                    format(linked_root_ctx.span_id, "016x"),
                 )
-                invocation_span.add_link(child_ctx)
+                invocation_span.add_link(linked_root_ctx)
 
-            with proxy.use_span(child_span, end_on_exit=end_on_exit) as span:
-                yield LinkedSubagentSpans(
+            with proxy.use_span(linked_root_span, end_on_exit=end_on_exit) as span:
+                yield LinkedTraceSpans(
                     invocation_span=invocation_span,
-                    child_span=span,
+                    linked_root_span=span,
                 )
         finally:
             if invocation_span.is_recording():

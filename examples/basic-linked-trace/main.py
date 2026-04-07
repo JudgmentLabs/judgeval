@@ -1,7 +1,7 @@
 from judgeval import Tracer
 
 
-Tracer.init(project_name="basic-subagent")
+Tracer.init(project_name="basic-linked-trace")
 
 
 @Tracer.observe(span_type="tool")
@@ -17,7 +17,7 @@ def search_hotels(destination: str) -> str:
     return f"Central hotel in {destination}"
 
 
-@Tracer.observe_subagent()
+@Tracer.observe_linked_trace()
 def plan_transport_and_lodging(destination: str) -> dict[str, object]:
     flights = search_flights(destination)
     hotel = search_hotels(destination)

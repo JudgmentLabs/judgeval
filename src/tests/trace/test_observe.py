@@ -86,10 +86,10 @@ class TestObserveSync:
 
         assert double(5) == 10
 
-    def test_subagent_creates_linked_root_trace(self, tracer, collecting_exporter):
+    def test_linked_trace_creates_linked_root_trace(self, tracer, collecting_exporter):
         @BaseTracer.observe(span_type="agent")
         def parent():
-            @BaseTracer.observe_subagent()
+            @BaseTracer.observe_linked_trace()
             def child():
                 return "ok"
 
@@ -155,12 +155,12 @@ class TestObserveAsync:
         assert span.status.status_code.name == "ERROR"
 
     @pytest.mark.asyncio
-    async def test_async_subagent_creates_linked_root_trace(
+    async def test_async_linked_trace_creates_linked_root_trace(
         self, tracer, collecting_exporter
     ):
         @BaseTracer.observe(span_type="agent")
         async def parent():
-            @BaseTracer.observe_subagent()
+            @BaseTracer.observe_linked_trace()
             async def child():
                 return "ok"
 

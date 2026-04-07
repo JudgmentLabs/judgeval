@@ -132,12 +132,12 @@ class TestContextPropagation:
         BaseTracer._set_propagating_baggage_key("some.key", "val")
 
 
-class TestSubagentTracing:
-    def test_start_subagent_span_creates_linked_root_trace(
+class TestLinkedTraceTracing:
+    def test_start_linked_trace_creates_linked_root_trace(
         self, tracer, collecting_exporter
     ):
         with BaseTracer.start_as_current_span("parent"):
-            with BaseTracer.start_subagent_span("child-root"):
+            with BaseTracer.start_linked_trace("child-root"):
                 pass
 
         parent = next(s for s in collecting_exporter.spans if s.name == "parent")
@@ -175,27 +175,27 @@ class TestSubagentTracing:
             marker.context.span_id, "016x"
         )
 
-    def test_start_subagent_span_propagates_baggage(self, tracer, collecting_exporter):
+    def test_start_linked_trace_propagates_baggage(self, tracer, collecting_exporter):
         with BaseTracer.start_as_current_span("parent"):
             BaseTracer.set_customer_id("cust-123")
             BaseTracer.set_session_id("sess-123")
-            with BaseTracer.start_subagent_span("child-root"):
+            with BaseTracer.start_linked_trace("child-root"):
                 pass
 
         child = next(s for s in collecting_exporter.spans if s.name == "child-root")
         assert child.attributes[AttributeKeys.JUDGMENT_CUSTOMER_ID] == "cust-123"
         assert child.attributes[AttributeKeys.JUDGMENT_SESSION_ID] == "sess-123"
 
-    def test_start_subagent_span_without_parent_logs_and_noops(self, tracer):
+    def test_start_linked_trace_without_parent_logs_and_noops(self, tracer):
         from judgeval.logger import judgeval_logger
 
         with patch.object(judgeval_logger, "warning") as warning_mock:
-            with BaseTracer.start_subagent_span("child-root") as span:
+            with BaseTracer.start_linked_trace("child-root") as span:
                 assert not span.is_recording()
 
         warning_mock.assert_called_once()
 
-    def test_start_subagent_span_child_creation_failure_logs_and_noops(
+    def test_start_linked_trace_root_creation_failure_logs_and_noops(
         self, tracer, collecting_exporter
     ):
         from judgeval.logger import judgeval_logger
@@ -221,7 +221,7 @@ class TestSubagentTracing:
                     autospec=True,
                     side_effect=failing_start_span,
                 ):
-                    with BaseTracer.start_subagent_span("child-root") as span:
+                    with BaseTracer.start_linked_trace("child-root") as span:
                         assert not span.is_recording()
 
         assert invocation_span is not None

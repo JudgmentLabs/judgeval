@@ -13,7 +13,7 @@ from judgeval.logger import judgeval_logger
 from judgeval.utils.serialize import safe_serialize
 from judgeval.trace.base_tracer import BaseTracer
 from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
-from judgeval.trace.internal import SubagentManager
+from judgeval.trace.internal import LinkedTraceManager
 from judgeval.trace.exporters.judgment_span_exporter import JudgmentSpanExporter
 from judgeval.trace.exporters.noop_judgment_span_exporter import (
     NoOpJudgmentSpanExporter,
@@ -87,7 +87,7 @@ class Tracer(BaseTracer):
         "_span_exporter",
         "_span_processor",
         "_enable_monitoring",
-        "_subagent_manager",
+        "_linked_trace_manager",
     )
 
     TRACER_NAME = JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
@@ -119,7 +119,7 @@ class Tracer(BaseTracer):
         self._enable_monitoring = enable_monitoring
         self._span_exporter: Optional[JudgmentSpanExporter] = None
         self._span_processor: Optional[JudgmentSpanProcessor] = None
-        self._subagent_manager = SubagentManager(self)
+        self._linked_trace_manager = LinkedTraceManager(self)
 
     @classmethod
     def init(
@@ -262,7 +262,7 @@ class Tracer(BaseTracer):
 
         return tracer
 
-    def _start_linked_root_span(
+    def _start_linked_trace(
         self,
         name: str,
         source_span: Span,
@@ -270,7 +270,7 @@ class Tracer(BaseTracer):
         *,
         end_on_exit: bool = True,
     ):
-        return self._subagent_manager.start_linked_root_span(
+        return self._linked_trace_manager.start_linked_trace(
             name,
             source_span,
             attributes=attributes,
