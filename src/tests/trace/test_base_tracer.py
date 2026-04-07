@@ -132,6 +132,63 @@ class TestContextPropagation:
         BaseTracer._set_propagating_baggage_key("some.key", "val")
 
 
+class TestSubagentTracing:
+    def test_start_subagent_span_creates_linked_root_trace(
+        self, tracer, collecting_exporter
+    ):
+        with BaseTracer.start_as_current_span("parent"):
+            with BaseTracer.start_subagent_span("child-root"):
+                pass
+
+        parent = next(s for s in collecting_exporter.spans if s.name == "parent")
+        marker = next(
+            s
+            for s in collecting_exporter.spans
+            if s.name == "child-root" and s.context.trace_id == parent.context.trace_id
+        )
+        child = next(
+            s
+            for s in collecting_exporter.spans
+            if s.name == "child-root" and s.context.trace_id != parent.context.trace_id
+        )
+
+        assert parent.context.trace_id != child.context.trace_id
+        assert marker.parent is not None
+        assert marker.parent.span_id == parent.context.span_id
+        assert child.parent is None
+        assert len(child.links) == 1
+        assert child.links[0].context.trace_id == marker.context.trace_id
+        assert child.links[0].context.span_id == marker.context.span_id
+        assert marker.attributes[AttributeKeys.JUDGMENT_LINK_TARGET_TRACE_ID] == format(
+            child.context.trace_id, "032x"
+        )
+        assert marker.attributes[AttributeKeys.JUDGMENT_LINK_TARGET_SPAN_ID] == format(
+            child.context.span_id, "016x"
+        )
+        assert child.attributes[AttributeKeys.JUDGMENT_LINK_SOURCE_TRACE_ID] == format(
+            marker.context.trace_id, "032x"
+        )
+        assert child.attributes[AttributeKeys.JUDGMENT_LINK_SOURCE_SPAN_ID] == format(
+            marker.context.span_id, "016x"
+        )
+
+    def test_start_subagent_span_propagates_baggage(self, tracer, collecting_exporter):
+        with BaseTracer.start_as_current_span("parent"):
+            BaseTracer.set_customer_id("cust-123")
+            BaseTracer.set_session_id("sess-123")
+            with BaseTracer.start_subagent_span("child-root"):
+                pass
+
+        child = next(s for s in collecting_exporter.spans if s.name == "child-root")
+        assert child.attributes[AttributeKeys.JUDGMENT_CUSTOMER_ID] == "cust-123"
+        assert child.attributes[AttributeKeys.JUDGMENT_SESSION_ID] == "sess-123"
+
+    def test_start_subagent_span_requires_active_parent(self, tracer):
+        with pytest.raises(RuntimeError, match="active parent span"):
+            with BaseTracer.start_subagent_span("child-root"):
+                pass
+
+
 class TestGuardBranches:
     def test_set_attribute_noop_outside_span(self, tracer):
         BaseTracer.set_attribute("key", "value")

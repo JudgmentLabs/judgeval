@@ -38,6 +38,10 @@ class AttributeKeys(str, Enum):
 
     JUDGMENT_SESSION_ID = "judgment.session_id"
     JUDGMENT_PROJECT_ID_OVERRIDE = "judgment.project_id_override"
+    JUDGMENT_LINK_SOURCE_TRACE_ID = "judgment.link.source_trace_id"
+    JUDGMENT_LINK_SOURCE_SPAN_ID = "judgment.link.source_span_id"
+    JUDGMENT_LINK_TARGET_TRACE_ID = "judgment.link.target_trace_id"
+    JUDGMENT_LINK_TARGET_SPAN_ID = "judgment.link.target_span_id"
 
     GEN_AI_PROMPT = "gen_ai.prompt"
     GEN_AI_COMPLETION = "gen_ai.completion"
