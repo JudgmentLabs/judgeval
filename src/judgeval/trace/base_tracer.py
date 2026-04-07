@@ -4,6 +4,7 @@ import contextvars
 import functools
 import inspect
 import json
+from opentelemetry import trace as trace_api
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -42,6 +43,7 @@ from judgeval.trace.generators import (
     _ObservedAsyncGenerator,
 )
 from judgeval.background_queue import enqueue as bg_enqueue
+from judgeval.logger import judgeval_logger
 
 if TYPE_CHECKING:
     from judgeval.internal.api import JudgmentSyncClient
@@ -301,10 +303,25 @@ class BaseTracer(ABC):
         *,
         end_on_exit: bool = True,
     ) -> Iterator[LinkedSubagentSpans]:
-        tracer = BaseTracer._get_active_tracer()
-        source_span = BaseTracer.get_current_span()
+        proxy = BaseTracer._get_proxy_provider()
+        tracer = proxy.get_active_tracer()
+        if tracer is None:
+            judgeval_logger.warning(
+                "start_subagent_span() called without an active tracer. "
+                "Continuing without subagent tracing."
+            )
+            yield LinkedSubagentSpans(trace_api.INVALID_SPAN, trace_api.INVALID_SPAN)
+            return
+
+        source_span = proxy.get_current_span()
         if source_span is None or not source_span.is_recording():
-            raise RuntimeError("start_subagent_span() requires an active parent span.")
+            judgeval_logger.warning(
+                "start_subagent_span() called without an active parent span. "
+                "Continuing without subagent tracing."
+            )
+            yield LinkedSubagentSpans(trace_api.INVALID_SPAN, trace_api.INVALID_SPAN)
+            return
+
         with tracer._start_linked_root_span(
             name,
             source_span,

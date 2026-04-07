@@ -10,16 +10,26 @@ from opentelemetry.util.types import Attributes
 
 from judgeval.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
 from judgeval.judgment_attribute_keys import AttributeKeys
+from judgeval.logger import judgeval_logger
 from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
 
 if TYPE_CHECKING:
     from judgeval.trace.tracer import Tracer
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class LinkedSubagentSpans:
     invocation_span: Span
     child_span: Span
+
+
+def _noop_linked_spans(
+    invocation_span: Span = trace_api.INVALID_SPAN,
+) -> LinkedSubagentSpans:
+    return LinkedSubagentSpans(
+        invocation_span=invocation_span,
+        child_span=trace_api.INVALID_SPAN,
+    )
 
 
 class SubagentManager:
@@ -39,9 +49,12 @@ class SubagentManager:
     ) -> Iterator[LinkedSubagentSpans]:
         source_ctx = source_span.get_span_context()
         if not source_ctx.is_valid:
-            raise RuntimeError(
-                "start_subagent_span() requires a valid parent span context."
+            judgeval_logger.warning(
+                "start_subagent_span() received an invalid parent span context. "
+                "Continuing without subagent tracing."
             )
+            yield _noop_linked_spans()
+            return
 
         proxy = JudgmentTracerProvider.get_instance()
         invocation_span = proxy.get_tracer(
@@ -50,9 +63,12 @@ class SubagentManager:
         try:
             invocation_ctx = invocation_span.get_span_context()
             if not invocation_ctx.is_valid:
-                raise RuntimeError(
-                    "Failed to create parent-side subagent invocation span."
+                judgeval_logger.warning(
+                    "Failed to create a valid parent-side subagent invocation span. "
+                    "Continuing without subagent tracing."
                 )
+                yield _noop_linked_spans()
+                return
             invocation_span.set_attribute(AttributeKeys.JUDGMENT_SPAN_KIND, "agent")
 
             child_attributes = dict(attributes or {})
@@ -64,18 +80,37 @@ class SubagentManager:
                 invocation_ctx.span_id, "016x"
             )
 
-            child_span = proxy.get_tracer(
-                JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
-            ).start_span(
-                name,
-                context=trace_api.set_span_in_context(
-                    trace_api.INVALID_SPAN,
-                    proxy.get_current_context(),
-                ),
-                attributes=child_attributes,
-                links=[trace_api.Link(invocation_ctx)],
-            )
+            try:
+                child_span = proxy.get_tracer(
+                    JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
+                ).start_span(
+                    name,
+                    context=trace_api.set_span_in_context(
+                        trace_api.INVALID_SPAN,
+                        proxy.get_current_context(),
+                    ),
+                    attributes=child_attributes,
+                    links=[trace_api.Link(invocation_ctx)],
+                )
+            except Exception as e:
+                judgeval_logger.warning(
+                    "Failed to create linked subagent child span '%s': %s. "
+                    "Continuing without subagent tracing.",
+                    name,
+                    e,
+                )
+                yield _noop_linked_spans(invocation_span)
+                return
+
             child_ctx = child_span.get_span_context()
+            if not child_ctx.is_valid:
+                judgeval_logger.warning(
+                    "Failed to create a valid linked subagent child span for '%s'. "
+                    "Continuing without subagent tracing.",
+                    name,
+                )
+                yield _noop_linked_spans(invocation_span)
+                return
 
             if (
                 invocation_span.is_recording()

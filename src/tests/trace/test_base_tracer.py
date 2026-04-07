@@ -186,14 +186,19 @@ class TestSubagentTracing:
         assert child.attributes[AttributeKeys.JUDGMENT_CUSTOMER_ID] == "cust-123"
         assert child.attributes[AttributeKeys.JUDGMENT_SESSION_ID] == "sess-123"
 
-    def test_start_subagent_span_requires_active_parent(self, tracer):
-        with pytest.raises(RuntimeError, match="active parent span"):
-            with BaseTracer.start_subagent_span("child-root"):
-                pass
+    def test_start_subagent_span_without_parent_logs_and_noops(self, tracer):
+        from judgeval.logger import judgeval_logger
 
-    def test_start_subagent_span_ends_invocation_when_child_creation_fails(
+        with patch.object(judgeval_logger, "warning") as warning_mock:
+            with BaseTracer.start_subagent_span("child-root") as span:
+                assert not span.is_recording()
+
+        warning_mock.assert_called_once()
+
+    def test_start_subagent_span_child_creation_failure_logs_and_noops(
         self, tracer, collecting_exporter
     ):
+        from judgeval.logger import judgeval_logger
         from judgeval.trace.judgment_tracer_provider import ProxyTracer
 
         original_start_span = ProxyTracer.start_span
@@ -208,19 +213,20 @@ class TestSubagentTracing:
                 return invocation_span
             raise RuntimeError("child creation failed")
 
-        with BaseTracer.start_as_current_span("parent"):
-            with patch.object(
-                ProxyTracer,
-                "start_span",
-                autospec=True,
-                side_effect=failing_start_span,
-            ):
-                with pytest.raises(RuntimeError, match="child creation failed"):
-                    with BaseTracer.start_subagent_span("child-root"):
-                        pass
+        with patch.object(judgeval_logger, "warning") as warning_mock:
+            with BaseTracer.start_as_current_span("parent"):
+                with patch.object(
+                    ProxyTracer,
+                    "start_span",
+                    autospec=True,
+                    side_effect=failing_start_span,
+                ):
+                    with BaseTracer.start_subagent_span("child-root") as span:
+                        assert not span.is_recording()
 
         assert invocation_span is not None
         assert not invocation_span.is_recording()
+        warning_mock.assert_called_once()
         assert any(s.name == "child-root" for s in collecting_exporter.spans)
 
 
