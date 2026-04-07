@@ -86,6 +86,41 @@ class TestObserveSync:
 
         assert double(5) == 10
 
+    def test_subagent_creates_linked_root_trace(self, tracer, collecting_exporter):
+        @BaseTracer.observe(span_type="agent")
+        def parent():
+            @BaseTracer.observe_subagent()
+            def child():
+                return "ok"
+
+            return child()
+
+        parent()
+
+        parent_span = next(s for s in collecting_exporter.spans if s.name == "parent")
+        marker_span = next(
+            s
+            for s in collecting_exporter.spans
+            if s.name == "child" and s.context.trace_id == parent_span.context.trace_id
+        )
+        child_span = next(
+            s
+            for s in collecting_exporter.spans
+            if s.name == "child" and s.context.trace_id != parent_span.context.trace_id
+        )
+        assert parent_span.context.trace_id != child_span.context.trace_id
+        assert marker_span.parent is not None
+        assert marker_span.parent.span_id == parent_span.context.span_id
+        assert marker_span.attributes[
+            AttributeKeys.JUDGMENT_LINK_TARGET_TRACE_ID
+        ] == format(child_span.context.trace_id, "032x")
+        assert "ok" in marker_span.attributes[AttributeKeys.JUDGMENT_OUTPUT]
+        assert child_span.attributes[
+            AttributeKeys.JUDGMENT_LINK_SOURCE_TRACE_ID
+        ] == format(marker_span.context.trace_id, "032x")
+        assert len(child_span.links) == 1
+        assert child_span.links[0].context.span_id == marker_span.context.span_id
+
 
 class TestObserveAsync:
     @pytest.mark.asyncio
@@ -118,6 +153,43 @@ class TestObserveAsync:
 
         span = next(s for s in collecting_exporter.spans if s.name == "bad")
         assert span.status.status_code.name == "ERROR"
+
+    @pytest.mark.asyncio
+    async def test_async_subagent_creates_linked_root_trace(
+        self, tracer, collecting_exporter
+    ):
+        @BaseTracer.observe(span_type="agent")
+        async def parent():
+            @BaseTracer.observe_subagent()
+            async def child():
+                return "ok"
+
+            return await child()
+
+        await parent()
+
+        parent_span = next(s for s in collecting_exporter.spans if s.name == "parent")
+        marker_span = next(
+            s
+            for s in collecting_exporter.spans
+            if s.name == "child" and s.context.trace_id == parent_span.context.trace_id
+        )
+        child_span = next(
+            s
+            for s in collecting_exporter.spans
+            if s.name == "child" and s.context.trace_id != parent_span.context.trace_id
+        )
+        assert parent_span.context.trace_id != child_span.context.trace_id
+        assert marker_span.parent is not None
+        assert marker_span.parent.span_id == parent_span.context.span_id
+        assert marker_span.attributes[
+            AttributeKeys.JUDGMENT_LINK_TARGET_SPAN_ID
+        ] == format(child_span.context.span_id, "016x")
+        assert marker_span.attributes[AttributeKeys.JUDGMENT_INPUT] == "{}"
+        assert "ok" in marker_span.attributes[AttributeKeys.JUDGMENT_OUTPUT]
+        assert child_span.attributes[
+            AttributeKeys.JUDGMENT_LINK_SOURCE_SPAN_ID
+        ] == format(marker_span.context.span_id, "016x")
 
 
 class TestObserveGenerator:
