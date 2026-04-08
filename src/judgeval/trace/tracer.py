@@ -6,14 +6,12 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import SpanLimits, TracerProvider
 from opentelemetry.sdk.trace.sampling import Sampler
 from opentelemetry.sdk.trace import SpanProcessor
-from opentelemetry.trace import Span
 
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
 from judgeval.logger import judgeval_logger
 from judgeval.utils.serialize import safe_serialize
 from judgeval.trace.base_tracer import BaseTracer
 from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
-from judgeval.trace.internal import LinkedTraceManager
 from judgeval.trace.exporters.judgment_span_exporter import JudgmentSpanExporter
 from judgeval.trace.exporters.noop_judgment_span_exporter import (
     NoOpJudgmentSpanExporter,
@@ -87,7 +85,6 @@ class Tracer(BaseTracer):
         "_span_exporter",
         "_span_processor",
         "_enable_monitoring",
-        "_linked_trace_manager",
     )
 
     TRACER_NAME = JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
@@ -119,7 +116,6 @@ class Tracer(BaseTracer):
         self._enable_monitoring = enable_monitoring
         self._span_exporter: Optional[JudgmentSpanExporter] = None
         self._span_processor: Optional[JudgmentSpanProcessor] = None
-        self._linked_trace_manager = LinkedTraceManager(self)
 
     @classmethod
     def init(
@@ -261,21 +257,6 @@ class Tracer(BaseTracer):
             tracer.set_active()
 
         return tracer
-
-    def _start_linked_trace(
-        self,
-        name: str,
-        source_span: Span,
-        attributes: Optional[Dict[str, Any]] = None,
-        *,
-        end_on_exit: bool = True,
-    ):
-        return self._linked_trace_manager.start_linked_trace(
-            name,
-            source_span,
-            attributes=attributes,
-            end_on_exit=end_on_exit,
-        )
 
     def set_active(self) -> bool:
         """Set this tracer as the globally active tracer.

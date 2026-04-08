@@ -33,6 +33,7 @@ class _ObservedGeneratorBase:
         "_context",
         "_closed",
         "_disable_generator_yield_span",
+        "_on_finish",
     )
 
     _generator: Any
@@ -42,6 +43,7 @@ class _ObservedGeneratorBase:
     _context: contextvars.Context
     _closed: bool
     _disable_generator_yield_span: bool
+    _on_finish: Optional[Callable[[], None]]
 
     def __init__(
         self,
@@ -51,6 +53,7 @@ class _ObservedGeneratorBase:
         tracer: trace.Tracer,
         context: contextvars.Context,
         disable_generator_yield_span: bool = False,
+        on_finish: Optional[Callable[[], None]] = None,
     ) -> None:
         self._generator = generator
         self._span = span
@@ -59,6 +62,7 @@ class _ObservedGeneratorBase:
         self._context = context
         self._closed = False
         self._disable_generator_yield_span = disable_generator_yield_span
+        self._on_finish = on_finish
 
     def _emit_yield_span(self, item: Any) -> None:
         if self._disable_generator_yield_span:
@@ -83,8 +87,14 @@ class _ObservedGeneratorBase:
         if self._closed:
             return
         self._closed = True
-        self._span.set_attribute(AttributeKeys.JUDGMENT_SPAN_KIND, "generator")
-        self._span.end()
+        callback = self._on_finish
+        self._on_finish = None
+        try:
+            self._span.set_attribute(AttributeKeys.JUDGMENT_SPAN_KIND, "generator")
+            self._span.end()
+        finally:
+            if callback is not None:
+                callback()
 
     def __del__(self) -> None:
         self._finish()

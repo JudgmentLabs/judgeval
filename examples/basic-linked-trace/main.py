@@ -17,7 +17,7 @@ def search_hotels(destination: str) -> str:
     return f"Central hotel in {destination}"
 
 
-@Tracer.observe_linked_trace()
+@Tracer.observe(span_type="agent", fork=True)
 def plan_transport_and_lodging(destination: str) -> dict[str, object]:
     flights = search_flights(destination)
     hotel = search_hotels(destination)

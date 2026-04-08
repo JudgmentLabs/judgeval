@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from judgeval.trace.internal.linked_trace import (
-    LinkedTraceManager,
     LinkedTraceSpans,
+    start_linked_trace,
 )
 
-__all__ = ["LinkedTraceSpans", "LinkedTraceManager"]
+__all__ = ["LinkedTraceSpans", "start_linked_trace"]
