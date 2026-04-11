@@ -1,0 +1,13 @@
+[project]
+name = "basic-distributed-tracing-example"
+version = "0.0.1"
+requires-python = ">=3.10"
+dependencies = [
+    "judgeval",
+    "fastapi",
+    "uvicorn",
+    "httpx",
+]
+
+[tool.uv.sources]
+judgeval = { path = "../../", editable = true }
