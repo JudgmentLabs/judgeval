@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+import json
+import os
+import sys
+import urllib.error
+import urllib.request
+
+proxy = os.environ.get("OSIRIS_PROXY_URL", "").rstrip("/")
+session_id = os.environ.get("OSIRIS_CREDENTIAL_SESSION_ID", "")
+token = os.environ.get("GITHUB_TOKEN", "")
+if not proxy or not session_id or not token:
+    print("gh command is not available through osiris-proxy", file=sys.stderr)
+    raise SystemExit(2)
+url = f"{proxy}/v1/credential-sessions/{session_id}/github/gh"
+body = json.dumps({"args": sys.argv[1:]}).encode()
+request = urllib.request.Request(
+    url,
+    data=body,
+    headers={
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    },
+    method="POST",
+)
+try:
+    with urllib.request.urlopen(request) as response:
+        payload = json.loads(response.read().decode())
+except urllib.error.HTTPError as exc:
+    print(exc.read().decode() or str(exc), file=sys.stderr)
+    raise SystemExit(exc.code if exc.code < 128 else 2)
+output = payload.get("output", "")
+if output:
+    print(output, end="" if output.endswith("\n") else "\n")
+raise SystemExit(int(payload.get("returncode", 0)))
