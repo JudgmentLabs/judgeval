@@ -50,7 +50,7 @@ from judgeval.logger import judgeval_logger
 if TYPE_CHECKING:
     from judgeval.internal.api import JudgmentSyncClient
     from judgeval.trace.processors.judgment_span_processor import (
-        JudgmentSpanProcessor,
+        JudgmentSpanProcessorLike,
     )
     from judgeval.trace.exporters.judgment_span_exporter import JudgmentSpanExporter
 
@@ -145,7 +145,7 @@ class BaseTracer(ABC):
     # ------------------------------------------------------------------ #
 
     @abstractmethod
-    def get_span_processor(self) -> JudgmentSpanProcessor:
+    def get_span_processor(self) -> JudgmentSpanProcessorLike:
         """Return the span processor for this tracer."""
 
     @abstractmethod

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import threading
-from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from weakref import finalize
 
 from opentelemetry.context import Context
 from opentelemetry.sdk.trace import ReadableSpan, Span
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExporter
 from opentelemetry.trace.span import SpanContext
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter
 
 from judgeval.judgment_attribute_keys import AttributeKeys, InternalAttributeKeys
 from judgeval.utils.decorators.dont_throw import dont_throw
@@ -16,60 +16,41 @@ from judgeval.trace.processors.judgment_baggage_processor import (
 )
 
 if TYPE_CHECKING:
+    from judgeval.data.example import Example
     from judgeval.trace.base_tracer import BaseTracer
 
 
-@runtime_checkable
-class JudgmentSpanProcessorLike(Protocol):
-    """Structural type for the Judgment-specific hooks ``BaseTracer`` calls
-    on a span processor.
+class OfflineJudgmentSpanProcessor(SimpleSpanProcessor):
+    """Synchronous span processor used by :class:`OfflineTracer`.
 
-    Implementers are also expected to be OTel ``SpanProcessor`` instances at
-    runtime (so they can be registered via ``TracerProvider.add_span_processor``),
-    but that nominal relationship is intentionally not encoded here -- mypy
-    forbids a Protocol from inheriting a non-Protocol base, and the only
-    callers that need ``SpanProcessor`` semantics handle that bridge locally.
-    """
+    Unlike :class:`JudgmentSpanProcessor` (which extends
+    ``BatchSpanProcessor`` and exports spans on a background worker
+    thread), this processor exports each span synchronously via the
+    configured exporter as soon as it ends. That matches the
+    short-lived, deterministic lifecycle of offline / experiment runs
+    where you want the trace flushed before moving on to the next
+    example.
 
-    def emit_partial(self) -> None: ...
+    Per-span state management (counters, lists), partial-span emission,
+    and baggage propagation are implemented locally instead of being
+    inherited from the batched ``JudgmentSpanProcessor`` so that nothing
+    in this class spawns background threads.
 
-    def state_set(self, span_context: SpanContext, key: str, value: Any) -> None: ...
-
-    def state_get(
-        self, span_context: SpanContext, key: str, default: Any = None
-    ) -> Any: ...
-
-    def state_incr(self, span_context: SpanContext, key: str) -> int: ...
-
-    def state_append(
-        self, span_context: SpanContext, key: str, item: Any
-    ) -> list[Any]: ...
-
-
-class JudgmentSpanProcessor(BatchSpanProcessor):
-    """Span processor that manages span lifecycle, state, and batched export.
-
-    Extends the OpenTelemetry ``BatchSpanProcessor`` with per-span mutable
-    state (counters, lists), partial-span emission for streaming updates,
-    and automatic baggage propagation.
-
-    Created automatically by ``Tracer.init()``. Use it directly only when
-    building a custom tracing pipeline.
-
-    Args:
-        tracer: The ``BaseTracer`` instance that owns this processor.
-        exporter: The span exporter to send completed spans to.
-        max_queue_size: Maximum number of spans queued before dropping.
-        schedule_delay_millis: Delay between export batches in milliseconds.
-        max_export_batch_size: Maximum spans per export batch.
-        export_timeout_millis: Timeout for each export call in milliseconds.
+    On every *root* span end this processor also appends a new
+    :class:`Example` to the caller-supplied ``dataset`` list, populated
+    with the static ``example_fields`` plus an ``offline_trace_id`` field
+    referencing the offline trace.
     """
 
     __slots__ = (
         "tracer",
-        "_span_finalizers",
+        "_dataset",
+        "_example_fields",
+        "_dataset_lock",
+        "_seen_trace_ids",
+        "_state_lock",
         "_state",
-        "_lock",
+        "_span_finalizers",
         "_baggage_processor",
     )
 
@@ -79,26 +60,27 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
         exporter: SpanExporter,
         /,
         *,
-        max_queue_size: int | None = None,
-        schedule_delay_millis: float | None = None,
-        max_export_batch_size: int | None = None,
-        export_timeout_millis: float | None = None,
+        dataset: List[Example],
+        example_fields: Optional[Dict[str, Any]] = None,
     ):
+        super().__init__(exporter)
         self.tracer = tracer
-        super().__init__(
-            exporter,
-            max_queue_size=max_queue_size,
-            schedule_delay_millis=schedule_delay_millis,
-            max_export_batch_size=max_export_batch_size,
-            export_timeout_millis=export_timeout_millis,
-        )
-        self._lock = threading.RLock()
-        self._span_finalizers: dict[tuple[int, int], finalize] = {}
+        self._dataset = dataset
+        self._example_fields: Dict[str, Any] = dict(example_fields or {})
+        self._dataset_lock = threading.Lock()
+        self._seen_trace_ids: set[str] = set()
+
+        self._state_lock = threading.RLock()
         self._state: dict[tuple[int, int], dict[str, Any]] = {}
+        self._span_finalizers: dict[tuple[int, int], finalize] = {}
         self._baggage_processor = JudgmentBaggageProcessor()
 
+    # ------------------------------------------------------------------ #
+    #  State management (mirrors JudgmentSpanProcessor's API)            #
+    # ------------------------------------------------------------------ #
+
     def _cleanup_span_state(self, span_key: tuple[int, int]) -> None:
-        with self._lock:
+        with self._state_lock:
             self._state.pop(span_key, None)
             self._span_finalizers.pop(span_key, None)
 
@@ -106,7 +88,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
         if not span.context:
             return
         span_key = (span.context.trace_id, span.context.span_id)
-        with self._lock:
+        with self._state_lock:
             self._span_finalizers[span_key] = finalize(
                 span, self._cleanup_span_state, span_key
             )
@@ -114,7 +96,7 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
     def state_set(self, span_context: SpanContext, key: str, value: Any) -> None:
         """Store a value in the mutable state for a span."""
         span_key = (span_context.trace_id, span_context.span_id)
-        with self._lock:
+        with self._state_lock:
             self._state.setdefault(span_key, {})[key] = value
 
     def state_get(
@@ -122,13 +104,13 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
     ) -> Any:
         """Retrieve a value from the mutable state for a span."""
         span_key = (span_context.trace_id, span_context.span_id)
-        with self._lock:
+        with self._state_lock:
             return self._state.get(span_key, {}).get(key, default)
 
     def state_incr(self, span_context: SpanContext, key: str) -> int:
         """Atomically increment a counter. Returns the value before increment."""
         span_key = (span_context.trace_id, span_context.span_id)
-        with self._lock:
+        with self._state_lock:
             attrs = self._state.setdefault(span_key, {})
             stored = attrs.get(key, 0)
             prev: int = stored if isinstance(stored, int) else 0
@@ -138,12 +120,16 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
     def state_append(self, span_context: SpanContext, key: str, item: Any) -> list[Any]:
         """Atomically append to a list. Returns the new list."""
         span_key = (span_context.trace_id, span_context.span_id)
-        with self._lock:
+        with self._state_lock:
             attrs = self._state.setdefault(span_key, {})
             stored = attrs.get(key, [])
             lst: list[Any] = [*(stored if isinstance(stored, list) else []), item]
             attrs[key] = lst
             return lst
+
+    # ------------------------------------------------------------------ #
+    #  Span lifecycle                                                    #
+    # ------------------------------------------------------------------ #
 
     def _emit_span(self, span: ReadableSpan, *, is_partial: bool = False) -> None:
         if not span.context:
@@ -170,11 +156,12 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
             end_time=span.end_time or span.start_time,
             instrumentation_scope=span.instrumentation_scope,
         )
+        # SimpleSpanProcessor.on_end exports the span synchronously.
         super().on_end(emitted_span)
 
     @dont_throw
     def emit_partial(self) -> None:
-        """Export the current span's in-progress state for streaming updates."""
+        """Synchronously export the current span's in-progress state."""
         from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
 
         proxy = JudgmentTracerProvider.get_instance()
@@ -189,6 +176,29 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
         ):
             return
         self._emit_span(span=span, is_partial=True)
+
+    @dont_throw
+    def _maybe_create_example(self, span: ReadableSpan) -> None:
+        if span.parent is not None or not span.context:
+            return
+
+        trace_id_hex = format(span.context.trace_id, "032x")
+
+        with self._dataset_lock:
+            if trace_id_hex in self._seen_trace_ids:
+                return
+            self._seen_trace_ids.add(trace_id_hex)
+
+        from judgeval.data.example import Example
+
+        properties: Dict[str, Any] = {
+            **self._example_fields,
+            "offline_trace_id": trace_id_hex,
+        }
+        example = Example.create(**properties)
+
+        with self._dataset_lock:
+            self._dataset.append(example)
 
     @dont_throw
     def on_start(self, span: Span, parent_context: Optional[Context] = None) -> None:
@@ -206,6 +216,11 @@ class JudgmentSpanProcessor(BatchSpanProcessor):
                 span.context, InternalAttributeKeys.CANCELLED, False
             )
             if not is_cancelled:
+                self._maybe_create_example(span)
                 self._emit_span(span=span)
         finally:
             self._cleanup_span_state(span_key)
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        """No-op flush: ``SimpleSpanProcessor`` exports synchronously."""
+        return True
