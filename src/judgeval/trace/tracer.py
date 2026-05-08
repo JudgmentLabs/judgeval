@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Optional, Sequence
+from typing import Any, Callable, ClassVar, Dict, Optional, Sequence, cast
 
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import SpanLimits, TracerProvider
+from opentelemetry.sdk.trace import SpanLimits, SpanProcessor, TracerProvider
 from opentelemetry.sdk.trace.sampling import Sampler
-from opentelemetry.sdk.trace import SpanProcessor
 
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
 from judgeval.logger import judgeval_logger
@@ -16,7 +15,10 @@ from judgeval.trace.exporters.judgment_span_exporter import JudgmentSpanExporter
 from judgeval.trace.exporters.noop_judgment_span_exporter import (
     NoOpJudgmentSpanExporter,
 )
-from judgeval.trace.processors.judgment_span_processor import JudgmentSpanProcessor
+from judgeval.trace.processors.judgment_span_processor import (
+    JudgmentSpanProcessor,
+    JudgmentSpanProcessorLike,
+)
 from judgeval.trace.processors.noop_judgment_span_processor import (
     NoOpJudgmentSpanProcessor,
 )
@@ -89,6 +91,8 @@ class Tracer(BaseTracer):
 
     TRACER_NAME = JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
 
+    _ALWAYS_ATTACH_PROCESSOR: ClassVar[bool] = False
+
     def __init__(
         self,
         project_name: Optional[str],
@@ -115,7 +119,7 @@ class Tracer(BaseTracer):
         )
         self._enable_monitoring = enable_monitoring
         self._span_exporter: Optional[JudgmentSpanExporter] = None
-        self._span_processor: Optional[JudgmentSpanProcessor] = None
+        self._span_processor: Optional[JudgmentSpanProcessorLike] = None
 
     @classmethod
     def init(
@@ -131,6 +135,8 @@ class Tracer(BaseTracer):
         sampler: Optional[Sampler] = None,
         span_limits: Optional[SpanLimits] = None,
         span_processors: Optional[Sequence[SpanProcessor]] = None,
+        *,
+        _extra_init_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Tracer:
         """Create and activate a new Tracer.
 
@@ -174,25 +180,25 @@ class Tracer(BaseTracer):
 
         if not project_name:
             judgeval_logger.warning(
-                "project_name not provided. Tracer will not export spans."
+                f"project_name not provided. {cls.__name__} will not export spans."
             )
             enable_monitoring = False
 
         if not api_key:
             judgeval_logger.warning(
-                "api_key not provided. Tracer will not export spans."
+                f"api_key not provided. {cls.__name__} will not export spans."
             )
             enable_monitoring = False
 
         if not organization_id:
             judgeval_logger.warning(
-                "organization_id not provided. Tracer will not export spans."
+                f"organization_id not provided. {cls.__name__} will not export spans."
             )
             enable_monitoring = False
 
         if not api_url:
             judgeval_logger.warning(
-                "api_url not provided. Tracer will not export spans."
+                f"api_url not provided. {cls.__name__} will not export spans."
             )
             enable_monitoring = False
 
@@ -209,11 +215,11 @@ class Tracer(BaseTracer):
             project_id = resolve_project_id(client, project_name)
             if not project_id:
                 judgeval_logger.warning(
-                    f"Project '{project_name}' not found. Tracer will not export spans."
+                    f"Project '{project_name}' not found. {cls.__name__} will not export spans."
                 )
                 enable_monitoring = False
 
-        resource_attrs = {
+        resource_attrs: Dict[str, Any] = {
             "service.name": project_name or "unknown",
             "telemetry.sdk.name": cls.TRACER_NAME,
             "telemetry.sdk.version": get_version(),
@@ -242,10 +248,13 @@ class Tracer(BaseTracer):
             tracer_provider=tracer_provider,
             enable_monitoring=enable_monitoring,
             client=client,
+            **(_extra_init_kwargs or {}),
         )
 
-        if enable_monitoring:
-            tracer_provider.add_span_processor(tracer.get_span_processor())
+        if enable_monitoring or cls._ALWAYS_ATTACH_PROCESSOR:
+            tracer_provider.add_span_processor(
+                cast(SpanProcessor, tracer.get_span_processor())
+            )
 
         for processor in span_processors or []:
             tracer_provider.add_span_processor(processor)
@@ -300,7 +309,7 @@ class Tracer(BaseTracer):
             )
         return self._span_exporter
 
-    def get_span_processor(self) -> JudgmentSpanProcessor:
+    def get_span_processor(self) -> JudgmentSpanProcessorLike:
         """Return the span processor for this tracer.
 
         Returns a no-op processor when monitoring is disabled.

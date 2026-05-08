@@ -5,6 +5,7 @@ from judgeval.internal.api import JudgmentSyncClient
 from judgeval.utils import resolve_project_id
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
 from judgeval.logger import judgeval_logger
+from judgeval.judgeval_offline_tracer import JudgevalOfflineTracer
 
 
 class Judgeval:
@@ -66,6 +67,7 @@ class Judgeval:
         "_internal_client",
         "_project_name",
         "_project_id",
+        "_offline_tracer",
     )
 
     def __init__(
@@ -107,6 +109,19 @@ class Judgeval:
                 f"Project '{project_name}' not found. "
                 "Some operations requiring project_id will be skipped."
             )
+
+        self._offline_tracer = JudgevalOfflineTracer(self)
+
+    @property
+    def offline_tracer(self):
+        """Create offline / experiment traces tied to this project.
+
+        Use ``client.offline_tracer.init(dataset=..., example_fields=...)`` —
+        project and credentials come from this ``Judgeval`` instance.
+
+        Decorate traced functions with ``Tracer.observe`` as usual.
+        """
+        return self._offline_tracer
 
     @property
     def evaluation(self):

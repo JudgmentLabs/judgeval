@@ -2,7 +2,6 @@ from judgeval.utils.version_check import check_latest_version
 from judgeval.judgeval import Judgeval
 from judgeval.trace import (
     Tracer,
-    OfflineTracer,
     JudgmentTracerProvider,
     wrap,
     propagation,
@@ -15,7 +14,6 @@ check_latest_version()
 __all__ = [
     "Judgeval",
     "Tracer",
-    "OfflineTracer",
     "JudgmentTracerProvider",
     "propagation",
     "wrap",
