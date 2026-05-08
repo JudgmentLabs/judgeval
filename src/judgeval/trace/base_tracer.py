@@ -50,7 +50,7 @@ from judgeval.logger import judgeval_logger
 if TYPE_CHECKING:
     from judgeval.internal.api import JudgmentSyncClient
     from judgeval.trace.processors.judgment_span_processor import (
-        JudgmentSpanProcessorLike,
+        JudgmentSpanProcessor,
     )
     from judgeval.trace.exporters.judgment_span_exporter import JudgmentSpanExporter
 
@@ -145,7 +145,7 @@ class BaseTracer(ABC):
     # ------------------------------------------------------------------ #
 
     @abstractmethod
-    def get_span_processor(self) -> JudgmentSpanProcessorLike:
+    def get_span_processor(self) -> JudgmentSpanProcessor:
         """Return the span processor for this tracer."""
 
     @abstractmethod
@@ -338,67 +338,6 @@ class BaseTracer(ABC):
         ) as span:
             BaseTracer._emit_partial()
             yield span
-
-    @staticmethod
-    @contextmanager
-    def continue_trace(carrier: Any) -> Iterator[Any]:
-        """Continue a distributed trace from an upstream service.
-
-        Extracts W3C trace context and Judgment baggage from ``carrier``
-        and makes it the active context for the duration of the block.
-        Any span started inside — including ``@Tracer.observe`` functions
-        — becomes a child of the upstream parent, stitching your service
-        into the caller's trace.
-
-        Use this at the entry point of an inbound request (HTTP handler,
-        message queue consumer, RPC dispatcher, etc.) to join the trace
-        started by the upstream caller.
-
-        Args:
-            carrier: A mapping containing propagation keys. Typically
-                ``request.headers`` from FastAPI, Flask, or Starlette,
-                but any dict-shaped mapping with lowercase keys works
-                (message queue attributes, Lambda event headers, RPC
-                metadata, etc.). If the carrier contains no trace
-                context, the block runs with a fresh context — no error.
-
-        Yields:
-            The extracted OTel ``Context``. Most callers can ignore
-            this; it is exposed for advanced use cases like reading
-            baggage off the upstream context.
-
-        Examples:
-            FastAPI:
-
-            ```python
-            @Tracer.observe(span_type="agent")
-            def handle(payload): ...
-
-            @app.post("/run")
-            async def run(request: Request):
-                with Tracer.continue_trace(request.headers):
-                    return handle(await request.json())
-            ```
-
-            Propagating in the opposite direction (outbound):
-
-            ```python
-            from judgeval.trace.propagation import inject
-
-            headers = {}
-            inject(headers)
-            httpx.post(downstream_url, headers=headers, json=payload)
-            ```
-        """
-        from judgeval.trace.propagation import extract
-
-        proxy = BaseTracer._get_proxy_provider()
-        ctx = extract(carrier)
-        token = proxy.attach_context(ctx)
-        try:
-            yield ctx
-        finally:
-            proxy.detach_context(token)
 
     @staticmethod
     @contextmanager

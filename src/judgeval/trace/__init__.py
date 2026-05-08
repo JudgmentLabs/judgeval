@@ -3,10 +3,7 @@ from __future__ import annotations
 from judgeval.trace.base_tracer import BaseTracer
 from judgeval.trace.tracer import Tracer
 from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
-from judgeval.trace.exporters import (
-    JudgmentSpanExporter,
-    NoOpJudgmentSpanExporter,
-)
+from judgeval.trace.exporters import JudgmentSpanExporter, NoOpJudgmentSpanExporter
 from judgeval.trace.processors import (
     JudgmentSpanProcessor,
     NoOpJudgmentSpanProcessor,

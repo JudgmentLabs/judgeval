@@ -16,10 +16,10 @@ from judgeval.logger import judgeval_logger
 from judgeval.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
 
 if TYPE_CHECKING:
-    from judgeval.trace.base_tracer import BaseTracer as JudgmentTracer
+    from judgeval.trace.tracer import Tracer as JudgmentTracer
 
 _Links = Optional[Sequence[Link]]
-_active_tracer_var: ContextVar[Optional["JudgmentTracer"]] = ContextVar(
+_active_tracer_var: ContextVar[Optional[JudgmentTracer]] = ContextVar(
     "active_tracer", default=None
 )
 

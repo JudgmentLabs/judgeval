@@ -1,21 +1,24 @@
 from __future__ import annotations
 
-from typing import Any, Callable, ClassVar, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
+from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import SpanLimits, SpanProcessor, TracerProvider
 from opentelemetry.sdk.trace.sampling import Sampler
 
 from judgeval.data.example import Example
+from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
 from judgeval.internal.api import JudgmentSyncClient
 from judgeval.trace.exporters.judgment_span_exporter import JudgmentSpanExporter
-from judgeval.trace.exporters.noop_judgment_span_exporter import (
-    NoOpJudgmentSpanExporter,
-)
+from judgeval.trace.id_generator import IsolatedRandomIdGenerator
+from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
 from judgeval.trace.processors.offline_judgment_span_processor import (
     OfflineJudgmentSpanProcessor,
 )
 from judgeval.trace.tracer import Tracer
+from judgeval.utils import resolve_project_id
 from judgeval.utils.serialize import safe_serialize
+from judgeval.version import get_version
 
 
 OFFLINE_TRACES_PATH = "otel/v1/offline-traces"
@@ -24,29 +27,21 @@ OFFLINE_TRACES_PATH = "otel/v1/offline-traces"
 class OfflineTracer(Tracer):
     """Tracer for offline / experiment-style runs.
 
-    Behaves like ``Tracer`` for span creation and ``@Tracer.observe``,
-    with two differences:
+    Behaves like `Tracer` for span creation and `@Tracer.observe`, with
+    two differences:
 
     * Spans are pushed to the project's *offline* OTLP endpoint and stored
-      in the ``offline_otel_traces`` ClickHouse table. They do **not**
+      in the `offline_otel_traces` ClickHouse table. They do **not**
       appear on the live monitoring page.
-    * Each completed root span produces a new ``Example`` that is
-      appended to the caller-supplied ``dataset`` list. The example
-      carries the ``offline_trace_id`` of the offline trace plus any
-      static ``example_fields`` configured at init time.
+    * Each completed root span produces a new `Example` that is appended
+      to the caller-supplied `dataset` list. The example carries the
+      `offline_trace_id` of the offline trace plus any static
+      `example_fields` configured at init time.
 
-    OfflineTracer is **not** constructed directly by user code. Use
-    ``Judgeval.offline_tracer`` instead, which fills in project /
-    credentials from the active ``Judgeval`` client:
-
-    ```python
-    client = Judgeval(project_name="default_project")
-    results: list[Example] = []
-    tracer = client.offline_tracer.init(
-        dataset=results,
-        example_fields={"input": "...", "golden_output": "..."},
-    )
-    ```
+    Unlike `Tracer`, `OfflineTracer` requires all credentials upfront and
+    raises `ValueError` if any are missing — there is no no-op fallback.
+    Prefer `Judgeval.offline_tracer(...)` over calling `OfflineTracer.init`
+    directly so credentials are reused from the active `Judgeval` client.
     """
 
     __slots__ = (
@@ -54,22 +49,17 @@ class OfflineTracer(Tracer):
         "_example_fields",
     )
 
-    # The offline processor must run even when credentials are missing so
-    # the dataset list still gets populated.
-    _ALWAYS_ATTACH_PROCESSOR: ClassVar[bool] = True
-
     def __init__(
         self,
-        project_name: Optional[str],
-        project_id: Optional[str],
-        api_key: Optional[str],
-        organization_id: Optional[str],
-        api_url: Optional[str],
+        project_name: str,
+        project_id: str,
+        api_key: str,
+        organization_id: str,
+        api_url: str,
         environment: Optional[str],
         serializer: Callable[[Any], str],
         tracer_provider: TracerProvider,
-        enable_monitoring: bool,
-        client: Optional[JudgmentSyncClient],
+        client: JudgmentSyncClient,
         dataset: List[Example],
         example_fields: Optional[Dict[str, Any]],
     ):
@@ -82,7 +72,7 @@ class OfflineTracer(Tracer):
             environment=environment,
             serializer=serializer,
             tracer_provider=tracer_provider,
-            enable_monitoring=enable_monitoring,
+            enable_monitoring=True,
             client=client,
         )
         self._dataset = dataset
@@ -106,87 +96,111 @@ class OfflineTracer(Tracer):
         dataset: List[Example],
         example_fields: Optional[Dict[str, Any]] = None,
     ) -> "OfflineTracer":
-        """Create and activate a new OfflineTracer.
+        """Create and activate a new `OfflineTracer`.
 
-        Args mirror ``Tracer.init``, plus:
+        Args mirror `Tracer.init` plus:
             dataset: Caller-owned list. Each completed root span appends a
-                new ``Example`` with the offline trace id and any
-                ``example_fields`` configured here.
-            example_fields: Static fields copied onto every emitted
-                example (e.g. ``{"input": ..., "golden_output": ...}``).
+                new `Example` carrying the `offline_trace_id` of the trace
+                and the static `example_fields`.
+            example_fields: Static fields copied onto every emitted example
+                (e.g. `{"input": ..., "golden_output": ...}`).
 
-        Prefer ``Judgeval.offline_tracer`` over calling this directly so
-        credentials are reused from the ``Judgeval`` client.
+        Raises:
+            ValueError: If `project_name`, `api_key`, `organization_id`, or
+                `api_url` cannot be resolved (explicit arg or env var), or
+                if the project cannot be found on the backend.
         """
-        return super().init(  # type: ignore[return-value]
+        api_key = api_key or JUDGMENT_API_KEY
+        organization_id = organization_id or JUDGMENT_ORG_ID
+        api_url = api_url or JUDGMENT_API_URL
+
+        if not project_name:
+            raise ValueError("project_name is required for OfflineTracer")
+        if not api_key:
+            raise ValueError("api_key is required for OfflineTracer")
+        if not organization_id:
+            raise ValueError("organization_id is required for OfflineTracer")
+        if not api_url:
+            raise ValueError("api_url is required for OfflineTracer")
+
+        client = JudgmentSyncClient(api_url, api_key, organization_id)
+        project_id = resolve_project_id(client, project_name)
+        if not project_id:
+            raise ValueError(
+                f"Project '{project_name}' not found; cannot start OfflineTracer"
+            )
+
+        resource_attrs: Dict[str, Any] = {
+            "service.name": project_name,
+            "telemetry.sdk.name": cls.TRACER_NAME,
+            "telemetry.sdk.version": get_version(),
+            "judgment.offline": "true",
+        }
+        if environment:
+            resource_attrs["deployment.environment"] = environment
+        if resource_attributes:
+            resource_attrs.update(resource_attributes)
+
+        tracer_provider = TracerProvider(
+            resource=Resource.create(resource_attrs),
+            id_generator=IsolatedRandomIdGenerator(),
+            sampler=sampler,
+            span_limits=span_limits,
+        )
+
+        tracer = cls(
             project_name=project_name,
+            project_id=project_id,
             api_key=api_key,
             organization_id=organization_id,
             api_url=api_url,
             environment=environment,
-            set_active=set_active,
             serializer=serializer,
-            resource_attributes={
-                "judgment.offline": "true",
-                **(resource_attributes or {}),
-            },
-            sampler=sampler,
-            span_limits=span_limits,
-            span_processors=span_processors,
-            _extra_init_kwargs={
-                "dataset": dataset,
-                "example_fields": example_fields,
-            },
+            tracer_provider=tracer_provider,
+            client=client,
+            dataset=dataset,
+            example_fields=example_fields,
         )
 
-    # ------------------------------------------------------------------ #
-    # Exporter / processor overrides — the only behavioral differences
-    # vs. plain Tracer.
-    # ------------------------------------------------------------------ #
+        tracer_provider.add_span_processor(tracer.get_span_processor())
+        for processor in span_processors or []:
+            tracer_provider.add_span_processor(processor)
+
+        proxy = JudgmentTracerProvider.get_instance()
+        proxy.register(tracer)
+
+        if set_active:
+            tracer.set_active()
+
+        return tracer
 
     def get_span_exporter(self) -> JudgmentSpanExporter:
         """Return the offline span exporter for this tracer.
 
-        Falls back to a no-op exporter when monitoring is disabled.
+        Targets the project's offline OTLP endpoint. Credentials are
+        guaranteed present (validated in :meth:`init`).
         """
-        if self._span_exporter is not None:
-            return self._span_exporter
-
-        if (
-            not self._enable_monitoring
-            or not self.project_id
-            or not self.api_key
-            or not self.organization_id
-            or not self.api_url
-        ):
-            self._span_exporter = NoOpJudgmentSpanExporter()
-        else:
-            base = self.api_url.rstrip("/")
-            endpoint = f"{base}/{OFFLINE_TRACES_PATH}"
+        if self._span_exporter is None:
+            assert self.api_url is not None
+            assert self.api_key is not None
+            assert self.organization_id is not None
+            assert self.project_id is not None
             self._span_exporter = JudgmentSpanExporter(
-                endpoint=endpoint,
+                endpoint=f"{self.api_url.rstrip('/')}/{OFFLINE_TRACES_PATH}",
                 api_key=self.api_key,
                 organization_id=self.organization_id,
                 project_id=self.project_id,
             )
         return self._span_exporter
 
-    def get_span_processor(self) -> OfflineJudgmentSpanProcessor:  # type: ignore[override]
-        """Return the offline span processor for this tracer.
-
-        Unlike the online processor, this one is wired up regardless of
-        ``enable_monitoring`` so the dataset list is still populated when
-        spans only route to a no-op exporter (e.g. credentials missing).
-        """
-        if self._span_processor is not None:
-            assert isinstance(self._span_processor, OfflineJudgmentSpanProcessor)
-            return self._span_processor
-
-        processor = OfflineJudgmentSpanProcessor(
-            self,
-            self.get_span_exporter(),
-            dataset=self._dataset,
-            example_fields=self._example_fields,
-        )
-        self._span_processor = processor
-        return processor
+    def get_span_processor(self) -> OfflineJudgmentSpanProcessor:
+        """Return the offline span processor for this tracer."""
+        if self._span_processor is None:
+            self._span_processor = OfflineJudgmentSpanProcessor(
+                self,
+                self.get_span_exporter(),
+                dataset=self._dataset,
+                example_fields=self._example_fields,
+            )
+        assert isinstance(self._span_processor, OfflineJudgmentSpanProcessor)
+        return self._span_processor

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import threading
-from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Optional
 from weakref import finalize
 
 from opentelemetry.context import Context
@@ -17,33 +17,6 @@ from judgeval.trace.processors.judgment_baggage_processor import (
 
 if TYPE_CHECKING:
     from judgeval.trace.base_tracer import BaseTracer
-
-
-@runtime_checkable
-class JudgmentSpanProcessorLike(Protocol):
-    """Structural type for the Judgment-specific hooks ``BaseTracer`` calls
-    on a span processor.
-
-    Implementers are also expected to be OTel ``SpanProcessor`` instances at
-    runtime (so they can be registered via ``TracerProvider.add_span_processor``),
-    but that nominal relationship is intentionally not encoded here -- mypy
-    forbids a Protocol from inheriting a non-Protocol base, and the only
-    callers that need ``SpanProcessor`` semantics handle that bridge locally.
-    """
-
-    def emit_partial(self) -> None: ...
-
-    def state_set(self, span_context: SpanContext, key: str, value: Any) -> None: ...
-
-    def state_get(
-        self, span_context: SpanContext, key: str, default: Any = None
-    ) -> Any: ...
-
-    def state_incr(self, span_context: SpanContext, key: str) -> int: ...
-
-    def state_append(
-        self, span_context: SpanContext, key: str, item: Any
-    ) -> list[Any]: ...
 
 
 class JudgmentSpanProcessor(BatchSpanProcessor):

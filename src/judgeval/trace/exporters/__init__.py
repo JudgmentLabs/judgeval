@@ -5,7 +5,4 @@ from judgeval.trace.exporters.noop_judgment_span_exporter import (
     NoOpJudgmentSpanExporter,
 )
 
-__all__ = [
-    "JudgmentSpanExporter",
-    "NoOpJudgmentSpanExporter",
-]
+__all__ = ["JudgmentSpanExporter", "NoOpJudgmentSpanExporter"]
