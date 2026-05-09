@@ -165,7 +165,7 @@ class Judgeval:
         """
         from judgeval.trace.offline_tracer import OfflineTracer
 
-        return OfflineTracer.init(
+        return OfflineTracer.create(
             project_name=self._project_name,
             api_key=self._api_key,
             organization_id=self._organization_id,

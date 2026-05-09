@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Callable, ClassVar, Dict, List, Optional, Sequence
 
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import SpanLimits, SpanProcessor, TracerProvider
@@ -40,7 +40,7 @@ class OfflineTracer(Tracer):
 
     Unlike `Tracer`, `OfflineTracer` requires all credentials upfront and
     raises `ValueError` if any are missing — there is no no-op fallback.
-    Prefer `Judgeval.offline_tracer(...)` over calling `OfflineTracer.init`
+    Prefer `Judgeval.offline_tracer(...)` over calling `OfflineTracer.create`
     directly so credentials are reused from the active `Judgeval` client.
     """
 
@@ -48,6 +48,8 @@ class OfflineTracer(Tracer):
         "_dataset",
         "_example_fields",
     )
+
+    SUPPORTS_LIVE_INSTRUMENTATION: ClassVar[bool] = False
 
     def __init__(
         self,
@@ -79,7 +81,7 @@ class OfflineTracer(Tracer):
         self._example_fields: Dict[str, Any] = dict(example_fields or {})
 
     @classmethod
-    def init(  # type: ignore[override]
+    def create(
         cls,
         project_name: Optional[str] = None,
         api_key: Optional[str] = None,
@@ -178,7 +180,7 @@ class OfflineTracer(Tracer):
         """Return the offline span exporter for this tracer.
 
         Targets the project's offline OTLP endpoint. Credentials are
-        guaranteed present (validated in :meth:`init`).
+        guaranteed present (validated in `create`).
         """
         if self._span_exporter is None:
             assert self.api_url is not None
