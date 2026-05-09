@@ -72,7 +72,7 @@ def openai_llm_call():
 @BaseTracer.observe()
 def anthropic_llm_call():
     anthropic_client.messages.create(
-        model="claude-3-haiku-20240307",
+        model="claude-haiku-4-5",
         messages=[{"role": "user", "content": PROMPT}],
         max_tokens=30,
     )
@@ -120,7 +120,7 @@ def openai_streaming_llm_call():
 @BaseTracer.observe()
 def anthropic_streaming_llm_call():
     stream = anthropic_client.messages.create(
-        model="claude-3-haiku-20240307",
+        model="claude-haiku-4-5",
         messages=[{"role": "user", "content": PROMPT}],
         max_tokens=30,
         stream=True,
@@ -165,7 +165,7 @@ async def openai_async_llm_call():
 @BaseTracer.observe()
 async def anthropic_async_llm_call():
     await anthropic_client_async.messages.create(
-        model="claude-3-haiku-20240307",
+        model="claude-haiku-4-5",
         messages=[{"role": "user", "content": PROMPT}],
         max_tokens=30,
     )
@@ -204,7 +204,7 @@ async def openai_async_streaming_llm_call():
 @BaseTracer.observe()
 async def anthropic_async_streaming_llm_call():
     stream = await anthropic_client_async.messages.create(
-        model="claude-3-haiku-20240307",
+        model="claude-haiku-4-5",
         messages=[{"role": "user", "content": PROMPT}],
         max_tokens=30,
         stream=True,
