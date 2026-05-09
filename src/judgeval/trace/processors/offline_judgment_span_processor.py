@@ -7,7 +7,6 @@ from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter
 
 from judgeval.trace.processors.judgment_span_processor import JudgmentSpanProcessor
-from judgeval.utils.decorators.dont_throw import dont_throw
 
 if TYPE_CHECKING:
     from judgeval.data.example import Example
@@ -46,7 +45,6 @@ class OfflineJudgmentSpanProcessor(JudgmentSpanProcessor):
         self._dataset_lock = threading.Lock()
         self._seen_trace_ids: set[str] = set()
 
-    @dont_throw
     def _maybe_create_example(self, span: ReadableSpan) -> None:
         if span.parent is not None or not span.context:
             return
@@ -68,7 +66,8 @@ class OfflineJudgmentSpanProcessor(JudgmentSpanProcessor):
         with self._dataset_lock:
             self._dataset.append(example)
 
-    @dont_throw
     def on_end(self, span: ReadableSpan) -> None:
-        self._maybe_create_example(span)
-        super().on_end(span)
+        try:
+            self._maybe_create_example(span)
+        finally:
+            super().on_end(span)
