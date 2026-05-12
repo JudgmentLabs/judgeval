@@ -100,11 +100,9 @@ class OfflineTracer(Tracer):
     ) -> "OfflineTracer":
         """Create and activate a new `OfflineTracer`.
 
-        Args mirror `Tracer.init` plus:
-            dataset: Caller-owned list. Each completed root span appends a
-                new `Example` carrying the `offline_trace_id` of the trace
-                and the static `example_fields`.
-            example_fields: Static fields copied onto every emitted example
+        Args:
+            dataset: List that receives an `Example` for each completed root span.
+            example_fields: Fields included on every `Example` in `dataset`
                 (e.g. `{"input": ..., "golden_output": ...}`).
 
         Raises:

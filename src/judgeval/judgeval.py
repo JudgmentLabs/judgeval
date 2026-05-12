@@ -136,10 +136,8 @@ class Judgeval:
         the offline trace id and the static ``example_fields``.
 
         Args:
-            dataset: Caller-owned list. Each completed root span appends a
-                new ``Example`` carrying the ``offline_trace_id`` of the
-                trace and the static ``example_fields``.
-            example_fields: Static fields copied onto every emitted example
+            dataset: List that receives an ``Example`` for each completed root span.
+            example_fields: Fields included on every ``Example`` in ``dataset``
                 (e.g. ``{"input": ..., "golden_output": ...}``).
             environment: Deployment environment label.
             set_active: If True, register this as the active tracer.
