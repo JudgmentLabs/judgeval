@@ -1,36 +1,41 @@
 """Google ADK agent with Judgment tracing.
 
-When running with `adk web`, ADK sets up its own global TracerProvider
-before importing this module. OpenTelemetry enforces first-writer-wins
-semantics, so calling install_as_global_tracer_provider() would silently
-fail. Instead, we attach Judgment's span processor directly to ADK's
-provider so that all spans — both ADK's internal spans and our own
-@Tracer.observe spans — flow to the Judgment dashboard.
+There are two runtime environments to handle:
+
+- **adk web** (local dev): ADK sets up its own SDK TracerProvider before
+  importing this module.  We attach Judgment's span processor to it so
+  ADK's spans also flow to the Judgment dashboard.
+
+- **Vertex Agent Engine**: The agent module is imported before the
+  runtime installs its SDK TracerProvider.  get_tracer_provider()
+  returns OTel's default ProxyTracerProvider (no add_span_processor).
+  We install JudgmentTracerProvider as the global provider instead;
+  when Vertex's runtime later calls add_span_processor on it, the
+  processor is forwarded to all registered tracers.
 
 Usage:
     adk web my_agent
 """
 
-from opentelemetry import trace as trace_api
-
 from google.adk import Agent
 from google.adk.tools import ToolContext
 
+from opentelemetry import trace as trace_api
+from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
 from judgeval import Tracer
+from judgeval.trace import JudgmentTracerProvider
 
-# 1. Initialize Judgment tracing.
-#    This creates an internal TracerProvider with the JudgmentSpanProcessor
-#    and registers it with JudgmentTracerProvider. The @Tracer.observe
-#    decorator works immediately after this call.
 tracer = Tracer.init(project_name="my-adk-agent")
 
-# 2. Attach Judgment's span processor to ADK's global provider.
-#    ADK's _setup_telemetry() has already called set_tracer_provider()
-#    by the time this module is imported. Adding our processor here
-#    means ADK's own spans (agent execution, model calls, tool calls)
-#    are also exported to the Judgment dashboard.
+# If a real SDK TracerProvider is already installed (adk web), attach
+# our processor to it.  Otherwise (Vertex Agent Engine), install
+# JudgmentTracerProvider as the global provider so the runtime can
+# add its own processors to it later.
 global_provider = trace_api.get_tracer_provider()
-global_provider.add_span_processor(tracer.get_span_processor())
+if isinstance(global_provider, SDKTracerProvider):
+    global_provider.add_span_processor(tracer.get_span_processor())
+else:
+    JudgmentTracerProvider.install_as_global_tracer_provider()
 
 
 @Tracer.observe(span_type="tool")
