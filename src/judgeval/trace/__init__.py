@@ -7,6 +7,7 @@ from judgeval.trace.exporters import JudgmentSpanExporter, NoOpJudgmentSpanExpor
 from judgeval.trace.processors import (
     JudgmentSpanProcessor,
     NoOpJudgmentSpanProcessor,
+    OfflineJudgmentSpanProcessor,
 )
 from judgeval.trace.id_generator import IsolatedRandomIdGenerator
 from judgeval.trace import propagation
@@ -20,6 +21,7 @@ __all__ = [
     "NoOpJudgmentSpanExporter",
     "JudgmentSpanProcessor",
     "NoOpJudgmentSpanProcessor",
+    "OfflineJudgmentSpanProcessor",
     "IsolatedRandomIdGenerator",
     "propagation",
     "wrap",
