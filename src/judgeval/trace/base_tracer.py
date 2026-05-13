@@ -12,6 +12,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    ClassVar,
     Dict,
     Iterator,
     Optional,
@@ -114,6 +115,8 @@ class BaseTracer(ABC):
         "_client",
     )
 
+    SUPPORTS_LIVE_INSTRUMENTATION: ClassVar[bool] = True
+
     # ------------------------------------------------------------------ #
     #  Initialization                                                     #
     # ------------------------------------------------------------------ #
@@ -184,7 +187,7 @@ class BaseTracer(ABC):
         """Ask the active tracer's span processor to emit the current span
         as a partial update without ending it."""
         tracer = BaseTracer._get_proxy_provider().get_active_tracer()
-        if tracer is None:
+        if tracer is None or not tracer.SUPPORTS_LIVE_INSTRUMENTATION:
             return
         tracer.get_span_processor().emit_partial()
 
@@ -1123,7 +1126,11 @@ class BaseTracer(ABC):
             return
         proxy = BaseTracer._get_proxy_provider()
         tracer = proxy.get_active_tracer()
-        if not tracer or not tracer.project_id:
+        if (
+            not tracer
+            or not tracer.project_id
+            or not tracer.SUPPORTS_LIVE_INSTRUMENTATION
+        ):
             return
         ids = BaseTracer._get_current_trace_and_span_id()
         if not ids:
@@ -1177,7 +1184,11 @@ class BaseTracer(ABC):
         """
         proxy = BaseTracer._get_proxy_provider()
         tracer = proxy.get_active_tracer()
-        if not tracer or not tracer.project_id:
+        if (
+            not tracer
+            or not tracer.project_id
+            or not tracer.SUPPORTS_LIVE_INSTRUMENTATION
+        ):
             return
         current_span = proxy.get_current_span()
         if current_span is None or not current_span.is_recording():
