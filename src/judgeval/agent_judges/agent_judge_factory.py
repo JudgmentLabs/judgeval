@@ -209,21 +209,17 @@ class AgentJudgeFactory:
             raise
 
         judge = response["judge"]
-        return _agent_judge_from_detail(judge)
-
-
-def _agent_judge_from_detail(detail: Dict[str, Any]) -> AgentJudge:
-    return AgentJudge(
-        judge_id=detail["id"],
-        name=detail["name"],
-        prompt=detail.get("prompt") or "",
-        model=detail.get("model") or "",
-        score_type=cast(ScoreType, detail["score_type"]),
-        description=detail.get("description"),
-        judge_description=detail.get("judge_description"),
-        categories=detail.get("categories"),
-        min_score=detail.get("min_score"),
-        max_score=detail.get("max_score"),
-        major_version=detail.get("major_version"),
-        minor_version=detail.get("minor_version"),
-    )
+        return AgentJudge(
+            judge_id=judge["id"],
+            name=judge["name"],
+            prompt=judge.get("prompt") or "",
+            model=judge.get("model") or "",
+            score_type=cast(ScoreType, judge["score_type"]),
+            description=judge.get("description"),
+            judge_description=judge.get("judge_description"),
+            categories=judge.get("categories"),
+            min_score=judge.get("min_score"),
+            max_score=judge.get("max_score"),
+            major_version=judge.get("major_version"),
+            minor_version=judge.get("minor_version"),
+        )
