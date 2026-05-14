@@ -90,9 +90,7 @@ class TestAgentJudgeFactoryCreate:
 
     def test_create_missing_project_id_returns_none(self):
         factory, _ = _make_factory(project_id=None)
-        result = factory.create(
-            name="n", prompt="p", model="m", score_type="numeric"
-        )
+        result = factory.create(name="n", prompt="p", model="m", score_type="numeric")
         assert result is None
 
 
@@ -117,9 +115,7 @@ class TestAgentJudgeFactoryUpdate:
             "judge": _judge_detail(),
         }
         factory.update(judge_id="judge-1", prompt="x")
-        payload = client.patch_projects_judges_by_judge_id.call_args.kwargs[
-            "payload"
-        ]
+        payload = client.patch_projects_judges_by_judge_id.call_args.kwargs["payload"]
         assert payload == {"prompt": "x"}
 
     def test_update_forwards_version_overrides(self):
@@ -135,9 +131,7 @@ class TestAgentJudgeFactoryUpdate:
             target_major_version=1,
             target_minor_version=0,
         )
-        payload = client.patch_projects_judges_by_judge_id.call_args.kwargs[
-            "payload"
-        ]
+        payload = client.patch_projects_judges_by_judge_id.call_args.kwargs["payload"]
         assert payload["source_major_version"] == 0
         assert payload["source_minor_version"] == 1
         assert payload["target_major_version"] == 1
