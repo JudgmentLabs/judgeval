@@ -7,7 +7,7 @@ from weakref import WeakSet
 from opentelemetry import trace as trace_api
 from opentelemetry.context.context import Context
 from opentelemetry.context.contextvars_context import ContextVarsRuntimeContext
-from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace import SpanProcessor, TracerProvider
 from opentelemetry.trace import Link, NoOpTracer, Span, SpanKind, Tracer
 from opentelemetry.util.types import Attributes
 from opentelemetry.util._decorator import _agnosticcontextmanager
@@ -124,13 +124,16 @@ class JudgmentTracerProvider(TracerProvider):
         "_instrumentations",
         "_proxy_tracer",
         "_tracers",
+        "_external_span_processors",
     )
 
     def __init__(self):
+        super().__init__(shutdown_on_exit=False)
         self._runtime_context = ContextVarsRuntimeContext()
         self._instrumentations: list = []
         self._proxy_tracer = ProxyTracer(self)
         self._tracers: WeakSet[JudgmentTracer] = WeakSet()
+        self._external_span_processors: list[SpanProcessor] = []
 
     @classmethod
     def get_instance(cls) -> JudgmentTracerProvider:
@@ -141,13 +144,33 @@ class JudgmentTracerProvider(TracerProvider):
 
     @classmethod
     def install_as_global_tracer_provider(cls) -> bool:
-        """Install this provider as the OpenTelemetry global tracer provider."""
-        trace_api.set_tracer_provider(cls.get_instance())
-        return True
+        """Install this provider as the OpenTelemetry global tracer provider.
+
+        Returns True if the provider was successfully installed, False if
+        another provider was already set (OpenTelemetry enforces
+        first-writer-wins semantics).
+        """
+        instance = cls.get_instance()
+        trace_api.set_tracer_provider(instance)
+        installed = trace_api.get_tracer_provider() is instance
+        if not installed:
+            judgeval_logger.warning(
+                "Failed to install JudgmentTracerProvider as the global "
+                "tracer provider. Another TracerProvider was already "
+                "installed. Spans created by external instrumentation "
+                "may not be captured by Judgment."
+            )
+        return installed
 
     def register(self, tracer: JudgmentTracer) -> None:
-        """Add a tracer to the tracked set (weak reference)."""
+        """Add a tracer to the tracked set (weak reference).
+
+        Any span processors previously added via ``add_span_processor``
+        are automatically forwarded to the tracer's underlying provider.
+        """
         self._tracers.add(tracer)
+        for processor in self._external_span_processors:
+            tracer._tracer_provider.add_span_processor(processor)
 
     def deregister(self, tracer: JudgmentTracer) -> None:
         """Remove a tracer from the tracked set."""
@@ -214,6 +237,18 @@ class JudgmentTracerProvider(TracerProvider):
     ) -> Tracer:
         return self._proxy_tracer
 
+    def add_span_processor(self, span_processor: SpanProcessor) -> None:
+        """Register a span processor with all managed tracers.
+
+        Processors are forwarded to the underlying ``TracerProvider`` of
+        every currently registered ``JudgmentTracer``, and will be
+        automatically added to any tracer registered in the future via
+        ``register()``.
+        """
+        self._external_span_processors.append(span_processor)
+        for tracer in self._tracers:
+            tracer._tracer_provider.add_span_processor(span_processor)
+
     def add_instrumentation(self, instrumentor) -> None:
         """Register and activate a third-party OTel instrumentor."""
         try:
@@ -263,12 +298,15 @@ class JudgmentTracerProvider(TracerProvider):
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         """Flush pending spans from all registered tracers."""
-        return all(
+        results = [
             t._tracer_provider.force_flush(timeout_millis) for t in self._tracers
-        )
+        ]
+        results.append(self._active_span_processor.force_flush(timeout_millis))
+        return all(results)
 
     def shutdown(self) -> None:
         """Shut down all registered tracers and clear the tracked set."""
         for t in self._tracers:
             t._tracer_provider.shutdown()
         self._tracers.clear()
+        self._active_span_processor.shutdown()

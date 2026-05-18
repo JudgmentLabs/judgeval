@@ -373,6 +373,24 @@ class JudgmentSyncClient:
             payload,
         )
 
+    def post_projects_judges(
+        self, project_id: str, payload: SDKCreateAgentJudgeRequest
+    ) -> SDKCreateAgentJudgeResponse:
+        return self._request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/judges", self.base_url),
+            payload,
+        )
+
+    def patch_projects_judges_by_judge_id(
+        self, project_id: str, judge_id: str, payload: SDKUpdateAgentJudgeRequest
+    ) -> SDKUpdateAgentJudgeResponse:
+        return self._request(
+            "PATCH",
+            url_for(f"/v1/projects/{project_id}/judges/{judge_id}", self.base_url),
+            payload,
+        )
+
 
 class JudgmentAsyncClient:
     __slots__ = ("base_url", "api_key", "organization_id", "client")
@@ -712,6 +730,24 @@ class JudgmentAsyncClient:
         return await self._request(
             "POST",
             url_for("/v1/e2e_fetch_span_score/", self.base_url),
+            payload,
+        )
+
+    async def post_projects_judges(
+        self, project_id: str, payload: SDKCreateAgentJudgeRequest
+    ) -> SDKCreateAgentJudgeResponse:
+        return await self._request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/judges", self.base_url),
+            payload,
+        )
+
+    async def patch_projects_judges_by_judge_id(
+        self, project_id: str, judge_id: str, payload: SDKUpdateAgentJudgeRequest
+    ) -> SDKUpdateAgentJudgeResponse:
+        return await self._request(
+            "PATCH",
+            url_for(f"/v1/projects/{project_id}/judges/{judge_id}", self.base_url),
             payload,
         )
 

@@ -7,6 +7,9 @@ from opentelemetry.sdk.trace import ReadableSpan, Span
 from opentelemetry.trace.span import SpanContext
 
 from judgeval.trace.processors.judgment_span_processor import JudgmentSpanProcessor
+from judgeval.trace.exporters.noop_judgment_span_exporter import (
+    NoOpJudgmentSpanExporter,
+)
 
 
 class NoOpJudgmentSpanProcessor(JudgmentSpanProcessor):
@@ -20,6 +23,10 @@ class NoOpJudgmentSpanProcessor(JudgmentSpanProcessor):
 
     def __init__(self):
         pass
+
+    @property
+    def span_exporter(self) -> NoOpJudgmentSpanExporter:
+        return NoOpJudgmentSpanExporter()
 
     def on_start(self, span: Span, parent_context: Optional[Context] = None) -> None:
         pass

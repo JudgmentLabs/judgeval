@@ -72,21 +72,26 @@ from .pull_all_datasets_response import (
 from .pull_dataset_response import PullDatasetResponse as PullDatasetResponse
 from .resolve_project_request import ResolveProjectRequest as ResolveProjectRequest
 from .resolve_project_response import ResolveProjectResponse as ResolveProjectResponse
+from .sdk_create_agent_judge_request import (
+    SDKCreateAgentJudgeRequest as SDKCreateAgentJudgeRequest,
+)
+from .sdk_create_agent_judge_response import (
+    SDKCreateAgentJudgeResponse as SDKCreateAgentJudgeResponse,
+)
+from .sdk_update_agent_judge_request import (
+    SDKUpdateAgentJudgeRequest as SDKUpdateAgentJudgeRequest,
+)
+from .sdk_update_agent_judge_response import (
+    SDKUpdateAgentJudgeResponse as SDKUpdateAgentJudgeResponse,
+)
 from .scorer_config import ScorerConfig as ScorerConfig
 from .scorer_exists_response import ScorerExistsResponse as ScorerExistsResponse
 from .scoring_result import ScoringResult as ScoringResult
 from .tag_prompt_request import TagPromptRequest as TagPromptRequest
 from .tag_prompt_response import TagPromptResponse as TagPromptResponse
 from .trace_evaluation_run import TraceEvaluationRun as TraceEvaluationRun
-from .trace_info import TraceInfo as TraceInfo
 from .trace_scoring_result import TraceScoringResult as TraceScoringResult
 from .trace_span import TraceSpan as TraceSpan
-from .trigger_root_span_rules_request import (
-    TriggerRootSpanRulesRequest as TriggerRootSpanRulesRequest,
-)
-from .trigger_root_span_rules_response import (
-    TriggerRootSpanRulesResponse as TriggerRootSpanRulesResponse,
-)
 from .untag_prompt_request import UntagPromptRequest as UntagPromptRequest
 from .untag_prompt_response import UntagPromptResponse as UntagPromptResponse
 from .upload_custom_scorer_bundle_metadata import (

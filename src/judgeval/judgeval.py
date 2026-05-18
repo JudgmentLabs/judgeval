@@ -256,3 +256,34 @@ class Judgeval:
             project_id=self._project_id,
             project_name=self._project_name,
         )
+
+    @property
+    def agent_judges(self):
+        """Manage Agent Judges (prompt-based scorers) on the platform.
+
+        Returns:
+            AgentJudgeFactory: Use `.create()` or `.update()` to create
+                and update prompt-based Agent Judges.
+
+        Examples:
+            ```python
+            judge = client.agent_judges.create(
+                name="helpfulness",
+                prompt="Score the assistant's helpfulness from 0 to 1.",
+                model="gpt-5.2",
+                score_type="numeric",
+            )
+
+            client.agent_judges.update(
+                judge_id=judge.judge_id,
+                prompt="Updated rubric prompt.",
+            )
+            ```
+        """
+        from judgeval.agent_judges.agent_judge_factory import AgentJudgeFactory
+
+        return AgentJudgeFactory(
+            client=self._internal_client,
+            project_id=self._project_id,
+            project_name=self._project_name,
+        )
