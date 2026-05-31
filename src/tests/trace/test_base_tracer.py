@@ -4,6 +4,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 from judgeval.judgment_attribute_keys import AttributeKeys
+from judgeval.trace.tracer import Tracer
 from judgeval.trace.base_tracer import BaseTracer
 
 
@@ -130,6 +131,104 @@ class TestContextPropagation:
 
     def test_set_propagating_baggage_key_noop_outside_span(self, tracer):
         BaseTracer._set_propagating_baggage_key("some.key", "val")
+
+
+class TestScopedContext:
+    def test_sets_attributes_on_spans_created_inside_scope(
+        self, tracer, collecting_exporter
+    ):
+        with Tracer.scoped_context(
+            session_id="FT-347",
+            customer_id="firetiger",
+            customer_user_id="user-123",
+            attributes={"firetiger.issue_number": "FT-347"},
+        ):
+            with BaseTracer.start_as_current_span("inside"):
+                pass
+
+        span = next(s for s in collecting_exporter.spans if s.name == "inside")
+        assert span.attributes[AttributeKeys.JUDGMENT_SESSION_ID] == "FT-347"
+        assert span.attributes[AttributeKeys.JUDGMENT_CUSTOMER_ID] == "firetiger"
+        assert span.attributes[AttributeKeys.JUDGMENT_CUSTOMER_USER_ID] == "user-123"
+        assert span.attributes["firetiger.issue_number"] == "FT-347"
+
+    def test_sets_current_active_span_and_child_span(self, tracer, collecting_exporter):
+        with BaseTracer.start_as_current_span("root"):
+            with BaseTracer.scoped_context(session_id="session-1"):
+                with BaseTracer.start_as_current_span("child"):
+                    pass
+
+        root = next(s for s in collecting_exporter.spans if s.name == "root")
+        child = next(s for s in collecting_exporter.spans if s.name == "child")
+        assert root.attributes[AttributeKeys.JUDGMENT_SESSION_ID] == "session-1"
+        assert child.attributes[AttributeKeys.JUDGMENT_SESSION_ID] == "session-1"
+
+    def test_context_does_not_leak_after_scope(self, tracer, collecting_exporter):
+        with BaseTracer.scoped_context(session_id="scoped"):
+            with BaseTracer.start_as_current_span("inside"):
+                pass
+        with BaseTracer.start_as_current_span("outside"):
+            pass
+
+        inside = next(s for s in collecting_exporter.spans if s.name == "inside")
+        outside = next(s for s in collecting_exporter.spans if s.name == "outside")
+        assert inside.attributes[AttributeKeys.JUDGMENT_SESSION_ID] == "scoped"
+        assert AttributeKeys.JUDGMENT_SESSION_ID not in outside.attributes
+
+    def test_nested_context_restores_outer_scope(self, tracer, collecting_exporter):
+        with BaseTracer.scoped_context(session_id="outer"):
+            with BaseTracer.start_as_current_span("outer-before"):
+                pass
+            with BaseTracer.scoped_context(session_id="inner"):
+                with BaseTracer.start_as_current_span("inner"):
+                    pass
+            with BaseTracer.start_as_current_span("outer-after"):
+                pass
+
+        outer_before = next(
+            s for s in collecting_exporter.spans if s.name == "outer-before"
+        )
+        inner = next(s for s in collecting_exporter.spans if s.name == "inner")
+        outer_after = next(
+            s for s in collecting_exporter.spans if s.name == "outer-after"
+        )
+        assert outer_before.attributes[AttributeKeys.JUDGMENT_SESSION_ID] == "outer"
+        assert inner.attributes[AttributeKeys.JUDGMENT_SESSION_ID] == "inner"
+        assert outer_after.attributes[AttributeKeys.JUDGMENT_SESSION_ID] == "outer"
+
+    def test_context_restores_after_exception(self, tracer, collecting_exporter):
+        with pytest.raises(RuntimeError, match="boom"):
+            with BaseTracer.scoped_context(session_id="scoped"):
+                with BaseTracer.start_as_current_span("inside"):
+                    pass
+                raise RuntimeError("boom")
+        with BaseTracer.start_as_current_span("outside"):
+            pass
+
+        inside = next(s for s in collecting_exporter.spans if s.name == "inside")
+        outside = next(s for s in collecting_exporter.spans if s.name == "outside")
+        assert inside.attributes[AttributeKeys.JUDGMENT_SESSION_ID] == "scoped"
+        assert AttributeKeys.JUDGMENT_SESSION_ID not in outside.attributes
+
+    def test_arbitrary_attributes_are_serialized_and_invalid_entries_skipped(
+        self, tracer, collecting_exporter
+    ):
+        with BaseTracer.scoped_context(
+            attributes={
+                "payload": {"issue": "FT-347"},
+                "count": 3,
+                "": "skip-empty-key",
+                "skip.none": None,
+            },
+        ):
+            with BaseTracer.start_as_current_span("serialized"):
+                pass
+
+        span = next(s for s in collecting_exporter.spans if s.name == "serialized")
+        assert span.attributes["payload"] == '{"issue":"FT-347"}'
+        assert span.attributes["count"] == 3
+        assert "" not in span.attributes
+        assert "skip.none" not in span.attributes
 
 
 class TestLinkedTraceTracing:
