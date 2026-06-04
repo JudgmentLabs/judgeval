@@ -1,7 +1,13 @@
+from typing import ClassVar, List
+
 from judgeval import Judgeval
 from judgeval.data import Example
 from judgeval.judges import Judge
-from judgeval.hosted.responses import BinaryResponse, NumericResponse
+from judgeval.hosted.responses import (
+    BinaryResponse,
+    CategoricalResponse,
+    Category,
+)
 
 
 class ContainsExpectedAnswer(Judge[BinaryResponse]):
@@ -17,14 +23,20 @@ class ContainsExpectedAnswer(Judge[BinaryResponse]):
         )
 
 
-class OutputLength(Judge[NumericResponse]):
-    """Scores output based on whether it stays within a reasonable length (under 300 chars)."""
+class LengthCategory(CategoricalResponse):
+    categories: ClassVar[List[Category]] = [
+        Category(value="Concise", description="The output is under 300 characters."),
+        Category(value="Long", description="The output is 300 characters or longer."),
+    ]
 
-    async def score(self, data: Example) -> NumericResponse:
+
+class OutputLength(Judge[LengthCategory]):
+    """Classifies output based on whether it stays within a reasonable length."""
+
+    async def score(self, data: Example) -> LengthCategory:
         length = len(data["actual_output"])
-        score = max(1.0 - (length / 300), 0.0)
-        return NumericResponse(
-            value=round(score, 2),
+        return LengthCategory(
+            value="Concise" if length < 300 else "Long",
             reason=f"Output is {length} characters",
         )
 
@@ -49,10 +61,8 @@ results = evaluation.run(
     examples=examples,
     scorers=[ContainsExpectedAnswer(), OutputLength()],
     eval_run_name="basic-eval",
-    assert_test=True,
 )
 
 for result in results:
-    print(f"Success: {result.success}")
     for scorer in result.scorers_data:
-        print(f"  {scorer.name}: score={scorer.score}, reason={scorer.reason}")
+        print(f"  {scorer.name}: {scorer.value}")

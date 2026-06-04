@@ -4,7 +4,7 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import Generic, List, Optional, TypeVar
+from typing import Any, Generic, List, Optional, TypeVar
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
@@ -19,6 +19,61 @@ from judgeval.internal.api.models import ExampleEvaluationRun, ExperimentRunItem
 from judgeval.judges import Judge
 
 S = TypeVar("S", str, Judge)
+
+
+def _binary_label(value: bool) -> str:
+    return "Yes" if value else "No"
+
+
+def _scorer_value(scorer_dict: dict[str, Any]) -> str | float | None:
+    score_type = scorer_dict.get("score_type")
+
+    if score_type == "binary":
+        bool_value = scorer_dict.get("bool_value")
+        if isinstance(bool_value, bool):
+            return _binary_label(bool_value)
+        value = scorer_dict.get("value")
+        if isinstance(value, bool):
+            return _binary_label(value)
+        if isinstance(value, str):
+            return value
+        str_value = scorer_dict.get("str_value")
+        if isinstance(str_value, str) and str_value:
+            return str_value
+
+    if score_type == "categorical":
+        str_value = scorer_dict.get("str_value")
+        if isinstance(str_value, str):
+            return str_value
+        value = scorer_dict.get("value")
+        if isinstance(value, str):
+            return value
+
+    bool_value = scorer_dict.get("bool_value")
+    if isinstance(bool_value, bool):
+        return _binary_label(bool_value)
+
+    str_value = scorer_dict.get("str_value")
+    if isinstance(str_value, str) and str_value:
+        return str_value
+
+    num_value = scorer_dict.get("num_value")
+    if isinstance(num_value, (int, float)):
+        return float(num_value)
+
+    value = scorer_dict.get("value")
+    if isinstance(value, bool):
+        return _binary_label(value)
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    score = scorer_dict.get("score")
+    if isinstance(score, (int, float)):
+        return float(score)
+
+    return None
 
 
 class EvaluatorRunner(ABC, Generic[S]):
@@ -139,8 +194,12 @@ class EvaluatorRunner(ABC, Generic[S]):
         """
         console.print()
         results: List[ScoringResult] = []
-        passed = 0
-        failed = 0
+
+        if assert_test:
+            judgeval_logger.warning(
+                "assert_test is deprecated and ignored by the current "
+                "evaluation result payload."
+            )
 
         for i, res in enumerate(results_data):
             judgeval_logger.info(f"Processing result {i + 1}: {res.keys()}")
@@ -153,12 +212,10 @@ class EvaluatorRunner(ABC, Generic[S]):
                 scorers_data.append(
                     ScorerData(
                         name=scorer_dict["name"],
-                        threshold=scorer_dict["threshold"],
-                        success=bool(scorer_dict["success"]),
-                        score=scorer_dict["score"],
+                        value=_scorer_value(scorer_dict),
+                        score_type=scorer_dict.get("score_type"),
                         minimum_score_range=scorer_dict.get("minimum_score_range", 0),
                         maximum_score_range=scorer_dict.get("maximum_score_range", 1),
-                        reason=scorer_dict.get("reason"),
                         evaluation_model=scorer_dict.get("evaluation_model"),
                         error=scorer_dict.get("error"),
                         additional_metadata=scorer_dict.get("additional_metadata")
@@ -167,70 +224,30 @@ class EvaluatorRunner(ABC, Generic[S]):
                     )
                 )
 
-            success = all(s.success for s in scorers_data)
-
-            if success:
-                passed += 1
-                console.print(
-                    f"[green]✓[/green] Example {i + 1}: [green]PASSED[/green]"
-                )
-            else:
-                failed += 1
-                console.print(f"[red]✗[/red] Example {i + 1}: [red]FAILED[/red]")
+            console.print(f"[cyan]•[/cyan] Example {i + 1}:")
 
             for scorer_data in scorers_data:
-                score_str = (
-                    f"{scorer_data.score:.3f}"
-                    if scorer_data.score is not None
-                    else "N/A"
-                )
-                status_color = "green" if scorer_data.success else "red"
+                value = scorer_data.value
+                value_str = f"{value:.3f}" if isinstance(value, float) else value
+                if value_str is None:
+                    value_str = "N/A"
                 console.print(
-                    f"  [dim]{scorer_data.name}:[/dim] "
-                    f"[{status_color}]{score_str}[/{status_color}] "
-                    f"(threshold: {scorer_data.threshold})"
+                    f"  [dim]{scorer_data.name}:[/dim] [cyan]{value_str}[/cyan]"
                 )
+                if scorer_data.error:
+                    console.print(f"    [red]{scorer_data.error}[/red]")
 
             results.append(
                 ScoringResult(
-                    success=success,
                     scorers_data=scorers_data,
                     data_object=examples[i],
                 )
             )
 
         console.print()
-
-        if passed == len(results):
-            console.print(
-                f"[bold green]✓ All tests passed![/bold green] "
-                f"({passed}/{len(results)})"
-            )
-        else:
-            console.print(
-                f"[bold yellow]⚠ Results:[/bold yellow] "
-                f"[green]{passed} passed[/green] | "
-                f"[red]{failed} failed[/red]"
-            )
+        console.print(f"[bold green]✓[/bold green] Results ready ({len(results)})")
 
         console.print(f"[dim]View full details:[/dim] [link={url}]{url}[/link]\n")
-
-        if assert_test and not all(r.success for r in results):
-            lines = [f"Evaluation failed: {failed}/{len(results)} examples failed\n"]
-            for i, result in enumerate(results):
-                if not result.success:
-                    lines.append(f"  Example {i + 1}:")
-                    for s in result.scorers_data:
-                        if not s.success:
-                            score_str = (
-                                f"{s.score:.3f}" if s.score is not None else "N/A"
-                            )
-                            lines.append(
-                                f"    {s.name}: {score_str} (threshold: {s.threshold})"
-                            )
-                            if s.reason:
-                                lines.append(f"      {s.reason}")
-            raise AssertionError("\n".join(lines))
 
         return results
 
@@ -248,8 +265,8 @@ class EvaluatorRunner(ABC, Generic[S]):
             examples: Examples to evaluate.
             scorers: Scorers to run (strings or ``Judge`` instances).
             eval_run_name: Name for this evaluation run.
-            assert_test: When True, raises ``AssertionError`` if any scorer
-                fails its threshold.
+            assert_test: Deprecated and ignored by the current evaluation
+                result payload.
             timeout_seconds: Maximum time to wait for results.
 
         Returns:

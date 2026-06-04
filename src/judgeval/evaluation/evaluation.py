@@ -36,7 +36,7 @@ class Evaluation:
             eval_run_name="nightly-eval",
         )
         for result in results:
-            print(result.success, result.scorers_data)
+            print(result.scorers_data)
         ```
 
         Using a custom judge:
@@ -80,8 +80,8 @@ class Evaluation:
             scorers: Hosted scorer names (e.g. `["faithfulness"]`) or
                 `Judge` instances (e.g. `[ToxicityJudge()]`).
             eval_run_name: A name for this run, visible in the dashboard.
-            assert_test: If True, raises an exception when any scorer
-                fails its threshold. Useful in CI/CD pipelines.
+            assert_test: Deprecated and ignored by the current evaluation
+                result payload.
             timeout_seconds: Maximum seconds to wait for hosted scorer
                 results before timing out.
 
@@ -101,7 +101,7 @@ class Evaluation:
                 scorers=["answer_relevancy"],
                 eval_run_name="quick-test",
             )
-            print(results[0].success)  # True/False
+            print(results[0].scorers_data)
             ```
         """
         hosted_scorers = [s for s in scorers if isinstance(s, str)]

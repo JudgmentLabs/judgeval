@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 
 @dataclass(slots=True)
@@ -9,17 +9,15 @@ class ScorerData:
     """The result from a single scorer for one example.
 
     Each `ScoringResult` contains a list of `ScorerData` -- one per scorer
-    that was run. Check `success` to see if the score met the threshold, and
-    `reason` for the scorer's explanation.
+    that was run. Inspect `value` for the scorer's output.
 
     Attributes:
         name: Scorer name (e.g. `"faithfulness"`).
-        threshold: Minimum score required for `success=True`.
-        success: Whether the score met or exceeded the threshold.
-        score: The numeric score (0.0 to 1.0 by default).
+        value: The scorer result. Binary scorers use `"Yes"` or `"No"`;
+            categorical scorers use their selected category.
+        score_type: Result type returned by the scorer.
         minimum_score_range: Lower bound of the scoring scale.
         maximum_score_range: Upper bound of the scoring scale.
-        reason: The scorer's explanation for the score.
         evaluation_model: The LLM used to produce the score.
         error: Error message if scoring failed.
         additional_metadata: Extra metadata from the scorer.
@@ -27,12 +25,10 @@ class ScorerData:
     """
 
     name: str
-    threshold: float
-    success: bool
-    score: Optional[float] = None
+    value: Optional[Union[str, float]] = None
+    score_type: Optional[str] = None
     minimum_score_range: float = 0
     maximum_score_range: float = 1
-    reason: Optional[str] = None
     evaluation_model: Optional[str] = None
     error: Optional[str] = None
     additional_metadata: Dict[str, Any] = field(default_factory=dict)
@@ -42,17 +38,15 @@ class ScorerData:
         """Serialize to a dictionary, omitting None fields."""
         result: Dict[str, Any] = {
             "name": self.name,
-            "threshold": self.threshold,
-            "success": self.success,
         }
-        if self.score is not None:
-            result["score"] = self.score
+        if self.value is not None:
+            result["value"] = self.value
+        if self.score_type is not None:
+            result["score_type"] = self.score_type
         if self.minimum_score_range is not None:
             result["minimum_score_range"] = self.minimum_score_range
         if self.maximum_score_range is not None:
             result["maximum_score_range"] = self.maximum_score_range
-        if self.reason is not None:
-            result["reason"] = self.reason
         if self.evaluation_model is not None:
             result["evaluation_model"] = self.evaluation_model
         if self.error is not None:

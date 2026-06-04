@@ -9,11 +9,14 @@ from typing_extensions import NotRequired
 class ExperimentScorer(TypedDict):
     scorer_data_id: str
     name: str
-    score: float
-    success: float
+    score: NotRequired[Optional[float]]
+    score_type: NotRequired[Optional[str]]
+    num_value: NotRequired[Optional[float]]
+    bool_value: NotRequired[Optional[bool]]
+    str_value: NotRequired[Optional[str]]
+    value: NotRequired[Optional[Any]]
     reason: NotRequired[Optional[str]]
     evaluation_model: NotRequired[Optional[str]]
-    threshold: float
     created_at: str
     error: NotRequired[Optional[str]]
     additional_metadata: NotRequired[Optional[Dict[str, Any]]]
