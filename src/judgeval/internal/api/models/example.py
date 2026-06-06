@@ -2,7 +2,7 @@
 # DO NOT EDIT MANUALLY
 from __future__ import annotations
 
-from typing import TypedDict, Optional
+from typing import TypedDict, Optional, List, Union, Any, Dict
 from typing_extensions import NotRequired
 
 
@@ -12,3 +12,4 @@ class Example(TypedDict):
     name: NotRequired[Optional[str]]
     trace_id: NotRequired[Optional[str]]
     span_id: NotRequired[Optional[str]]
+    offline_trace_id: NotRequired[Optional[str]]

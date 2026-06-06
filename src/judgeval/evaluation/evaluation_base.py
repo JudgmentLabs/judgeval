@@ -30,48 +30,29 @@ def _scorer_value(scorer_dict: dict[str, Any]) -> str | float | None:
 
     if score_type == "binary":
         bool_value = scorer_dict.get("bool_value")
-        if isinstance(bool_value, bool):
-            return _binary_label(bool_value)
-        value = scorer_dict.get("value")
-        if isinstance(value, bool):
-            return _binary_label(value)
-        if isinstance(value, str):
-            return value
-        str_value = scorer_dict.get("str_value")
-        if isinstance(str_value, str) and str_value:
-            return str_value
+        return _binary_label(bool_value) if isinstance(bool_value, bool) else None
 
     if score_type == "categorical":
         str_value = scorer_dict.get("str_value")
-        if isinstance(str_value, str):
-            return str_value
-        value = scorer_dict.get("value")
-        if isinstance(value, str):
-            return value
+        return str_value if isinstance(str_value, str) else None
+
+    if score_type == "numeric":
+        num_value = scorer_dict.get("num_value")
+        if isinstance(num_value, (int, float)):
+            return float(num_value)
+        return None
 
     bool_value = scorer_dict.get("bool_value")
     if isinstance(bool_value, bool):
         return _binary_label(bool_value)
 
     str_value = scorer_dict.get("str_value")
-    if isinstance(str_value, str) and str_value:
+    if isinstance(str_value, str):
         return str_value
 
     num_value = scorer_dict.get("num_value")
     if isinstance(num_value, (int, float)):
         return float(num_value)
-
-    value = scorer_dict.get("value")
-    if isinstance(value, bool):
-        return _binary_label(value)
-    if isinstance(value, str):
-        return value
-    if isinstance(value, (int, float)):
-        return float(value)
-
-    score = scorer_dict.get("score")
-    if isinstance(score, (int, float)):
-        return float(score)
 
     return None
 

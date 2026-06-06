@@ -2,16 +2,16 @@
 # DO NOT EDIT MANUALLY
 from __future__ import annotations
 
-from typing import TypedDict, Optional, List, Any, Dict
+from typing import TypedDict, Optional, List, Union, Any, Dict
 from typing_extensions import NotRequired
 
 
 class SDKUpdateAgentJudgeRequest(TypedDict):
     judge_description: NotRequired[Optional[str]]
+    score_type: NotRequired[Optional[str]]
     description: NotRequired[Optional[str]]
     model: NotRequired[Optional[str]]
     prompt: NotRequired[Optional[str]]
-    score_type: NotRequired[Optional[str]]
     categories: NotRequired[Optional[List[Dict[str, Any]]]]
     min_score: NotRequired[Optional[float]]
     max_score: NotRequired[Optional[float]]

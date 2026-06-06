@@ -2,21 +2,24 @@
 # DO NOT EDIT MANUALLY
 from __future__ import annotations
 
-from typing import TypedDict, Optional, Any, Dict
+from typing import TypedDict, Optional, List, Union, Any, Dict
 from typing_extensions import NotRequired
 
 
 class ExperimentScorer(TypedDict):
     scorer_data_id: str
+    judge_id: str
+    judge_name: str
     name: str
-    score: NotRequired[Optional[float]]
-    score_type: NotRequired[Optional[str]]
-    num_value: NotRequired[Optional[float]]
-    bool_value: NotRequired[Optional[bool]]
-    str_value: NotRequired[Optional[str]]
-    value: NotRequired[Optional[Any]]
+    score_type: str
+    num_value: float
+    bool_value: bool
+    str_value: str
+    score: float
+    success: float
     reason: NotRequired[Optional[str]]
     evaluation_model: NotRequired[Optional[str]]
+    threshold: float
     created_at: str
     error: NotRequired[Optional[str]]
     additional_metadata: NotRequired[Optional[Dict[str, Any]]]

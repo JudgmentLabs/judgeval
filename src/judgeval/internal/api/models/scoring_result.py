@@ -2,7 +2,13 @@
 # DO NOT EDIT MANUALLY
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import TypedDict, Optional, List, Union, Any, Dict
+from typing_extensions import NotRequired
+
+from .example import Example
+from .example_scoring_result import ExampleScoringResult
+from .trace_scoring_result import TraceScoringResult
+from .trace_span import TraceSpan
 
 
 class ScoringResult(TypedDict):

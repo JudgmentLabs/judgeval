@@ -350,18 +350,11 @@ class JudgmentSyncClient:
             {},
         )
 
-    def get_e2e_traces_per_project(
-        self, project_id: str, limit: Optional[str] = None, offset: Optional[str] = None
-    ) -> E2ETracesPerProjectResponse:
-        query_params = {}
-        if limit is not None:
-            query_params["limit"] = limit
-        if offset is not None:
-            query_params["offset"] = offset
+    def get_e2e_traces_per_project(self, project_id: str) -> Any:
         return self._request(
             "GET",
             url_for(f"/v1/e2e_traces_per_project/{project_id}", self.base_url),
-            query_params,
+            {},
         )
 
     def post_e2e_fetch_span_score(
@@ -710,18 +703,11 @@ class JudgmentAsyncClient:
             {},
         )
 
-    async def get_e2e_traces_per_project(
-        self, project_id: str, limit: Optional[str] = None, offset: Optional[str] = None
-    ) -> E2ETracesPerProjectResponse:
-        query_params = {}
-        if limit is not None:
-            query_params["limit"] = limit
-        if offset is not None:
-            query_params["offset"] = offset
+    async def get_e2e_traces_per_project(self, project_id: str) -> Any:
         return await self._request(
             "GET",
             url_for(f"/v1/e2e_traces_per_project/{project_id}", self.base_url),
-            query_params,
+            {},
         )
 
     async def post_e2e_fetch_span_score(

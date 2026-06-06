@@ -2,7 +2,8 @@
 # DO NOT EDIT MANUALLY
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import TypedDict, Optional, List, Union, Any, Dict
+from typing_extensions import NotRequired
 
 
 class ResolveProjectResponse(TypedDict):

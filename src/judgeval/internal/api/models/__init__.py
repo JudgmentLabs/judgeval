@@ -27,12 +27,6 @@ from .e2_e_fetch_span_score_response import (
     E2EFetchSpanScoreResponse as E2EFetchSpanScoreResponse,
 )
 from .e2_e_fetch_trace_response import E2EFetchTraceResponse as E2EFetchTraceResponse
-from .e2_e_traces_per_project_response import (
-    E2ETracesPerProjectResponse as E2ETracesPerProjectResponse,
-)
-from .e2_e_traces_per_project_row import (
-    E2ETracesPerProjectRow as E2ETracesPerProjectRow,
-)
 from .error_response import ErrorResponse as ErrorResponse
 from .example import Example as Example
 from .example_evaluation_run import ExampleEvaluationRun as ExampleEvaluationRun
