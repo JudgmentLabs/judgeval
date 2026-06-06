@@ -4,7 +4,7 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import Any, Generic, List, Optional, TypeVar
+from typing import Any, Generic, List, Mapping, Optional, TypeVar
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
@@ -25,7 +25,7 @@ def _binary_label(value: bool) -> str:
     return "Yes" if value else "No"
 
 
-def _scorer_value(scorer_dict: dict[str, Any]) -> str | float | None:
+def _scorer_value(scorer_dict: Mapping[str, Any]) -> str | float | None:
     score_type = scorer_dict.get("score_type")
 
     if score_type == "binary":

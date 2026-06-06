@@ -2,17 +2,10 @@
 # DO NOT EDIT MANUALLY
 from __future__ import annotations
 
-from typing import TypedDict, Optional, List, Union, Any, Dict
-from typing_extensions import NotRequired
+from typing import TypedDict, List
 
-from .base_scorer import BaseScorer
-from .example import Example
 from .example_evaluation_run import ExampleEvaluationRun
-from .example_scoring_result import ExampleScoringResult
-from .scorer_config import ScorerConfig
 from .scoring_result import ScoringResult
-from .trace_scoring_result import TraceScoringResult
-from .trace_span import TraceSpan
 
 
 class LogEvalResultsRequest(TypedDict):

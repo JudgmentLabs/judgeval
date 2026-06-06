@@ -2,11 +2,10 @@
 # DO NOT EDIT MANUALLY
 from __future__ import annotations
 
-from typing import TypedDict, Optional, List, Union, Any, Dict
+from typing import TypedDict, Optional, List
 from typing_extensions import NotRequired
 
 from .experiment_run_item import ExperimentRunItem
-from .experiment_scorer import ExperimentScorer
 
 
 class FetchExperimentRunResponse(TypedDict):

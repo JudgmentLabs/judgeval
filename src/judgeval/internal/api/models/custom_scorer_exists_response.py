@@ -2,8 +2,7 @@
 # DO NOT EDIT MANUALLY
 from __future__ import annotations
 
-from typing import TypedDict, Optional, List, Union, Any, Dict
-from typing_extensions import NotRequired
+from typing import TypedDict
 
 
 class CustomScorerExistsResponse(TypedDict):
