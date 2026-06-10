@@ -22,6 +22,9 @@ class ScorerData:
         error: Error message if scoring failed.
         additional_metadata: Extra metadata from the scorer.
         id: Unique identifier for this result.
+        success: Outcome of a client-side pass condition for the row this
+            scorer result belongs to. `None` when no pass condition was
+            evaluated.
     """
 
     name: str
@@ -33,6 +36,7 @@ class ScorerData:
     error: Optional[str] = None
     additional_metadata: Dict[str, Any] = field(default_factory=dict)
     id: Optional[str] = None
+    success: Optional[bool] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to a dictionary, omitting None fields."""
@@ -55,4 +59,6 @@ class ScorerData:
             result["additional_metadata"] = self.additional_metadata
         if self.id is not None:
             result["id"] = self.id
+        if self.success is not None:
+            result["success"] = self.success
         return result
