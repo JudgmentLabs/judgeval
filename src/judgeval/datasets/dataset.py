@@ -4,8 +4,8 @@ import datetime
 import orjson
 import os
 import yaml
-from dataclasses import dataclass
-from typing import List, Literal, Optional, Iterable, Iterator
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Literal, Optional, Iterable, Iterator
 from itertools import islice
 from rich.progress import (
     Progress,
@@ -17,6 +17,7 @@ from rich.progress import (
 
 
 from judgeval.data.example import Example
+from judgeval.exceptions import JudgmentAPIError, map_judgment_api_error
 from judgeval.internal.api import JudgmentSyncClient
 from judgeval.logger import judgeval_logger
 
@@ -36,6 +37,55 @@ def _batch_examples(
         yield batch
 
 
+def example_to_dataset_entry(example: Example) -> Dict[str, Any]:
+    """Serialize an `Example` into the dataset example payload shape.
+
+    The example's custom properties become the example data fields.
+    Reserved keys (`example_id`, `created_at`, `offline_trace_id`) are
+    lifted to the top level so the server stores them as example
+    metadata rather than data.
+    """
+    properties = dict(example._properties)
+    entry: Dict[str, Any] = {
+        "example_id": example.example_id,
+        "created_at": example.created_at,
+    }
+    offline_trace_id = properties.pop("offline_trace_id", None)
+    if offline_trace_id is not None:
+        entry["offline_trace_id"] = offline_trace_id
+    entry.update(properties)
+    return entry
+
+
+def example_from_dataset_entry(entry: Dict[str, Any]) -> Example:
+    """Build an `Example` from a server dataset example payload.
+
+    The server returns examples as `{example_id, created_at, data,
+    offline_trace_id, metadata, ...}` with the example fields nested
+    under `data`.
+    """
+    data = entry.get("data")
+    if not isinstance(data, dict):
+        data = {
+            k: v
+            for k, v in entry.items()
+            if k not in ("example_id", "created_at", "name")
+        }
+
+    example = Example(
+        example_id=entry.get("example_id", "") or "",
+        created_at=entry.get("created_at", "") or "",
+        name=entry.get("name"),
+    )
+    for key, value in data.items():
+        example._properties[key] = value
+
+    offline_trace_id = entry.get("offline_trace_id")
+    if offline_trace_id and "offline_trace_id" not in example._properties:
+        example._properties["offline_trace_id"] = offline_trace_id
+    return example
+
+
 @dataclass
 class DatasetInfo:
     """Summary metadata returned when listing datasets.
@@ -47,31 +97,89 @@ class DatasetInfo:
         dataset_id: Unique dataset identifier.
         name: Dataset name.
         created_at: ISO-8601 creation timestamp.
-        kind: Dataset kind (currently `"example"`).
         entries: Number of examples in the dataset.
-        creator: Email of the user who created the dataset.
+        current_version: Latest dataset version number.
+        test_config_count: Number of test configs referencing the dataset.
+        creator_id: ID of the user who created the dataset.
+        schema: The dataset's JSON Schema.
     """
 
     dataset_id: str
     name: str
-    created_at: str
-    kind: str
-    entries: float
-    creator: str
+    created_at: Optional[str] = None
+    entries: Optional[float] = None
+    current_version: Optional[float] = None
+    test_config_count: Optional[float] = None
+    creator_id: Optional[str] = None
+    schema: Optional[Dict[str, Any]] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> DatasetInfo:
+        return cls(
+            dataset_id=data.get("dataset_id", ""),
+            name=data.get("name", ""),
+            created_at=data.get("created_at"),
+            entries=data.get("entries"),
+            current_version=data.get("current_version"),
+            test_config_count=data.get("test_config_count"),
+            creator_id=data.get("creator_id"),
+            schema=data.get("schema"),
+        )
+
+
+@dataclass
+class DatasetVersion:
+    """A single immutable version of a dataset.
+
+    Returned by `Dataset.versions()` / `client.datasets.versions()`.
+
+    Attributes:
+        version_id: Unique version identifier.
+        dataset_id: Owning dataset ID.
+        version_number: Monotonically increasing version number.
+        created_at: ISO-8601 creation timestamp.
+        item_count: Number of examples in this version.
+        user_id: ID of the user who created the version.
+    """
+
+    version_id: str
+    dataset_id: str
+    version_number: int
+    created_at: Optional[str] = None
+    item_count: Optional[int] = None
+    user_id: Optional[str] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> DatasetVersion:
+        return cls(
+            version_id=data.get("version_id", ""),
+            dataset_id=data.get("dataset_id", ""),
+            version_number=int(data.get("version_number", 0) or 0),
+            created_at=data.get("created_at"),
+            item_count=(
+                int(data["item_count"]) if data.get("item_count") is not None else None
+            ),
+            user_id=data.get("user_id"),
+        )
 
 
 @dataclass
 class Dataset:
-    """A collection of `Example` objects stored on the Judgment platform.
+    """A schema-enforced collection of `Example` objects on the Judgment platform.
 
-    Datasets are created and retrieved via `client.datasets`. Once you
-    have a `Dataset`, you can add examples, iterate over them, export to
-    JSON/YAML, or display a rich table preview.
+    Datasets are created and retrieved via `client.datasets`. Every
+    dataset has a JSON Schema that all examples are validated against
+    server-side. Once you have a `Dataset`, you can append examples, add
+    trace-backed examples, list versions, iterate over examples, export
+    to JSON/YAML, or display a rich table preview.
 
     Attributes:
         name: Dataset name.
         project_id: Owning project ID.
         project_name: Project name.
+        dataset_id: Unique dataset identifier (set when created/fetched).
+        schema: The dataset's JSON Schema. Examples must conform to it.
+        current_version: Latest dataset version number.
         dataset_kind: Kind of dataset (default `"example"`).
         examples: The loaded examples (populated when using `.get()`).
         client: Internal API client (set automatically).
@@ -80,10 +188,19 @@ class Dataset:
         Create a dataset and add examples:
 
         ```python
-        dataset = client.datasets.create(name="golden-set")
+        dataset = client.datasets.create(
+            name="golden-set",
+            schema={
+                "type": "object",
+                "properties": {
+                    "input": {"type": "string"},
+                    "expected_output": {"type": "string"},
+                },
+                "required": ["input"],
+            },
+        )
         dataset.add_examples([
             Example.create(input="What is AI?", expected_output="Artificial Intelligence"),
-            Example.create(input="What is ML?", expected_output="Machine Learning"),
         ])
         ```
 
@@ -94,20 +211,21 @@ class Dataset:
         for example in dataset:
             print(example["input"])
         ```
-
-        Export to file:
-
-        ```python
-        dataset.save_as("json", dir_path="./exports", save_name="golden-set")
-        ```
     """
 
     name: str
     project_id: str
     project_name: str
+    dataset_id: Optional[str] = None
+    schema: Optional[Dict[str, Any]] = field(default=None)
+    current_version: Optional[int] = None
     dataset_kind: str = "example"
     examples: Optional[List[Example]] = None
     client: Optional[JudgmentSyncClient] = None
+
+    @property
+    def _identifier(self) -> str:
+        return self.dataset_id or self.name
 
     def add_from_json(self, file_path: str, batch_size: int = 100) -> None:
         """Upload examples from a JSON file.
@@ -165,10 +283,12 @@ class Dataset:
         self.add_examples(examples, batch_size=batch_size)
 
     def add_examples(self, examples: Iterable[Example], batch_size: int = 100) -> None:
-        """Upload `Example` objects to this dataset.
+        """Append `Example` objects to this dataset.
 
-        Examples are uploaded in batches with a progress bar. Accepts any
-        iterable, including generators.
+        Examples are validated server-side against the dataset schema and
+        uploaded in batches with a progress bar. Each successful batch
+        advances the dataset version. Accepts any iterable, including
+        generators.
 
         Args:
             examples: A list (or iterable) of `Example` objects.
@@ -176,6 +296,7 @@ class Dataset:
 
         Raises:
             TypeError: If a single `Example` is passed instead of a list.
+            JudgmentValidationError: If examples fail schema validation.
         """
         if not self.client:
             return
@@ -217,15 +338,96 @@ class Dataset:
                     info=f"Batch {batch_num} ({batch_size_actual} examples, {total_uploaded} total)",
                 )
 
-                self.client.post_projects_datasets_by_dataset_name_examples(
-                    project_id=self.project_id,
-                    dataset_name=self.name,
-                    payload={"examples": [e.to_dict() for e in batch]},
-                )
+                try:
+                    response = self.client.post_projects_datasets_by_dataset_identifier_examples(
+                        project_id=self.project_id,
+                        dataset_identifier=self._identifier,
+                        payload={
+                            "examples": [example_to_dataset_entry(e) for e in batch]
+                        },
+                    )
+                except JudgmentAPIError as e:
+                    raise map_judgment_api_error(
+                        e,
+                        f"Failed to add examples to dataset '{self.name}': {e.detail}",
+                    ) from e
+
+                version_added = response.get("version_added")
+                if version_added is not None:
+                    self.current_version = int(version_added)
 
         judgeval_logger.info(
             f"Successfully added {total_uploaded} examples to dataset {self.name}"
         )
+
+    def add_traces(self, trace_ids: List[str]) -> List[str]:
+        """Add trace-backed examples to this dataset.
+
+        Copies the given online traces to offline storage and appends one
+        trace-backed example per trace. The dataset schema's required
+        properties must be a subset of `{"trace"}`.
+
+        Args:
+            trace_ids: Trace IDs to add.
+
+        Returns:
+            The IDs of the created examples.
+
+        Raises:
+            JudgmentValidationError: If the dataset schema requires data
+                fields other than `trace`.
+        """
+        if not self.client or not trace_ids:
+            return []
+
+        try:
+            response = self.client.post_projects_datasets_by_dataset_identifier_traces(
+                project_id=self.project_id,
+                dataset_identifier=self._identifier,
+                payload={"trace_ids": trace_ids},
+            )
+        except JudgmentAPIError as e:
+            raise map_judgment_api_error(
+                e, f"Failed to add traces to dataset '{self.name}': {e.detail}"
+            ) from e
+
+        version_added = response.get("version_added")
+        if version_added is not None:
+            self.current_version = int(version_added)
+        example_ids = response.get("example_ids", []) or []
+        judgeval_logger.info(
+            f"Added {len(example_ids)} trace-backed examples to dataset {self.name}"
+        )
+        return example_ids
+
+    def versions(self) -> List[DatasetVersion]:
+        """List all versions of this dataset, newest first.
+
+        Returns:
+            A list of `DatasetVersion` objects.
+        """
+        if not self.client:
+            return []
+
+        response = self.client.get_projects_datasets_by_dataset_identifier_versions(
+            project_id=self.project_id,
+            dataset_identifier=self._identifier,
+        )
+        return [DatasetVersion.from_dict(v) for v in response.get("versions", []) or []]
+
+    def delete(self) -> None:
+        """Delete this dataset from the platform.
+
+        Dependent test configs are deleted along with the dataset.
+        """
+        if not self.client:
+            return
+
+        self.client.delete_projects_datasets_by_dataset_identifier(
+            project_id=self.project_id,
+            dataset_identifier=self._identifier,
+        )
+        judgeval_logger.info(f"Deleted dataset {self.name}")
 
     def save_as(
         self,
