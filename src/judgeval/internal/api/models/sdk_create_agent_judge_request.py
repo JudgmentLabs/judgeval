@@ -16,3 +16,4 @@ class SDKCreateAgentJudgeRequest(TypedDict):
     categories: NotRequired[Optional[List[Dict[str, Any]]]]
     min_score: NotRequired[Optional[float]]
     max_score: NotRequired[Optional[float]]
+    judge_type: NotRequired[Optional[str]]

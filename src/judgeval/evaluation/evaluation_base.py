@@ -4,7 +4,7 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import Any, Generic, List, Mapping, Optional, TypeVar
+from typing import Any, Dict, Generic, List, Mapping, Optional, TypeVar
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
@@ -15,10 +15,14 @@ from judgeval.data.example import Example
 from judgeval.data.scorer_data import ScorerData
 from judgeval.data.scoring_result import ScoringResult
 from judgeval.internal.api import JudgmentSyncClient
-from judgeval.internal.api.models import ExampleEvaluationRun, ExperimentRunItem
+from judgeval.internal.api.models import ExampleEvaluationRun
 from judgeval.judges import Judge
 
 S = TypeVar("S", str, Judge)
+
+# Per-example result rows returned by the legacy experiments fetch
+# endpoint (now backed by offline test runs server-side).
+ExperimentRunItem = Dict[str, Any]
 
 
 def _binary_label(value: bool) -> str:
@@ -192,7 +196,9 @@ class EvaluatorRunner(ABC, Generic[S]):
 
                 scorers_data.append(
                     ScorerData(
-                        name=scorer_dict["name"],
+                        name=scorer_dict.get("judge_name")
+                        or scorer_dict.get("name")
+                        or "",
                         value=_scorer_value(scorer_dict),
                         score_type=scorer_dict.get("score_type"),
                         minimum_score_range=scorer_dict.get("minimum_score_range", 0),
@@ -202,6 +208,7 @@ class EvaluatorRunner(ABC, Generic[S]):
                         additional_metadata=scorer_dict.get("additional_metadata")
                         or {},
                         id=scorer_dict.get("scorer_data_id"),
+                        success=scorer_dict.get("success"),
                     )
                 )
 

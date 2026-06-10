@@ -10,9 +10,13 @@ from rich.progress import Progress
 
 from judgeval.logger import judgeval_logger
 from judgeval.data.example import Example
+from judgeval.exceptions import JudgmentAPIError, map_judgment_api_error
 from judgeval.judges import Judge
 from judgeval.hosted.responses import ScorerResponse
-from judgeval.internal.api.models import ExampleEvaluationRun, LocalScorerResult
+from judgeval.internal.api.models import (
+    ExampleEvaluationRun,
+    OfflineTestsLocalScorerResult,
+)
 from judgeval.evaluation.evaluation_base import EvaluatorRunner
 
 
@@ -69,7 +73,7 @@ class LocalEvaluatorRunner(EvaluatorRunner[Judge]):
             f"[green]✓[/green] Scoring completed in [bold]{elapsed:.1f}s[/bold]"
         )
 
-        api_results: List[LocalScorerResult] = []
+        api_results: List[OfflineTestsLocalScorerResult] = []
         for i, example in enumerate(examples):
             scorer_entries: List[Dict[str, Any]] = []
             for scorer_name, res, exc in results_by_example[i]:
@@ -100,10 +104,19 @@ class LocalEvaluatorRunner(EvaluatorRunner[Judge]):
                 }
             )
 
-        self._client.post_projects_eval_results_examples(
-            project_id=project_id,
-            payload={"results": api_results, "run": payload},
-        )
+        try:
+            self._client.post_projects_eval_results_examples(
+                project_id=project_id,
+                payload={"results": api_results, "run": payload},
+            )
+        except JudgmentAPIError as e:
+            raise map_judgment_api_error(
+                e,
+                "Failed to log local scorer results: the v1 offline-tests API "
+                "requires results to belong to a test run. Use "
+                "client.offline_tests.run(...) to run dataset-backed offline "
+                f"tests. Server detail: {e.detail}",
+            ) from e
         judgeval_logger.info("Local scorer results logged to backend")
         return len(examples)
 

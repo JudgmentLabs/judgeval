@@ -2,12 +2,14 @@
 # DO NOT EDIT MANUALLY
 from __future__ import annotations
 
-from typing import TypedDict, List
+from typing import TypedDict, Optional, List
+from typing_extensions import NotRequired
 
 from .example_evaluation_run import ExampleEvaluationRun
 from .scoring_result import ScoringResult
 
 
-class LogEvalResultsRequest(TypedDict):
+class OfflineTestsLogEvalResultsRequest(TypedDict):
+    test_run_id: NotRequired[Optional[str]]
     results: List[ScoringResult]
     run: ExampleEvaluationRun

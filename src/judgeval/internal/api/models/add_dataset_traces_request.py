@@ -2,9 +2,8 @@
 # DO NOT EDIT MANUALLY
 from __future__ import annotations
 
-from typing import List
-
-from .dataset_info import DatasetInfo
+from typing import TypedDict, List
 
 
-PullAllDatasetsResponse = List[DatasetInfo]
+class AddDatasetTracesRequest(TypedDict):
+    trace_ids: List[str]

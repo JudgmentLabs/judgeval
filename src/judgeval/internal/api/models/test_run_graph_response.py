@@ -2,8 +2,8 @@
 # DO NOT EDIT MANUALLY
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import TypedDict, Any, Dict
 
 
-class CreateDatasetResponse(TypedDict):
-    detail: str
+class TestRunGraphResponse(TypedDict):
+    graph: Dict[str, Any]

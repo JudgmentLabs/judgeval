@@ -27,7 +27,10 @@ def _headers(
 def _handle_response(r: Response) -> Any:
     if r.status_code >= 400:
         try:
-            detail = r.json().get("detail", "")
+            body = r.json()
+            detail = (
+                body.get("detail") or body.get("message") or body.get("error") or ""
+            )
         except Exception:
             detail = r.text
         raise JudgmentAPIError(r.status_code, detail, r)
@@ -122,41 +125,283 @@ class JudgmentSyncClient:
         )
 
     def post_projects_datasets(
-        self, project_id: str, payload: CreateDatasetRequest
-    ) -> CreateDatasetResponse:
+        self, project_id: str, payload: CreateOfflineDatasetRequest
+    ) -> CreateOfflineDatasetResponse:
         return self._request(
             "POST",
             url_for(f"/v1/projects/{project_id}/datasets", self.base_url),
             payload,
         )
 
-    def get_projects_datasets(self, project_id: str) -> PullAllDatasetsResponse:
+    def get_projects_datasets(self, project_id: str) -> PullAllOfflineDatasetsResponse:
         return self._request(
             "GET",
             url_for(f"/v1/projects/{project_id}/datasets", self.base_url),
             {},
         )
 
-    def post_projects_datasets_by_dataset_name_examples(
-        self, project_id: str, dataset_name: str, payload: InsertExamplesRequest
-    ) -> InsertExamplesResponse:
+    def get_projects_datasets_by_dataset_identifier_versions(
+        self, project_id: str, dataset_identifier: str
+    ) -> OfflineDatasetVersionsResponse:
+        return self._request(
+            "GET",
+            url_for(
+                f"/v1/projects/{project_id}/datasets/{dataset_identifier}/versions",
+                self.base_url,
+            ),
+            {},
+        )
+
+    def get_projects_datasets_by_dataset_identifier_page(
+        self,
+        project_id: str,
+        dataset_identifier: str,
+        version: Optional[str] = None,
+        limit: Optional[str] = None,
+        cursor_created_at: Optional[str] = None,
+        cursor_example_id: Optional[str] = None,
+    ) -> OfflineDatasetPageResponse:
+        query_params = {}
+        if version is not None:
+            query_params["version"] = version
+        if limit is not None:
+            query_params["limit"] = limit
+        if cursor_created_at is not None:
+            query_params["cursor_created_at"] = cursor_created_at
+        if cursor_example_id is not None:
+            query_params["cursor_example_id"] = cursor_example_id
+        return self._request(
+            "GET",
+            url_for(
+                f"/v1/projects/{project_id}/datasets/{dataset_identifier}/page",
+                self.base_url,
+            ),
+            query_params,
+        )
+
+    def post_projects_datasets_by_dataset_identifier_examples(
+        self,
+        project_id: str,
+        dataset_identifier: str,
+        payload: InsertOfflineDatasetExamplesRequest,
+    ) -> AddDatasetItemsResponse:
         return self._request(
             "POST",
             url_for(
-                f"/v1/projects/{project_id}/datasets/{dataset_name}/examples",
+                f"/v1/projects/{project_id}/datasets/{dataset_identifier}/examples",
                 self.base_url,
             ),
             payload,
         )
 
-    def get_projects_datasets_by_dataset_name(
-        self, project_id: str, dataset_name: str
-    ) -> PullDatasetResponse:
+    def post_projects_datasets_by_dataset_identifier_traces(
+        self, project_id: str, dataset_identifier: str, payload: AddDatasetTracesRequest
+    ) -> AddDatasetItemsResponse:
+        return self._request(
+            "POST",
+            url_for(
+                f"/v1/projects/{project_id}/datasets/{dataset_identifier}/traces",
+                self.base_url,
+            ),
+            payload,
+        )
+
+    def delete_projects_datasets_by_dataset_identifier(
+        self, project_id: str, dataset_identifier: str
+    ) -> DeleteOfflineDatasetResponse:
+        return self._request(
+            "DELETE",
+            url_for(
+                f"/v1/projects/{project_id}/datasets/{dataset_identifier}",
+                self.base_url,
+            ),
+            {},
+        )
+
+    def get_projects_datasets_by_dataset_identifier(
+        self, project_id: str, dataset_identifier: str
+    ) -> PullOfflineDatasetResponse:
         return self._request(
             "GET",
             url_for(
-                f"/v1/projects/{project_id}/datasets/{dataset_name}", self.base_url
+                f"/v1/projects/{project_id}/datasets/{dataset_identifier}",
+                self.base_url,
             ),
+            {},
+        )
+
+    def get_projects_test_configs(
+        self, project_id: str, dataset_id: Optional[str] = None
+    ) -> TestConfigsResponse:
+        query_params = {}
+        if dataset_id is not None:
+            query_params["dataset_id"] = dataset_id
+        return self._request(
+            "GET",
+            url_for(f"/v1/projects/{project_id}/test-configs", self.base_url),
+            query_params,
+        )
+
+    def post_projects_test_configs(
+        self, project_id: str, payload: CreateTestConfigRequest
+    ) -> TestConfigResponse:
+        return self._request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/test-configs", self.base_url),
+            payload,
+        )
+
+    def get_projects_test_configs_by_test_config_id(
+        self, project_id: str, test_config_id: str
+    ) -> TestConfigResponse:
+        return self._request(
+            "GET",
+            url_for(
+                f"/v1/projects/{project_id}/test-configs/{test_config_id}",
+                self.base_url,
+            ),
+            {},
+        )
+
+    def patch_projects_test_configs_by_test_config_id(
+        self, project_id: str, test_config_id: str, payload: UpdateTestConfigRequest
+    ) -> TestConfigResponse:
+        return self._request(
+            "PATCH",
+            url_for(
+                f"/v1/projects/{project_id}/test-configs/{test_config_id}",
+                self.base_url,
+            ),
+            payload,
+        )
+
+    def delete_projects_test_configs_by_test_config_id(
+        self, project_id: str, test_config_id: str
+    ) -> DeleteTestConfigResponse:
+        return self._request(
+            "DELETE",
+            url_for(
+                f"/v1/projects/{project_id}/test-configs/{test_config_id}",
+                self.base_url,
+            ),
+            {},
+        )
+
+    def get_projects_test_runs(
+        self,
+        project_id: str,
+        test_config_id: Optional[str] = None,
+        dataset_id: Optional[str] = None,
+        status: Optional[str] = None,
+        limit: Optional[str] = None,
+    ) -> TestRunsResponse:
+        query_params = {}
+        if test_config_id is not None:
+            query_params["test_config_id"] = test_config_id
+        if dataset_id is not None:
+            query_params["dataset_id"] = dataset_id
+        if status is not None:
+            query_params["status"] = status
+        if limit is not None:
+            query_params["limit"] = limit
+        return self._request(
+            "GET",
+            url_for(f"/v1/projects/{project_id}/test-runs", self.base_url),
+            query_params,
+        )
+
+    def post_projects_test_runs(
+        self, project_id: str, payload: CreateTestRunRequest
+    ) -> PreparedTestRunResponse:
+        return self._request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/test-runs", self.base_url),
+            payload,
+        )
+
+    def get_projects_test_runs_by_test_run_id(
+        self, project_id: str, test_run_id: str
+    ) -> TestRunResponse:
+        return self._request(
+            "GET",
+            url_for(
+                f"/v1/projects/{project_id}/test-runs/{test_run_id}", self.base_url
+            ),
+            {},
+        )
+
+    def patch_projects_test_runs_by_test_run_id_status(
+        self, project_id: str, test_run_id: str, payload: UpdateTestRunStatusRequest
+    ) -> TestRunResponse:
+        return self._request(
+            "PATCH",
+            url_for(
+                f"/v1/projects/{project_id}/test-runs/{test_run_id}/status",
+                self.base_url,
+            ),
+            payload,
+        )
+
+    def get_projects_test_runs_by_test_run_id_items(
+        self, project_id: str, test_run_id: str
+    ) -> TestRunItemsResponse:
+        return self._request(
+            "GET",
+            url_for(
+                f"/v1/projects/{project_id}/test-runs/{test_run_id}/items",
+                self.base_url,
+            ),
+            {},
+        )
+
+    def get_projects_test_runs_by_test_run_id_results(
+        self, project_id: str, test_run_id: str
+    ) -> TestRunItemsResponse:
+        return self._request(
+            "GET",
+            url_for(
+                f"/v1/projects/{project_id}/test-runs/{test_run_id}/results",
+                self.base_url,
+            ),
+            {},
+        )
+
+    def get_projects_test_runs_by_test_run_id_graph(
+        self, project_id: str, test_run_id: str
+    ) -> TestRunGraphResponse:
+        return self._request(
+            "GET",
+            url_for(
+                f"/v1/projects/{project_id}/test-runs/{test_run_id}/graph",
+                self.base_url,
+            ),
+            {},
+        )
+
+    def post_projects_eval_results(
+        self, project_id: str, payload: OfflineTestsLogEvalResultsRequest
+    ) -> LogCanonicalTestRunResultsResponse:
+        return self._request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/eval-results", self.base_url),
+            payload,
+        )
+
+    def post_projects_eval_results_examples(
+        self, project_id: str, payload: OfflineTestsLogEvalResultsExamplesRequest
+    ) -> LogCanonicalTestRunExampleResultsResponse:
+        return self._request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/eval-results/examples", self.base_url),
+            payload,
+        )
+
+    def get_projects_experiments_by_run_id(
+        self, project_id: str, run_id: str
+    ) -> FetchTestRunViaExperimentAliasResponse:
+        return self._request(
+            "GET",
+            url_for(f"/v1/projects/{project_id}/experiments/{run_id}", self.base_url),
             {},
         )
 
@@ -176,33 +421,6 @@ class JudgmentSyncClient:
             "POST",
             url_for(f"/v1/projects/{project_id}/evaluate/traces", self.base_url),
             payload,
-        )
-
-    def post_projects_eval_results(
-        self, project_id: str, payload: LogEvalResultsRequest
-    ) -> LogEvalResultsResponse:
-        return self._request(
-            "POST",
-            url_for(f"/v1/projects/{project_id}/eval-results", self.base_url),
-            payload,
-        )
-
-    def post_projects_eval_results_examples(
-        self, project_id: str, payload: LogEvalResultsExamplesRequest
-    ) -> LogEvalResultsExamplesResponse:
-        return self._request(
-            "POST",
-            url_for(f"/v1/projects/{project_id}/eval-results/examples", self.base_url),
-            payload,
-        )
-
-    def get_projects_experiments_by_run_id(
-        self, project_id: str, run_id: str
-    ) -> FetchExperimentRunResponse:
-        return self._request(
-            "GET",
-            url_for(f"/v1/projects/{project_id}/experiments/{run_id}", self.base_url),
-            {},
         )
 
     def post_projects_eval_queue_examples(
@@ -475,41 +693,285 @@ class JudgmentAsyncClient:
         )
 
     async def post_projects_datasets(
-        self, project_id: str, payload: CreateDatasetRequest
-    ) -> CreateDatasetResponse:
+        self, project_id: str, payload: CreateOfflineDatasetRequest
+    ) -> CreateOfflineDatasetResponse:
         return await self._request(
             "POST",
             url_for(f"/v1/projects/{project_id}/datasets", self.base_url),
             payload,
         )
 
-    async def get_projects_datasets(self, project_id: str) -> PullAllDatasetsResponse:
+    async def get_projects_datasets(
+        self, project_id: str
+    ) -> PullAllOfflineDatasetsResponse:
         return await self._request(
             "GET",
             url_for(f"/v1/projects/{project_id}/datasets", self.base_url),
             {},
         )
 
-    async def post_projects_datasets_by_dataset_name_examples(
-        self, project_id: str, dataset_name: str, payload: InsertExamplesRequest
-    ) -> InsertExamplesResponse:
+    async def get_projects_datasets_by_dataset_identifier_versions(
+        self, project_id: str, dataset_identifier: str
+    ) -> OfflineDatasetVersionsResponse:
+        return await self._request(
+            "GET",
+            url_for(
+                f"/v1/projects/{project_id}/datasets/{dataset_identifier}/versions",
+                self.base_url,
+            ),
+            {},
+        )
+
+    async def get_projects_datasets_by_dataset_identifier_page(
+        self,
+        project_id: str,
+        dataset_identifier: str,
+        version: Optional[str] = None,
+        limit: Optional[str] = None,
+        cursor_created_at: Optional[str] = None,
+        cursor_example_id: Optional[str] = None,
+    ) -> OfflineDatasetPageResponse:
+        query_params = {}
+        if version is not None:
+            query_params["version"] = version
+        if limit is not None:
+            query_params["limit"] = limit
+        if cursor_created_at is not None:
+            query_params["cursor_created_at"] = cursor_created_at
+        if cursor_example_id is not None:
+            query_params["cursor_example_id"] = cursor_example_id
+        return await self._request(
+            "GET",
+            url_for(
+                f"/v1/projects/{project_id}/datasets/{dataset_identifier}/page",
+                self.base_url,
+            ),
+            query_params,
+        )
+
+    async def post_projects_datasets_by_dataset_identifier_examples(
+        self,
+        project_id: str,
+        dataset_identifier: str,
+        payload: InsertOfflineDatasetExamplesRequest,
+    ) -> AddDatasetItemsResponse:
         return await self._request(
             "POST",
             url_for(
-                f"/v1/projects/{project_id}/datasets/{dataset_name}/examples",
+                f"/v1/projects/{project_id}/datasets/{dataset_identifier}/examples",
                 self.base_url,
             ),
             payload,
         )
 
-    async def get_projects_datasets_by_dataset_name(
-        self, project_id: str, dataset_name: str
-    ) -> PullDatasetResponse:
+    async def post_projects_datasets_by_dataset_identifier_traces(
+        self, project_id: str, dataset_identifier: str, payload: AddDatasetTracesRequest
+    ) -> AddDatasetItemsResponse:
+        return await self._request(
+            "POST",
+            url_for(
+                f"/v1/projects/{project_id}/datasets/{dataset_identifier}/traces",
+                self.base_url,
+            ),
+            payload,
+        )
+
+    async def delete_projects_datasets_by_dataset_identifier(
+        self, project_id: str, dataset_identifier: str
+    ) -> DeleteOfflineDatasetResponse:
+        return await self._request(
+            "DELETE",
+            url_for(
+                f"/v1/projects/{project_id}/datasets/{dataset_identifier}",
+                self.base_url,
+            ),
+            {},
+        )
+
+    async def get_projects_datasets_by_dataset_identifier(
+        self, project_id: str, dataset_identifier: str
+    ) -> PullOfflineDatasetResponse:
         return await self._request(
             "GET",
             url_for(
-                f"/v1/projects/{project_id}/datasets/{dataset_name}", self.base_url
+                f"/v1/projects/{project_id}/datasets/{dataset_identifier}",
+                self.base_url,
             ),
+            {},
+        )
+
+    async def get_projects_test_configs(
+        self, project_id: str, dataset_id: Optional[str] = None
+    ) -> TestConfigsResponse:
+        query_params = {}
+        if dataset_id is not None:
+            query_params["dataset_id"] = dataset_id
+        return await self._request(
+            "GET",
+            url_for(f"/v1/projects/{project_id}/test-configs", self.base_url),
+            query_params,
+        )
+
+    async def post_projects_test_configs(
+        self, project_id: str, payload: CreateTestConfigRequest
+    ) -> TestConfigResponse:
+        return await self._request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/test-configs", self.base_url),
+            payload,
+        )
+
+    async def get_projects_test_configs_by_test_config_id(
+        self, project_id: str, test_config_id: str
+    ) -> TestConfigResponse:
+        return await self._request(
+            "GET",
+            url_for(
+                f"/v1/projects/{project_id}/test-configs/{test_config_id}",
+                self.base_url,
+            ),
+            {},
+        )
+
+    async def patch_projects_test_configs_by_test_config_id(
+        self, project_id: str, test_config_id: str, payload: UpdateTestConfigRequest
+    ) -> TestConfigResponse:
+        return await self._request(
+            "PATCH",
+            url_for(
+                f"/v1/projects/{project_id}/test-configs/{test_config_id}",
+                self.base_url,
+            ),
+            payload,
+        )
+
+    async def delete_projects_test_configs_by_test_config_id(
+        self, project_id: str, test_config_id: str
+    ) -> DeleteTestConfigResponse:
+        return await self._request(
+            "DELETE",
+            url_for(
+                f"/v1/projects/{project_id}/test-configs/{test_config_id}",
+                self.base_url,
+            ),
+            {},
+        )
+
+    async def get_projects_test_runs(
+        self,
+        project_id: str,
+        test_config_id: Optional[str] = None,
+        dataset_id: Optional[str] = None,
+        status: Optional[str] = None,
+        limit: Optional[str] = None,
+    ) -> TestRunsResponse:
+        query_params = {}
+        if test_config_id is not None:
+            query_params["test_config_id"] = test_config_id
+        if dataset_id is not None:
+            query_params["dataset_id"] = dataset_id
+        if status is not None:
+            query_params["status"] = status
+        if limit is not None:
+            query_params["limit"] = limit
+        return await self._request(
+            "GET",
+            url_for(f"/v1/projects/{project_id}/test-runs", self.base_url),
+            query_params,
+        )
+
+    async def post_projects_test_runs(
+        self, project_id: str, payload: CreateTestRunRequest
+    ) -> PreparedTestRunResponse:
+        return await self._request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/test-runs", self.base_url),
+            payload,
+        )
+
+    async def get_projects_test_runs_by_test_run_id(
+        self, project_id: str, test_run_id: str
+    ) -> TestRunResponse:
+        return await self._request(
+            "GET",
+            url_for(
+                f"/v1/projects/{project_id}/test-runs/{test_run_id}", self.base_url
+            ),
+            {},
+        )
+
+    async def patch_projects_test_runs_by_test_run_id_status(
+        self, project_id: str, test_run_id: str, payload: UpdateTestRunStatusRequest
+    ) -> TestRunResponse:
+        return await self._request(
+            "PATCH",
+            url_for(
+                f"/v1/projects/{project_id}/test-runs/{test_run_id}/status",
+                self.base_url,
+            ),
+            payload,
+        )
+
+    async def get_projects_test_runs_by_test_run_id_items(
+        self, project_id: str, test_run_id: str
+    ) -> TestRunItemsResponse:
+        return await self._request(
+            "GET",
+            url_for(
+                f"/v1/projects/{project_id}/test-runs/{test_run_id}/items",
+                self.base_url,
+            ),
+            {},
+        )
+
+    async def get_projects_test_runs_by_test_run_id_results(
+        self, project_id: str, test_run_id: str
+    ) -> TestRunItemsResponse:
+        return await self._request(
+            "GET",
+            url_for(
+                f"/v1/projects/{project_id}/test-runs/{test_run_id}/results",
+                self.base_url,
+            ),
+            {},
+        )
+
+    async def get_projects_test_runs_by_test_run_id_graph(
+        self, project_id: str, test_run_id: str
+    ) -> TestRunGraphResponse:
+        return await self._request(
+            "GET",
+            url_for(
+                f"/v1/projects/{project_id}/test-runs/{test_run_id}/graph",
+                self.base_url,
+            ),
+            {},
+        )
+
+    async def post_projects_eval_results(
+        self, project_id: str, payload: OfflineTestsLogEvalResultsRequest
+    ) -> LogCanonicalTestRunResultsResponse:
+        return await self._request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/eval-results", self.base_url),
+            payload,
+        )
+
+    async def post_projects_eval_results_examples(
+        self, project_id: str, payload: OfflineTestsLogEvalResultsExamplesRequest
+    ) -> LogCanonicalTestRunExampleResultsResponse:
+        return await self._request(
+            "POST",
+            url_for(f"/v1/projects/{project_id}/eval-results/examples", self.base_url),
+            payload,
+        )
+
+    async def get_projects_experiments_by_run_id(
+        self, project_id: str, run_id: str
+    ) -> FetchTestRunViaExperimentAliasResponse:
+        return await self._request(
+            "GET",
+            url_for(f"/v1/projects/{project_id}/experiments/{run_id}", self.base_url),
             {},
         )
 
@@ -529,33 +991,6 @@ class JudgmentAsyncClient:
             "POST",
             url_for(f"/v1/projects/{project_id}/evaluate/traces", self.base_url),
             payload,
-        )
-
-    async def post_projects_eval_results(
-        self, project_id: str, payload: LogEvalResultsRequest
-    ) -> LogEvalResultsResponse:
-        return await self._request(
-            "POST",
-            url_for(f"/v1/projects/{project_id}/eval-results", self.base_url),
-            payload,
-        )
-
-    async def post_projects_eval_results_examples(
-        self, project_id: str, payload: LogEvalResultsExamplesRequest
-    ) -> LogEvalResultsExamplesResponse:
-        return await self._request(
-            "POST",
-            url_for(f"/v1/projects/{project_id}/eval-results/examples", self.base_url),
-            payload,
-        )
-
-    async def get_projects_experiments_by_run_id(
-        self, project_id: str, run_id: str
-    ) -> FetchExperimentRunResponse:
-        return await self._request(
-            "GET",
-            url_for(f"/v1/projects/{project_id}/experiments/{run_id}", self.base_url),
-            {},
         )
 
     async def post_projects_eval_queue_examples(

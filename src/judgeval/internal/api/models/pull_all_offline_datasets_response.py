@@ -2,8 +2,7 @@
 # DO NOT EDIT MANUALLY
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import List, Any, Dict
 
 
-class LogEvalResultsExamplesResponse(TypedDict):
-    ui_results_url: str
+PullAllOfflineDatasetsResponse = List[Dict[str, Any]]
