@@ -39,7 +39,9 @@ def infer_schema_from_examples(examples: Sequence[Example]) -> Dict[str, Any]:
     supplied. Property types are inferred from the example values; a
     field is marked `required` only if it is present (and non-None) in
     every example. The reserved `offline_trace_id` field maps to the
-    reserved `trace` schema property.
+    reserved `trace` schema property: it is emitted when at least one
+    example has a non-None trace, and marked `required` only when every
+    example does (so `{{trace}}` judges can bind to the dataset).
 
     Args:
         examples: Examples to infer the schema from. Must be non-empty.
@@ -58,13 +60,14 @@ def infer_schema_from_examples(examples: Sequence[Example]) -> Dict[str, Any]:
 
     properties: Dict[str, Any] = {}
     required: Optional[set] = None
-    any_trace = False
+    traced_count = 0
 
     for example in examples:
         keys = set()
         for key, value in example._properties.items():
             if key == "offline_trace_id":
-                any_trace = True
+                if value is not None:
+                    traced_count += 1
                 continue
             if value is None:
                 continue
@@ -73,8 +76,10 @@ def infer_schema_from_examples(examples: Sequence[Example]) -> Dict[str, Any]:
                 properties[key] = {"type": _json_schema_type(value)}
         required = keys if required is None else (required & keys)
 
-    if any_trace:
+    if traced_count:
         properties["trace"] = {"type": "string"}
+        if traced_count == len(examples) and required is not None:
+            required.add("trace")
 
     schema: Dict[str, Any] = {
         "type": "object",

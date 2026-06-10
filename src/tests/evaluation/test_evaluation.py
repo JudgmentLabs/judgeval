@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
 
 from judgeval.data.example import Example
 from judgeval.evaluation.evaluation import Evaluation
+from judgeval.exceptions import JudgmentAPIError
 
 
 def _make_evaluation():
@@ -57,6 +59,22 @@ class TestEvaluationRouting:
             eval_run_name="run-1",
         )
         eval_._local.run.assert_called_once()
+
+
+class TestHostedFastFail:
+    def test_hosted_scorers_fast_fail_without_queueing(self):
+        client = MagicMock()
+        eval_ = Evaluation(
+            client=client, project_id="proj-1", project_name="test-project"
+        )
+        with pytest.raises(JudgmentAPIError, match="offline_tests"):
+            eval_.run(
+                examples=[Example.create(input="q")],
+                scorers=["faithfulness"],
+                eval_run_name="run-1",
+            )
+        client.post_projects_eval_queue_examples.assert_not_called()
+        client.get_projects_experiments_by_run_id.assert_not_called()
 
 
 class TestEvaluationFactory:

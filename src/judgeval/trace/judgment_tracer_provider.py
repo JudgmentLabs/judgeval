@@ -199,6 +199,16 @@ class JudgmentTracerProvider(TracerProvider):
         _active_tracer_var.set(tracer)
         return True
 
+    def restore_active(self, tracer: Optional[JudgmentTracer]) -> None:
+        """Restore the active tracer for the current context.
+
+        Counterpart to ``set_active`` for temporary activations: pass the
+        tracer captured via ``get_active_tracer()`` before the switch, or
+        ``None`` to deactivate entirely. Unlike ``set_active`` this does
+        not register the tracer.
+        """
+        _active_tracer_var.set(tracer)
+
     def get_active_tracer(self) -> Optional[JudgmentTracer]:
         """Return the tracer active in the current async context, or None."""
         return _active_tracer_var.get()

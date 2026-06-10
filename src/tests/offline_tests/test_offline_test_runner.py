@@ -445,6 +445,55 @@ class TestRunAgentLoop:
 
         assert traces == {}
 
+    def test_run_agent_restores_previous_active_tracer(self):
+        from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
+
+        runner, client = _make_runner()
+        client.api_key = "key"
+        client.organization_id = "org"
+        client.base_url = "http://localhost"
+
+        proxy = JudgmentTracerProvider.get_instance()
+        original = proxy.get_active_tracer()
+        previous = MagicMock()
+        proxy.set_active(previous)
+
+        tracer = MagicMock()
+
+        def fake_create(**kwargs):
+            assert kwargs["set_active"] is True
+            proxy.set_active(tracer)
+            tracer.observe = lambda func, span_type=None: func
+            return tracer
+
+        try:
+            with patch(
+                "judgeval.trace.offline_tracer.OfflineTracer.create",
+                side_effect=fake_create,
+            ):
+                runner.run_agent(
+                    lambda input: input,
+                    [{"example_id": "ex-1", "data": {"input": "q1"}}],
+                )
+            assert proxy.get_active_tracer() is previous
+            tracer._tracer_provider.shutdown.assert_called_once()
+
+            # restored even when the agent loop raises
+            with patch(
+                "judgeval.trace.offline_tracer.OfflineTracer.create",
+                side_effect=fake_create,
+            ):
+                with pytest.raises(TypeError, match="does not accept"):
+                    runner.run_agent(
+                        lambda input: input,
+                        [{"example_id": "ex-1", "data": {"other": 1}}],
+                    )
+            assert proxy.get_active_tracer() is previous
+        finally:
+            proxy.deregister(previous)
+            proxy.deregister(tracer)
+            proxy.restore_active(original)
+
     def test_run_agent_signature_mismatch_raises(self):
         runner, client = _make_runner()
         client.api_key = "key"

@@ -242,6 +242,43 @@ class TestInferSchema:
         assert schema["properties"]["trace"] == {"type": "string"}
         assert "offline_trace_id" not in schema["properties"]
 
+    def test_all_traced_examples_mark_trace_required(self):
+        schema = infer_schema_from_examples(
+            [
+                Example.create(input="q1", offline_trace_id="t1"),
+                Example.create(input="q2", offline_trace_id="t2"),
+            ]
+        )
+        assert schema["properties"]["trace"] == {"type": "string"}
+        assert schema["required"] == ["input", "trace"]
+
+    def test_partially_traced_examples_emit_optional_trace(self):
+        schema = infer_schema_from_examples(
+            [
+                Example.create(input="q1", offline_trace_id="t1"),
+                Example.create(input="q2"),
+            ]
+        )
+        assert schema["properties"]["trace"] == {"type": "string"}
+        assert schema["required"] == ["input"]
+
+    def test_untraced_examples_omit_trace_property(self):
+        schema = infer_schema_from_examples(
+            [Example.create(input="q1"), Example.create(input="q2")]
+        )
+        assert "trace" not in schema["properties"]
+        assert schema["required"] == ["input"]
+
+    def test_none_only_trace_ids_omit_trace_property(self):
+        schema = infer_schema_from_examples(
+            [
+                Example.create(input="q1", offline_trace_id=None),
+                Example.create(input="q2", offline_trace_id=None),
+            ]
+        )
+        assert "trace" not in schema["properties"]
+        assert schema["required"] == ["input"]
+
     def test_empty_raises(self):
         with pytest.raises(ValueError):
             infer_schema_from_examples([])

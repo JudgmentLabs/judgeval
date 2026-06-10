@@ -21,24 +21,13 @@ class Evaluation:
 
     - **Hosted scorers** -- pass scorer names as strings (e.g.
       `"faithfulness"`, `"answer_relevancy"`). Evaluation runs server-side
-      on the Judgment platform.
+      on the Judgment platform. **Not supported against offline-tests-v1
+      servers** -- results cannot be retrieved, so `run()` raises
+      immediately; use `client.offline_tests` instead.
     - **Custom judges** -- pass `Judge` subclass instances for in-process
       evaluation with your own scoring logic.
 
     Examples:
-        Using hosted scorers:
-
-        ```python
-        evaluation = client.evaluation.create()
-        results = evaluation.run(
-            examples=examples,
-            scorers=["faithfulness", "answer_relevancy"],
-            eval_run_name="nightly-eval",
-        )
-        for result in results:
-            print(result.scorers_data)
-        ```
-
         Using a custom judge:
 
         ```python
@@ -75,6 +64,12 @@ class Evaluation:
         Pass **either** hosted scorer names (strings) **or** custom `Judge`
         instances. Mixing both in one call is not supported.
 
+        Hosted ad-hoc evaluation results cannot be retrieved against
+        offline-tests-v1 servers, so passing hosted scorer names raises a
+        `JudgmentAPIError` before any work is queued. Use
+        `client.offline_tests.run(...)` for dataset-backed offline tests,
+        or `Judge` instances to score examples locally.
+
         Args:
             examples: The `Example` objects to evaluate.
             scorers: Hosted scorer names (e.g. `["faithfulness"]`) or
@@ -98,7 +93,7 @@ class Evaluation:
                         expected_output="A high-level programming language.",
                     ),
                 ],
-                scorers=["answer_relevancy"],
+                scorers=[RelevancyJudge()],
                 eval_run_name="quick-test",
             )
             print(results[0].scorers_data)

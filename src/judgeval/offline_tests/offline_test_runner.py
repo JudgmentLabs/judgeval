@@ -249,9 +249,15 @@ class OfflineTestRunner:
         produces a dedicated offline trace; the resulting trace IDs are
         returned keyed by example ID. Entrypoint/example field mismatches
         raise immediately; runtime errors inside the agent are recorded on
-        the trace and logged, and the loop continues.
+        the trace and logged, and the loop continues. The previously
+        active tracer (if any) is restored once the loop finishes, so
+        subsequent `@observe` spans do not route to the offline endpoint.
         """
+        from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
         from judgeval.trace.offline_tracer import OfflineTracer
+
+        proxy = JudgmentTracerProvider.get_instance()
+        previous_tracer = proxy.get_active_tracer()
 
         captured: List[Example] = []
         tracer = OfflineTracer.create(
@@ -262,45 +268,50 @@ class OfflineTestRunner:
             set_active=True,
             dataset=captured,
         )
-        wrapped = tracer.observe(agent_function, span_type="agent")
-        is_async = inspect.iscoroutinefunction(agent_function)
+        try:
+            wrapped = tracer.observe(agent_function, span_type="agent")
+            is_async = inspect.iscoroutinefunction(agent_function)
 
-        task = None
-        if progress is not None:
-            task = progress.add_task(
-                f"Running agent over {len(examples)} example(s)...", total=None
-            )
-
-        agent_traces: Dict[str, str] = {}
-        for index, example in enumerate(examples):
-            example_id = example.get("example_id") or ""
-            data = example.get("data") or {}
-            kwargs = build_agent_kwargs(agent_function, data)
-
-            before = len(captured)
-            try:
-                if is_async:
-                    asyncio.run(wrapped(**kwargs))
-                else:
-                    wrapped(**kwargs)
-            except Exception as exc:
-                judgeval_logger.error(
-                    f"Agent entrypoint raised for example {example_id}: {exc}"
+            task = None
+            if progress is not None:
+                task = progress.add_task(
+                    f"Running agent over {len(examples)} example(s)...", total=None
                 )
 
-            for produced in captured[before:]:
-                offline_trace_id = produced._properties.get("offline_trace_id")
-                if example_id and offline_trace_id:
-                    agent_traces[example_id] = offline_trace_id
-                    break
+            agent_traces: Dict[str, str] = {}
+            for index, example in enumerate(examples):
+                example_id = example.get("example_id") or ""
+                data = example.get("data") or {}
+                kwargs = build_agent_kwargs(agent_function, data)
 
-            if progress is not None and task is not None:
-                progress.update(
-                    task,
-                    description=f"Running agent... ({index + 1}/{len(examples)})",
-                )
+                before = len(captured)
+                try:
+                    if is_async:
+                        asyncio.run(wrapped(**kwargs))
+                    else:
+                        wrapped(**kwargs)
+                except Exception as exc:
+                    judgeval_logger.error(
+                        f"Agent entrypoint raised for example {example_id}: {exc}"
+                    )
 
-        tracer.force_flush()
+                for produced in captured[before:]:
+                    offline_trace_id = produced._properties.get("offline_trace_id")
+                    if example_id and offline_trace_id:
+                        agent_traces[example_id] = offline_trace_id
+                        break
+
+                if progress is not None and task is not None:
+                    progress.update(
+                        task,
+                        description=f"Running agent... ({index + 1}/{len(examples)})",
+                    )
+        finally:
+            tracer.force_flush()
+            proxy.restore_active(previous_tracer)
+            proxy.deregister(tracer)
+            tracer._tracer_provider.shutdown()
+
         return agent_traces
 
     def wait_for_completion(
