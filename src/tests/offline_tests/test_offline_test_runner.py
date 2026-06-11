@@ -122,6 +122,8 @@ ITEMS = [
 
 def _make_runner():
     client = MagicMock()
+    client.base_url = "http://api.test"
+    client._request.return_value = {"updated": 1}
     runner = OfflineTestRunner(
         client=client, project_id="proj-1", project_name="test-project"
     )
@@ -142,10 +144,6 @@ def _stub_lifecycle(client, status="completed"):
     }
     client.get_projects_test_runs_by_test_run_id_items.return_value = {
         "results": [json.loads(json.dumps(item)) for item in ITEMS],
-        "ui_results_url": "https://app/tests/run-1",
-    }
-    client.post_projects_eval_results.return_value = {
-        "test_run_id": "run-1",
         "ui_results_url": "https://app/tests/run-1",
     }
 
@@ -490,36 +488,168 @@ class TestBuildResults:
         assert results[0].trace_id == "trace-abc"
 
 
-class TestReportResults:
-    def test_echoes_evaluation_run_id_success_and_agent_trace(self):
+class TestReportSuccess:
+    def test_patches_success_per_evaluation_run(self):
         runner, client = _make_runner()
         results = runner.build_results(
             ITEMS,
-            agent_traces={"ex-1": "trace-abc"},
+            agent_traces={},
             pass_condition_fn=lambda fields, scorers: True,
         )
-        runner.report_results(
-            "run-1", PREPARED, ITEMS, results, agent_traces={"ex-1": "trace-abc"}
-        )
-        payload = client.post_projects_eval_results.call_args.kwargs["payload"]
-        assert payload["test_run_id"] == "run-1"
-        wire = payload["results"][0]
-        scorer = wire["scorers_data"][0]
-        assert scorer["evaluation_run_id"] == "er-1"
-        assert scorer["success"] is True
-        assert scorer["scorer_name"] == "helpfulness"
-        assert scorer["score_type"] == "binary"
-        assert scorer["bool_value"] is True
-        assert scorer["reason"] == {"text": "looks good"}
-        assert wire["data_object"]["example_id"] == "ex-1"
-        assert wire["data_object"]["agent_offline_trace_id"] == "trace-abc"
-        assert wire["data_object"]["input"] == "q1"
-        assert payload["run"]["project_id"] == "proj-1"
+        runner.report_success("run-1", PREPARED, ITEMS, results)
+        client._request.assert_called_once()
+        args, kwargs = client._request.call_args
+        assert args[0] == "PATCH"
+        assert args[1] == "http://api.test/v1/projects/proj-1/test-runs/run-1/success"
+        assert kwargs["payload"] == {
+            "successes": [{"evaluation_run_id": "er-1", "success": True}]
+        }
 
-    def test_no_rows_skips_post(self):
+    def test_failure_outcome_is_patched(self):
         runner, client = _make_runner()
-        runner.report_results("run-1", PREPARED, [], [], agent_traces={})
-        client.post_projects_eval_results.assert_not_called()
+        results = runner.build_results(
+            ITEMS,
+            agent_traces={},
+            pass_condition_fn=lambda fields, scorers: False,
+        )
+        runner.report_success("run-1", PREPARED, ITEMS, results)
+        payload = client._request.call_args.kwargs["payload"]
+        assert payload == {
+            "successes": [{"evaluation_run_id": "er-1", "success": False}]
+        }
+
+    def test_matches_evaluation_run_ids_by_judge_version(self):
+        runner, client = _make_runner()
+        prepared = {
+            "evaluation_runs": [
+                {
+                    "run_id": "er-v1",
+                    "judge_name": "helpfulness",
+                    "example_id": "ex-1",
+                    "judge_id": "j1",
+                    "judge_major_version": 1,
+                    "judge_minor_version": 0,
+                },
+                {
+                    "run_id": "er-v2",
+                    "judge_name": "helpfulness",
+                    "example_id": "ex-1",
+                    "judge_id": "j1",
+                    "judge_major_version": 2,
+                    "judge_minor_version": 0,
+                },
+            ]
+        }
+        items = [
+            {
+                "example_id": "ex-1",
+                "data": {"input": "q1"},
+                "scorers": [
+                    {
+                        "judge_id": "j1",
+                        "judge_name": "helpfulness",
+                        "judge_major_version": 2,
+                        "judge_minor_version": 0,
+                        "score_type": "binary",
+                        "bool_value": True,
+                    },
+                    {
+                        "judge_id": "j1",
+                        "judge_name": "helpfulness",
+                        "judge_major_version": 1,
+                        "judge_minor_version": 0,
+                        "score_type": "binary",
+                        "bool_value": False,
+                    },
+                ],
+            }
+        ]
+        results = runner.build_results(
+            items, agent_traces={}, pass_condition_fn=lambda fields, scorers: True
+        )
+        runner.report_success("run-1", prepared, items, results)
+        payload = client._request.call_args.kwargs["payload"]
+        # same judge name twice: version-keyed matching attributes each row
+        assert payload == {
+            "successes": [
+                {"evaluation_run_id": "er-v2", "success": True},
+                {"evaluation_run_id": "er-v1", "success": True},
+            ]
+        }
+
+    def test_falls_back_to_judge_name_match(self):
+        runner, client = _make_runner()
+        prepared = {
+            "evaluation_runs": [
+                {
+                    "run_id": "er-1",
+                    "judge_name": "helpfulness",
+                    "example_id": "ex-1",
+                }
+            ]
+        }
+        items = [
+            {
+                "example_id": "ex-1",
+                "data": {},
+                "scorers": [
+                    {
+                        "judge_id": "j1",
+                        "judge_name": "helpfulness",
+                        "judge_major_version": 3,
+                        "judge_minor_version": 1,
+                        "score_type": "binary",
+                        "bool_value": True,
+                    }
+                ],
+            }
+        ]
+        results = runner.build_results(
+            items, agent_traces={}, pass_condition_fn=lambda fields, scorers: True
+        )
+        runner.report_success("run-1", prepared, items, results)
+        payload = client._request.call_args.kwargs["payload"]
+        assert payload == {
+            "successes": [{"evaluation_run_id": "er-1", "success": True}]
+        }
+
+    def test_unmatched_scorer_row_skipped(self):
+        runner, client = _make_runner()
+        items = [
+            {
+                "example_id": "ex-other",
+                "data": {},
+                "scorers": [
+                    {
+                        "judge_id": "j-unknown",
+                        "judge_name": "unknown",
+                        "score_type": "binary",
+                        "bool_value": True,
+                    }
+                ],
+            }
+        ]
+        results = runner.build_results(
+            items, agent_traces={}, pass_condition_fn=lambda fields, scorers: True
+        )
+        runner.report_success("run-1", PREPARED, items, results)
+        client._request.assert_not_called()
+
+    def test_no_rows_skips_patch(self):
+        runner, client = _make_runner()
+        runner.report_success("run-1", PREPARED, [], [])
+        client._request.assert_not_called()
+
+    def test_maps_422_to_validation_error(self):
+        runner, client = _make_runner()
+        client._request.side_effect = JudgmentAPIError(
+            422, "evaluation_run_id er-x does not belong to run-1", None
+        )
+        results = runner.build_results(
+            ITEMS, agent_traces={}, pass_condition_fn=lambda fields, scorers: True
+        )
+        with pytest.raises(JudgmentValidationError):
+            runner.report_success("run-1", PREPARED, ITEMS, results)
 
 
 class TestRunOrchestration:
@@ -531,13 +661,21 @@ class TestRunOrchestration:
         assert outcome.test_run_id == "run-1"
         assert outcome.status == "completed"
         assert outcome.passed is True
-        client.post_projects_eval_results.assert_called_once()
+        client._request.assert_called_once()
+        args, kwargs = client._request.call_args
+        assert args[0] == "PATCH"
+        assert args[1].endswith("/v1/projects/proj-1/test-runs/run-1/success")
+        assert kwargs["payload"] == {
+            "successes": [{"evaluation_run_id": "er-1", "success": True}]
+        }
+        client.post_projects_eval_results.assert_not_called()
 
-    def test_skips_reporting_without_pass_condition_or_agent(self):
+    def test_skips_success_patch_without_pass_condition(self):
         runner, client = _make_runner()
         _stub_lifecycle(client)
         outcome = runner.run(CONFIG)
         assert outcome.passed is None
+        client._request.assert_not_called()
         client.post_projects_eval_results.assert_not_called()
 
     def test_assert_test_requires_pass_condition(self):
@@ -596,11 +734,32 @@ class TestRunOrchestration:
 
         assert calls == ["q1"]
         assert outcome.agent_offline_trace_ids == {"ex-1": "trace-abc"}
-        # agent traces are reported even without a pass condition
-        client.post_projects_eval_results.assert_called_once()
-        payload = client.post_projects_eval_results.call_args.kwargs["payload"]
-        data_object = payload["results"][0]["data_object"]
-        assert data_object["agent_offline_trace_id"] == "trace-abc"
+        # agent traces were attached at run creation; without a pass
+        # condition nothing is reported back after the run
+        client._request.assert_not_called()
+        client.post_projects_eval_results.assert_not_called()
+
+    def test_agent_with_pass_condition_patches_success_only(self):
+        runner, client = _make_runner()
+        _stub_lifecycle(client)
+
+        def fake_run_agent(agent_function, examples, progress=None):
+            return {"ex-1": "trace-abc"}
+
+        with patch.object(OfflineTestRunner, "run_agent", side_effect=fake_run_agent):
+            runner.run(
+                CONFIG,
+                agent_function=lambda input: input,
+                pass_condition_fn=lambda fields, scorers: True,
+            )
+
+        client._request.assert_called_once()
+        payload = client._request.call_args.kwargs["payload"]
+        # only evaluation_run_id + success cross the wire -- no trace echo
+        assert payload == {
+            "successes": [{"evaluation_run_id": "er-1", "success": True}]
+        }
+        client.post_projects_eval_results.assert_not_called()
 
     def test_agent_runs_before_run_creation_and_traces_attached(self):
         runner, client = _make_runner()

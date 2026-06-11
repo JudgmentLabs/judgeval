@@ -237,8 +237,8 @@ class OfflineTestsFactory:
         agent entrypoint once per example (each call producing an offline
         trace), then creates the test run with the agent traces attached
         so server-side judges evaluate with the agent's trace in context.
-        Waits for results and reports per-row pass/fail outcomes back to
-        the platform.
+        Waits for results and, when `pass_condition_fn` is given, PATCHes
+        each row's pass/fail outcome onto the run's stored results.
 
         Args:
             test_config: Test config name, ID, or `TestConfig` object.

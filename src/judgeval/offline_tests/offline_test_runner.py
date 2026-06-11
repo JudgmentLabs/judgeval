@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import time
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 
 import orjson
 from rich.console import Console
@@ -21,6 +21,7 @@ from judgeval.evaluation.evaluation_base import _scorer_value
 from judgeval.internal.api import JudgmentSyncClient
 from judgeval.logger import judgeval_logger
 from judgeval.offline_tests.types import OfflineTestResult, TestConfig
+from judgeval.utils.url import url_for
 
 AgentFunction = Callable[..., Any]
 PassConditionFn = Callable[[Dict[str, Any], List[ScorerData]], bool]
@@ -147,19 +148,6 @@ def _parse_reason(raw: Any) -> Dict[str, Any]:
     return {"text": ""}
 
 
-def _parse_metadata(raw: Any) -> Optional[Dict[str, Any]]:
-    if isinstance(raw, dict):
-        return raw
-    if isinstance(raw, str) and raw:
-        try:
-            parsed = orjson.loads(raw)
-            if isinstance(parsed, dict):
-                return parsed
-        except orjson.JSONDecodeError:
-            return None
-    return None
-
-
 def _reason_text(raw: Any) -> Optional[str]:
     reason = _parse_reason(raw)
     text = reason.get("text")
@@ -182,9 +170,9 @@ class OfflineTestRunner:
        judge context.
     4. Wait for the run to reach a terminal status and fetch per-example
        results.
-    5. Evaluate the optional `pass_condition_fn` per row and report the
-       enriched results back (echoing `evaluation_run_id`, `success`, and
-       `agent_offline_trace_id`).
+    5. Evaluate the optional `pass_condition_fn` per row and PATCH the
+       per-evaluation-run `success` outcomes onto the test run. Skipped
+       entirely when no pass condition is given.
     """
 
     __slots__ = ("_client", "_project_id", "_project_name")
@@ -576,22 +564,21 @@ class OfflineTestRunner:
             )
         return results
 
-    def report_results(
+    def report_success(
         self,
         test_run_id: str,
         prepared: Dict[str, Any],
         items: List[Dict[str, Any]],
         results: List[ScoringResult],
-        agent_traces: Dict[str, str],
     ) -> None:
-        """Report enriched results back to the server.
+        """PATCH per-row pass-condition outcomes onto the test run.
 
-        Echoes each scorer row with its `evaluation_run_id` (for exact
-        attribution) and the `success` outcome of the pass condition. The
-        example's `agent_offline_trace_id` is included again -- the server
-        already received it at run creation, but the re-posted rows
-        replace the stored rows (ReplacingMergeTree re-insert), so
-        omitting it would null the column on the replacement rows.
+        Sends one `{evaluation_run_id, success}` entry per scorer row to
+        `PATCH .../test-runs/{id}/success`. Each row's `evaluation_run_id`
+        comes from the prepare response refs (matched by judge version,
+        falling back to judge name); the server validates the IDs and
+        re-inserts its own stored rows with the new success -- nothing
+        else is echoed back.
         """
         refs_by_version: Dict[Tuple[str, str, int, int], str] = {}
         refs_by_name: Dict[Tuple[str, str], str] = {}
@@ -617,41 +604,15 @@ class OfflineTestRunner:
             if isinstance(result.data_object, Example)
         }
 
-        wire_results: List[Dict[str, Any]] = []
+        successes: List[Dict[str, Any]] = []
         for item in items:
             example_id = item.get("example_id") or ""
-            data = item.get("data") or {}
             result = results_by_example.get(example_id)
             success_by_index: List[Optional[bool]] = (
                 [scorer.success for scorer in result.scorers_data] if result else []
             )
 
-            scorers_data: List[Dict[str, Any]] = []
             for index, scorer in enumerate(item.get("scorers") or []):
-                score_type = scorer.get("score_type")
-                entry: Dict[str, Any] = {
-                    "scorer_name": scorer.get("judge_name") or "",
-                    "score_type": score_type,
-                    "reason": _parse_reason(scorer.get("reason")),
-                }
-                if score_type == "binary":
-                    entry["bool_value"] = bool(scorer.get("bool_value"))
-                elif score_type == "categorical":
-                    entry["str_value"] = str(scorer.get("str_value") or "")
-                elif score_type == "numeric":
-                    entry["num_value"] = float(scorer.get("num_value") or 0)
-                else:
-                    judgeval_logger.warning(
-                        f"Skipping scorer row with unknown score_type {score_type!r}"
-                    )
-                    continue
-
-                metadata = _parse_metadata(scorer.get("metadata"))
-                if metadata is not None:
-                    entry["metadata"] = metadata
-                if scorer.get("error") is not None:
-                    entry["error"] = scorer.get("error")
-
                 evaluation_run_id = refs_by_version.get(
                     (
                         example_id,
@@ -660,60 +621,52 @@ class OfflineTestRunner:
                         int(scorer.get("judge_minor_version") or 0),
                     )
                 ) or refs_by_name.get((example_id, scorer.get("judge_name") or ""))
-                if evaluation_run_id:
-                    entry["evaluation_run_id"] = evaluation_run_id
+                if not evaluation_run_id:
+                    judgeval_logger.warning(
+                        f"No evaluation run ref for scorer "
+                        f"{scorer.get('judge_name')!r} of example {example_id!r}; "
+                        "skipping its success update"
+                    )
+                    continue
+                successes.append(
+                    {
+                        "evaluation_run_id": evaluation_run_id,
+                        "success": success_by_index[index]
+                        if index < len(success_by_index)
+                        else None,
+                    }
+                )
 
-                if index < len(success_by_index):
-                    entry["success"] = success_by_index[index]
-                scorers_data.append(entry)
-
-            if not scorers_data:
-                continue
-
-            data_object: Dict[str, Any] = {
-                "example_id": example_id,
-                "created_at": item.get("created_at") or "",
-            }
-            entry_example = item.get("example")
-            if isinstance(entry_example, dict):
-                if entry_example.get("created_at"):
-                    data_object["created_at"] = entry_example["created_at"]
-                if entry_example.get("offline_trace_id"):
-                    data_object["offline_trace_id"] = entry_example["offline_trace_id"]
-            data_object.update(data)
-            agent_offline_trace_id = agent_traces.get(example_id)
-            if agent_offline_trace_id:
-                data_object["agent_offline_trace_id"] = agent_offline_trace_id
-
-            wire_results.append(
-                {"scorers_data": scorers_data, "data_object": data_object}
-            )
-
-        if not wire_results:
+        if not successes:
             return
 
-        run_payload: Dict[str, Any] = {
-            "id": test_run_id,
-            "project_id": self._project_id,
-            "eval_name": f"Offline Test Run {test_run_id}",
-            "examples": [wire["data_object"] for wire in wire_results],
-            "custom_scorers": [],
-            "judgment_scorers": [],
-        }
-
         try:
-            self._client.post_projects_eval_results(
-                project_id=self._project_id,
-                payload={
-                    "test_run_id": test_run_id,
-                    "results": wire_results,  # type: ignore[typeddict-item]
-                    "run": run_payload,  # type: ignore[typeddict-item]
-                },
-            )
+            self._patch_test_run_success(test_run_id, successes)
         except JudgmentAPIError as e:
             raise map_judgment_api_error(
-                e, f"Failed to report test run results: {e.detail}"
+                e, f"Failed to report test run successes: {e.detail}"
             ) from e
+
+    def _patch_test_run_success(
+        self, test_run_id: str, successes: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Call `PATCH .../test-runs/{id}/success` via the raw client.
+
+        The route is not in the generated client yet, so this reuses
+        `JudgmentSyncClient._request` (same httpx machinery, headers, and
+        error handling). A future client regen will pick up the route.
+        """
+        return cast(
+            Dict[str, Any],
+            self._client._request(
+                "PATCH",
+                url_for(
+                    f"/v1/projects/{self._project_id}/test-runs/{test_run_id}/success",
+                    self._client.base_url,
+                ),
+                payload={"successes": successes},
+            ),
+        )
 
     # ------------------------------------------------------------------ #
     #  Orchestration                                                     #
@@ -793,8 +746,8 @@ class OfflineTestRunner:
 
         results = self.build_results(items, agent_traces, pass_condition_fn)
 
-        if pass_condition_fn is not None or agent_traces:
-            self.report_results(test_run_id, prepared, items, results, agent_traces)
+        if pass_condition_fn is not None:
+            self.report_success(test_run_id, prepared, items, results)
 
         self._display_results(console, status, results, ui_results_url)
 
