@@ -74,7 +74,6 @@ class TestDatasetFactoryCreate:
         schema = {
             "type": "object",
             "properties": {"input": {"type": "string"}},
-            "required": ["input"],
         }
         client.post_projects_datasets.return_value = {
             "detail": "ok",
@@ -89,6 +88,16 @@ class TestDatasetFactoryCreate:
         assert payload["schema"] == schema
         assert payload["name"] == "new-ds"
         assert payload["overwrite"] is False
+
+    def test_create_with_required_key_raises(self):
+        factory, _ = _make_factory()
+        schema = {
+            "type": "object",
+            "properties": {"input": {"type": "string"}},
+            "required": ["input"],
+        }
+        with pytest.raises(ValueError, match="remove the 'required' field"):
+            factory.create("new-ds", schema=schema)
 
     def test_create_sends_examples_inline(self):
         factory, client = _make_factory()
@@ -125,8 +134,8 @@ class TestDatasetFactoryCreate:
         assert payload["schema"]["type"] == "object"
         assert payload["schema"]["properties"]["input"] == {"type": "string"}
         assert payload["schema"]["properties"]["score"] == {"type": "number"}
-        # All inferred properties must be required.
-        assert sorted(payload["schema"]["required"]) == ["input", "score"]
+        # Inferred schemas must not contain a "required" key.
+        assert "required" not in payload["schema"]
 
     def test_create_conflict_maps_to_conflict_error(self):
         factory, client = _make_factory()
@@ -227,15 +236,16 @@ class TestInferSchema:
         assert props["items"] == {"type": "array"}
         assert props["nested"] == {"type": "object"}
 
-    def test_required_equals_all_keys(self):
+    def test_no_required_key_in_schema(self):
         schema = infer_schema_from_examples(
             [
                 Example.create(input="q", expected_output="a"),
                 Example.create(input="q2", expected_output="b"),
             ]
         )
-        assert schema["required"] == ["expected_output", "input"]
+        assert "required" not in schema
         assert "expected_output" in schema["properties"]
+        assert "input" in schema["properties"]
 
     def test_heterogeneous_fields_raises(self):
         with pytest.raises(ValueError, match="same set of fields"):
@@ -262,7 +272,7 @@ class TestInferSchema:
         assert schema["properties"]["trace"] == {"type": "string"}
         assert "offline_trace_id" not in schema["properties"]
 
-    def test_all_traced_examples_mark_trace_required(self):
+    def test_all_traced_examples_emit_trace_property(self):
         schema = infer_schema_from_examples(
             [
                 Example.create(input="q1", offline_trace_id="t1"),
@@ -270,7 +280,7 @@ class TestInferSchema:
             ]
         )
         assert schema["properties"]["trace"] == {"type": "string"}
-        assert schema["required"] == ["input", "trace"]
+        assert "required" not in schema
 
     def test_partially_traced_examples_raises(self):
         with pytest.raises(ValueError, match="optional trace"):
@@ -286,7 +296,7 @@ class TestInferSchema:
             [Example.create(input="q1"), Example.create(input="q2")]
         )
         assert "trace" not in schema["properties"]
-        assert schema["required"] == ["input"]
+        assert "required" not in schema
 
     def test_none_only_trace_ids_omit_trace_property(self):
         schema = infer_schema_from_examples(
@@ -296,7 +306,7 @@ class TestInferSchema:
             ]
         )
         assert "trace" not in schema["properties"]
-        assert schema["required"] == ["input"]
+        assert "required" not in schema
 
     def test_empty_raises(self):
         with pytest.raises(ValueError):

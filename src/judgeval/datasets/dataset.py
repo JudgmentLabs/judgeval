@@ -196,8 +196,8 @@ class Dataset:
                     "input": {"type": "string"},
                     "expected_output": {"type": "string"},
                 },
-                # All declared properties must be required.
-                "required": ["input", "expected_output"],
+                # Every property is always required (server-enforced);
+                # do not include a "required" key.
             },
         )
         dataset.add_examples([

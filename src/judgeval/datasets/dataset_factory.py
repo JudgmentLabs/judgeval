@@ -36,17 +36,17 @@ def infer_schema_from_examples(examples: Sequence[Example]) -> Dict[str, Any]:
     """Infer a JSON Schema from a set of examples.
 
     Convenience for `client.datasets.create()` when no explicit schema is
-    supplied. Property types are inferred from the example values. All
-    declared properties are marked ``required`` — examples must share one
-    shape (every example must have the same set of non-None fields).
-    Heterogeneous examples (where some examples are missing fields that
-    others have) are rejected with a ``ValueError``.
+    supplied. Property types are inferred from the example values. Every
+    declared property is required (the server enforces this internally) —
+    examples must share one shape (every example must have the same set of
+    non-None fields). Heterogeneous examples (where some examples are
+    missing fields that others have) are rejected with a ``ValueError``.
 
     The reserved ``offline_trace_id`` field maps to the reserved ``trace``
     schema property. Either ALL examples must have a non-None
-    ``offline_trace_id`` (the property is added and marked required), or
-    NONE may have one (the property is omitted entirely). A mix of traced
-    and untraced examples is rejected with a ``ValueError``.
+    ``offline_trace_id`` (the property is added), or NONE may have one
+    (the property is omitted entirely). A mix of traced and untraced
+    examples is rejected with a ``ValueError``.
 
     Args:
         examples: Examples to infer the schema from. Must be non-empty and
@@ -54,8 +54,9 @@ def infer_schema_from_examples(examples: Sequence[Example]) -> Dict[str, Any]:
             and all are either traced or none are).
 
     Returns:
-        A JSON Schema dict with ``type: "object"`` where ``required``
-        equals every declared property key.
+        A JSON Schema dict of the form ``{"type": "object", "properties":
+        {...}}`` — every declared property is always required; no
+        ``required`` key is emitted.
 
     Raises:
         ValueError: If no examples are provided, examples have
@@ -117,19 +118,13 @@ def infer_schema_from_examples(examples: Sequence[Example]) -> Dict[str, Any]:
             f"offline_trace_id. A dataset cannot have an optional trace."
         )
 
-    required: set = set(all_keys) if all_keys else set()
-
     if traced_count == len(examples):
         properties["trace"] = {"type": "string"}
-        required.add("trace")
 
-    schema: Dict[str, Any] = {
+    return {
         "type": "object",
         "properties": properties,
     }
-    if required:
-        schema["required"] = sorted(required)
-    return schema
 
 
 class DatasetFactory:
@@ -151,8 +146,8 @@ class DatasetFactory:
                     "input": {"type": "string"},
                     "expected_output": {"type": "string"},
                 },
-                # All declared properties must be required.
-                "required": ["input", "expected_output"],
+                # Every property is always required (server-enforced); do
+                # not include a "required" key.
             },
             examples=[
                 Example.create(input="What is AI?", expected_output="Artificial Intelligence"),
@@ -240,10 +235,10 @@ class DatasetFactory:
         schema is inferred from the provided examples as a convenience --
         passing an explicit schema is recommended.
 
-        All declared schema properties are marked ``required`` -- every
-        example in a dataset must share one shape. When inferring from
-        examples, all examples must have identical non-None field sets and
-        must be uniformly traced or untrace (mixed presence raises
+        Every declared schema property is required (enforced server-side)
+        -- every example in a dataset must share one shape. When inferring
+        from examples, all examples must have identical non-None field sets
+        and must be uniformly traced or untraced (mixed presence raises
         ``ValueError`` before any server call is made).
 
         The reserved schema property `trace` must be `{"type": "string"}`
@@ -262,7 +257,8 @@ class DatasetFactory:
             The new `Dataset`, or `None` if the project is not resolved.
 
         Raises:
-            ValueError: If neither `schema` nor `examples` are provided.
+            ValueError: If neither `schema` nor `examples` are provided,
+                or if the supplied schema contains a ``required`` key.
             JudgmentConflictError: If a dataset with this name exists and
                 `overwrite` is False.
             JudgmentValidationError: If the schema is invalid, examples
@@ -278,8 +274,8 @@ class DatasetFactory:
                         "input": {"type": "string"},
                         "expected_output": {"type": "string"},
                     },
-                    # All declared properties must be required.
-                    "required": ["input", "expected_output"],
+                    # Every property is always required (server-enforced);
+                    # do not include a "required" key.
                 },
                 examples=[
                     Example.create(input="What is 2+2?", expected_output="4"),
@@ -293,6 +289,11 @@ class DatasetFactory:
 
         if not isinstance(examples, list):
             examples = list(examples)
+
+        if schema is not None and "required" in schema:
+            raise ValueError(
+                "all properties are required; remove the 'required' field from the schema"
+            )
 
         if schema is None:
             if not examples:
