@@ -233,10 +233,12 @@ class OfflineTestsFactory:
     ) -> Optional[OfflineTestResult]:
         """Run an offline test for a test config.
 
-        Creates a test run (queueing server-side judge evaluation over the
-        dataset examples), optionally calls your agent entrypoint once per
-        example (each call producing an offline trace), waits for results,
-        and reports per-row pass/fail outcomes back to the platform.
+        Fetches the dataset version's examples, optionally calls your
+        agent entrypoint once per example (each call producing an offline
+        trace), then creates the test run with the agent traces attached
+        so server-side judges evaluate with the agent's trace in context.
+        Waits for results and reports per-row pass/fail outcomes back to
+        the platform.
 
         Args:
             test_config: Test config name, ID, or `TestConfig` object.
@@ -245,6 +247,9 @@ class OfflineTestsFactory:
                 same-named keyword arguments; a signature mismatch raises
                 `TypeError`. Each call is wrapped in an `OfflineTracer`
                 and its offline trace is attributed to the result row.
+                The agent runs *before* the test run is created; the
+                collected traces are attached at creation so judges see
+                them in context.
             judge_versions: Optional version pins, e.g.
                 `[{"name": "helpfulness", "tag": "prod"}]` or
                 `[{"name": "helpfulness", "version": "1.2"}]`. Judges not
@@ -269,7 +274,9 @@ class OfflineTestsFactory:
             resolved or the config cannot be found.
 
         Raises:
-            ValueError: If `assert_test` is set without `pass_condition_fn`.
+            ValueError: If `assert_test` is set without `pass_condition_fn`,
+                or if `dataset_version` does not match any version of the
+                config's dataset.
             TypeError: If the agent entrypoint cannot accept an example's
                 fields.
             JudgmentValidationError: If the server rejects the run (e.g.

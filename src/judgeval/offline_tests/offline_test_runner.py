@@ -26,6 +26,7 @@ AgentFunction = Callable[..., Any]
 PassConditionFn = Callable[[Dict[str, Any], List[ScorerData]], bool]
 
 TERMINAL_STATUSES = frozenset({"completed", "error", "cancelled"})
+EXAMPLES_PAGE_SIZE = 100
 
 
 def normalize_judge_versions(
@@ -171,14 +172,17 @@ class OfflineTestRunner:
     Used by `client.offline_tests.run()` -- you don't instantiate it
     directly. The lifecycle is:
 
-    1. `POST test-runs` -- creates the run and queues server-side judge
-       evaluation over the dataset examples.
+    1. Resolve the dataset version under test and fetch its examples.
     2. Optionally call the agent entrypoint once per dataset example,
        wrapped in an `OfflineTracer` so each call produces an offline
-       trace.
-    3. Wait for the run to reach a terminal status and fetch per-example
+       trace. All traces are flushed before the run is created.
+    3. `POST test-runs` -- creates the run pinned to the dataset version
+       fetched in step 1, attaching any agent traces (`agent_traces`) so
+       server-side judge evaluation is queued with the agent's trace in
+       judge context.
+    4. Wait for the run to reach a terminal status and fetch per-example
        results.
-    4. Evaluate the optional `pass_condition_fn` per row and report the
+    5. Evaluate the optional `pass_condition_fn` per row and report the
        enriched results back (echoing `evaluation_run_id`, `success`, and
        `agent_offline_trace_id`).
     """
@@ -199,6 +203,123 @@ class OfflineTestRunner:
     #  Lifecycle steps                                                   #
     # ------------------------------------------------------------------ #
 
+    def resolve_dataset_version(
+        self,
+        test_config: TestConfig,
+        dataset_version: Optional[int | str] = None,
+    ) -> Dict[str, Any]:
+        """Resolve the dataset version a run will evaluate.
+
+        Returns the raw version entry (`version_id`, `version_number`,
+        ...) for the requested version -- a version number (int), a
+        version ID (str), or the latest version when `dataset_version`
+        is None. The resolved version is the one whose examples are
+        fetched *and* the one pinned at run creation, so the two always
+        match.
+
+        Raises:
+            ValueError: If the dataset has no versions or no version
+                matches `dataset_version`.
+        """
+        try:
+            response = (
+                self._client.get_projects_datasets_by_dataset_identifier_versions(
+                    project_id=self._project_id,
+                    dataset_identifier=test_config.dataset_id,
+                )
+            )
+        except JudgmentAPIError as e:
+            raise map_judgment_api_error(
+                e,
+                f"Failed to fetch versions for dataset of test config "
+                f"'{test_config.name}': {e.detail}",
+            ) from e
+
+        versions = [v for v in response.get("versions") or [] if isinstance(v, dict)]
+        if dataset_version is None:
+            if not versions:
+                raise ValueError(
+                    f"Dataset of test config '{test_config.name}' has no versions"
+                )
+            return max(versions, key=lambda v: int(v.get("version_number") or 0))
+
+        if isinstance(dataset_version, int):
+            for version in versions:
+                if int(version.get("version_number") or 0) == dataset_version:
+                    return version
+        else:
+            for version in versions:
+                if version.get("version_id") == dataset_version:
+                    return version
+        raise ValueError(
+            f"Dataset version {dataset_version!r} does not exist for the "
+            f"dataset of test config '{test_config.name}'"
+        )
+
+    def fetch_examples(
+        self,
+        test_config: TestConfig,
+        version_number: int,
+    ) -> List[Dict[str, Any]]:
+        """Fetch every example of one dataset version.
+
+        Pages through the dataset's example endpoint and returns entries
+        as `{example_id, created_at, data, ...}` dicts with `data`
+        normalized to a dict.
+        """
+        examples: List[Dict[str, Any]] = []
+        cursor_created_at: Optional[str] = None
+        cursor_example_id: Optional[str] = None
+
+        while True:
+            try:
+                page = self._client.get_projects_datasets_by_dataset_identifier_page(
+                    project_id=self._project_id,
+                    dataset_identifier=test_config.dataset_id,
+                    version=str(version_number),
+                    limit=str(EXAMPLES_PAGE_SIZE),
+                    cursor_created_at=cursor_created_at,
+                    cursor_example_id=cursor_example_id,
+                )
+            except JudgmentAPIError as e:
+                raise map_judgment_api_error(
+                    e,
+                    f"Failed to fetch examples for dataset of test config "
+                    f"'{test_config.name}': {e.detail}",
+                ) from e
+
+            entries = [e for e in page.get("entries") or [] if isinstance(e, dict)]
+            for entry in entries:
+                data = entry.get("data")
+                if isinstance(data, str):
+                    try:
+                        data = orjson.loads(data)
+                    except orjson.JSONDecodeError:
+                        data = None
+                examples.append(
+                    {**entry, "data": data if isinstance(data, dict) else {}}
+                )
+
+            metadata = page.get("metadata") or {}
+            has_more = metadata.get("hasMore")
+            if has_more is None:
+                has_more = metadata.get("has_more")
+            if has_more is None:
+                has_more = len(entries) == EXAMPLES_PAGE_SIZE
+            if not has_more or not entries:
+                break
+
+            last = entries[-1]
+            next_cursor = (
+                str(last.get("created_at") or ""),
+                str(last.get("example_id") or ""),
+            )
+            if next_cursor == (cursor_created_at, cursor_example_id):
+                break
+            cursor_created_at, cursor_example_id = next_cursor
+
+        return examples
+
     def create_test_run(
         self,
         test_config: TestConfig,
@@ -206,8 +327,18 @@ class OfflineTestRunner:
         judge_versions: Optional[List[Dict[str, Any]]] = None,
         versioned_results: Optional[bool] = None,
         source: str = "sdk",
+        agent_traces: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
-        """Create (prepare + queue) a test run and return the prepared payload."""
+        """Create a test run and return the prepared payload.
+
+        Creation queues server-side judge evaluation immediately. When
+        `agent_traces` is provided, each
+        `{example_id, agent_offline_trace_id}` pair is attached so judges
+        evaluate with the agent's trace in context; the server validates
+        the example IDs against the dataset version (422 on unknown or
+        duplicate IDs). Callers must therefore flush agent traces before
+        calling this.
+        """
         payload: Dict[str, Any] = {
             "test_config_id": test_config.id,
             "source": source,
@@ -224,6 +355,12 @@ class OfflineTestRunner:
                 versioned_results = True
         if versioned_results is not None:
             payload["versioned_results"] = versioned_results
+
+        if agent_traces:
+            payload["agent_traces"] = [
+                {"example_id": example_id, "agent_offline_trace_id": trace_id}
+                for example_id, trace_id in agent_traces.items()
+            ]
 
         try:
             prepared = self._client.post_projects_test_runs(
@@ -252,6 +389,10 @@ class OfflineTestRunner:
         the trace and logged, and the loop continues. The previously
         active tracer (if any) is restored once the loop finishes, so
         subsequent `@observe` spans do not route to the offline endpoint.
+
+        Before returning, the offline tracer is force-flushed and its
+        provider shut down, so every agent trace is exported by the time
+        the test run is created with these trace IDs attached.
         """
         from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
         from judgeval.trace.offline_tracer import OfflineTracer
@@ -425,9 +566,11 @@ class OfflineTestRunner:
         """Report enriched results back to the server.
 
         Echoes each scorer row with its `evaluation_run_id` (for exact
-        attribution), the `success` outcome of the pass condition, and
-        the example's `agent_offline_trace_id`. The rows replace the
-        server-side rows for this run/example/judge-version.
+        attribution) and the `success` outcome of the pass condition. The
+        example's `agent_offline_trace_id` is included again -- the server
+        already received it at run creation, but the re-posted rows
+        replace the stored rows (ReplacingMergeTree re-insert), so
+        omitting it would null the column on the replacement rows.
         """
         refs_by_version: Dict[Tuple[str, str, int, int], str] = {}
         refs_by_name: Dict[Tuple[str, str], str] = {}
@@ -578,22 +721,18 @@ class OfflineTestRunner:
         console.print(f"[dim]Config:[/dim] {test_config.name}")
         console.print(f"[dim]Project:[/dim] {self._project_name}")
 
-        prepared = self.create_test_run(
-            test_config,
-            dataset_version=dataset_version,
-            judge_versions=judge_versions,
-            versioned_results=versioned_results,
-        )
-        test_run = prepared.get("test_run") or {}
-        test_run_id = test_run.get("id") or ""
-        examples = prepared.get("examples") or []
-        ui_results_url = prepared.get("ui_results_url") or ""
+        version = self.resolve_dataset_version(test_config, dataset_version)
+        version_number = int(version.get("version_number") or 0)
+        examples = self.fetch_examples(test_config, version_number)
 
         console.print(
-            f"[dim]Run:[/dim] {test_run_id} | [dim]Examples:[/dim] {len(examples)}"
+            f"[dim]Dataset version:[/dim] {version_number} | "
+            f"[dim]Examples:[/dim] {len(examples)}"
         )
-        judgeval_logger.info(
-            f"Created test run {test_run_id} with {len(examples)} examples"
+
+        # Pin the run to the exact version the examples were fetched from.
+        pinned_version: int | str = (
+            dataset_version if isinstance(dataset_version, str) else version_number
         )
 
         with Progress(
@@ -602,9 +741,29 @@ class OfflineTestRunner:
             TimeElapsedColumn(),
             console=console,
         ) as progress:
+            # The agent runs before the test run exists; run_agent flushes
+            # the offline tracer (and shuts down its provider) before
+            # returning, so all agent traces are exported by the time they
+            # are attached to the run below.
             agent_traces: Dict[str, str] = {}
-            if agent_function is not None:
+            if agent_function is not None and examples:
                 agent_traces = self.run_agent(agent_function, examples, progress)
+
+            prepared = self.create_test_run(
+                test_config,
+                dataset_version=pinned_version,
+                judge_versions=judge_versions,
+                versioned_results=versioned_results,
+                agent_traces=agent_traces,
+            )
+            test_run = prepared.get("test_run") or {}
+            test_run_id = test_run.get("id") or ""
+            ui_results_url = prepared.get("ui_results_url") or ""
+
+            console.print(f"[dim]Run:[/dim] {test_run_id}")
+            judgeval_logger.info(
+                f"Created test run {test_run_id} over {len(examples)} examples"
+            )
 
             status = self.wait_for_completion(test_run_id, timeout_seconds, progress)
 

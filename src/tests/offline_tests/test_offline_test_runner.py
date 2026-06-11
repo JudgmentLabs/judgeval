@@ -22,6 +22,30 @@ from judgeval.offline_tests.types import OfflineTestResult, TestConfig
 
 CONFIG = TestConfig(id="cfg-1", name="nightly", dataset_id="d1")
 
+VERSIONS = {
+    "versions": [
+        {
+            "version_id": "v1",
+            "dataset_id": "d1",
+            "version_number": 1,
+            "created_at": "2026-01-01",
+        },
+    ]
+}
+
+PAGE = {
+    "dataset": {"dataset_id": "d1", "name": "golden"},
+    "entries": [
+        {
+            "example_id": "ex-1",
+            "created_at": "2026-01-01",
+            "data": {"input": "q1"},
+            "offline_trace_id": None,
+        },
+    ],
+    "metadata": {"hasMore": False, "nextCursor": None},
+}
+
 PREPARED = {
     "test_run": {"id": "run-1", "status": "running"},
     "dataset": {"dataset_id": "d1", "name": "golden"},
@@ -96,6 +120,12 @@ def _make_runner():
 
 
 def _stub_lifecycle(client, status="completed"):
+    client.get_projects_datasets_by_dataset_identifier_versions.return_value = (
+        json.loads(json.dumps(VERSIONS))
+    )
+    client.get_projects_datasets_by_dataset_identifier_page.return_value = json.loads(
+        json.dumps(PAGE)
+    )
     client.post_projects_test_runs.return_value = dict(PREPARED)
     client.get_projects_test_runs_by_test_run_id.return_value = {
         "test_run": {"id": "run-1", "status": status},
@@ -171,6 +201,133 @@ class TestBuildAgentKwargs:
         assert build_agent_kwargs(agent, {"input": "q"}) == {"input": "q"}
 
 
+class TestDatasetResolution:
+    def test_latest_version_by_default(self):
+        runner, client = _make_runner()
+        client.get_projects_datasets_by_dataset_identifier_versions.return_value = {
+            "versions": [
+                {"version_id": "v2", "version_number": 2},
+                {"version_id": "v1", "version_number": 1},
+            ]
+        }
+        version = runner.resolve_dataset_version(CONFIG)
+        assert version["version_id"] == "v2"
+        kwargs = (
+            client.get_projects_datasets_by_dataset_identifier_versions.call_args.kwargs
+        )
+        assert kwargs["dataset_identifier"] == "d1"
+
+    def test_resolve_by_version_number(self):
+        runner, client = _make_runner()
+        client.get_projects_datasets_by_dataset_identifier_versions.return_value = {
+            "versions": [
+                {"version_id": "v2", "version_number": 2},
+                {"version_id": "v1", "version_number": 1},
+            ]
+        }
+        assert runner.resolve_dataset_version(CONFIG, 1)["version_id"] == "v1"
+
+    def test_resolve_by_version_id(self):
+        runner, client = _make_runner()
+        client.get_projects_datasets_by_dataset_identifier_versions.return_value = {
+            "versions": [
+                {"version_id": "v2", "version_number": 2},
+                {"version_id": "v1", "version_number": 1},
+            ]
+        }
+        assert runner.resolve_dataset_version(CONFIG, "v1")["version_number"] == 1
+
+    def test_resolve_unknown_version_raises(self):
+        runner, client = _make_runner()
+        client.get_projects_datasets_by_dataset_identifier_versions.return_value = (
+            json.loads(json.dumps(VERSIONS))
+        )
+        with pytest.raises(ValueError, match="does not exist"):
+            runner.resolve_dataset_version(CONFIG, 99)
+        with pytest.raises(ValueError, match="does not exist"):
+            runner.resolve_dataset_version(CONFIG, "missing-id")
+
+    def test_resolve_no_versions_raises(self):
+        runner, client = _make_runner()
+        client.get_projects_datasets_by_dataset_identifier_versions.return_value = {
+            "versions": []
+        }
+        with pytest.raises(ValueError, match="no versions"):
+            runner.resolve_dataset_version(CONFIG)
+
+    def test_fetch_examples_single_page(self):
+        runner, client = _make_runner()
+        client.get_projects_datasets_by_dataset_identifier_page.return_value = (
+            json.loads(json.dumps(PAGE))
+        )
+        examples = runner.fetch_examples(CONFIG, 1)
+        assert examples == [
+            {
+                "example_id": "ex-1",
+                "created_at": "2026-01-01",
+                "data": {"input": "q1"},
+                "offline_trace_id": None,
+            }
+        ]
+        kwargs = (
+            client.get_projects_datasets_by_dataset_identifier_page.call_args.kwargs
+        )
+        assert kwargs["version"] == "1"
+        assert kwargs["cursor_created_at"] is None
+
+    def test_fetch_examples_paginates_with_cursor(self):
+        runner, client = _make_runner()
+        page_1 = {
+            "entries": [
+                {"example_id": "ex-1", "created_at": "t1", "data": {"input": "q1"}},
+                {"example_id": "ex-2", "created_at": "t2", "data": {"input": "q2"}},
+            ],
+            "metadata": {"hasMore": True},
+        }
+        page_2 = {
+            "entries": [
+                {"example_id": "ex-3", "created_at": "t3", "data": {"input": "q3"}},
+            ],
+            "metadata": {"hasMore": False},
+        }
+        client.get_projects_datasets_by_dataset_identifier_page.side_effect = [
+            page_1,
+            page_2,
+        ]
+        examples = runner.fetch_examples(CONFIG, 1)
+        assert [e["example_id"] for e in examples] == ["ex-1", "ex-2", "ex-3"]
+        second_call = (
+            client.get_projects_datasets_by_dataset_identifier_page.call_args_list[
+                1
+            ].kwargs
+        )
+        assert second_call["cursor_created_at"] == "t2"
+        assert second_call["cursor_example_id"] == "ex-2"
+
+    def test_fetch_examples_parses_string_data(self):
+        runner, client = _make_runner()
+        client.get_projects_datasets_by_dataset_identifier_page.return_value = {
+            "entries": [
+                {
+                    "example_id": "ex-1",
+                    "created_at": "t1",
+                    "data": json.dumps({"input": "q1"}),
+                }
+            ],
+            "metadata": {"hasMore": False},
+        }
+        examples = runner.fetch_examples(CONFIG, 1)
+        assert examples[0]["data"] == {"input": "q1"}
+
+    def test_fetch_examples_maps_api_error(self):
+        runner, client = _make_runner()
+        client.get_projects_datasets_by_dataset_identifier_page.side_effect = (
+            JudgmentAPIError(422, "Version 9 does not exist", None)
+        )
+        with pytest.raises(JudgmentValidationError):
+            runner.fetch_examples(CONFIG, 9)
+
+
 class TestCreateTestRun:
     def test_payload_includes_source_and_config(self):
         runner, client = _make_runner()
@@ -202,6 +359,22 @@ class TestCreateTestRun:
         )
         payload = client.post_projects_test_runs.call_args.kwargs["payload"]
         assert payload["versioned_results"] is True
+
+    def test_agent_traces_attached_to_payload(self):
+        runner, client = _make_runner()
+        client.post_projects_test_runs.return_value = dict(PREPARED)
+        runner.create_test_run(CONFIG, agent_traces={"ex-1": "trace-abc"})
+        payload = client.post_projects_test_runs.call_args.kwargs["payload"]
+        assert payload["agent_traces"] == [
+            {"example_id": "ex-1", "agent_offline_trace_id": "trace-abc"}
+        ]
+
+    def test_empty_agent_traces_omitted(self):
+        runner, client = _make_runner()
+        client.post_projects_test_runs.return_value = dict(PREPARED)
+        runner.create_test_run(CONFIG, agent_traces={})
+        payload = client.post_projects_test_runs.call_args.kwargs["payload"]
+        assert "agent_traces" not in payload
 
     def test_maps_422_to_validation_error(self):
         runner, client = _make_runner()
@@ -332,7 +505,7 @@ class TestRunOrchestration:
                 assert_test=True,
             )
 
-    def test_agent_function_invoked_per_example(self):
+    def test_agent_function_invoked_per_fetched_example(self):
         runner, client = _make_runner()
         _stub_lifecycle(client)
         calls = []
@@ -342,6 +515,8 @@ class TestRunOrchestration:
             return f"answer to {input}"
 
         def fake_run_agent(agent_function, examples, progress=None):
+            # examples come from the dataset fetch, not the prepare response
+            assert [e["example_id"] for e in examples] == ["ex-1"]
             for example in examples:
                 agent_function(**example["data"])
             return {"ex-1": "trace-abc"}
@@ -357,12 +532,98 @@ class TestRunOrchestration:
         data_object = payload["results"][0]["data_object"]
         assert data_object["agent_offline_trace_id"] == "trace-abc"
 
+    def test_agent_runs_before_run_creation_and_traces_attached(self):
+        runner, client = _make_runner()
+        _stub_lifecycle(client)
+        order = []
+
+        def fake_run_agent(agent_function, examples, progress=None):
+            order.append("agent")
+            assert client.post_projects_test_runs.call_count == 0
+            return {"ex-1": "trace-abc"}
+
+        def fake_post(**kwargs):
+            order.append("create")
+            return dict(PREPARED)
+
+        client.post_projects_test_runs.side_effect = fake_post
+
+        with patch.object(OfflineTestRunner, "run_agent", side_effect=fake_run_agent):
+            runner.run(CONFIG, agent_function=lambda input: input)
+
+        assert order == ["agent", "create"]
+        payload = client.post_projects_test_runs.call_args.kwargs["payload"]
+        assert payload["agent_traces"] == [
+            {"example_id": "ex-1", "agent_offline_trace_id": "trace-abc"}
+        ]
+        assert payload["dataset_version_number"] == 1
+
+    def test_no_agent_traces_key_without_agent(self):
+        runner, client = _make_runner()
+        _stub_lifecycle(client)
+        runner.run(CONFIG)
+        payload = client.post_projects_test_runs.call_args.kwargs["payload"]
+        assert "agent_traces" not in payload
+
+    def test_run_pins_resolved_dataset_version(self):
+        runner, client = _make_runner()
+        _stub_lifecycle(client)
+
+        # default: latest version number is pinned explicitly
+        runner.run(CONFIG)
+        payload = client.post_projects_test_runs.call_args.kwargs["payload"]
+        assert payload["dataset_version_number"] == 1
+
+        # a version id passes through as dataset_version_id
+        runner.run(CONFIG, dataset_version="v1")
+        payload = client.post_projects_test_runs.call_args.kwargs["payload"]
+        assert payload["dataset_version_id"] == "v1"
+        assert "dataset_version_number" not in payload
+
+    def test_traces_flushed_before_run_creation(self):
+        runner, client = _make_runner()
+        _stub_lifecycle(client)
+        client.api_key = "key"
+        client.organization_id = "org"
+        client.base_url = "http://localhost"
+
+        tracer = MagicMock()
+
+        def fake_create(**kwargs):
+            dataset = kwargs["dataset"]
+
+            def observe(func, span_type=None):
+                def wrapper(**call_kwargs):
+                    result = func(**call_kwargs)
+                    dataset.append(Example.create(offline_trace_id="trace-abc"))
+                    return result
+
+                return wrapper
+
+            tracer.observe = observe
+            return tracer
+
+        def fake_post(**kwargs):
+            # by the time the run is created, the offline tracer has been
+            # flushed and its provider shut down
+            tracer.force_flush.assert_called_once()
+            tracer._tracer_provider.shutdown.assert_called_once()
+            return dict(PREPARED)
+
+        client.post_projects_test_runs.side_effect = fake_post
+
+        with patch(
+            "judgeval.trace.offline_tracer.OfflineTracer.create",
+            side_effect=fake_create,
+        ):
+            outcome = runner.run(CONFIG, agent_function=lambda input: input)
+
+        assert outcome.agent_offline_trace_ids == {"ex-1": "trace-abc"}
+        client.post_projects_test_runs.assert_called_once()
+
     def test_timeout_raises(self):
         runner, client = _make_runner()
-        client.post_projects_test_runs.return_value = dict(PREPARED)
-        client.get_projects_test_runs_by_test_run_id.return_value = {
-            "test_run": {"id": "run-1", "status": "running"}
-        }
+        _stub_lifecycle(client, status="running")
         with pytest.raises(TimeoutError):
             runner.run(CONFIG, timeout_seconds=0)
 
