@@ -89,16 +89,6 @@ class TestDatasetFactoryCreate:
         assert payload["name"] == "new-ds"
         assert payload["overwrite"] is False
 
-    def test_create_with_required_key_raises(self):
-        factory, _ = _make_factory()
-        schema = {
-            "type": "object",
-            "properties": {"input": {"type": "string"}},
-            "required": ["input"],
-        }
-        with pytest.raises(ValueError, match="remove the 'required' field"):
-            factory.create("new-ds", schema=schema)
-
     def test_create_sends_examples_inline(self):
         factory, client = _make_factory()
         client.post_projects_datasets.return_value = {

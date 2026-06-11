@@ -36,11 +36,11 @@ def infer_schema_from_examples(examples: Sequence[Example]) -> Dict[str, Any]:
     """Infer a JSON Schema from a set of examples.
 
     Convenience for `client.datasets.create()` when no explicit schema is
-    supplied. Property types are inferred from the example values. Every
-    declared property is required (the server enforces this internally) —
-    examples must share one shape (every example must have the same set of
-    non-None fields). Heterogeneous examples (where some examples are
-    missing fields that others have) are rejected with a ``ValueError``.
+    supplied. Property types are inferred from the example values; every
+    example must contain every declared field, so examples must share one
+    shape (the same set of non-None fields). Heterogeneous examples (where
+    some examples are missing fields that others have) are rejected with a
+    ``ValueError``.
 
     The reserved ``offline_trace_id`` field maps to the reserved ``trace``
     schema property. Either ALL examples must have a non-None
@@ -55,8 +55,7 @@ def infer_schema_from_examples(examples: Sequence[Example]) -> Dict[str, Any]:
 
     Returns:
         A JSON Schema dict of the form ``{"type": "object", "properties":
-        {...}}`` — every declared property is always required; no
-        ``required`` key is emitted.
+        {...}}`` declaring the example fields.
 
     Raises:
         ValueError: If no examples are provided, examples have
@@ -146,8 +145,6 @@ class DatasetFactory:
                     "input": {"type": "string"},
                     "expected_output": {"type": "string"},
                 },
-                # Every property is always required (server-enforced); do
-                # not include a "required" key.
             },
             examples=[
                 Example.create(input="What is AI?", expected_output="Artificial Intelligence"),
@@ -235,11 +232,11 @@ class DatasetFactory:
         schema is inferred from the provided examples as a convenience --
         passing an explicit schema is recommended.
 
-        Every declared schema property is required (enforced server-side)
-        -- every example in a dataset must share one shape. When inferring
-        from examples, all examples must have identical non-None field sets
-        and must be uniformly traced or untraced (mixed presence raises
-        ``ValueError`` before any server call is made).
+        Every example in a dataset must contain every declared schema
+        field -- one shape per dataset. When inferring from examples, all
+        examples must have identical non-None field sets and must be
+        uniformly traced or untraced (mixed presence raises ``ValueError``
+        before any server call is made).
 
         The reserved schema property `trace` must be `{"type": "string"}`
         and represents an example's offline trace ID.
@@ -257,8 +254,7 @@ class DatasetFactory:
             The new `Dataset`, or `None` if the project is not resolved.
 
         Raises:
-            ValueError: If neither `schema` nor `examples` are provided,
-                or if the supplied schema contains a ``required`` key.
+            ValueError: If neither `schema` nor `examples` are provided.
             JudgmentConflictError: If a dataset with this name exists and
                 `overwrite` is False.
             JudgmentValidationError: If the schema is invalid, examples
@@ -274,8 +270,6 @@ class DatasetFactory:
                         "input": {"type": "string"},
                         "expected_output": {"type": "string"},
                     },
-                    # Every property is always required (server-enforced);
-                    # do not include a "required" key.
                 },
                 examples=[
                     Example.create(input="What is 2+2?", expected_output="4"),
@@ -289,11 +283,6 @@ class DatasetFactory:
 
         if not isinstance(examples, list):
             examples = list(examples)
-
-        if schema is not None and "required" in schema:
-            raise ValueError(
-                "all properties are required; remove the 'required' field from the schema"
-            )
 
         if schema is None:
             if not examples:

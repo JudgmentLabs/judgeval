@@ -259,8 +259,6 @@ class Judgeval:
                         "input": {"type": "string"},
                         "expected_output": {"type": "string"},
                     },
-                    # Every property is always required (server-enforced);
-                    # do not include a "required" key.
                 },
                 examples=[
                     Example.create(input="What is 2+2?", expected_output="4"),

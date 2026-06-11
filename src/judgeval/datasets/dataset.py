@@ -196,8 +196,6 @@ class Dataset:
                     "input": {"type": "string"},
                     "expected_output": {"type": "string"},
                 },
-                # Every property is always required (server-enforced);
-                # do not include a "required" key.
             },
         )
         dataset.add_examples([
@@ -365,8 +363,8 @@ class Dataset:
         """Add trace-backed examples to this dataset.
 
         Copies the given online traces to offline storage and appends one
-        trace-backed example per trace. The dataset schema's required
-        properties must be a subset of `{"trace"}`.
+        trace-backed example per trace. The dataset schema must not declare
+        any data fields besides the reserved `trace` property.
 
         Args:
             trace_ids: Trace IDs to add.
