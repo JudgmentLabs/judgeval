@@ -36,21 +36,30 @@ def infer_schema_from_examples(examples: Sequence[Example]) -> Dict[str, Any]:
     """Infer a JSON Schema from a set of examples.
 
     Convenience for `client.datasets.create()` when no explicit schema is
-    supplied. Property types are inferred from the example values; a
-    field is marked `required` only if it is present (and non-None) in
-    every example. The reserved `offline_trace_id` field maps to the
-    reserved `trace` schema property: it is emitted when at least one
-    example has a non-None trace, and marked `required` only when every
-    example does (so `{{trace}}` judges can bind to the dataset).
+    supplied. Property types are inferred from the example values. All
+    declared properties are marked ``required`` — examples must share one
+    shape (every example must have the same set of non-None fields).
+    Heterogeneous examples (where some examples are missing fields that
+    others have) are rejected with a ``ValueError``.
+
+    The reserved ``offline_trace_id`` field maps to the reserved ``trace``
+    schema property. Either ALL examples must have a non-None
+    ``offline_trace_id`` (the property is added and marked required), or
+    NONE may have one (the property is omitted entirely). A mix of traced
+    and untraced examples is rejected with a ``ValueError``.
 
     Args:
-        examples: Examples to infer the schema from. Must be non-empty.
+        examples: Examples to infer the schema from. Must be non-empty and
+            homogeneous (all examples share the same set of property keys,
+            and all are either traced or none are).
 
     Returns:
-        A JSON Schema dict with `type: "object"`.
+        A JSON Schema dict with ``type: "object"`` where ``required``
+        equals every declared property key.
 
     Raises:
-        ValueError: If no examples are provided.
+        ValueError: If no examples are provided, examples have
+            heterogeneous fields, or examples have mixed trace presence.
     """
     if not examples:
         raise ValueError(
@@ -59,7 +68,8 @@ def infer_schema_from_examples(examples: Sequence[Example]) -> Dict[str, Any]:
         )
 
     properties: Dict[str, Any] = {}
-    required: Optional[set] = None
+    # Track the full set of non-None, non-trace keys seen across all examples
+    all_keys: Optional[set] = None
     traced_count = 0
 
     for example in examples:
@@ -74,12 +84,44 @@ def infer_schema_from_examples(examples: Sequence[Example]) -> Dict[str, Any]:
             keys.add(key)
             if key not in properties:
                 properties[key] = {"type": _json_schema_type(value)}
-        required = keys if required is None else (required & keys)
+        if all_keys is None:
+            all_keys = keys
+        elif all_keys != keys:
+            # Find which fields differ between the first example's key set and
+            # the current example's key set to produce a helpful message.
+            extra_in_first = all_keys - keys
+            extra_in_current = keys - all_keys
+            missing_desc_parts = []
+            if extra_in_first:
+                missing_desc_parts.append(
+                    f"fields present in earlier examples but missing here: "
+                    f"{sorted(extra_in_first)}"
+                )
+            if extra_in_current:
+                missing_desc_parts.append(
+                    f"fields present here but missing in earlier examples: "
+                    f"{sorted(extra_in_current)}"
+                )
+            raise ValueError(
+                "All examples must share the same set of fields (dataset schemas "
+                "require all declared properties). "
+                + "; ".join(missing_desc_parts)
+                + ". Pass an explicit `schema` or make all examples homogeneous."
+            )
 
-    if traced_count:
+    # Check trace consistency
+    if traced_count != 0 and traced_count != len(examples):
+        raise ValueError(
+            f"All examples must be traced or none may be traced — "
+            f"{traced_count} of {len(examples)} examples have a non-None "
+            f"offline_trace_id. A dataset cannot have an optional trace."
+        )
+
+    required: set = set(all_keys) if all_keys else set()
+
+    if traced_count == len(examples):
         properties["trace"] = {"type": "string"}
-        if traced_count == len(examples) and required is not None:
-            required.add("trace")
+        required.add("trace")
 
     schema: Dict[str, Any] = {
         "type": "object",
@@ -109,7 +151,8 @@ class DatasetFactory:
                     "input": {"type": "string"},
                     "expected_output": {"type": "string"},
                 },
-                "required": ["input"],
+                # All declared properties must be required.
+                "required": ["input", "expected_output"],
             },
             examples=[
                 Example.create(input="What is AI?", expected_output="Artificial Intelligence"),
@@ -197,6 +240,12 @@ class DatasetFactory:
         schema is inferred from the provided examples as a convenience --
         passing an explicit schema is recommended.
 
+        All declared schema properties are marked ``required`` -- every
+        example in a dataset must share one shape. When inferring from
+        examples, all examples must have identical non-None field sets and
+        must be uniformly traced or untrace (mixed presence raises
+        ``ValueError`` before any server call is made).
+
         The reserved schema property `trace` must be `{"type": "string"}`
         and represents an example's offline trace ID.
 
@@ -225,10 +274,16 @@ class DatasetFactory:
                 name="qa-pairs",
                 schema={
                     "type": "object",
-                    "properties": {"input": {"type": "string"}},
-                    "required": ["input"],
+                    "properties": {
+                        "input": {"type": "string"},
+                        "expected_output": {"type": "string"},
+                    },
+                    # All declared properties must be required.
+                    "required": ["input", "expected_output"],
                 },
-                examples=[Example.create(input="What is 2+2?")],
+                examples=[
+                    Example.create(input="What is 2+2?", expected_output="4"),
+                ],
             )
             ```
         """

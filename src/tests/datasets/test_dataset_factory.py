@@ -125,6 +125,8 @@ class TestDatasetFactoryCreate:
         assert payload["schema"]["type"] == "object"
         assert payload["schema"]["properties"]["input"] == {"type": "string"}
         assert payload["schema"]["properties"]["score"] == {"type": "number"}
+        # All inferred properties must be required.
+        assert sorted(payload["schema"]["required"]) == ["input", "score"]
 
     def test_create_conflict_maps_to_conflict_error(self):
         factory, client = _make_factory()
@@ -225,15 +227,33 @@ class TestInferSchema:
         assert props["items"] == {"type": "array"}
         assert props["nested"] == {"type": "object"}
 
-    def test_required_is_intersection(self):
+    def test_required_equals_all_keys(self):
         schema = infer_schema_from_examples(
             [
                 Example.create(input="q", expected_output="a"),
-                Example.create(input="q2"),
+                Example.create(input="q2", expected_output="b"),
             ]
         )
-        assert schema["required"] == ["input"]
+        assert schema["required"] == ["expected_output", "input"]
         assert "expected_output" in schema["properties"]
+
+    def test_heterogeneous_fields_raises(self):
+        with pytest.raises(ValueError, match="same set of fields"):
+            infer_schema_from_examples(
+                [
+                    Example.create(input="q", expected_output="a"),
+                    Example.create(input="q2"),
+                ]
+            )
+
+    def test_heterogeneous_fields_error_names_missing_fields(self):
+        with pytest.raises(ValueError, match="expected_output"):
+            infer_schema_from_examples(
+                [
+                    Example.create(input="q", expected_output="a"),
+                    Example.create(input="q2"),
+                ]
+            )
 
     def test_offline_trace_id_maps_to_trace_property(self):
         schema = infer_schema_from_examples(
@@ -252,15 +272,14 @@ class TestInferSchema:
         assert schema["properties"]["trace"] == {"type": "string"}
         assert schema["required"] == ["input", "trace"]
 
-    def test_partially_traced_examples_emit_optional_trace(self):
-        schema = infer_schema_from_examples(
-            [
-                Example.create(input="q1", offline_trace_id="t1"),
-                Example.create(input="q2"),
-            ]
-        )
-        assert schema["properties"]["trace"] == {"type": "string"}
-        assert schema["required"] == ["input"]
+    def test_partially_traced_examples_raises(self):
+        with pytest.raises(ValueError, match="optional trace"):
+            infer_schema_from_examples(
+                [
+                    Example.create(input="q1", offline_trace_id="t1"),
+                    Example.create(input="q2"),
+                ]
+            )
 
     def test_untraced_examples_omit_trace_property(self):
         schema = infer_schema_from_examples(

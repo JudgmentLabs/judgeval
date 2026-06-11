@@ -259,7 +259,8 @@ class Judgeval:
                         "input": {"type": "string"},
                         "expected_output": {"type": "string"},
                     },
-                    "required": ["input"],
+                    # All declared properties must be required.
+                    "required": ["input", "expected_output"],
                 },
                 examples=[
                     Example.create(input="What is 2+2?", expected_output="4"),
