@@ -263,15 +263,38 @@ class OfflineTestRunner:
     ) -> List[Dict[str, Any]]:
         """Fetch every example of one dataset version.
 
-        Pages through the dataset's example endpoint and returns entries
-        as `{example_id, created_at, data, ...}` dicts with `data`
-        normalized to a dict.
+        Pages through the dataset's ``/page`` endpoint which returns:
+
+        .. code-block:: json
+
+            {
+              "dataset": {...},
+              "entries": [
+                {
+                  "item":    {"id": "...", "version_added": 1, "example_id": "...", "created_at": "<item ts>", ...},
+                  "example": {"example_id": "...", "data": {...}, "offline_trace_id": "...|null", "metadata": {...}, "created_at": "<example ts>"}
+                }
+              ],
+              "metadata": {"hasMore": true|false, "nextCursor": {"created_at": "...", "example_id": "..."} | null}
+            }
+
+        Returns a list of dicts with keys ``example_id``, ``data`` (always a
+        ``dict``), ``offline_trace_id``, and ``created_at`` drawn from the
+        nested ``example`` object.  Pagination uses ``metadata.nextCursor``
+        verbatim; the cursor is never derived from individual entries.
         """
         examples: List[Dict[str, Any]] = []
         cursor_created_at: Optional[str] = None
         cursor_example_id: Optional[str] = None
+        page_count = 0
+        max_pages = 10_000
 
         while True:
+            if page_count >= max_pages:
+                raise RuntimeError(
+                    f"fetch_examples exceeded {max_pages} pages for dataset of "
+                    f"test config '{test_config.name}'; aborting to prevent runaway loop"
+                )
             try:
                 page = self._client.get_projects_datasets_by_dataset_identifier_page(
                     project_id=self._project_id,
@@ -287,36 +310,34 @@ class OfflineTestRunner:
                     f"Failed to fetch examples for dataset of test config "
                     f"'{test_config.name}': {e.detail}",
                 ) from e
+            page_count += 1
 
             entries = [e for e in page.get("entries") or [] if isinstance(e, dict)]
             for entry in entries:
-                data = entry.get("data")
+                example = entry["example"]
+                data = example.get("data")
                 if isinstance(data, str):
                     try:
                         data = orjson.loads(data)
                     except orjson.JSONDecodeError:
                         data = None
                 examples.append(
-                    {**entry, "data": data if isinstance(data, dict) else {}}
+                    {
+                        "example_id": example.get("example_id"),
+                        "data": data if isinstance(data, dict) else {},
+                        "offline_trace_id": example.get("offline_trace_id"),
+                        "created_at": example.get("created_at"),
+                    }
                 )
 
             metadata = page.get("metadata") or {}
             has_more = metadata.get("hasMore")
-            if has_more is None:
-                has_more = metadata.get("has_more")
-            if has_more is None:
-                has_more = len(entries) == EXAMPLES_PAGE_SIZE
-            if not has_more or not entries:
+            next_cursor = metadata.get("nextCursor")
+            if not has_more or not next_cursor:
                 break
 
-            last = entries[-1]
-            next_cursor = (
-                str(last.get("created_at") or ""),
-                str(last.get("example_id") or ""),
-            )
-            if next_cursor == (cursor_created_at, cursor_example_id):
-                break
-            cursor_created_at, cursor_example_id = next_cursor
+            cursor_created_at = str(next_cursor["created_at"])
+            cursor_example_id = str(next_cursor["example_id"])
 
         return examples
 

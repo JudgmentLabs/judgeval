@@ -37,10 +37,19 @@ PAGE = {
     "dataset": {"dataset_id": "d1", "name": "golden"},
     "entries": [
         {
-            "example_id": "ex-1",
-            "created_at": "2026-01-01",
-            "data": {"input": "q1"},
-            "offline_trace_id": None,
+            "item": {
+                "id": "item-1",
+                "version_added": 1,
+                "example_id": "ex-1",
+                "created_at": "2026-01-02",
+            },
+            "example": {
+                "example_id": "ex-1",
+                "data": {"input": "q1"},
+                "offline_trace_id": None,
+                "metadata": {},
+                "created_at": "2026-01-01",
+            },
         },
     ],
     "metadata": {"hasMore": False, "nextCursor": None},
@@ -275,20 +284,70 @@ class TestDatasetResolution:
         assert kwargs["version"] == "1"
         assert kwargs["cursor_created_at"] is None
 
+    def test_fetch_examples_offline_trace_id_propagated(self):
+        """An example carrying an offline_trace_id is forwarded to callers."""
+        runner, client = _make_runner()
+        client.get_projects_datasets_by_dataset_identifier_page.return_value = {
+            "dataset": {"dataset_id": "d1", "name": "golden"},
+            "entries": [
+                {
+                    "item": {
+                        "id": "item-1",
+                        "version_added": 1,
+                        "example_id": "ex-1",
+                        "created_at": "2026-01-02",
+                    },
+                    "example": {
+                        "example_id": "ex-1",
+                        "data": {"input": "q1"},
+                        "offline_trace_id": "trace-abc",
+                        "metadata": {},
+                        "created_at": "2026-01-01",
+                    },
+                }
+            ],
+            "metadata": {"hasMore": False, "nextCursor": None},
+        }
+        examples = runner.fetch_examples(CONFIG, 1)
+        assert examples[0]["offline_trace_id"] == "trace-abc"
+        assert examples[0]["example_id"] == "ex-1"
+        assert examples[0]["data"] == {"input": "q1"}
+
     def test_fetch_examples_paginates_with_cursor(self):
         runner, client = _make_runner()
+
+        def _make_entry(example_id, created_at, data):
+            return {
+                "item": {
+                    "id": f"item-{example_id}",
+                    "version_added": 1,
+                    "example_id": example_id,
+                    "created_at": "item-ts",
+                },
+                "example": {
+                    "example_id": example_id,
+                    "data": data,
+                    "offline_trace_id": None,
+                    "metadata": {},
+                    "created_at": created_at,
+                },
+            }
+
         page_1 = {
             "entries": [
-                {"example_id": "ex-1", "created_at": "t1", "data": {"input": "q1"}},
-                {"example_id": "ex-2", "created_at": "t2", "data": {"input": "q2"}},
+                _make_entry("ex-1", "t1", {"input": "q1"}),
+                _make_entry("ex-2", "t2", {"input": "q2"}),
             ],
-            "metadata": {"hasMore": True},
+            "metadata": {
+                "hasMore": True,
+                "nextCursor": {"created_at": "t2", "example_id": "ex-2"},
+            },
         }
         page_2 = {
             "entries": [
-                {"example_id": "ex-3", "created_at": "t3", "data": {"input": "q3"}},
+                _make_entry("ex-3", "t3", {"input": "q3"}),
             ],
-            "metadata": {"hasMore": False},
+            "metadata": {"hasMore": False, "nextCursor": None},
         }
         client.get_projects_datasets_by_dataset_identifier_page.side_effect = [
             page_1,
@@ -301,6 +360,7 @@ class TestDatasetResolution:
                 1
             ].kwargs
         )
+        # cursor params must come from metadata.nextCursor, not the last entry
         assert second_call["cursor_created_at"] == "t2"
         assert second_call["cursor_example_id"] == "ex-2"
 
@@ -309,12 +369,22 @@ class TestDatasetResolution:
         client.get_projects_datasets_by_dataset_identifier_page.return_value = {
             "entries": [
                 {
-                    "example_id": "ex-1",
-                    "created_at": "t1",
-                    "data": json.dumps({"input": "q1"}),
+                    "item": {
+                        "id": "item-1",
+                        "version_added": 1,
+                        "example_id": "ex-1",
+                        "created_at": "item-ts",
+                    },
+                    "example": {
+                        "example_id": "ex-1",
+                        "data": json.dumps({"input": "q1"}),
+                        "offline_trace_id": None,
+                        "metadata": {},
+                        "created_at": "t1",
+                    },
                 }
             ],
-            "metadata": {"hasMore": False},
+            "metadata": {"hasMore": False, "nextCursor": None},
         }
         examples = runner.fetch_examples(CONFIG, 1)
         assert examples[0]["data"] == {"input": "q1"}
