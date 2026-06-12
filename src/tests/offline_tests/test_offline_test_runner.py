@@ -130,6 +130,37 @@ def _make_runner():
     return runner, client
 
 
+def _stub_raw_request(client, items_pages=None):
+    """Route the raw `_request` helper: GET serves items pages, PATCH acks.
+
+    `items_pages` is a list of successive responses for the items GET;
+    the last page is repeated if called again.
+    """
+    if items_pages is None:
+        items_pages = [
+            {
+                "results": [json.loads(json.dumps(item)) for item in ITEMS],
+                "has_more": False,
+                "next_cursor": None,
+                "ui_results_url": "https://app/tests/run-1",
+            }
+        ]
+    state = {"page": 0}
+
+    def _request(method, url, payload, *args, **kwargs):
+        if method == "GET":
+            page = items_pages[min(state["page"], len(items_pages) - 1)]
+            state["page"] += 1
+            return page
+        return {"updated": 1}
+
+    client._request.side_effect = _request
+
+
+def _request_calls(client, method):
+    return [c for c in client._request.call_args_list if c.args[0] == method]
+
+
 def _stub_lifecycle(client, status="completed"):
     client.get_projects_datasets_by_dataset_identifier_versions.return_value = (
         json.loads(json.dumps(VERSIONS))
@@ -142,10 +173,7 @@ def _stub_lifecycle(client, status="completed"):
         "test_run": {"id": "run-1", "status": status},
         "ui_results_url": "https://app/tests/run-1",
     }
-    client.get_projects_test_runs_by_test_run_id_items.return_value = {
-        "results": [json.loads(json.dumps(item)) for item in ITEMS],
-        "ui_results_url": "https://app/tests/run-1",
-    }
+    _stub_raw_request(client)
 
 
 class TestNormalizeJudgeVersions:
@@ -394,6 +422,65 @@ class TestDatasetResolution:
         )
         with pytest.raises(JudgmentValidationError):
             runner.fetch_examples(CONFIG, 9)
+
+
+class TestFetchItems:
+    def _items_page(self, example_ids, has_more, next_cursor, url="https://app/run-1"):
+        return {
+            "results": [
+                {"example_id": example_id, "data": {}, "scorers": []}
+                for example_id in example_ids
+            ],
+            "has_more": has_more,
+            "next_cursor": next_cursor,
+            "ui_results_url": url,
+        }
+
+    def test_single_page(self):
+        runner, client = _make_runner()
+        client._request.return_value = self._items_page(["ex-1"], False, None)
+        items, url = runner.fetch_items("run-1")
+        assert [i["example_id"] for i in items] == ["ex-1"]
+        assert url == "https://app/run-1"
+        client._request.assert_called_once()
+        args = client._request.call_args.args
+        assert args[0] == "GET"
+        assert args[1] == "http://api.test/v1/projects/proj-1/test-runs/run-1/items"
+        # limit is always sent explicitly; no cursor on the first page
+        assert args[2] == {"limit": 200}
+
+    def test_paginates_until_has_more_false(self):
+        runner, client = _make_runner()
+        client._request.side_effect = [
+            self._items_page(["ex-1", "ex-2"], True, "ex-2"),
+            self._items_page(["ex-3"], False, None),
+        ]
+        items, url = runner.fetch_items("run-1")
+        assert [i["example_id"] for i in items] == ["ex-1", "ex-2", "ex-3"]
+        assert url == "https://app/run-1"
+        assert client._request.call_count == 2
+        second_params = client._request.call_args_list[1].args[2]
+        assert second_params == {"limit": 200, "cursor": "ex-2"}
+
+    def test_old_server_without_pagination_fields(self):
+        """Servers predating pagination omit has_more/next_cursor entirely."""
+        runner, client = _make_runner()
+        client._request.return_value = {
+            "results": [{"example_id": "ex-1", "data": {}, "scorers": []}],
+            "ui_results_url": "https://app/run-1",
+        }
+        items, url = runner.fetch_items("run-1")
+        assert [i["example_id"] for i in items] == ["ex-1"]
+        assert url == "https://app/run-1"
+        client._request.assert_called_once()
+
+    def test_null_next_cursor_stops_despite_has_more(self):
+        """A defective has_more=True with no cursor must not loop forever."""
+        runner, client = _make_runner()
+        client._request.return_value = self._items_page(["ex-1"], True, None)
+        items, _ = runner.fetch_items("run-1")
+        assert len(items) == 1
+        client._request.assert_called_once()
 
 
 class TestCreateTestRun:
@@ -661,9 +748,9 @@ class TestRunOrchestration:
         assert outcome.test_run_id == "run-1"
         assert outcome.status == "completed"
         assert outcome.passed is True
-        client._request.assert_called_once()
-        args, kwargs = client._request.call_args
-        assert args[0] == "PATCH"
+        patches = _request_calls(client, "PATCH")
+        assert len(patches) == 1
+        args, kwargs = patches[0]
         assert args[1].endswith("/v1/projects/proj-1/test-runs/run-1/success")
         assert kwargs["payload"] == {
             "successes": [{"evaluation_run_id": "er-1", "success": True}]
@@ -675,7 +762,7 @@ class TestRunOrchestration:
         _stub_lifecycle(client)
         outcome = runner.run(CONFIG)
         assert outcome.passed is None
-        client._request.assert_not_called()
+        assert _request_calls(client, "PATCH") == []
         client.post_projects_eval_results.assert_not_called()
 
     def test_assert_test_requires_pass_condition(self):
@@ -736,7 +823,7 @@ class TestRunOrchestration:
         assert outcome.agent_offline_trace_ids == {"ex-1": "trace-abc"}
         # agent traces were attached at run creation; without a pass
         # condition nothing is reported back after the run
-        client._request.assert_not_called()
+        assert _request_calls(client, "PATCH") == []
         client.post_projects_eval_results.assert_not_called()
 
     def test_agent_with_pass_condition_patches_success_only(self):
@@ -753,8 +840,9 @@ class TestRunOrchestration:
                 pass_condition_fn=lambda fields, scorers: True,
             )
 
-        client._request.assert_called_once()
-        payload = client._request.call_args.kwargs["payload"]
+        patches = _request_calls(client, "PATCH")
+        assert len(patches) == 1
+        payload = patches[0].kwargs["payload"]
         # only evaluation_run_id + success cross the wire -- no trace echo
         assert payload == {
             "successes": [{"evaluation_run_id": "er-1", "success": True}]

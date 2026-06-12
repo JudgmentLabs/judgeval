@@ -265,6 +265,9 @@ class OfflineTestsFactory:
             pass_condition_fn: Optional callable
                 `(data_fields, scorer_data_list) -> bool` evaluated per
                 example row; the outcome is stored as the row's `success`.
+                Each scorer's `reason` and string value arrive truncated
+                to 128 characters server-side, so conditions should key
+                off scores/prefixes rather than full reason text.
             assert_test: Raise `JudgmentTestError` unless every row passes
                 its pass condition. Requires `pass_condition_fn`.
             timeout_seconds: Maximum seconds to wait for judge results.

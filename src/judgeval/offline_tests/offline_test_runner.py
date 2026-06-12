@@ -28,6 +28,8 @@ PassConditionFn = Callable[[Dict[str, Any], List[ScorerData]], bool]
 
 TERMINAL_STATUSES = frozenset({"completed", "error", "cancelled"})
 EXAMPLES_PAGE_SIZE = 100
+# Server default and maximum page size for test-run items reads.
+ITEMS_PAGE_SIZE = 200
 
 
 def normalize_judge_versions(
@@ -498,12 +500,61 @@ class OfflineTestRunner:
             time.sleep(2)
 
     def fetch_items(self, test_run_id: str) -> Tuple[List[Dict[str, Any]], str]:
-        """Fetch per-example scorer rows for a test run."""
-        response = self._client.get_projects_test_runs_by_test_run_id_items(
-            project_id=self._project_id,
-            test_run_id=test_run_id,
-        )
-        return (response.get("results") or [], response.get("ui_results_url") or "")
+        """Fetch every per-example scorer row for a test run.
+
+        Pages through ``GET .../test-runs/{id}/items`` with ``limit`` /
+        ``cursor`` query params (keyset-paginated by ``example_id``; the
+        server caps pages at 200 rows) until ``has_more`` is false or
+        ``next_cursor`` is null. Older servers that do not paginate omit
+        both fields and are treated as a single full page.
+
+        The server truncates each scorer's ``str_value``, ``reason``, and
+        ``error`` to 128 characters in these rows; follow
+        ``ui_results_url`` for the full values.
+
+        Uses the raw ``JudgmentSyncClient._request`` helper (same httpx
+        machinery, headers, and error handling) because the generated
+        client does not expose the ``limit``/``cursor`` query params yet.
+        A future client regen will pick them up.
+        """
+        items: List[Dict[str, Any]] = []
+        ui_results_url = ""
+        cursor: Optional[str] = None
+        page_count = 0
+        max_pages = 10_000
+
+        while True:
+            if page_count >= max_pages:
+                raise RuntimeError(
+                    f"fetch_items exceeded {max_pages} pages for test run "
+                    f"{test_run_id}; aborting to prevent runaway loop"
+                )
+            params: Dict[str, Any] = {"limit": ITEMS_PAGE_SIZE}
+            if cursor is not None:
+                params["cursor"] = cursor
+            response = cast(
+                Dict[str, Any],
+                self._client._request(
+                    "GET",
+                    url_for(
+                        f"/v1/projects/{self._project_id}/test-runs/{test_run_id}/items",
+                        self._client.base_url,
+                    ),
+                    params,
+                ),
+            )
+            page_count += 1
+
+            items.extend(response.get("results") or [])
+            if not ui_results_url:
+                ui_results_url = response.get("ui_results_url") or ""
+
+            next_cursor = response.get("next_cursor")
+            if not response.get("has_more") or not next_cursor:
+                break
+            cursor = str(next_cursor)
+
+        return items, ui_results_url
 
     def build_results(
         self,
