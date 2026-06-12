@@ -15,7 +15,6 @@ from judgeval.exceptions import (
 from judgeval.offline_tests.offline_test_runner import (
     OfflineTestRunner,
     build_agent_kwargs,
-    has_duplicate_judges,
     normalize_judge_versions,
 )
 from judgeval.offline_tests.types import OfflineTestResult, TestConfig
@@ -194,12 +193,6 @@ class TestNormalizeJudgeVersions:
             [{"name": "j", "tag": "prod", "extra": "x"}]
         )
         assert normalized == [{"name": "j", "tag": "prod"}]
-
-    def test_duplicate_judges_detected(self):
-        assert has_duplicate_judges(
-            [{"name": "j", "tag": "prod"}, {"name": "j", "version": "1.0"}]
-        )
-        assert not has_duplicate_judges([{"name": "a"}, {"name": "b"}])
 
 
 class TestBuildAgentKwargs:
@@ -502,7 +495,9 @@ class TestCreateTestRun:
         payload = client.post_projects_test_runs.call_args.kwargs["payload"]
         assert payload["dataset_version_id"] == "ver-uuid"
 
-    def test_versioned_results_auto_set_for_duplicate_judges(self):
+    def test_duplicate_judge_versions_pass_through_unchanged(self):
+        # Multi-version runs need no extra flags: queue refs carry the
+        # pinned judge versions server-side.
         runner, client = _make_runner()
         client.post_projects_test_runs.return_value = dict(PREPARED)
         runner.create_test_run(
@@ -513,7 +508,11 @@ class TestCreateTestRun:
             ],
         )
         payload = client.post_projects_test_runs.call_args.kwargs["payload"]
-        assert payload["versioned_results"] is True
+        assert payload["judge_versions"] == [
+            {"name": "j", "tag": "prod"},
+            {"name": "j", "version": "0.1"},
+        ]
+        assert "versioned_results" not in payload
 
     def test_agent_traces_attached_to_payload(self):
         runner, client = _make_runner()

@@ -226,7 +226,6 @@ class OfflineTestsFactory:
         agent_function: Optional[AgentFunction] = None,
         judge_versions: Optional[List[Dict[str, Any]]] = None,
         dataset_version: Optional[int | str] = None,
-        versioned_results: Optional[bool] = None,
         pass_condition_fn: Optional[PassConditionFn] = None,
         assert_test: bool = False,
         timeout_seconds: int = 600,
@@ -259,9 +258,6 @@ class OfflineTestsFactory:
             dataset_version: Dataset version to evaluate -- a version
                 number (int) or version ID (str). Defaults to the latest
                 version.
-            versioned_results: Advanced override; defaults to True
-                automatically when `judge_versions` pins the same judge
-                twice.
             pass_condition_fn: Optional callable
                 `(data_fields, scorer_data_list) -> bool` evaluated per
                 example row; the outcome is stored as the row's `success`.
@@ -308,7 +304,6 @@ class OfflineTestsFactory:
             agent_function=agent_function,
             judge_versions=judge_versions,
             dataset_version=dataset_version,
-            versioned_results=versioned_results,
             pass_condition_fn=pass_condition_fn,
             assert_test=assert_test,
             timeout_seconds=timeout_seconds,

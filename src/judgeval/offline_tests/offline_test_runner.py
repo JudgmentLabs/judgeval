@@ -72,17 +72,6 @@ def normalize_judge_versions(
     return normalized
 
 
-def has_duplicate_judges(judge_versions: List[Dict[str, Any]]) -> bool:
-    """Whether two `judge_versions` entries reference the same judge."""
-    seen = set()
-    for entry in judge_versions:
-        key = entry.get("judge_id") or entry.get("name")
-        if key in seen:
-            return True
-        seen.add(key)
-    return False
-
-
 def build_agent_kwargs(
     agent_function: AgentFunction, data: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -336,7 +325,6 @@ class OfflineTestRunner:
         test_config: TestConfig,
         dataset_version: Optional[int | str] = None,
         judge_versions: Optional[List[Dict[str, Any]]] = None,
-        versioned_results: Optional[bool] = None,
         source: str = "sdk",
         agent_traces: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
@@ -362,10 +350,6 @@ class OfflineTestRunner:
         normalized = normalize_judge_versions(judge_versions)
         if normalized:
             payload["judge_versions"] = normalized
-            if versioned_results is None and has_duplicate_judges(normalized):
-                versioned_results = True
-        if versioned_results is not None:
-            payload["versioned_results"] = versioned_results
 
         if agent_traces:
             payload["agent_traces"] = [
@@ -729,7 +713,6 @@ class OfflineTestRunner:
         agent_function: Optional[AgentFunction] = None,
         judge_versions: Optional[List[Dict[str, Any]]] = None,
         dataset_version: Optional[int | str] = None,
-        versioned_results: Optional[bool] = None,
         pass_condition_fn: Optional[PassConditionFn] = None,
         assert_test: bool = False,
         timeout_seconds: int = 600,
@@ -778,7 +761,6 @@ class OfflineTestRunner:
                 test_config,
                 dataset_version=pinned_version,
                 judge_versions=judge_versions,
-                versioned_results=versioned_results,
                 agent_traces=agent_traces,
             )
             test_run = prepared.get("test_run") or {}
