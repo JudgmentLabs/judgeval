@@ -12,11 +12,14 @@ from judgeval.datasets.dataset import (
     example_to_dataset_entry,
 )
 from judgeval.data.example import Example
+from judgeval.data.trace import TraceRef
 from judgeval.logger import judgeval_logger
 from judgeval.utils.guards import expect_project_id
 
 
 def _json_schema_type(value: Any) -> str:
+    if isinstance(value, TraceRef):
+        return "trace"
     if isinstance(value, bool):
         return "boolean"
     if isinstance(value, int):
@@ -42,24 +45,21 @@ def infer_schema_from_examples(examples: Sequence[Example]) -> Dict[str, Any]:
     some examples are missing fields that others have) are rejected with a
     ``ValueError``.
 
-    The reserved ``offline_trace_id`` field maps to the reserved ``trace``
-    schema property. Either ALL examples must have a non-None
-    ``offline_trace_id`` (the property is added), or NONE may have one
-    (the property is omitted entirely). A mix of traced and untraced
-    examples is rejected with a ``ValueError``.
+    A field whose value is a ``TraceRef`` is inferred as a trace column
+    (``{"type": "trace"}``); its value is the referenced trace id. At most
+    one trace column is permitted per dataset.
 
     Args:
         examples: Examples to infer the schema from. Must be non-empty and
-            homogeneous (all examples share the same set of property keys,
-            and all are either traced or none are).
+            homogeneous (all examples share the same set of property keys).
 
     Returns:
         A JSON Schema dict of the form ``{"type": "object", "properties":
         {...}}`` declaring the example fields.
 
     Raises:
-        ValueError: If no examples are provided, examples have
-            heterogeneous fields, or examples have mixed trace presence.
+        ValueError: If no examples are provided, examples have heterogeneous
+            fields, or more than one trace column is declared.
     """
     if not examples:
         raise ValueError(
@@ -68,17 +68,12 @@ def infer_schema_from_examples(examples: Sequence[Example]) -> Dict[str, Any]:
         )
 
     properties: Dict[str, Any] = {}
-    # Track the full set of non-None, non-trace keys seen across all examples
+    # Track the full set of non-None keys seen across all examples.
     all_keys: Optional[set] = None
-    traced_count = 0
 
     for example in examples:
         keys = set()
         for key, value in example._properties.items():
-            if key == "offline_trace_id":
-                if value is not None:
-                    traced_count += 1
-                continue
             if value is None:
                 continue
             keys.add(key)
@@ -109,16 +104,16 @@ def infer_schema_from_examples(examples: Sequence[Example]) -> Dict[str, Any]:
                 + ". Pass an explicit `schema` or make all examples homogeneous."
             )
 
-    # Check trace consistency
-    if traced_count != 0 and traced_count != len(examples):
+    trace_cols = [
+        name
+        for name, prop in properties.items()
+        if isinstance(prop, dict) and prop.get("type") == "trace"
+    ]
+    if len(trace_cols) > 1:
         raise ValueError(
-            f"All examples must be traced or none may be traced — "
-            f"{traced_count} of {len(examples)} examples have a non-None "
-            f"offline_trace_id. A dataset cannot have an optional trace."
+            "A dataset may declare at most one trace column; inferred "
+            f"{len(trace_cols)}: {sorted(trace_cols)}."
         )
-
-    if traced_count == len(examples):
-        properties["trace"] = {"type": "string"}
 
     return {
         "type": "object",
@@ -234,12 +229,12 @@ class DatasetFactory:
 
         Every example in a dataset must contain every declared schema
         field -- one shape per dataset. When inferring from examples, all
-        examples must have identical non-None field sets and must be
-        uniformly traced or untraced (mixed presence raises ``ValueError``
-        before any server call is made).
+        examples must have identical non-None field sets.
 
-        The reserved schema property `trace` must be `{"type": "string"}`
-        and represents an example's offline trace ID.
+        A column may be declared with `{"type": "trace"}` (any name); its
+        value is a trace id rather than literal data. Wrap such values in
+        `TraceRef` so inference records the column as trace-typed. At most
+        one trace column is permitted per dataset.
 
         Args:
             name: Name for the dataset (unique within the project,
@@ -273,6 +268,19 @@ class DatasetFactory:
                 },
                 examples=[
                     Example.create(input="What is 2+2?", expected_output="4"),
+                ],
+            )
+            ```
+
+            A dataset with a trace column (any name):
+
+            ```python
+            from judgeval.data.trace import TraceRef
+
+            dataset = client.datasets.create(
+                name="transcripts",
+                examples=[
+                    Example.create(transcript=TraceRef("<trace_id>")),
                 ],
             )
             ```

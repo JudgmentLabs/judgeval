@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from judgeval.data.example import Example
+from judgeval.data.trace import TraceRef
 from judgeval.datasets.dataset import (
     Dataset,
     DatasetVersion,
@@ -251,13 +252,18 @@ class TestVersionsAndDelete:
 
 class TestDatasetEntrySerialization:
     def test_example_to_dataset_entry_lifts_reserved_keys(self):
-        example = Example.create(input="q", offline_trace_id="trace-1")
+        example = Example.create(input="q")
         entry = example_to_dataset_entry(example)
         assert entry["example_id"] == example.example_id
         assert entry["created_at"] == example.created_at
-        assert entry["offline_trace_id"] == "trace-1"
         assert entry["input"] == "q"
         assert "name" not in entry
+
+    def test_example_to_dataset_entry_serializes_traceref_to_id(self):
+        example = Example.create(question="q", transcript=TraceRef("trace-1"))
+        entry = example_to_dataset_entry(example)
+        assert entry["transcript"] == "trace-1"
+        assert entry["question"] == "q"
 
     def test_example_from_dataset_entry_nested_data(self):
         entry = {

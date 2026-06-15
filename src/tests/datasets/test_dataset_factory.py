@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from judgeval.data.example import Example
+from judgeval.data.trace import TraceRef
 from judgeval.datasets.dataset import Dataset, DatasetInfo, DatasetVersion
 from judgeval.datasets.dataset_factory import (
     DatasetFactory,
@@ -255,47 +256,38 @@ class TestInferSchema:
                 ]
             )
 
-    def test_offline_trace_id_maps_to_trace_property(self):
+    def test_traceref_infers_trace_typed_column_under_any_name(self):
         schema = infer_schema_from_examples(
-            [Example.create(input="q", offline_trace_id="t1")]
+            [Example.create(question="q", transcript=TraceRef("t1"))]
         )
-        assert schema["properties"]["trace"] == {"type": "string"}
-        assert "offline_trace_id" not in schema["properties"]
+        assert schema["properties"]["transcript"] == {"type": "trace"}
+        assert schema["properties"]["question"] == {"type": "string"}
 
-    def test_all_traced_examples_emit_trace_property(self):
+    def test_all_traceref_examples_emit_trace_typed_column(self):
         schema = infer_schema_from_examples(
             [
-                Example.create(input="q1", offline_trace_id="t1"),
-                Example.create(input="q2", offline_trace_id="t2"),
+                Example.create(transcript=TraceRef("t1")),
+                Example.create(transcript=TraceRef("t2")),
             ]
         )
-        assert schema["properties"]["trace"] == {"type": "string"}
+        assert schema["properties"]["transcript"] == {"type": "trace"}
         assert "required" not in schema
 
-    def test_partially_traced_examples_raises(self):
-        with pytest.raises(ValueError, match="optional trace"):
+    def test_more_than_one_trace_column_raises(self):
+        with pytest.raises(ValueError, match="at most one trace column"):
             infer_schema_from_examples(
                 [
-                    Example.create(input="q1", offline_trace_id="t1"),
-                    Example.create(input="q2"),
+                    Example.create(trace=TraceRef("t1"), apple=TraceRef("t2")),
                 ]
             )
 
-    def test_untraced_examples_omit_trace_property(self):
+    def test_untraced_examples_omit_trace_column(self):
         schema = infer_schema_from_examples(
             [Example.create(input="q1"), Example.create(input="q2")]
         )
-        assert "trace" not in schema["properties"]
-        assert "required" not in schema
-
-    def test_none_only_trace_ids_omit_trace_property(self):
-        schema = infer_schema_from_examples(
-            [
-                Example.create(input="q1", offline_trace_id=None),
-                Example.create(input="q2", offline_trace_id=None),
-            ]
+        assert all(
+            prop.get("type") != "trace" for prop in schema["properties"].values()
         )
-        assert "trace" not in schema["properties"]
         assert "required" not in schema
 
     def test_empty_raises(self):

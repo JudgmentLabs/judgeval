@@ -17,6 +17,7 @@ from rich.progress import (
 
 
 from judgeval.data.example import Example
+from judgeval.data.trace import TraceRef
 from judgeval.exceptions import JudgmentAPIError, map_judgment_api_error
 from judgeval.internal.api import JudgmentSyncClient
 from judgeval.logger import judgeval_logger
@@ -41,19 +42,17 @@ def example_to_dataset_entry(example: Example) -> Dict[str, Any]:
     """Serialize an `Example` into the dataset example payload shape.
 
     The example's custom properties become the example data fields.
-    Reserved keys (`example_id`, `created_at`, `offline_trace_id`) are
-    lifted to the top level so the server stores them as example
-    metadata rather than data.
+    `example_id` and `created_at` are lifted to the top level. `TraceRef`
+    field values are serialized as their bare trace id; the server stores
+    a trace-typed column inline in the example data.
     """
     properties = dict(example._properties)
     entry: Dict[str, Any] = {
         "example_id": example.example_id,
         "created_at": example.created_at,
     }
-    offline_trace_id = properties.pop("offline_trace_id", None)
-    if offline_trace_id is not None:
-        entry["offline_trace_id"] = offline_trace_id
-    entry.update(properties)
+    for key, value in properties.items():
+        entry[key] = value.trace_id if isinstance(value, TraceRef) else value
     return entry
 
 
@@ -363,8 +362,8 @@ class Dataset:
         """Add trace-backed examples to this dataset.
 
         Copies the given online traces to offline storage and appends one
-        trace-backed example per trace. The dataset schema must not declare
-        any data fields besides the reserved `trace` property.
+        trace-backed example per trace. The dataset schema must declare a
+        single trace column (`{"type": "trace"}`) and nothing else.
 
         Args:
             trace_ids: Trace IDs to add.
@@ -373,8 +372,8 @@ class Dataset:
             The IDs of the created examples.
 
         Raises:
-            JudgmentValidationError: If the dataset schema requires data
-                fields other than `trace`.
+            JudgmentValidationError: If the dataset schema declares anything
+                other than a single trace column.
         """
         if not self.client or not trace_ids:
             return []

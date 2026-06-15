@@ -19,3 +19,24 @@ class Trace:
     """
 
     spans: List[TraceSpan]
+
+
+@dataclass(slots=True)
+class TraceRef:
+    """A pointer to a trace by id, for use as a dataset example field value.
+
+    A dataset column can be declared with `{"type": "trace"}`; its value is
+    not literal data but a reference to a stored trace. Wrap the trace id in
+    `TraceRef` so the SDK records the column as trace-typed when inferring a
+    schema, and serializes the value as the bare trace id on upload:
+
+        Example.create(question="...", transcript=TraceRef("<trace_id>"))
+
+    Attributes:
+        trace_id: The id of the trace this field points at.
+    """
+
+    trace_id: str
+
+    def __str__(self) -> str:
+        return self.trace_id
