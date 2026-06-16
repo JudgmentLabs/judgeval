@@ -5,9 +5,6 @@ from __future__ import annotations
 from .add_dataset_items_response import (
     AddDatasetItemsResponse as AddDatasetItemsResponse,
 )
-from .add_dataset_traces_request import (
-    AddDatasetTracesRequest as AddDatasetTracesRequest,
-)
 from .add_project_request import AddProjectRequest as AddProjectRequest
 from .add_project_response import AddProjectResponse as AddProjectResponse
 from .add_to_run_eval_queue_examples_response import (

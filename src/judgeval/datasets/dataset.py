@@ -358,46 +358,6 @@ class Dataset:
             f"Successfully added {total_uploaded} examples to dataset {self.name}"
         )
 
-    def add_traces(self, trace_ids: List[str]) -> List[str]:
-        """Add trace-backed examples to this dataset.
-
-        Copies the given online traces to offline storage and appends one
-        trace-backed example per trace. The dataset schema must declare a
-        single trace column (`{"type": "trace"}`) and nothing else.
-
-        Args:
-            trace_ids: Trace IDs to add.
-
-        Returns:
-            The IDs of the created examples.
-
-        Raises:
-            JudgmentValidationError: If the dataset schema declares anything
-                other than a single trace column.
-        """
-        if not self.client or not trace_ids:
-            return []
-
-        try:
-            response = self.client.post_projects_datasets_by_dataset_identifier_traces(
-                project_id=self.project_id,
-                dataset_identifier=self._identifier,
-                payload={"trace_ids": trace_ids},
-            )
-        except JudgmentAPIError as e:
-            raise map_judgment_api_error(
-                e, f"Failed to add traces to dataset '{self.name}': {e.detail}"
-            ) from e
-
-        version_added = response.get("version_added")
-        if version_added is not None:
-            self.current_version = int(version_added)
-        example_ids = response.get("example_ids", []) or []
-        judgeval_logger.info(
-            f"Added {len(example_ids)} trace-backed examples to dataset {self.name}"
-        )
-        return example_ids
-
     def versions(self) -> List[DatasetVersion]:
         """List all versions of this dataset, newest first.
 

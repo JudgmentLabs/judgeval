@@ -158,53 +158,6 @@ class TestAddExamples:
             ds.add_examples([Example.create(x=1)])
 
 
-class TestAddTraces:
-    def test_add_traces_calls_client(self):
-        client = MagicMock()
-        client.post_projects_datasets_by_dataset_identifier_traces.return_value = {
-            "example_ids": ["e1", "e2"],
-            "version_added": 3,
-        }
-        ds = Dataset(
-            name="test-ds",
-            project_id="proj-1",
-            project_name="proj",
-            client=client,
-        )
-        example_ids = ds.add_traces(["t1", "t2"])
-        assert example_ids == ["e1", "e2"]
-        assert ds.current_version == 3
-        call = client.post_projects_datasets_by_dataset_identifier_traces.call_args
-        assert call.kwargs["payload"] == {"trace_ids": ["t1", "t2"]}
-
-    def test_add_traces_empty_noop(self):
-        client = MagicMock()
-        ds = Dataset(
-            name="test-ds",
-            project_id="proj-1",
-            project_name="proj",
-            client=client,
-        )
-        assert ds.add_traces([]) == []
-        client.post_projects_datasets_by_dataset_identifier_traces.assert_not_called()
-
-    def test_add_traces_maps_validation_error(self):
-        from judgeval.exceptions import JudgmentAPIError, JudgmentValidationError
-
-        client = MagicMock()
-        client.post_projects_datasets_by_dataset_identifier_traces.side_effect = (
-            JudgmentAPIError(422, "schema requires data fields", None)
-        )
-        ds = Dataset(
-            name="test-ds",
-            project_id="proj-1",
-            project_name="proj",
-            client=client,
-        )
-        with pytest.raises(JudgmentValidationError):
-            ds.add_traces(["t1"])
-
-
 class TestVersionsAndDelete:
     def test_versions_returns_dataset_versions(self):
         client = MagicMock()

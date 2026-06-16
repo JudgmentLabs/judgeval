@@ -194,18 +194,6 @@ class JudgmentSyncClient:
             payload,
         )
 
-    def post_projects_datasets_by_dataset_identifier_traces(
-        self, project_id: str, dataset_identifier: str, payload: AddDatasetTracesRequest
-    ) -> AddDatasetItemsResponse:
-        return self._request(
-            "POST",
-            url_for(
-                f"/v1/projects/{project_id}/datasets/{dataset_identifier}/traces",
-                self.base_url,
-            ),
-            payload,
-        )
-
     def delete_projects_datasets_by_dataset_identifier(
         self, project_id: str, dataset_identifier: str
     ) -> DeleteOfflineDatasetResponse:
@@ -759,18 +747,6 @@ class JudgmentAsyncClient:
             "POST",
             url_for(
                 f"/v1/projects/{project_id}/datasets/{dataset_identifier}/examples",
-                self.base_url,
-            ),
-            payload,
-        )
-
-    async def post_projects_datasets_by_dataset_identifier_traces(
-        self, project_id: str, dataset_identifier: str, payload: AddDatasetTracesRequest
-    ) -> AddDatasetItemsResponse:
-        return await self._request(
-            "POST",
-            url_for(
-                f"/v1/projects/{project_id}/datasets/{dataset_identifier}/traces",
                 self.base_url,
             ),
             payload,
