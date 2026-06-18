@@ -12,14 +12,11 @@ from judgeval.datasets.dataset import (
     example_to_dataset_entry,
 )
 from judgeval.data.example import Example
-from judgeval.data.trace import TraceRef
 from judgeval.logger import judgeval_logger
 from judgeval.utils.guards import expect_project_id
 
 
 def _json_schema_type(value: Any) -> str:
-    if isinstance(value, TraceRef):
-        return "trace"
     if isinstance(value, bool):
         return "boolean"
     if isinstance(value, int):
@@ -43,11 +40,8 @@ def infer_schema_from_examples(examples: Sequence[Example]) -> Dict[str, Any]:
     example must contain every declared field, so examples must share one
     shape (the same set of non-None fields). Heterogeneous examples (where
     some examples are missing fields that others have) are rejected with a
-    ``ValueError``.
-
-    A field whose value is a ``TraceRef`` is inferred as a trace column
-    (``{"type": "trace"}``); its value is the referenced trace id. At most
-    one trace column is permitted per dataset.
+    ``ValueError``. Inferred types are JSON Schema primitives only; to
+    declare a trace column (``{"type": "trace"}``) pass an explicit schema.
 
     Args:
         examples: Examples to infer the schema from. Must be non-empty and
@@ -58,8 +52,8 @@ def infer_schema_from_examples(examples: Sequence[Example]) -> Dict[str, Any]:
         {...}}`` declaring the example fields.
 
     Raises:
-        ValueError: If no examples are provided, examples have heterogeneous
-            fields, or more than one trace column is declared.
+        ValueError: If no examples are provided or examples have
+            heterogeneous fields.
     """
     if not examples:
         raise ValueError(
@@ -103,17 +97,6 @@ def infer_schema_from_examples(examples: Sequence[Example]) -> Dict[str, Any]:
                 + "; ".join(missing_desc_parts)
                 + ". Pass an explicit `schema` or make all examples homogeneous."
             )
-
-    trace_cols = [
-        name
-        for name, prop in properties.items()
-        if isinstance(prop, dict) and prop.get("type") == "trace"
-    ]
-    if len(trace_cols) > 1:
-        raise ValueError(
-            "A dataset may declare at most one trace column; inferred "
-            f"{len(trace_cols)}: {sorted(trace_cols)}."
-        )
 
     return {
         "type": "object",
@@ -232,9 +215,9 @@ class DatasetFactory:
         examples must have identical non-None field sets.
 
         A column may be declared with `{"type": "trace"}` (any name); its
-        value is a trace id rather than literal data. Wrap such values in
-        `TraceRef` so inference records the column as trace-typed. At most
-        one trace column is permitted per dataset.
+        value is a trace id rather than literal data. Trace columns must be
+        declared in an explicit `schema` (inference treats values as their
+        JSON primitive).
 
         Args:
             name: Name for the dataset (unique within the project,
@@ -272,15 +255,18 @@ class DatasetFactory:
             )
             ```
 
-            A dataset with a trace column (any name):
+            A dataset with a trace column (declared explicitly; the value
+            is the trace id):
 
             ```python
-            from judgeval.data.trace import TraceRef
-
             dataset = client.datasets.create(
                 name="transcripts",
+                schema={
+                    "type": "object",
+                    "properties": {"transcript": {"type": "trace"}},
+                },
                 examples=[
-                    Example.create(transcript=TraceRef("<trace_id>")),
+                    Example.create(transcript="<trace_id>"),
                 ],
             )
             ```

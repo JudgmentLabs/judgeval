@@ -7,7 +7,7 @@ import pytest
 from judgeval.exceptions import JudgmentAPIError, JudgmentValidationError
 from judgeval.offline_tests.offline_test_runner import OfflineTestRunner
 from judgeval.offline_tests.offline_tests_factory import OfflineTestsFactory
-from judgeval.offline_tests.types import TestConfig, TestRunInfo
+from judgeval.offline_tests.types import TestConfig
 
 CONFIG_RESPONSE = {
     "test_config": {
@@ -50,7 +50,7 @@ class TestCreateConfig:
         )
         assert isinstance(config, TestConfig)
         assert config.id == "cfg-1"
-        assert config.judges[0].name == "helpfulness"
+        assert config.judges[0]["judge"]["name"] == "helpfulness"
         payload = client.post_projects_test_configs.call_args.kwargs["payload"]
         assert payload["dataset_name"] == "golden-set"
         assert payload["judges"] == [{"name": "helpfulness"}]
@@ -152,39 +152,3 @@ class TestRuns:
     def test_run_missing_project_returns_none(self):
         factory, _ = _make_factory(project_id=None)
         assert factory.run(test_config="nightly") is None
-
-    def test_list_runs(self):
-        factory, client = _make_factory()
-        client.get_projects_test_runs.return_value = {
-            "test_runs": [
-                {
-                    "id": "run-1",
-                    "test_config_id": "cfg-1",
-                    "dataset_id": "d1",
-                    "dataset_version_id": "v1",
-                    "status": "completed",
-                    "source": "sdk",
-                    "user_id": "u1",
-                    "project_id": "proj-1",
-                }
-            ]
-        }
-        runs = factory.list_runs(test_config_id="cfg-1")
-        assert len(runs) == 1
-        assert isinstance(runs[0], TestRunInfo)
-        assert runs[0].status == "completed"
-
-    def test_get_run(self):
-        factory, client = _make_factory()
-        client.get_projects_test_runs_by_test_run_id.return_value = {
-            "test_run": {
-                "id": "run-1",
-                "test_config_id": "cfg-1",
-                "dataset_id": "d1",
-                "dataset_version_id": "v1",
-                "status": "running",
-            }
-        }
-        run = factory.get_run("run-1")
-        assert run.id == "run-1"
-        assert run.status == "running"

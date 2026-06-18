@@ -8,7 +8,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from judgeval.data.example import Example
-from judgeval.data.trace import TraceRef
 from judgeval.datasets.dataset import (
     Dataset,
     DatasetVersion,
@@ -212,8 +211,8 @@ class TestDatasetEntrySerialization:
         assert entry["input"] == "q"
         assert "name" not in entry
 
-    def test_example_to_dataset_entry_serializes_traceref_to_id(self):
-        example = Example.create(question="q", transcript=TraceRef("trace-1"))
+    def test_example_to_dataset_entry_passes_trace_column_string(self):
+        example = Example.create(question="q", transcript="trace-1")
         entry = example_to_dataset_entry(example)
         assert entry["transcript"] == "trace-1"
         assert entry["question"] == "q"

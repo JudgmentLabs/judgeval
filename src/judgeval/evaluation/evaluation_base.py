@@ -196,9 +196,7 @@ class EvaluatorRunner(ABC, Generic[S]):
 
                 scorers_data.append(
                     ScorerData(
-                        name=scorer_dict.get("judge_name")
-                        or scorer_dict.get("name")
-                        or "",
+                        name=scorer_dict["judge_name"],
                         value=_scorer_value(scorer_dict),
                         score_type=scorer_dict.get("score_type"),
                         minimum_score_range=scorer_dict.get("minimum_score_range", 0),

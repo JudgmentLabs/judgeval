@@ -7,35 +7,6 @@ from judgeval.data.scoring_result import ScoringResult
 
 
 @dataclass
-class TestConfigJudge:
-    """A judge attached to a test config.
-
-    Attributes:
-        judge_id: The platform judge ID.
-        name: Judge name (when expanded by the server).
-        judge_type: Judge type (e.g. `"prompt"`, `"agent"`).
-        score_type: The judge's score type.
-    """
-
-    __test__ = False
-
-    judge_id: str
-    name: Optional[str] = None
-    judge_type: Optional[str] = None
-    score_type: Optional[str] = None
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> TestConfigJudge:
-        judge = data.get("judge") or {}
-        return cls(
-            judge_id=data.get("judge_id", "") or judge.get("id", ""),
-            name=judge.get("name"),
-            judge_type=judge.get("judge_type"),
-            score_type=judge.get("score_type"),
-        )
-
-
-@dataclass
 class TestConfig:
     """A reusable offline-test configuration (dataset + judges).
 
@@ -49,7 +20,7 @@ class TestConfig:
         dataset_id: The dataset evaluated by this config.
         description: Optional human-readable description.
         created_at: ISO-8601 creation timestamp.
-        judges: The judges attached to this config.
+        judges: The judge membership rows as returned by the server.
     """
 
     __test__ = False
@@ -59,7 +30,7 @@ class TestConfig:
     dataset_id: str
     description: Optional[str] = None
     created_at: Optional[str] = None
-    judges: List[TestConfigJudge] = field(default_factory=list)
+    judges: List[Dict[str, Any]] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> TestConfig:
@@ -69,53 +40,7 @@ class TestConfig:
             dataset_id=data.get("dataset_id", ""),
             description=data.get("description"),
             created_at=data.get("created_at"),
-            judges=[
-                TestConfigJudge.from_dict(j)
-                for j in (data.get("judges") or [])
-                if isinstance(j, dict)
-            ],
-        )
-
-
-@dataclass
-class TestRunInfo:
-    """Metadata for a single offline test run.
-
-    Attributes:
-        id: Unique test run ID.
-        test_config_id: The config this run was created from.
-        dataset_id: Dataset evaluated by the run.
-        dataset_version_id: The pinned dataset version.
-        status: One of `pending`, `running`, `completed`, `error`,
-            `cancelled`.
-        source: Where the run was created from (`sdk`, `cli`, `mcp`,
-            `platform`).
-        error_message: Error detail when `status == "error"`.
-        created_at: ISO-8601 creation timestamp.
-    """
-
-    __test__ = False
-
-    id: str
-    test_config_id: str
-    dataset_id: str
-    dataset_version_id: str
-    status: str
-    source: Optional[str] = None
-    error_message: Optional[str] = None
-    created_at: Optional[str] = None
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> TestRunInfo:
-        return cls(
-            id=data.get("id", ""),
-            test_config_id=data.get("test_config_id", ""),
-            dataset_id=data.get("dataset_id", ""),
-            dataset_version_id=data.get("dataset_version_id", ""),
-            status=data.get("status", ""),
-            source=data.get("source"),
-            error_message=data.get("error_message"),
-            created_at=data.get("created_at"),
+            judges=[j for j in (data.get("judges") or []) if isinstance(j, dict)],
         )
 
 

@@ -5,7 +5,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from judgeval.data.example import Example
-from judgeval.data.trace import TraceRef
 from judgeval.datasets.dataset import Dataset, DatasetInfo, DatasetVersion
 from judgeval.datasets.dataset_factory import (
     DatasetFactory,
@@ -256,30 +255,14 @@ class TestInferSchema:
                 ]
             )
 
-    def test_traceref_infers_trace_typed_column_under_any_name(self):
+    def test_string_values_infer_as_string_not_trace(self):
+        # Trace columns are only created from an explicit schema; inference
+        # treats a trace-id string as a plain string column.
         schema = infer_schema_from_examples(
-            [Example.create(question="q", transcript=TraceRef("t1"))]
+            [Example.create(question="q", transcript="t1")]
         )
-        assert schema["properties"]["transcript"] == {"type": "trace"}
+        assert schema["properties"]["transcript"] == {"type": "string"}
         assert schema["properties"]["question"] == {"type": "string"}
-
-    def test_all_traceref_examples_emit_trace_typed_column(self):
-        schema = infer_schema_from_examples(
-            [
-                Example.create(transcript=TraceRef("t1")),
-                Example.create(transcript=TraceRef("t2")),
-            ]
-        )
-        assert schema["properties"]["transcript"] == {"type": "trace"}
-        assert "required" not in schema
-
-    def test_more_than_one_trace_column_raises(self):
-        with pytest.raises(ValueError, match="at most one trace column"):
-            infer_schema_from_examples(
-                [
-                    Example.create(trace=TraceRef("t1"), apple=TraceRef("t2")),
-                ]
-            )
 
     def test_untraced_examples_omit_trace_column(self):
         schema = infer_schema_from_examples(

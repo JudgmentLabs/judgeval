@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import re
+from uuid import UUID
 from typing import Any, Dict, List, Optional, Union
 
 from judgeval.exceptions import JudgmentAPIError, map_judgment_api_error
@@ -11,17 +11,16 @@ from judgeval.offline_tests.offline_test_runner import (
     OfflineTestRunner,
     PassConditionFn,
 )
-from judgeval.offline_tests.types import OfflineTestResult, TestConfig, TestRunInfo
+from judgeval.offline_tests.types import OfflineTestResult, TestConfig
 from judgeval.utils.guards import expect_project_id
-
-_UUID_PATTERN = re.compile(
-    r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
-    re.IGNORECASE,
-)
 
 
 def _is_uuid(value: str) -> bool:
-    return bool(_UUID_PATTERN.match(value))
+    try:
+        UUID(value)
+        return True
+    except ValueError:
+        return False
 
 
 class OfflineTestsFactory:
@@ -304,48 +303,3 @@ class OfflineTestsFactory:
             assert_test=assert_test,
             timeout_seconds=timeout_seconds,
         )
-
-    def list_runs(
-        self,
-        test_config_id: Optional[str] = None,
-        dataset_id: Optional[str] = None,
-        status: Optional[str] = None,
-    ) -> Optional[List[TestRunInfo]]:
-        """List test runs in the project, optionally filtered.
-
-        Args:
-            test_config_id: Filter to runs of one test config.
-            dataset_id: Filter to runs over one dataset.
-            status: Filter by run status.
-
-        Returns:
-            A list of `TestRunInfo` objects, or `None` if the project is
-            not resolved.
-        """
-        project_id = expect_project_id(self._project_id)
-        if not project_id:
-            return None
-
-        response = self._client.get_projects_test_runs(
-            project_id=project_id,
-            test_config_id=test_config_id,
-            dataset_id=dataset_id,
-            status=status,
-        )
-        return [TestRunInfo.from_dict(r) for r in response.get("test_runs", []) or []]
-
-    def get_run(self, test_run_id: str) -> Optional[TestRunInfo]:
-        """Fetch test run metadata by ID.
-
-        Returns:
-            The `TestRunInfo`, or `None` if the project is not resolved.
-        """
-        project_id = expect_project_id(self._project_id)
-        if not project_id:
-            return None
-
-        response = self._client.get_projects_test_runs_by_test_run_id(
-            project_id=project_id,
-            test_run_id=test_run_id,
-        )
-        return TestRunInfo.from_dict(response.get("test_run") or {})

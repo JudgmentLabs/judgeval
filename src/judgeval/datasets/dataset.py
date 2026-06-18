@@ -17,7 +17,6 @@ from rich.progress import (
 
 
 from judgeval.data.example import Example
-from judgeval.data.trace import TraceRef
 from judgeval.exceptions import JudgmentAPIError, map_judgment_api_error
 from judgeval.internal.api import JudgmentSyncClient
 from judgeval.logger import judgeval_logger
@@ -41,18 +40,16 @@ def _batch_examples(
 def example_to_dataset_entry(example: Example) -> Dict[str, Any]:
     """Serialize an `Example` into the dataset example payload shape.
 
-    The example's custom properties become the example data fields.
-    `example_id` and `created_at` are lifted to the top level. `TraceRef`
-    field values are serialized as their bare trace id; the server stores
-    a trace-typed column inline in the example data.
+    The example's custom properties become the example data fields;
+    `example_id` and `created_at` are lifted to the top level. For a
+    trace-typed column (declared `{"type": "trace"}` in the dataset
+    schema), set the field to the trace id string.
     """
-    properties = dict(example._properties)
     entry: Dict[str, Any] = {
         "example_id": example.example_id,
         "created_at": example.created_at,
     }
-    for key, value in properties.items():
-        entry[key] = value.trace_id if isinstance(value, TraceRef) else value
+    entry.update(example._properties)
     return entry
 
 
