@@ -88,10 +88,6 @@ class OfflineTestsFactory:
     ) -> Optional[TestConfig]:
         """Create a test config binding a dataset to a set of judges.
 
-        The server enforces judge/dataset compatibility: every judge
-        placeholder variable must be a required property of the dataset
-        schema (`{{trace}}` requires a required `trace` property).
-
         Args:
             name: Name for the test config.
             dataset: Dataset name or dataset ID.
