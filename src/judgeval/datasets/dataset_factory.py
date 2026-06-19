@@ -1,6 +1,16 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Iterable, Literal, Optional, Sequence, TypedDict
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Literal,
+    Mapping,
+    Optional,
+    Sequence,
+    TypedDict,
+)
 
 from judgeval.exceptions import JudgmentAPIError, map_judgment_api_error
 from judgeval.internal.api import JudgmentSyncClient
@@ -21,6 +31,11 @@ from judgeval.utils.guards import expect_project_id
 _TRACE_TYPE = "trace"
 
 
+DatasetColumnType = Literal[
+    "string", "integer", "number", "boolean", "array", "object", "trace"
+]
+
+
 class DatasetSchemaProperty(TypedDict):
     """A single dataset column declaration.
 
@@ -29,7 +44,7 @@ class DatasetSchemaProperty(TypedDict):
     pointer type `"trace"` (value is a trace id).
     """
 
-    type: str
+    type: DatasetColumnType
 
 
 class DatasetSchema(TypedDict):
@@ -44,7 +59,7 @@ class DatasetSchema(TypedDict):
     properties: Dict[str, DatasetSchemaProperty]
 
 
-def validate_dataset_schema(schema: Dict[str, Any]) -> None:
+def validate_dataset_schema(schema: Mapping[str, Any]) -> None:
     """Validate a dataset JSON Schema client-side before sending.
 
     Mirrors the server's structural checks so obvious mistakes fail fast
@@ -356,8 +371,8 @@ class DatasetFactory:
                 f"{len(examples)} example(s)"
             )
         else:
+            validate_dataset_schema(schema)
             resolved_schema = dict(schema)
-            validate_dataset_schema(resolved_schema)
 
         try:
             response = self._client.post_projects_datasets(
