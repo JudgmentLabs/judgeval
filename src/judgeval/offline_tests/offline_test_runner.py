@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import time
-from typing import Any, Callable, Dict, List, Optional, Tuple, cast
+from typing import Any, Callable, Dict, List, Optional, Tuple, TypedDict, cast
 
 import orjson
 from rich.console import Console
@@ -26,6 +26,25 @@ from judgeval.utils.url import url_for
 AgentFunction = Callable[..., Any]
 PassConditionFn = Callable[[Dict[str, Any], List[ScorerData]], bool]
 
+
+class JudgeVersionPin(TypedDict, total=False):
+    """A single ``judge_versions`` entry.
+
+    Identify the judge by ``name`` or ``judge_id``; optionally pin a
+    ``tag``, a ``version`` string, or a ``major_version``/``minor_version``
+    pair. All keys are optional so callers can mix identification and
+    pinning styles, but every entry must carry a ``name`` or ``judge_id``
+    (enforced at runtime by ``normalize_judge_versions``).
+    """
+
+    name: str
+    judge_id: str
+    tag: str
+    version: str
+    major_version: int
+    minor_version: int
+
+
 TERMINAL_STATUSES = frozenset({"completed", "error", "cancelled"})
 EXAMPLES_PAGE_SIZE = 100
 # Server default and maximum page size for test-run items reads.
@@ -33,7 +52,7 @@ ITEMS_PAGE_SIZE = 200
 
 
 def normalize_judge_versions(
-    judge_versions: Optional[List[Dict[str, Any]]],
+    judge_versions: Optional[List[JudgeVersionPin]],
 ) -> Optional[List[Dict[str, Any]]]:
     """Validate and normalize `judge_versions` entries.
 
@@ -47,13 +66,15 @@ def normalize_judge_versions(
     if not judge_versions:
         return None
 
-    allowed_keys = (
-        "judge_id",
-        "name",
-        "tag",
-        "version",
-        "major_version",
-        "minor_version",
+    allowed_keys = frozenset(
+        {
+            "judge_id",
+            "name",
+            "tag",
+            "version",
+            "major_version",
+            "minor_version",
+        }
     )
     normalized: List[Dict[str, Any]] = []
     for entry in judge_versions:
@@ -66,8 +87,11 @@ def normalize_judge_versions(
             raise ValueError(
                 "judge_versions entries require a 'name' (or 'judge_id') key"
             )
+        # Iterate items() rather than index by a variable key: keeps the
+        # entry typed as JudgeVersionPin (TypedDict allows .items(); it only
+        # rejects dynamic entry[key] access) while dropping unset/None keys.
         normalized.append(
-            {k: entry[k] for k in allowed_keys if entry.get(k) is not None}
+            {k: v for k, v in entry.items() if k in allowed_keys and v is not None}
         )
     return normalized
 
@@ -324,7 +348,7 @@ class OfflineTestRunner:
         self,
         test_config: TestConfig,
         dataset_version: Optional[int | str] = None,
-        judge_versions: Optional[List[Dict[str, Any]]] = None,
+        judge_versions: Optional[List[JudgeVersionPin]] = None,
         source: str = "sdk",
         agent_traces: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
@@ -711,13 +735,19 @@ class OfflineTestRunner:
         self,
         test_config: TestConfig,
         agent_function: Optional[AgentFunction] = None,
-        judge_versions: Optional[List[Dict[str, Any]]] = None,
+        judge_versions: Optional[List[JudgeVersionPin]] = None,
         dataset_version: Optional[int | str] = None,
         pass_condition_fn: Optional[PassConditionFn] = None,
         assert_test: bool = False,
         timeout_seconds: int = 600,
     ) -> OfflineTestResult:
-        """Execute the full offline-test lifecycle for a test config."""
+        """Execute the full offline-test lifecycle for a test config.
+
+        When ``agent_function`` is omitted, no agent is invoked: the judges
+        score each example's existing trace (the dataset's trace-typed
+        column / ``offline_trace_id``). When provided, the agent is run once
+        per example first and the judges score the resulting agent trace.
+        """
         if assert_test and pass_condition_fn is None:
             raise ValueError(
                 "assert_test=True requires a pass_condition_fn to decide "

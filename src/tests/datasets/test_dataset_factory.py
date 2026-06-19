@@ -9,6 +9,7 @@ from judgeval.datasets.dataset import Dataset, DatasetInfo, DatasetVersion
 from judgeval.datasets.dataset_factory import (
     DatasetFactory,
     infer_schema_from_examples,
+    validate_dataset_schema,
 )
 from judgeval.exceptions import (
     JudgmentAPIError,
@@ -276,3 +277,54 @@ class TestInferSchema:
     def test_empty_raises(self):
         with pytest.raises(ValueError):
             infer_schema_from_examples([])
+
+
+class TestValidateDatasetSchema:
+    def test_accepts_valid_object_schema(self):
+        validate_dataset_schema(
+            {"type": "object", "properties": {"input": {"type": "string"}}}
+        )
+
+    def test_accepts_single_trace_column(self):
+        validate_dataset_schema(
+            {"type": "object", "properties": {"transcript": {"type": "trace"}}}
+        )
+
+    def test_rejects_non_dict(self):
+        with pytest.raises(ValueError, match="JSON object"):
+            validate_dataset_schema("nope")  # type: ignore[arg-type]
+
+    def test_rejects_wrong_top_level_type(self):
+        with pytest.raises(ValueError, match='type "object"'):
+            validate_dataset_schema({"type": "array", "properties": {}})
+
+    def test_rejects_missing_properties(self):
+        with pytest.raises(ValueError, match="properties"):
+            validate_dataset_schema({"type": "object"})
+
+    def test_rejects_multiple_trace_columns(self):
+        with pytest.raises(ValueError, match="at most one trace column"):
+            validate_dataset_schema(
+                {
+                    "type": "object",
+                    "properties": {
+                        "a": {"type": "trace"},
+                        "b": {"type": "trace"},
+                    },
+                }
+            )
+
+    def test_create_rejects_invalid_schema_before_request(self):
+        factory, client = _make_factory()
+        with pytest.raises(ValueError, match="at most one trace column"):
+            factory.create(
+                "bad",
+                schema={
+                    "type": "object",
+                    "properties": {
+                        "a": {"type": "trace"},
+                        "b": {"type": "trace"},
+                    },
+                },
+            )
+        client.post_projects_datasets.assert_not_called()

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Iterable, Optional, Sequence
+from typing import Any, Dict, List, Iterable, Literal, Optional, Sequence, TypedDict
 
 from judgeval.exceptions import JudgmentAPIError, map_judgment_api_error
 from judgeval.internal.api import JudgmentSyncClient
@@ -14,6 +14,65 @@ from judgeval.datasets.dataset import (
 from judgeval.data.example import Example
 from judgeval.logger import judgeval_logger
 from judgeval.utils.guards import expect_project_id
+
+# A column declared with a Judgment pointer type holds an id pointing at
+# another resource rather than literal data. `trace` is the only one wired
+# end to end today; its stored value is the trace id (a string).
+_TRACE_TYPE = "trace"
+
+
+class DatasetSchemaProperty(TypedDict):
+    """A single dataset column declaration.
+
+    `type` is a JSON Schema primitive (`"string"`, `"integer"`,
+    `"number"`, `"boolean"`, `"array"`, `"object"`) or the Judgment
+    pointer type `"trace"` (value is a trace id).
+    """
+
+    type: str
+
+
+class DatasetSchema(TypedDict):
+    """A dataset's JSON Schema.
+
+    Datasets are object-typed with one property per column. Prefer this
+    over a bare ``dict`` so editors and type checkers can catch malformed
+    schemas; a plain dict of the same shape is still accepted at runtime.
+    """
+
+    type: Literal["object"]
+    properties: Dict[str, DatasetSchemaProperty]
+
+
+def validate_dataset_schema(schema: Dict[str, Any]) -> None:
+    """Validate a dataset JSON Schema client-side before sending.
+
+    Mirrors the server's structural checks so obvious mistakes fail fast
+    without a round-trip; the server remains the source of truth for full
+    JSON Schema validation.
+
+    Raises:
+        ValueError: If the schema is not a dict, does not declare top-level
+            ``type: "object"``, lacks a ``properties`` object, or declares
+            more than one trace-typed column.
+    """
+    if not isinstance(schema, dict):
+        raise ValueError("Dataset schema must be a JSON object (dict).")
+    if schema.get("type") != "object":
+        raise ValueError('Dataset schema must declare top-level type "object".')
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        raise ValueError("Dataset schema must declare a 'properties' object.")
+    trace_cols = [
+        name
+        for name, prop in properties.items()
+        if isinstance(prop, dict) and prop.get("type") == _TRACE_TYPE
+    ]
+    if len(trace_cols) > 1:
+        raise ValueError(
+            "A dataset may declare at most one trace column; found "
+            f"{len(trace_cols)}: {', '.join(trace_cols)}."
+        )
 
 
 def _json_schema_type(value: Any) -> str:
@@ -199,7 +258,7 @@ class DatasetFactory:
     def create(
         self,
         name: str,
-        schema: Optional[Dict[str, Any]] = None,
+        schema: Optional[DatasetSchema] = None,
         examples: Iterable[Example] = [],
         overwrite: bool = False,
     ) -> Optional[Dataset]:
@@ -217,13 +276,18 @@ class DatasetFactory:
         A column may be declared with `{"type": "trace"}` (any name); its
         value is a trace id rather than literal data. Trace columns must be
         declared in an explicit `schema` (inference treats values as their
-        JSON primitive).
+        JSON primitive). At most one trace column is allowed per dataset.
+
+        An explicit `schema` is checked client-side (`validate_dataset_schema`)
+        before the request so obvious mistakes fail fast; the server performs
+        the full JSON Schema validation.
 
         Args:
             name: Name for the dataset (unique within the project,
                 case-sensitive).
-            schema: JSON Schema for the dataset's examples. Required
-                unless `examples` are provided to infer one from.
+            schema: JSON Schema for the dataset's examples (a `DatasetSchema`
+                or a plain dict of the same shape). Required unless
+                `examples` are provided to infer one from.
             examples: Examples to upload with the dataset.
             overwrite: Replace an existing dataset with the same name.
                 Rejected by the server if the dataset has test configs.
@@ -232,7 +296,8 @@ class DatasetFactory:
             The new `Dataset`, or `None` if the project is not resolved.
 
         Raises:
-            ValueError: If neither `schema` nor `examples` are provided.
+            ValueError: If neither `schema` nor `examples` are provided, or
+                if an explicit `schema` is structurally invalid.
             JudgmentConflictError: If a dataset with this name exists and
                 `overwrite` is False.
             JudgmentValidationError: If the schema is invalid, examples
@@ -278,24 +343,28 @@ class DatasetFactory:
         if not isinstance(examples, list):
             examples = list(examples)
 
+        resolved_schema: Dict[str, Any]
         if schema is None:
             if not examples:
                 raise ValueError(
                     "Datasets require a JSON Schema. Pass `schema=...` to "
                     "client.datasets.create(), or provide `examples` to infer one."
                 )
-            schema = infer_schema_from_examples(examples)
+            resolved_schema = infer_schema_from_examples(examples)
             judgeval_logger.info(
                 f"No schema provided for dataset {name}; inferred one from "
                 f"{len(examples)} example(s)"
             )
+        else:
+            resolved_schema = dict(schema)
+            validate_dataset_schema(resolved_schema)
 
         try:
             response = self._client.post_projects_datasets(
                 project_id=project_id,
                 payload={
                     "name": name,
-                    "schema": schema,
+                    "schema": resolved_schema,
                     "examples": [example_to_dataset_entry(e) for e in examples],
                     "dataset_kind": "example",
                     "overwrite": overwrite,
@@ -313,7 +382,7 @@ class DatasetFactory:
             name=name,
             project_id=project_id,
             dataset_id=response.get("dataset_id") or created.get("dataset_id"),
-            schema=created.get("schema") or schema,
+            schema=created.get("schema") or resolved_schema,
             current_version=(
                 int(current_version) if current_version is not None else None
             ),

@@ -8,6 +8,7 @@ from judgeval.internal.api import JudgmentSyncClient
 from judgeval.logger import judgeval_logger
 from judgeval.offline_tests.offline_test_runner import (
     AgentFunction,
+    JudgeVersionPin,
     OfflineTestRunner,
     PassConditionFn,
 )
@@ -219,7 +220,7 @@ class OfflineTestsFactory:
         self,
         test_config: Union[str, TestConfig],
         agent_function: Optional[AgentFunction] = None,
-        judge_versions: Optional[List[Dict[str, Any]]] = None,
+        judge_versions: Optional[List[JudgeVersionPin]] = None,
         dataset_version: Optional[int | str] = None,
         pass_condition_fn: Optional[PassConditionFn] = None,
         assert_test: bool = False,
@@ -234,6 +235,11 @@ class OfflineTestsFactory:
         Waits for results and, when `pass_condition_fn` is given, PATCHes
         each row's pass/fail outcome onto the run's stored results.
 
+        Without `agent_function`, no agent is run: the judges score each
+        example's existing trace -- the dataset's trace-typed column (or the
+        example's `offline_trace_id`). With `agent_function`, the agent is
+        run once per example and the judges score the agent's trace instead.
+
         Args:
             test_config: Test config name, ID, or `TestConfig` object.
             agent_function: Optional agent entrypoint. Called once per
@@ -243,7 +249,8 @@ class OfflineTestsFactory:
                 and its offline trace is attributed to the result row.
                 The agent runs *before* the test run is created; the
                 collected traces are attached at creation so judges see
-                them in context.
+                them in context. When omitted, the judges score each
+                example's existing trace instead.
             judge_versions: Optional version pins, e.g.
                 `[{"name": "helpfulness", "tag": "prod"}]` or
                 `[{"name": "helpfulness", "version": "1.2"}]`. Judges not
