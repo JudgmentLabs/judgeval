@@ -330,28 +330,58 @@ class JudgmentSyncClient:
             payload,
         )
 
+    def patch_projects_test_runs_by_test_run_id_success(
+        self, project_id: str, test_run_id: str, payload: ApplyTestRunSuccessRequest
+    ) -> ApplyTestRunSuccessResponse:
+        return self._request(
+            "PATCH",
+            url_for(
+                f"/v1/projects/{project_id}/test-runs/{test_run_id}/success",
+                self.base_url,
+            ),
+            payload,
+        )
+
     def get_projects_test_runs_by_test_run_id_items(
-        self, project_id: str, test_run_id: str
+        self,
+        project_id: str,
+        test_run_id: str,
+        limit: Optional[str] = None,
+        cursor: Optional[str] = None,
     ) -> TestRunItemsResponse:
+        query_params = {}
+        if limit is not None:
+            query_params["limit"] = limit
+        if cursor is not None:
+            query_params["cursor"] = cursor
         return self._request(
             "GET",
             url_for(
                 f"/v1/projects/{project_id}/test-runs/{test_run_id}/items",
                 self.base_url,
             ),
-            {},
+            query_params,
         )
 
     def get_projects_test_runs_by_test_run_id_results(
-        self, project_id: str, test_run_id: str
+        self,
+        project_id: str,
+        test_run_id: str,
+        limit: Optional[str] = None,
+        cursor: Optional[str] = None,
     ) -> TestRunItemsResponse:
+        query_params = {}
+        if limit is not None:
+            query_params["limit"] = limit
+        if cursor is not None:
+            query_params["cursor"] = cursor
         return self._request(
             "GET",
             url_for(
                 f"/v1/projects/{project_id}/test-runs/{test_run_id}/results",
                 self.base_url,
             ),
-            {},
+            query_params,
         )
 
     def get_projects_test_runs_by_test_run_id_graph(
@@ -366,9 +396,27 @@ class JudgmentSyncClient:
             {},
         )
 
+    def get_projects_experiments_by_run_id(
+        self,
+        project_id: str,
+        run_id: str,
+        limit: Optional[str] = None,
+        cursor: Optional[str] = None,
+    ) -> FetchTestRunViaExperimentAliasResponse:
+        query_params = {}
+        if limit is not None:
+            query_params["limit"] = limit
+        if cursor is not None:
+            query_params["cursor"] = cursor
+        return self._request(
+            "GET",
+            url_for(f"/v1/projects/{project_id}/experiments/{run_id}", self.base_url),
+            query_params,
+        )
+
     def post_projects_eval_results(
         self, project_id: str, payload: OfflineTestsLogEvalResultsRequest
-    ) -> LogCanonicalTestRunResultsResponse:
+    ) -> OfflineTestsLogEvalResultsResponse:
         return self._request(
             "POST",
             url_for(f"/v1/projects/{project_id}/eval-results", self.base_url),
@@ -377,20 +425,11 @@ class JudgmentSyncClient:
 
     def post_projects_eval_results_examples(
         self, project_id: str, payload: OfflineTestsLogEvalResultsExamplesRequest
-    ) -> LogCanonicalTestRunExampleResultsResponse:
+    ) -> OfflineTestsLogEvalResultsExamplesResponse:
         return self._request(
             "POST",
             url_for(f"/v1/projects/{project_id}/eval-results/examples", self.base_url),
             payload,
-        )
-
-    def get_projects_experiments_by_run_id(
-        self, project_id: str, run_id: str
-    ) -> FetchTestRunViaExperimentAliasResponse:
-        return self._request(
-            "GET",
-            url_for(f"/v1/projects/{project_id}/experiments/{run_id}", self.base_url),
-            {},
         )
 
     def post_projects_evaluate_examples(
@@ -888,28 +927,58 @@ class JudgmentAsyncClient:
             payload,
         )
 
+    async def patch_projects_test_runs_by_test_run_id_success(
+        self, project_id: str, test_run_id: str, payload: ApplyTestRunSuccessRequest
+    ) -> ApplyTestRunSuccessResponse:
+        return await self._request(
+            "PATCH",
+            url_for(
+                f"/v1/projects/{project_id}/test-runs/{test_run_id}/success",
+                self.base_url,
+            ),
+            payload,
+        )
+
     async def get_projects_test_runs_by_test_run_id_items(
-        self, project_id: str, test_run_id: str
+        self,
+        project_id: str,
+        test_run_id: str,
+        limit: Optional[str] = None,
+        cursor: Optional[str] = None,
     ) -> TestRunItemsResponse:
+        query_params = {}
+        if limit is not None:
+            query_params["limit"] = limit
+        if cursor is not None:
+            query_params["cursor"] = cursor
         return await self._request(
             "GET",
             url_for(
                 f"/v1/projects/{project_id}/test-runs/{test_run_id}/items",
                 self.base_url,
             ),
-            {},
+            query_params,
         )
 
     async def get_projects_test_runs_by_test_run_id_results(
-        self, project_id: str, test_run_id: str
+        self,
+        project_id: str,
+        test_run_id: str,
+        limit: Optional[str] = None,
+        cursor: Optional[str] = None,
     ) -> TestRunItemsResponse:
+        query_params = {}
+        if limit is not None:
+            query_params["limit"] = limit
+        if cursor is not None:
+            query_params["cursor"] = cursor
         return await self._request(
             "GET",
             url_for(
                 f"/v1/projects/{project_id}/test-runs/{test_run_id}/results",
                 self.base_url,
             ),
-            {},
+            query_params,
         )
 
     async def get_projects_test_runs_by_test_run_id_graph(
@@ -924,9 +993,27 @@ class JudgmentAsyncClient:
             {},
         )
 
+    async def get_projects_experiments_by_run_id(
+        self,
+        project_id: str,
+        run_id: str,
+        limit: Optional[str] = None,
+        cursor: Optional[str] = None,
+    ) -> FetchTestRunViaExperimentAliasResponse:
+        query_params = {}
+        if limit is not None:
+            query_params["limit"] = limit
+        if cursor is not None:
+            query_params["cursor"] = cursor
+        return await self._request(
+            "GET",
+            url_for(f"/v1/projects/{project_id}/experiments/{run_id}", self.base_url),
+            query_params,
+        )
+
     async def post_projects_eval_results(
         self, project_id: str, payload: OfflineTestsLogEvalResultsRequest
-    ) -> LogCanonicalTestRunResultsResponse:
+    ) -> OfflineTestsLogEvalResultsResponse:
         return await self._request(
             "POST",
             url_for(f"/v1/projects/{project_id}/eval-results", self.base_url),
@@ -935,20 +1022,11 @@ class JudgmentAsyncClient:
 
     async def post_projects_eval_results_examples(
         self, project_id: str, payload: OfflineTestsLogEvalResultsExamplesRequest
-    ) -> LogCanonicalTestRunExampleResultsResponse:
+    ) -> OfflineTestsLogEvalResultsExamplesResponse:
         return await self._request(
             "POST",
             url_for(f"/v1/projects/{project_id}/eval-results/examples", self.base_url),
             payload,
-        )
-
-    async def get_projects_experiments_by_run_id(
-        self, project_id: str, run_id: str
-    ) -> FetchTestRunViaExperimentAliasResponse:
-        return await self._request(
-            "GET",
-            url_for(f"/v1/projects/{project_id}/experiments/{run_id}", self.base_url),
-            {},
         )
 
     async def post_projects_evaluate_examples(

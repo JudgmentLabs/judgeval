@@ -225,6 +225,8 @@ class OfflineTestsFactory:
         pass_condition_fn: Optional[PassConditionFn] = None,
         assert_test: bool = False,
         timeout_seconds: int = 600,
+        run_name: Optional[str] = None,
+        field_mapping: Optional[Dict[str, str]] = None,
     ) -> Optional[OfflineTestResult]:
         """Run an offline test for a test config.
 
@@ -269,6 +271,13 @@ class OfflineTestsFactory:
             assert_test: Raise `JudgmentTestError` unless every row passes
                 its pass condition. Requires `pass_condition_fn`.
             timeout_seconds: Maximum seconds to wait for judge results.
+            run_name: Optional display name for this run. Defaults to an
+                auto-generated name server-side when omitted.
+            field_mapping: Optional `{param_name: dataset_field_name}` map for
+                when an agent parameter is named differently from its dataset
+                field (e.g. `{"input": "question"}`). Unmapped parameters fall
+                back to the field of the same name. Example fields the agent
+                does not declare are ignored.
 
         Returns:
             An `OfflineTestResult`, or `None` if the project is not
@@ -309,4 +318,6 @@ class OfflineTestsFactory:
             pass_condition_fn=pass_condition_fn,
             assert_test=assert_test,
             timeout_seconds=timeout_seconds,
+            run_name=run_name,
+            field_mapping=field_mapping,
         )

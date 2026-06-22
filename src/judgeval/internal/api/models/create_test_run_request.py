@@ -8,8 +8,9 @@ from typing_extensions import NotRequired
 
 class CreateTestRunRequest(TypedDict):
     test_config_id: str
+    name: NotRequired[Optional[str]]
     dataset_version_id: NotRequired[Optional[str]]
     dataset_version_number: NotRequired[Optional[float]]
     judge_versions: NotRequired[Optional[List[Dict[str, Any]]]]
     source: NotRequired[Optional[str]]
-    versioned_results: NotRequired[Optional[bool]]
+    agent_traces: NotRequired[Optional[List[Dict[str, Any]]]]

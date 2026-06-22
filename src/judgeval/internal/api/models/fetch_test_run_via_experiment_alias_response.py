@@ -2,10 +2,14 @@
 # DO NOT EDIT MANUALLY
 from __future__ import annotations
 
-from typing import TypedDict, Optional, List, Any, Dict
+from typing import TypedDict, Optional, List, Union, Any, Dict
 from typing_extensions import NotRequired
+
+from .experiment_run_item import ExperimentRunItem
 
 
 class FetchTestRunViaExperimentAliasResponse(TypedDict):
-    results: NotRequired[Optional[List[Dict[str, Any]]]]
+    results: NotRequired[Optional[Union[List[Dict[str, Any]], List[ExperimentRunItem]]]]
+    has_more: NotRequired[Optional[bool]]
+    next_cursor: NotRequired[Optional[str]]
     ui_results_url: NotRequired[Optional[str]]

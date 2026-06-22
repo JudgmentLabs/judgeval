@@ -5,6 +5,5 @@ from __future__ import annotations
 from typing import TypedDict
 
 
-class LogCanonicalTestRunExampleResultsResponse(TypedDict):
-    test_run_id: str
+class OfflineTestsLogEvalResultsExamplesResponse(TypedDict):
     ui_results_url: str

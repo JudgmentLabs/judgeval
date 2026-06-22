@@ -8,4 +8,6 @@ from typing_extensions import NotRequired
 
 class TestRunItemsResponse(TypedDict):
     results: List[Dict[str, Any]]
+    has_more: bool
+    next_cursor: NotRequired[Optional[str]]
     ui_results_url: NotRequired[Optional[str]]

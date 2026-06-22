@@ -97,18 +97,24 @@ def normalize_judge_versions(
 
 
 def build_agent_kwargs(
-    agent_function: AgentFunction, data: Dict[str, Any]
+    agent_function: AgentFunction,
+    data: Dict[str, Any],
+    field_mapping: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """Map an example's data fields onto the agent entrypoint's parameters.
 
-    Every data field is passed as a same-named keyword argument. Raises if
-    the entrypoint cannot accept a field or requires a parameter the
-    example does not provide.
+    Each declared parameter is filled from the example field of the same name,
+    or from a custom-mapped field via ``field_mapping`` (``{param_name:
+    dataset_field_name}``). Example fields the entrypoint does not declare are
+    ignored -- so a dataset can carry extra columns (e.g. ``trace``) the agent
+    doesn't use -- unless the entrypoint accepts ``**kwargs``, in which case the
+    leftover fields are passed through too. The match succeeds as long as the
+    example supplies every required (no-default) parameter.
 
     Raises:
-        TypeError: On any mismatch between the entrypoint signature and
-            the example's fields.
+        TypeError: only if a required parameter has no matching example field.
     """
+    field_mapping = field_mapping or {}
     signature = inspect.signature(agent_function)
     params = signature.parameters
 
@@ -125,27 +131,31 @@ def build_agent_kwargs(
         )
     }
 
-    if not accepts_var_keyword:
-        unexpected = sorted(set(data) - set(keyword_params))
-        if unexpected:
-            raise TypeError(
-                f"Agent entrypoint {agent_function.__name__}() does not accept "
-                f"example field(s) {unexpected}. Add matching parameters "
-                "(or **kwargs) to the entrypoint, or update the dataset schema."
-            )
+    kwargs: Dict[str, Any] = {}
+    missing: List[str] = []
+    for name, p in keyword_params.items():
+        source = field_mapping.get(name, name)
+        if source in data:
+            kwargs[name] = data[source]
+        elif p.default is inspect.Parameter.empty:
+            missing.append(source)
 
-    missing = sorted(
-        name
-        for name, p in keyword_params.items()
-        if p.default is inspect.Parameter.empty and name not in data
-    )
     if missing:
         raise TypeError(
-            f"Agent entrypoint {agent_function.__name__}() requires parameter(s) "
-            f"{missing} that are not present in the example data."
+            f"Agent entrypoint {agent_function.__name__}() requires example "
+            f"field(s) {sorted(missing)} that are not present in the example "
+            "data (check the dataset schema or pass a field_mapping)."
         )
 
-    return dict(data)
+    # A **kwargs entrypoint opts into receiving everything; forward any example
+    # fields not already bound to a named parameter under their own names.
+    if accepts_var_keyword:
+        consumed = {field_mapping.get(name, name) for name in keyword_params}
+        for field, value in data.items():
+            if field not in consumed and field not in kwargs:
+                kwargs[field] = value
+
+    return kwargs
 
 
 def _parse_reason(raw: Any) -> Dict[str, Any]:
@@ -351,6 +361,7 @@ class OfflineTestRunner:
         judge_versions: Optional[List[JudgeVersionPin]] = None,
         source: str = "sdk",
         agent_traces: Optional[Dict[str, str]] = None,
+        name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Create a test run and return the prepared payload.
 
@@ -366,6 +377,8 @@ class OfflineTestRunner:
             "test_config_id": test_config.id,
             "source": source,
         }
+        if name:
+            payload["name"] = name
         if isinstance(dataset_version, int):
             payload["dataset_version_number"] = dataset_version
         elif isinstance(dataset_version, str):
@@ -398,6 +411,7 @@ class OfflineTestRunner:
         agent_function: AgentFunction,
         examples: List[Dict[str, Any]],
         progress: Optional[Progress] = None,
+        field_mapping: Optional[Dict[str, str]] = None,
     ) -> Dict[str, str]:
         """Call the agent entrypoint once per dataset example.
 
@@ -442,7 +456,7 @@ class OfflineTestRunner:
             for index, example in enumerate(examples):
                 example_id = example.get("example_id") or ""
                 data = example.get("data") or {}
-                kwargs = build_agent_kwargs(agent_function, data)
+                kwargs = build_agent_kwargs(agent_function, data, field_mapping)
 
                 before = len(captured)
                 try:
@@ -740,6 +754,8 @@ class OfflineTestRunner:
         pass_condition_fn: Optional[PassConditionFn] = None,
         assert_test: bool = False,
         timeout_seconds: int = 600,
+        run_name: Optional[str] = None,
+        field_mapping: Optional[Dict[str, str]] = None,
     ) -> OfflineTestResult:
         """Execute the full offline-test lifecycle for a test config.
 
@@ -785,13 +801,16 @@ class OfflineTestRunner:
             # are attached to the run below.
             agent_traces: Dict[str, str] = {}
             if agent_function is not None and examples:
-                agent_traces = self.run_agent(agent_function, examples, progress)
+                agent_traces = self.run_agent(
+                    agent_function, examples, progress, field_mapping
+                )
 
             prepared = self.create_test_run(
                 test_config,
                 dataset_version=pinned_version,
                 judge_versions=judge_versions,
                 agent_traces=agent_traces,
+                name=run_name,
             )
             test_run = prepared.get("test_run") or {}
             test_run_id = test_run.get("id") or ""
