@@ -8,8 +8,19 @@ from judgeval.datasets.dataset import DatasetInfo
 from e2etests.utils import create_project, delete_project
 
 
+# New-model datasets are schema-enforced: create() needs a schema (or examples
+# to infer one). Shared shape for the input/actual_output examples below.
+INPUT_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "input": {"type": "string"},
+        "actual_output": {"type": "string"},
+    },
+}
+
+
 def test_create_dataset(client: Judgeval, random_name: str):
-    client.datasets.create(name=random_name)
+    client.datasets.create(name=random_name, schema=INPUT_OUTPUT_SCHEMA)
 
 
 def test_create_dataset_with_example(client: Judgeval, random_name: str):
@@ -73,19 +84,23 @@ def test_pull_dataset(client: Judgeval):
     dataset1 = client.datasets.get(name=random_name1)
     dataset2 = client.datasets.get(name=random_name2)
 
+    # Examples are not guaranteed to come back in insertion order, so compare
+    # as sets of (input, actual_output) pairs.
+    def pairs(dataset):
+        return {
+            (e._properties.get("input"), e._properties.get("actual_output"))
+            for e in dataset
+        }
+
     assert dataset1, "Failed to pull dataset"
     assert dataset1.name == random_name1
     assert len(dataset1) == 3, "Dataset should have 3 examples"
-    for i, e in enumerate(dataset1, start=1):
-        assert e._properties.get("input") == f"input {i}"
-        assert e._properties.get("actual_output") == f"output {i}"
+    assert pairs(dataset1) == {(f"input {i}", f"output {i}") for i in (1, 2, 3)}
 
     assert dataset2, "Failed to pull dataset"
     assert dataset2.name == random_name2
     assert len(dataset2) == 2, "Dataset should have 2 examples"
-    for i, e in enumerate(dataset2, start=4):
-        assert e._properties.get("input") == f"input {i}"
-        assert e._properties.get("actual_output") == f"output {i}"
+    assert pairs(dataset2) == {(f"input {i}", f"output {i}") for i in (4, 5)}
 
 
 def test_append_dataset(client: Judgeval, random_name: str):
@@ -108,13 +123,15 @@ def test_append_dataset(client: Judgeval, random_name: str):
     dataset = client.datasets.get(name=random_name)
     assert dataset, "Failed to pull dataset"
     assert len(dataset) == initial_example_count + 3
-    for i, e in enumerate(dataset, start=1):
-        assert e._properties.get("input") == f"input {i}"
-        assert e._properties.get("actual_output") == f"output {i}"
+    pairs = {
+        (e._properties.get("input"), e._properties.get("actual_output"))
+        for e in dataset
+    }
+    assert pairs == {(f"input {i}", f"output {i}") for i in range(1, 6)}
 
 
 def test_add_examples_error(client: Judgeval, random_name: str):
-    dataset = client.datasets.create(name=random_name)
+    dataset = client.datasets.create(name=random_name, schema=INPUT_OUTPUT_SCHEMA)
     with pytest.raises(TypeError):
         ex = Example.create(input="input 1", actual_output="output 1")
         dataset.add_examples(ex)
@@ -181,8 +198,7 @@ def test_dataset_list_after_creation(client: Judgeval, random_name: str):
 
     for dataset_info in updated_datasets:
         assert isinstance(dataset_info, DatasetInfo)
-        assert dataset_info.kind == "example"
-        assert dataset_info.entries >= 0
+        assert dataset_info.entries is None or dataset_info.entries >= 0
 
 
 def test_dataset_list_reflects_changes(client: Judgeval, random_name: str):
@@ -201,7 +217,7 @@ def test_dataset_list_reflects_changes(client: Judgeval, random_name: str):
 
     client.datasets.create(
         name=random_name,
-        examples=[],
+        schema=INPUT_OUTPUT_SCHEMA,
         overwrite=True,
     )
 

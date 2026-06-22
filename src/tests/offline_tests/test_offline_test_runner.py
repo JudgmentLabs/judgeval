@@ -202,12 +202,20 @@ class TestBuildAgentKwargs:
 
         assert build_agent_kwargs(agent, {"input": "q"}) == {"input": "q"}
 
-    def test_unexpected_field_raises(self):
+    def test_unexpected_field_ignored(self):
         def agent(input):
             return input
 
-        with pytest.raises(TypeError, match="does not accept"):
-            build_agent_kwargs(agent, {"input": "q", "other": 1})
+        # Extra example fields the agent doesn't declare are ignored.
+        assert build_agent_kwargs(agent, {"input": "q", "other": 1}) == {"input": "q"}
+
+    def test_field_mapping_renames_source_field(self):
+        def agent(input):
+            return input
+
+        assert build_agent_kwargs(agent, {"question": "q"}, {"input": "question"}) == {
+            "input": "q"
+        }
 
     def test_var_keyword_accepts_everything(self):
         def agent(**kwargs):
@@ -219,7 +227,7 @@ class TestBuildAgentKwargs:
         def agent(input, expected_output):
             return input
 
-        with pytest.raises(TypeError, match="requires parameter"):
+        with pytest.raises(TypeError, match="requires example field"):
             build_agent_kwargs(agent, {"input": "q"})
 
     def test_defaulted_params_optional(self):
@@ -808,7 +816,7 @@ class TestRunOrchestration:
             calls.append(input)
             return f"answer to {input}"
 
-        def fake_run_agent(agent_function, examples, progress=None):
+        def fake_run_agent(agent_function, examples, progress=None, field_mapping=None):
             # examples come from the dataset fetch, not the prepare response
             assert [e["example_id"] for e in examples] == ["ex-1"]
             for example in examples:
@@ -829,7 +837,7 @@ class TestRunOrchestration:
         runner, client = _make_runner()
         _stub_lifecycle(client)
 
-        def fake_run_agent(agent_function, examples, progress=None):
+        def fake_run_agent(agent_function, examples, progress=None, field_mapping=None):
             return {"ex-1": "trace-abc"}
 
         with patch.object(OfflineTestRunner, "run_agent", side_effect=fake_run_agent):
@@ -853,7 +861,7 @@ class TestRunOrchestration:
         _stub_lifecycle(client)
         order = []
 
-        def fake_run_agent(agent_function, examples, progress=None):
+        def fake_run_agent(agent_function, examples, progress=None, field_mapping=None):
             order.append("agent")
             assert client.post_projects_test_runs.call_count == 0
             return {"ex-1": "trace-abc"}
@@ -1060,7 +1068,7 @@ class TestRunAgentLoop:
                 "judgeval.trace.offline_tracer.OfflineTracer.create",
                 side_effect=fake_create,
             ):
-                with pytest.raises(TypeError, match="does not accept"):
+                with pytest.raises(TypeError, match="requires example field"):
                     runner.run_agent(
                         lambda input: input,
                         [{"example_id": "ex-1", "data": {"other": 1}}],
@@ -1087,7 +1095,7 @@ class TestRunAgentLoop:
             "judgeval.trace.offline_tracer.OfflineTracer.create",
             return_value=tracer,
         ):
-            with pytest.raises(TypeError, match="does not accept"):
+            with pytest.raises(TypeError, match="requires example field"):
                 runner.run_agent(
                     agent, [{"example_id": "ex-1", "data": {"input": "q1"}}]
                 )

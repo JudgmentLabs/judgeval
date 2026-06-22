@@ -4,7 +4,7 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import Any, Dict, Generic, List, Mapping, Optional, TypeVar
+from typing import Any, Dict, Generic, List, Mapping, Optional, TypeVar, cast
 
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
@@ -138,7 +138,9 @@ class EvaluatorRunner(ABC, Generic[S]):
                 project_id=project_id,
                 run_id=eval_id,
             )
-            results_data = response.get("results", []) or []
+            results_data = cast(
+                List[ExperimentRunItem], response.get("results", []) or []
+            )
             poll_count += 1
 
             completed = len(results_data)
