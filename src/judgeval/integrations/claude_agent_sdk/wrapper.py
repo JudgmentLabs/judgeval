@@ -64,7 +64,7 @@ class ToolSpanTracker:
             if not tool_name or not tool_use_id:
                 continue
 
-            span = Tracer._get_otel_tracer().start_span(
+            span = Tracer.getOTELTracer().start_span(
                 str(tool_name),
                 context=self.state.parent_context,
                 attributes={
@@ -148,7 +148,7 @@ class LLMSpanTracker:
             content = _serialize_content_blocks(message.content)
             outputs.append({"content": content, "role": "assistant"})
 
-        self.current_span_context = Tracer._get_otel_tracer().start_as_current_span(
+        self.current_span_context = Tracer.getOTELTracer().start_as_current_span(
             "anthropic.messages.create",
             attributes={
                 AttributeKeys.JUDGMENT_SPAN_KIND: "llm",

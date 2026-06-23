@@ -258,7 +258,12 @@ class BaseTracer(ABC):
     # ------------------------------------------------------------------ #
 
     @staticmethod
-    def _get_otel_tracer() -> OTELTracer:
+    def getOTELTracer() -> OTELTracer:
+        """Get the underlying OpenTelemetry ``Tracer`` instance.
+
+        Returns:
+            The OpenTelemetry ``Tracer``.
+        """
         proxy = BaseTracer._get_proxy_provider()
         return proxy.get_tracer(JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME)
 
@@ -278,7 +283,7 @@ class BaseTracer(ABC):
         Returns:
             The newly started ``Span``.
         """
-        span = BaseTracer._get_otel_tracer().start_span(name, attributes=attributes)
+        span = BaseTracer.getOTELTracer().start_span(name, attributes=attributes)
         BaseTracer._emit_partial()
         return span
 
@@ -336,7 +341,7 @@ class BaseTracer(ABC):
         Yields:
             The newly started ``Span``.
         """
-        with BaseTracer._get_otel_tracer().start_as_current_span(
+        with BaseTracer.getOTELTracer().start_as_current_span(
             name, attributes=attributes
         ) as span:
             BaseTracer._emit_partial()

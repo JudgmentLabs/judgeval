@@ -121,3 +121,56 @@ class TestAttachDetach:
         token = provider.attach_context(ctx)
         assert get_value(key, provider.get_current_context()) == "val"
         provider.detach_context(token)
+
+
+class TestGlobalContextBridge:
+    """When installed as the global provider, the active span must be visible
+    to third-party OTel instrumentation that reads the current span from the
+    global context via trace.get_current_span(). When embedded (not the global
+    provider), Judgment's context stays isolated from the host's."""
+
+    def test_active_span_visible_to_external_when_global(
+        self, tracer, collecting_exporter
+    ):
+        from opentelemetry import trace as otel_trace
+        from judgeval.trace.base_tracer import BaseTracer
+
+        provider = JudgmentTracerProvider.get_instance()
+        provider._use_global_context = True  # set by install_as_global_*
+
+        with BaseTracer.start_as_current_span("work"):
+            external = otel_trace.get_current_span()  # reads the GLOBAL context
+            assert external.is_recording()
+            external.set_attribute("external.attr", "value")
+
+        assert any(
+            (s.attributes or {}).get("external.attr") == "value"
+            for s in collecting_exporter.spans
+        )
+
+    def test_active_span_isolated_from_global_when_embedded(self, tracer):
+        from opentelemetry import trace as otel_trace
+        from judgeval.trace.base_tracer import BaseTracer
+
+        provider = JudgmentTracerProvider.get_instance()
+        assert provider._use_global_context is False  # default
+
+        with BaseTracer.start_as_current_span("work"):
+            # Judgment's active span must not leak into the global context
+            assert otel_trace.get_current_span().is_recording() is False
+
+    def test_install_as_global_sets_flag(self):
+        from unittest.mock import patch
+
+        provider = JudgmentTracerProvider.get_instance()
+        assert provider._use_global_context is False
+        with patch.object(
+            JudgmentTracerProvider, "get_instance", return_value=provider
+        ), patch(
+            "judgeval.trace.judgment_tracer_provider.trace_api.set_tracer_provider"
+        ), patch(
+            "judgeval.trace.judgment_tracer_provider.trace_api.get_tracer_provider",
+            return_value=provider,
+        ):
+            assert JudgmentTracerProvider.install_as_global_tracer_provider() is True
+        assert provider._use_global_context is True
