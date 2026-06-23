@@ -104,8 +104,9 @@ def build_agent_kwargs(
     """Map an example's data fields onto the agent entrypoint's parameters.
 
     Each declared parameter is filled from the example field of the same name,
-    or from a custom-mapped field via ``field_mapping`` (``{param_name:
-    dataset_field_name}``). Example fields the entrypoint does not declare are
+    or from a custom-mapped field via ``field_mapping`` (which maps each
+    parameter name to the dataset field it reads). Example fields the entrypoint
+    does not declare are
     ignored -- so a dataset can carry extra columns (e.g. ``trace``) the agent
     doesn't use -- unless the entrypoint accepts ``**kwargs``, in which case the
     leftover fields are passed through too. The match succeeds as long as the
@@ -276,20 +277,20 @@ class OfflineTestRunner:
     ) -> List[Dict[str, Any]]:
         """Fetch every example of one dataset version.
 
-        Pages through the dataset's ``/page`` endpoint which returns:
+        Pages through the dataset's ``/page`` endpoint, which returns:
 
-        .. code-block:: json
-
+        ```json
+        {
+          "dataset": {...},
+          "entries": [
             {
-              "dataset": {...},
-              "entries": [
-                {
-                  "item":    {"id": "...", "version_added": 1, "example_id": "...", "created_at": "<item ts>", ...},
-                  "example": {"example_id": "...", "data": {...}, "offline_trace_id": "...|null", "metadata": {...}, "created_at": "<example ts>"}
-                }
-              ],
-              "metadata": {"hasMore": true|false, "nextCursor": {"created_at": "...", "example_id": "..."} | null}
+              "item":    {"id": "...", "version_added": 1, "example_id": "...", "created_at": "<item ts>", ...},
+              "example": {"example_id": "...", "data": {...}, "offline_trace_id": "...|null", "metadata": {...}, "created_at": "<example ts>"}
             }
+          ],
+          "metadata": {"hasMore": true|false, "nextCursor": {"created_at": "...", "example_id": "..."} | null}
+        }
+        ```
 
         Returns a list of dicts with keys ``example_id``, ``data`` (always a
         ``dict``), ``offline_trace_id``, and ``created_at`` drawn from the

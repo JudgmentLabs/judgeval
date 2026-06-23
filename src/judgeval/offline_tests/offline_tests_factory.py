@@ -273,11 +273,12 @@ class OfflineTestsFactory:
             timeout_seconds: Maximum seconds to wait for judge results.
             run_name: Optional display name for this run. Defaults to an
                 auto-generated name server-side when omitted.
-            field_mapping: Optional `{param_name: dataset_field_name}` map for
-                when an agent parameter is named differently from its dataset
-                field (e.g. `{"input": "question"}`). Unmapped parameters fall
-                back to the field of the same name. Example fields the agent
-                does not declare are ignored.
+            field_mapping: Optional map from an agent parameter name to the
+                dataset field it should read, for when a parameter is named
+                differently from its field (e.g. parameter ``input`` reading
+                field ``question``). Unmapped parameters fall back to the field
+                of the same name. Example fields the agent does not declare are
+                ignored.
 
         Returns:
             An `OfflineTestResult`, or `None` if the project is not

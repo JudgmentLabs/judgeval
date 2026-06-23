@@ -122,8 +122,9 @@ def infer_schema_from_examples(examples: Sequence[Example]) -> Dict[str, Any]:
             homogeneous (all examples share the same set of property keys).
 
     Returns:
-        A JSON Schema dict of the form ``{"type": "object", "properties":
-        {...}}`` declaring the example fields.
+        A JSON Schema dict of the form
+        ``{"type": "object", "properties": {...}}`` declaring the example
+        fields.
 
     Raises:
         ValueError: If no examples are provided or examples have
