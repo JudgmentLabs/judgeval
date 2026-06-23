@@ -164,13 +164,15 @@ class TestGlobalContextBridge:
 
         provider = JudgmentTracerProvider.get_instance()
         assert provider._use_global_context is False
-        with patch.object(
-            JudgmentTracerProvider, "get_instance", return_value=provider
-        ), patch(
-            "judgeval.trace.judgment_tracer_provider.trace_api.set_tracer_provider"
-        ), patch(
-            "judgeval.trace.judgment_tracer_provider.trace_api.get_tracer_provider",
-            return_value=provider,
+        with (
+            patch.object(JudgmentTracerProvider, "get_instance", return_value=provider),
+            patch(
+                "judgeval.trace.judgment_tracer_provider.trace_api.set_tracer_provider"
+            ),
+            patch(
+                "judgeval.trace.judgment_tracer_provider.trace_api.get_tracer_provider",
+                return_value=provider,
+            ),
         ):
             assert JudgmentTracerProvider.install_as_global_tracer_provider() is True
         assert provider._use_global_context is True
