@@ -17,11 +17,10 @@ from judgeval.data.scorer_data import ScorerData
 class ScoringResult:
     """The combined result of running scorers against a single example.
 
-    Returned by `Evaluation.run()`. Check `success` to see if **all**
-    scorers passed, or inspect `scorers_data` for per-scorer details.
+    Returned by `Evaluation.run()`. Inspect `scorers_data` for per-scorer
+    values, errors, and metadata.
 
     Attributes:
-        success: True only if every scorer met its threshold.
         scorers_data: Per-scorer results (see `ScorerData`).
         data_object: The `Example` or `TraceSpan` that was scored.
         name: The evaluation run name.
@@ -37,13 +36,11 @@ class ScoringResult:
             eval_run_name="nightly",
         )
         for result in results:
-            if not result.success:
-                for scorer in result.scorers_data:
-                    print(f"{scorer.name}: {scorer.score} - {scorer.reason}")
+            for scorer in result.scorers_data:
+                print(f"{scorer.name}: {scorer.value}")
         ```
     """
 
-    success: bool
     scorers_data: List[ScorerData]
     data_object: Union[TraceSpan, Example]
     name: Optional[str] = None
@@ -54,7 +51,6 @@ class ScoringResult:
     def to_dict(self) -> APIScoringResult:
         scorers_list: List[Dict[str, Any]] = [s.to_dict() for s in self.scorers_data]
         result: Dict[str, Any] = {
-            "success": self.success,
             "scorers_data": scorers_list,
         }
         if self.name is not None:

@@ -8,10 +8,10 @@ from typing_extensions import NotRequired
 
 class SDKUpdateAgentJudgeRequest(TypedDict):
     judge_description: NotRequired[Optional[str]]
+    score_type: NotRequired[Optional[str]]
     description: NotRequired[Optional[str]]
     model: NotRequired[Optional[str]]
     prompt: NotRequired[Optional[str]]
-    score_type: NotRequired[Optional[str]]
     categories: NotRequired[Optional[List[Dict[str, Any]]]]
     min_score: NotRequired[Optional[float]]
     max_score: NotRequired[Optional[float]]

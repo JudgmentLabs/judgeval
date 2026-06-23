@@ -2,7 +2,8 @@
 # DO NOT EDIT MANUALLY
 from __future__ import annotations
 
-from typing import List, Any, Dict
+from typing import TypedDict
 
 
-E2ETracesPerProjectRow = List[Dict[str, Any]]
+class OfflineTestsLogEvalResultsResponse(TypedDict):
+    ui_results_url: str

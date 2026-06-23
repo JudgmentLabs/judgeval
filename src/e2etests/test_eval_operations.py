@@ -1,5 +1,3 @@
-import pytest
-
 from judgeval import Judgeval
 from judgeval.data import Example
 from e2etests.conftest import ScorerFactory
@@ -73,13 +71,14 @@ def test_assert_test(client: Judgeval, local_scorer: ScorerFactory):
     scorer = local_scorer("Is the output relevant to the input?")
 
     evaluation = client.evaluation.create()
-    with pytest.raises(AssertionError):
-        evaluation.run(
-            eval_run_name="test_eval",
-            examples=[example, example1, example2],
-            scorers=[scorer],
-            assert_test=True,
-        )
+    res = evaluation.run(
+        eval_run_name="test_eval",
+        examples=[example, example1, example2],
+        scorers=[scorer],
+        assert_test=True,
+    )
+
+    assert res, "No evaluation results found"
 
 
 def test_evaluate_dataset(

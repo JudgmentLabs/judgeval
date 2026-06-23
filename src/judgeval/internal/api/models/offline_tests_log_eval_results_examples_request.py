@@ -5,9 +5,9 @@ from __future__ import annotations
 from typing import TypedDict, List
 
 from .example_evaluation_run import ExampleEvaluationRun
-from .local_scorer_result import LocalScorerResult
+from .offline_tests_local_scorer_result import OfflineTestsLocalScorerResult
 
 
-class LogEvalResultsExamplesRequest(TypedDict):
-    results: List[LocalScorerResult]
+class OfflineTestsLogEvalResultsExamplesRequest(TypedDict):
+    results: List[OfflineTestsLocalScorerResult]
     run: ExampleEvaluationRun

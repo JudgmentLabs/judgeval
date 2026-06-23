@@ -206,6 +206,42 @@ class Judgeval:
         )
 
     @property
+    def offline_tests(self):
+        """Access offline tests: test configs and dataset-backed test runs.
+
+        Returns:
+            OfflineTestsFactory: Use `.create_config()` to bind a dataset
+                to judges, and `.run()` to execute a test run (optionally
+                driving an agent entrypoint and asserting a pass
+                condition).
+
+        Examples:
+            ```python
+            config = client.offline_tests.create_config(
+                name="nightly-regression",
+                dataset="golden-set",
+                judges=["helpfulness"],
+            )
+
+            result = client.offline_tests.run(
+                test_config="nightly-regression",
+                agent_function=my_agent,
+                pass_condition_fn=lambda fields, scorers: all(
+                    s.error is None for s in scorers
+                ),
+                assert_test=True,
+            )
+            ```
+        """
+        from judgeval.offline_tests.offline_tests_factory import OfflineTestsFactory
+
+        return OfflineTestsFactory(
+            client=self._internal_client,
+            project_id=self._project_id,
+            project_name=self._project_name,
+        )
+
+    @property
     def datasets(self):
         """Manage datasets of evaluation examples.
 
@@ -217,6 +253,13 @@ class Judgeval:
             ```python
             dataset = client.datasets.create(
                 name="golden-set",
+                schema={
+                    "type": "object",
+                    "properties": {
+                        "input": {"type": "string"},
+                        "expected_output": {"type": "string"},
+                    },
+                },
                 examples=[
                     Example.create(input="What is 2+2?", expected_output="4"),
                 ],

@@ -169,6 +169,35 @@ class BaseTracer(ABC):
         return tracer.serializer if tracer else safe_serialize
 
     @staticmethod
+    def _normalize_scoped_context_attributes(
+        *,
+        session_id: Optional[str] = None,
+        customer_id: Optional[str] = None,
+        customer_user_id: Optional[str] = None,
+        attributes: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        normalized: Dict[str, Any] = {}
+
+        def add(key: Any, value: Any) -> None:
+            if key is None or value is None:
+                return
+            if isinstance(key, AttributeKeys):
+                key = key.value
+            if not key:
+                return
+            normalized[str(key)] = serialize_attribute(
+                value, BaseTracer._get_serializer()
+            )
+
+        if attributes is not None:
+            for key, value in attributes.items():
+                add(key, value)
+        add(AttributeKeys.JUDGMENT_SESSION_ID.value, session_id)
+        add(AttributeKeys.JUDGMENT_CUSTOMER_ID.value, customer_id)
+        add(AttributeKeys.JUDGMENT_CUSTOMER_USER_ID.value, customer_user_id)
+        return normalized
+
+    @staticmethod
     def _get_current_trace_and_span_id() -> Optional[tuple[str, str]]:
         """Return ``(trace_id, span_id)`` as hex strings, or ``None``
         if no valid sampled span is active."""
@@ -405,6 +434,43 @@ class BaseTracer(ABC):
         token = proxy.attach_context(ctx)
         try:
             yield ctx
+        finally:
+            proxy.detach_context(token)
+
+    @staticmethod
+    @contextmanager
+    def scoped_context(
+        *,
+        session_id: Optional[str] = None,
+        customer_id: Optional[str] = None,
+        customer_user_id: Optional[str] = None,
+        attributes: Optional[Dict[str, Any]] = None,
+    ) -> Iterator[None]:
+        """Temporarily apply Judgment context to spans created in the block.
+
+        This is useful before integration-created spans exist, such as around
+        a wrapped LLM client call. Context is restored when the block exits.
+        """
+        proxy = BaseTracer._get_proxy_provider()
+        scoped_attributes = BaseTracer._normalize_scoped_context_attributes(
+            session_id=session_id,
+            customer_id=customer_id,
+            customer_user_id=customer_user_id,
+            attributes=attributes,
+        )
+
+        current_span = proxy.get_current_span()
+        if current_span is not None and current_span.is_recording():
+            for key, value in scoped_attributes.items():
+                current_span.set_attribute(key, value)
+
+        ctx = proxy.get_current_context()
+        for key, value in scoped_attributes.items():
+            ctx = baggage.set_baggage(key, value, ctx)
+
+        token = proxy.attach_context(ctx)
+        try:
+            yield
         finally:
             proxy.detach_context(token)
 

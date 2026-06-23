@@ -12,7 +12,10 @@ from judgeval.logger import judgeval_logger
 from judgeval.data.example import Example
 from judgeval.judges import Judge
 from judgeval.hosted.responses import ScorerResponse
-from judgeval.internal.api.models import ExampleEvaluationRun, LocalScorerResult
+from judgeval.internal.api.models import (
+    ExampleEvaluationRun,
+    OfflineTestsLocalScorerResult,
+)
 from judgeval.evaluation.evaluation_base import EvaluatorRunner
 
 
@@ -69,7 +72,7 @@ class LocalEvaluatorRunner(EvaluatorRunner[Judge]):
             f"[green]✓[/green] Scoring completed in [bold]{elapsed:.1f}s[/bold]"
         )
 
-        api_results: List[LocalScorerResult] = []
+        api_results: List[OfflineTestsLocalScorerResult] = []
         for i, example in enumerate(examples):
             scorer_entries: List[Dict[str, Any]] = []
             for scorer_name, res, exc in results_by_example[i]:

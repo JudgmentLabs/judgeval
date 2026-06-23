@@ -2,8 +2,8 @@
 # DO NOT EDIT MANUALLY
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import TypedDict, Any, Dict
 
 
-class InsertExamplesResponse(TypedDict):
-    detail: str
+class TestConfigResponse(TypedDict):
+    test_config: Dict[str, Any]

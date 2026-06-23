@@ -8,7 +8,13 @@ from typing_extensions import NotRequired
 
 class ExperimentScorer(TypedDict):
     scorer_data_id: str
+    judge_id: str
+    judge_name: str
     name: str
+    score_type: str
+    num_value: float
+    bool_value: bool
+    str_value: str
     score: float
     success: float
     reason: NotRequired[Optional[str]]

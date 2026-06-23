@@ -49,7 +49,6 @@ include = [
 
 [project.optional-dependencies]
 s3 = ["boto3>=1.40.11"]
-trainer = ["fireworks-ai>=0.19.18"]
 
 
 [dependency-groups]
@@ -59,8 +58,6 @@ dev = [
     "datamodel-code-generator>=0.32.0",
     "google-genai>=1.28.0",
     "groq>=0.30.0",
-    "langchain-core>=0.3.81",
-    "langgraph>=0.6.4",
     "mypy>=1.17.1",
     "openai>=1.92.0",
     "opentelemetry-instrumentation-openai>=0.44.1",
@@ -73,10 +70,7 @@ dev = [
     "types-tqdm>=4.67.0.20250809",
     "pytest-asyncio>=1.1.0",
     "pytest-xdist>=3.8.0",
-    "langchain-openai>=0.3.23",
-    "langchain-tavily>=0.2.11",
     "streamlit>=1.49.1",
-    "langchain-community>=0.3.29",
     "openlit>=1.35.5,<1.36.8",
     "dotenv>=0.9.9",
     "datasets>=4.4.1",

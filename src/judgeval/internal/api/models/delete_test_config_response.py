@@ -2,9 +2,9 @@
 # DO NOT EDIT MANUALLY
 from __future__ import annotations
 
-from typing import List
-
-from .dataset_info import DatasetInfo
+from typing import TypedDict
 
 
-PullAllDatasetsResponse = List[DatasetInfo]
+class DeleteTestConfigResponse(TypedDict):
+    status: str
+    message: str

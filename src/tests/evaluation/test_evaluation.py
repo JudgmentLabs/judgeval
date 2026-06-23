@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-
 from judgeval.data.example import Example
 from judgeval.evaluation.evaluation import Evaluation
 
@@ -57,6 +56,44 @@ class TestEvaluationRouting:
             eval_run_name="run-1",
         )
         eval_._local.run.assert_called_once()
+
+
+class TestHostedSubmitAndPoll:
+    def test_hosted_scorers_queue_and_poll_results(self):
+        client = MagicMock()
+        eval_ = Evaluation(
+            client=client, project_id="proj-1", project_name="test-project"
+        )
+        client.get_projects_experiments_by_run_id.return_value = {
+            "results": [
+                {
+                    "scorers": [
+                        {
+                            "judge_name": "faithfulness",
+                            "score_type": "binary",
+                            "bool_value": True,
+                            "success": True,
+                        }
+                    ]
+                }
+            ],
+            "ui_results_url": "https://app/experiments/run-1",
+        }
+        results = eval_.run(
+            examples=[Example.create(input="q")],
+            scorers=["faithfulness"],
+            eval_run_name="run-1",
+        )
+        client.post_projects_eval_queue_examples.assert_called_once()
+        queue_kwargs = client.post_projects_eval_queue_examples.call_args.kwargs
+        assert queue_kwargs["project_id"] == "proj-1"
+        assert queue_kwargs["payload"]["judgment_scorers"] == [{"name": "faithfulness"}]
+        client.get_projects_experiments_by_run_id.assert_called()
+        assert len(results) == 1
+        scorer = results[0].scorers_data[0]
+        assert scorer.name == "faithfulness"
+        assert scorer.value == "Yes"
+        assert scorer.success is True
 
 
 class TestEvaluationFactory:

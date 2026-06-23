@@ -40,7 +40,7 @@ class TestTracerRegistration:
         t = _make_tracer()
         provider = JudgmentTracerProvider.get_instance()
         provider.deregister(t)
-        assert t not in provider._tracers
+        assert t not in provider._judgment_tracers
 
     def test_set_active_returns_true(self):
         t = _make_tracer()

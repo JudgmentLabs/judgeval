@@ -124,7 +124,7 @@ class JudgmentTracerProvider(TracerProvider):
         "_runtime_context",
         "_instrumentations",
         "_proxy_tracer",
-        "_tracers",
+        "_judgment_tracers",
         "_external_span_processors",
         "_use_global_context",
     )
@@ -134,7 +134,7 @@ class JudgmentTracerProvider(TracerProvider):
         self._runtime_context = ContextVarsRuntimeContext()
         self._instrumentations: list = []
         self._proxy_tracer = ProxyTracer(self)
-        self._tracers: WeakSet[JudgmentTracer] = WeakSet()
+        self._judgment_tracers: WeakSet[JudgmentTracer] = WeakSet()
         self._external_span_processors: list[SpanProcessor] = []
         # When this provider is installed as the global provider it owns the
         # global OTel context too, so active spans must be published there
@@ -182,13 +182,13 @@ class JudgmentTracerProvider(TracerProvider):
         Any span processors previously added via ``add_span_processor``
         are automatically forwarded to the tracer's underlying provider.
         """
-        self._tracers.add(tracer)
+        self._judgment_tracers.add(tracer)
         for processor in self._external_span_processors:
             tracer._tracer_provider.add_span_processor(processor)
 
     def deregister(self, tracer: JudgmentTracer) -> None:
         """Remove a tracer from the tracked set."""
-        self._tracers.discard(tracer)
+        self._judgment_tracers.discard(tracer)
 
     def set_active(self, tracer: JudgmentTracer) -> bool:
         """Set a tracer as the active tracer for the current context.
@@ -212,6 +212,16 @@ class JudgmentTracerProvider(TracerProvider):
         self.register(tracer)
         _active_tracer_var.set(tracer)
         return True
+
+    def restore_active(self, tracer: Optional[JudgmentTracer]) -> None:
+        """Restore the active tracer for the current context.
+
+        Counterpart to ``set_active`` for temporary activations: pass the
+        tracer captured via ``get_active_tracer()`` before the switch, or
+        ``None`` to deactivate entirely. Unlike ``set_active`` this does
+        not register the tracer.
+        """
+        _active_tracer_var.set(tracer)
 
     def get_active_tracer(self) -> Optional[JudgmentTracer]:
         """Return the tracer active in the current async context, or None."""
@@ -262,7 +272,7 @@ class JudgmentTracerProvider(TracerProvider):
         ``register()``.
         """
         self._external_span_processors.append(span_processor)
-        for tracer in self._tracers:
+        for tracer in self._judgment_tracers:
             tracer._tracer_provider.add_span_processor(span_processor)
 
     def add_instrumentation(self, instrumentor) -> None:
@@ -320,14 +330,15 @@ class JudgmentTracerProvider(TracerProvider):
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         """Flush pending spans from all registered tracers."""
         results = [
-            t._tracer_provider.force_flush(timeout_millis) for t in self._tracers
+            t._tracer_provider.force_flush(timeout_millis)
+            for t in self._judgment_tracers
         ]
         results.append(self._active_span_processor.force_flush(timeout_millis))
         return all(results)
 
     def shutdown(self) -> None:
         """Shut down all registered tracers and clear the tracked set."""
-        for t in self._tracers:
+        for t in self._judgment_tracers:
             t._tracer_provider.shutdown()
-        self._tracers.clear()
+        self._judgment_tracers.clear()
         self._active_span_processor.shutdown()

@@ -8,7 +8,13 @@ from unittest.mock import MagicMock
 import pytest
 
 from judgeval.data.example import Example
-from judgeval.datasets.dataset import Dataset, _batch_examples
+from judgeval.datasets.dataset import (
+    Dataset,
+    DatasetVersion,
+    _batch_examples,
+    example_from_dataset_entry,
+    example_to_dataset_entry,
+)
 
 
 def _make_dataset(examples=None):
@@ -100,6 +106,10 @@ class TestAddExamples:
 
     def test_add_examples_calls_client(self):
         client = MagicMock()
+        client.post_projects_datasets_by_dataset_identifier_examples.return_value = {
+            "example_ids": [],
+            "version_added": 2,
+        }
         ds = Dataset(
             name="test-ds",
             project_id="proj-1",
@@ -109,7 +119,121 @@ class TestAddExamples:
         )
         examples = [Example.create(x=i) for i in range(3)]
         ds.add_examples(examples, batch_size=2)
-        assert client.post_projects_datasets_by_dataset_name_examples.call_count >= 1
+        assert (
+            client.post_projects_datasets_by_dataset_identifier_examples.call_count == 2
+        )
+        assert ds.current_version == 2
+
+    def test_add_examples_prefers_dataset_id_identifier(self):
+        client = MagicMock()
+        client.post_projects_datasets_by_dataset_identifier_examples.return_value = {}
+        ds = Dataset(
+            name="test-ds",
+            project_id="proj-1",
+            project_name="proj",
+            dataset_id="ds-uuid",
+            examples=[],
+            client=client,
+        )
+        ds.add_examples([Example.create(x=1)])
+        call = client.post_projects_datasets_by_dataset_identifier_examples.call_args
+        assert call.kwargs["dataset_identifier"] == "ds-uuid"
+
+    def test_add_examples_maps_validation_error(self):
+        from judgeval.exceptions import JudgmentAPIError, JudgmentValidationError
+
+        client = MagicMock()
+        client.post_projects_datasets_by_dataset_identifier_examples.side_effect = (
+            JudgmentAPIError(422, "examples failed schema validation", None)
+        )
+        ds = Dataset(
+            name="test-ds",
+            project_id="proj-1",
+            project_name="proj",
+            examples=[],
+            client=client,
+        )
+        with pytest.raises(JudgmentValidationError):
+            ds.add_examples([Example.create(x=1)])
+
+
+class TestVersionsAndDelete:
+    def test_versions_returns_dataset_versions(self):
+        client = MagicMock()
+        client.get_projects_datasets_by_dataset_identifier_versions.return_value = {
+            "versions": [
+                {
+                    "version_id": "v2",
+                    "dataset_id": "d1",
+                    "version_number": 2,
+                    "item_count": 5,
+                },
+                {
+                    "version_id": "v1",
+                    "dataset_id": "d1",
+                    "version_number": 1,
+                    "item_count": 3,
+                },
+            ]
+        }
+        ds = Dataset(
+            name="test-ds",
+            project_id="proj-1",
+            project_name="proj",
+            client=client,
+        )
+        versions = ds.versions()
+        assert len(versions) == 2
+        assert isinstance(versions[0], DatasetVersion)
+        assert versions[0].version_number == 2
+        assert versions[1].item_count == 3
+
+    def test_delete_calls_client(self):
+        client = MagicMock()
+        ds = Dataset(
+            name="test-ds",
+            project_id="proj-1",
+            project_name="proj",
+            dataset_id="ds-uuid",
+            client=client,
+        )
+        ds.delete()
+        call = client.delete_projects_datasets_by_dataset_identifier.call_args
+        assert call.kwargs["dataset_identifier"] == "ds-uuid"
+
+
+class TestDatasetEntrySerialization:
+    def test_example_to_dataset_entry_lifts_reserved_keys(self):
+        example = Example.create(input="q")
+        entry = example_to_dataset_entry(example)
+        assert entry["example_id"] == example.example_id
+        assert entry["created_at"] == example.created_at
+        assert entry["input"] == "q"
+        assert "name" not in entry
+
+    def test_example_to_dataset_entry_passes_trace_column_string(self):
+        example = Example.create(question="q", transcript="trace-1")
+        entry = example_to_dataset_entry(example)
+        assert entry["transcript"] == "trace-1"
+        assert entry["question"] == "q"
+
+    def test_example_from_dataset_entry_nested_data(self):
+        entry = {
+            "example_id": "e1",
+            "created_at": "2026-01-01",
+            "data": {"input": "q", "expected_output": "a"},
+            "offline_trace_id": "trace-1",
+        }
+        example = example_from_dataset_entry(entry)
+        assert example.example_id == "e1"
+        assert example["input"] == "q"
+        assert example["expected_output"] == "a"
+        assert example["offline_trace_id"] == "trace-1"
+
+    def test_example_from_dataset_entry_flat_fallback(self):
+        entry = {"example_id": "e1", "created_at": "2026-01-01", "input": "q"}
+        example = example_from_dataset_entry(entry)
+        assert example["input"] == "q"
 
 
 class TestBatchExamples:
