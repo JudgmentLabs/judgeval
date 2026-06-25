@@ -8,6 +8,8 @@ from judgeval.instrumentation.llm.providers import (
     HAS_TOGETHER,
     HAS_ANTHROPIC,
     HAS_GOOGLE_GENAI,
+    HAS_MINIMAX,
+    is_minimax_client,
     ApiClient,
 )
 
@@ -15,6 +17,10 @@ T = TypeVar("T", bound=ApiClient)
 
 
 def _detect_provider(client: ApiClient) -> ProviderType:
+    # MiniMax must be checked before OpenAI because MiniMax clients are OpenAI instances
+    if HAS_MINIMAX and is_minimax_client(client):
+        return ProviderType.MINIMAX
+
     if HAS_OPENAI:
         from openai import OpenAI, AsyncOpenAI
 
@@ -50,12 +56,16 @@ def _detect_provider(client: ApiClient) -> ProviderType:
 def wrap_provider(client: T) -> T:
     """
     Wraps an API client to add tracing capabilities.
-    Supports OpenAI, Together, Anthropic, and Google GenAI clients.
+    Supports OpenAI, Together, Anthropic, Google GenAI, and MiniMax clients.
     Uses the active tracer via JudgmentTracerProvider.
     """
     provider_type = _detect_provider(client)
 
-    if provider_type == ProviderType.OPENAI:
+    if provider_type == ProviderType.MINIMAX:
+        from .llm_minimax.wrapper import wrap_minimax_client
+
+        return cast(T, wrap_minimax_client(client))
+    elif provider_type == ProviderType.OPENAI:
         from .llm_openai.wrapper import wrap_openai_client
 
         return cast(T, wrap_openai_client(client))
