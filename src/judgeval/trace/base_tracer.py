@@ -1175,7 +1175,7 @@ class BaseTracer(ABC):
     def set_propagating_attribute(key: str, value: str) -> None:
         """Set an attribute and propagate it to all child spans via baggage.
 
-        Unlike :meth:`set_attribute` (single span only). The ``judgment.``
+        Unlike ``set_attribute`` (single span only). The ``judgment.``
         prefix is reserved and ignored.
         """
         if key.startswith("judgment."):
