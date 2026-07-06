@@ -1172,6 +1172,7 @@ class BaseTracer(ABC):
         )
 
     @staticmethod
+    @dont_throw
     def set_propagating_attribute(key: str, value: str) -> None:
         """Set an attribute and propagate it to all child spans via baggage.
 
