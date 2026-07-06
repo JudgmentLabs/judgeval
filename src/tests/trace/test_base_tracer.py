@@ -132,6 +132,36 @@ class TestContextPropagation:
     def test_set_propagating_baggage_key_noop_outside_span(self, tracer):
         BaseTracer._set_propagating_baggage_key("some.key", "val")
 
+    def test_set_propagating_attribute_on_span(self, tracer, collecting_exporter):
+        with BaseTracer.start_as_current_span("surface"):
+            BaseTracer.set_propagating_attribute("luna.surface", "slack")
+        span = next(s for s in collecting_exporter.spans if s.name == "surface")
+        assert span.attributes["luna.surface"] == "slack"
+
+    def test_set_propagating_attribute_propagates_to_child(
+        self, tracer, collecting_exporter
+    ):
+        with BaseTracer.start_as_current_span("root"):
+            BaseTracer.set_propagating_attribute("luna.surface", "platform")
+            with BaseTracer.start_as_current_span("child"):
+                pass
+        child = next(s for s in collecting_exporter.spans if s.name == "child")
+        assert child.attributes.get("luna.surface") == "platform"
+
+    def test_set_propagating_attribute_rejects_reserved_prefix(
+        self, tracer, collecting_exporter
+    ):
+        from judgeval.logger import judgeval_logger
+
+        with patch.object(judgeval_logger, "warning") as warning_mock:
+            with BaseTracer.start_as_current_span("reserved"):
+                BaseTracer.set_propagating_attribute(
+                    AttributeKeys.JUDGMENT_CUSTOMER_ID.value, "evil"
+                )
+        span = next(s for s in collecting_exporter.spans if s.name == "reserved")
+        assert AttributeKeys.JUDGMENT_CUSTOMER_ID not in span.attributes
+        warning_mock.assert_called_once()
+
 
 class TestScopedContext:
     def test_sets_attributes_on_spans_created_inside_scope(

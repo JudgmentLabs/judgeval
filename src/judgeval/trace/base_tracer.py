@@ -1171,6 +1171,41 @@ class BaseTracer(ABC):
             AttributeKeys.JUDGMENT_SESSION_ID.value, session_id
         )
 
+    @staticmethod
+    def set_propagating_attribute(key: str, value: str) -> None:
+        """Set an arbitrary attribute and propagate it to all child spans.
+
+        Unlike :meth:`set_attribute`, which applies only to a single span,
+        the value set here follows the whole trace via baggage — every
+        descendant span receives it as an attribute. Use this to tag a trace
+        with a dimension you want to filter on in Views (e.g. the surface an
+        agent is running on).
+
+        The ``judgment.`` namespace is reserved for SDK-managed keys (customer
+        ID, session ID, etc.); use :meth:`set_customer_id` / :meth:`set_session_id`
+        for those instead.
+
+        Args:
+            key: The attribute key. Must not use the reserved ``judgment.``
+                prefix.
+            value: The attribute value.
+
+        Examples:
+            ```python
+            @Tracer.observe(span_type="agent")
+            def handle_message(message: str):
+                Tracer.set_propagating_attribute("luna.surface", "slack")
+                return agent.respond(message)
+            ```
+        """
+        if key.startswith("judgment."):
+            judgeval_logger.warning(
+                f'set_propagating_attribute: key "{key}" uses the reserved '
+                '"judgment." prefix; ignoring'
+            )
+            return
+        BaseTracer._set_propagating_baggage_key(key, value)
+
     # ------------------------------------------------------------------ #
     #  Static: Tags                                                      #
     # ------------------------------------------------------------------ #
