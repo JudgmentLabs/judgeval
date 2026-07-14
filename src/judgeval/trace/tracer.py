@@ -4,7 +4,7 @@ from typing import Any, Callable, Dict, Optional, Sequence
 
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import SpanLimits, TracerProvider
-from opentelemetry.sdk.trace.sampling import Sampler
+from opentelemetry.sdk.trace.sampling import ALWAYS_ON, Sampler
 from opentelemetry.sdk.trace import SpanProcessor
 
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
@@ -150,7 +150,9 @@ class Tracer(BaseTracer):
                 `@Tracer.observe()` and other static methods use it.
             serializer: Custom serializer for span inputs/outputs.
             resource_attributes: Extra OpenTelemetry resource attributes.
-            sampler: Custom OpenTelemetry sampler.
+            sampler: Custom OpenTelemetry sampler. Defaults to ``ALWAYS_ON``;
+                pass an explicit sampler for parent-based or ratio-based
+                sampling.
             span_limits: OpenTelemetry span limits.
             span_processors: Additional span processors appended after the
                 default Judgment processor.
@@ -224,10 +226,14 @@ class Tracer(BaseTracer):
             resource_attrs.update(resource_attributes)
 
         resource = Resource.create(resource_attrs)
+        # Default to ALWAYS_ON rather than the OTel default
+        # (ParentBased(ALWAYS_ON)), which drops spans whose parent context is
+        # unsampled. Judgment samples its own spans independently of the
+        # parent's sampling decision; pass an explicit sampler to override.
         tracer_provider = TracerProvider(
             resource=resource,
             id_generator=IsolatedRandomIdGenerator(),
-            sampler=sampler,
+            sampler=sampler if sampler is not None else ALWAYS_ON,
             span_limits=span_limits,
         )
 

@@ -4,7 +4,7 @@ from typing import Any, Callable, ClassVar, Dict, List, Optional, Sequence
 
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import SpanLimits, SpanProcessor, TracerProvider
-from opentelemetry.sdk.trace.sampling import Sampler
+from opentelemetry.sdk.trace.sampling import ALWAYS_ON, Sampler
 
 from judgeval.data.example import Example
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
@@ -141,10 +141,12 @@ class OfflineTracer(Tracer):
         if resource_attributes:
             resource_attrs.update(resource_attributes)
 
+        # Default to ALWAYS_ON so sampling is independent of the parent context
+        # (see Tracer.init).
         tracer_provider = TracerProvider(
             resource=Resource.create(resource_attrs),
             id_generator=IsolatedRandomIdGenerator(),
-            sampler=sampler,
+            sampler=sampler if sampler is not None else ALWAYS_ON,
             span_limits=span_limits,
         )
 

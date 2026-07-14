@@ -4,7 +4,6 @@ from contextvars import ContextVar, Token
 from typing import TYPE_CHECKING, ClassVar, Optional, Sequence
 from weakref import WeakSet
 
-from opentelemetry import context as context_api
 from opentelemetry import trace as trace_api
 from opentelemetry.context.context import Context
 from opentelemetry.context.contextvars_context import ContextVarsRuntimeContext
@@ -126,7 +125,6 @@ class JudgmentTracerProvider(TracerProvider):
         "_proxy_tracer",
         "_judgment_tracers",
         "_external_span_processors",
-        "_use_global_context",
     )
 
     def __init__(self):
@@ -136,14 +134,6 @@ class JudgmentTracerProvider(TracerProvider):
         self._proxy_tracer = ProxyTracer(self)
         self._judgment_tracers: WeakSet[JudgmentTracer] = WeakSet()
         self._external_span_processors: list[SpanProcessor] = []
-        # When this provider is installed as the global provider it owns the
-        # global OTel context too, so active spans must be published there
-        # (not only in Judgment's private context). That lets third-party
-        # instrumentation that reads the current span via the standard API
-        # (trace.get_current_span()) target the live span. In the embedded
-        # case (a host app owns the global provider) we keep our context
-        # isolated so we don't interfere with the host.
-        self._use_global_context = False
 
     @classmethod
     def get_instance(cls) -> JudgmentTracerProvider:
@@ -156,6 +146,12 @@ class JudgmentTracerProvider(TracerProvider):
     def install_as_global_tracer_provider(cls) -> bool:
         """Install this provider as the OpenTelemetry global tracer provider.
 
+        Makes ``trace.get_tracer(...)`` return Judgment's ``ProxyTracer`` for
+        the process, so spans from third-party instrumentation are routed
+        through Judgment and nest under Judgment's spans via our runtime
+        context. The global OTel *context* is left untouched: parents are
+        selected from Judgment's private runtime context, not the global one.
+
         Returns True if the provider was successfully installed, False if
         another provider was already set (OpenTelemetry enforces
         first-writer-wins semantics).
@@ -163,10 +159,6 @@ class JudgmentTracerProvider(TracerProvider):
         instance = cls.get_instance()
         trace_api.set_tracer_provider(instance)
         installed = trace_api.get_tracer_provider() is instance
-        # Once we own the global provider we also own the global context:
-        # mirror active spans there so third-party instrumentation that reads
-        # the current span via the standard OTel API sees the live span.
-        instance._use_global_context = installed
         if not installed:
             judgeval_logger.warning(
                 "Failed to install JudgmentTracerProvider as the global "
@@ -228,9 +220,12 @@ class JudgmentTracerProvider(TracerProvider):
         return _active_tracer_var.get()
 
     def get_current_context(self) -> Context:
-        """Return the current OpenTelemetry context."""
-        if self._use_global_context:
-            return context_api.get_current()
+        """Return the current OpenTelemetry context.
+
+        Always Judgment's private runtime context, so the parent for a new span
+        is only ever another Judgment span (or none), not a span from the
+        global context.
+        """
         return self._runtime_context.get_current()
 
     def get_current_span(self) -> Span:
@@ -317,15 +312,10 @@ class JudgmentTracerProvider(TracerProvider):
                 span.end()
 
     def attach_context(self, ctx: Context) -> Token[Context]:
-        if self._use_global_context:
-            return context_api.attach(ctx)
         return self._runtime_context.attach(ctx)
 
     def detach_context(self, token: Token[Context]) -> None:
-        if self._use_global_context:
-            context_api.detach(token)
-        else:
-            self._runtime_context.detach(token)
+        self._runtime_context.detach(token)
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         """Flush pending spans from all registered tracers."""
