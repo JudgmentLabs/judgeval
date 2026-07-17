@@ -18,6 +18,7 @@ from typing import (
     Union,
 )
 
+from judgeval.jql._generated_contract import DiscoveryKind
 from judgeval.jql._generated_transport import (
     JqlPresentationResponse,
     JqlQueryResponse,
@@ -26,7 +27,6 @@ from judgeval.jql._generated_transport import (
 JsonObject = Dict[str, Any]
 Filter = Mapping[str, Any]
 Expr = Mapping[str, Any]
-from judgeval.jql._generated_contract import DiscoveryKind
 
 
 def _compact(values: Mapping[str, Any]) -> JsonObject:

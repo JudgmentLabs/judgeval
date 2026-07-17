@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence,
 from judgeval.internal.api import JudgmentSyncClient
 from judgeval.utils import resolve_project_id
 from judgeval.utils.serialize import safe_serialize
+from judgeval.utils.url import url_for
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
 from judgeval.logger import judgeval_logger
 
@@ -199,7 +200,7 @@ class Judgeval:
             "JqlQueryResponse",
             self._internal_client._request(
                 "POST",
-                f"{self._api_url.rstrip('/')}/v1/projects/{project_id}/query",
+                url_for(f"/v1/projects/{project_id}/query", self._api_url),
                 payload,
             ),
         )
@@ -216,7 +217,7 @@ class Judgeval:
             "JqlPresentationResponse",
             self._internal_client._request(
                 "POST",
-                f"{self._api_url.rstrip('/')}/v1/projects/{project_id}/query/presentation",
+                url_for(f"/v1/projects/{project_id}/query/presentation", self._api_url),
                 payload,
             ),
         )
