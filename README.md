@@ -78,6 +78,19 @@ def run_agent(question: str) -> str:
 run_agent("What is the capital of the United States?")
 ```
 
+### JQL
+
+JQL queries use the same API key, organization, and project configuration as the
+rest of Judgeval. Tenant identifiers are not part of the query payload.
+
+```python
+from judgeval import Judgeval
+from judgeval.jql import eq, traces
+
+client = Judgeval(project_name="my-project")
+result = client.query(traces().where(eq("session", "session-123")).ids())
+```
+
 ## Integrations
 
 Supports OpenAI, Anthropic, Google GenAI, Together AI, LangGraph, OpenLit, and Claude Agent SDK. See the full [integrations docs](https://docs.judgmentlabs.ai/documentation/integrations/introduction).

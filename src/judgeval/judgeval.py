@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, cast
 
 from judgeval.internal.api import JudgmentSyncClient
 from judgeval.utils import resolve_project_id
@@ -13,6 +13,12 @@ if TYPE_CHECKING:
 
     from judgeval.data.example import Example
     from judgeval.trace.offline_tracer import OfflineTracer
+    from judgeval.jql import (
+        DiscoveryKind,
+        JqlPresentationResponse,
+        JqlQueryResponse,
+        QueryInput,
+    )
 
 
 class Judgeval:
@@ -178,6 +184,63 @@ class Judgeval:
             dataset=dataset,
             example_fields=example_fields,
         )
+
+    def query(
+        self, query: "QueryInput", *, limit: Optional[int] = None
+    ) -> "JqlQueryResponse":
+        """Run a structured, tenant-scoped JQL query for this project."""
+        from judgeval.jql import to_json
+
+        project_id = self._require_jql_project_id()
+        payload: Dict[str, Any] = {"query": to_json(query)}
+        if limit is not None:
+            payload["limit"] = limit
+        return cast(
+            "JqlQueryResponse",
+            self._internal_client._request(
+                "POST",
+                f"{self._api_url.rstrip('/')}/v1/projects/{project_id}/query",
+                payload,
+            ),
+        )
+
+    def present(
+        self, query: Dict[str, Any], *, limit: Optional[int] = None
+    ) -> "JqlPresentationResponse":
+        """Run a chart or table JQL query for this project."""
+        project_id = self._require_jql_project_id()
+        payload: Dict[str, Any] = {"query": query}
+        if limit is not None:
+            payload["limit"] = limit
+        return cast(
+            "JqlPresentationResponse",
+            self._internal_client._request(
+                "POST",
+                f"{self._api_url.rstrip('/')}/v1/projects/{project_id}/query/presentation",
+                payload,
+            ),
+        )
+
+    def discover(
+        self,
+        kind: "DiscoveryKind",
+        *,
+        limit: Optional[int] = None,
+        **options: Any,
+    ) -> "JqlQueryResponse":
+        """Discover project-scoped judges, fields, models, and related values."""
+        from judgeval.jql import discovery
+
+        if limit is not None:
+            options["limit"] = limit
+        return self.query(discovery(kind, **options), limit=limit)
+
+    def _require_jql_project_id(self) -> str:
+        if not self._project_id:
+            raise ValueError(
+                f"Project '{self._project_name}' must resolve before running JQL."
+            )
+        return self._project_id
 
     @property
     def evaluation(self):

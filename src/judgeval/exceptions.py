@@ -9,10 +9,26 @@ class JudgmentAPIError(HTTPError):
     detail: str
     response: Optional[Response]
 
-    def __init__(self, status_code: int, detail: str, response: Optional[Response]):
+    code: Optional[str]
+    hint: Optional[str]
+    retry_after_seconds: Optional[int]
+
+    def __init__(
+        self,
+        status_code: int,
+        detail: str,
+        response: Optional[Response],
+        *,
+        code: Optional[str] = None,
+        hint: Optional[str] = None,
+        retry_after_seconds: Optional[int] = None,
+    ):
         self.status_code = status_code
         self.detail = detail
         self.response = response
+        self.code = code
+        self.hint = hint
+        self.retry_after_seconds = retry_after_seconds
         super().__init__(f"{status_code}: {detail}")
 
 
@@ -50,11 +66,32 @@ def map_judgment_api_error(
     """
     detail = message or error.detail
     if error.status_code == 409:
-        return JudgmentConflictError(error.status_code, detail, error.response)
+        return JudgmentConflictError(
+            error.status_code,
+            detail,
+            error.response,
+            code=error.code,
+            hint=error.hint,
+            retry_after_seconds=error.retry_after_seconds,
+        )
     if error.status_code == 422:
-        return JudgmentValidationError(error.status_code, detail, error.response)
+        return JudgmentValidationError(
+            error.status_code,
+            detail,
+            error.response,
+            code=error.code,
+            hint=error.hint,
+            retry_after_seconds=error.retry_after_seconds,
+        )
     if message:
-        return JudgmentAPIError(error.status_code, detail, error.response)
+        return JudgmentAPIError(
+            error.status_code,
+            detail,
+            error.response,
+            code=error.code,
+            hint=error.hint,
+            retry_after_seconds=error.retry_after_seconds,
+        )
     return error
 
 
