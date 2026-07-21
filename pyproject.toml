@@ -83,6 +83,9 @@ directory = "dist"
 artifacts = ["src/judgeval/**/*.py"]
 exclude = ["src/e2etests/*", "src/tests/*", "src/demo/*"]
 
+[tool.hatch.build.hooks.custom]
+path = "hatch_build.py"
+
 
 [tool.mypy]
 check_untyped_defs = true

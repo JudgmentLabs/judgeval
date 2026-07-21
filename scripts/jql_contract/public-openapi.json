@@ -1,0 +1,391 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Judgeval Public JQL API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/v1/projects/{projectId}/query": {
+      "post": {
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "organizationHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicJqlRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlQueryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project or public JQL endpoint not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Query validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Organization rate limit exceeded",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "JQL backend request failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Public JQL is temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/projects/{projectId}/query/presentation": {
+      "post": {
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "organizationHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicJqlRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlPresentationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project or public JQL endpoint not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Query validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Organization rate limit exceeded",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "JQL backend request failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Public JQL is temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "PublicJqlRequest": {
+        "additionalProperties": false,
+        "$id": "PublicJqlRequest",
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "properties": {
+          "query": {},
+          "limit": {
+            "minimum": 1,
+            "maximum": 10000,
+            "type": "integer"
+          }
+        }
+      },
+      "PublicJqlQueryResponse": {
+        "$id": "PublicJqlQueryResponse",
+        "type": "object",
+        "required": [
+          "query_id",
+          "rows",
+          "row_count",
+          "elapsed_ms"
+        ],
+        "properties": {
+          "query_id": {
+            "type": "string"
+          },
+          "rows": {
+            "nullable": true,
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "patternProperties": {
+                    "^(.*)$": {}
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "row_count": {
+            "nullable": true,
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "elapsed_ms": {
+            "type": "number"
+          }
+        }
+      },
+      "PublicJqlPresentationResponse": {
+        "$id": "PublicJqlPresentationResponse",
+        "type": "object",
+        "required": [
+          "query_id",
+          "presentation",
+          "frame",
+          "elapsed_ms"
+        ],
+        "properties": {
+          "query_id": {
+            "type": "string"
+          },
+          "presentation": {},
+          "frame": {
+            "nullable": true,
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "elapsed_ms": {
+            "type": "number"
+          }
+        }
+      },
+      "PublicJqlErrorResponse": {
+        "$id": "PublicJqlErrorResponse",
+        "type": "object",
+        "required": [
+          "error",
+          "message"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "hint": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "apiKeyAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      },
+      "organizationHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Organization-Id"
+      }
+    }
+  }
+}

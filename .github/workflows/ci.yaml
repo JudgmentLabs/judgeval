@@ -10,6 +10,77 @@ jobs:
   validate-branch:
     uses: ./.github/workflows/merge-branch-check.yaml
 
+  jql-codegen:
+    name: JQL generated contract
+    needs: [validate-branch]
+    if: needs.validate-branch.result == 'success' || needs.validate-branch.result == 'skipped'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Regenerate from checked-in public contracts
+        run: python scripts/generate_jql.py
+
+      - name: Check generated JQL output is current
+        run: |
+          git diff --exit-code -- \
+            src/judgeval/jql/_generated_contract.py \
+            src/judgeval/jql/_generated_transport.py
+
+      - name: Build distributions
+        run: |
+          pip install uv
+          uv build
+
+      - name: Check package build preserves generated output
+        run: |
+          git diff --exit-code -- \
+            src/judgeval/jql/_generated_contract.py \
+            src/judgeval/jql/_generated_transport.py
+
+  jql-parity:
+    name: JQL parity with judgment-mono
+    needs: [validate-branch]
+    if: (needs.validate-branch.result == 'success' || needs.validate-branch.result == 'skipped') && github.event.pull_request.head.repo.full_name == github.repository && !contains(github.actor, '[bot]')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout SDK
+        uses: actions/checkout@v4
+
+      - name: Checkout canonical JQL sources
+        uses: actions/checkout@v4
+        with:
+          repository: JudgmentLabs/judgment-mono
+          ref: main
+          token: ${{ secrets.RELEASE_BOT_GITHUB_PAT }}
+          persist-credentials: false
+          path: .jql-source/judgment-mono
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Regenerate from judgment-mono
+        run: |
+          python scripts/generate_jql.py \
+            .jql-source/judgment-mono/services/data-access-service/openapi.json \
+            .jql-source/judgment-mono/services/judgeval-server/openapi.public-jql.json
+
+      - name: Check canonical JQL parity
+        run: |
+          git diff --exit-code -- \
+            src/judgeval/jql/_generated_contract.py \
+            src/judgeval/jql/_generated_transport.py
+
   run-tests:
     needs: [validate-branch]
     if: needs.validate-branch.result == 'success' || needs.validate-branch.result == 'skipped'

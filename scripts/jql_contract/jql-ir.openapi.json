@@ -1,0 +1,4444 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Public JQL IR",
+    "version": "1"
+  },
+  "paths": {},
+  "components": {
+    "schemas": {
+      "SourceQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "all": "#/components/schemas/AllFilter",
+                    "ancestor_of": "#/components/schemas/HierarchyFilter",
+                    "any": "#/components/schemas/AnyFilter",
+                    "any_span": "#/components/schemas/QuantifierFilter",
+                    "any_trace": "#/components/schemas/QuantifierFilter",
+                    "at_least": "#/components/schemas/AtLeastFilter",
+                    "attr": "#/components/schemas/AttrFilter",
+                    "cited_by": "#/components/schemas/CitedByFilter",
+                    "cost": "#/components/schemas/CostFilter",
+                    "descendant_of": "#/components/schemas/HierarchyFilter",
+                    "duration": "#/components/schemas/DurationFilter",
+                    "eq": "#/components/schemas/CompareFilter",
+                    "every_span": "#/components/schemas/QuantifierFilter",
+                    "every_trace": "#/components/schemas/QuantifierFilter",
+                    "grep": "#/components/schemas/GrepFilter",
+                    "gt": "#/components/schemas/CompareFilter",
+                    "gte": "#/components/schemas/CompareFilter",
+                    "judge": "#/components/schemas/JudgeFilter",
+                    "judged": "#/components/schemas/JudgedFilter",
+                    "lt": "#/components/schemas/CompareFilter",
+                    "lte": "#/components/schemas/CompareFilter",
+                    "model": "#/components/schemas/ModelFilter",
+                    "name": "#/components/schemas/NameFilter",
+                    "ne": "#/components/schemas/CompareFilter",
+                    "no_span": "#/components/schemas/QuantifierFilter",
+                    "no_trace": "#/components/schemas/QuantifierFilter",
+                    "not": "#/components/schemas/NotFilter",
+                    "over_scores": "#/components/schemas/OverRelFilter",
+                    "over_spans": "#/components/schemas/OverRelFilter",
+                    "over_traces": "#/components/schemas/OverRelFilter",
+                    "query": "#/components/schemas/SourceQuery",
+                    "rg": "#/components/schemas/RgFilter",
+                    "status": "#/components/schemas/StatusFilter",
+                    "tokens": "#/components/schemas/TokensFilter"
+                  },
+                  "propertyName": "op"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/StatusFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NameFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ModelFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CostFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/DurationFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/JudgeFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/JudgedFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AttrFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/GrepFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RgFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TokensFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CompareFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CitedByFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AllFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AnyFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NotFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/QuantifierFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/HierarchyFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OverRelFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AtLeastFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SourceQuery"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filter"
+          },
+          "op": {
+            "const": "query",
+            "title": "Op",
+            "type": "string"
+          },
+          "pipe": {
+            "anyOf": [
+              {
+                "items": {
+                  "discriminator": {
+                    "mapping": {
+                      "derive": "#/components/schemas/DeriveStage",
+                      "pick": "#/components/schemas/PickStage",
+                      "sort": "#/components/schemas/SortStage",
+                      "summarize": "#/components/schemas/SummarizeStage",
+                      "take": "#/components/schemas/TakeStage",
+                      "where": "#/components/schemas/WhereStage"
+                    },
+                    "propertyName": "op"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/WhereStage"
+                    },
+                    {
+                      "$ref": "#/components/schemas/PickStage"
+                    },
+                    {
+                      "$ref": "#/components/schemas/DeriveStage"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SummarizeStage"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SortStage"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TakeStage"
+                    }
+                  ]
+                },
+                "maxItems": 8,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipe"
+          },
+          "select": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "agg": "#/components/schemas/AggregateSelect",
+                    "count": "#/components/schemas/CountSelect",
+                    "ids": "#/components/schemas/IdsSelect",
+                    "ranked": "#/components/schemas/RankedSelect",
+                    "recent": "#/components/schemas/RecentSelect",
+                    "rows": "#/components/schemas/RowsSelect",
+                    "top": "#/components/schemas/TopSelect",
+                    "trend": "#/components/schemas/TrendSelect"
+                  },
+                  "propertyName": "op"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/RowsSelect"
+                  },
+                  {
+                    "$ref": "#/components/schemas/IdsSelect"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CountSelect"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RecentSelect"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TopSelect"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RankedSelect"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AggregateSelect"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TrendSelect"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Select"
+          },
+          "source": {
+            "enum": [
+              "traces",
+              "spans",
+              "sessions"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "time": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimeSpec"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "op",
+          "source"
+        ],
+        "title": "SourceQuery",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "root",
+            "doc": "one grain query: source + filter + time + select; nests as a cross-grain filter",
+            "dsl": [
+              "traces",
+              "spans",
+              "sessions"
+            ],
+            "example": "traces({ filter: status('error') }).last('7d').ids()",
+            "lang": "proj.traces(pred)",
+            "model": "SourceQuery",
+            "op": "query",
+            "result_shape": {
+              "kind": "table"
+            },
+            "ts": {
+              "name": "query",
+              "params": [
+                {
+                  "name": "options",
+                  "optional": true,
+                  "ts_type": "QueryOptions"
+                }
+              ],
+              "style": "root"
+            }
+          }
+        ]
+      },
+      "StatusFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "op": {
+            "const": "status",
+            "title": "Op",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "value"
+        ],
+        "title": "StatusFilter",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "filter",
+            "doc": "trace/span status",
+            "example": "status('error')",
+            "lang": "status(\"error\")",
+            "model": "StatusFilter",
+            "op": "status",
+            "ts": {
+              "name": "status",
+              "params": [
+                {
+                  "name": "value",
+                  "ts_type": "string",
+                  "wire": "value"
+                }
+              ],
+              "style": "const_object"
+            }
+          }
+        ]
+      },
+      "NameFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "op": {
+            "const": "name",
+            "title": "Op",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "value"
+        ],
+        "title": "NameFilter",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "filter",
+            "doc": "span name \u2014 span grain",
+            "example": "name('agent.run')",
+            "lang": "name(\"agent.run\")",
+            "model": "NameFilter",
+            "op": "name",
+            "ts": {
+              "name": "name",
+              "params": [
+                {
+                  "name": "value",
+                  "ts_type": "string",
+                  "wire": "value"
+                }
+              ],
+              "style": "const_object"
+            }
+          }
+        ]
+      },
+      "ModelFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "op": {
+            "const": "model",
+            "title": "Op",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "value"
+        ],
+        "title": "ModelFilter",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "filter",
+            "doc": "LLM model name \u2014 span grain",
+            "example": "model('gpt-4o')",
+            "lang": "model(\"gpt-4o\")",
+            "model": "ModelFilter",
+            "op": "model",
+            "ts": {
+              "name": "model",
+              "params": [
+                {
+                  "name": "value",
+                  "ts_type": "string",
+                  "wire": "value"
+                }
+              ],
+              "style": "const_object"
+            }
+          }
+        ]
+      },
+      "CostFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "gt": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gt"
+          },
+          "gte": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gte"
+          },
+          "lt": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lt"
+          },
+          "lte": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lte"
+          },
+          "op": {
+            "const": "cost",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op"
+        ],
+        "title": "CostFilter",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "filter",
+            "doc": "span cost \u2014 span grain",
+            "example": "cost({ gt: 0.01 })",
+            "lang": "cost(gt=0.01)",
+            "model": "CostFilter",
+            "op": "cost",
+            "ts": {
+              "name": "cost",
+              "params": [
+                {
+                  "name": "bounds",
+                  "ts_type": "Bounds"
+                }
+              ],
+              "style": "bounds"
+            }
+          }
+        ]
+      },
+      "DurationFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "gt": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gt"
+          },
+          "gte": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gte"
+          },
+          "lt": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lt"
+          },
+          "lte": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lte"
+          },
+          "op": {
+            "const": "duration",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op"
+        ],
+        "title": "DurationFilter",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "filter",
+            "doc": "duration in ms",
+            "example": "duration({ gte: 1000 })",
+            "lang": "duration(gte=1000)",
+            "model": "DurationFilter",
+            "op": "duration",
+            "ts": {
+              "name": "duration",
+              "params": [
+                {
+                  "name": "bounds",
+                  "ts_type": "Bounds"
+                }
+              ],
+              "style": "bounds"
+            }
+          }
+        ]
+      },
+      "JudgeFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "op": {
+            "const": "judge",
+            "title": "Op",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "required": [
+          "op",
+          "name"
+        ],
+        "title": "JudgeFilter",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "filter",
+            "doc": "raw fact-store judge scores",
+            "dsl": [
+              "judge"
+            ],
+            "example": "judge('Missed Escalation', 'true')",
+            "lang": "judge(\"Missed Escalation\", \"true\")",
+            "model": "JudgeFilter",
+            "op": "judge",
+            "ts": {
+              "name": "judge",
+              "params": [
+                {
+                  "name": "judgeName",
+                  "ts_type": "string",
+                  "wire": "name"
+                },
+                {
+                  "name": "value",
+                  "optional": true,
+                  "ts_type": "unknown",
+                  "wire": "value"
+                }
+              ],
+              "style": "optional_value"
+            }
+          }
+        ]
+      },
+      "JudgedFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "op": {
+            "const": "judged",
+            "title": "Op",
+            "type": "string"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "required": [
+          "op"
+        ],
+        "title": "JudgedFilter",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "filter",
+            "doc": "config-store judge lookup",
+            "dsl": [
+              "judged"
+            ],
+            "example": "judged({ name: 'Customer Issue Tracking', value: 'true' })",
+            "lang": "judged(name=\"Judge\", value=\"true\")",
+            "model": "JudgedFilter",
+            "op": "judged",
+            "ts": {
+              "name": "judged",
+              "params": [
+                {
+                  "name": "options",
+                  "ts_type": "Omit<JudgedFilter, 'op'>"
+                }
+              ],
+              "style": "options_spread"
+            }
+          }
+        ]
+      },
+      "AttrFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "op": {
+            "const": "attr",
+            "title": "Op",
+            "type": "string"
+          },
+          "selector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selector"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "required": [
+          "op",
+          "key"
+        ],
+        "title": "AttrFilter",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "filter",
+            "doc": "structured attributes",
+            "dsl": [
+              "attr"
+            ],
+            "example": "attr('gen_ai.request.model')",
+            "lang": "attr(\"key\", \"v\", selector=\".path\")",
+            "model": "AttrFilter",
+            "op": "attr",
+            "ts": {
+              "name": "attr",
+              "params": [
+                {
+                  "name": "key",
+                  "ts_type": "string",
+                  "wire": "key"
+                },
+                {
+                  "name": "value",
+                  "optional": true,
+                  "ts_type": "unknown",
+                  "wire": "value"
+                },
+                {
+                  "name": "selector",
+                  "optional": true,
+                  "ts_type": "string",
+                  "wire": "selector"
+                }
+              ],
+              "style": "conditional_fields"
+            }
+          }
+        ]
+      },
+      "GrepFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "op": {
+            "const": "grep",
+            "title": "Op",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "field",
+          "value"
+        ],
+        "title": "GrepFilter",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "filter",
+            "doc": "substring search",
+            "dsl": [
+              "contains"
+            ],
+            "example": "grep('output', 'ProviderError')",
+            "lang": "grep(\"output\", \"x\")",
+            "model": "GrepFilter",
+            "op": "grep",
+            "ts": {
+              "name": "grep",
+              "params": [
+                {
+                  "name": "field",
+                  "ts_type": "string",
+                  "wire": "field"
+                },
+                {
+                  "name": "value",
+                  "ts_type": "string",
+                  "wire": "value"
+                }
+              ],
+              "style": "const_object"
+            }
+          }
+        ]
+      },
+      "RgFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "ignore_case": {
+            "default": false,
+            "title": "Ignore Case",
+            "type": "boolean"
+          },
+          "op": {
+            "const": "rg",
+            "title": "Op",
+            "type": "string"
+          },
+          "pattern": {
+            "title": "Pattern",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "field",
+          "pattern"
+        ],
+        "title": "RgFilter",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "filter",
+            "doc": "regex search",
+            "dsl": [
+              "matches"
+            ],
+            "example": "rg('output', 'timed out|rate limit', { ignoreCase: true })",
+            "lang": "rg(\"output\", \"pat\", i=True)",
+            "model": "RgFilter",
+            "op": "rg",
+            "ts": {
+              "name": "rg",
+              "params": [
+                {
+                  "name": "field",
+                  "ts_type": "string",
+                  "wire": "field"
+                },
+                {
+                  "name": "pattern",
+                  "ts_type": "string",
+                  "wire": "pattern"
+                },
+                {
+                  "name": "ignoreCase",
+                  "optional": true,
+                  "ts_type": "boolean",
+                  "wire": "ignore_case"
+                }
+              ],
+              "style": "options_fields"
+            }
+          }
+        ]
+      },
+      "TokensFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "op": {
+            "const": "tokens",
+            "title": "Op",
+            "type": "string"
+          },
+          "words": {
+            "title": "Words",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "field",
+          "words"
+        ],
+        "title": "TokensFilter",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "filter",
+            "doc": "fast whole-word content search",
+            "dsl": [
+              "tokens"
+            ],
+            "example": "tokens('output', 'refund denied')",
+            "lang": "tokens(\"output\", \"a b\")",
+            "model": "TokensFilter",
+            "op": "tokens",
+            "ts": {
+              "name": "tokens",
+              "params": [
+                {
+                  "name": "field",
+                  "ts_type": "string",
+                  "wire": "field"
+                },
+                {
+                  "name": "words",
+                  "ts_type": "string",
+                  "wire": "words"
+                }
+              ],
+              "style": "const_object"
+            }
+          }
+        ]
+      },
+      "CompareFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "op": {
+            "enum": [
+              "eq",
+              "ne",
+              "gt",
+              "gte",
+              "lt",
+              "lte"
+            ],
+            "title": "Op",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ColExpr"
+              },
+              {}
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "op",
+          "field",
+          "value"
+        ],
+        "title": "CompareFilter",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "filter",
+            "doc": "compare any valid grain field with a literal",
+            "dsl": [
+              "eq"
+            ],
+            "example": "eq('duration', 1000)",
+            "model": "CompareFilter",
+            "op": "eq",
+            "ts": {
+              "name": "eq",
+              "params": [
+                {
+                  "name": "field",
+                  "ts_type": "string",
+                  "wire": "field"
+                },
+                {
+                  "name": "value",
+                  "ts_type": "unknown",
+                  "wire": "value"
+                }
+              ],
+              "style": "compare"
+            }
+          },
+          {
+            "category": "filter",
+            "doc": "compare any valid grain field with a literal",
+            "dsl": [
+              "ne"
+            ],
+            "example": "ne('duration', 1000)",
+            "model": "CompareFilter",
+            "op": "ne",
+            "ts": {
+              "name": "ne",
+              "params": [
+                {
+                  "name": "field",
+                  "ts_type": "string",
+                  "wire": "field"
+                },
+                {
+                  "name": "value",
+                  "ts_type": "unknown",
+                  "wire": "value"
+                }
+              ],
+              "style": "compare"
+            }
+          },
+          {
+            "category": "filter",
+            "doc": "compare any valid grain field with a literal",
+            "dsl": [
+              "gt"
+            ],
+            "example": "gt('duration', 1000)",
+            "model": "CompareFilter",
+            "op": "gt",
+            "ts": {
+              "name": "gt",
+              "params": [
+                {
+                  "name": "field",
+                  "ts_type": "string",
+                  "wire": "field"
+                },
+                {
+                  "name": "value",
+                  "ts_type": "unknown",
+                  "wire": "value"
+                }
+              ],
+              "style": "compare"
+            }
+          },
+          {
+            "category": "filter",
+            "doc": "compare any valid grain field with a literal",
+            "dsl": [
+              "gte"
+            ],
+            "example": "gte('duration', 1000)",
+            "model": "CompareFilter",
+            "op": "gte",
+            "ts": {
+              "name": "gte",
+              "params": [
+                {
+                  "name": "field",
+                  "ts_type": "string",
+                  "wire": "field"
+                },
+                {
+                  "name": "value",
+                  "ts_type": "unknown",
+                  "wire": "value"
+                }
+              ],
+              "style": "compare"
+            }
+          },
+          {
+            "category": "filter",
+            "doc": "compare any valid grain field with a literal",
+            "dsl": [
+              "lt"
+            ],
+            "example": "lt('duration', 1000)",
+            "model": "CompareFilter",
+            "op": "lt",
+            "ts": {
+              "name": "lt",
+              "params": [
+                {
+                  "name": "field",
+                  "ts_type": "string",
+                  "wire": "field"
+                },
+                {
+                  "name": "value",
+                  "ts_type": "unknown",
+                  "wire": "value"
+                }
+              ],
+              "style": "compare"
+            }
+          },
+          {
+            "category": "filter",
+            "doc": "compare any valid grain field with a literal",
+            "dsl": [
+              "lte"
+            ],
+            "example": "lte('duration', 1000)",
+            "model": "CompareFilter",
+            "op": "lte",
+            "ts": {
+              "name": "lte",
+              "params": [
+                {
+                  "name": "field",
+                  "ts_type": "string",
+                  "wire": "field"
+                },
+                {
+                  "name": "value",
+                  "ts_type": "unknown",
+                  "wire": "value"
+                }
+              ],
+              "style": "compare"
+            }
+          }
+        ]
+      },
+      "ColExpr": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "op": {
+            "const": "col",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "name"
+        ],
+        "title": "ColExpr",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "expression",
+            "doc": "a column reference operand",
+            "dsl": [
+              "col"
+            ],
+            "example": "col('cost')",
+            "lang": "Col / module globals",
+            "model": "ColExpr",
+            "op": "col",
+            "ts": {
+              "name": "col",
+              "params": [
+                {
+                  "name": "name",
+                  "ts_type": "string",
+                  "wire": "name"
+                }
+              ],
+              "style": "expr_fn"
+            }
+          }
+        ]
+      },
+      "CitedByFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "judge": {
+            "title": "Judge",
+            "type": "string"
+          },
+          "op": {
+            "const": "cited_by",
+            "title": "Op",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "required": [
+          "op",
+          "judge"
+        ],
+        "title": "CitedByFilter",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "filter",
+            "doc": "spans cited as evidence by a judge",
+            "dsl": [
+              "cited_by"
+            ],
+            "example": "citedBy('Helpfulness', 'true')",
+            "model": "CitedByFilter",
+            "op": "cited_by",
+            "ts": {
+              "name": "citedBy",
+              "params": [
+                {
+                  "name": "judgeName",
+                  "ts_type": "string",
+                  "wire": "judge"
+                },
+                {
+                  "name": "value",
+                  "optional": true,
+                  "ts_type": "unknown",
+                  "wire": "value"
+                }
+              ],
+              "style": "optional_value"
+            }
+          }
+        ]
+      },
+      "AllFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "filters": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "all": "#/components/schemas/AllFilter",
+                  "ancestor_of": "#/components/schemas/HierarchyFilter",
+                  "any": "#/components/schemas/AnyFilter",
+                  "any_span": "#/components/schemas/QuantifierFilter",
+                  "any_trace": "#/components/schemas/QuantifierFilter",
+                  "at_least": "#/components/schemas/AtLeastFilter",
+                  "attr": "#/components/schemas/AttrFilter",
+                  "cited_by": "#/components/schemas/CitedByFilter",
+                  "cost": "#/components/schemas/CostFilter",
+                  "descendant_of": "#/components/schemas/HierarchyFilter",
+                  "duration": "#/components/schemas/DurationFilter",
+                  "eq": "#/components/schemas/CompareFilter",
+                  "every_span": "#/components/schemas/QuantifierFilter",
+                  "every_trace": "#/components/schemas/QuantifierFilter",
+                  "grep": "#/components/schemas/GrepFilter",
+                  "gt": "#/components/schemas/CompareFilter",
+                  "gte": "#/components/schemas/CompareFilter",
+                  "judge": "#/components/schemas/JudgeFilter",
+                  "judged": "#/components/schemas/JudgedFilter",
+                  "lt": "#/components/schemas/CompareFilter",
+                  "lte": "#/components/schemas/CompareFilter",
+                  "model": "#/components/schemas/ModelFilter",
+                  "name": "#/components/schemas/NameFilter",
+                  "ne": "#/components/schemas/CompareFilter",
+                  "no_span": "#/components/schemas/QuantifierFilter",
+                  "no_trace": "#/components/schemas/QuantifierFilter",
+                  "not": "#/components/schemas/NotFilter",
+                  "over_scores": "#/components/schemas/OverRelFilter",
+                  "over_spans": "#/components/schemas/OverRelFilter",
+                  "over_traces": "#/components/schemas/OverRelFilter",
+                  "query": "#/components/schemas/SourceQuery",
+                  "rg": "#/components/schemas/RgFilter",
+                  "status": "#/components/schemas/StatusFilter",
+                  "tokens": "#/components/schemas/TokensFilter"
+                },
+                "propertyName": "op"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/StatusFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/NameFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/ModelFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/CostFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/DurationFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/JudgeFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/JudgedFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/AttrFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/GrepFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/RgFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/TokensFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/CompareFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/CitedByFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/AllFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/AnyFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/NotFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/QuantifierFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/HierarchyFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/OverRelFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/AtLeastFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/SourceQuery"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Filters",
+            "type": "array"
+          },
+          "op": {
+            "const": "all",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "filters"
+        ],
+        "title": "AllFilter",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "combinator",
+            "doc": "every filter matches (AND)",
+            "dsl": [
+              "all_of"
+            ],
+            "example": "all(judge('A', 'true'), status('error'))",
+            "lang": "a & b",
+            "model": "AllFilter",
+            "op": "all",
+            "ts": {
+              "name": "all",
+              "params": [
+                {
+                  "name": "filters",
+                  "ts_type": "FilterInput[]",
+                  "wire": "filters"
+                }
+              ],
+              "style": "variadic_filters"
+            }
+          }
+        ]
+      },
+      "AnyFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "filters": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "all": "#/components/schemas/AllFilter",
+                  "ancestor_of": "#/components/schemas/HierarchyFilter",
+                  "any": "#/components/schemas/AnyFilter",
+                  "any_span": "#/components/schemas/QuantifierFilter",
+                  "any_trace": "#/components/schemas/QuantifierFilter",
+                  "at_least": "#/components/schemas/AtLeastFilter",
+                  "attr": "#/components/schemas/AttrFilter",
+                  "cited_by": "#/components/schemas/CitedByFilter",
+                  "cost": "#/components/schemas/CostFilter",
+                  "descendant_of": "#/components/schemas/HierarchyFilter",
+                  "duration": "#/components/schemas/DurationFilter",
+                  "eq": "#/components/schemas/CompareFilter",
+                  "every_span": "#/components/schemas/QuantifierFilter",
+                  "every_trace": "#/components/schemas/QuantifierFilter",
+                  "grep": "#/components/schemas/GrepFilter",
+                  "gt": "#/components/schemas/CompareFilter",
+                  "gte": "#/components/schemas/CompareFilter",
+                  "judge": "#/components/schemas/JudgeFilter",
+                  "judged": "#/components/schemas/JudgedFilter",
+                  "lt": "#/components/schemas/CompareFilter",
+                  "lte": "#/components/schemas/CompareFilter",
+                  "model": "#/components/schemas/ModelFilter",
+                  "name": "#/components/schemas/NameFilter",
+                  "ne": "#/components/schemas/CompareFilter",
+                  "no_span": "#/components/schemas/QuantifierFilter",
+                  "no_trace": "#/components/schemas/QuantifierFilter",
+                  "not": "#/components/schemas/NotFilter",
+                  "over_scores": "#/components/schemas/OverRelFilter",
+                  "over_spans": "#/components/schemas/OverRelFilter",
+                  "over_traces": "#/components/schemas/OverRelFilter",
+                  "query": "#/components/schemas/SourceQuery",
+                  "rg": "#/components/schemas/RgFilter",
+                  "status": "#/components/schemas/StatusFilter",
+                  "tokens": "#/components/schemas/TokensFilter"
+                },
+                "propertyName": "op"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/StatusFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/NameFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/ModelFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/CostFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/DurationFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/JudgeFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/JudgedFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/AttrFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/GrepFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/RgFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/TokensFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/CompareFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/CitedByFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/AllFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/AnyFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/NotFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/QuantifierFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/HierarchyFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/OverRelFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/AtLeastFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/SourceQuery"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Filters",
+            "type": "array"
+          },
+          "op": {
+            "const": "any",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "filters"
+        ],
+        "title": "AnyFilter",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "combinator",
+            "doc": "at least one filter matches (OR)",
+            "dsl": [
+              "any_of"
+            ],
+            "example": "any(judge('A', 'true'), status('error'))",
+            "lang": "a | b",
+            "model": "AnyFilter",
+            "op": "any",
+            "ts": {
+              "name": "any",
+              "params": [
+                {
+                  "name": "filters",
+                  "ts_type": "FilterInput[]",
+                  "wire": "filters"
+                }
+              ],
+              "style": "variadic_filters"
+            }
+          }
+        ]
+      },
+      "NotFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "filter": {
+            "discriminator": {
+              "mapping": {
+                "all": "#/components/schemas/AllFilter",
+                "ancestor_of": "#/components/schemas/HierarchyFilter",
+                "any": "#/components/schemas/AnyFilter",
+                "any_span": "#/components/schemas/QuantifierFilter",
+                "any_trace": "#/components/schemas/QuantifierFilter",
+                "at_least": "#/components/schemas/AtLeastFilter",
+                "attr": "#/components/schemas/AttrFilter",
+                "cited_by": "#/components/schemas/CitedByFilter",
+                "cost": "#/components/schemas/CostFilter",
+                "descendant_of": "#/components/schemas/HierarchyFilter",
+                "duration": "#/components/schemas/DurationFilter",
+                "eq": "#/components/schemas/CompareFilter",
+                "every_span": "#/components/schemas/QuantifierFilter",
+                "every_trace": "#/components/schemas/QuantifierFilter",
+                "grep": "#/components/schemas/GrepFilter",
+                "gt": "#/components/schemas/CompareFilter",
+                "gte": "#/components/schemas/CompareFilter",
+                "judge": "#/components/schemas/JudgeFilter",
+                "judged": "#/components/schemas/JudgedFilter",
+                "lt": "#/components/schemas/CompareFilter",
+                "lte": "#/components/schemas/CompareFilter",
+                "model": "#/components/schemas/ModelFilter",
+                "name": "#/components/schemas/NameFilter",
+                "ne": "#/components/schemas/CompareFilter",
+                "no_span": "#/components/schemas/QuantifierFilter",
+                "no_trace": "#/components/schemas/QuantifierFilter",
+                "not": "#/components/schemas/NotFilter",
+                "over_scores": "#/components/schemas/OverRelFilter",
+                "over_spans": "#/components/schemas/OverRelFilter",
+                "over_traces": "#/components/schemas/OverRelFilter",
+                "query": "#/components/schemas/SourceQuery",
+                "rg": "#/components/schemas/RgFilter",
+                "status": "#/components/schemas/StatusFilter",
+                "tokens": "#/components/schemas/TokensFilter"
+              },
+              "propertyName": "op"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StatusFilter"
+              },
+              {
+                "$ref": "#/components/schemas/NameFilter"
+              },
+              {
+                "$ref": "#/components/schemas/ModelFilter"
+              },
+              {
+                "$ref": "#/components/schemas/CostFilter"
+              },
+              {
+                "$ref": "#/components/schemas/DurationFilter"
+              },
+              {
+                "$ref": "#/components/schemas/JudgeFilter"
+              },
+              {
+                "$ref": "#/components/schemas/JudgedFilter"
+              },
+              {
+                "$ref": "#/components/schemas/AttrFilter"
+              },
+              {
+                "$ref": "#/components/schemas/GrepFilter"
+              },
+              {
+                "$ref": "#/components/schemas/RgFilter"
+              },
+              {
+                "$ref": "#/components/schemas/TokensFilter"
+              },
+              {
+                "$ref": "#/components/schemas/CompareFilter"
+              },
+              {
+                "$ref": "#/components/schemas/CitedByFilter"
+              },
+              {
+                "$ref": "#/components/schemas/AllFilter"
+              },
+              {
+                "$ref": "#/components/schemas/AnyFilter"
+              },
+              {
+                "$ref": "#/components/schemas/NotFilter"
+              },
+              {
+                "$ref": "#/components/schemas/QuantifierFilter"
+              },
+              {
+                "$ref": "#/components/schemas/HierarchyFilter"
+              },
+              {
+                "$ref": "#/components/schemas/OverRelFilter"
+              },
+              {
+                "$ref": "#/components/schemas/AtLeastFilter"
+              },
+              {
+                "$ref": "#/components/schemas/SourceQuery"
+              }
+            ],
+            "title": "Filter"
+          },
+          "op": {
+            "const": "not",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "filter"
+        ],
+        "title": "NotFilter",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "combinator",
+            "doc": "the filter does not match (NOT)",
+            "dsl": [
+              "not_"
+            ],
+            "example": "not(judge('Topic Classification'))",
+            "lang": "~a",
+            "model": "NotFilter",
+            "op": "not",
+            "ts": {
+              "name": "not",
+              "params": [
+                {
+                  "name": "filter",
+                  "ts_type": "FilterInput",
+                  "wire": "filter"
+                }
+              ],
+              "style": "filter_fn"
+            }
+          }
+        ]
+      },
+      "QuantifierFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "filter": {
+            "discriminator": {
+              "mapping": {
+                "all": "#/components/schemas/AllFilter",
+                "ancestor_of": "#/components/schemas/HierarchyFilter",
+                "any": "#/components/schemas/AnyFilter",
+                "any_span": "#/components/schemas/QuantifierFilter",
+                "any_trace": "#/components/schemas/QuantifierFilter",
+                "at_least": "#/components/schemas/AtLeastFilter",
+                "attr": "#/components/schemas/AttrFilter",
+                "cited_by": "#/components/schemas/CitedByFilter",
+                "cost": "#/components/schemas/CostFilter",
+                "descendant_of": "#/components/schemas/HierarchyFilter",
+                "duration": "#/components/schemas/DurationFilter",
+                "eq": "#/components/schemas/CompareFilter",
+                "every_span": "#/components/schemas/QuantifierFilter",
+                "every_trace": "#/components/schemas/QuantifierFilter",
+                "grep": "#/components/schemas/GrepFilter",
+                "gt": "#/components/schemas/CompareFilter",
+                "gte": "#/components/schemas/CompareFilter",
+                "judge": "#/components/schemas/JudgeFilter",
+                "judged": "#/components/schemas/JudgedFilter",
+                "lt": "#/components/schemas/CompareFilter",
+                "lte": "#/components/schemas/CompareFilter",
+                "model": "#/components/schemas/ModelFilter",
+                "name": "#/components/schemas/NameFilter",
+                "ne": "#/components/schemas/CompareFilter",
+                "no_span": "#/components/schemas/QuantifierFilter",
+                "no_trace": "#/components/schemas/QuantifierFilter",
+                "not": "#/components/schemas/NotFilter",
+                "over_scores": "#/components/schemas/OverRelFilter",
+                "over_spans": "#/components/schemas/OverRelFilter",
+                "over_traces": "#/components/schemas/OverRelFilter",
+                "query": "#/components/schemas/SourceQuery",
+                "rg": "#/components/schemas/RgFilter",
+                "status": "#/components/schemas/StatusFilter",
+                "tokens": "#/components/schemas/TokensFilter"
+              },
+              "propertyName": "op"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StatusFilter"
+              },
+              {
+                "$ref": "#/components/schemas/NameFilter"
+              },
+              {
+                "$ref": "#/components/schemas/ModelFilter"
+              },
+              {
+                "$ref": "#/components/schemas/CostFilter"
+              },
+              {
+                "$ref": "#/components/schemas/DurationFilter"
+              },
+              {
+                "$ref": "#/components/schemas/JudgeFilter"
+              },
+              {
+                "$ref": "#/components/schemas/JudgedFilter"
+              },
+              {
+                "$ref": "#/components/schemas/AttrFilter"
+              },
+              {
+                "$ref": "#/components/schemas/GrepFilter"
+              },
+              {
+                "$ref": "#/components/schemas/RgFilter"
+              },
+              {
+                "$ref": "#/components/schemas/TokensFilter"
+              },
+              {
+                "$ref": "#/components/schemas/CompareFilter"
+              },
+              {
+                "$ref": "#/components/schemas/CitedByFilter"
+              },
+              {
+                "$ref": "#/components/schemas/AllFilter"
+              },
+              {
+                "$ref": "#/components/schemas/AnyFilter"
+              },
+              {
+                "$ref": "#/components/schemas/NotFilter"
+              },
+              {
+                "$ref": "#/components/schemas/QuantifierFilter"
+              },
+              {
+                "$ref": "#/components/schemas/HierarchyFilter"
+              },
+              {
+                "$ref": "#/components/schemas/OverRelFilter"
+              },
+              {
+                "$ref": "#/components/schemas/AtLeastFilter"
+              },
+              {
+                "$ref": "#/components/schemas/SourceQuery"
+              }
+            ],
+            "title": "Filter"
+          },
+          "op": {
+            "enum": [
+              "any_span",
+              "every_span",
+              "no_span",
+              "any_trace",
+              "every_trace",
+              "no_trace"
+            ],
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "filter"
+        ],
+        "title": "QuantifierFilter",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "quantifier",
+            "doc": "at least one child span matches",
+            "dsl": [
+              "any_span"
+            ],
+            "example": "anySpan(status('error'))",
+            "model": "QuantifierFilter",
+            "op": "any_span",
+            "ts": {
+              "name": "anySpan",
+              "params": [
+                {
+                  "name": "filter",
+                  "ts_type": "FilterInput",
+                  "wire": "filter"
+                }
+              ],
+              "style": "quantify"
+            }
+          },
+          {
+            "category": "quantifier",
+            "doc": "every child span matches",
+            "dsl": [
+              "every_span"
+            ],
+            "example": "everySpan(status('error'))",
+            "model": "QuantifierFilter",
+            "op": "every_span",
+            "ts": {
+              "name": "everySpan",
+              "params": [
+                {
+                  "name": "filter",
+                  "ts_type": "FilterInput",
+                  "wire": "filter"
+                }
+              ],
+              "style": "quantify"
+            }
+          },
+          {
+            "category": "quantifier",
+            "doc": "no child span matches",
+            "dsl": [
+              "no_span"
+            ],
+            "example": "noSpan(status('error'))",
+            "model": "QuantifierFilter",
+            "op": "no_span",
+            "ts": {
+              "name": "noSpan",
+              "params": [
+                {
+                  "name": "filter",
+                  "ts_type": "FilterInput",
+                  "wire": "filter"
+                }
+              ],
+              "style": "quantify"
+            }
+          },
+          {
+            "category": "quantifier",
+            "doc": "at least one trace in the session matches",
+            "dsl": [
+              "any_trace"
+            ],
+            "example": "anyTrace(status('error'))",
+            "model": "QuantifierFilter",
+            "op": "any_trace",
+            "ts": {
+              "name": "anyTrace",
+              "params": [
+                {
+                  "name": "filter",
+                  "ts_type": "FilterInput",
+                  "wire": "filter"
+                }
+              ],
+              "style": "quantify"
+            }
+          },
+          {
+            "category": "quantifier",
+            "doc": "every trace in the session matches",
+            "dsl": [
+              "every_trace"
+            ],
+            "example": "everyTrace(status('error'))",
+            "model": "QuantifierFilter",
+            "op": "every_trace",
+            "ts": {
+              "name": "everyTrace",
+              "params": [
+                {
+                  "name": "filter",
+                  "ts_type": "FilterInput",
+                  "wire": "filter"
+                }
+              ],
+              "style": "quantify"
+            }
+          },
+          {
+            "category": "quantifier",
+            "doc": "no trace in the session matches",
+            "dsl": [
+              "no_trace"
+            ],
+            "example": "noTrace(status('error'))",
+            "model": "QuantifierFilter",
+            "op": "no_trace",
+            "ts": {
+              "name": "noTrace",
+              "params": [
+                {
+                  "name": "filter",
+                  "ts_type": "FilterInput",
+                  "wire": "filter"
+                }
+              ],
+              "style": "quantify"
+            }
+          }
+        ]
+      },
+      "HierarchyFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "depth": {
+            "anyOf": [
+              {
+                "const": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 1,
+            "title": "Depth"
+          },
+          "filter": {
+            "discriminator": {
+              "mapping": {
+                "all": "#/components/schemas/AllFilter",
+                "ancestor_of": "#/components/schemas/HierarchyFilter",
+                "any": "#/components/schemas/AnyFilter",
+                "any_span": "#/components/schemas/QuantifierFilter",
+                "any_trace": "#/components/schemas/QuantifierFilter",
+                "at_least": "#/components/schemas/AtLeastFilter",
+                "attr": "#/components/schemas/AttrFilter",
+                "cited_by": "#/components/schemas/CitedByFilter",
+                "cost": "#/components/schemas/CostFilter",
+                "descendant_of": "#/components/schemas/HierarchyFilter",
+                "duration": "#/components/schemas/DurationFilter",
+                "eq": "#/components/schemas/CompareFilter",
+                "every_span": "#/components/schemas/QuantifierFilter",
+                "every_trace": "#/components/schemas/QuantifierFilter",
+                "grep": "#/components/schemas/GrepFilter",
+                "gt": "#/components/schemas/CompareFilter",
+                "gte": "#/components/schemas/CompareFilter",
+                "judge": "#/components/schemas/JudgeFilter",
+                "judged": "#/components/schemas/JudgedFilter",
+                "lt": "#/components/schemas/CompareFilter",
+                "lte": "#/components/schemas/CompareFilter",
+                "model": "#/components/schemas/ModelFilter",
+                "name": "#/components/schemas/NameFilter",
+                "ne": "#/components/schemas/CompareFilter",
+                "no_span": "#/components/schemas/QuantifierFilter",
+                "no_trace": "#/components/schemas/QuantifierFilter",
+                "not": "#/components/schemas/NotFilter",
+                "over_scores": "#/components/schemas/OverRelFilter",
+                "over_spans": "#/components/schemas/OverRelFilter",
+                "over_traces": "#/components/schemas/OverRelFilter",
+                "query": "#/components/schemas/SourceQuery",
+                "rg": "#/components/schemas/RgFilter",
+                "status": "#/components/schemas/StatusFilter",
+                "tokens": "#/components/schemas/TokensFilter"
+              },
+              "propertyName": "op"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StatusFilter"
+              },
+              {
+                "$ref": "#/components/schemas/NameFilter"
+              },
+              {
+                "$ref": "#/components/schemas/ModelFilter"
+              },
+              {
+                "$ref": "#/components/schemas/CostFilter"
+              },
+              {
+                "$ref": "#/components/schemas/DurationFilter"
+              },
+              {
+                "$ref": "#/components/schemas/JudgeFilter"
+              },
+              {
+                "$ref": "#/components/schemas/JudgedFilter"
+              },
+              {
+                "$ref": "#/components/schemas/AttrFilter"
+              },
+              {
+                "$ref": "#/components/schemas/GrepFilter"
+              },
+              {
+                "$ref": "#/components/schemas/RgFilter"
+              },
+              {
+                "$ref": "#/components/schemas/TokensFilter"
+              },
+              {
+                "$ref": "#/components/schemas/CompareFilter"
+              },
+              {
+                "$ref": "#/components/schemas/CitedByFilter"
+              },
+              {
+                "$ref": "#/components/schemas/AllFilter"
+              },
+              {
+                "$ref": "#/components/schemas/AnyFilter"
+              },
+              {
+                "$ref": "#/components/schemas/NotFilter"
+              },
+              {
+                "$ref": "#/components/schemas/QuantifierFilter"
+              },
+              {
+                "$ref": "#/components/schemas/HierarchyFilter"
+              },
+              {
+                "$ref": "#/components/schemas/OverRelFilter"
+              },
+              {
+                "$ref": "#/components/schemas/AtLeastFilter"
+              },
+              {
+                "$ref": "#/components/schemas/SourceQuery"
+              }
+            ],
+            "title": "Filter"
+          },
+          "op": {
+            "enum": [
+              "descendant_of",
+              "ancestor_of"
+            ],
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "filter"
+        ],
+        "title": "HierarchyFilter",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "hierarchy",
+            "doc": "spans below a matching span in the trace tree",
+            "dsl": [
+              "descendant_of"
+            ],
+            "example": "descendantOf(eq('span_name', 'agent'))",
+            "model": "HierarchyFilter",
+            "op": "descendant_of",
+            "ts": {
+              "name": "descendantOf",
+              "params": [
+                {
+                  "name": "filter",
+                  "ts_type": "FilterInput",
+                  "wire": "filter"
+                },
+                {
+                  "name": "depth",
+                  "optional": true,
+                  "ts_type": "1 | null",
+                  "wire": "depth"
+                }
+              ],
+              "style": "hierarchy"
+            }
+          },
+          {
+            "category": "hierarchy",
+            "doc": "spans above a matching span in the trace tree",
+            "dsl": [
+              "ancestor_of"
+            ],
+            "example": "ancestorOf(eq('span_name', 'agent'))",
+            "model": "HierarchyFilter",
+            "op": "ancestor_of",
+            "ts": {
+              "name": "ancestorOf",
+              "params": [
+                {
+                  "name": "filter",
+                  "ts_type": "FilterInput",
+                  "wire": "filter"
+                },
+                {
+                  "name": "depth",
+                  "optional": true,
+                  "ts_type": "1 | null",
+                  "wire": "depth"
+                }
+              ],
+              "style": "hierarchy"
+            }
+          }
+        ]
+      },
+      "OverRelFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "agg": {
+            "$ref": "#/components/schemas/OverAgg"
+          },
+          "cmp": {
+            "enum": [
+              "eq",
+              "ne",
+              "gt",
+              "gte",
+              "lt",
+              "lte"
+            ],
+            "title": "Cmp",
+            "type": "string"
+          },
+          "op": {
+            "enum": [
+              "over_spans",
+              "over_traces",
+              "over_scores"
+            ],
+            "title": "Op",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Value"
+          },
+          "where": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "all": "#/components/schemas/AllFilter",
+                    "ancestor_of": "#/components/schemas/HierarchyFilter",
+                    "any": "#/components/schemas/AnyFilter",
+                    "any_span": "#/components/schemas/QuantifierFilter",
+                    "any_trace": "#/components/schemas/QuantifierFilter",
+                    "at_least": "#/components/schemas/AtLeastFilter",
+                    "attr": "#/components/schemas/AttrFilter",
+                    "cited_by": "#/components/schemas/CitedByFilter",
+                    "cost": "#/components/schemas/CostFilter",
+                    "descendant_of": "#/components/schemas/HierarchyFilter",
+                    "duration": "#/components/schemas/DurationFilter",
+                    "eq": "#/components/schemas/CompareFilter",
+                    "every_span": "#/components/schemas/QuantifierFilter",
+                    "every_trace": "#/components/schemas/QuantifierFilter",
+                    "grep": "#/components/schemas/GrepFilter",
+                    "gt": "#/components/schemas/CompareFilter",
+                    "gte": "#/components/schemas/CompareFilter",
+                    "judge": "#/components/schemas/JudgeFilter",
+                    "judged": "#/components/schemas/JudgedFilter",
+                    "lt": "#/components/schemas/CompareFilter",
+                    "lte": "#/components/schemas/CompareFilter",
+                    "model": "#/components/schemas/ModelFilter",
+                    "name": "#/components/schemas/NameFilter",
+                    "ne": "#/components/schemas/CompareFilter",
+                    "no_span": "#/components/schemas/QuantifierFilter",
+                    "no_trace": "#/components/schemas/QuantifierFilter",
+                    "not": "#/components/schemas/NotFilter",
+                    "over_scores": "#/components/schemas/OverRelFilter",
+                    "over_spans": "#/components/schemas/OverRelFilter",
+                    "over_traces": "#/components/schemas/OverRelFilter",
+                    "query": "#/components/schemas/SourceQuery",
+                    "rg": "#/components/schemas/RgFilter",
+                    "status": "#/components/schemas/StatusFilter",
+                    "tokens": "#/components/schemas/TokensFilter"
+                  },
+                  "propertyName": "op"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/StatusFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NameFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ModelFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CostFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/DurationFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/JudgeFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/JudgedFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AttrFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/GrepFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RgFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TokensFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CompareFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CitedByFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AllFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AnyFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NotFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/QuantifierFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/HierarchyFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OverRelFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AtLeastFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SourceQuery"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Where"
+          }
+        },
+        "required": [
+          "op",
+          "agg",
+          "cmp",
+          "value"
+        ],
+        "title": "OverRelFilter",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "aggregate",
+            "doc": "an aggregate over a row's child spans meets a threshold",
+            "dsl": [
+              "over_spans"
+            ],
+            "example": "overSpans({ func: 'sum', field: 'cost' }, 'gt', 1)",
+            "model": "OverRelFilter",
+            "op": "over_spans",
+            "ts": {
+              "name": "overSpans",
+              "params": [
+                {
+                  "name": "agg",
+                  "ts_type": "OverAgg",
+                  "wire": "agg"
+                },
+                {
+                  "name": "cmp",
+                  "ts_type": "CompareOp",
+                  "wire": "cmp"
+                },
+                {
+                  "name": "value",
+                  "ts_type": "number",
+                  "wire": "value"
+                },
+                {
+                  "name": "where",
+                  "optional": true,
+                  "ts_type": "FilterInput",
+                  "wire": "where"
+                }
+              ],
+              "style": "over_rel"
+            }
+          },
+          {
+            "category": "aggregate",
+            "doc": "an aggregate over a session's traces meets a threshold",
+            "dsl": [
+              "over_traces"
+            ],
+            "example": "overTraces({ func: 'count' }, 'gte', 5)",
+            "model": "OverRelFilter",
+            "op": "over_traces",
+            "ts": {
+              "name": "overTraces",
+              "params": [
+                {
+                  "name": "agg",
+                  "ts_type": "OverAgg",
+                  "wire": "agg"
+                },
+                {
+                  "name": "cmp",
+                  "ts_type": "CompareOp",
+                  "wire": "cmp"
+                },
+                {
+                  "name": "value",
+                  "ts_type": "number",
+                  "wire": "value"
+                },
+                {
+                  "name": "where",
+                  "optional": true,
+                  "ts_type": "FilterInput",
+                  "wire": "where"
+                }
+              ],
+              "style": "over_rel"
+            }
+          },
+          {
+            "category": "aggregate",
+            "doc": "an aggregate over a row's judge scores meets a threshold (no where)",
+            "dsl": [
+              "over_scores"
+            ],
+            "example": "overScores({ func: 'count_distinct', field: 'judge' }, 'gte', 3)",
+            "model": "OverRelFilter",
+            "op": "over_scores",
+            "ts": {
+              "name": "overScores",
+              "params": [
+                {
+                  "name": "agg",
+                  "ts_type": "OverAgg",
+                  "wire": "agg"
+                },
+                {
+                  "name": "cmp",
+                  "ts_type": "CompareOp",
+                  "wire": "cmp"
+                },
+                {
+                  "name": "value",
+                  "ts_type": "number",
+                  "wire": "value"
+                }
+              ],
+              "style": "over_rel"
+            }
+          }
+        ]
+      },
+      "OverAgg": {
+        "additionalProperties": false,
+        "description": "The aggregate an over_* predicate compares \u2014 deliberately narrower than AggExpr\n(no per/quantile/nested where; see compile._agg_over).",
+        "properties": {
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field"
+          },
+          "func": {
+            "enum": [
+              "count",
+              "count_distinct",
+              "sum",
+              "avg",
+              "min",
+              "max"
+            ],
+            "title": "Func",
+            "type": "string"
+          }
+        },
+        "required": [
+          "func"
+        ],
+        "title": "OverAgg",
+        "type": "object"
+      },
+      "AtLeastFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "k": {
+            "minimum": 1.0,
+            "title": "K",
+            "type": "integer"
+          },
+          "of": {
+            "enum": [
+              "spans",
+              "traces"
+            ],
+            "title": "Of",
+            "type": "string"
+          },
+          "op": {
+            "const": "at_least",
+            "title": "Op",
+            "type": "string"
+          },
+          "where": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "all": "#/components/schemas/AllFilter",
+                    "ancestor_of": "#/components/schemas/HierarchyFilter",
+                    "any": "#/components/schemas/AnyFilter",
+                    "any_span": "#/components/schemas/QuantifierFilter",
+                    "any_trace": "#/components/schemas/QuantifierFilter",
+                    "at_least": "#/components/schemas/AtLeastFilter",
+                    "attr": "#/components/schemas/AttrFilter",
+                    "cited_by": "#/components/schemas/CitedByFilter",
+                    "cost": "#/components/schemas/CostFilter",
+                    "descendant_of": "#/components/schemas/HierarchyFilter",
+                    "duration": "#/components/schemas/DurationFilter",
+                    "eq": "#/components/schemas/CompareFilter",
+                    "every_span": "#/components/schemas/QuantifierFilter",
+                    "every_trace": "#/components/schemas/QuantifierFilter",
+                    "grep": "#/components/schemas/GrepFilter",
+                    "gt": "#/components/schemas/CompareFilter",
+                    "gte": "#/components/schemas/CompareFilter",
+                    "judge": "#/components/schemas/JudgeFilter",
+                    "judged": "#/components/schemas/JudgedFilter",
+                    "lt": "#/components/schemas/CompareFilter",
+                    "lte": "#/components/schemas/CompareFilter",
+                    "model": "#/components/schemas/ModelFilter",
+                    "name": "#/components/schemas/NameFilter",
+                    "ne": "#/components/schemas/CompareFilter",
+                    "no_span": "#/components/schemas/QuantifierFilter",
+                    "no_trace": "#/components/schemas/QuantifierFilter",
+                    "not": "#/components/schemas/NotFilter",
+                    "over_scores": "#/components/schemas/OverRelFilter",
+                    "over_spans": "#/components/schemas/OverRelFilter",
+                    "over_traces": "#/components/schemas/OverRelFilter",
+                    "query": "#/components/schemas/SourceQuery",
+                    "rg": "#/components/schemas/RgFilter",
+                    "status": "#/components/schemas/StatusFilter",
+                    "tokens": "#/components/schemas/TokensFilter"
+                  },
+                  "propertyName": "op"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/StatusFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NameFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ModelFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CostFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/DurationFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/JudgeFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/JudgedFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AttrFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/GrepFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RgFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TokensFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CompareFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CitedByFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AllFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AnyFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NotFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/QuantifierFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/HierarchyFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/OverRelFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AtLeastFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SourceQuery"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Where"
+          }
+        },
+        "required": [
+          "op",
+          "k",
+          "of"
+        ],
+        "title": "AtLeastFilter",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "aggregate",
+            "doc": "at least k related rows match \u2014 between any_ (k=1) and every_",
+            "dsl": [
+              "at_least",
+              "span",
+              "trace"
+            ],
+            "example": "atLeast(3, 'spans', status('error'))",
+            "model": "AtLeastFilter",
+            "op": "at_least",
+            "ts": {
+              "name": "atLeast",
+              "params": [
+                {
+                  "name": "k",
+                  "ts_type": "number",
+                  "wire": "k"
+                },
+                {
+                  "name": "of",
+                  "ts_type": "'spans' | 'traces'",
+                  "wire": "of"
+                },
+                {
+                  "name": "where",
+                  "optional": true,
+                  "ts_type": "FilterInput",
+                  "wire": "where"
+                }
+              ],
+              "style": "at_least"
+            }
+          }
+        ]
+      },
+      "WhereStage": {
+        "additionalProperties": false,
+        "properties": {
+          "filter": {
+            "discriminator": {
+              "mapping": {
+                "all": "#/components/schemas/StageAllFilter",
+                "any": "#/components/schemas/StageAnyFilter",
+                "eq": "#/components/schemas/CompareFilter",
+                "gt": "#/components/schemas/CompareFilter",
+                "gte": "#/components/schemas/CompareFilter",
+                "lt": "#/components/schemas/CompareFilter",
+                "lte": "#/components/schemas/CompareFilter",
+                "ne": "#/components/schemas/CompareFilter",
+                "not": "#/components/schemas/StageNotFilter",
+                "status": "#/components/schemas/StatusFilter"
+              },
+              "propertyName": "op"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilter"
+              },
+              {
+                "$ref": "#/components/schemas/StatusFilter"
+              },
+              {
+                "$ref": "#/components/schemas/StageAllFilter"
+              },
+              {
+                "$ref": "#/components/schemas/StageAnyFilter"
+              },
+              {
+                "$ref": "#/components/schemas/StageNotFilter"
+              }
+            ],
+            "title": "Filter"
+          },
+          "op": {
+            "const": "where",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "filter"
+        ],
+        "title": "WhereStage",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "stage",
+            "doc": "keep rows passing a comparison (after summarize: HAVING)",
+            "dsl": [
+              "where"
+            ],
+            "example": ".pipe().where(gt('total', 1))",
+            "model": "WhereStage",
+            "op": "where",
+            "ts": {
+              "name": "where",
+              "params": [
+                {
+                  "name": "filter",
+                  "ts_type": "StageFilterInput",
+                  "wire": "filter"
+                }
+              ],
+              "style": "pipe_method"
+            }
+          }
+        ]
+      },
+      "StageAllFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "filters": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "all": "#/components/schemas/StageAllFilter",
+                  "any": "#/components/schemas/StageAnyFilter",
+                  "eq": "#/components/schemas/CompareFilter",
+                  "gt": "#/components/schemas/CompareFilter",
+                  "gte": "#/components/schemas/CompareFilter",
+                  "lt": "#/components/schemas/CompareFilter",
+                  "lte": "#/components/schemas/CompareFilter",
+                  "ne": "#/components/schemas/CompareFilter",
+                  "not": "#/components/schemas/StageNotFilter",
+                  "status": "#/components/schemas/StatusFilter"
+                },
+                "propertyName": "op"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/CompareFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/StatusFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/StageAllFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/StageAnyFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/StageNotFilter"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Filters",
+            "type": "array"
+          },
+          "op": {
+            "const": "all",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "filters"
+        ],
+        "title": "StageAllFilter",
+        "type": "object"
+      },
+      "StageAnyFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "filters": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "all": "#/components/schemas/StageAllFilter",
+                  "any": "#/components/schemas/StageAnyFilter",
+                  "eq": "#/components/schemas/CompareFilter",
+                  "gt": "#/components/schemas/CompareFilter",
+                  "gte": "#/components/schemas/CompareFilter",
+                  "lt": "#/components/schemas/CompareFilter",
+                  "lte": "#/components/schemas/CompareFilter",
+                  "ne": "#/components/schemas/CompareFilter",
+                  "not": "#/components/schemas/StageNotFilter",
+                  "status": "#/components/schemas/StatusFilter"
+                },
+                "propertyName": "op"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/CompareFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/StatusFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/StageAllFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/StageAnyFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/StageNotFilter"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Filters",
+            "type": "array"
+          },
+          "op": {
+            "const": "any",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "filters"
+        ],
+        "title": "StageAnyFilter",
+        "type": "object"
+      },
+      "StageNotFilter": {
+        "additionalProperties": false,
+        "properties": {
+          "filter": {
+            "discriminator": {
+              "mapping": {
+                "all": "#/components/schemas/StageAllFilter",
+                "any": "#/components/schemas/StageAnyFilter",
+                "eq": "#/components/schemas/CompareFilter",
+                "gt": "#/components/schemas/CompareFilter",
+                "gte": "#/components/schemas/CompareFilter",
+                "lt": "#/components/schemas/CompareFilter",
+                "lte": "#/components/schemas/CompareFilter",
+                "ne": "#/components/schemas/CompareFilter",
+                "not": "#/components/schemas/StageNotFilter",
+                "status": "#/components/schemas/StatusFilter"
+              },
+              "propertyName": "op"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilter"
+              },
+              {
+                "$ref": "#/components/schemas/StatusFilter"
+              },
+              {
+                "$ref": "#/components/schemas/StageAllFilter"
+              },
+              {
+                "$ref": "#/components/schemas/StageAnyFilter"
+              },
+              {
+                "$ref": "#/components/schemas/StageNotFilter"
+              }
+            ],
+            "title": "Filter"
+          },
+          "op": {
+            "const": "not",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "filter"
+        ],
+        "title": "StageNotFilter",
+        "type": "object"
+      },
+      "PickStage": {
+        "additionalProperties": false,
+        "properties": {
+          "by": {
+            "default": "timestamp",
+            "title": "By",
+            "type": "string"
+          },
+          "n": {
+            "default": 1,
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "N",
+            "type": "integer"
+          },
+          "op": {
+            "const": "pick",
+            "title": "Op",
+            "type": "string"
+          },
+          "per": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per"
+          },
+          "reverse": {
+            "default": false,
+            "title": "Reverse",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "op"
+        ],
+        "title": "PickStage",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "stage",
+            "doc": "keep the first/last n rows per group (adds rank column `_rn`)",
+            "dsl": [
+              "pick"
+            ],
+            "example": ".pipe().pick({ per: 'trace', by: 'timestamp', reverse: true })",
+            "model": "PickStage",
+            "op": "pick",
+            "ts": {
+              "name": "pick",
+              "params": [
+                {
+                  "name": "options",
+                  "optional": true,
+                  "ts_type": "Omit<PickStage, 'op'>"
+                }
+              ],
+              "style": "pipe_method"
+            }
+          }
+        ]
+      },
+      "DeriveStage": {
+        "additionalProperties": false,
+        "properties": {
+          "cols": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "discriminator": {
+                    "mapping": {
+                      "agg_expr": "#/components/schemas/AggExpr",
+                      "arith": "#/components/schemas/ArithExpr",
+                      "col": "#/components/schemas/ColExpr"
+                    },
+                    "propertyName": "op"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ColExpr"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AggExpr"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ArithExpr"
+                    }
+                  ]
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "maxProperties": 16,
+            "minProperties": 1,
+            "title": "Cols",
+            "type": "object"
+          },
+          "op": {
+            "const": "derive",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "cols"
+        ],
+        "title": "DeriveStage",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "stage",
+            "doc": "add computed columns to every row (rows unchanged)",
+            "dsl": [
+              "derive"
+            ],
+            "example": ".pipe().derive({ share: arith('div', col('cost'), aggExpr({ func: 'sum', field: 'cost', per: 'trace' })) })",
+            "model": "DeriveStage",
+            "op": "derive",
+            "ts": {
+              "name": "derive",
+              "params": [
+                {
+                  "name": "cols",
+                  "ts_type": "Record<string, ExprInput>",
+                  "wire": "cols"
+                }
+              ],
+              "style": "pipe_method"
+            }
+          }
+        ]
+      },
+      "AggExpr": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field"
+          },
+          "func": {
+            "enum": [
+              "count",
+              "count_distinct",
+              "sum",
+              "avg",
+              "min",
+              "max",
+              "quantile"
+            ],
+            "title": "Func",
+            "type": "string"
+          },
+          "op": {
+            "const": "agg_expr",
+            "title": "Op",
+            "type": "string"
+          },
+          "per": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per"
+          },
+          "q": {
+            "anyOf": [
+              {
+                "exclusiveMaximum": 1.0,
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Q"
+          },
+          "where": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "all": "#/components/schemas/StageAllFilter",
+                    "any": "#/components/schemas/StageAnyFilter",
+                    "eq": "#/components/schemas/CompareFilter",
+                    "gt": "#/components/schemas/CompareFilter",
+                    "gte": "#/components/schemas/CompareFilter",
+                    "lt": "#/components/schemas/CompareFilter",
+                    "lte": "#/components/schemas/CompareFilter",
+                    "ne": "#/components/schemas/CompareFilter",
+                    "not": "#/components/schemas/StageNotFilter",
+                    "status": "#/components/schemas/StatusFilter"
+                  },
+                  "propertyName": "op"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/CompareFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/StatusFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/StageAllFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/StageAnyFilter"
+                  },
+                  {
+                    "$ref": "#/components/schemas/StageNotFilter"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Where"
+          }
+        },
+        "required": [
+          "op",
+          "func"
+        ],
+        "title": "AggExpr",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "expression",
+            "doc": "an aggregate expression; `per` makes it a per-group window, `where` a conditional aggregate",
+            "dsl": [
+              "sum_",
+              "avg_",
+              "min_",
+              "max_",
+              "count_",
+              "distinct_",
+              "quantile_"
+            ],
+            "example": "aggExpr({ func: 'sum', field: 'cost', per: 'trace' })",
+            "lang": "Agg",
+            "model": "AggExpr",
+            "op": "agg_expr",
+            "ts": {
+              "name": "aggExpr",
+              "params": [
+                {
+                  "name": "options",
+                  "ts_type": "Omit<AggExpr, 'op'>"
+                }
+              ],
+              "style": "expr_options"
+            }
+          }
+        ]
+      },
+      "ArithExpr": {
+        "additionalProperties": false,
+        "properties": {
+          "fn": {
+            "enum": [
+              "div",
+              "mul",
+              "add",
+              "sub"
+            ],
+            "title": "Fn",
+            "type": "string"
+          },
+          "left": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "agg_expr": "#/components/schemas/AggExpr",
+                    "arith": "#/components/schemas/ArithExpr",
+                    "col": "#/components/schemas/ColExpr"
+                  },
+                  "propertyName": "op"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ColExpr"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AggExpr"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ArithExpr"
+                  }
+                ]
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Left"
+          },
+          "op": {
+            "const": "arith",
+            "title": "Op",
+            "type": "string"
+          },
+          "right": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "agg_expr": "#/components/schemas/AggExpr",
+                    "arith": "#/components/schemas/ArithExpr",
+                    "col": "#/components/schemas/ColExpr"
+                  },
+                  "propertyName": "op"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ColExpr"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AggExpr"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ArithExpr"
+                  }
+                ]
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Right"
+          }
+        },
+        "required": [
+          "op",
+          "fn",
+          "left",
+          "right"
+        ],
+        "title": "ArithExpr",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "expression",
+            "doc": "arithmetic over expressions",
+            "dsl": [
+              "div",
+              "mul",
+              "add",
+              "sub"
+            ],
+            "example": "arith('div', col('cost'), aggExpr({ func: 'sum', field: 'cost', per: 'trace' }))",
+            "lang": "Arith",
+            "model": "ArithExpr",
+            "op": "arith",
+            "ts": {
+              "name": "arith",
+              "params": [
+                {
+                  "name": "fn",
+                  "ts_type": "'div' | 'mul' | 'add' | 'sub'",
+                  "wire": "fn"
+                },
+                {
+                  "name": "left",
+                  "ts_type": "ExprInput",
+                  "wire": "left"
+                },
+                {
+                  "name": "right",
+                  "ts_type": "ExprInput",
+                  "wire": "right"
+                }
+              ],
+              "style": "arith"
+            }
+          }
+        ]
+      },
+      "SummarizeStage": {
+        "additionalProperties": false,
+        "properties": {
+          "aggs": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "discriminator": {
+                    "mapping": {
+                      "agg_expr": "#/components/schemas/AggExpr",
+                      "arith": "#/components/schemas/ArithExpr",
+                      "col": "#/components/schemas/ColExpr"
+                    },
+                    "propertyName": "op"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ColExpr"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AggExpr"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ArithExpr"
+                    }
+                  ]
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "maxProperties": 16,
+            "minProperties": 1,
+            "title": "Aggs",
+            "type": "object"
+          },
+          "by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/components/schemas/BucketExpr"
+              },
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BucketExpr"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By"
+          },
+          "op": {
+            "const": "summarize",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "aggs"
+        ],
+        "title": "SummarizeStage",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "stage",
+            "doc": "collapse to one row per group with computed aggregates (grain change)",
+            "dsl": [
+              "summarize"
+            ],
+            "example": ".pipe().summarize('span_name', { n: aggExpr({ func: 'count' }) })",
+            "model": "SummarizeStage",
+            "op": "summarize",
+            "ts": {
+              "name": "summarize",
+              "params": [
+                {
+                  "name": "by",
+                  "ts_type": "string | BucketExpr | (string | BucketExpr)[] | undefined",
+                  "wire": "by"
+                },
+                {
+                  "name": "aggs",
+                  "ts_type": "Record<string, ExprInput>",
+                  "wire": "aggs"
+                }
+              ],
+              "style": "pipe_method"
+            }
+          }
+        ]
+      },
+      "BucketExpr": {
+        "additionalProperties": false,
+        "properties": {
+          "every": {
+            "title": "Every",
+            "type": "string"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "op": {
+            "const": "bucket",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "field",
+          "every"
+        ],
+        "title": "BucketExpr",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "expression",
+            "doc": "time-bucket key for summarize (outputs column `bucket`)",
+            "dsl": [
+              "bucket"
+            ],
+            "example": "bucket('timestamp', '1w')",
+            "lang": "Bucket",
+            "model": "BucketExpr",
+            "op": "bucket",
+            "ts": {
+              "name": "bucket",
+              "params": [
+                {
+                  "name": "field",
+                  "ts_type": "string",
+                  "wire": "field"
+                },
+                {
+                  "name": "every",
+                  "ts_type": "string",
+                  "wire": "every"
+                }
+              ],
+              "style": "expr_fn"
+            }
+          }
+        ]
+      },
+      "SortStage": {
+        "additionalProperties": false,
+        "properties": {
+          "by": {
+            "title": "By",
+            "type": "string"
+          },
+          "op": {
+            "const": "sort",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "by"
+        ],
+        "title": "SortStage",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "stage",
+            "doc": "order the rows",
+            "dsl": [
+              "sort"
+            ],
+            "example": ".pipe().sort('cost desc')",
+            "model": "SortStage",
+            "op": "sort",
+            "ts": {
+              "name": "sort",
+              "params": [
+                {
+                  "name": "by",
+                  "ts_type": "string",
+                  "wire": "by"
+                }
+              ],
+              "style": "pipe_method"
+            }
+          }
+        ]
+      },
+      "TakeStage": {
+        "additionalProperties": false,
+        "properties": {
+          "n": {
+            "minimum": 1.0,
+            "title": "N",
+            "type": "integer"
+          },
+          "offset": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Offset",
+            "type": "integer"
+          },
+          "op": {
+            "const": "take",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "n"
+        ],
+        "title": "TakeStage",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "stage",
+            "doc": "keep the first n rows (after sort), optionally skipping offset rows",
+            "dsl": [
+              "take"
+            ],
+            "example": ".pipe().sort('cost desc').take(10)",
+            "model": "TakeStage",
+            "op": "take",
+            "ts": {
+              "name": "take",
+              "params": [
+                {
+                  "name": "n",
+                  "ts_type": "number",
+                  "wire": "n"
+                },
+                {
+                  "name": "offset",
+                  "optional": true,
+                  "ts_type": "number",
+                  "wire": "offset"
+                }
+              ],
+              "style": "pipe_method"
+            }
+          }
+        ]
+      },
+      "RowsSelect": {
+        "additionalProperties": false,
+        "properties": {
+          "fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fields"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "op": {
+            "const": "rows",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op"
+        ],
+        "title": "RowsSelect",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "select",
+            "doc": "rows: `.rows({ fields: ['trace_id', 'status'], limit: 100 })`",
+            "dsl": [
+              "rows",
+              "select"
+            ],
+            "example": ".rows({ fields: ['trace_id', 'status'], limit: 100 })",
+            "lang": ".select(*fields)",
+            "model": "RowsSelect",
+            "op": "rows",
+            "result_shape": {
+              "caller_fields": true,
+              "kind": "table"
+            },
+            "ts": {
+              "name": "rows",
+              "params": [
+                {
+                  "name": "options",
+                  "optional": true,
+                  "ts_type": "{ fields?: string[]; limit?: number }"
+                }
+              ],
+              "style": "select_method"
+            }
+          }
+        ]
+      },
+      "IdsSelect": {
+        "additionalProperties": false,
+        "properties": {
+          "op": {
+            "const": "ids",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op"
+        ],
+        "title": "IdsSelect",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "select",
+            "doc": "matching IDs \u2014 cap with the request-level `limit` option",
+            "dsl": [
+              "ids"
+            ],
+            "example": ".ids()",
+            "lang": ".ids()",
+            "model": "IdsSelect",
+            "op": "ids",
+            "result_shape": {
+              "kind": "id_list"
+            },
+            "ts": {
+              "name": "ids",
+              "style": "select_method"
+            }
+          }
+        ]
+      },
+      "CountSelect": {
+        "additionalProperties": false,
+        "properties": {
+          "by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By"
+          },
+          "op": {
+            "const": "count",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op"
+        ],
+        "title": "CountSelect",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "select",
+            "doc": "a total, or per-group counts: `.count('status')`",
+            "dsl": [
+              "count"
+            ],
+            "example": ".count('status')",
+            "lang": ".count(by=None)",
+            "model": "CountSelect",
+            "op": "count",
+            "result_shape": {
+              "columns": [
+                "count"
+              ],
+              "grouped_by_field": "by",
+              "kind": "scalar"
+            },
+            "ts": {
+              "name": "count",
+              "params": [
+                {
+                  "name": "by",
+                  "optional": true,
+                  "ts_type": "string",
+                  "wire": "by"
+                }
+              ],
+              "style": "select_method"
+            }
+          }
+        ]
+      },
+      "RecentSelect": {
+        "additionalProperties": false,
+        "properties": {
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "op": {
+            "const": "recent",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "n"
+        ],
+        "title": "RecentSelect",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "select",
+            "doc": "the n most recent rows",
+            "dsl": [
+              "recent"
+            ],
+            "example": ".recent(10)",
+            "lang": ".recent(n)",
+            "model": "RecentSelect",
+            "op": "recent",
+            "result_shape": {
+              "kind": "table"
+            },
+            "ts": {
+              "name": "recent",
+              "params": [
+                {
+                  "name": "n",
+                  "ts_type": "number",
+                  "wire": "n"
+                }
+              ],
+              "style": "select_method"
+            }
+          }
+        ]
+      },
+      "TopSelect": {
+        "additionalProperties": false,
+        "properties": {
+          "by": {
+            "title": "By",
+            "type": "string"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "op": {
+            "const": "top",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "n",
+          "by"
+        ],
+        "title": "TopSelect",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "select",
+            "doc": "the n largest by a numeric field: `.top(20, 'duration')`",
+            "dsl": [
+              "top"
+            ],
+            "example": ".top(20, 'duration')",
+            "lang": ".top(n, by)",
+            "model": "TopSelect",
+            "op": "top",
+            "result_shape": {
+              "kind": "table"
+            },
+            "ts": {
+              "name": "top",
+              "params": [
+                {
+                  "name": "n",
+                  "ts_type": "number",
+                  "wire": "n"
+                },
+                {
+                  "name": "by",
+                  "ts_type": "string",
+                  "wire": "by"
+                }
+              ],
+              "style": "select_method"
+            }
+          }
+        ]
+      },
+      "RankedSelect": {
+        "additionalProperties": false,
+        "properties": {
+          "by": {
+            "default": "timestamp",
+            "title": "By",
+            "type": "string"
+          },
+          "op": {
+            "const": "ranked",
+            "title": "Op",
+            "type": "string"
+          },
+          "pick": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              }
+            ],
+            "default": 1,
+            "title": "Pick"
+          },
+          "within": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Within"
+          }
+        },
+        "required": [
+          "op"
+        ],
+        "title": "RankedSelect",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "select",
+            "doc": "positional rows globally or within a field; `{ within?, by?, pick? }`",
+            "dsl": [
+              "ranked"
+            ],
+            "example": ".ranked({ within: 'trace', by: 'cost desc', pick: [2, 4] })",
+            "model": "RankedSelect",
+            "op": "ranked",
+            "result_shape": {
+              "kind": "table"
+            },
+            "ts": {
+              "name": "ranked",
+              "params": [
+                {
+                  "name": "options",
+                  "optional": true,
+                  "ts_type": "Omit<RankedSelect, 'op'>"
+                }
+              ],
+              "style": "select_method"
+            }
+          }
+        ]
+      },
+      "AggregateSelect": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "func": {
+            "enum": [
+              "avg",
+              "sum",
+              "min",
+              "max",
+              "quantile",
+              "count_distinct"
+            ],
+            "title": "Func",
+            "type": "string"
+          },
+          "op": {
+            "const": "agg",
+            "title": "Op",
+            "type": "string"
+          },
+          "q": {
+            "anyOf": [
+              {
+                "exclusiveMaximum": 1.0,
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Q"
+          }
+        },
+        "required": [
+          "op",
+          "func",
+          "field"
+        ],
+        "title": "AggregateSelect",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "select",
+            "doc": "one scalar `value`; `{ func, field, q? }`, where `q` is required for `quantile`",
+            "dsl": [
+              "agg"
+            ],
+            "example": ".agg({ func: 'quantile', field: 'cost', q: 0.95 })",
+            "model": "AggregateSelect",
+            "op": "agg",
+            "result_shape": {
+              "columns": [
+                "value"
+              ],
+              "kind": "scalar"
+            },
+            "ts": {
+              "name": "agg",
+              "params": [
+                {
+                  "name": "options",
+                  "ts_type": "Omit<AggregateSelect, 'op'>"
+                }
+              ],
+              "style": "select_method"
+            }
+          }
+        ]
+      },
+      "TrendSelect": {
+        "additionalProperties": false,
+        "properties": {
+          "bucket": {
+            "default": "1d",
+            "title": "Bucket",
+            "type": "string"
+          },
+          "metric": {
+            "default": "count",
+            "enum": [
+              "count",
+              "rate"
+            ],
+            "title": "Metric",
+            "type": "string"
+          },
+          "op": {
+            "const": "trend",
+            "title": "Op",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op"
+        ],
+        "title": "TrendSelect",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "select",
+            "doc": "time buckets; `{ metric: 'count' | 'rate', bucket: '1d' }`",
+            "dsl": [
+              "trend"
+            ],
+            "example": ".trend({ metric: 'rate', bucket: '1w' })",
+            "model": "TrendSelect",
+            "op": "trend",
+            "result_shape": {
+              "columns": [
+                "bucket",
+                "n",
+                "total",
+                "rate"
+              ],
+              "kind": "timeseries"
+            },
+            "ts": {
+              "name": "trend",
+              "params": [
+                {
+                  "name": "options",
+                  "optional": true,
+                  "ts_type": "Omit<TrendSelect, 'op'>"
+                }
+              ],
+              "style": "select_method"
+            }
+          }
+        ]
+      },
+      "TimeSpec": {
+        "additionalProperties": false,
+        "properties": {
+          "between": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Between"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          }
+        },
+        "title": "TimeSpec",
+        "type": "object"
+      },
+      "DiscoveryQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "history": {
+            "default": false,
+            "title": "History",
+            "type": "boolean"
+          },
+          "judge": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Judge"
+          },
+          "kind": {
+            "enum": [
+              "judges",
+              "behaviors",
+              "span_names",
+              "models",
+              "fields",
+              "rules",
+              "judge_prompts",
+              "judge_config",
+              "citations"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "op": {
+            "const": "discovery",
+            "title": "Op",
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "traces",
+                  "spans"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "time": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimeSpec"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "required": [
+          "op",
+          "kind"
+        ],
+        "title": "DiscoveryQuery",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "discovery",
+            "doc": "catalog lookup: judge names, span names, models, ...",
+            "example": "discovery('judges')",
+            "lang": "proj.judges()",
+            "model": "DiscoveryQuery",
+            "op": "discovery",
+            "result_shape": {
+              "kind": "table"
+            },
+            "ts": {
+              "name": "discovery",
+              "params": [
+                {
+                  "name": "kind",
+                  "ts_type": "DiscoveryKind",
+                  "wire": "kind"
+                },
+                {
+                  "name": "options",
+                  "optional": true,
+                  "ts_type": "DiscoveryOptions"
+                }
+              ],
+              "style": "discovery"
+            },
+            "variants": [
+              [
+                "judges",
+                "current judge names/config",
+                "`history`, `limit`"
+              ],
+              [
+                "behaviors",
+                "behavior names/values",
+                "`history`, `limit`"
+              ],
+              [
+                "span_names",
+                "span names seen in facts",
+                "`time`, `limit`"
+              ],
+              [
+                "models",
+                "model names seen in facts",
+                "`time`, `limit`"
+              ],
+              [
+                "fields",
+                "standard fields usable for filters, groups, and aggregates",
+                "`source` (required), `limit`"
+              ],
+              [
+                "citations",
+                "spans cited by a judge decision",
+                "`judge`, `value`, `time`, `limit`"
+              ],
+              [
+                "rules",
+                "rule configs",
+                "`limit`"
+              ],
+              [
+                "judge_prompts",
+                "judge prompt configs",
+                "`limit`"
+              ],
+              [
+                "judge_config",
+                "judge configuration",
+                "`limit`"
+              ]
+            ]
+          }
+        ]
+      },
+      "ChartQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "chart_type": {
+            "enum": [
+              "bar",
+              "line",
+              "area",
+              "pie"
+            ],
+            "title": "Chart Type",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "op": {
+            "const": "chart",
+            "title": "Op",
+            "type": "string"
+          },
+          "query": {
+            "$ref": "#/components/schemas/SourceQuery"
+          },
+          "series_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PresentationField"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "x_axis": {
+            "$ref": "#/components/schemas/PresentationField"
+          },
+          "y_axis": {
+            "$ref": "#/components/schemas/PresentationField"
+          }
+        },
+        "required": [
+          "op",
+          "chart_type",
+          "title",
+          "x_axis",
+          "y_axis",
+          "query"
+        ],
+        "title": "ChartQuery",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "presentation",
+            "doc": "chart-ready rows with explicit axes and a bounded chart type",
+            "dsl": [
+              "chart"
+            ],
+            "example": ".chart({ chartType: 'bar', title: 'Cost by model', xAxis: { key: 'model' }, yAxis: { key: 'cost' } })",
+            "model": "ChartQuery",
+            "op": "chart",
+            "result_shape": {
+              "caller_fields": true,
+              "kind": "chart"
+            },
+            "ts": {
+              "name": "chart",
+              "params": [
+                {
+                  "name": "options",
+                  "ts_type": "Omit<ChartQuery, 'op' | 'query'>"
+                }
+              ],
+              "style": "presentation_method"
+            }
+          }
+        ]
+      },
+      "PresentationField": {
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "default": "auto",
+            "enum": [
+              "auto",
+              "number",
+              "compact",
+              "percent",
+              "currency_usd",
+              "duration_ms",
+              "datetime"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "key": {
+            "maxLength": 80,
+            "minLength": 1,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "PresentationField",
+        "type": "object"
+      },
+      "TableQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/PresentationField"
+            },
+            "maxItems": 16,
+            "minItems": 1,
+            "title": "Columns",
+            "type": "array"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "op": {
+            "const": "table",
+            "title": "Op",
+            "type": "string"
+          },
+          "query": {
+            "$ref": "#/components/schemas/SourceQuery"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "title",
+          "columns",
+          "query"
+        ],
+        "title": "TableQuery",
+        "type": "object",
+        "x-jql": [
+          {
+            "category": "presentation",
+            "doc": "table-ready rows projected to an explicit ordered column list",
+            "dsl": [
+              "table"
+            ],
+            "example": ".table({ title: 'Expensive spans', columns: [{ key: 'span_name' }, { key: 'cost' }] })",
+            "model": "TableQuery",
+            "op": "table",
+            "result_shape": {
+              "caller_fields": true,
+              "kind": "table"
+            },
+            "ts": {
+              "name": "table",
+              "params": [
+                {
+                  "name": "options",
+                  "ts_type": "Omit<TableQuery, 'op' | 'query'>"
+                }
+              ],
+              "style": "presentation_method"
+            }
+          }
+        ]
+      }
+    }
+  }
+}
