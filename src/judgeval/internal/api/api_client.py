@@ -38,13 +38,17 @@ def _handle_response(r: Response) -> Any:
             code = None
             hint = None
         retry_after = r.headers.get("Retry-After")
+        try:
+            retry_after_seconds = int(retry_after) if retry_after else None
+        except ValueError:
+            retry_after_seconds = None
         raise JudgmentAPIError(
             r.status_code,
             detail,
             r,
             code=code,
             hint=hint,
-            retry_after_seconds=int(retry_after) if retry_after else None,
+            retry_after_seconds=retry_after_seconds,
         )
     return r.json()
 

@@ -172,3 +172,34 @@ def test_api_error_preserves_code_hint_and_retry_after() -> None:
     assert raised.value.code == "JQL_RATE_LIMITED"
     assert raised.value.hint == "Slow down."
     assert raised.value.retry_after_seconds == 2
+
+
+def test_api_error_ignores_http_date_retry_after() -> None:
+    response = httpx.Response(
+        429,
+        json={
+            "error": "JQL_RATE_LIMITED",
+            "message": "Retry later.",
+            "hint": "Slow down.",
+        },
+        headers={"Retry-After": "Wed, 21 Oct 2015 07:28:00 GMT"},
+    )
+
+    with pytest.raises(JudgmentAPIError) as raised:
+        _handle_response(response)
+
+    assert (
+        raised.value.status_code,
+        raised.value.detail,
+        raised.value.response,
+        raised.value.code,
+        raised.value.hint,
+        raised.value.retry_after_seconds,
+    ) == (
+        429,
+        "Retry later.",
+        response,
+        "JQL_RATE_LIMITED",
+        "Slow down.",
+        None,
+    )
