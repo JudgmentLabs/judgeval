@@ -65,34 +65,22 @@ def map_judgment_api_error(
         message: Optional message overriding the server-provided detail.
     """
     detail = message or error.detail
-    if error.status_code == 409:
-        return JudgmentConflictError(
-            error.status_code,
-            detail,
-            error.response,
-            code=error.code,
-            hint=error.hint,
-            retry_after_seconds=error.retry_after_seconds,
-        )
-    if error.status_code == 422:
-        return JudgmentValidationError(
-            error.status_code,
-            detail,
-            error.response,
-            code=error.code,
-            hint=error.hint,
-            retry_after_seconds=error.retry_after_seconds,
-        )
-    if message:
-        return JudgmentAPIError(
-            error.status_code,
-            detail,
-            error.response,
-            code=error.code,
-            hint=error.hint,
-            retry_after_seconds=error.retry_after_seconds,
-        )
-    return error
+    error_type: type[JudgmentAPIError] | None = {
+        409: JudgmentConflictError,
+        422: JudgmentValidationError,
+    }.get(error.status_code)
+    if error_type is None:
+        if not message:
+            return error
+        error_type = JudgmentAPIError
+    return error_type(
+        error.status_code,
+        detail,
+        error.response,
+        code=error.code,
+        hint=error.hint,
+        retry_after_seconds=error.retry_after_seconds,
+    )
 
 
 class JudgmentTestError(Exception): ...
