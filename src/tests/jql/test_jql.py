@@ -101,10 +101,45 @@ def test_pipeline_and_presentation_are_project_free() -> None:
         columns=[{"key": "model"}, {"key": "total", "format": "currency_usd"}],
     )
 
-    assert presentation["op"] == "table"
-    assert presentation["query"]["pipe"][-1] == {"op": "take", "n": 10}
-    assert "organization_id" not in presentation["query"]
-    assert "project_id" not in presentation["query"]
+    assert presentation == {
+        "title": "Spend by model",
+        "columns": [
+            {"key": "model"},
+            {"key": "total", "format": "currency_usd"},
+        ],
+        "op": "table",
+        "query": {
+            "op": "query",
+            "source": "spans",
+            "time": {"last": "7d"},
+            "pipe": [
+                {
+                    "op": "derive",
+                    "cols": {"expensive": {"op": "col", "name": "cost"}},
+                },
+                {
+                    "op": "where",
+                    "filter": {
+                        "op": "gte",
+                        "field": "expensive",
+                        "value": 1,
+                    },
+                },
+                {
+                    "op": "summarize",
+                    "by": "model",
+                    "aggs": {
+                        "total": {
+                            "op": "agg_expr",
+                            "func": "sum",
+                            "field": "cost",
+                        }
+                    },
+                },
+                {"op": "take", "n": 10},
+            ],
+        },
+    }
 
 
 def test_judgeval_query_sends_only_public_fields(
@@ -152,7 +187,12 @@ def test_judgeval_query_sends_only_public_fields(
             None,
         )
     ]
-    assert response["rows"] == [{"trace_id": "trace-1"}]
+    assert response == {
+        "query_id": "q-1",
+        "rows": [{"trace_id": "trace-1"}],
+        "row_count": 1,
+        "elapsed_ms": 4,
+    }
 
 
 def test_api_error_preserves_code_hint_and_retry_after() -> None:
@@ -169,9 +209,15 @@ def test_api_error_preserves_code_hint_and_retry_after() -> None:
     with pytest.raises(JudgmentAPIError) as raised:
         _handle_response(response)
 
-    assert raised.value.code == "JQL_RATE_LIMITED"
-    assert raised.value.hint == "Slow down."
-    assert raised.value.retry_after_seconds == 2
+    assert vars(raised.value) == {
+        "status_code": 429,
+        "detail": "Retry later.",
+        "response": response,
+        "code": "JQL_RATE_LIMITED",
+        "hint": "Slow down.",
+        "retry_after_seconds": 2,
+        "_request": None,
+    }
 
 
 def test_api_error_ignores_http_date_retry_after() -> None:
@@ -188,18 +234,12 @@ def test_api_error_ignores_http_date_retry_after() -> None:
     with pytest.raises(JudgmentAPIError) as raised:
         _handle_response(response)
 
-    assert (
-        raised.value.status_code,
-        raised.value.detail,
-        raised.value.response,
-        raised.value.code,
-        raised.value.hint,
-        raised.value.retry_after_seconds,
-    ) == (
-        429,
-        "Retry later.",
-        response,
-        "JQL_RATE_LIMITED",
-        "Slow down.",
-        None,
-    )
+    assert vars(raised.value) == {
+        "status_code": 429,
+        "detail": "Retry later.",
+        "response": response,
+        "code": "JQL_RATE_LIMITED",
+        "hint": "Slow down.",
+        "retry_after_seconds": None,
+        "_request": None,
+    }
