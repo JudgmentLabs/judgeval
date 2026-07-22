@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import inspect
+
 import httpx
 import pytest
 
+import judgeval.jql as jql
 from judgeval import Judgeval
 from judgeval.exceptions import JudgmentAPIError
 from judgeval.internal.api.api_client import JudgmentSyncClient, _handle_response
@@ -18,63 +21,24 @@ from judgeval.jql._generated_contract import SUPPORTED_OPS
 
 
 def test_generated_contract_covers_the_builder_surface() -> None:
-    assert {
-        "agg",
-        "agg_expr",
-        "all",
-        "ancestor_of",
-        "any",
-        "any_span",
-        "any_trace",
-        "arith",
-        "at_least",
-        "attr",
-        "bucket",
-        "chart",
-        "cited_by",
-        "col",
-        "cost",
-        "count",
-        "derive",
-        "descendant_of",
-        "discovery",
-        "duration",
-        "eq",
-        "every_span",
-        "every_trace",
-        "grep",
-        "gt",
-        "gte",
-        "ids",
-        "judge",
-        "judged",
-        "lt",
-        "lte",
-        "model",
-        "name",
-        "ne",
-        "no_span",
-        "no_trace",
-        "not",
-        "over_scores",
-        "over_spans",
-        "over_traces",
-        "pick",
-        "query",
-        "ranked",
-        "recent",
-        "rg",
-        "rows",
-        "sort",
-        "status",
-        "summarize",
-        "table",
-        "take",
-        "tokens",
-        "top",
-        "trend",
-        "where",
-    } == set(SUPPORTED_OPS)
+    module_builder_ops = {
+        name
+        for name, value in vars(jql).items()
+        if inspect.isfunction(value)
+        and value.__module__ == jql.__name__
+        and not name.startswith("_")
+    } - {"all_", "any_", "not_", "traces", "spans", "sessions", "to_json"}
+    # Normalize Python-safe aliases and source constructors to canonical JQL ops.
+    module_builder_ops.update({"all", "any", "not", "query"})
+
+    fluent_builder_ops = {
+        name
+        for builder in (jql.QueryBuilder, jql.PipelineBuilder)
+        for name, value in vars(builder).items()
+        if callable(value) and not name.startswith("_")
+    } - {"last", "since", "between", "pipe", "to_json"}
+
+    assert module_builder_ops | fluent_builder_ops == set(SUPPORTED_OPS)
 
 
 def test_session_to_trace_ids_uses_canonical_json() -> None:
