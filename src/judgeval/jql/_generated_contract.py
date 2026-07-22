@@ -2,9 +2,6 @@
 
 from typing import Literal
 
-JQL_IR_SCHEMA_SHA256 = (
-    "6ae52ed9a91fe26af4c56007e041b57b6e7b0d474f493a555e7327c556567c76"
-)
 SUPPORTED_OPS = (
     "agg",
     "agg_expr",

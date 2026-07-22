@@ -18,7 +18,7 @@ from typing import (
     Union,
 )
 
-from judgeval.jql._generated_contract import DiscoveryKind
+from judgeval.jql._generated_contract import DiscoveryKind, SUPPORTED_OPS
 from judgeval.jql._generated_transport import (
     JqlPresentationResponse,
     JqlQueryResponse,
@@ -27,34 +27,43 @@ from judgeval.jql._generated_transport import (
 JsonObject = Dict[str, Any]
 Filter = Mapping[str, Any]
 Expr = Mapping[str, Any]
+Cmp = Literal["eq", "ne", "gt", "gte", "lt", "lte"]
+ChartType = Literal["bar", "line", "area", "pie"]
+PresentationField = Mapping[str, Any]
 
 
 def _compact(values: Mapping[str, Any]) -> JsonObject:
     return {key: deepcopy(value) for key, value in values.items() if value is not None}
 
 
+def _node(operation: str, values: Optional[Mapping[str, Any]] = None) -> JsonObject:
+    if operation not in SUPPORTED_OPS:
+        raise ValueError(f"Unsupported JQL operation: {operation}")
+    return {**deepcopy(dict(values or {})), "op": operation}
+
+
 def status(value: str) -> JsonObject:
-    return {"op": "status", "value": value}
+    return _node("status", {"value": value})
 
 
 def name(value: str) -> JsonObject:
-    return {"op": "name", "value": value}
+    return _node("name", {"value": value})
 
 
 def model(value: str) -> JsonObject:
-    return {"op": "model", "value": value}
+    return _node("model", {"value": value})
 
 
 def cost(**bounds: float) -> JsonObject:
-    return {"op": "cost", **bounds}
+    return _node("cost", bounds)
 
 
 def duration(**bounds: float) -> JsonObject:
-    return {"op": "duration", **bounds}
+    return _node("duration", bounds)
 
 
 def judge(name: str, value: Any = None) -> JsonObject:
-    return _compact({"op": "judge", "name": name, "value": value})
+    return _compact(_node("judge", {"name": name, "value": value}))
 
 
 def judged(
@@ -66,37 +75,39 @@ def judged(
     mode: Optional[str] = None,
 ) -> JsonObject:
     return _compact(
-        {
-            "op": "judged",
-            "name": name,
-            "value": value,
-            "prompt": prompt,
-            "type": type,
-            "mode": mode,
-        }
+        _node(
+            "judged",
+            {
+                "name": name,
+                "value": value,
+                "prompt": prompt,
+                "type": type,
+                "mode": mode,
+            },
+        )
     )
 
 
 def attr(key: str, value: Any = None, selector: Optional[str] = None) -> JsonObject:
-    return _compact({"op": "attr", "key": key, "value": value, "selector": selector})
+    return _compact(_node("attr", {"key": key, "value": value, "selector": selector}))
 
 
 def grep(field: str, value: str) -> JsonObject:
-    return {"op": "grep", "field": field, "value": value}
+    return _node("grep", {"field": field, "value": value})
 
 
 def rg(field: str, pattern: str, *, ignore_case: Optional[bool] = None) -> JsonObject:
     return _compact(
-        {"op": "rg", "field": field, "pattern": pattern, "ignore_case": ignore_case}
+        _node("rg", {"field": field, "pattern": pattern, "ignore_case": ignore_case})
     )
 
 
 def tokens(field: str, words: str) -> JsonObject:
-    return {"op": "tokens", "field": field, "words": words}
+    return _node("tokens", {"field": field, "words": words})
 
 
 def _compare(op: str, field: str, value: Any) -> JsonObject:
-    return {"op": op, "field": field, "value": deepcopy(value)}
+    return _node(op, {"field": field, "value": value})
 
 
 def eq(field: str, value: Any) -> JsonObject:
@@ -124,23 +135,23 @@ def lte(field: str, value: Any) -> JsonObject:
 
 
 def cited_by(judge: str, value: Any = None) -> JsonObject:
-    return _compact({"op": "cited_by", "judge": judge, "value": value})
+    return _compact(_node("cited_by", {"judge": judge, "value": value}))
 
 
 def all_(first: Filter, *rest: Filter) -> JsonObject:
-    return {"op": "all", "filters": [deepcopy(dict(item)) for item in (first, *rest)]}
+    return _node("all", {"filters": [deepcopy(dict(item)) for item in (first, *rest)]})
 
 
 def any_(first: Filter, *rest: Filter) -> JsonObject:
-    return {"op": "any", "filters": [deepcopy(dict(item)) for item in (first, *rest)]}
+    return _node("any", {"filters": [deepcopy(dict(item)) for item in (first, *rest)]})
 
 
 def not_(filter: Filter) -> JsonObject:
-    return {"op": "not", "filter": deepcopy(dict(filter))}
+    return _node("not", {"filter": filter})
 
 
 def _quantify(op: str, filter: Filter) -> JsonObject:
-    return {"op": op, "filter": deepcopy(dict(filter))}
+    return _node(op, {"filter": filter})
 
 
 def any_span(filter: Filter) -> JsonObject:
@@ -168,52 +179,61 @@ def no_trace(filter: Filter) -> JsonObject:
 
 
 def descendant_of(filter: Filter, depth: Optional[int] = 1) -> JsonObject:
-    return {"op": "descendant_of", "filter": deepcopy(dict(filter)), "depth": depth}
+    return _node("descendant_of", {"filter": filter, "depth": depth})
 
 
 def ancestor_of(filter: Filter, depth: Optional[int] = 1) -> JsonObject:
-    return {"op": "ancestor_of", "filter": deepcopy(dict(filter)), "depth": depth}
+    return _node("ancestor_of", {"filter": filter, "depth": depth})
 
 
 def _over(
     op: str,
     agg: Mapping[str, Any],
-    cmp: Literal["eq", "ne", "gt", "gte", "lt", "lte"],
+    cmp: Cmp,
     value: float,
     where: Optional[Filter] = None,
 ) -> JsonObject:
     return _compact(
-        {
-            "op": op,
-            "agg": dict(agg),
-            "cmp": cmp,
-            "value": value,
-            "where": dict(where) if where is not None else None,
-        }
+        _node(
+            op,
+            {
+                "agg": dict(agg),
+                "cmp": cmp,
+                "value": value,
+                "where": dict(where) if where is not None else None,
+            },
+        )
     )
 
 
 def over_spans(
-    agg: Mapping[str, Any], cmp: str, value: float, where: Optional[Filter] = None
+    agg: Mapping[str, Any], cmp: Cmp, value: float, where: Optional[Filter] = None
 ) -> JsonObject:
-    return _over("over_spans", agg, cmp, value, where)  # type: ignore[arg-type]
+    return _over("over_spans", agg, cmp, value, where)
 
 
 def over_traces(
-    agg: Mapping[str, Any], cmp: str, value: float, where: Optional[Filter] = None
+    agg: Mapping[str, Any], cmp: Cmp, value: float, where: Optional[Filter] = None
 ) -> JsonObject:
-    return _over("over_traces", agg, cmp, value, where)  # type: ignore[arg-type]
+    return _over("over_traces", agg, cmp, value, where)
 
 
-def over_scores(agg: Mapping[str, Any], cmp: str, value: float) -> JsonObject:
-    return _over("over_scores", agg, cmp, value)  # type: ignore[arg-type]
+def over_scores(agg: Mapping[str, Any], cmp: Cmp, value: float) -> JsonObject:
+    return _over("over_scores", agg, cmp, value)
 
 
 def at_least(
     k: int, of: Literal["spans", "traces"], where: Optional[Filter] = None
 ) -> JsonObject:
     return _compact(
-        {"op": "at_least", "k": k, "of": of, "where": dict(where) if where else None}
+        _node(
+            "at_least",
+            {
+                "k": k,
+                "of": of,
+                "where": dict(where) if where is not None else None,
+            },
+        )
     )
 
 
@@ -226,27 +246,75 @@ def agg_expr(
     where: Optional[Filter] = None,
 ) -> JsonObject:
     return _compact(
-        {
-            "op": "agg_expr",
-            "func": func,
-            "field": field,
-            "q": q,
-            "per": per,
-            "where": dict(where) if where else None,
-        }
+        _node(
+            "agg_expr",
+            {
+                "func": func,
+                "field": field,
+                "q": q,
+                "per": per,
+                "where": dict(where) if where is not None else None,
+            },
+        )
     )
 
 
 def arith(fn: Literal["div", "mul", "add", "sub"], left: Any, right: Any) -> JsonObject:
-    return {"op": "arith", "fn": fn, "left": deepcopy(left), "right": deepcopy(right)}
+    return _node("arith", {"fn": fn, "left": left, "right": right})
 
 
 def bucket(field: str, every: str) -> JsonObject:
-    return {"op": "bucket", "field": field, "every": every}
+    return _node("bucket", {"field": field, "every": every})
 
 
 def col(name: str) -> JsonObject:
-    return {"op": "col", "name": name}
+    return _node("col", {"name": name})
+
+
+def _chart(
+    query: JsonObject,
+    *,
+    chart_type: ChartType,
+    title: str,
+    x_axis: PresentationField,
+    y_axis: PresentationField,
+    series_by: Optional[PresentationField] = None,
+    description: Optional[str] = None,
+) -> JsonObject:
+    return _compact(
+        _node(
+            "chart",
+            {
+                "chart_type": chart_type,
+                "title": title,
+                "x_axis": x_axis,
+                "y_axis": y_axis,
+                "series_by": series_by,
+                "description": description,
+                "query": query,
+            },
+        )
+    )
+
+
+def _table(
+    query: JsonObject,
+    *,
+    title: str,
+    columns: Sequence[PresentationField],
+    description: Optional[str] = None,
+) -> JsonObject:
+    return _compact(
+        _node(
+            "table",
+            {
+                "title": title,
+                "columns": list(columns),
+                "description": description,
+                "query": query,
+            },
+        )
+    )
 
 
 @dataclass(frozen=True)
@@ -270,7 +338,11 @@ class QueryBuilder:
 
     def pipe(self) -> "PipelineBuilder":
         spec = self.to_json()
-        spec.pop("select", None)
+        if "select" in spec:
+            raise ValueError(
+                "pipe() cannot follow a select; call pipe() before "
+                "rows()/ids()/count()/recent()/top()/ranked()/agg()/trend()"
+            )
         spec.pop("pipe", None)
         return PipelineBuilder(spec, ())
 
@@ -279,46 +351,76 @@ class QueryBuilder:
     ) -> "QueryBuilder":
         return self._select(
             _compact(
-                {
-                    "op": "rows",
-                    "fields": list(fields) if fields else None,
-                    "limit": limit,
-                }
+                _node(
+                    "rows",
+                    {
+                        "fields": list(fields) if fields else None,
+                        "limit": limit,
+                    },
+                )
             )
         )
 
     def ids(self) -> "QueryBuilder":
-        return self._select({"op": "ids"})
+        return self._select(_node("ids"))
 
     def count(self, by: Optional[str] = None) -> "QueryBuilder":
-        return self._select(_compact({"op": "count", "by": by}))
+        return self._select(_compact(_node("count", {"by": by})))
 
     def recent(self, n: int) -> "QueryBuilder":
-        return self._select({"op": "recent", "n": n})
+        return self._select(_node("recent", {"n": n}))
 
     def top(self, n: int, by: str) -> "QueryBuilder":
-        return self._select({"op": "top", "n": n, "by": by})
+        return self._select(_node("top", {"n": n, "by": by}))
 
     def ranked(self, **options: Any) -> "QueryBuilder":
-        return self._select({"op": "ranked", **deepcopy(options)})
+        return self._select(_node("ranked", options))
 
     def agg(self, func: str, field: str, q: Optional[float] = None) -> "QueryBuilder":
         return self._select(
-            _compact({"op": "agg", "func": func, "field": field, "q": q})
+            _compact(_node("agg", {"func": func, "field": field, "q": q}))
         )
 
     def trend(
         self, *, metric: Optional[str] = None, bucket: Optional[str] = None
     ) -> "QueryBuilder":
         return self._select(
-            _compact({"op": "trend", "metric": metric, "bucket": bucket})
+            _compact(_node("trend", {"metric": metric, "bucket": bucket}))
         )
 
-    def chart(self, **options: Any) -> JsonObject:
-        return {**deepcopy(options), "op": "chart", "query": self.to_json()}
+    def chart(
+        self,
+        *,
+        chart_type: ChartType,
+        title: str,
+        x_axis: PresentationField,
+        y_axis: PresentationField,
+        series_by: Optional[PresentationField] = None,
+        description: Optional[str] = None,
+    ) -> JsonObject:
+        return _chart(
+            self.to_json(),
+            chart_type=chart_type,
+            title=title,
+            x_axis=x_axis,
+            y_axis=y_axis,
+            series_by=series_by,
+            description=description,
+        )
 
-    def table(self, **options: Any) -> JsonObject:
-        return {**deepcopy(options), "op": "table", "query": self.to_json()}
+    def table(
+        self,
+        *,
+        title: str,
+        columns: Sequence[PresentationField],
+        description: Optional[str] = None,
+    ) -> JsonObject:
+        return _table(
+            self.to_json(),
+            title=title,
+            columns=columns,
+            description=description,
+        )
 
     def to_json(self) -> JsonObject:
         return deepcopy(self._spec)
@@ -336,33 +438,68 @@ class PipelineBuilder:
     _stages: tuple[JsonObject, ...]
 
     def where(self, filter: Filter) -> "PipelineBuilder":
-        return self._append({"op": "where", "filter": dict(filter)})
+        return self._append(_node("where", {"filter": filter}))
 
     def pick(self, **options: Any) -> "PipelineBuilder":
-        return self._append({"op": "pick", **deepcopy(options)})
+        return self._append(_node("pick", options))
 
     def derive(self, cols: Mapping[str, Any]) -> "PipelineBuilder":
-        return self._append({"op": "derive", "cols": deepcopy(dict(cols))})
+        return self._append(_node("derive", {"cols": cols}))
 
     def summarize(
         self, aggs: Mapping[str, Any], *, by: Any = None
     ) -> "PipelineBuilder":
-        return self._append(_compact({"op": "summarize", "by": by, "aggs": dict(aggs)}))
+        return self._append(
+            _compact(_node("summarize", {"by": by, "aggs": dict(aggs)}))
+        )
 
     def sort(self, by: str) -> "PipelineBuilder":
-        return self._append({"op": "sort", "by": by})
+        return self._append(_node("sort", {"by": by}))
 
     def take(self, n: int, offset: Optional[int] = None) -> "PipelineBuilder":
-        return self._append(_compact({"op": "take", "n": n, "offset": offset}))
+        return self._append(_compact(_node("take", {"n": n, "offset": offset})))
 
-    def chart(self, **options: Any) -> JsonObject:
-        return {**deepcopy(options), "op": "chart", "query": self.to_json()}
+    def chart(
+        self,
+        *,
+        chart_type: ChartType,
+        title: str,
+        x_axis: PresentationField,
+        y_axis: PresentationField,
+        series_by: Optional[PresentationField] = None,
+        description: Optional[str] = None,
+    ) -> JsonObject:
+        return _chart(
+            self.to_json(),
+            chart_type=chart_type,
+            title=title,
+            x_axis=x_axis,
+            y_axis=y_axis,
+            series_by=series_by,
+            description=description,
+        )
 
-    def table(self, **options: Any) -> JsonObject:
-        return {**deepcopy(options), "op": "table", "query": self.to_json()}
+    def table(
+        self,
+        *,
+        title: str,
+        columns: Sequence[PresentationField],
+        description: Optional[str] = None,
+    ) -> JsonObject:
+        return _table(
+            self.to_json(),
+            title=title,
+            columns=columns,
+            description=description,
+        )
 
     def to_json(self) -> JsonObject:
-        return {**deepcopy(self._spec), "pipe": deepcopy(list(self._stages))}
+        spec = deepcopy(self._spec)
+        if self._stages:
+            spec["pipe"] = deepcopy(list(self._stages))
+        else:
+            spec.pop("pipe", None)
+        return spec
 
     def _append(self, stage: JsonObject) -> "PipelineBuilder":
         return PipelineBuilder(self._spec, (*self._stages, deepcopy(stage)))
@@ -373,11 +510,13 @@ def _query(
 ) -> QueryBuilder:
     return QueryBuilder(
         _compact(
-            {
-                "op": "query",
-                "source": source,
-                "filter": dict(filter) if filter else None,
-            }
+            _node(
+                "query",
+                {
+                    "source": source,
+                    "filter": dict(filter) if filter is not None else None,
+                },
+            )
         )
     )
 
@@ -395,7 +534,7 @@ def sessions(filter: Optional[Filter] = None) -> QueryBuilder:
 
 
 def discovery(kind: DiscoveryKind, **options: Any) -> JsonObject:
-    return _compact({"op": "discovery", "kind": kind, **options})
+    return _compact(_node("discovery", {**deepcopy(options), "kind": kind}))
 
 
 QueryInput = Union[JsonObject, QueryBuilder, PipelineBuilder]
@@ -415,19 +554,20 @@ any = any_
 
 __all__ = [
     "DiscoveryKind",
+    "ChartType",
+    "Cmp",
     "Expr",
     "Filter",
     "JqlPresentationResponse",
     "JqlQueryResponse",
     "JsonObject",
     "PipelineBuilder",
+    "PresentationField",
     "QueryBuilder",
     "QueryInput",
     "agg_expr",
-    "all",
     "all_",
     "ancestor_of",
-    "any",
     "any_",
     "any_span",
     "any_trace",

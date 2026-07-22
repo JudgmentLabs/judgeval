@@ -36,24 +36,28 @@ jobs:
 
       - name: Build distributions
         run: |
+          mkdir -p .jql-source/judgment-mono
+          touch .jql-source/judgment-mono/PRIVATE_SOURCE_MARKER
           pip install uv
           uv build
 
-      - name: Check package build preserves generated output
-        run: |
-          git diff --exit-code -- \
-            src/judgeval/jql/_generated_contract.py \
-            src/judgeval/jql/_generated_transport.py
+      - name: Check distribution contents
+        run: python scripts/check_distribution_contents.py
 
   jql-parity:
     name: JQL parity with judgment-mono
     needs: [validate-branch]
     if: (needs.validate-branch.result == 'success' || needs.validate-branch.result == 'skipped') && github.event.pull_request.head.repo.full_name == github.repository && !contains(github.actor, '[bot]')
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: judgeval
 
     steps:
       - name: Checkout SDK
         uses: actions/checkout@v4
+        with:
+          path: judgeval
 
       - name: Checkout canonical JQL sources
         uses: actions/checkout@v4
@@ -62,7 +66,7 @@ jobs:
           ref: main
           token: ${{ secrets.RELEASE_BOT_GITHUB_PAT }}
           persist-credentials: false
-          path: .jql-source/judgment-mono
+          path: judgment-mono
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -72,8 +76,8 @@ jobs:
       - name: Regenerate from judgment-mono
         run: |
           python scripts/generate_jql.py \
-            .jql-source/judgment-mono/services/data-access-service/openapi.json \
-            .jql-source/judgment-mono/services/judgeval-server/openapi.public-jql.json
+            ../judgment-mono/services/data-access-service/openapi.json \
+            ../judgment-mono/services/judgeval-server/openapi.public-jql.json
 
       - name: Check canonical JQL parity
         run: |

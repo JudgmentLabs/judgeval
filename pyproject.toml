@@ -81,7 +81,21 @@ dev = [
 [tool.hatch.build]
 directory = "dist"
 artifacts = ["src/judgeval/**/*.py"]
-exclude = ["src/e2etests/*", "src/tests/*", "src/demo/*"]
+exclude = [
+    "/.jql-source/**",
+    "src/e2etests/*",
+    "src/tests/*",
+    "src/demo/*",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/LICENSE.md",
+    "/README.md",
+    "/hatch_build.py",
+    "/pyproject.toml",
+    "/src/judgeval/**",
+]
 
 [tool.hatch.build.hooks.custom]
 path = "hatch_build.py"

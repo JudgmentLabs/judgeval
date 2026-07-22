@@ -7,11 +7,13 @@ import pytest
 
 import judgeval.jql as jql
 from judgeval import Judgeval
-from judgeval.exceptions import JudgmentAPIError
+from judgeval.exceptions import JudgmentAPIError, JudgmentProjectNotFoundError
 from judgeval.internal.api.api_client import JudgmentSyncClient, _handle_response
 from judgeval.jql import (
     agg_expr,
+    at_least,
     col,
+    discovery,
     eq,
     gte,
     spans,
@@ -41,6 +43,42 @@ def test_generated_contract_covers_the_builder_surface() -> None:
     assert module_builder_ops | fluent_builder_ops == set(SUPPORTED_OPS)
 
 
+def test_builders_reject_ops_missing_from_the_generated_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(jql, "SUPPORTED_OPS", ())
+
+    with pytest.raises(ValueError, match="Unsupported JQL operation: eq"):
+        eq("status", "success")
+
+
+def test_builder_discriminators_cannot_be_overridden() -> None:
+    assert jql.cost(op=1.0)["op"] == "cost"
+    assert traces().ranked(op="evil").to_json()["select"]["op"] == "ranked"
+    assert traces().pipe().pick(op="evil").to_json()["pipe"][0]["op"] == "pick"
+    assert discovery("judges", op="evil")["op"] == "discovery"
+
+
+def test_empty_pipeline_is_omitted_and_select_cannot_be_discarded() -> None:
+    assert spans().pipe().to_json() == {"op": "query", "source": "spans"}
+
+    with pytest.raises(ValueError, match=r"pipe\(\) cannot follow a select"):
+        traces().ids().pipe()
+
+
+def test_empty_filters_are_preserved_consistently() -> None:
+    assert traces({}).to_json()["filter"] == {}
+    assert at_least(1, "spans", where={})["where"] == {}
+    assert agg_expr("count", where={})["where"] == {}
+
+
+def test_star_exports_do_not_shadow_python_builtins() -> None:
+    assert "all" not in jql.__all__
+    assert "any" not in jql.__all__
+    assert jql.all is jql.all_
+    assert jql.any is jql.any_
+
+
 def test_session_to_trace_ids_uses_canonical_json() -> None:
     assert traces().where(eq("session", "session-1")).ids().to_json() == {
         "op": "query",
@@ -50,7 +88,7 @@ def test_session_to_trace_ids_uses_canonical_json() -> None:
     }
 
 
-def test_pipeline_and_presentation_are_project_free() -> None:
+def test_pipeline_and_presentation_use_canonical_json() -> None:
     query = (
         spans()
         .last("7d")
@@ -157,6 +195,67 @@ def test_judgeval_query_sends_only_public_fields(
         "row_count": 1,
         "elapsed_ms": 4,
     }
+
+
+def test_present_normalizes_builder_input_and_discover_sends_limit_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("judgeval.judgeval.resolve_project_id", lambda *_: "project-1")
+    calls = []
+
+    def fake_request(self, method, url, payload, params=None):  # type: ignore[no-untyped-def]
+        calls.append((url, payload))
+        return {}
+
+    monkeypatch.setattr(JudgmentSyncClient, "_request", fake_request)
+    client = Judgeval(
+        project_name="demo",
+        api_key="api-key",
+        organization_id="org-1",
+        api_url="https://api.example.com/",
+    )
+
+    client.present(traces().ids(), limit=10)
+    client.discover("judges", limit=25)
+
+    assert calls == [
+        (
+            "https://api.example.com/v1/projects/project-1/query/presentation",
+            {
+                "query": {
+                    "op": "query",
+                    "source": "traces",
+                    "select": {"op": "ids"},
+                },
+                "limit": 10,
+            },
+        ),
+        (
+            "https://api.example.com/v1/projects/project-1/query",
+            {
+                "query": {"op": "discovery", "kind": "judges"},
+                "limit": 25,
+            },
+        ),
+    ]
+
+
+def test_jql_requires_a_project_visible_to_the_organization(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("judgeval.judgeval.resolve_project_id", lambda *_: None)
+    client = Judgeval(
+        project_name="missing",
+        api_key="api-key",
+        organization_id="org-1",
+        api_url="https://api.example.com/",
+    )
+
+    with pytest.raises(
+        JudgmentProjectNotFoundError,
+        match="Project 'missing' was not found for this organization",
+    ):
+        client.query(traces())
 
 
 def test_api_error_preserves_code_hint_and_retry_after() -> None:

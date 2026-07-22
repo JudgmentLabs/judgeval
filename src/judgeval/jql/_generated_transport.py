@@ -2,10 +2,6 @@
 
 from typing import Any, Dict, List, Optional, TypedDict
 
-PUBLIC_JQL_OPENAPI_SHA256 = (
-    "e889654bbd14fe91ddf3662dc62aa415b264a137787960d20f4ec2e27d123a18"
-)
-
 
 class JqlQueryResponse(TypedDict):
     query_id: str

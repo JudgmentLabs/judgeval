@@ -31,6 +31,7 @@ def _handle_response(r: Response) -> Any:
             detail = (
                 body.get("detail") or body.get("message") or body.get("error") or ""
             )
+            # The error code is also the readable fallback when detail/message are absent.
             code = body.get("error")
             hint = body.get("hint")
         except Exception:

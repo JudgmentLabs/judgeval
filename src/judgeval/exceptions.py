@@ -104,6 +104,12 @@ class JudgmentRuntimeError(RuntimeError):
     ...
 
 
+class JudgmentProjectNotFoundError(ValueError):
+    """Raised when a project is not visible to the configured organization."""
+
+    ...
+
+
 class InvalidJudgeModelError(Exception):
     """Raised when a judge is configured with an unsupported model."""
 
@@ -113,6 +119,7 @@ class InvalidJudgeModelError(Exception):
 __all__ = (
     "JudgmentAPIError",
     "JudgmentConflictError",
+    "JudgmentProjectNotFoundError",
     "JudgmentValidationError",
     "JudgmentRuntimeError",
     "JudgmentTestError",

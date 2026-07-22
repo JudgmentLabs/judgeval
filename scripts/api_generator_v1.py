@@ -915,6 +915,7 @@ def generate_api_file() -> str:
         '                or body.get("error")',
         '                or ""',
         "            )",
+        "            # The error code is also the readable fallback when detail/message are absent.",
         '            code = body.get("error")',
         '            hint = body.get("hint")',
         "        except Exception:",
