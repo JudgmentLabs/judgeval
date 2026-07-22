@@ -37,7 +37,7 @@ jobs:
       - name: Build distributions
         run: |
           mkdir -p .jql-source/judgment-mono
-          touch .jql-source/judgment-mono/PRIVATE_SOURCE_MARKER
+          echo "PRIVATE MONOREPO CONTENT" > .jql-source/judgment-mono/PRIVATE_SOURCE_MARKER
           pip install uv
           uv build
 
