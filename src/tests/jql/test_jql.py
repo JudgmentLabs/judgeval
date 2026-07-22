@@ -54,9 +54,22 @@ def test_builders_reject_ops_missing_from_the_generated_contract(
 
 def test_builder_discriminators_cannot_be_overridden() -> None:
     assert jql.cost(op=1.0)["op"] == "cost"
-    assert traces().ranked(op="evil").to_json()["select"]["op"] == "ranked"
-    assert traces().pipe().pick(op="evil").to_json()["pipe"][0]["op"] == "pick"
     assert discovery("judges", op="evil")["op"] == "discovery"
+    with pytest.raises(TypeError):
+        traces().ranked(op="evil")  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        traces().pipe().pick(op="evil")  # type: ignore[call-arg]
+
+
+def test_ranked_and_pick_emit_contract_fields() -> None:
+    assert traces().ranked(by="cost", pick=(2, 5), within="session").to_json()[
+        "select"
+    ] == {"op": "ranked", "by": "cost", "pick": [2, 5], "within": "session"}
+    assert spans().pipe().pick(by="cost", n=3, per="model", reverse=True).to_json()[
+        "pipe"
+    ] == [{"op": "pick", "by": "cost", "n": 3, "per": "model", "reverse": True}]
+    with pytest.raises(TypeError):
+        traces().ranked(bye="cost")  # type: ignore[call-arg]
 
 
 def test_empty_pipeline_is_omitted_and_select_cannot_be_discarded() -> None:

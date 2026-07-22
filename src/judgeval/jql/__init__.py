@@ -373,8 +373,27 @@ class QueryBuilder:
     def top(self, n: int, by: str) -> "QueryBuilder":
         return self._select(_node("top", {"n": n, "by": by}))
 
-    def ranked(self, **options: Any) -> "QueryBuilder":
-        return self._select(_node("ranked", options))
+    def ranked(
+        self,
+        *,
+        by: Optional[str] = None,
+        pick: Optional[Union[int, Sequence[int]]] = None,
+        within: Optional[str] = None,
+    ) -> "QueryBuilder":
+        return self._select(
+            _compact(
+                _node(
+                    "ranked",
+                    {
+                        "by": by,
+                        "pick": pick
+                        if pick is None or isinstance(pick, int)
+                        else list(pick),
+                        "within": within,
+                    },
+                )
+            )
+        )
 
     def agg(self, func: str, field: str, q: Optional[float] = None) -> "QueryBuilder":
         return self._select(
@@ -440,8 +459,17 @@ class PipelineBuilder:
     def where(self, filter: Filter) -> "PipelineBuilder":
         return self._append(_node("where", {"filter": filter}))
 
-    def pick(self, **options: Any) -> "PipelineBuilder":
-        return self._append(_node("pick", options))
+    def pick(
+        self,
+        *,
+        by: Optional[str] = None,
+        n: Optional[int] = None,
+        per: Optional[str] = None,
+        reverse: Optional[bool] = None,
+    ) -> "PipelineBuilder":
+        return self._append(
+            _compact(_node("pick", {"by": by, "n": n, "per": per, "reverse": reverse}))
+        )
 
     def derive(self, cols: Mapping[str, Any]) -> "PipelineBuilder":
         return self._append(_node("derive", {"cols": cols}))
