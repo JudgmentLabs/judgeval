@@ -5,6 +5,8 @@ import zipfile
 from pathlib import Path
 from types import ModuleType
 
+import pytest
+
 
 def load_checker() -> ModuleType:
     path = (
@@ -59,3 +61,17 @@ def test_archive_content_scan_rejects_private_marker(tmp_path: Path) -> None:
     errors = checker.distribution_errors(wheel, {"src/judgeval/__init__.py"})
 
     assert errors == ["private-source marker found in: judgeval/__init__.py"]
+
+
+def test_rejects_duplicate_archive_entries(tmp_path: Path) -> None:
+    checker = load_checker()
+    wheel = tmp_path / "judgeval-1.0.0-py3-none-any.whl"
+    with zipfile.ZipFile(wheel, "w") as archive:
+        for name, content in valid_wheel_files().items():
+            archive.writestr(name, content)
+        archive.writestr("judgeval/__init__.py", b"duplicate copy")
+
+    with pytest.raises(RuntimeError) as error:
+        checker.distribution_errors(wheel, {"src/judgeval/__init__.py"})
+
+    assert str(error.value) == "archive contains duplicate entries"

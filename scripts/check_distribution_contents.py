@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 import tarfile
 import zipfile
 from pathlib import Path
@@ -35,18 +36,19 @@ def tracked_package_files() -> set[str]:
         ["git", "ls-files", "-z", "--", "src/judgeval"],
         check=True,
         capture_output=True,
+        text=True,
     )
-    return {value.decode("utf-8") for value in result.stdout.split(b"\0") if value}
+    return {name for name in result.stdout.split("\0") if name}
 
 
-def archive_files(path: Path) -> dict[str, bytes]:
+def archive_entries(path: Path) -> list[tuple[str, bytes]]:
     if path.suffix == ".whl":
         with zipfile.ZipFile(path) as archive:
-            return {
-                info.filename: archive.read(info)
+            return [
+                (info.filename, archive.read(info))
                 for info in archive.infolist()
                 if not info.is_dir()
-            }
+            ]
     if path.name.endswith(".tar.gz"):
         with tarfile.open(path, "r:gz") as archive:
             members = archive.getmembers()
@@ -63,16 +65,23 @@ def archive_files(path: Path) -> dict[str, bytes]:
                 raise RuntimeError(
                     f"sdist contains links or special entries: {', '.join(special)}"
                 )
-            files = {}
-            for member in members:
-                if not member.isfile():
-                    continue
-                extracted = archive.extractfile(member)
-                if extracted is None:
-                    raise RuntimeError(f"could not read sdist member: {member.name}")
-                files[member.name.removeprefix(f"{root}/")] = extracted.read()
-            return files
+            return [
+                (
+                    member.name.removeprefix(f"{root}/"),
+                    archive.extractfile(member).read(),
+                )
+                for member in members
+                if member.isfile()
+            ]
     raise ValueError(f"Unsupported distribution archive: {path}")
+
+
+def archive_files(path: Path) -> dict[str, bytes]:
+    entries = archive_entries(path)
+    files = dict(entries)
+    if len(files) != len(entries):
+        raise RuntimeError("archive contains duplicate entries")
+    return files
 
 
 def expected_names(path: Path, names: set[str], tracked: set[str]) -> set[str]:
@@ -105,10 +114,9 @@ def distribution_errors(path: Path, tracked: set[str]) -> list[str]:
         errors.append(f"missing files: {', '.join(missing)}")
     if len(files) > MAX_ARCHIVE_FILES:
         errors.append(f"contains {len(files)} files; limit is {MAX_ARCHIVE_FILES}")
-    if path.stat().st_size > MAX_ARCHIVE_BYTES:
-        errors.append(
-            f"archive is {path.stat().st_size} bytes; limit is {MAX_ARCHIVE_BYTES}"
-        )
+    archive_bytes = path.stat().st_size
+    if archive_bytes > MAX_ARCHIVE_BYTES:
+        errors.append(f"archive is {archive_bytes} bytes; limit is {MAX_ARCHIVE_BYTES}")
     unpacked_bytes = sum(len(content) for content in files.values())
     if unpacked_bytes > MAX_UNPACKED_BYTES:
         errors.append(
@@ -121,6 +129,12 @@ def distribution_errors(path: Path, tracked: set[str]) -> list[str]:
     if marked:
         errors.append(f"private-source marker found in: {', '.join(marked)}")
     return errors
+
+
+def plant_marker() -> None:
+    marker = Path(".jql-source/judgment-mono/PRIVATE_SOURCE_MARKER")
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_bytes(PRIVATE_SOURCE_MARKER)
 
 
 def main() -> None:
@@ -141,4 +155,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    if "--plant" in sys.argv:
+        plant_marker()
+    else:
+        main()
