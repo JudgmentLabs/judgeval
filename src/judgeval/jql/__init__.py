@@ -30,6 +30,8 @@ Expr = Mapping[str, Any]
 Cmp = Literal["eq", "ne", "gt", "gte", "lt", "lte"]
 ChartType = Literal["bar", "line", "area", "pie"]
 PresentationField = Mapping[str, Any]
+# HierarchyFilter.depth is pinned to exactly 1 (or null) in the public IR.
+HierarchyDepth = Literal[1]
 
 
 def _compact(values: Mapping[str, Any]) -> JsonObject:
@@ -186,11 +188,11 @@ def no_trace(filter: Filter) -> JsonObject:
     return _quantify("no_trace", filter)
 
 
-def descendant_of(filter: Filter, depth: Optional[int] = 1) -> JsonObject:
+def descendant_of(filter: Filter, depth: Optional[HierarchyDepth] = 1) -> JsonObject:
     return _node("descendant_of", {"filter": filter, "depth": depth})
 
 
-def ancestor_of(filter: Filter, depth: Optional[int] = 1) -> JsonObject:
+def ancestor_of(filter: Filter, depth: Optional[HierarchyDepth] = 1) -> JsonObject:
     return _node("ancestor_of", {"filter": filter, "depth": depth})
 
 
@@ -600,6 +602,7 @@ __all__ = [
     "Cmp",
     "Expr",
     "Filter",
+    "HierarchyDepth",
     "JqlPresentationResponse",
     "JqlQueryResponse",
     "JsonObject",

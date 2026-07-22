@@ -11,8 +11,10 @@ from judgeval.exceptions import JudgmentAPIError, JudgmentProjectNotFoundError
 from judgeval.internal.api.api_client import JudgmentSyncClient, _handle_response
 from judgeval.jql import (
     agg_expr,
+    ancestor_of,
     at_least,
     col,
+    descendant_of,
     discovery,
     eq,
     gte,
@@ -66,6 +68,11 @@ def test_builder_discriminators_cannot_be_overridden() -> None:
 def test_second_select_is_rejected_instead_of_replacing() -> None:
     with pytest.raises(ValueError, match="select is already set to 'ids'"):
         traces().ids().count()
+
+
+def test_hierarchy_depth_emits_only_contract_values() -> None:
+    assert descendant_of(eq("name", "tool"))["depth"] == 1
+    assert ancestor_of(eq("name", "tool"), depth=None)["depth"] is None
 
 
 def test_ranked_and_pick_emit_contract_fields() -> None:
