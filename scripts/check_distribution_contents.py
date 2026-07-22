@@ -34,22 +34,23 @@ def unexpected_names(path: Path, names: set[str]) -> set[str]:
         return {
             name
             for name in names
-            if not name.startswith("judgeval/") and ".dist-info/" not in name
+            if not name.startswith("judgeval/")
+            and not name.split("/", 1)[0].endswith(".dist-info")
         }
-    allowed_files = {
+    allowed = {
         ".gitignore",
         "LICENSE.md",
         "README.md",
         "hatch_build.py",
         "pyproject.toml",
         "PKG-INFO",
+        "src",
+        "src/judgeval",
     }
     return {
         name
         for name in names
-        if name not in allowed_files
-        and name != "src"
-        and not name.startswith("src/judgeval")
+        if name not in allowed and not name.startswith("src/judgeval/")
     }
 
 

@@ -80,7 +80,6 @@ dev = [
 
 [tool.hatch.build]
 directory = "dist"
-artifacts = ["src/judgeval/**/*.py"]
 exclude = [
     "/.jql-source/**",
     "src/e2etests/*",
