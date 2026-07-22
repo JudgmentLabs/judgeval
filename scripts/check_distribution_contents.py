@@ -86,9 +86,8 @@ def archive_files(path: Path) -> dict[str, bytes]:
 
 def expected_names(path: Path, names: set[str], tracked: set[str]) -> set[str]:
     if path.suffix == ".whl":
-        dist_info_roots = {
-            name.split("/", 1)[0] for name in names if ".dist-info/" in name
-        }
+        roots = {name.split("/", 1)[0] for name in names}
+        dist_info_roots = {root for root in roots if root.endswith(".dist-info")}
         if len(dist_info_roots) != 1:
             raise RuntimeError(
                 f"wheel must have one dist-info root, found {dist_info_roots}"
