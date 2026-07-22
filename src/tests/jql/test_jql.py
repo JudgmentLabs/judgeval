@@ -7,7 +7,12 @@ import pytest
 
 import judgeval.jql as jql
 from judgeval import Judgeval
-from judgeval.exceptions import JudgmentAPIError, JudgmentProjectNotFoundError
+from judgeval.exceptions import (
+    JudgmentAPIError,
+    JudgmentConflictError,
+    JudgmentProjectNotFoundError,
+    JudgmentValidationError,
+)
 from judgeval.internal.api.api_client import JudgmentSyncClient, _handle_response
 from judgeval.jql import (
     agg_expr,
@@ -283,6 +288,38 @@ def test_jql_requires_a_project_visible_to_the_organization(
         match="Project 'missing' was not found for this organization",
     ):
         client.query(traces())
+
+
+def test_jql_errors_map_to_typed_sdk_exceptions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("judgeval.judgeval.resolve_project_id", lambda *_: "project-1")
+    client = Judgeval(
+        project_name="demo",
+        api_key="api-key",
+        organization_id="org-1",
+        api_url="https://api.example.com/",
+    )
+
+    def raise_status(status_code: int) -> None:
+        def fake_request(self, method, url, payload, params=None):  # type: ignore[no-untyped-def]
+            raise JudgmentAPIError(status_code, "boom", None, code="JQL_INVALID")
+
+        monkeypatch.setattr(JudgmentSyncClient, "_request", fake_request)
+
+    raise_status(422)
+    with pytest.raises(JudgmentValidationError) as invalid:
+        client.query(traces())
+    assert invalid.value.code == "JQL_INVALID"
+
+    raise_status(409)
+    with pytest.raises(JudgmentConflictError):
+        client.discover("judges")
+
+    raise_status(500)
+    with pytest.raises(JudgmentAPIError) as server_error:
+        client.query(traces())
+    assert type(server_error.value) is JudgmentAPIError
 
 
 def test_api_error_preserves_code_hint_and_retry_after() -> None:

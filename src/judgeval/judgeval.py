@@ -2,7 +2,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, cast
 
 from judgeval.internal.api import JudgmentSyncClient
-from judgeval.exceptions import JudgmentProjectNotFoundError
+from judgeval.exceptions import (
+    JudgmentAPIError,
+    JudgmentProjectNotFoundError,
+    map_judgment_api_error,
+)
 from judgeval.utils import resolve_project_id
 from judgeval.utils.serialize import safe_serialize
 from judgeval.utils.url import url_for
@@ -211,11 +215,17 @@ class Judgeval:
         payload: Dict[str, Any] = {"query": query}
         if limit is not None:
             payload["limit"] = limit
-        return self._internal_client._request(
-            "POST",
-            url_for(f"/v1/projects/{project_id}/{path}", self._api_url),
-            payload,
-        )
+        try:
+            return self._internal_client._request(
+                "POST",
+                url_for(f"/v1/projects/{project_id}/{path}", self._api_url),
+                payload,
+            )
+        except JudgmentAPIError as error:
+            mapped = map_judgment_api_error(error)
+            if mapped is error:
+                raise
+            raise mapped from error
 
     def discover(
         self,
