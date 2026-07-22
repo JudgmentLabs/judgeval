@@ -39,7 +39,15 @@ def _compact(values: Mapping[str, Any]) -> JsonObject:
 def _node(operation: str, values: Optional[Mapping[str, Any]] = None) -> JsonObject:
     if operation not in SUPPORTED_OPS:
         raise ValueError(f"Unsupported JQL operation: {operation}")
-    return {**deepcopy(dict(values or {})), "op": operation}
+    spec = deepcopy(dict(values or {}))
+    supplied = spec.pop("op", operation)
+    if supplied != operation:
+        raise ValueError(
+            f"Conflicting op {supplied!r} for JQL node {operation!r}; "
+            "the operation discriminator cannot be overridden"
+        )
+    spec["op"] = operation
+    return spec
 
 
 def status(value: str) -> JsonObject:
@@ -445,6 +453,12 @@ class QueryBuilder:
         return deepcopy(self._spec)
 
     def _select(self, select: JsonObject) -> "QueryBuilder":
+        existing = self._spec.get("select")
+        if existing is not None:
+            raise ValueError(
+                f"select is already set to {existing['op']!r}; a query has exactly "
+                f"one select, so start a new query instead of adding {select['op']!r}"
+            )
         return self._replace(select=select)
 
     def _replace(self, **values: Any) -> "QueryBuilder":

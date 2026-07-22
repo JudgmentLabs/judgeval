@@ -53,12 +53,19 @@ def test_builders_reject_ops_missing_from_the_generated_contract(
 
 
 def test_builder_discriminators_cannot_be_overridden() -> None:
-    assert jql.cost(op=1.0)["op"] == "cost"
-    assert discovery("judges", op="evil")["op"] == "discovery"
+    with pytest.raises(ValueError, match="Conflicting op 'evil'"):
+        jql.cost(op="evil")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="Conflicting op 'evil'"):
+        discovery("judges", op="evil")
     with pytest.raises(TypeError):
         traces().ranked(op="evil")  # type: ignore[call-arg]
     with pytest.raises(TypeError):
         traces().pipe().pick(op="evil")  # type: ignore[call-arg]
+
+
+def test_second_select_is_rejected_instead_of_replacing() -> None:
+    with pytest.raises(ValueError, match="select is already set to 'ids'"):
+        traces().ids().count()
 
 
 def test_ranked_and_pick_emit_contract_fields() -> None:
