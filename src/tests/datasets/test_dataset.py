@@ -122,6 +122,15 @@ class TestDatasetLoadFromFile:
         assert examples[0].example_id == "e1"
         assert examples[0]["input"] == "q"
 
+    def test_examples_from_file_entries_generates_ids_for_plain_entries(self):
+        examples = _examples_from_file_entries([{"input": "a"}, {"input": "b"}])
+        assert len(examples) == 2
+        assert examples[0].example_id
+        assert examples[1].example_id
+        assert examples[0].created_at
+        assert examples[1].created_at
+        assert examples[0].example_id != examples[1].example_id
+
     def test_add_from_json_loads_save_as_output(self):
         client = MagicMock()
         client.post_projects_datasets_by_dataset_identifier_examples.return_value = {
@@ -324,6 +333,12 @@ class TestDatasetEntrySerialization:
     def test_example_from_dataset_entry_flat_fallback(self):
         entry = {"example_id": "e1", "created_at": "2026-01-01", "input": "q"}
         example = example_from_dataset_entry(entry)
+        assert example["input"] == "q"
+
+    def test_example_from_dataset_entry_generates_id_when_missing(self):
+        example = example_from_dataset_entry({"input": "q"})
+        assert example.example_id
+        assert example.created_at
         assert example["input"] == "q"
 
 

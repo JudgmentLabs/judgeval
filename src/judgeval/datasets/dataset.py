@@ -68,11 +68,17 @@ def example_from_dataset_entry(entry: Dict[str, Any]) -> Example:
             if k not in ("example_id", "created_at", "name")
         }
 
-    example = Example(
-        example_id=entry.get("example_id", "") or "",
-        created_at=entry.get("created_at", "") or "",
-        name=entry.get("name"),
-    )
+    example_kwargs: Dict[str, Any] = {}
+    example_id = entry.get("example_id")
+    if example_id:
+        example_kwargs["example_id"] = example_id
+    created_at = entry.get("created_at")
+    if created_at:
+        example_kwargs["created_at"] = created_at
+    if "name" in entry:
+        example_kwargs["name"] = entry.get("name")
+
+    example = Example(**example_kwargs)
     for key, value in data.items():
         example._properties[key] = value
 
