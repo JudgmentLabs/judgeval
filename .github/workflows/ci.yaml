@@ -147,6 +147,7 @@ jobs:
     name: E2E Tests
     runs-on: ubuntu-latest
     env:
+      EXPECTED_AWS_ACCOUNT_ID: "762168327048"
       TEST_TIMEOUT_SECONDS: ${{ secrets.TEST_TIMEOUT_SECONDS }}
     steps:
       - name: Configure AWS Credentials
@@ -155,6 +156,14 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-1
+
+      - name: Verify AWS account
+        run: |
+          actual_account_id=$(aws sts get-caller-identity --query Account --output text)
+          if [ "$actual_account_id" != "$EXPECTED_AWS_ACCOUNT_ID" ]; then
+            echo "::error::Expected AWS account $EXPECTED_AWS_ACCOUNT_ID, got $actual_account_id"
+            exit 1
+          fi
 
       - name: Checkout code
         uses: actions/checkout@v4
