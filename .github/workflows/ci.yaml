@@ -101,7 +101,6 @@ jobs:
     env:
       PYTHONPATH: "."
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      TOGETHER_API_KEY: ${{ secrets.TOGETHER_API_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
@@ -148,6 +147,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TEST_TIMEOUT_SECONDS: ${{ secrets.TEST_TIMEOUT_SECONDS }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4

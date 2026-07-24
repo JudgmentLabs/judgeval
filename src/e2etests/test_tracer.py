@@ -7,7 +7,6 @@ import pytest
 import orjson
 from openai import OpenAI, AsyncOpenAI
 from anthropic import Anthropic, AsyncAnthropic
-from together import Together, AsyncTogether  # type: ignore[import-untyped]
 from google import genai
 
 from judgeval import Tracer
@@ -35,12 +34,10 @@ tracer = Tracer.init(project_name=project_name)
 
 openai_client = wrap(OpenAI())
 anthropic_client = wrap(Anthropic())
-together_client = wrap(Together(api_key=os.getenv("TOGETHER_API_KEY")))
 google_client = wrap(genai.Client(api_key=os.getenv("GOOGLE_API_KEY")))
 
 openai_client_async = wrap(AsyncOpenAI())
 anthropic_client_async = wrap(AsyncAnthropic())
-together_client_async = wrap(AsyncTogether(api_key=os.getenv("TOGETHER_API_KEY")))
 
 QUERY_RETRY = 60
 PROMPT = "I need you to solve this math problem: 1 + 1 = ?"
@@ -75,18 +72,6 @@ def anthropic_llm_call():
         model="claude-haiku-4-5",
         messages=[{"role": "user", "content": PROMPT}],
         max_tokens=30,
-    )
-    return format(BaseTracer.get_current_span().get_span_context().trace_id, "032x")
-
-
-@BaseTracer.observe()
-def together_llm_call():
-    together_client.chat.completions.create(
-        model="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": PROMPT},
-        ],
     )
     return format(BaseTracer.get_current_span().get_span_context().trace_id, "032x")
 
@@ -135,26 +120,6 @@ def anthropic_streaming_llm_call():
 
 
 @BaseTracer.observe()
-def together_streaming_llm_call():
-    stream = together_client.chat.completions.create(
-        model="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": PROMPT},
-        ],
-        stream=True,
-        stream_options={"include_usage": True},
-    )
-
-    accumulated_content = ""
-    for chunk in stream:
-        if chunk.choices and chunk.choices[0].delta.content:
-            accumulated_content += chunk.choices[0].delta.content
-
-    return format(BaseTracer.get_current_span().get_span_context().trace_id, "032x")
-
-
-@BaseTracer.observe()
 async def openai_async_llm_call():
     await openai_client_async.chat.completions.create(
         model="gpt-4o-mini", messages=[{"role": "user", "content": PROMPT}]
@@ -168,15 +133,6 @@ async def anthropic_async_llm_call():
         model="claude-haiku-4-5",
         messages=[{"role": "user", "content": PROMPT}],
         max_tokens=30,
-    )
-    return format(BaseTracer.get_current_span().get_span_context().trace_id, "032x")
-
-
-@BaseTracer.observe()
-async def together_async_llm_call():
-    await together_client_async.chat.completions.create(
-        model="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
-        messages=[{"role": "user", "content": PROMPT}],
     )
     return format(BaseTracer.get_current_span().get_span_context().trace_id, "032x")
 
@@ -214,26 +170,6 @@ async def anthropic_async_streaming_llm_call():
     async for chunk in stream:
         if hasattr(chunk, "delta") and hasattr(chunk.delta, "text"):
             accumulated_content += chunk.delta.text or ""
-
-    return format(BaseTracer.get_current_span().get_span_context().trace_id, "032x")
-
-
-@BaseTracer.observe()
-async def together_async_streaming_llm_call():
-    stream = await together_client_async.chat.completions.create(
-        model="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": PROMPT},
-        ],
-        stream=True,
-        stream_options={"include_usage": True},
-    )
-
-    accumulated_content = ""
-    async for chunk in stream:
-        if chunk.choices and chunk.choices[0].delta.content:
-            accumulated_content += chunk.choices[0].delta.content
 
     return format(BaseTracer.get_current_span().get_span_context().trace_id, "032x")
 
@@ -319,12 +255,6 @@ def test_anthropic_llm_cost():
     retrieve_llm_cost_helper(trace_id)
 
 
-@pytest.mark.skip(reason="Skipping together client because unreliable")
-def test_together_llm_cost():
-    trace_id = together_llm_call()
-    retrieve_llm_cost_helper(trace_id)
-
-
 @pytest.mark.skip(reason="Skipping google client quotes")
 def test_google_llm_cost():
     trace_id = google_llm_call()
@@ -343,13 +273,6 @@ async def test_anthropic_async_llm_cost():
     retrieve_llm_cost_helper(trace_id)
 
 
-@pytest.mark.skip(reason="Skipping together client because unreliable")
-@pytest.mark.asyncio
-async def test_together_async_llm_cost():
-    trace_id = await together_async_llm_call()
-    retrieve_llm_cost_helper(trace_id)
-
-
 def test_openai_streaming_llm_cost():
     trace_id = openai_streaming_llm_call()
     retrieve_streaming_trace_helper(trace_id)
@@ -357,12 +280,6 @@ def test_openai_streaming_llm_cost():
 
 def test_anthropic_streaming_llm_cost():
     trace_id = anthropic_streaming_llm_call()
-    retrieve_streaming_trace_helper(trace_id)
-
-
-@pytest.mark.skip(reason="Together account blocked")
-def test_together_streaming_llm_cost():
-    trace_id = together_streaming_llm_call()
     retrieve_streaming_trace_helper(trace_id)
 
 
@@ -375,11 +292,4 @@ async def test_openai_async_streaming_llm_cost():
 @pytest.mark.asyncio
 async def test_anthropic_async_streaming_llm_cost():
     trace_id = await anthropic_async_streaming_llm_call()
-    retrieve_streaming_trace_helper(trace_id)
-
-
-@pytest.mark.skip(reason="Together account blocked")
-@pytest.mark.asyncio
-async def test_together_async_streaming_llm_cost():
-    trace_id = await together_async_streaming_llm_call()
     retrieve_streaming_trace_helper(trace_id)
