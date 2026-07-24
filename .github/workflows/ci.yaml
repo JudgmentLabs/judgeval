@@ -156,6 +156,9 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-1
 
+      - name: Report AWS account ID
+        run: aws sts get-caller-identity --query Account --output text
+
       - name: Checkout code
         uses: actions/checkout@v4
 
