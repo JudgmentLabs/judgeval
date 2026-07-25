@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence,
 from judgeval.internal.api import JudgmentSyncClient
 from judgeval.exceptions import (
     JudgmentAPIError,
+    JudgmentJQLUnavailableError,
     JudgmentProjectNotFoundError,
     map_judgment_api_error,
 )
@@ -25,6 +26,12 @@ if TYPE_CHECKING:
         JqlQueryResponse,
         QueryInput,
     )
+
+
+#: Detail the API sends when a JQL-enabled organization asks for a project it
+#: cannot see. Used only to sharpen the 404 message; an unrecognized detail
+#: falls back to naming both possible causes.
+_JQL_PROJECT_NOT_FOUND_DETAIL = "Project not found"
 
 
 class Judgeval:
@@ -222,10 +229,42 @@ class Judgeval:
                 payload,
             )
         except JudgmentAPIError as error:
+            if error.status_code == 404:
+                raise self._jql_unavailable_error(error) from error
             mapped = map_judgment_api_error(error)
             if mapped is error:
                 raise
             raise mapped from error
+
+    def _jql_unavailable_error(
+        self, error: JudgmentAPIError
+    ) -> JudgmentJQLUnavailableError:
+        """Explain the opaque 404 the public JQL API returns.
+
+        The organization-level feature gate runs before the project lookup
+        server-side, so a disabled organization never reaches the project
+        check. That makes the two 404 details disjoint: only a JQL-enabled
+        organization can be told the project is missing. When the detail is
+        anything else, either cause is possible and both are named.
+        """
+        if error.detail == _JQL_PROJECT_NOT_FOUND_DETAIL:
+            detail = (
+                f"Project '{self._project_name}' was not found for this organization."
+            )
+        else:
+            detail = (
+                "JQL is not enabled for this organization, or project "
+                f"'{self._project_name}' was not found — the API returns the same "
+                "404 for both. Contact Judgment to enable JQL for your organization."
+            )
+        return JudgmentJQLUnavailableError(
+            error.status_code,
+            detail,
+            error.response,
+            code=error.code,
+            hint=error.hint,
+            retry_after_seconds=error.retry_after_seconds,
+        )
 
     def discover(
         self,

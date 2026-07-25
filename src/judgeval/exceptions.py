@@ -52,6 +52,20 @@ class JudgmentValidationError(JudgmentAPIError):
     ...
 
 
+class JudgmentJQLUnavailableError(JudgmentAPIError):
+    """Raised when a JQL request is answered with HTTP 404.
+
+    The public JQL API returns the same opaque 404 whether JQL is not
+    enabled for the organization or the project does not exist, so this
+    error covers both causes and its detail names them.
+
+    This is distinct from a 503, which means JQL is enabled but
+    temporarily unavailable.
+    """
+
+    ...
+
+
 def map_judgment_api_error(
     error: JudgmentAPIError, message: Optional[str] = None
 ) -> JudgmentAPIError:
@@ -107,6 +121,7 @@ class InvalidJudgeModelError(Exception):
 __all__ = (
     "JudgmentAPIError",
     "JudgmentConflictError",
+    "JudgmentJQLUnavailableError",
     "JudgmentProjectNotFoundError",
     "JudgmentValidationError",
     "JudgmentRuntimeError",
