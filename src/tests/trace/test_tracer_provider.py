@@ -176,3 +176,70 @@ class TestGlobalContextBridge:
         ):
             assert JudgmentTracerProvider.install_as_global_tracer_provider() is True
         assert provider._use_global_context is True
+
+
+class TestForeignGlobalParent:
+    """Owning the global context must not mean inheriting from it.
+
+    Third-party instrumentation and host applications routinely leave a span
+    current in the global OTel context. Judgment spans have to keep parenting
+    from Judgment's own context, otherwise they get reparented onto a foreign
+    trace and the trace tree silently breaks."""
+
+    def _foreign_span(self):
+        from opentelemetry.sdk.trace import TracerProvider as SdkTracerProvider
+
+        return SdkTracerProvider().get_tracer("foreign").start_span("foreign-root")
+
+    def test_foreign_global_span_is_not_adopted_as_parent(
+        self, tracer, collecting_exporter
+    ):
+        from opentelemetry import context as context_api
+        from opentelemetry import trace as otel_trace
+        from judgeval.trace.base_tracer import BaseTracer
+
+        provider = JudgmentTracerProvider.get_instance()
+        provider._use_global_context = True
+
+        foreign = self._foreign_span()
+        token = context_api.attach(otel_trace.set_span_in_context(foreign))
+        try:
+            with BaseTracer.start_as_current_span("judgment-root"):
+                pass
+        finally:
+            context_api.detach(token)
+            foreign.end()
+
+        span = next(
+            s for s in collecting_exporter.spans if s.name == "judgment-root"
+        )
+        assert span.parent is None
+        assert (
+            span.context.trace_id != foreign.get_span_context().trace_id
+        ), "Judgment root span was reparented onto the foreign trace"
+
+    def test_judgment_children_still_parent_to_judgment_spans(
+        self, tracer, collecting_exporter
+    ):
+        from opentelemetry import context as context_api
+        from opentelemetry import trace as otel_trace
+        from judgeval.trace.base_tracer import BaseTracer
+
+        provider = JudgmentTracerProvider.get_instance()
+        provider._use_global_context = True
+
+        foreign = self._foreign_span()
+        token = context_api.attach(otel_trace.set_span_in_context(foreign))
+        try:
+            with BaseTracer.start_as_current_span("parent"):
+                with BaseTracer.start_as_current_span("child"):
+                    pass
+        finally:
+            context_api.detach(token)
+            foreign.end()
+
+        by_name = {s.name: s for s in collecting_exporter.spans}
+        parent, child = by_name["parent"], by_name["child"]
+        assert child.parent is not None
+        assert child.parent.span_id == parent.context.span_id
+        assert child.context.trace_id == parent.context.trace_id
