@@ -3,6 +3,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from judgeval.trace.tracer import Tracer
+from judgeval.trace.offline_tracer import OfflineTracer
 from judgeval.trace.exporters.noop_judgment_span_exporter import (
     NoOpJudgmentSpanExporter,
 )
@@ -96,9 +97,29 @@ class TestTracerInitEnabled:
                 environment="staging",
             )
         assert (
-            t._tracer_provider.resource.attributes.get("deployment.environment")
+            t._tracer_provider.resource.attributes.get("deployment.environment.name")
             == "staging"
         )
+        assert "deployment.environment" not in t._tracer_provider.resource.attributes
+
+    def test_environment_in_offline_resource(self):
+        with patch(
+            "judgeval.trace.offline_tracer.resolve_project_id", return_value="p"
+        ):
+            t = OfflineTracer.create(
+                project_name="x",
+                api_key="k",
+                organization_id="o",
+                api_url="http://api",
+                environment="staging",
+                set_active=False,
+                dataset=[],
+            )
+        assert (
+            t._tracer_provider.resource.attributes.get("deployment.environment.name")
+            == "staging"
+        )
+        assert "deployment.environment" not in t._tracer_provider.resource.attributes
 
     def test_custom_resource_attributes(self):
         with patch("judgeval.trace.tracer.resolve_project_id", return_value="p"):

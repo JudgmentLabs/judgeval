@@ -137,7 +137,7 @@ class OfflineTracer(Tracer):
             "judgment.offline": "true",
         }
         if environment:
-            resource_attrs["deployment.environment"] = environment
+            resource_attrs["deployment.environment.name"] = environment
         if resource_attributes:
             resource_attrs.update(resource_attributes)
 
