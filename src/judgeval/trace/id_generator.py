@@ -7,16 +7,11 @@ from opentelemetry.sdk.trace.id_generator import IdGenerator
 
 
 class IsolatedRandomIdGenerator(IdGenerator):
-    """Generates trace and span IDs using ``os.urandom()`` for fork-safe entropy.
+    """Generates trace and span IDs from the OS entropy pool via ``os.urandom()``.
 
-    ``os.urandom()`` reads directly from the OS entropy pool on every call and
-    never shares state across forked processes, making this generator safe for
-    use in forking servers such as Uvicorn (``--workers N``) or Gunicorn
-    pre-fork workers where ``Tracer.init()`` is called before the fork.
-
-    A ``random.Random`` instance seeded before a fork is **not** fork-safe:
-    every child process inherits an identical copy of the PRNG state and
-    therefore generates the same ID sequence, causing collisions.
+    Each call reads fresh bytes directly from the operating system, so IDs are
+    statistically unique across threads, processes, and forked workers without
+    any shared or inherited state.
     """
 
     def generate_span_id(self) -> int:
