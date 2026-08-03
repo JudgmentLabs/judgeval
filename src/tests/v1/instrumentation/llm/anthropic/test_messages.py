@@ -18,7 +18,7 @@ class BaseAnthropicTest:
     """Base class with helper methods for Anthropic tests."""
 
     def verify_tracing_if_wrapped(
-        self, client, mock_processor, expected_model_name="claude-3-haiku-20240307"
+        self, client, mock_processor, expected_model_name="claude-haiku-4-5"
     ):
         """Helper method to verify tracing only if client is wrapped."""
         if hasattr(client, "_judgment_tracer"):
@@ -42,7 +42,7 @@ class TestNonStreamingSyncWrapper(BaseAnthropicTest):
     def test_messages_create(self, sync_client_maybe_wrapped, mock_processor):
         """Test sync messages.create with tracing verification"""
         response = sync_client_maybe_wrapped.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Say 'test' and nothing else"}],
         )
@@ -66,7 +66,7 @@ class TestNonStreamingSyncWrapper(BaseAnthropicTest):
         initial_span_count = len(mock_processor.ended_spans)
 
         response1 = sync_client_maybe_wrapped.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Say 'first'"}],
         )
@@ -99,7 +99,7 @@ class TestNonStreamingSyncWrapper(BaseAnthropicTest):
                 span=span1,
                 attrs=attrs1,
                 expected_span_name="ANTHROPIC_API_CALL",
-                expected_model_name="claude-3-haiku-20240307",
+                expected_model_name="claude-haiku-4-5",
             )
 
             verify_span_attributes_comprehensive(
@@ -115,7 +115,7 @@ class TestNonStreamingAsyncWrapper(BaseAnthropicTest):
     async def test_messages_create(self, async_client_maybe_wrapped, mock_processor):
         """Test async messages.create with tracing verification"""
         response = await async_client_maybe_wrapped.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Say 'test' and nothing else"}],
         )
@@ -140,13 +140,13 @@ class TestNonStreamingAsyncWrapper(BaseAnthropicTest):
         initial_span_count = len(mock_processor.ended_spans)
 
         response1 = await async_client_maybe_wrapped.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Say 'first'"}],
         )
 
         response2 = await async_client_maybe_wrapped.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Say 'second'"}],
         )
@@ -173,14 +173,14 @@ class TestNonStreamingAsyncWrapper(BaseAnthropicTest):
                 span=span1,
                 attrs=attrs1,
                 expected_span_name="ANTHROPIC_API_CALL",
-                expected_model_name="claude-3-haiku-20240307",
+                expected_model_name="claude-haiku-4-5",
             )
 
             verify_span_attributes_comprehensive(
                 span=span2,
                 attrs=attrs2,
                 expected_span_name="ANTHROPIC_API_CALL",
-                expected_model_name="claude-3-haiku-20240307",
+                expected_model_name="claude-haiku-4-5",
             )
 
     @pytest.mark.asyncio
@@ -212,7 +212,7 @@ class TestNonStreamingAsyncWrapper(BaseAnthropicTest):
         ]
 
         response1 = await wrapped_async_client.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             max_tokens=1024,
             system=system_blocks,
             messages=user_msg,
@@ -225,12 +225,12 @@ class TestNonStreamingAsyncWrapper(BaseAnthropicTest):
             span=span,
             attrs=attrs,
             expected_span_name="ANTHROPIC_API_CALL",
-            expected_model_name="claude-3-haiku-20240307",
+            expected_model_name="claude-haiku-4-5",
             check_cache_creation_value=True,
         )
 
         response2 = await wrapped_async_client.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             max_tokens=1024,
             system=system_blocks,
             messages=user_msg,
@@ -247,7 +247,7 @@ class TestNonStreamingAsyncWrapper(BaseAnthropicTest):
             span=span,
             attrs=attrs,
             expected_span_name="ANTHROPIC_API_CALL",
-            expected_model_name="claude-3-haiku-20240307",
+            expected_model_name="claude-haiku-4-5",
             check_cache_read_value=True,
         )
 
@@ -256,7 +256,7 @@ class TestStreamingSync(BaseAnthropicTest):
     def test_messages_create_streaming(self, sync_client_maybe_wrapped, mock_processor):
         """Test sync messages.create with stream=True and tracing verification"""
         stream = sync_client_maybe_wrapped.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Count to 3"}],
             stream=True,
@@ -276,7 +276,7 @@ class TestStreamingSync(BaseAnthropicTest):
     ):
         """Test sync messages.stream with context manager and tracing verification"""
         with sync_client_maybe_wrapped.messages.stream(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Count to 3"}],
         ) as stream:
@@ -291,7 +291,7 @@ class TestStreamingSync(BaseAnthropicTest):
     ):
         """Verify content is accumulated correctly across chunks with tracing verification"""
         with sync_client_maybe_wrapped.messages.stream(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Say: Hello World"}],
         ) as stream:
@@ -307,7 +307,7 @@ class TestStreamingSync(BaseAnthropicTest):
     def test_streaming_early_break(self, sync_client_maybe_wrapped, mock_processor):
         """Test breaking out of stream early with tracing verification"""
         stream = sync_client_maybe_wrapped.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Count to 10"}],
             stream=True,
@@ -358,7 +358,7 @@ class TestStreamingAsync(BaseAnthropicTest):
     ):
         """Test async messages.create with stream=True and tracing verification"""
         stream = await async_client_maybe_wrapped.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Count to 3"}],
             stream=True,
@@ -379,7 +379,7 @@ class TestStreamingAsync(BaseAnthropicTest):
     ):
         """Test async messages.stream with context manager and tracing verification"""
         async with async_client_maybe_wrapped.messages.stream(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Count to 3"}],
         ) as stream:
@@ -395,7 +395,7 @@ class TestStreamingAsync(BaseAnthropicTest):
     ):
         """Verify content is accumulated correctly across chunks with tracing verification"""
         async with async_client_maybe_wrapped.messages.stream(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Say: Hello World"}],
         ) as stream:
@@ -414,7 +414,7 @@ class TestStreamingAsync(BaseAnthropicTest):
     ):
         """Test breaking out of stream early with tracing verification"""
         stream = await async_client_maybe_wrapped.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Count to 10"}],
             stream=True,
@@ -477,13 +477,13 @@ class TestEdgeCases(BaseAnthropicTest):
         initial_span_count = len(mock_processor.ended_spans)
 
         response1 = client1.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Say: one"}],
         )
 
         response2 = client2.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Say: two"}],
         )
@@ -509,14 +509,14 @@ class TestEdgeCases(BaseAnthropicTest):
             span=span1,
             attrs=attrs1,
             expected_span_name="ANTHROPIC_API_CALL",
-            expected_model_name="claude-3-haiku-20240307",
+            expected_model_name="claude-haiku-4-5",
         )
 
         verify_span_attributes_comprehensive(
             span=span2,
             attrs=attrs2,
             expected_span_name="ANTHROPIC_API_CALL",
-            expected_model_name="claude-3-haiku-20240307",
+            expected_model_name="claude-haiku-4-5",
         )
 
 
@@ -534,7 +534,7 @@ class TestSafetyGuarantees(BaseAnthropicTest):
 
         wrapped_client = wrap_anthropic_client_sync(tracer, sync_client)
         response = wrapped_client.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "test"}],
         )
@@ -550,7 +550,7 @@ class TestSafetyGuarantees(BaseAnthropicTest):
             span=span,
             attrs=attrs,
             expected_span_name="ANTHROPIC_API_CALL",
-            expected_model_name="claude-3-haiku-20240307",
+            expected_model_name="claude-haiku-4-5",
             check_prompt=False,  # May fail due to broken serialization
             check_completion=False,  # May fail due to broken serialization
         )
@@ -567,13 +567,13 @@ class TestSafetyGuarantees(BaseAnthropicTest):
         )
 
         unwrapped_response = unwrapped.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Say exactly: test"}],
         )
 
         wrapped_response = wrapped.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "Say exactly: test"}],
         )
@@ -622,7 +622,7 @@ class TestSafetyGuarantees(BaseAnthropicTest):
     ):
         """Verify streaming exceptions propagate correctly with tracing verification"""
         stream = sync_client_maybe_wrapped.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "test"}],
             stream=True,
@@ -651,7 +651,7 @@ class TestSafetyGuarantees(BaseAnthropicTest):
 
         wrapped_client = wrap_anthropic_client_sync(tracer, sync_client)
         response = wrapped_client.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5",
             max_tokens=1024,
             messages=[{"role": "user", "content": "test"}],
         )
@@ -666,6 +666,6 @@ class TestSafetyGuarantees(BaseAnthropicTest):
             span=span,
             attrs=attrs,
             expected_span_name="ANTHROPIC_API_CALL",
-            expected_model_name="claude-3-haiku-20240307",
+            expected_model_name="claude-haiku-4-5",
             check_completion=False,  # May fail due to broken attribute setting
         )
