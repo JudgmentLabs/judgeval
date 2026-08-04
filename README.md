@@ -98,6 +98,15 @@ the query to their traces. If no session resolves, the request fails instead of
 falling back to the whole project. Both options work with `present()` and
 `discover()`.
 
+Use `offline_traces()` or `offline_spans()` to query traces captured by an
+offline test:
+
+```python
+from judgeval.jql import offline_traces
+
+offline_result = client.query(offline_traces().rows())
+```
+
 ## Integrations
 
 Supports OpenAI, Anthropic, Google GenAI, Together AI, LangGraph, OpenLit, and Claude Agent SDK. See the full [integrations docs](https://docs.judgmentlabs.ai/documentation/integrations/introduction).

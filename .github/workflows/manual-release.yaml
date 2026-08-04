@@ -66,6 +66,7 @@ jobs:
             ../judgment-mono/services/judgeval-server/openapi.public-jql.json
           git diff --exit-code -- \
             src/judgeval/jql/_generated_contract.py \
+            src/judgeval/jql/_generated_roots.py \
             src/judgeval/jql/_generated_transport.py
 
       - name: Create new tag
