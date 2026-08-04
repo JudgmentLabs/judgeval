@@ -88,13 +88,14 @@ from judgeval import Judgeval
 from judgeval.jql import spans
 
 client = Judgeval(project_name="my-project")
-result = client.query(spans().rows(), session_ids=["session-123"])
+result = client.query(spans().rows(), trace_ids=["trace-123"])
 ```
 
-`session_ids` is outside the JQL query object. Judgment resolves the sessions
+`trace_ids` and `session_ids` are mutually exclusive options outside the JQL
+query object. Trace IDs narrow the query directly. Judgment resolves session IDs
 within the authenticated organization and project, then narrows every part of
-the query to their traces. If none resolve, the request fails instead of
-falling back to the whole project. The same option works with `present()` and
+the query to their traces. If no session resolves, the request fails instead of
+falling back to the whole project. Both options work with `present()` and
 `discover()`.
 
 ## Integrations
