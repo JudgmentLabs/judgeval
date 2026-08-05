@@ -270,7 +270,9 @@
         "additionalProperties": false,
         "$id": "PublicJqlRequest",
         "type": "object",
-        "required": ["query"],
+        "required": [
+          "query"
+        ],
         "properties": {
           "query": {},
           "limit": {
@@ -281,7 +283,7 @@
           "trace_ids": {
             "minItems": 1,
             "maxItems": 1000,
-            "description": "Traces to bind directly to the query within the authenticated organization and project.",
+            "description": "Traces to bind directly to the query within the authenticated organization and project. Use offline trace IDs for offline query sources.",
             "type": "array",
             "items": {
               "minLength": 1,
@@ -293,7 +295,7 @@
           "session_ids": {
             "minItems": 1,
             "maxItems": 1000,
-            "description": "Sessions to resolve to a trace-scoped query within the authenticated organization and project.",
+            "description": "Live sessions to resolve to a trace-scoped query within the authenticated organization and project. Unavailable for offline query sources.",
             "type": "array",
             "items": {
               "minLength": 1,
@@ -307,7 +309,12 @@
       "PublicJqlQueryResponse": {
         "$id": "PublicJqlQueryResponse",
         "type": "object",
-        "required": ["query_id", "rows", "row_count", "elapsed_ms"],
+        "required": [
+          "query_id",
+          "rows",
+          "row_count",
+          "elapsed_ms"
+        ],
         "properties": {
           "query_id": {
             "type": "string"
@@ -348,7 +355,12 @@
       "PublicJqlPresentationResponse": {
         "$id": "PublicJqlPresentationResponse",
         "type": "object",
-        "required": ["query_id", "presentation", "frame", "elapsed_ms"],
+        "required": [
+          "query_id",
+          "presentation",
+          "frame",
+          "elapsed_ms"
+        ],
         "properties": {
           "query_id": {
             "type": "string"
@@ -371,7 +383,10 @@
       "PublicJqlErrorResponse": {
         "$id": "PublicJqlErrorResponse",
         "type": "object",
-        "required": ["error", "message"],
+        "required": [
+          "error",
+          "message"
+        ],
         "properties": {
           "error": {
             "type": "string"
