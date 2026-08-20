@@ -35,7 +35,7 @@ To get started, dive into the [docs](https://docs.judgmentlabs.ai/documentation)
 
 **Online monitoring** -- Automatically score live production traffic server-side with no latency impact. Detected behaviors surface as structured signals — configure Slack alerts so regressions and recurrences never go unnoticed.
 
-**Broad integrations** -- Auto-instrumentation for OpenAI, Anthropic, Google GenAI, and Together AI. Framework support for LangGraph, OpenLit, and Claude Agent SDK.
+**Broad integrations** -- Auto-instrumentation for OpenAI, Anthropic, Google GenAI, Together AI, and OrcaRouter. Framework support for LangGraph, OpenLit, and Claude Agent SDK.
 
 ## Quickstart
 
@@ -93,7 +93,29 @@ result = client.query(traces().where(eq("session", "session-123")).ids())
 
 ## Integrations
 
-Supports OpenAI, Anthropic, Google GenAI, Together AI, LangGraph, OpenLit, and Claude Agent SDK. See the full [integrations docs](https://docs.judgmentlabs.ai/documentation/integrations/introduction).
+Supports OpenAI, Anthropic, Google GenAI, Together AI, OrcaRouter, LangGraph, OpenLit, and Claude Agent SDK. See the full [integrations docs](https://docs.judgmentlabs.ai/documentation/integrations/introduction).
+
+### OrcaRouter
+
+[OrcaRouter](https://www.orcarouter.ai) is an OpenAI-compatible gateway that routes to leading open-weight and frontier models through a single API. Any OpenAI client pointed at OrcaRouter is detected automatically and traced with an `ORCAROUTER_API_CALL` span:
+
+```python
+from openai import OpenAI
+from judgeval import wrap
+
+client = wrap(
+    OpenAI(
+        api_key="sk-orca-...",
+        base_url="https://api.orcarouter.ai/v1",
+    )
+)
+response = client.chat.completions.create(
+    model="orcarouter/auto",
+    messages=[{"role": "user", "content": "Hello!"}],
+)
+```
+
+Clients using an `sk-orca-` key are detected even without a custom `base_url`. It also runs gateway-level, zero-trust security for AI agents on the same endpoint — screening every prompt/response and governing every tool call on a default-deny basis, with no application code changes.
 
 ## CLI
 

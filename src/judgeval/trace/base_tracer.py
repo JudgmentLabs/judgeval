@@ -912,9 +912,11 @@ class BaseTracer(ABC):
     def wrap(client: TClient) -> TClient:
         """Wrap an LLM client for automatic tracing of all API calls.
 
-        Supported providers: **OpenAI**, **Anthropic**, **Together AI**, and
-        **Google GenAI**. Once wrapped, every API call made through the client
-        is recorded as a span with model name, token counts, and cost.
+        Supported providers: **OpenAI**, **Anthropic**, **Together AI**,
+        **Google GenAI**, and **OrcaRouter** (an OpenAI-compatible gateway at
+        https://www.orcarouter.ai). Once wrapped, every API call made through
+        the client is recorded as a span with model name, token counts, and
+        cost.
 
         Args:
             client: An LLM provider client instance (e.g. `OpenAI()`,
@@ -930,6 +932,9 @@ class BaseTracer(ABC):
 
             openai = Tracer.wrap(OpenAI())
             anthropic = Tracer.wrap(Anthropic())
+            orcarouter = Tracer.wrap(
+                OpenAI(base_url="https://api.orcarouter.ai/v1")
+            )
             ```
         """
         from judgeval.instrumentation.llm import wrap_provider
