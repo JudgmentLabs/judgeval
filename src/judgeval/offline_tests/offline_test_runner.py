@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
+import functools
 import inspect
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable, Dict, List, Optional, Tuple, TypedDict, cast
 
 import orjson
@@ -413,16 +416,22 @@ class OfflineTestRunner:
         examples: List[Dict[str, Any]],
         progress: Optional[Progress] = None,
         field_mapping: Optional[Dict[str, str]] = None,
+        concurrency: int = 1,
     ) -> Dict[str, str]:
         """Call the agent entrypoint once per dataset example.
 
         Each call is wrapped in the `OfflineTracer` machinery so it
         produces a dedicated offline trace; the resulting trace IDs are
         returned keyed by example ID. Entrypoint/example field mismatches
-        raise immediately; runtime errors inside the agent are recorded on
-        the trace and logged, and the loop continues. The previously
-        active tracer (if any) is restored once the loop finishes, so
-        subsequent `@observe` spans do not route to the offline endpoint.
+        raise before any agent call. With `concurrency` > 1 that many
+        examples run at a time on worker threads (each call in a copy of
+        the current context, so the offline tracer stays active and
+        traces stay isolated per call); at 1 the agent runs sequentially
+        on the calling thread as before. Runtime errors inside the agent
+        are recorded on the trace and logged, and the remaining examples
+        still run. The previously active tracer (if any) is restored once
+        the loop finishes, so subsequent `@observe` spans do not route to
+        the offline endpoint.
 
         Before returning, the offline tracer is force-flushed and its
         provider shut down, so every agent trace is exported by the time
@@ -431,21 +440,38 @@ class OfflineTestRunner:
         from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
         from judgeval.trace.offline_tracer import OfflineTracer
 
+        if concurrency < 1:
+            raise ValueError(f"concurrency must be >= 1, got {concurrency}")
+
+        # Fail fast on entrypoint/example mismatches before any agent call
+        # (and before any traces are exported).
+        kwargs_per_example = [
+            build_agent_kwargs(agent_function, example.get("data") or {}, field_mapping)
+            for example in examples
+        ]
+
         proxy = JudgmentTracerProvider.get_instance()
         previous_tracer = proxy.get_active_tracer()
 
-        captured: List[Example] = []
+        # The dataset list is required by OfflineTracer.create but unused
+        # here: example→trace correlation happens inside each observed call.
         tracer = OfflineTracer.create(
             project_name=self._project_name,
             api_key=self._client.api_key,
             organization_id=self._client.organization_id,
             api_url=self._client.base_url,
             set_active=True,
-            dataset=captured,
+            dataset=[],
         )
         try:
-            wrapped = tracer.observe(agent_function, span_type="agent")
             is_async = inspect.iscoroutinefunction(agent_function)
+            # An observed generator entrypoint is returned uniterated, so its
+            # span never ends and no trace is exported — record nothing for
+            # it rather than attach a trace id that won't exist server-side.
+            records_traces = not (
+                inspect.isgeneratorfunction(agent_function)
+                or inspect.isasyncgenfunction(agent_function)
+            )
 
             task = None
             if progress is not None:
@@ -453,13 +479,40 @@ class OfflineTestRunner:
                     f"Running agent over {len(examples)} example(s)...", total=None
                 )
 
-            agent_traces: Dict[str, str] = {}
-            for index, example in enumerate(examples):
+            def invoke(
+                example: Dict[str, Any], kwargs: Dict[str, Any]
+            ) -> Tuple[str, Optional[str]]:
                 example_id = example.get("example_id") or ""
-                data = example.get("data") or {}
-                kwargs = build_agent_kwargs(agent_function, data, field_mapping)
 
-                before = len(captured)
+                # Capture the offline trace id from inside the observed
+                # call: correlation by example, safe under concurrency.
+                holder: Dict[str, str] = {}
+
+                def record_trace_id() -> None:
+                    # If activation was refused (run() nested inside a live
+                    # root span) spans route to the live tracer; don't attach
+                    # a foreign trace id.
+                    if not records_traces or proxy.get_active_tracer() is not tracer:
+                        return
+                    ids = tracer._get_current_trace_and_span_id()
+                    if ids:
+                        holder["trace_id"] = ids[0]
+
+                probe: AgentFunction
+                if is_async:
+
+                    @functools.wraps(agent_function)
+                    async def probe(**kw: Any) -> Any:
+                        record_trace_id()
+                        return await agent_function(**kw)
+                else:
+
+                    @functools.wraps(agent_function)
+                    def probe(**kw: Any) -> Any:
+                        record_trace_id()
+                        return agent_function(**kw)
+
+                wrapped = tracer.observe(probe, span_type="agent")
                 try:
                     if is_async:
                         asyncio.run(wrapped(**kwargs))
@@ -469,18 +522,40 @@ class OfflineTestRunner:
                     judgeval_logger.error(
                         f"Agent entrypoint raised for example {example_id}: {exc}"
                     )
+                return example_id, holder.get("trace_id")
 
-                for produced in captured[before:]:
-                    offline_trace_id = produced._properties.get("offline_trace_id")
-                    if example_id and offline_trace_id:
-                        agent_traces[example_id] = offline_trace_id
-                        break
+            agent_traces: Dict[str, str] = {}
 
+            def collect(result: Tuple[str, Optional[str]], completed: int) -> None:
+                example_id, trace_id = result
+                if example_id and trace_id:
+                    agent_traces[example_id] = trace_id
                 if progress is not None and task is not None:
                     progress.update(
                         task,
-                        description=f"Running agent... ({index + 1}/{len(examples)})",
+                        description=f"Running agent... ({completed}/{len(examples)})",
                     )
+
+            if concurrency == 1:
+                # Stay on the calling thread so thread-affine agents
+                # (signals, sqlite handles, ...) keep working by default.
+                for index, example in enumerate(examples):
+                    collect(invoke(example, kwargs_per_example[index]), index + 1)
+            else:
+                # copy_context() carries the active-tracer ContextVar into
+                # the worker threads; without it no spans would be recorded.
+                pool = ThreadPoolExecutor(max_workers=concurrency)
+                try:
+                    futures = [
+                        pool.submit(contextvars.copy_context().run, invoke, ex, kw)
+                        for ex, kw in zip(examples, kwargs_per_example)
+                    ]
+                    for completed, future in enumerate(as_completed(futures), 1):
+                        collect(future.result(), completed)
+                finally:
+                    # Drop still-queued examples on interrupt/error instead
+                    # of draining the whole dataset before surfacing it.
+                    pool.shutdown(wait=True, cancel_futures=True)
         finally:
             tracer.force_flush()
             proxy.restore_active(previous_tracer)
@@ -757,19 +832,23 @@ class OfflineTestRunner:
         timeout_seconds: int = 600,
         run_name: Optional[str] = None,
         field_mapping: Optional[Dict[str, str]] = None,
+        concurrency: int = 1,
     ) -> OfflineTestResult:
         """Execute the full offline-test lifecycle for a test config.
 
         When ``agent_function`` is omitted, no agent is invoked: the judges
         score each example's existing trace (the dataset's trace-typed
         column / ``offline_trace_id``). When provided, the agent is run once
-        per example first and the judges score the resulting agent trace.
+        per example first (up to ``concurrency`` examples at a time) and the
+        judges score the resulting agent trace.
         """
         if assert_test and pass_condition_fn is None:
             raise ValueError(
                 "assert_test=True requires a pass_condition_fn to decide "
                 "whether each row passes."
             )
+        if concurrency < 1:
+            raise ValueError(f"concurrency must be >= 1, got {concurrency}")
 
         console = Console()
         console.print("\n[bold cyan]Starting Offline Test[/bold cyan]")
@@ -803,7 +882,7 @@ class OfflineTestRunner:
             agent_traces: Dict[str, str] = {}
             if agent_function is not None and examples:
                 agent_traces = self.run_agent(
-                    agent_function, examples, progress, field_mapping
+                    agent_function, examples, progress, field_mapping, concurrency
                 )
 
             prepared = self.create_test_run(
