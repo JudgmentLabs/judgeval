@@ -18,7 +18,14 @@ from typing import (
     Union,
 )
 
-from judgeval.jql._generated_contract import DiscoveryKind, SUPPORTED_OPS
+from judgeval.jql._generated_contract import DiscoveryKind, QuerySource, SUPPORTED_OPS
+from judgeval.jql._generated_roots import (
+    offline_spans,
+    offline_traces,
+    sessions,
+    spans,
+    traces,
+)
 from judgeval.jql._generated_transport import (
     JqlPresentationResponse,
     JqlQueryResponse,
@@ -549,9 +556,7 @@ class PipelineBuilder:
         return PipelineBuilder(self._spec, (*self._stages, deepcopy(stage)))
 
 
-def _query(
-    source: Literal["traces", "spans", "sessions"], filter: Optional[Filter]
-) -> QueryBuilder:
+def _query(source: QuerySource, filter: Optional[Filter]) -> QueryBuilder:
     return QueryBuilder(
         _compact(
             _node(
@@ -563,18 +568,6 @@ def _query(
             )
         )
     )
-
-
-def traces(filter: Optional[Filter] = None) -> QueryBuilder:
-    return _query("traces", filter)
-
-
-def spans(filter: Optional[Filter] = None) -> QueryBuilder:
-    return _query("spans", filter)
-
-
-def sessions(filter: Optional[Filter] = None) -> QueryBuilder:
-    return _query("sessions", filter)
 
 
 def discovery(kind: DiscoveryKind, **options: Any) -> JsonObject:
@@ -610,6 +603,7 @@ __all__ = [
     "PresentationField",
     "QueryBuilder",
     "QueryInput",
+    "QuerySource",
     "agg_expr",
     "all_",
     "ancestor_of",
@@ -642,6 +636,8 @@ __all__ = [
     "no_span",
     "no_trace",
     "not_",
+    "offline_spans",
+    "offline_traces",
     "over_scores",
     "over_spans",
     "over_traces",

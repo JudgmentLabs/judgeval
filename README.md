@@ -85,10 +85,26 @@ rest of Judgeval. Tenant identifiers are not part of the query payload.
 
 ```python
 from judgeval import Judgeval
-from judgeval.jql import eq, traces
+from judgeval.jql import spans
 
 client = Judgeval(project_name="my-project")
-result = client.query(traces().where(eq("session", "session-123")).ids())
+result = client.query(spans().rows(), trace_ids=["trace-123"])
+```
+
+`trace_ids` and `session_ids` are mutually exclusive options outside the JQL
+query object. Trace IDs narrow the query directly. Judgment resolves session IDs
+within the authenticated organization and project, then narrows every part of
+the query to their traces. If no session resolves, the request fails instead of
+falling back to the whole project. Both options work with `present()` and
+`discover()`.
+
+Use `offline_traces()` or `offline_spans()` to query traces captured by an
+offline test:
+
+```python
+from judgeval.jql import offline_traces
+
+offline_result = client.query(offline_traces().rows())
 ```
 
 ## Integrations
