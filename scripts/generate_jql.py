@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import keyword
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -13,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_DIR = ROOT / "scripts" / "jql_contract"
 OUTPUTS = (
     ROOT / "src" / "judgeval" / "jql" / "_generated_contract.py",
+    ROOT / "src" / "judgeval" / "jql" / "_generated_roots.py",
     ROOT / "src" / "judgeval" / "jql" / "_generated_transport.py",
 )
 ROOT_SCHEMAS = (
@@ -138,11 +140,17 @@ def generate(dal_document: dict[str, Any], public_document: dict[str, Any]) -> N
     schemas = jql_contract["components"]["schemas"]
     entries = {item["op"] for node in walk(schemas) for item in node.get("x-jql", [])}
     discovery_kinds = schemas["DiscoveryQuery"]["properties"]["kind"]["enum"]
+    query_sources = schemas["SourceQuery"]["properties"]["source"]["enum"]
 
     operation_members = "\n".join(
         f"    {json.dumps(operation)}," for operation in sorted(entries)
     )
-    literal_members = "\n".join(f"    {json.dumps(kind)}," for kind in discovery_kinds)
+    discovery_kind_members = "\n".join(
+        f"    {json.dumps(kind)}," for kind in discovery_kinds
+    )
+    query_source_members = "\n".join(
+        f"    {json.dumps(source)}," for source in query_sources
+    )
     contract_source = f'''"""Generated from DAL OpenAPI x-jql metadata; do not edit."""
 
 from typing import Literal
@@ -150,11 +158,53 @@ from typing import Literal
 SUPPORTED_OPS = (
 {operation_members}
 )
+QUERY_SOURCES = (
+{query_source_members}
+)
+QuerySource = Literal[
+{query_source_members}
+]
 DiscoveryKind = Literal[
-{literal_members}
+{discovery_kind_members}
 ]
 '''
     OUTPUTS[0].write_text(contract_source, encoding="utf-8", newline="\n")
+
+    invalid_sources = [
+        source
+        for source in query_sources
+        if not source.isidentifier() or keyword.iskeyword(source)
+    ]
+    if invalid_sources:
+        raise ValueError(
+            f"JQL query sources must be valid Python identifiers: {invalid_sources!r}"
+        )
+    root_functions = "\n\n\n".join(
+        f"""def {source}(filter: Optional[Filter] = None) -> QueryBuilder:
+    from judgeval.jql import _query
+
+    return _query({json.dumps(source)}, filter)"""
+        for source in query_sources
+    )
+    root_exports = "\n".join(f'    "{source}",' for source in query_sources)
+    roots_source = f'''"""Generated from DAL OpenAPI query sources; do not edit."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from judgeval.jql import Filter, QueryBuilder
+
+
+{root_functions}
+
+
+__all__ = [
+{root_exports}
+]
+'''
+    OUTPUTS[1].write_text(roots_source, encoding="utf-8", newline="\n")
 
     public_schemas = public_document["components"]["schemas"]
     classes = [
@@ -169,7 +219,7 @@ DiscoveryKind = Literal[
         or (name == "Any" and "Any" in class_source)
         or f"{name}[" in class_source
     ]
-    OUTPUTS[1].write_text(
+    OUTPUTS[2].write_text(
         '"""Generated from Judgeval public JQL OpenAPI; do not edit."""\n\n'
         f"from typing import {', '.join(typing_names)}\n\n\n" + class_source + "\n",
         encoding="utf-8",
@@ -177,7 +227,7 @@ DiscoveryKind = Literal[
     )
     print(
         f"Generated {OUTPUTS[0]} with {len(entries)} canonical JQL operations and "
-        f"{OUTPUTS[1]}."
+        f"{OUTPUTS[1]} with {len(query_sources)} query roots and {OUTPUTS[2]}."
     )
 
 

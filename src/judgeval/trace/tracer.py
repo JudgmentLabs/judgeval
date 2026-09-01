@@ -219,7 +219,7 @@ class Tracer(BaseTracer):
             "telemetry.sdk.version": get_version(),
         }
         if environment:
-            resource_attrs["deployment.environment"] = environment
+            resource_attrs["deployment.environment.name"] = environment
         if resource_attributes:
             resource_attrs.update(resource_attributes)
 
