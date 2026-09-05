@@ -1,14 +1,21 @@
 import sys
 
-if len(sys.argv) != 2:
-    print("Usage: python set_version.py <new_version>")
-    sys.exit(1)
-
-new_version = sys.argv[1]
 version_placeholder = "0.0.0"
 
 
 def update_file(file_path, placeholder, new_val):
+    """Replace the first occurrence of ``placeholder`` with ``new_val`` in ``file_path``.
+
+    Reads the file at ``file_path``, verifies that ``placeholder`` is present,
+    substitutes the first occurrence with ``new_val``, and writes the result back.
+    Exits the process with a non-zero status code on I/O errors or when the
+    placeholder is not found.
+
+    Args:
+        file_path (str): Path to the file that should be updated.
+        placeholder (str): The string token to search for and replace.
+        new_val (str): The value that replaces the first occurrence of ``placeholder``.\
+    """
     try:
         with open(file_path, "r") as f:
             content = f.read()
@@ -30,6 +37,12 @@ def update_file(file_path, placeholder, new_val):
         sys.exit(1)
 
 
-files_to_update = ["pyproject.toml", "src/judgeval/version.py"]
-for file in files_to_update:
-    update_file(file, version_placeholder, new_version)
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: python set_version.py <new_version>")
+        sys.exit(1)
+
+    new_version = sys.argv[1]
+    files_to_update = ["pyproject.toml", "src/judgeval/version.py"]
+    for file in files_to_update:
+        update_file(file, version_placeholder, new_version)
