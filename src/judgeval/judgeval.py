@@ -23,6 +23,7 @@ if TYPE_CHECKING:
         DiscoveryKind,
         JqlPresentationResponse,
         JqlQueryResponse,
+        SqlResponse,
         QueryInput,
     )
 
@@ -207,6 +208,28 @@ class Judgeval:
             self._run_jql("query", to_json(query), limit, trace_ids, session_ids),
         )
 
+    def sql(self, sql_text: str) -> "SqlResponse":
+        """Run one read-only virtual SQL SELECT for this organization and project.
+
+        Results are capped by the DAL at 1,000 rows and 5 MiB. The response
+        includes column metadata and catalog_version, with no query_id.
+        """
+        project_id = self._require_query_project_id()
+        try:
+            return cast(
+                "SqlResponse",
+                self._internal_client._request(
+                    "POST",
+                    url_for(f"/v1/projects/{project_id}/sql", self._api_url),
+                    {"sql": sql_text},
+                ),
+            )
+        except JudgmentAPIError as error:
+            mapped = map_judgment_api_error(error)
+            if mapped is error:
+                raise
+            raise mapped from error
+
     def present(
         self,
         query: "QueryInput",
@@ -235,7 +258,7 @@ class Judgeval:
     ) -> Any:
         if trace_ids is not None and session_ids is not None:
             raise ValueError("trace_ids and session_ids are mutually exclusive")
-        project_id = self._require_jql_project_id()
+        project_id = self._require_query_project_id()
         payload: Dict[str, Any] = {"query": query}
         if limit is not None:
             payload["limit"] = limit
@@ -274,11 +297,11 @@ class Judgeval:
             session_ids=session_ids,
         )
 
-    def _require_jql_project_id(self) -> str:
+    def _require_query_project_id(self) -> str:
         if not self._project_id:
             raise JudgmentProjectNotFoundError(
                 f"Project '{self._project_name}' was not found for this organization; "
-                "JQL queries require a resolved project."
+                "Public queries require a resolved project."
             )
         return self._project_id
 

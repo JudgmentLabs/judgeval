@@ -15,3 +15,11 @@ class JqlPresentationResponse(TypedDict):
     presentation: Any
     frame: Optional[Any]
     elapsed_ms: float
+
+
+class SqlResponse(TypedDict):
+    catalog_version: str
+    columns: List[Dict[str, Any]]
+    rows: List[Dict[str, Any]]
+    row_count: int
+    elapsed_ms: float
