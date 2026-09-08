@@ -405,6 +405,8 @@
         "properties": {
           "sql": {
             "minLength": 1,
+            "maxLength": 50000,
+            "pattern": "\\S",
             "type": "string"
           }
         }

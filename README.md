@@ -124,7 +124,8 @@ JSON body `{"sql": "SELECT count() AS run_count FROM telemetry.traces"}`.
 Organization and project scope are derived by the server. Trace/session scope,
 physical tables, writes, multiple statements, and caller-specified execution limits
 are unsupported. DAL catalog allowlists, tenant isolation, and result limits of
-1,000 rows and 5 MiB apply; over-limit results return an error.
+1,000 rows and 5 MiB apply; over-limit results return an error. SQL text must
+contain a non-whitespace character and cannot exceed 50,000 characters.
 
 The response contains `catalog_version`, `columns` (name, type, nullable),
 `rows`, `row_count`, and `elapsed_ms`. It does not contain `query_id`.
