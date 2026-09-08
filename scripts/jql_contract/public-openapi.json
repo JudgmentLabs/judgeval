@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Judgeval Public JQL API",
+    "title": "Judgeval Public Query API",
     "version": "1.0.0"
   },
   "paths": {
@@ -75,7 +75,7 @@
             }
           },
           "404": {
-            "description": "Project or public JQL endpoint not found",
+            "description": "Project or public query endpoint not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -112,7 +112,7 @@
             }
           },
           "502": {
-            "description": "JQL backend request failed",
+            "description": "Query backend request failed",
             "content": {
               "application/json": {
                 "schema": {
@@ -122,7 +122,7 @@
             }
           },
           "503": {
-            "description": "Public JQL is temporarily unavailable",
+            "description": "Public queries are temporarily unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -204,7 +204,7 @@
             }
           },
           "404": {
-            "description": "Project or public JQL endpoint not found",
+            "description": "Project or public query endpoint not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -241,7 +241,7 @@
             }
           },
           "502": {
-            "description": "JQL backend request failed",
+            "description": "Query backend request failed",
             "content": {
               "application/json": {
                 "schema": {
@@ -251,7 +251,7 @@
             }
           },
           "503": {
-            "description": "Public JQL is temporarily unavailable",
+            "description": "Public queries are temporarily unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -333,7 +333,7 @@
             }
           },
           "404": {
-            "description": "Project or public JQL endpoint not found",
+            "description": "Project or public query endpoint not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -370,7 +370,7 @@
             }
           },
           "502": {
-            "description": "JQL backend request failed",
+            "description": "Query backend request failed",
             "content": {
               "application/json": {
                 "schema": {
@@ -380,7 +380,7 @@
             }
           },
           "503": {
-            "description": "Public JQL is temporarily unavailable",
+            "description": "Public queries are temporarily unavailable",
             "content": {
               "application/json": {
                 "schema": {

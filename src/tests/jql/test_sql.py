@@ -79,7 +79,7 @@ def test_sql_requires_resolved_project(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(JudgmentProjectNotFoundError) as caught:
         client().sql(SQL)
     assert {"message": str(caught.value), "calls": calls} == {
-        "message": "Project 'demo' was not found for this organization; JQL queries require a resolved project.",
+        "message": "Project 'demo' was not found for this organization; Public queries require a resolved project.",
         "calls": [],
     }
 

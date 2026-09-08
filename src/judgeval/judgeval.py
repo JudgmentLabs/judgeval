@@ -214,7 +214,7 @@ class Judgeval:
         Results are capped by the DAL at 1,000 rows and 5 MiB. The response
         includes column metadata and catalog_version, with no query_id.
         """
-        project_id = self._require_jql_project_id()
+        project_id = self._require_query_project_id()
         try:
             return cast(
                 "SqlResponse",
@@ -258,7 +258,7 @@ class Judgeval:
     ) -> Any:
         if trace_ids is not None and session_ids is not None:
             raise ValueError("trace_ids and session_ids are mutually exclusive")
-        project_id = self._require_jql_project_id()
+        project_id = self._require_query_project_id()
         payload: Dict[str, Any] = {"query": query}
         if limit is not None:
             payload["limit"] = limit
@@ -297,11 +297,11 @@ class Judgeval:
             session_ids=session_ids,
         )
 
-    def _require_jql_project_id(self) -> str:
+    def _require_query_project_id(self) -> str:
         if not self._project_id:
             raise JudgmentProjectNotFoundError(
                 f"Project '{self._project_name}' was not found for this organization; "
-                "JQL queries require a resolved project."
+                "Public queries require a resolved project."
             )
         return self._project_id
 
