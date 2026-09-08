@@ -209,7 +209,11 @@ __all__ = [
     public_schemas = public_document["components"]["schemas"]
     classes = [
         typed_dict_source(name, public_schemas[name])
-        for name in ("PublicJqlQueryResponse", "PublicJqlPresentationResponse")
+        for name in (
+            "PublicJqlQueryResponse",
+            "PublicJqlPresentationResponse",
+            "PublicSqlResponse",
+        )
     ]
     class_source = "\n\n\n".join(classes)
     typing_names = [

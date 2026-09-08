@@ -5,6 +5,135 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/v1/projects/{projectId}/sql": {
+      "post": {
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "organizationHeader": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicSqlRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSqlResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project or public JQL endpoint not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Query validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Organization rate limit exceeded",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "JQL backend request failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Public JQL is temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/projects/{projectId}/query": {
       "post": {
         "security": [
@@ -266,6 +395,73 @@
   },
   "components": {
     "schemas": {
+      "PublicSqlRequest": {
+        "additionalProperties": false,
+        "$id": "PublicSqlRequest",
+        "type": "object",
+        "required": [
+          "sql"
+        ],
+        "properties": {
+          "sql": {
+            "minLength": 1,
+            "type": "string"
+          }
+        }
+      },
+      "PublicSqlResponse": {
+        "$id": "PublicSqlResponse",
+        "type": "object",
+        "required": [
+          "catalog_version",
+          "columns",
+          "rows",
+          "row_count",
+          "elapsed_ms"
+        ],
+        "properties": {
+          "catalog_version": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "type",
+                "nullable"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "nullable": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "patternProperties": {
+                "^(.*)$": {}
+              }
+            }
+          },
+          "row_count": {
+            "type": "integer"
+          },
+          "elapsed_ms": {
+            "type": "number"
+          }
+        }
+      },
       "PublicJqlRequest": {
         "additionalProperties": false,
         "$id": "PublicJqlRequest",

@@ -107,6 +107,29 @@ from judgeval.jql import offline_traces
 offline_result = client.query(offline_traces().rows())
 ```
 
+### Virtual SQL
+
+`Judgeval.sql(sql_text)` runs a read-only SELECT against the virtual SQL catalog
+using the client's existing API key, organization membership, and resolved project.
+Viewer access and the public query rate limit apply.
+
+```python
+result = client.sql("SELECT count() AS run_count FROM telemetry.traces")
+print(result["rows"])
+```
+
+The public HTTP equivalent is `POST /v1/projects/{projectId}/sql` with
+`Authorization: Bearer <api-key>`, `X-Organization-Id: <organization-id>`, and
+JSON body `{"sql": "SELECT count() AS run_count FROM telemetry.traces"}`.
+Organization and project scope are derived by the server. Trace/session scope,
+physical tables, writes, multiple statements, and caller-specified execution limits
+are unsupported. DAL catalog allowlists, tenant isolation, and result limits of
+1,000 rows and 5 MiB apply; over-limit results return an error.
+
+The response contains `catalog_version`, `columns` (name, type, nullable),
+`rows`, `row_count`, and `elapsed_ms`. It does not contain `query_id`.
+Validation and execution errors use the same exception mapping as `query()`.
+
 ## Integrations
 
 Supports OpenAI, Anthropic, Google GenAI, Together AI, LangGraph, OpenLit, and Claude Agent SDK. See the full [integrations docs](https://docs.judgmentlabs.ai/documentation/integrations/introduction).

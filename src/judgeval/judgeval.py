@@ -23,6 +23,7 @@ if TYPE_CHECKING:
         DiscoveryKind,
         JqlPresentationResponse,
         JqlQueryResponse,
+        SqlResponse,
         QueryInput,
     )
 
@@ -206,6 +207,28 @@ class Judgeval:
             "JqlQueryResponse",
             self._run_jql("query", to_json(query), limit, trace_ids, session_ids),
         )
+
+    def sql(self, sql_text: str) -> "SqlResponse":
+        """Run one read-only virtual SQL SELECT for this organization and project.
+
+        Results are capped by the DAL at 1,000 rows and 5 MiB. The response
+        includes column metadata and catalog_version, with no query_id.
+        """
+        project_id = self._require_jql_project_id()
+        try:
+            return cast(
+                "SqlResponse",
+                self._internal_client._request(
+                    "POST",
+                    url_for(f"/v1/projects/{project_id}/sql", self._api_url),
+                    {"sql": sql_text},
+                ),
+            )
+        except JudgmentAPIError as error:
+            mapped = map_judgment_api_error(error)
+            if mapped is error:
+                raise
+            raise mapped from error
 
     def present(
         self,

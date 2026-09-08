@@ -29,6 +29,7 @@ from judgeval.jql._generated_roots import (
 from judgeval.jql._generated_transport import (
     JqlPresentationResponse,
     JqlQueryResponse,
+    SqlResponse,
 )
 
 JsonObject = Dict[str, Any]
@@ -598,6 +599,7 @@ __all__ = [
     "HierarchyDepth",
     "JqlPresentationResponse",
     "JqlQueryResponse",
+    "SqlResponse",
     "JsonObject",
     "PipelineBuilder",
     "PresentationField",
