@@ -10,6 +10,7 @@ from judgeval import Judgeval
 from judgeval.exceptions import (
     JudgmentAPIError,
     JudgmentConflictError,
+    JudgmentJQLUnavailableError,
     JudgmentProjectNotFoundError,
     JudgmentValidationError,
 )
@@ -320,6 +321,73 @@ def test_jql_errors_map_to_typed_sdk_exceptions(
     with pytest.raises(JudgmentAPIError) as server_error:
         client.query(traces())
     assert type(server_error.value) is JudgmentAPIError
+
+
+def _jql_client_raising(
+    monkeypatch: pytest.MonkeyPatch, status_code: int, detail: str
+) -> Judgeval:
+    monkeypatch.setattr("judgeval.judgeval.resolve_project_id", lambda *_: "project-1")
+
+    def fake_request(self, method, url, payload, params=None):  # type: ignore[no-untyped-def]
+        raise JudgmentAPIError(status_code, detail, None, code="Resource not found")
+
+    monkeypatch.setattr(JudgmentSyncClient, "_request", fake_request)
+    return Judgeval(
+        project_name="demo",
+        api_key="api-key",
+        organization_id="org-1",
+        api_url="https://api.example.com/",
+    )
+
+
+def test_jql_404_explains_the_feature_gate_and_the_missing_project(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _jql_client_raising(monkeypatch, 404, "Resource not found")
+
+    with pytest.raises(JudgmentJQLUnavailableError) as raised:
+        client.query(traces())
+
+    message = str(raised.value)
+    assert "JQL is not enabled for this organization" in message
+    assert "project 'demo' was not found" in message
+    assert "Contact Judgment" in message
+    assert raised.value.status_code == 404
+    # The opaque server detail must not survive as the user-facing message.
+    assert "Resource not found" not in message
+
+
+def test_jql_404_for_a_missing_project_does_not_blame_the_feature_gate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _jql_client_raising(monkeypatch, 404, "Project not found")
+
+    with pytest.raises(JudgmentJQLUnavailableError) as raised:
+        client.query(traces())
+
+    message = str(raised.value)
+    assert message == "404: Project 'demo' was not found for this organization."
+    assert "not enabled" not in message
+
+
+def test_jql_404_error_is_catchable_as_a_plain_api_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _jql_client_raising(monkeypatch, 404, "Resource not found")
+
+    # Existing callers that catch JudgmentAPIError keep working.
+    with pytest.raises(JudgmentAPIError):
+        client.discover("judges")
+
+
+def test_non_jql_404_is_left_alone(monkeypatch: pytest.MonkeyPatch) -> None:
+    from judgeval.exceptions import map_judgment_api_error
+
+    error = JudgmentAPIError(404, "Resource not found", None)
+
+    # The shared mapper is used by datasets and offline tests too, so it must
+    # not turn every 404 in the SDK into a JQL error.
+    assert map_judgment_api_error(error) is error
 
 
 def test_api_error_preserves_code_hint_and_retry_after() -> None:
