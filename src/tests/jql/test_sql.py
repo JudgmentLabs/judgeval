@@ -25,17 +25,38 @@ def client() -> Judgeval:
     )
 
 
-def test_sql_forwarding(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize(
+    "sql_response",
+    [
+        RESULT,
+        {
+            "catalog_version": "1",
+            "columns": [
+                {"name": "run_count", "type": "UInt64", "nullable": False},
+                {"name": "values", "type": "Array(Int64)", "nullable": False},
+            ],
+            "rows": [
+                {
+                    "run_count": "9007199254740993",
+                    "values": ["-9223372036854775808", 42],
+                }
+            ],
+            "row_count": 1,
+            "elapsed_ms": 2,
+        },
+    ],
+)
+def test_sql_forwarding(monkeypatch: pytest.MonkeyPatch, sql_response: dict) -> None:
     monkeypatch.setattr("judgeval.judgeval.resolve_project_id", lambda *_: "project-1")
     calls = []
 
     def request(self, method, url, payload, params=None):
         calls.append((method, url, payload, params))
-        return RESULT
+        return sql_response
 
     monkeypatch.setattr(JudgmentSyncClient, "_request", request)
     assert {"response": client().sql(SQL), "calls": calls} == {
-        "response": RESULT,
+        "response": sql_response,
         "calls": [
             (
                 "POST",

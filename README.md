@@ -129,6 +129,11 @@ contain a non-whitespace character and cannot exceed 50,000 characters.
 
 The response contains `catalog_version`, `columns` (name, type, nullable),
 `rows`, `row_count`, and `elapsed_ms`. It does not contain `query_id`.
+SQL integers outside JavaScript's safe range (`-(2**53 - 1)` to `2**53 - 1`)
+arrive as exact decimal strings, including inside nested arrays and objects.
+For example, `9007199254740993` arrives as `"9007199254740993"`; use `int(value)`
+when you need a Python integer. Small integers and floating-point values remain
+numbers, and column types retain their original SQL types.
 Validation and execution errors use the same exception mapping as `query()`.
 
 ## Integrations

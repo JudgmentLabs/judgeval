@@ -448,6 +448,7 @@
             }
           },
           "rows": {
+            "description": "SQL integers outside the JavaScript safe range (-(2^53 - 1) to 2^53 - 1) are returned as exact decimal strings, including in nested values. Column types retain the original SQL types.",
             "type": "array",
             "items": {
               "type": "object",
