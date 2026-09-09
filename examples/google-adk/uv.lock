@@ -1066,7 +1066,6 @@ dev = [
     { name = "groq", specifier = ">=0.30.0" },
     { name = "mypy", specifier = ">=1.17.1" },
     { name = "openai", specifier = ">=1.92.0" },
-    { name = "openlit", specifier = ">=1.35.5,<1.36.8" },
     { name = "opentelemetry-instrumentation-openai", specifier = ">=0.44.1" },
     { name = "pre-commit", specifier = ">=4.2.0" },
     { name = "pytest", specifier = ">=8.4.1" },
