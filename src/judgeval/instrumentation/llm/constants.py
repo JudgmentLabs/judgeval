@@ -8,4 +8,5 @@ class ProviderType(Enum):
     ANTHROPIC = "anthropic"
     TOGETHER = "together"
     GOOGLE = "google"
+    MINIMAX = "minimax"
     DEFAULT = "default"
