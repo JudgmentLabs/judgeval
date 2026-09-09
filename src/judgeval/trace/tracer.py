@@ -43,7 +43,7 @@ class Tracer(BaseTracer):
 
     Args:
         project_name: Your Judgment project name.
-        project_id: Resolved project ID (set automatically by `init`).
+        project_id: Project ID supplied to `init`, or resolved from `project_name`.
         api_key: Judgment API key.
         organization_id: Organization ID.
         api_url: Judgment API endpoint URL.
@@ -131,6 +131,8 @@ class Tracer(BaseTracer):
         sampler: Optional[Sampler] = None,
         span_limits: Optional[SpanLimits] = None,
         span_processors: Optional[Sequence[SpanProcessor]] = None,
+        *,
+        project_id: Optional[str] = None,
     ) -> Tracer:
         """Create and activate a new Tracer.
 
@@ -140,7 +142,10 @@ class Tracer(BaseTracer):
         missing, the tracer still works but spans won't be exported.
 
         Args:
-            project_name: Your Judgment project name. Required for span export.
+            project_name: Your Judgment project name. Used to resolve the project
+                ID when `project_id` is not supplied.
+            project_id: Judgment project ID. When provided, skips project name
+                resolution.
             api_key: Judgment API key. Defaults to `JUDGMENT_API_KEY` env var.
             organization_id: Organization ID. Defaults to `JUDGMENT_ORG_ID` env var.
             api_url: API endpoint URL. Defaults to `JUDGMENT_API_URL` env var.
@@ -164,6 +169,7 @@ class Tracer(BaseTracer):
                 project_name="search-assistant",
                 environment="production",
             )
+            tracer = Tracer.init(project_id="proj_456")
             ```
         """
         api_key = api_key or JUDGMENT_API_KEY
@@ -172,9 +178,9 @@ class Tracer(BaseTracer):
 
         enable_monitoring = True
 
-        if not project_name:
+        if not project_name and not project_id:
             judgeval_logger.warning(
-                "project_name not provided. Tracer will not export spans."
+                "project_name or project_id not provided. Tracer will not export spans."
             )
             enable_monitoring = False
 
@@ -197,21 +203,15 @@ class Tracer(BaseTracer):
             enable_monitoring = False
 
         client: Optional[JudgmentSyncClient] = None
-        project_id: Optional[str] = None
-        if (
-            enable_monitoring
-            and project_name
-            and api_key
-            and organization_id
-            and api_url
-        ):
+        if enable_monitoring and api_key and organization_id and api_url:
             client = JudgmentSyncClient(api_url, api_key, organization_id)
-            project_id = resolve_project_id(client, project_name)
-            if not project_id:
-                judgeval_logger.warning(
-                    f"Project '{project_name}' not found. Tracer will not export spans."
-                )
-                enable_monitoring = False
+            if not project_id and project_name:
+                project_id = resolve_project_id(client, project_name)
+                if not project_id:
+                    judgeval_logger.warning(
+                        f"Project '{project_name}' not found. Tracer will not export spans."
+                    )
+                    enable_monitoring = False
 
         resource_attrs = {
             "service.name": project_name or "unknown",
