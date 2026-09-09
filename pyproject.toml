@@ -70,7 +70,6 @@ dev = [
     "pytest-asyncio>=1.1.0",
     "pytest-xdist>=3.8.0",
     "streamlit>=1.49.1",
-    "openlit>=1.35.5,<1.36.8",
     "dotenv>=0.9.9",
     "datasets>=4.4.1",
     "claude-agent-sdk>=0.1.6",
