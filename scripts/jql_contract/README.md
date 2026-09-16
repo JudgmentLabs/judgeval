@@ -4,7 +4,7 @@ These files are public-safe snapshots of the canonical JQL contracts in
 `JudgmentLabs/judgment-mono`:
 
 - `jql-ir.openapi.json` contains only the public JQL IR schema-reference closure.
-- `public-openapi.json` is judgeval-server's public JQL transport contract.
+- `public-openapi.json` is judgeval-server's public query transport contract, including Virtual SQL.
 
 Python package builds regenerate the checked-in contract, query-root, and
 transport modules under `src/judgeval/jql` from these snapshots. Pull-request

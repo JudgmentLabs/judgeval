@@ -78,7 +78,52 @@ def run_agent(question: str) -> str:
 run_agent("What is the capital of the United States?")
 ```
 
-### JQL
+### Virtual SQL
+
+Use `Judgeval.sql(sql_text)` for new read-only queries against the virtual SQL
+catalog. It uses the client's existing API key, organization membership, and
+resolved project.
+Viewer access and the public query rate limit apply.
+
+```python
+from judgeval import Judgeval
+
+client = Judgeval(project_name="my-project")
+result = client.sql("SELECT count() AS run_count FROM telemetry.traces")
+print(result["rows"])
+```
+
+The public HTTP equivalent is `POST /v1/projects/{projectId}/sql` with
+`Authorization: Bearer <api-key>`, `X-Organization-Id: <organization-id>`, and
+JSON body `{"sql": "SELECT count() AS run_count FROM telemetry.traces"}`.
+Organization and project scope are derived by the server. The SDK method accepts
+only SQL text, without JQL-style `trace_ids`, `session_ids`, or `limit` options.
+Use SQL predicates on supported catalog columns to narrow results. Physical
+tables, writes, multiple statements, and caller-specified execution limits are
+unsupported. DAL catalog allowlists, tenant isolation, and result limits of
+1,000 rows and 5 MiB apply; over-limit results return an error. SQL text must
+contain a non-whitespace character and cannot exceed 50,000 characters.
+
+The response contains `catalog_version`, `columns` (name, type, nullable),
+`rows`, `row_count`, and `elapsed_ms`. It does not contain `query_id`.
+SQL integers outside JavaScript's safe range (`-(2**53 - 1)` to `2**53 - 1`)
+arrive as exact decimal strings, including inside nested arrays and objects.
+For example, `9007199254740993` arrives as `"9007199254740993"`; use `int(value)`
+when you need a Python integer. Small integers and floating-point values remain
+numbers, and column types retain their original SQL types.
+Validation and execution errors use the SDK's existing exception mapping.
+
+When migrating from JQL, update callers for the SQL response shape and smaller
+row cap. `present()` frames and `discover()` results are not interchangeable
+with SQL rows; migrate those consumers explicitly before retiring a JQL call.
+
+### JQL (legacy)
+
+JQL guidance is deprecated for new integrations. Use [Virtual SQL](#virtual-sql)
+for new read-only queries. Existing `query()`, `present()`, and `discover()`
+methods remain supported.
+
+The examples below are retained for maintaining existing JQL integrations.
 
 JQL queries use the same API key, organization, and project configuration as the
 rest of Judgeval. Tenant identifiers are not part of the query payload.
@@ -106,35 +151,6 @@ from judgeval.jql import offline_traces
 
 offline_result = client.query(offline_traces().rows())
 ```
-
-### Virtual SQL
-
-`Judgeval.sql(sql_text)` runs a read-only SELECT against the virtual SQL catalog
-using the client's existing API key, organization membership, and resolved project.
-Viewer access and the public query rate limit apply.
-
-```python
-result = client.sql("SELECT count() AS run_count FROM telemetry.traces")
-print(result["rows"])
-```
-
-The public HTTP equivalent is `POST /v1/projects/{projectId}/sql` with
-`Authorization: Bearer <api-key>`, `X-Organization-Id: <organization-id>`, and
-JSON body `{"sql": "SELECT count() AS run_count FROM telemetry.traces"}`.
-Organization and project scope are derived by the server. Trace/session scope,
-physical tables, writes, multiple statements, and caller-specified execution limits
-are unsupported. DAL catalog allowlists, tenant isolation, and result limits of
-1,000 rows and 5 MiB apply; over-limit results return an error. SQL text must
-contain a non-whitespace character and cannot exceed 50,000 characters.
-
-The response contains `catalog_version`, `columns` (name, type, nullable),
-`rows`, `row_count`, and `elapsed_ms`. It does not contain `query_id`.
-SQL integers outside JavaScript's safe range (`-(2**53 - 1)` to `2**53 - 1`)
-arrive as exact decimal strings, including inside nested arrays and objects.
-For example, `9007199254740993` arrives as `"9007199254740993"`; use `int(value)`
-when you need a Python integer. Small integers and floating-point values remain
-numbers, and column types retain their original SQL types.
-Validation and execution errors use the same exception mapping as `query()`.
 
 ## Integrations
 

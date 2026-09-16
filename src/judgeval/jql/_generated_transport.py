@@ -1,4 +1,4 @@
-"""Generated from Judgeval public JQL OpenAPI; do not edit."""
+"""Generated from Judgeval public query OpenAPI; do not edit."""
 
 from typing import Any, Dict, List, Optional, TypedDict
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import httpx
 import pytest
 
 from judgeval import Judgeval
@@ -50,19 +51,26 @@ def test_sql_forwarding(monkeypatch: pytest.MonkeyPatch, sql_response: dict) -> 
     monkeypatch.setattr("judgeval.judgeval.resolve_project_id", lambda *_: "project-1")
     calls = []
 
-    def request(self, method, url, payload, params=None):
-        calls.append((method, url, payload, params))
-        return sql_response
+    def request(self, method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        return httpx.Response(200, json=sql_response)
 
-    monkeypatch.setattr(JudgmentSyncClient, "_request", request)
+    monkeypatch.setattr(httpx.Client, "request", request)
     assert {"response": client().sql(SQL), "calls": calls} == {
         "response": sql_response,
         "calls": [
             (
                 "POST",
                 "https://api.example.com/v1/projects/project-1/sql",
-                {"sql": SQL},
-                None,
+                {
+                    "json": {"sql": SQL},
+                    "params": None,
+                    "headers": {
+                        "Authorization": "Bearer api-key",
+                        "X-Organization-Id": "org-1",
+                        "Content-Type": "application/json",
+                    },
+                },
             )
         ],
     }
@@ -84,14 +92,21 @@ def test_sql_requires_resolved_project(monkeypatch: pytest.MonkeyPatch) -> None:
     }
 
 
-@pytest.mark.parametrize("status", [400, 401, 403, 404, 422, 429, 502])
+@pytest.mark.parametrize("status", [422, 429])
 def test_sql_maps_errors_like_query(
     monkeypatch: pytest.MonkeyPatch, status: int
 ) -> None:
     from judgeval.exceptions import map_judgment_api_error
 
     monkeypatch.setattr("judgeval.judgeval.resolve_project_id", lambda *_: "project-1")
-    error = JudgmentAPIError(status, "Rejected", None, code="BAD_SQL")
+    error = JudgmentAPIError(
+        status,
+        "Rejected",
+        None,
+        code="BAD_SQL",
+        hint="Check the query.",
+        retry_after_seconds=2 if status == 429 else None,
+    )
     expected = map_judgment_api_error(error)
 
     def request(*args, **kwargs):

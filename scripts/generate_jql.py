@@ -224,7 +224,7 @@ __all__ = [
         or f"{name}[" in class_source
     ]
     OUTPUTS[2].write_text(
-        '"""Generated from Judgeval public JQL OpenAPI; do not edit."""\n\n'
+        '"""Generated from Judgeval public query OpenAPI; do not edit."""\n\n'
         f"from typing import {', '.join(typing_names)}\n\n\n" + class_source + "\n",
         encoding="utf-8",
         newline="\n",

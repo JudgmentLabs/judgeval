@@ -200,7 +200,11 @@ class Judgeval:
         trace_ids: Optional[Sequence[str]] = None,
         session_ids: Optional[Sequence[str]] = None,
     ) -> "JqlQueryResponse":
-        """Run JQL for this project, optionally narrowed by trace or session IDs."""
+        """Run a legacy JQL query, optionally narrowed by trace or session IDs.
+
+        JQL guidance is deprecated for new integrations; prefer :meth:`sql`.
+        Existing JQL calls remain supported.
+        """
         from judgeval.jql import to_json
 
         return cast(
@@ -211,8 +215,27 @@ class Judgeval:
     def sql(self, sql_text: str) -> "SqlResponse":
         """Run one read-only virtual SQL SELECT for this organization and project.
 
-        Results are capped by the DAL at 1,000 rows and 5 MiB. The response
-        includes column metadata and catalog_version, with no query_id.
+        Prefer this method for new read-only queries. The server derives tenant
+        scope from the client's credentials and resolved project.
+
+        Args:
+            sql_text: One SELECT against the virtual catalog, at most 50,000
+                characters. Use SQL predicates to narrow the results.
+
+        Returns:
+            A dictionary with catalog_version, columns, rows, row_count, and
+            elapsed_ms. There is no query_id or JQL presentation frame. Integers
+            outside JavaScript's safe range arrive as exact decimal strings.
+
+        Results are capped by the server at 1,000 rows and 5 MiB; exceeding
+        either cap returns an error. JQL-style limit, trace_ids, and session_ids
+        options are not accepted.
+
+        Example:
+            ```python
+            result = client.sql("SELECT count() AS run_count FROM telemetry.traces")
+            print(result["rows"])
+            ```
         """
         project_id = self._require_query_project_id()
         try:
@@ -238,7 +261,12 @@ class Judgeval:
         trace_ids: Optional[Sequence[str]] = None,
         session_ids: Optional[Sequence[str]] = None,
     ) -> "JqlPresentationResponse":
-        """Run a chart or table JQL query, optionally narrowed by trace or session IDs."""
+        """Run a legacy JQL chart or table query.
+
+        JQL guidance is deprecated for new integrations. Use :meth:`sql` for
+        new queries and render its rows in your application. Existing JQL
+        presentation calls and their frame responses remain supported.
+        """
         from judgeval.jql import to_json
 
         return cast(
@@ -287,7 +315,12 @@ class Judgeval:
         session_ids: Optional[Sequence[str]] = None,
         **options: Any,
     ) -> "JqlQueryResponse":
-        """Discover project-scoped judges, fields, models, and related values."""
+        """Discover project-scoped judges, fields, models, and related values.
+
+        This is a legacy JQL method. Prefer :meth:`sql` for new integrations,
+        using the virtual catalog tables for the data you need. Existing
+        discovery calls remain supported; SQL returns a different row schema.
+        """
         from judgeval.jql import discovery
 
         return self.query(
