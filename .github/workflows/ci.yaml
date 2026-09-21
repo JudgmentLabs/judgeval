@@ -26,7 +26,7 @@ jobs:
           python-version: "3.11"
 
       - name: Regenerate from checked-in public contracts
-        run: python scripts/generate_jql.py
+        run: python scripts/generate_query_contracts.py
 
       - name: Check generated JQL output is current
         run: |
@@ -75,7 +75,7 @@ jobs:
 
       - name: Regenerate from judgment-mono
         run: |
-          python scripts/generate_jql.py \
+          python scripts/generate_query_contracts.py \
             ../judgment-mono/services/data-access-service/openapi.json \
             ../judgment-mono/services/judgeval-server/openapi.public-jql.json
 

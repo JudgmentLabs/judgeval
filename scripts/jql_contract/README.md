@@ -1,6 +1,6 @@
-# Public JQL code-generation inputs
+# Public query code-generation inputs
 
-These files are public-safe snapshots of the canonical JQL contracts in
+These files are public-safe snapshots of the canonical JQL and SQL contracts in
 `JudgmentLabs/judgment-mono`:
 
 - `jql-ir.openapi.json` contains only the public JQL IR schema-reference closure.
@@ -14,7 +14,7 @@ Python SDK output differs.
 After an intentional upstream contract change, refresh the snapshots with:
 
 ```sh
-python scripts/generate_jql.py --sync \
+python scripts/generate_query_contracts.py --sync \
   ../judgment-mono/services/data-access-service/openapi.json \
   ../judgment-mono/services/judgeval-server/openapi.public-jql.json
 ```

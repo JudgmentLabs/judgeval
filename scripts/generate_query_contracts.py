@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate Python JQL types from public-safe canonical contracts."""
+"""Generate Python types from public-safe JQL and SQL contracts."""
 
 from __future__ import annotations
 
