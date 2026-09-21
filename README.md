@@ -89,11 +89,20 @@ Viewer access and the public query rate limit apply.
 from judgeval import Judgeval
 
 client = Judgeval(project_name="my-project")
+print(client.discover_schema())
 result = client.sql("SELECT count() AS run_count FROM telemetry.traces")
 print(result["rows"])
 ```
 
-The public HTTP equivalent is `POST /v1/projects/{projectId}/sql` with
+`client.discover_schema()` returns a Markdown string with the server's generated
+tables, column types and descriptions, row semantics, examples, and query limits,
+using the same reference as MCP `discover_schema`. It contains no project data
+and requires organization viewer access, but no resolved project or public query
+opt-in. The HTTP equivalent is `GET /v1/sql/schema`, which returns
+`{"schema": "...Markdown reference..."}`. This differs from legacy `discover(kind)`,
+which queries project-specific values through JQL.
+
+For query execution, use `POST /v1/projects/{projectId}/sql` with
 `Authorization: Bearer <api-key>`, `X-Organization-Id: <organization-id>`, and
 JSON body `{"sql": "SELECT count() AS run_count FROM telemetry.traces"}`.
 Organization and project scope are derived by the server. The SDK method accepts

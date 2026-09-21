@@ -5,6 +5,49 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/v1/sql/schema": {
+      "get": {
+        "summary": "Discover the virtual SQL schema",
+        "security": [
+          {
+            "apiKeyAuth": [],
+            "organizationHeader": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The generated Markdown reference shared with MCP discover_schema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSqlSchemaResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicJqlErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/projects/{projectId}/sql": {
       "post": {
         "security": [
@@ -462,6 +505,19 @@
           },
           "elapsed_ms": {
             "type": "number"
+          }
+        }
+      },
+      "PublicSqlSchemaResponse": {
+        "$id": "PublicSqlSchemaResponse",
+        "type": "object",
+        "required": [
+          "schema"
+        ],
+        "properties": {
+          "schema": {
+            "description": "The virtual SQL catalog in Markdown.",
+            "type": "string"
           }
         }
       },

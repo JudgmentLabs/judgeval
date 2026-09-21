@@ -26,6 +26,37 @@ def client() -> Judgeval:
     )
 
 
+def test_discover_schema_returns_reference_without_resolved_project(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("judgeval.judgeval.resolve_project_id", lambda *_: None)
+    reference = "# Judgment SQL\n\n## telemetry.traces\ntrace_id: String — Trace ID\n"
+    calls = []
+
+    def request(self, method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        return httpx.Response(200, json={"schema": reference})
+
+    monkeypatch.setattr(httpx.Client, "request", request)
+    assert {"reference": client().discover_schema(), "calls": calls} == {
+        "reference": reference,
+        "calls": [
+            (
+                "GET",
+                "https://api.example.com/v1/sql/schema",
+                {
+                    "params": {},
+                    "headers": {
+                        "Authorization": "Bearer api-key",
+                        "X-Organization-Id": "org-1",
+                        "Content-Type": "application/json",
+                    },
+                },
+            )
+        ],
+    }
+
+
 @pytest.mark.parametrize(
     "sql_response",
     [

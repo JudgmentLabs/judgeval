@@ -212,11 +212,26 @@ class Judgeval:
             self._run_jql("query", to_json(query), limit, trace_ids, session_ids),
         )
 
+    def discover_schema(self) -> str:
+        """Return the virtual SQL schema reference as Markdown.
+
+        Mirrors MCP ``discover_schema``: published tables, column types and
+        descriptions, row semantics, examples, and query limits. Fetches the
+        server's generated catalog using this client's credentials. Contains
+        no project data and does not require a resolved project or public
+        query opt-in.
+        """
+        response = self._internal_client._request(
+            "GET", url_for("/v1/sql/schema", self._api_url), {}
+        )
+        return cast(str, response["schema"])
+
     def sql(self, sql_text: str) -> "SqlResponse":
         """Run one read-only virtual SQL SELECT for this organization and project.
 
         Prefer this method for new read-only queries. The server derives tenant
         scope from the client's credentials and resolved project.
+        Call :meth:`discover_schema` for supported tables and columns.
 
         Args:
             sql_text: One SELECT against the virtual catalog, at most 50,000
