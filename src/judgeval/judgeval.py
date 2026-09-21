@@ -213,7 +213,7 @@ class Judgeval:
         )
 
     def discover_schema(self) -> str:
-        """Return the virtual SQL schema reference as Markdown.
+        """Return the SQL schema reference as Markdown.
 
         Mirrors MCP ``discover_schema``: published tables, column types and
         descriptions, row semantics, examples, and query limits. Fetches the
@@ -227,7 +227,7 @@ class Judgeval:
         return cast(str, response["schema"])
 
     def sql(self, sql_text: str) -> "SqlResponse":
-        """Run one read-only virtual SQL SELECT for this organization and project.
+        """Run one read-only SQL SELECT for this organization and project.
 
         Prefer this method for new read-only queries. The server derives tenant
         scope from the client's credentials and resolved project.

@@ -78,11 +78,12 @@ def run_agent(question: str) -> str:
 run_agent("What is the capital of the United States?")
 ```
 
-### Virtual SQL
+### SQL
 
-Use `Judgeval.sql(sql_text)` for new read-only queries against the virtual SQL
-catalog. It uses the client's existing API key, organization membership, and
-resolved project.
+Use `Judgeval.sql(sql_text)` for read-only queries against Judgment's virtual
+schema, which abstracts the underlying storage. The server validates incoming
+queries, rejects writes, and enforces organization and project scope. The client
+uses its existing API key, organization membership, and resolved project.
 Viewer access and the public query rate limit apply.
 
 ```python
@@ -128,7 +129,7 @@ with SQL rows; migrate those consumers explicitly before retiring a JQL call.
 
 ### JQL (legacy)
 
-JQL guidance is deprecated for new integrations. Use [Virtual SQL](#virtual-sql)
+JQL guidance is deprecated for new integrations. Use [SQL](#sql)
 for new read-only queries. Existing `query()`, `present()`, and `discover()`
 methods remain supported.
 
