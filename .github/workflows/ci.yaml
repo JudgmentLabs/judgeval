@@ -216,6 +216,7 @@ jobs:
         run: |
           SECRET_VARS=$(aws secretsmanager get-secret-value --secret-id "$SECRETS_PATH" --query SecretString --output text)
           PROVIDER_SECRET_VARS=$(aws secretsmanager get-secret-value --secret-id stg/api-keys/e2e-tests --query SecretString --output text)
+          printf '%s\n' "$SECRET_VARS" "$PROVIDER_SECRET_VARS" | jq -r '.[] | select(type == "string" and length > 0) | gsub("%"; "%25") | gsub("\r"; "%0D") | gsub("\n"; "%0A") | "::add-mask::\(.)"'
           JUDGMENT_API_KEY=$(jq -er '.JUDGEVAL_GH_JUDGMENT_API_KEY | select(type == "string" and length > 0)' <<< "$SECRET_VARS")
           JUDGMENT_ORG_ID=$(jq -er '.JUDGEVAL_GH_JUDGMENT_ORG_ID | select(type == "string" and length > 0)' <<< "$SECRET_VARS")
           OPENAI_API_KEY=$(jq -er '.OPENAI_API_KEY | select(type == "string" and length > 0)' <<< "$PROVIDER_SECRET_VARS")
