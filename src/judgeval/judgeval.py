@@ -32,8 +32,7 @@ class Judgeval:
     """The main entry point for interacting with the Judgment platform.
 
     `Judgeval` connects to your Judgment project and gives you access to
-    **evaluations**, **datasets**, and **prompt versioning** through
-    convenient properties.
+    **SQL queries**, **evaluations**, and **datasets**.
 
     Credentials are resolved in order: explicit arguments first, then
     environment variables `JUDGMENT_API_KEY`, `JUDGMENT_ORG_ID`, and
@@ -70,13 +69,12 @@ class Judgeval:
         )
         ```
 
-        Once initialized, use the `evaluation`, `datasets`, and `prompts`
+        Once initialized, use the `evaluation` and `datasets`
         properties:
 
         ```python
         eval_runner = client.evaluation.create()
         dataset = client.datasets.get(name="golden-set")
-        prompt = client.prompts.get(name="system-prompt", tag="production")
         ```
     """
 
@@ -202,7 +200,7 @@ class Judgeval:
     ) -> "JqlQueryResponse":
         """Run a legacy JQL query, optionally narrowed by trace or session IDs.
 
-        JQL guidance is deprecated for new integrations; prefer :meth:`sql`.
+        JQL guidance is deprecated for new integrations; prefer `sql()`.
         Existing JQL calls remain supported.
         """
         from judgeval.jql import to_json
@@ -220,6 +218,14 @@ class Judgeval:
         server's generated catalog using this client's credentials. Contains
         no project data and does not require a resolved project or public
         query opt-in.
+
+        Returns:
+            The virtual schema reference as a Markdown string.
+
+        Examples:
+            ```python
+            print(client.discover_schema())
+            ```
         """
         response = self._internal_client._request(
             "GET", url_for("/v1/sql/schema", self._api_url), {}
@@ -231,22 +237,25 @@ class Judgeval:
 
         Prefer this method for new read-only queries. The server derives tenant
         scope from the client's credentials and resolved project.
-        Call :meth:`discover_schema` for supported tables and columns.
+        Call `discover_schema()` for supported tables and columns. Requires
+        viewer access and public SDK/API queries enabled for the organization.
+
+        Results are capped by the server at 1,000 rows and 5 MiB; exceeding
+        either cap returns an error. Use SQL predicates and LIMIT to narrow
+        results; JQL-style limit, trace_ids, and session_ids options are not
+        accepted.
 
         Args:
-            sql_text: One SELECT against the virtual catalog, at most 50,000
+            sql_text: One SELECT against the virtual schema, at most 50,000
                 characters. Use SQL predicates to narrow the results.
 
         Returns:
-            A dictionary with catalog_version, columns, rows, row_count, and
-            elapsed_ms. There is no query_id or JQL presentation frame. Integers
-            outside JavaScript's safe range arrive as exact decimal strings.
+            A dictionary with `catalog_version`, `columns` (name, type, nullable),
+            `rows` (dictionaries keyed by column name), `row_count`, and
+            `elapsed_ms`. Integers outside JavaScript's safe range arrive as
+            exact decimal strings.
 
-        Results are capped by the server at 1,000 rows and 5 MiB; exceeding
-        either cap returns an error. JQL-style limit, trace_ids, and session_ids
-        options are not accepted.
-
-        Example:
+        Examples:
             ```python
             result = client.sql("SELECT count() AS run_count FROM telemetry.traces")
             print(result["rows"])
@@ -278,7 +287,7 @@ class Judgeval:
     ) -> "JqlPresentationResponse":
         """Run a legacy JQL chart or table query.
 
-        JQL guidance is deprecated for new integrations. Use :meth:`sql` for
+        JQL guidance is deprecated for new integrations. Use `sql()` for
         new queries and render its rows in your application. Existing JQL
         presentation calls and their frame responses remain supported.
         """
@@ -332,7 +341,7 @@ class Judgeval:
     ) -> "JqlQueryResponse":
         """Discover project-scoped judges, fields, models, and related values.
 
-        This is a legacy JQL method. Prefer :meth:`sql` for new integrations,
+        This is a legacy JQL method. Prefer `sql()` for new integrations,
         using the virtual catalog tables for the data you need. Existing
         discovery calls remain supported; SQL returns a different row schema.
         """
