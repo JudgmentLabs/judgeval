@@ -44,6 +44,13 @@ jobs:
       - name: Check distribution contents
         run: python scripts/check_distribution_contents.py
 
+      - name: Check wheel imports with runtime dependencies only
+        run: |
+          uv venv /tmp/judgeval-wheel-smoke
+          uv pip install --python /tmp/judgeval-wheel-smoke/bin/python dist/*.whl
+          cd /tmp
+          /tmp/judgeval-wheel-smoke/bin/python -c 'from judgeval import Judgeval; from judgeval.datasets import DatasetFactory; from judgeval.evaluation import EvaluationFactory; from judgeval.trace import Tracer'
+
   jql-parity:
     name: JQL parity with judgment-mono
     needs: [validate-branch]
