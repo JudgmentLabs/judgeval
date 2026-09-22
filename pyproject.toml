@@ -26,6 +26,8 @@ dependencies = [
     "dotenv>=0.9.9",
     "pathspec>=1.0.4",
     "packaging>=25.0",
+    "pyyaml>=6.0.2",
+    "pydantic>=2.0",
 ]
 
 [project.urls]
