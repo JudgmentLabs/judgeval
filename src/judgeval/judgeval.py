@@ -200,8 +200,8 @@ class Judgeval:
     ) -> "JqlQueryResponse":
         """Run a legacy JQL query, optionally narrowed by trace or session IDs.
 
-        JQL guidance is deprecated for new integrations; prefer `sql()`.
-        Existing JQL calls remain supported.
+        **Deprecated.** Use [`sql()`](#sql) for new integrations, with SQL
+        predicates to narrow results. Existing JQL calls remain supported.
         """
         from judgeval.jql import to_json
 
@@ -287,9 +287,10 @@ class Judgeval:
     ) -> "JqlPresentationResponse":
         """Run a legacy JQL chart or table query.
 
-        JQL guidance is deprecated for new integrations. Use `sql()` for
-        new queries and render its rows in your application. Existing JQL
-        presentation calls and their frame responses remain supported.
+        **Deprecated.** Use [`sql()`](#sql) for new queries and render its
+        rows as charts or tables in your application. SQL does not return a
+        JQL presentation frame. Existing presentation calls and their frame
+        responses remain supported.
         """
         from judgeval.jql import to_json
 
@@ -341,9 +342,10 @@ class Judgeval:
     ) -> "JqlQueryResponse":
         """Discover project-scoped judges, fields, models, and related values.
 
-        This is a legacy JQL method. Prefer `sql()` for new integrations,
-        using the virtual catalog tables for the data you need. Existing
-        discovery calls remain supported; SQL returns a different row schema.
+        **Deprecated.** Use [`discover_schema()`](#discover_schema) to inspect
+        the SQL tables and columns, then [`sql()`](#sql) to query project values.
+        Schema discovery returns documentation, not project data. Existing
+        JQL discovery calls remain supported; SQL returns a different row schema.
         """
         from judgeval.jql import discovery
 
