@@ -100,22 +100,20 @@ tables, column types and descriptions, row semantics, examples, and query limits
 using the same reference as MCP `discover_schema`. It contains no project data
 and requires organization viewer access, but no resolved project or public query
 opt-in. The HTTP equivalent is `GET /v1/sql/schema`, which returns
-`{"schema": "...Markdown reference..."}`. This differs from legacy `discover(kind)`,
-which queries project-specific values through JQL.
+`{"schema": "...Markdown reference..."}`.
 
 For query execution, use `POST /v1/projects/{projectId}/sql` with
 `Authorization: Bearer <api-key>`, `X-Organization-Id: <organization-id>`, and
 JSON body `{"sql": "SELECT count() AS run_count FROM telemetry.traces"}`.
-Organization and project scope are derived by the server. The SDK method accepts
-only SQL text, without JQL-style `trace_ids`, `session_ids`, or `limit` options.
-Use SQL predicates on supported catalog columns to narrow results. Physical
-tables, writes, multiple statements, and caller-specified execution limits are
+Organization and project scope are derived by the server. Use SQL predicates on
+supported catalog columns and `LIMIT` to narrow results. Physical tables,
+writes, multiple statements, and caller-specified execution limits are
 unsupported. DAL catalog allowlists, tenant isolation, and result limits of
 1,000 rows and 5 MiB apply; over-limit results return an error. SQL text must
 contain a non-whitespace character and cannot exceed 50,000 characters.
 
 The response contains `catalog_version`, `columns` (name, type, nullable),
-`rows`, `row_count`, and `elapsed_ms`. It does not contain `query_id`.
+`rows`, `row_count`, and `elapsed_ms`.
 SQL integers outside JavaScript's safe range (`-(2**53 - 1)` to `2**53 - 1`)
 arrive as exact decimal strings, including inside nested arrays and objects.
 For example, `9007199254740993` arrives as `"9007199254740993"`; use `int(value)`

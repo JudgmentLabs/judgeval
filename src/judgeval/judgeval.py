@@ -242,8 +242,7 @@ class Judgeval:
 
         Results are capped by the server at 1,000 rows and 5 MiB; exceeding
         either cap returns an error. Use SQL predicates and LIMIT to narrow
-        results; JQL-style limit, trace_ids, and session_ids options are not
-        accepted.
+        results.
 
         Args:
             sql_text: One SELECT against the virtual schema, at most 50,000
