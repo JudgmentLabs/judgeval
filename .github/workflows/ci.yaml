@@ -156,8 +156,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TEST_TIMEOUT_SECONDS: ${{ secrets.TEST_TIMEOUT_SECONDS }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
       - name: Configure AWS Credentials
@@ -217,9 +215,12 @@ jobs:
         working-directory: src
         run: |
           SECRET_VARS=$(aws secretsmanager get-secret-value --secret-id "$SECRETS_PATH" --query SecretString --output text)
-          export $(echo "$SECRET_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
-          export JUDGMENT_API_KEY="$JUDGEVAL_GH_JUDGMENT_API_KEY"
-          export JUDGMENT_ORG_ID="$JUDGEVAL_GH_JUDGMENT_ORG_ID"
+          PROVIDER_SECRET_VARS=$(aws secretsmanager get-secret-value --secret-id stg/api-keys/e2e-tests --query SecretString --output text)
+          JUDGMENT_API_KEY=$(jq -er '.JUDGEVAL_GH_JUDGMENT_API_KEY | select(type == "string" and length > 0)' <<< "$SECRET_VARS")
+          JUDGMENT_ORG_ID=$(jq -er '.JUDGEVAL_GH_JUDGMENT_ORG_ID | select(type == "string" and length > 0)' <<< "$SECRET_VARS")
+          OPENAI_API_KEY=$(jq -er '.OPENAI_API_KEY | select(type == "string" and length > 0)' <<< "$PROVIDER_SECRET_VARS")
+          ANTHROPIC_API_KEY=$(jq -er '.ANTHROPIC_API_KEY | select(type == "string" and length > 0)' <<< "$PROVIDER_SECRET_VARS")
+          export JUDGMENT_API_KEY JUDGMENT_ORG_ID OPENAI_API_KEY ANTHROPIC_API_KEY
           export JUDGMENT_API_URL="$BASE_URL"
           timeout ${TEST_TIMEOUT_SECONDS}s uv run pytest -n auto --dist=loadfile --durations=0 --cov=. --cov-config=.coveragerc --cov-report=html ./e2etests
 
