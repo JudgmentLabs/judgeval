@@ -22,6 +22,10 @@ from .apply_test_run_success_response import (
     ApplyTestRunSuccessResponse as ApplyTestRunSuccessResponse,
 )
 from .base_scorer import BaseScorer as BaseScorer
+from .create_external_judge_input import (
+    CreateExternalJudgeInput as CreateExternalJudgeInput,
+)
+from .create_judge_result import CreateJudgeResult as CreateJudgeResult
 from .create_offline_dataset_request import (
     CreateOfflineDatasetRequest as CreateOfflineDatasetRequest,
 )
@@ -106,21 +110,15 @@ from .pull_offline_dataset_response import (
 )
 from .resolve_project_request import ResolveProjectRequest as ResolveProjectRequest
 from .resolve_project_response import ResolveProjectResponse as ResolveProjectResponse
-from .sdk_create_agent_judge_request import (
-    SDKCreateAgentJudgeRequest as SDKCreateAgentJudgeRequest,
-)
-from .sdk_create_agent_judge_response import (
-    SDKCreateAgentJudgeResponse as SDKCreateAgentJudgeResponse,
-)
-from .sdk_update_agent_judge_request import (
-    SDKUpdateAgentJudgeRequest as SDKUpdateAgentJudgeRequest,
-)
-from .sdk_update_agent_judge_response import (
-    SDKUpdateAgentJudgeResponse as SDKUpdateAgentJudgeResponse,
-)
 from .scorer_config import ScorerConfig as ScorerConfig
 from .scorer_exists_response import ScorerExistsResponse as ScorerExistsResponse
 from .scoring_result import ScoringResult as ScoringResult
+from .submit_external_judge_result import (
+    SubmitExternalJudgeResult as SubmitExternalJudgeResult,
+)
+from .submit_external_judge_result_response import (
+    SubmitExternalJudgeResultResponse as SubmitExternalJudgeResultResponse,
+)
 from .tag_prompt_request import TagPromptRequest as TagPromptRequest
 from .tag_prompt_response import TagPromptResponse as TagPromptResponse
 from .test_config_response import TestConfigResponse as TestConfigResponse

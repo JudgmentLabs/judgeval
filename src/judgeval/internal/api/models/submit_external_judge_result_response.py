@@ -5,5 +5,5 @@ from __future__ import annotations
 from typing import TypedDict
 
 
-class SDKCreateAgentJudgeResponse(TypedDict):
-    judge_id: str
+class SubmitExternalJudgeResultResponse(TypedDict):
+    id: str

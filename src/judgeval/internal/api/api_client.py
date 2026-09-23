@@ -629,20 +629,20 @@ class JudgmentSyncClient:
         )
 
     def post_projects_judges(
-        self, project_id: str, payload: SDKCreateAgentJudgeRequest
-    ) -> SDKCreateAgentJudgeResponse:
+        self, project_id: str, payload: CreateExternalJudgeInput
+    ) -> CreateJudgeResult:
         return self._request(
             "POST",
             url_for(f"/v1/projects/{project_id}/judges", self.base_url),
             payload,
         )
 
-    def patch_projects_judges_by_judge_id(
-        self, project_id: str, judge_id: str, payload: SDKUpdateAgentJudgeRequest
-    ) -> SDKUpdateAgentJudgeResponse:
+    def post_projects_judge_results(
+        self, project_id: str, payload: SubmitExternalJudgeResult
+    ) -> SubmitExternalJudgeResultResponse:
         return self._request(
-            "PATCH",
-            url_for(f"/v1/projects/{project_id}/judges/{judge_id}", self.base_url),
+            "POST",
+            url_for(f"/v1/projects/{project_id}/judge-results", self.base_url),
             payload,
         )
 
@@ -1226,20 +1226,20 @@ class JudgmentAsyncClient:
         )
 
     async def post_projects_judges(
-        self, project_id: str, payload: SDKCreateAgentJudgeRequest
-    ) -> SDKCreateAgentJudgeResponse:
+        self, project_id: str, payload: CreateExternalJudgeInput
+    ) -> CreateJudgeResult:
         return await self._request(
             "POST",
             url_for(f"/v1/projects/{project_id}/judges", self.base_url),
             payload,
         )
 
-    async def patch_projects_judges_by_judge_id(
-        self, project_id: str, judge_id: str, payload: SDKUpdateAgentJudgeRequest
-    ) -> SDKUpdateAgentJudgeResponse:
+    async def post_projects_judge_results(
+        self, project_id: str, payload: SubmitExternalJudgeResult
+    ) -> SubmitExternalJudgeResultResponse:
         return await self._request(
-            "PATCH",
-            url_for(f"/v1/projects/{project_id}/judges/{judge_id}", self.base_url),
+            "POST",
+            url_for(f"/v1/projects/{project_id}/judge-results", self.base_url),
             payload,
         )
 
