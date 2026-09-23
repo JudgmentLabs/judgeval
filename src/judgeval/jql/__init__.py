@@ -1,4 +1,7 @@
-"""Pure-Python builders for Judgment Query Language (JQL).
+"""Legacy builders for Judgment Query Language (JQL).
+
+For new integrations, use :meth:`judgeval.Judgeval.sql`. These builders remain
+supported for existing JQL queries; the JQL guidance is deprecated.
 
 The builders emit the canonical, project-free JSON IR. Tenant scope is supplied
 by :class:`judgeval.Judgeval` when the query is sent to the Judgment API.
@@ -29,6 +32,7 @@ from judgeval.jql._generated_roots import (
 from judgeval.jql._generated_transport import (
     JqlPresentationResponse,
     JqlQueryResponse,
+    SqlResponse,
 )
 
 JsonObject = Dict[str, Any]
@@ -598,6 +602,7 @@ __all__ = [
     "HierarchyDepth",
     "JqlPresentationResponse",
     "JqlQueryResponse",
+    "SqlResponse",
     "JsonObject",
     "PipelineBuilder",
     "PresentationField",

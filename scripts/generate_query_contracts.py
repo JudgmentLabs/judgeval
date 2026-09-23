@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate Python JQL types from public-safe canonical contracts."""
+"""Generate Python types from public-safe JQL and SQL contracts."""
 
 from __future__ import annotations
 
@@ -209,7 +209,11 @@ __all__ = [
     public_schemas = public_document["components"]["schemas"]
     classes = [
         typed_dict_source(name, public_schemas[name])
-        for name in ("PublicJqlQueryResponse", "PublicJqlPresentationResponse")
+        for name in (
+            "PublicJqlQueryResponse",
+            "PublicJqlPresentationResponse",
+            "PublicSqlResponse",
+        )
     ]
     class_source = "\n\n\n".join(classes)
     typing_names = [
@@ -220,7 +224,7 @@ __all__ = [
         or f"{name}[" in class_source
     ]
     OUTPUTS[2].write_text(
-        '"""Generated from Judgeval public JQL OpenAPI; do not edit."""\n\n'
+        '"""Generated from Judgeval public query OpenAPI; do not edit."""\n\n'
         f"from typing import {', '.join(typing_names)}\n\n\n" + class_source + "\n",
         encoding="utf-8",
         newline="\n",
