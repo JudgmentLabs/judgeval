@@ -322,3 +322,93 @@ class OfflineTestsFactory:
             run_name=run_name,
             field_mapping=field_mapping,
         )
+
+    # ------------------------------------------------------------------ #
+    #  Platform-started agent runs                                        #
+    # ------------------------------------------------------------------ #
+
+    def attach(
+        self,
+        test_run_id: str,
+        agent_function: AgentFunction,
+        pass_condition_fn: Optional[PassConditionFn] = None,
+        timeout_seconds: int = 600,
+        field_mapping: Optional[Dict[str, str]] = None,
+        wait: bool = True,
+    ) -> Optional[OfflineTestResult]:
+        """Run your agent for a test run that was started from the platform.
+
+        When a run is started in Judgment with *Run your agent* on a local
+        target, the platform creates the run and waits for traces. Calling
+        ``attach`` fetches the examples still waiting, runs
+        ``agent_function`` once per example under an offline tracer, streams
+        each trace back as it completes, and finalizes the run so the judges
+        start scoring.
+
+        Args:
+            test_run_id: The run id shown in the platform's *Connect your
+                agent* panel.
+            agent_function: Agent entrypoint, called with each example's
+                fields as keyword arguments (see ``run``).
+            pass_condition_fn: Optional per-row pass condition, recorded on
+                the run's results once judging completes.
+            timeout_seconds: Maximum seconds to wait for judge results.
+            field_mapping: Optional agent-parameter to dataset-field map.
+            wait: When ``False``, return as soon as the traces are attached
+                instead of waiting for judge results.
+
+        Returns:
+            An ``OfflineTestResult``, or ``None`` if the project is not
+            resolved.
+        """
+        project_id = expect_project_id(self._project_id)
+        if not project_id:
+            return None
+        runner = OfflineTestRunner(
+            client=self._client,
+            project_id=project_id,
+            project_name=self._project_name,
+        )
+        return runner.attach(
+            test_run_id,
+            agent_function,
+            pass_condition_fn=pass_condition_fn,
+            timeout_seconds=timeout_seconds,
+            field_mapping=field_mapping,
+            wait=wait,
+        )
+
+    def serve(
+        self,
+        agent_function: AgentFunction,
+        host: str = "0.0.0.0",
+        port: int = 8787,
+        path: str = "/judgment/run",
+        secret: Optional[str] = None,
+        field_mapping: Optional[Dict[str, str]] = None,
+        pass_condition_fn: Optional[PassConditionFn] = None,
+    ) -> None:
+        """Expose your agent as an endpoint the platform can dispatch runs to.
+
+        Save the resulting URL as an *agent endpoint* in Judgment. Each run
+        started against it sends one webhook; the server accepts it and
+        calls ``attach`` in the background. Blocks until interrupted.
+        """
+        from judgeval.offline_tests.serve import serve_agent
+
+        def attach(test_run_id: str) -> None:
+            self.attach(
+                test_run_id,
+                agent_function,
+                pass_condition_fn=pass_condition_fn,
+                field_mapping=field_mapping,
+            )
+
+        def banner(url: str) -> None:
+            judgeval_logger.info(
+                f"Serving agent for Judgment test runs at {url} "
+                f"(project {self._project_name!r}). Save this URL as an agent "
+                "endpoint in Judgment, then start a run against it."
+            )
+
+        serve_agent(attach, host=host, port=port, path=path, secret=secret, banner=banner)

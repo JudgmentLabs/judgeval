@@ -25,6 +25,7 @@ from judgeval.utils.url import url_for
 
 AgentFunction = Callable[..., Any]
 PassConditionFn = Callable[[Dict[str, Any], List[ScorerData]], bool]
+ExampleDoneCallback = Callable[[str, Optional[str], Optional[str]], None]
 
 
 class JudgeVersionPin(TypedDict, total=False):
@@ -413,6 +414,7 @@ class OfflineTestRunner:
         examples: List[Dict[str, Any]],
         progress: Optional[Progress] = None,
         field_mapping: Optional[Dict[str, str]] = None,
+        on_example_done: Optional[ExampleDoneCallback] = None,
     ) -> Dict[str, str]:
         """Call the agent entrypoint once per dataset example.
 
@@ -427,6 +429,11 @@ class OfflineTestRunner:
         Before returning, the offline tracer is force-flushed and its
         provider shut down, so every agent trace is exported by the time
         the test run is created with these trace IDs attached.
+
+        When ``on_example_done`` is given it is called after each example
+        with ``(example_id, trace_id_or_None, error_or_None)``. The tracer
+        is flushed first, so the trace is already exported when the callback
+        reports it; ``attach`` uses this to stream progress to the platform.
         """
         from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
         from judgeval.trace.offline_tracer import OfflineTracer
@@ -460,12 +467,14 @@ class OfflineTestRunner:
                 kwargs = build_agent_kwargs(agent_function, data, field_mapping)
 
                 before = len(captured)
+                error: Optional[str] = None
                 try:
                     if is_async:
                         asyncio.run(wrapped(**kwargs))
                     else:
                         wrapped(**kwargs)
                 except Exception as exc:
+                    error = f"{type(exc).__name__}: {exc}"
                     judgeval_logger.error(
                         f"Agent entrypoint raised for example {example_id}: {exc}"
                     )
@@ -475,6 +484,10 @@ class OfflineTestRunner:
                     if example_id and offline_trace_id:
                         agent_traces[example_id] = offline_trace_id
                         break
+
+                if on_example_done is not None:
+                    tracer.force_flush()
+                    on_example_done(example_id, agent_traces.get(example_id), error)
 
                 if progress is not None and task is not None:
                     progress.update(
@@ -740,6 +753,195 @@ class OfflineTestRunner:
                 ),
                 payload={"successes": successes},
             ),
+        )
+
+    # ------------------------------------------------------------------ #
+    #  Platform-started agent runs                                        #
+    # ------------------------------------------------------------------ #
+
+    def fetch_agent_run(self, test_run_id: str) -> Dict[str, Any]:
+        """Fetch the work a platform-started agent run is waiting on.
+
+        ``GET .../test-runs/{id}/agent-run`` returns the run, its per-example
+        trace status, the example inputs, and the evaluation refs needed to
+        report pass conditions.
+        """
+        return cast(
+            Dict[str, Any],
+            self._client._request(
+                "GET",
+                url_for(
+                    f"/v1/projects/{self._project_id}/test-runs/{test_run_id}/agent-run",
+                    self._client.base_url,
+                ),
+                {},
+            ),
+        )
+
+    def report_agent_traces(
+        self,
+        test_run_id: str,
+        traces: List[Dict[str, Any]],
+        finalize: bool = False,
+    ) -> Dict[str, Any]:
+        """Attach offline trace ids (or failures) to a platform-started run.
+
+        Judge evaluation is queued server-side once every example has
+        reported, or immediately when ``finalize`` is set.
+        """
+        payload: Dict[str, Any] = {"traces": traces}
+        if finalize:
+            payload["finalize"] = True
+        return cast(
+            Dict[str, Any],
+            self._client._request(
+                "POST",
+                url_for(
+                    f"/v1/projects/{self._project_id}/test-runs/{test_run_id}/agent-traces",
+                    self._client.base_url,
+                ),
+                payload,
+            ),
+        )
+
+    def attach(
+        self,
+        test_run_id: str,
+        agent_function: AgentFunction,
+        pass_condition_fn: Optional[PassConditionFn] = None,
+        timeout_seconds: int = 600,
+        field_mapping: Optional[Dict[str, str]] = None,
+        wait: bool = True,
+    ) -> OfflineTestResult:
+        """Produce the agent traces for a run started from the platform.
+
+        The platform creates the run and its evaluation rows up front. This
+        fetches the examples still waiting for a trace, runs the agent over
+        them under an ``OfflineTracer``, streams each trace id back as it
+        completes, and finalizes the run so the judges start scoring.
+        """
+        console = Console()
+        console.print("\n[bold cyan]Attaching agent to test run[/bold cyan]")
+        console.print(f"[dim]Run:[/dim] {test_run_id}")
+        console.print(f"[dim]Project:[/dim] {self._project_name}")
+
+        work = self.fetch_agent_run(test_run_id)
+        agent_run = work.get("agent_run") or {}
+        states = {
+            str(state.get("example_id")): str(state.get("status"))
+            for state in agent_run.get("examples") or []
+        }
+        examples = [
+            example
+            for example in (work.get("examples") or [])
+            if states.get(str(example.get("example_id"))) == "waiting"
+        ]
+        ui_results_url = work.get("ui_results_url") or ""
+        console.print(
+            f"[dim]Examples waiting for a trace:[/dim] {len(examples)} / {len(states)}"
+        )
+
+        agent_traces: Dict[str, str] = {}
+
+        def report(
+            example_id: str, trace_id: Optional[str], error: Optional[str]
+        ) -> None:
+            if trace_id:
+                agent_traces[example_id] = trace_id
+            try:
+                self.report_agent_traces(
+                    test_run_id,
+                    [
+                        {
+                            "example_id": example_id,
+                            "agent_offline_trace_id": trace_id,
+                            "error": error,
+                        }
+                    ],
+                )
+            except JudgmentAPIError as exc:
+                judgeval_logger.error(
+                    f"Could not report trace for example {example_id}: {exc}"
+                )
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            TimeElapsedColumn(),
+            console=console,
+        ) as progress:
+            if examples:
+                self.run_agent(
+                    agent_function,
+                    examples,
+                    progress,
+                    field_mapping,
+                    on_example_done=report,
+                )
+                # Every example reported as it finished, so the server has
+                # normally finalized already; only close out stragglers.
+                current = self.fetch_agent_run(test_run_id)
+                current_states = (current.get("agent_run") or {}).get("examples") or []
+                still_waiting = [
+                    str(state.get("example_id"))
+                    for state in current_states
+                    if state.get("status") == "waiting"
+                ]
+                if still_waiting:
+                    finalized = self.report_agent_traces(
+                        test_run_id,
+                        [
+                            {
+                                "example_id": example_id,
+                                "agent_offline_trace_id": agent_traces.get(example_id),
+                                "error": None
+                                if agent_traces.get(example_id)
+                                else "The agent produced no trace",
+                            }
+                            for example_id in still_waiting
+                        ],
+                        finalize=True,
+                    )
+                else:
+                    finalized = current
+                run_status = str(
+                    (finalized.get("test_run") or {}).get("status") or ""
+                )
+                console.print(
+                    f"[dim]Traces attached:[/dim] {len(agent_traces)} | "
+                    f"[dim]run status:[/dim] {run_status}"
+                )
+            else:
+                console.print("[yellow]No examples are waiting for a trace.[/yellow]")
+
+            if not wait:
+                return OfflineTestResult(
+                    test_run_id=test_run_id,
+                    status=str((work.get("test_run") or {}).get("status") or ""),
+                    ui_results_url=ui_results_url,
+                    results=[],
+                    agent_offline_trace_ids=agent_traces,
+                )
+
+            status = self.wait_for_completion(test_run_id, timeout_seconds, progress)
+
+        items, items_url = self.fetch_items(test_run_id)
+        ui_results_url = items_url or ui_results_url
+        results = self.build_results(items, agent_traces, pass_condition_fn)
+        if pass_condition_fn is not None:
+            self.report_success(
+                test_run_id,
+                {"evaluation_runs": work.get("evaluation_runs") or []},
+                items,
+                results,
+            )
+        self._display_results(console, status, results, ui_results_url)
+        return OfflineTestResult(
+            test_run_id=test_run_id,
+            status=status,
+            ui_results_url=ui_results_url,
+            results=results,
+            agent_offline_trace_ids=agent_traces,
         )
 
     # ------------------------------------------------------------------ #

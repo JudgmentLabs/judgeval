@@ -1099,3 +1099,104 @@ class TestRunAgentLoop:
                 runner.run_agent(
                     agent, [{"example_id": "ex-1", "data": {"input": "q1"}}]
                 )
+
+
+AGENT_RUN = {
+    "test_run": {"id": "run-1", "status": "pending"},
+    "agent_run": {
+        "target": {"type": "local"},
+        "progress": {"expected": 2, "traced": 0, "failed": 0, "waiting": 2},
+        "dispatch": None,
+        "created_at": "2026-01-01",
+        "finalized_at": None,
+        "examples": [
+            {"example_id": "ex-1", "status": "waiting"},
+            {"example_id": "ex-2", "status": "waiting"},
+        ],
+    },
+    "examples": [
+        {"example_id": "ex-1", "data": {"input": "q1"}},
+        {"example_id": "ex-2", "data": {"input": "q2"}},
+    ],
+    "evaluation_runs": PREPARED["evaluation_runs"],
+    "ui_results_url": "https://app/tests/run-1",
+}
+
+
+class TestAttach:
+    def _stub(self, runner, client, agent_run_states):
+        """GET agent-run returns successive states; POST agent-traces acks."""
+        states = [json.loads(json.dumps(s)) for s in agent_run_states]
+        posted = []
+
+        def _request(method, url, payload, *args, **kwargs):
+            if method == "GET" and url.endswith("/agent-run"):
+                return states.pop(0) if len(states) > 1 else states[0]
+            if method == "GET" and "/items" in url:
+                return {
+                    "results": [json.loads(json.dumps(item)) for item in ITEMS],
+                    "has_more": False,
+                    "next_cursor": None,
+                    "ui_results_url": "https://app/tests/run-1",
+                }
+            if method == "POST" and url.endswith("/agent-traces"):
+                posted.append(payload)
+                return {"test_run": {"id": "run-1", "status": "running"}, "agent_run": {}}
+            return {"updated": 1}
+
+        client._request.side_effect = _request
+        client.get_projects_test_runs_by_test_run_id.return_value = {
+            "test_run": {"id": "run-1", "status": "completed"},
+        }
+        run_agent = MagicMock(
+            side_effect=lambda agent, examples, progress, mapping, on_example_done: [
+                on_example_done(ex["example_id"], f"trace-{ex['example_id']}", None)
+                for ex in examples
+            ]
+            and {ex["example_id"]: f"trace-{ex['example_id']}" for ex in examples}
+        )
+        self._run_agent = run_agent
+        return posted
+
+    def _attach(self, runner, *args, **kwargs):
+        with patch.object(OfflineTestRunner, "run_agent", self._run_agent):
+            return runner.attach(*args, **kwargs)
+
+    def test_reports_each_trace_and_skips_finalize_when_server_finished(self):
+        runner, client = _make_runner()
+        finished = json.loads(json.dumps(AGENT_RUN))
+        finished["agent_run"]["finalized_at"] = "2026-01-02"
+        for state in finished["agent_run"]["examples"]:
+            state["status"] = "traced"
+        posted = self._stub(runner, client, [AGENT_RUN, finished])
+
+        outcome = self._attach(runner, "run-1", lambda input: input)
+
+        assert [p["traces"][0]["example_id"] for p in posted] == ["ex-1", "ex-2"]
+        assert all("finalize" not in p for p in posted)
+        assert outcome.status == "completed"
+        assert outcome.agent_offline_trace_ids == {
+            "ex-1": "trace-ex-1",
+            "ex-2": "trace-ex-2",
+        }
+
+    def test_finalizes_stragglers_the_server_still_lists_as_waiting(self):
+        runner, client = _make_runner()
+        posted = self._stub(runner, client, [AGENT_RUN, AGENT_RUN])
+
+        self._attach(runner, "run-1", lambda input: input, wait=False)
+
+        final = posted[-1]
+        assert final["finalize"] is True
+        assert {t["example_id"] for t in final["traces"]} == {"ex-1", "ex-2"}
+
+    def test_only_runs_examples_still_waiting(self):
+        runner, client = _make_runner()
+        partial = json.loads(json.dumps(AGENT_RUN))
+        partial["agent_run"]["examples"][0]["status"] = "traced"
+        self._stub(runner, client, [partial, partial])
+
+        self._attach(runner, "run-1", lambda input: input, wait=False)
+
+        examples_run = self._run_agent.call_args.args[1]
+        assert [ex["example_id"] for ex in examples_run] == ["ex-2"]

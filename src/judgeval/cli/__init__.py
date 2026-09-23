@@ -43,6 +43,149 @@ scorer_app = typer.Typer(
 
 app.add_typer(scorer_app, name="scorer", help="Commands to manage custom scorers")
 
+tests_app = typer.Typer(
+    no_args_is_help=True,
+    pretty_exceptions_enable=False,
+    pretty_exceptions_show_locals=False,
+    pretty_exceptions_short=False,
+    rich_help_panel=None,
+    rich_markup_mode=None,
+)
+
+app.add_typer(
+    tests_app,
+    name="tests",
+    help="Run your agent for offline test runs started from the platform",
+)
+
+
+def _load_agent_function(spec: str):
+    """Resolve ``path/to/file.py:function`` or ``package.module:function``."""
+    import importlib
+    import importlib.util
+
+    if ":" not in spec:
+        raise typer.BadParameter(
+            "Expected --agent as 'path/to/agent.py:function' or 'module.path:function'"
+        )
+    module_spec, function_name = spec.rsplit(":", 1)
+    sys.path.insert(0, os.getcwd())
+    module_path = Path(module_spec)
+    if module_path.suffix == ".py" and module_path.exists():
+        sys.path.insert(0, str(module_path.resolve().parent))
+        loaded = importlib.util.spec_from_file_location(
+            module_path.stem, module_path.resolve()
+        )
+        if loaded is None or loaded.loader is None:
+            raise typer.BadParameter(f"Could not load {module_spec}")
+        module = importlib.util.module_from_spec(loaded)
+        sys.modules[module_path.stem] = module
+        loaded.loader.exec_module(module)
+    else:
+        module = importlib.import_module(module_spec)
+    agent_function = getattr(module, function_name, None)
+    if agent_function is None or not callable(agent_function):
+        raise typer.BadParameter(
+            f"{function_name!r} is not a callable in {module_spec}"
+        )
+    return agent_function
+
+
+def _parse_field_mapping(pairs: list[str]) -> dict[str, str] | None:
+    if not pairs:
+        return None
+    mapping: dict[str, str] = {}
+    for pair in pairs:
+        if "=" not in pair:
+            raise typer.BadParameter(
+                f"--map expects agent_param=dataset_field, got {pair!r}"
+            )
+        param, field = pair.split("=", 1)
+        mapping[param.strip()] = field.strip()
+    return mapping
+
+
+def _offline_tests(project_name: str, api_key: str, organization_id: str):
+    from judgeval import Judgeval
+
+    if not api_key or not organization_id:
+        raise typer.BadParameter("JUDGMENT_API_KEY and JUDGMENT_ORG_ID required")
+    return Judgeval(
+        project_name=project_name, api_key=api_key, organization_id=organization_id
+    ).offline_tests
+
+
+@tests_app.command()
+def attach(
+    test_run_id: str = typer.Argument(help="Test run id shown in the platform"),
+    agent: str = typer.Option(
+        ..., "--agent", "-a", help="Agent entrypoint: path/to/agent.py:function"
+    ),
+    project_name: str = typer.Option(
+        ..., "--project", "-p", envvar="JUDGMENT_PROJECT", help="Project name"
+    ),
+    field_mapping: list[str] = typer.Option(
+        [], "--map", help="agent_param=dataset_field (repeatable)"
+    ),
+    no_wait: bool = typer.Option(
+        False, "--no-wait", help="Return once traces are attached, before judging"
+    ),
+    timeout_seconds: int = typer.Option(600, "--timeout", help="Seconds to wait"),
+    api_key: str = typer.Option(None, envvar="JUDGMENT_API_KEY"),
+    organization_id: str = typer.Option(None, envvar="JUDGMENT_ORG_ID"),
+):
+    """Run your agent for a test run that is waiting for traces."""
+    agent_function = _load_agent_function(agent)
+    offline_tests = _offline_tests(project_name, api_key, organization_id)
+    result = offline_tests.attach(
+        test_run_id,
+        agent_function,
+        field_mapping=_parse_field_mapping(field_mapping),
+        timeout_seconds=timeout_seconds,
+        wait=not no_wait,
+    )
+    if result is None:
+        raise typer.Exit(code=1)
+    if result.ui_results_url:
+        typer.echo(result.ui_results_url)
+
+
+@tests_app.command()
+def serve(
+    agent: str = typer.Option(
+        ..., "--agent", "-a", help="Agent entrypoint: path/to/agent.py:function"
+    ),
+    project_name: str = typer.Option(
+        ..., "--project", "-p", envvar="JUDGMENT_PROJECT", help="Project name"
+    ),
+    host: str = typer.Option("0.0.0.0", "--host"),
+    port: int = typer.Option(8787, "--port"),
+    path: str = typer.Option("/judgment/run", "--path"),
+    secret: str = typer.Option(
+        None, "--secret", envvar="JUDGMENT_AGENT_TARGET_SECRET",
+        help="Shared secret the platform sends as a bearer token",
+    ),
+    field_mapping: list[str] = typer.Option(
+        [], "--map", help="agent_param=dataset_field (repeatable)"
+    ),
+    api_key: str = typer.Option(None, envvar="JUDGMENT_API_KEY"),
+    organization_id: str = typer.Option(None, envvar="JUDGMENT_ORG_ID"),
+):
+    """Serve your agent as an endpoint the platform can dispatch runs to."""
+    agent_function = _load_agent_function(agent)
+    offline_tests = _offline_tests(project_name, api_key, organization_id)
+    typer.echo(
+        f"Serving agent at http://{'localhost' if host == '0.0.0.0' else host}:{port}{path}"
+    )
+    offline_tests.serve(
+        agent_function,
+        host=host,
+        port=port,
+        path=path,
+        secret=secret,
+        field_mapping=_parse_field_mapping(field_mapping),
+    )
+
 
 @app.command(
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
