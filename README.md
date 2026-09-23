@@ -121,45 +121,6 @@ when you need a Python integer. Small integers and floating-point values remain
 numbers, and column types retain their original SQL types.
 Validation and execution errors use the SDK's existing exception mapping.
 
-When migrating from JQL, update callers for the SQL response shape and smaller
-row cap. `present()` frames and `discover()` results are not interchangeable
-with SQL rows; migrate those consumers explicitly before retiring a JQL call.
-
-### JQL (legacy)
-
-JQL guidance is deprecated for new integrations. Use [SQL](#sql)
-for new read-only queries. Existing `query()`, `present()`, and `discover()`
-methods remain supported.
-
-The examples below are retained for maintaining existing JQL integrations.
-
-JQL queries use the same API key, organization, and project configuration as the
-rest of Judgeval. Tenant identifiers are not part of the query payload.
-
-```python
-from judgeval import Judgeval
-from judgeval.jql import spans
-
-client = Judgeval(project_name="my-project")
-result = client.query(spans().rows(), trace_ids=["trace-123"])
-```
-
-`trace_ids` and `session_ids` are mutually exclusive options outside the JQL
-query object. Trace IDs narrow the query directly. Judgment resolves session IDs
-within the authenticated organization and project, then narrows every part of
-the query to their traces. If no session resolves, the request fails instead of
-falling back to the whole project. Both options work with `present()` and
-`discover()`.
-
-Use `offline_traces()` or `offline_spans()` to query traces captured by an
-offline test:
-
-```python
-from judgeval.jql import offline_traces
-
-offline_result = client.query(offline_traces().rows())
-```
-
 ## Integrations
 
 Supports OpenAI, Anthropic, Google GenAI, Together AI, LangGraph, OpenLit, and Claude Agent SDK. See the full [integrations docs](https://docs.judgmentlabs.ai/documentation/integrations/introduction).
