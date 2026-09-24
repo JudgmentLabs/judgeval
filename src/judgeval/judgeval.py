@@ -404,31 +404,33 @@ class Judgeval:
         )
 
     @property
-    def agent_judges(self):
-        """Manage Agent Judges (prompt-based scorers) on the platform.
+    def external_judges(self):
+        """Create external judges and submit their results on the platform.
 
         Returns:
-            AgentJudgeFactory: Use `.create()` or `.update()` to create
-                and update prompt-based Agent Judges.
+            ExternalJudgeFactory: Use `.create()` to register an external
+                judge, then `.submit_result()` to attach scores your own
+                evaluation code produced to a trace or session.
 
         Examples:
             ```python
-            judge = client.agent_judges.create(
-                name="helpfulness",
-                prompt="Score the assistant's helpfulness from 0 to 1.",
-                model="gpt-5.2",
-                score_type="numeric",
+            judge = client.external_judges.create(
+                name="human-thumbs-up",
+                score_type="binary",
             )
 
-            client.agent_judges.update(
+            client.external_judges.submit_result(
                 judge_id=judge.judge_id,
-                prompt="Updated rubric prompt.",
+                trace_id="<trace_id>",
+                value=True,
             )
             ```
         """
-        from judgeval.agent_judges.agent_judge_factory import AgentJudgeFactory
+        from judgeval.external_judges.external_judge_factory import (
+            ExternalJudgeFactory,
+        )
 
-        return AgentJudgeFactory(
+        return ExternalJudgeFactory(
             client=self._internal_client,
             project_id=self._project_id,
             project_name=self._project_name,
