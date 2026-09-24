@@ -9,12 +9,10 @@ ScoreType = Literal["binary", "numeric", "categorical"]
 
 @dataclass
 class ExternalJudge:
-    """A judge whose scores are computed outside the Judgment platform.
+    """Metadata for a created external judge.
 
-    External judges don't have an executable implementation on the
-    platform — you create one to register its name and score shape, then
-    call `.submit_result()` (as many times as you like) to attach scores
-    your own evaluation code produced to a trace or session.
+    Returned by `client.external_judges.create()`. For creation and result
+    submission, see [ExternalJudgeFactory](/sdk-reference/python/external_judges/external_judge_factory).
 
     Attributes:
         judge_id: Unique judge identifier on the Judgment platform.
@@ -30,20 +28,6 @@ class ExternalJudge:
         minor_version: Minor version of the judge (`0` for a freshly
             created judge).
 
-    Examples:
-        ```python
-        client = Judgeval(project_name="my-project")
-        judge = client.external_judges.create(
-            name="human-thumbs-up",
-            score_type="binary",
-        )
-
-        client.external_judges.submit_result(
-            judge_id=judge.judge_id,
-            trace_id="<trace_id>",
-            value=True,
-        )
-        ```
     """
 
     judge_id: str
