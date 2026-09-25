@@ -2,13 +2,24 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+import difflib
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from judgeval.internal.api.models import Example as APIExample
 
 if TYPE_CHECKING:
     from judgeval.data.trace import Trace
+
+_RESERVED_KEYS = frozenset({"example_id", "created_at", "name", "trace"})
+_COMMON_KEYS = (
+    "input",
+    "actual_output",
+    "expected_output",
+    "retrieval_context",
+    "context",
+    "offline_trace_id",
+)
 
 
 @dataclass(slots=True)
@@ -51,7 +62,9 @@ class Example:
     """
 
     example_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    created_at: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
     name: Optional[str] = None
     _properties: Dict[str, Any] = field(default_factory=dict)
     trace: Optional[Trace] = None
@@ -76,6 +89,18 @@ class Example:
         """
         example = cls()
         for key, value in kwargs.items():
+            if key in _RESERVED_KEYS:
+                raise ValueError(
+                    f"Invalid property '{key}'. Don't pass this to Example.create()."
+                )
+            if key not in _COMMON_KEYS:
+                matches = difflib.get_close_matches(
+                    key, _COMMON_KEYS, n=1, cutoff=0.75
+                )
+                if matches:
+                    raise ValueError(
+                        f"Invalid property '{key}'. Did you mean '{matches[0]}'?"
+                    )
             example._properties[key] = value
         return example
 
