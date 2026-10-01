@@ -23,8 +23,6 @@ from typing import (
 
 from judgeval.jql._generated_contract import DiscoveryKind, QuerySource, SUPPORTED_OPS
 from judgeval.jql._generated_roots import (
-    offline_spans,
-    offline_traces,
     sessions,
     spans,
     traces,
@@ -641,8 +639,6 @@ __all__ = [
     "no_span",
     "no_trace",
     "not_",
-    "offline_spans",
-    "offline_traces",
     "over_scores",
     "over_spans",
     "over_traces",

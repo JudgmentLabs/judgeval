@@ -1,4 +1,4 @@
-from judgeval.jql import offline_spans, offline_traces
+from judgeval.jql import sessions, spans, traces
 from judgeval.jql._generated_contract import QUERY_SOURCES
 
 
@@ -7,24 +7,28 @@ def test_generated_query_sources_cover_every_public_root() -> None:
         "traces",
         "spans",
         "sessions",
-        "offline_traces",
-        "offline_spans",
     )
 
 
-def test_offline_roots_emit_canonical_json() -> None:
+def test_public_roots_emit_canonical_json() -> None:
     assert [
-        offline_traces().rows().to_json(),
-        offline_spans().rows().to_json(),
+        traces().rows().to_json(),
+        spans().rows().to_json(),
+        sessions().rows().to_json(),
     ] == [
         {
             "op": "query",
-            "source": "offline_traces",
+            "source": "traces",
             "select": {"op": "rows"},
         },
         {
             "op": "query",
-            "source": "offline_spans",
+            "source": "spans",
+            "select": {"op": "rows"},
+        },
+        {
+            "op": "query",
+            "source": "sessions",
             "select": {"op": "rows"},
         },
     ]

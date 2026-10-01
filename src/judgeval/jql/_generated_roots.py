@@ -26,22 +26,8 @@ def sessions(filter: Optional[Filter] = None) -> QueryBuilder:
     return _query("sessions", filter)
 
 
-def offline_traces(filter: Optional[Filter] = None) -> QueryBuilder:
-    from judgeval.jql import _query
-
-    return _query("offline_traces", filter)
-
-
-def offline_spans(filter: Optional[Filter] = None) -> QueryBuilder:
-    from judgeval.jql import _query
-
-    return _query("offline_spans", filter)
-
-
 __all__ = [
     "traces",
     "spans",
     "sessions",
-    "offline_traces",
-    "offline_spans",
 ]

@@ -538,7 +538,7 @@
           "trace_ids": {
             "minItems": 1,
             "maxItems": 1000,
-            "description": "Traces to bind directly to the query within the authenticated organization and project. Use offline trace IDs for offline query sources.",
+            "description": "Traces to bind directly to the query within the authenticated organization and project.",
             "type": "array",
             "items": {
               "minLength": 1,
