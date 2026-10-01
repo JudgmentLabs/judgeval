@@ -61,7 +61,7 @@ jobs:
 
       - name: Check canonical JQL parity
         run: |
-          python scripts/generate_jql.py \
+          python scripts/generate_query_contracts.py \
             ../judgment-mono/services/data-access-service/openapi.json \
             ../judgment-mono/services/judgeval-server/openapi.public-jql.json
           git diff --exit-code -- \

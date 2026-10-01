@@ -228,9 +228,7 @@
             "enum": [
               "traces",
               "spans",
-              "sessions",
-              "offline_traces",
-              "offline_spans"
+              "sessions"
             ],
             "title": "Source",
             "type": "string"
@@ -259,9 +257,7 @@
             "dsl": [
               "traces",
               "spans",
-              "sessions",
-              "offline_traces",
-              "offline_spans"
+              "sessions"
             ],
             "example": "traces({ filter: status('error') }).last('7d').ids()",
             "lang": "proj.traces(pred)",
@@ -4128,9 +4124,7 @@
                 "enum": [
                   "traces",
                   "spans",
-                  "sessions",
-                  "offline_traces",
-                  "offline_spans"
+                  "sessions"
                 ],
                 "type": "string"
               },
