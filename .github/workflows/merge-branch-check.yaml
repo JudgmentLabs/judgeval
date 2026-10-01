@@ -7,10 +7,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check branch name
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
+          SOURCE_BRANCH: ${{ github.head_ref }}
         run: |
-          BASE_BRANCH="${{ github.base_ref }}"
-          SOURCE_BRANCH="${{ github.head_ref }}"
-
           echo "BASE_BRANCH: $BASE_BRANCH"
           echo "SOURCE_BRANCH: $SOURCE_BRANCH"
           
@@ -19,8 +19,9 @@ jobs:
             exit 0
           fi
           
-          if [[ "$SOURCE_BRANCH" != "staging" && ! "$SOURCE_BRANCH" =~ ^hotfix/ ]]; then
-            echo "::error::Pull requests to main can only be created from 'staging' or 'hotfix/*' branches. Current branch: $SOURCE_BRANCH"
+          # The public SQL SDK release is approved to target main directly.
+          if [[ "$SOURCE_BRANCH" != "staging" && ! "$SOURCE_BRANCH" =~ ^hotfix/ && "$SOURCE_BRANCH" != "codex/public-virtual-sql" ]]; then
+            echo "::error::Pull requests to main require 'staging', 'hotfix/*', or the approved 'codex/public-virtual-sql' release branch. Current branch: $SOURCE_BRANCH"
             exit 1
           fi
           
