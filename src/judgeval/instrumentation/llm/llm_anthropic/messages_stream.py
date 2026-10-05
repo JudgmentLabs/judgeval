@@ -60,8 +60,10 @@ def wrap_messages_stream_sync(client: Anthropic) -> None:
                 return stream
 
             def __exit__(self, exc_type, exc_val, exc_tb):
-                self._manager.__exit__(exc_type, exc_val, exc_tb)
-                post_hook_exit_impl()
+                try:
+                    self._manager.__exit__(exc_type, exc_val, exc_tb)
+                finally:
+                    post_hook_exit_impl()
 
             def __getattr__(self, name):
                 return getattr(self._manager, name)
@@ -144,7 +146,7 @@ def wrap_messages_stream_sync(client: Anthropic) -> None:
                         span.set_attribute(
                             AttributeKeys.JUDGMENT_LLM_MODEL_NAME, final_message.model
                         )
-                    except Exception:
+                    except Exception:  # non-critical: token metadata is best-effort; span ends below
                         pass
 
                 span.end()
@@ -198,8 +200,10 @@ def wrap_messages_stream_async(client: AsyncAnthropic) -> None:
                 return stream
 
             async def __aexit__(self, exc_type, exc_val, exc_tb):
-                await self._manager.__aexit__(exc_type, exc_val, exc_tb)
-                await post_hook_aexit_impl()
+                try:
+                    await self._manager.__aexit__(exc_type, exc_val, exc_tb)
+                finally:
+                    await post_hook_aexit_impl()
 
             def __getattr__(self, name):
                 return getattr(self._manager, name)
@@ -282,7 +286,7 @@ def wrap_messages_stream_async(client: AsyncAnthropic) -> None:
                         span.set_attribute(
                             AttributeKeys.JUDGMENT_LLM_MODEL_NAME, final_message.model
                         )
-                    except Exception:
+                    except Exception:  # non-critical: token metadata is best-effort; span ends below
                         pass
 
                 span.end()
