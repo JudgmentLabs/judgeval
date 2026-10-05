@@ -68,11 +68,17 @@ def example_from_dataset_entry(entry: Dict[str, Any]) -> Example:
             if k not in ("example_id", "created_at", "name")
         }
 
-    example = Example(
-        example_id=entry.get("example_id", "") or "",
-        created_at=entry.get("created_at", "") or "",
-        name=entry.get("name"),
-    )
+    example_kwargs: Dict[str, Any] = {}
+    example_id = entry.get("example_id")
+    if example_id:
+        example_kwargs["example_id"] = example_id
+    created_at = entry.get("created_at")
+    if created_at:
+        example_kwargs["created_at"] = created_at
+    if "name" in entry:
+        example_kwargs["name"] = entry.get("name")
+
+    example = Example(**example_kwargs)
     for key, value in data.items():
         example._properties[key] = value
 
@@ -80,6 +86,32 @@ def example_from_dataset_entry(entry: Dict[str, Any]) -> Example:
     if offline_trace_id and "offline_trace_id" not in example._properties:
         example._properties["offline_trace_id"] = offline_trace_id
     return example
+
+
+def _parse_examples_file_data(data: Any) -> List[Any]:
+    """Normalize JSON/YAML file contents into a list of example entries."""
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict) and "examples" in data:
+        examples = data["examples"]
+        if not isinstance(examples, list):
+            raise ValueError("'examples' must be a list.")
+        return examples
+    raise ValueError("Expected a list of examples or an object with an 'examples' key.")
+
+
+def _examples_from_file_entries(entries: Iterable[Any]) -> List[Example]:
+    examples: List[Example] = []
+    for entry in entries:
+        if isinstance(entry, Example):
+            examples.append(entry)
+        elif isinstance(entry, dict):
+            examples.append(example_from_dataset_entry(entry))
+        else:
+            raise TypeError(
+                f"Each example must be a dict or Example, got {type(entry).__name__}."
+            )
+    return examples
 
 
 @dataclass
@@ -240,17 +272,7 @@ class Dataset:
         """
         with open(file_path, "rb") as file:
             data = orjson.loads(file.read())
-        examples = []
-        for e in data:
-            if isinstance(e, dict):
-                name = e.get("name")
-                example = Example(name=name)
-                for key, value in e.items():
-                    if key != "name":
-                        example._properties[key] = value
-                examples.append(example)
-            else:
-                examples.append(e)
+        examples = _examples_from_file_entries(_parse_examples_file_data(data))
         self.add_examples(examples, batch_size=batch_size)
 
     def add_from_yaml(self, file_path: str, batch_size: int = 100) -> None:
@@ -264,17 +286,7 @@ class Dataset:
         """
         with open(file_path, "r") as file:
             data = yaml.safe_load(file)
-        examples = []
-        for e in data:
-            if isinstance(e, dict):
-                name = e.get("name")
-                example = Example(name=name)
-                for key, value in e.items():
-                    if key != "name":
-                        example._properties[key] = value
-                examples.append(example)
-            else:
-                examples.append(e)
+        examples = _examples_from_file_entries(_parse_examples_file_data(data))
         self.add_examples(examples, batch_size=batch_size)
 
     def add_examples(self, examples: Iterable[Example], batch_size: int = 100) -> None:
@@ -421,6 +433,8 @@ class Dataset:
         elif file_type == "yaml":
             with open(complete_path, "w") as file:
                 yaml.dump({"examples": examples_data}, file, default_flow_style=False)
+        else:
+            raise ValueError(f"file_type must be 'json' or 'yaml', got {file_type!r}.")
 
     def __iter__(self):
         return iter(self.examples or [])
