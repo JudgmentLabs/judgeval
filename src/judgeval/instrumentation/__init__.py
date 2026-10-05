@@ -11,8 +11,9 @@ T = TypeVar("T", bound=ApiClient)
 def wrap(client: T) -> T:
     """Wrap a supported LLM client to add automatic tracing.
 
-    Supports OpenAI, Anthropic, Together, and Google GenAI clients.
-    Uses the active tracer via ``JudgmentTracerProvider``.
+    Supports OpenAI, Anthropic, Together, Google GenAI, and OrcaRouter
+    (OpenAI-compatible gateway) clients. Uses the active tracer via
+    ``JudgmentTracerProvider``.
 
     Args:
         client: An LLM provider client instance to wrap.

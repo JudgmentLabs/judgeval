@@ -53,6 +53,29 @@ class TestDetectProvider:
         result = _detect_provider(client)
         assert result == ProviderType.ANTHROPIC
 
+    def test_orcarouter_real_detection_by_base_url(self):
+        from openai import OpenAI
+
+        client = OpenAI(api_key="test-key", base_url="https://api.orcarouter.ai/v1")
+        result = _detect_provider(client)
+        assert result == ProviderType.ORCAROUTER
+
+    def test_orcarouter_real_detection_by_key_prefix(self):
+        from openai import OpenAI
+
+        client = OpenAI(api_key="sk-orca-test-key", base_url="https://gateway.local/v1")
+        result = _detect_provider(client)
+        assert result == ProviderType.ORCAROUTER
+
+    def test_orcarouter_async_real_detection(self):
+        from openai import AsyncOpenAI
+
+        client = AsyncOpenAI(
+            api_key="sk-orca-test-key", base_url="https://api.orcarouter.ai/v1"
+        )
+        result = _detect_provider(client)
+        assert result == ProviderType.ORCAROUTER
+
 
 class TestWrapProvider:
     def test_wraps_openai_sync(self):
@@ -67,6 +90,26 @@ class TestWrapProvider:
         from openai import AsyncOpenAI
 
         client = AsyncOpenAI(api_key="test", base_url="http://localhost")
+        original_create = client.chat.completions.create
+        wrap_provider(client)
+        assert client.chat.completions.create is not original_create
+
+    def test_wraps_orcarouter_sync(self):
+        from openai import OpenAI
+
+        client = OpenAI(
+            api_key="sk-orca-test-key", base_url="https://api.orcarouter.ai/v1"
+        )
+        original_create = client.chat.completions.create
+        wrap_provider(client)
+        assert client.chat.completions.create is not original_create
+
+    def test_wraps_orcarouter_async(self):
+        from openai import AsyncOpenAI
+
+        client = AsyncOpenAI(
+            api_key="sk-orca-test-key", base_url="https://api.orcarouter.ai/v1"
+        )
         original_create = client.chat.completions.create
         wrap_provider(client)
         assert client.chat.completions.create is not original_create
