@@ -9,18 +9,18 @@ ScoreType = Literal["numeric", "binary", "categorical"]
 
 @dataclass
 class AgentJudge:
-    """A prompt-based Agent Judge stored on the Judgment platform.
+    """A prompt-based Agent judge stored on the Judgment platform.
 
-    Agent Judges are LLM-driven scorers. The `prompt` field is the **rubric
-    prompt** used by the agent-judge harness when scoring an output. Versions
+    Agent judges are LLM-driven scorers. The `prompt` field is the **rubric
+    prompt** used by the Agent judge harness when scoring an output. Versions
     are managed implicitly — calling `.update()` writes a new minor version of
     the underlying prompt scorer (matching the default "save" flow in the UI).
 
     Attributes:
         judge_id: Unique judge identifier on the Judgment platform.
         name: Human-readable name of the judge (unique per project).
-        prompt: Rubric prompt template used by the agent judge.
-        model: LiteLLM model id driving the agent judge (e.g. `"gpt-5.2"`).
+        prompt: Rubric prompt template used by the Agent judge.
+        model: LiteLLM model id driving the Agent judge (e.g. `"gpt-5.2"`).
         score_type: One of `"numeric"`, `"binary"`, or `"categorical"`.
         description: Optional description stored on the scorer version.
         judge_description: Optional human-readable description shown in the UI.

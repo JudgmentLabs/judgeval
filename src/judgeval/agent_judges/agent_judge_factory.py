@@ -13,7 +13,7 @@ from judgeval.utils.guards import expect_project_id
 
 
 class AgentJudgeFactory:
-    """Create and update prompt-based Agent Judges on the Judgment platform.
+    """Create and update prompt-based Agent judges on the Judgment platform.
 
     Access this via `client.agent_judges` — you don't instantiate it directly.
 
@@ -60,11 +60,11 @@ class AgentJudgeFactory:
         min_score: Optional[float] = None,
         max_score: Optional[float] = None,
     ) -> Optional[AgentJudge]:
-        """Create a new Agent Judge.
+        """Create a new Agent judge.
 
         Args:
             name: Unique judge name within the project.
-            prompt: Rubric prompt template used by the agent judge.
+            prompt: Rubric prompt template used by the Agent judge.
             model: LiteLLM model id (e.g. `"gpt-5.2"`).
             score_type: One of `"numeric"`, `"binary"`, or `"categorical"`.
             description: Description stored on the underlying scorer version.
@@ -103,7 +103,7 @@ class AgentJudgeFactory:
                 payload=payload,
             )
         except Exception as e:
-            judgeval_logger.error(f"Failed to create agent judge: {e}")
+            judgeval_logger.error(f"Failed to create Agent judge: {e}")
             raise
 
         return AgentJudge(
@@ -138,7 +138,7 @@ class AgentJudgeFactory:
         target_major_version: Optional[int] = None,
         target_minor_version: Optional[int] = None,
     ) -> Optional[AgentJudge]:
-        """Update an existing Agent Judge.
+        """Update an existing Agent judge.
 
         Passing any of `prompt`, `model`, `categories`, `min_score`, or
         `max_score` writes a new version of the underlying prompt scorer.
@@ -205,7 +205,7 @@ class AgentJudgeFactory:
                 payload=payload,
             )
         except Exception as e:
-            judgeval_logger.error(f"Failed to update agent judge: {e}")
+            judgeval_logger.error(f"Failed to update Agent judge: {e}")
             raise
 
         judge = response["judge"]
