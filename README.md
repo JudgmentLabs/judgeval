@@ -23,7 +23,7 @@ Detect failures, triage root causes, and ship fixes backed by production data.
 
 ## Overview
 
-Judgeval is an open-source Python SDK for agent improvement. It provides tracing and agent-judge evaluation for LLM-powered applications — so you can detect failures, understand what went wrong, and validate fixes against real production cases before shipping.
+Judgeval is an open-source Python SDK for agent improvement. It provides tracing and Agent judge evaluation for LLM-powered applications — so you can detect failures, understand what went wrong, and validate fixes against real production cases before shipping.
 
 To get started, dive into the [docs](https://docs.judgmentlabs.ai/documentation).
 

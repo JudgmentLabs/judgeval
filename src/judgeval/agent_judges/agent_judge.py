@@ -12,7 +12,7 @@ class AgentJudge:
     """A prompt-based Agent judge stored on the Judgment platform.
 
     Agent judges are LLM-driven scorers. The `prompt` field is the **rubric
-    prompt** used by the agent-judge harness when scoring an output. Versions
+    prompt** used by the Agent judge harness when scoring an output. Versions
     are managed implicitly — calling `.update()` writes a new minor version of
     the underlying prompt scorer (matching the default "save" flow in the UI).
 
