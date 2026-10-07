@@ -365,7 +365,7 @@ class Judgeval:
 
     @property
     def evaluation(self):
-        """Access evaluations for scoring examples with hosted or custom judges.
+        """Access evaluations for scoring examples with hosted scorers or Code judges.
 
         Returns:
             EvaluationFactory: Use `.create()` to get an `Evaluation` you
@@ -486,11 +486,11 @@ class Judgeval:
 
     @property
     def agent_judges(self):
-        """Manage Agent Judges (prompt-based scorers) on the platform.
+        """Manage Agent judges (prompt-based scorers) on the platform.
 
         Returns:
             AgentJudgeFactory: Use `.create()` or `.update()` to create
-                and update prompt-based Agent Judges.
+                and update prompt-based Agent judges.
 
         Examples:
             ```python
