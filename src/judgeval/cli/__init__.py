@@ -41,7 +41,7 @@ scorer_app = typer.Typer(
     rich_markup_mode=None,
 )
 
-app.add_typer(scorer_app, name="scorer", help="Commands to manage custom scorers")
+app.add_typer(scorer_app, name="scorer", help="Commands to manage Code judges")
 
 
 @app.command(
@@ -96,7 +96,7 @@ def upload(
         None,
         "--name",
         "-n",
-        help="Custom scorer name (auto-detected if not provided)",
+        help="Code judge name (auto-detected if not provided)",
     ),
     bump_major: bool = typer.Option(
         False, "--bump-major", "-m", help="Bump major version"
@@ -105,7 +105,7 @@ def upload(
     organization_id: str = typer.Option(None, envvar="JUDGMENT_ORG_ID"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ):
-    """Upload custom scorer to Judgment."""
+    """Upload a Code judge to Judgment."""
     from judgeval.cli.upload_judge import upload_judge
 
     scorer_path = Path(entrypoint_path)
@@ -134,7 +134,7 @@ def upload(
         )
         if not result:
             raise typer.Abort()
-        typer.echo(f"Custom scorer uploaded successfully to project '{project_name}'!")
+        typer.echo(f"Code judge uploaded successfully to project '{project_name}'!")
     except JudgmentAPIError as e:
         if e.status_code == 409:
             judgeval_logger.error(e.detail)
@@ -159,7 +159,7 @@ def init(
     ),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ):
-    """Initialize skeleton code for a new custom scorer."""
+    """Initialize skeleton code for a new Code judge."""
     if not scorer_name.isidentifier():
         raise typer.BadParameter("Scorer name must be a valid Python identifier")
     scorer_path = Path(
