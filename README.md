@@ -31,9 +31,9 @@ To get started, dive into the [docs](https://docs.judgmentlabs.ai/documentation)
 
 **OpenTelemetry-based tracing** -- Instrument any function with `@Tracer.observe()`. Automatically captures inputs, outputs, and LLM token usage. Built on OpenTelemetry for full compatibility with existing observability stacks.
 
-**Agent judges** -- Define prompt-based scorers to evaluate agent behaviors at scale. Judges produce structured behaviors — scored, labeled outputs that describe how your agent acted — which accumulate into a searchable record of agent behavior over time. Run judges against live production traffic or replay them on historical traces to validate fixes before shipping.
+**Agent judges** -- Define prompt-based scorers to evaluate traces at scale. Judges apply labels to traces — a binary judge applies its label when true, and a classification judge applies the chosen option — and those labels accumulate into a searchable record of how your agent acted over time. Run judges against live production traffic or replay them on historical traces to validate fixes before shipping.
 
-**Online monitoring** -- Automatically score live production traffic server-side with no latency impact. Detected behaviors surface as structured signals — configure Slack alerts so regressions and recurrences never go unnoticed.
+**Online monitoring** -- Automatically score live production traffic server-side with no latency impact. When a judge applies a label, that label surfaces as a structured signal — configure Slack alerts so regressions and recurrences never go unnoticed.
 
 **Broad integrations** -- Auto-instrumentation for OpenAI, Anthropic, Google GenAI, and Together AI. Framework support for LangGraph, OpenLit, and Claude Agent SDK.
 
@@ -127,11 +127,11 @@ Supports OpenAI, Anthropic, Google GenAI, Together AI, LangGraph, OpenLit, and C
 
 ## CLI
 
-Manage agents, traces, judges, behaviors, and evaluations from the terminal. Query trace history, deploy judges, inspect detected behaviors, and run evals against production data — all without leaving your shell. See the [CLI repo](https://github.com/JudgmentLabs/cli/) and [docs](https://docs.judgmentlabs.ai/documentation/cli).
+Manage agents, traces, judges, labels, and evaluations from the terminal. Query trace history, deploy judges, review the labels judges applied, and run evals against production data — all without leaving your shell. See the [CLI repo](https://github.com/JudgmentLabs/cli/) and [docs](https://docs.judgmentlabs.ai/documentation/cli).
 
 ## MCP Server
 
-Connect Judgment to any MCP-compatible AI tool. Query agent traces, invoke judges, browse detected behaviors, and surface failures directly inside your AI assistant or IDE. See the [docs](https://docs.judgmentlabs.ai/documentation/mcp-server).
+Connect Judgment to any MCP-compatible AI tool. Query agent traces, invoke judges, browse the labels judges applied, and surface failures directly inside your AI assistant or IDE. See the [docs](https://docs.judgmentlabs.ai/documentation/mcp-server).
 
 ## Links
 
