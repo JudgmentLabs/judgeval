@@ -135,7 +135,9 @@ def _build_bundle(
     requirements_file_path: str | None,
 ) -> tuple[bytes, str, str | None, int]:
     if not os.path.exists(entrypoint_path):
-        raise FileNotFoundError(f"Code judge entrypoint file not found: {entrypoint_path}")
+        raise FileNotFoundError(
+            f"Code judge entrypoint file not found: {entrypoint_path}"
+        )
     all_abs: list[str] = [os.path.abspath(entrypoint_path)]
 
     for p in included_files_paths:

@@ -81,7 +81,9 @@ def load_otel_env(
 
 @scorer_app.command()
 def upload(
-    entrypoint_path: str = typer.Argument(help="Path to the Code judge entrypoint Python file"),
+    entrypoint_path: str = typer.Argument(
+        help="Path to the Code judge entrypoint Python file"
+    ),
     project_name: str = typer.Option(..., "--project", "-p", help="Project name"),
     requirements_file_path: str = typer.Option(
         None, "--requirements", "-r", help="Path to requirements.txt file"
