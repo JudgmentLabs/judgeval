@@ -103,7 +103,7 @@ class AgentJudgeFactory:
                 payload=payload,
             )
         except Exception as e:
-            judgeval_logger.error(f"Failed to create agent judge: {e}")
+            judgeval_logger.error(f"Failed to create Agent judge: {e}")
             raise
 
         return AgentJudge(
@@ -205,7 +205,7 @@ class AgentJudgeFactory:
                 payload=payload,
             )
         except Exception as e:
-            judgeval_logger.error(f"Failed to update agent judge: {e}")
+            judgeval_logger.error(f"Failed to update Agent judge: {e}")
             raise
 
         judge = response["judge"]
