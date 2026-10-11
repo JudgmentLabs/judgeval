@@ -238,7 +238,9 @@ class TestSyncStreamObject:
         del stream
         gc.collect()
 
-        assert len(_api_spans(collecting_exporter)) == 1
+        spans = _api_spans(collecting_exporter)
+        assert len(spans) == 1
+        assert spans[0].attributes.get(AttributeKeys.GEN_AI_COMPLETION) == "Hel"
         assert "Calling end() on an ended span" not in caplog.text
 
     @pytest.mark.parametrize("how", ["create", "partial_read", "stream_helper"])
@@ -261,8 +263,42 @@ class TestSyncStreamObject:
         del stream
         gc.collect()
 
-        assert len(_api_spans(collecting_exporter)) == 1
+        spans = _api_spans(collecting_exporter)
+        assert len(spans) == 1
+        if how == "partial_read":
+            assert spans[0].attributes.get(AttributeKeys.GEN_AI_COMPLETION) == "Hel"
         assert "Calling end() on an ended span" not in caplog.text
+
+    @pytest.mark.parametrize("how", ["unread", "partial_read"])
+    def test_stream_helper_exit_ends_span(
+        self, tracer, collecting_exporter, sse_sync_openai_client, how
+    ):
+        client = BaseTracer.wrap(sse_sync_openai_client)
+        with client.chat.completions.stream(model="gpt-4", messages=MESSAGES) as stream:
+            if how == "partial_read":
+                next(stream)
+
+        assert stream is not None  # the helper stream is still referenced
+        spans = _api_spans(collecting_exporter)
+        assert len(spans) == 1
+        if how == "partial_read":
+            assert spans[0].attributes.get(AttributeKeys.GEN_AI_COMPLETION) == "Hel"
+
+    def test_error_mid_stream_records_received_text(
+        self, tracer, collecting_exporter, failing_sync_openai_client
+    ):
+        client = failing_sync_openai_client
+        wrap_chat_completions_create_sync(client)
+        stream = client.chat.completions.create(
+            model="gpt-4", messages=MESSAGES, stream=True
+        )
+        with pytest.raises(Exception):
+            list(stream)
+
+        spans = _api_spans(collecting_exporter)
+        assert len(spans) == 1
+        assert spans[0].status.status_code.name == "ERROR"
+        assert spans[0].attributes.get(AttributeKeys.GEN_AI_COMPLETION) == "Hel"
 
     def test_close_from_another_thread_stops_reader(
         self, tracer, collecting_exporter, gated_sync_openai_client, caplog
@@ -409,7 +445,9 @@ class TestAsyncStreamObject:
         for _ in range(3):
             await asyncio.sleep(0)
 
-        assert len(_api_spans(collecting_exporter)) == 1
+        spans = _api_spans(collecting_exporter)
+        assert len(spans) == 1
+        assert spans[0].attributes.get(AttributeKeys.GEN_AI_COMPLETION) == "Hel"
         assert "Calling end() on an ended span" not in caplog.text
 
     @pytest.mark.asyncio
@@ -453,8 +491,46 @@ class TestAsyncStreamObject:
         for _ in range(3):
             await asyncio.sleep(0)
 
-        assert len(_api_spans(collecting_exporter)) == 1
+        spans = _api_spans(collecting_exporter)
+        assert len(spans) == 1
+        if how == "partial_read":
+            assert spans[0].attributes.get(AttributeKeys.GEN_AI_COMPLETION) == "Hel"
         assert "Calling end() on an ended span" not in caplog.text
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("how", ["unread", "partial_read"])
+    async def test_stream_helper_exit_ends_span(
+        self, tracer, collecting_exporter, sse_async_openai_client, how
+    ):
+        client = BaseTracer.wrap(sse_async_openai_client)
+        async with client.chat.completions.stream(
+            model="gpt-4", messages=MESSAGES
+        ) as stream:
+            if how == "partial_read":
+                await stream.__anext__()
+
+        assert stream is not None  # the helper stream is still referenced
+        spans = _api_spans(collecting_exporter)
+        assert len(spans) == 1
+        if how == "partial_read":
+            assert spans[0].attributes.get(AttributeKeys.GEN_AI_COMPLETION) == "Hel"
+
+    @pytest.mark.asyncio
+    async def test_error_mid_stream_records_received_text(
+        self, tracer, collecting_exporter, failing_async_openai_client
+    ):
+        client = failing_async_openai_client
+        wrap_chat_completions_create_async(client)
+        stream = await client.chat.completions.create(
+            model="gpt-4", messages=MESSAGES, stream=True
+        )
+        with pytest.raises(Exception):
+            [chunk async for chunk in stream]
+
+        spans = _api_spans(collecting_exporter)
+        assert len(spans) == 1
+        assert spans[0].status.status_code.name == "ERROR"
+        assert spans[0].attributes.get(AttributeKeys.GEN_AI_COMPLETION) == "Hel"
 
     @pytest.mark.asyncio
     async def test_close_from_another_task_stops_reader(

@@ -191,3 +191,49 @@ def gated_async_openai_client():
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
     return client, body
+
+
+class FailingSSE(httpx.SyncByteStream):
+    """Sends the first chunk, then fails as if the connection dropped."""
+
+    def __iter__(self):
+        yield _sse_bytes(_GATED_EVENTS[0])
+        raise httpx.ReadError("connection dropped")
+
+
+class AsyncFailingSSE(httpx.AsyncByteStream):
+    """Async counterpart of ``FailingSSE``."""
+
+    async def __aiter__(self):
+        yield _sse_bytes(_GATED_EVENTS[0])
+        raise httpx.ReadError("connection dropped")
+
+
+@pytest.fixture
+def failing_sync_openai_client():
+    def handler(request):
+        return httpx.Response(
+            200, headers={"content-type": "text/event-stream"}, stream=FailingSSE()
+        )
+
+    return OpenAI(
+        api_key="test-key",
+        base_url="http://localhost",
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+
+@pytest.fixture
+def failing_async_openai_client():
+    def handler(request):
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            stream=AsyncFailingSSE(),
+        )
+
+    return AsyncOpenAI(
+        api_key="test-key",
+        base_url="http://localhost",
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )

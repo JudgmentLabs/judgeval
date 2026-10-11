@@ -61,9 +61,15 @@ def _stream_options_unset(kwargs: Dict[str, Any]) -> bool:
     return isinstance(kwargs["stream_options"], sentinels)
 
 
-def _end_span(span: Any) -> None:
-    if span is not None and span.is_recording():
-        span.end()
+def _finish_stream_span(ctx: Dict[str, Any]) -> None:
+    """End a streaming call's span once, keeping any text received so far
+    (the stream may have been closed, dropped or failed before the end)."""
+    span = ctx.get("span")
+    if span is None or not span.is_recording():
+        return
+    if ctx.get("accumulated_content"):
+        span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, ctx["accumulated_content"])
+    span.end()
 
 
 class _TracedStream:
@@ -72,15 +78,18 @@ class _TracedStream:
     is dropped without being read to the end or closed ends its span when it is
     garbage-collected."""
 
-    __slots__ = ("_stream", "_iterator", "_span", "__weakref__")
+    __slots__ = ("_stream", "_iterator", "_finish", "__weakref__")
 
     def __init__(
-        self, stream: Any, iterator: Generator[Any, None, None], span: Any
+        self,
+        stream: Any,
+        iterator: Generator[Any, None, None],
+        finish: Callable[[], None],
     ) -> None:
         self._stream = stream
         self._iterator = iterator
-        self._span = span
-        weakref.finalize(self, _end_span, span)
+        self._finish = finish
+        weakref.finalize(self, finish)
 
     def __iter__(self) -> _TracedStream:
         return self
@@ -108,7 +117,7 @@ class _TracedStream:
                 # sees the closed stream.
                 pass
             else:
-                _end_span(self._span)
+                self._finish()
 
     def __getattr__(self, name: str) -> Any:
         if name in _TracedStream.__slots__:
@@ -119,15 +128,18 @@ class _TracedStream:
 class _AsyncTracedStream:
     """Async counterpart of ``_TracedStream`` for ``AsyncStream``."""
 
-    __slots__ = ("_stream", "_iterator", "_span", "__weakref__")
+    __slots__ = ("_stream", "_iterator", "_finish", "__weakref__")
 
     def __init__(
-        self, stream: Any, iterator: AsyncGenerator[Any, None], span: Any
+        self,
+        stream: Any,
+        iterator: AsyncGenerator[Any, None],
+        finish: Callable[[], None],
     ) -> None:
         self._stream = stream
         self._iterator = iterator
-        self._span = span
-        weakref.finalize(self, _end_span, span)
+        self._finish = finish
+        weakref.finalize(self, finish)
 
     def __aiter__(self) -> _AsyncTracedStream:
         return self
@@ -155,7 +167,7 @@ class _AsyncTracedStream:
                 # sees the closed stream.
                 pass
             else:
-                _end_span(self._span)
+                self._finish()
 
     aclose = close
 
@@ -163,6 +175,92 @@ class _AsyncTracedStream:
         if name in _AsyncTracedStream.__slots__:
             raise AttributeError(name)
         return getattr(self._stream, name)
+
+
+class _TracedStreamManager:
+    """Wraps the manager from ``chat.completions.stream()``. Leaving its block
+    only closes the HTTP response, so also close the traced stream underneath
+    to end its span."""
+
+    __slots__ = ("_manager", "_stream")
+
+    def __init__(self, manager: Any) -> None:
+        self._manager = manager
+        self._stream: Any = None
+
+    def __enter__(self) -> Any:
+        self._stream = self._manager.__enter__()
+        return self._stream
+
+    def __exit__(self, *exc_info: Any) -> Any:
+        try:
+            return self._manager.__exit__(*exc_info)
+        finally:
+            raw_stream = getattr(self._stream, "_raw_stream", None)
+            if isinstance(raw_stream, _TracedStream):
+                raw_stream.close()
+
+    def __getattr__(self, name: str) -> Any:
+        if name in _TracedStreamManager.__slots__:
+            raise AttributeError(name)
+        return getattr(self._manager, name)
+
+
+class _AsyncTracedStreamManager:
+    """Async counterpart of ``_TracedStreamManager``."""
+
+    __slots__ = ("_manager", "_stream")
+
+    def __init__(self, manager: Any) -> None:
+        self._manager = manager
+        self._stream: Any = None
+
+    async def __aenter__(self) -> Any:
+        self._stream = await self._manager.__aenter__()
+        return self._stream
+
+    async def __aexit__(self, *exc_info: Any) -> Any:
+        try:
+            return await self._manager.__aexit__(*exc_info)
+        finally:
+            raw_stream = getattr(self._stream, "_raw_stream", None)
+            if isinstance(raw_stream, _AsyncTracedStream):
+                await raw_stream.close()
+
+    def __getattr__(self, name: str) -> Any:
+        if name in _AsyncTracedStreamManager.__slots__:
+            raise AttributeError(name)
+        return getattr(self._manager, name)
+
+
+def wrap_chat_completions_stream_sync(client: OpenAI) -> None:
+    original_func = getattr(client.chat.completions, "stream", None)
+    if original_func is None:
+        return
+
+    def mutate_hook(ctx: Dict[str, Any], result: Any) -> Any:
+        return _TracedStreamManager(result)
+
+    setattr(
+        client.chat.completions,
+        "stream",
+        mutable_wrap_sync(original_func, mutate_hook=mutate_hook),
+    )
+
+
+def wrap_chat_completions_stream_async(client: AsyncOpenAI) -> None:
+    original_func = getattr(client.chat.completions, "stream", None)
+    if original_func is None:
+        return
+
+    def mutate_hook(ctx: Dict[str, Any], result: Any) -> Any:
+        return _AsyncTracedStreamManager(result)
+
+    setattr(
+        client.chat.completions,
+        "stream",
+        mutable_wrap_sync(original_func, mutate_hook=mutate_hook),
+    )
 
 
 def wrap_chat_completions_create_sync(client: OpenAI) -> None:
@@ -365,7 +463,7 @@ def _wrap_streaming_sync(
                 span.set_status(Status(StatusCode.ERROR))
 
         def finally_hook_inner(inner_ctx: Dict[str, Any]) -> None:
-            _end_span(ctx.get("span"))
+            _finish_stream_span(ctx)
 
         wrapped_generator = immutable_wrap_sync_iterator(
             traced_generator,
@@ -378,7 +476,7 @@ def _wrap_streaming_sync(
         return _TracedStream(
             result,
             cast("Generator[ChatCompletionChunk, None, None]", wrapped_generator()),
-            ctx.get("span"),
+            lambda: _finish_stream_span(ctx),
         )
 
     def error_hook(ctx: Dict[str, Any], error: Exception) -> None:
@@ -596,7 +694,7 @@ def _wrap_streaming_async(
                 span.set_status(Status(StatusCode.ERROR))
 
         def finally_hook_inner(inner_ctx: Dict[str, Any]) -> None:
-            _end_span(ctx.get("span"))
+            _finish_stream_span(ctx)
 
         wrapped_generator = immutable_wrap_async_iterator(
             traced_generator,
@@ -609,7 +707,7 @@ def _wrap_streaming_async(
         return _AsyncTracedStream(
             result,
             cast("AsyncGenerator[ChatCompletionChunk, None]", wrapped_generator()),
-            ctx.get("span"),
+            lambda: _finish_stream_span(ctx),
         )
 
     def error_hook(ctx: Dict[str, Any], error: Exception) -> None:
