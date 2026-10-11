@@ -45,6 +45,22 @@ def _supports_stream_options() -> bool:
         return False
 
 
+def _stream_options_unset(kwargs: Dict[str, Any]) -> bool:
+    """True when the caller did not set ``stream_options``. SDK helpers such as
+    ``chat.completions.stream()`` always pass the key, as the ``omit`` or
+    ``NOT_GIVEN`` sentinel when it is unset."""
+    if "stream_options" not in kwargs:
+        return True
+    import openai
+
+    sentinels = tuple(
+        t
+        for t in (getattr(openai, "NotGiven", None), getattr(openai, "Omit", None))
+        if isinstance(t, type)
+    )
+    return isinstance(kwargs["stream_options"], sentinels)
+
+
 def _end_span(span: Any) -> None:
     if span is not None and span.is_recording():
         span.end()
@@ -270,7 +286,7 @@ def _wrap_streaming_sync(
         ctx["accumulated_content"] = ""
 
     def mutate_kwargs_hook(ctx: Dict[str, Any], kwargs: Any) -> Any:
-        if "stream_options" not in kwargs and _supports_stream_options():
+        if _stream_options_unset(kwargs) and _supports_stream_options():
             modified_kwargs = dict(kwargs)
             modified_kwargs["stream_options"] = {"include_usage": True}
             return modified_kwargs
@@ -501,7 +517,7 @@ def _wrap_streaming_async(
         ctx["accumulated_content"] = ""
 
     def mutate_kwargs_hook(ctx: Dict[str, Any], kwargs: Any) -> Any:
-        if "stream_options" not in kwargs and _supports_stream_options():
+        if _stream_options_unset(kwargs) and _supports_stream_options():
             modified_kwargs = dict(kwargs)
             modified_kwargs["stream_options"] = {"include_usage": True}
             return modified_kwargs

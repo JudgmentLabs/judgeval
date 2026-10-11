@@ -195,6 +195,17 @@ class TestSyncStreamObject:
         assert len(spans) == 1
         assert spans[0].attributes.get(AttributeKeys.GEN_AI_COMPLETION) == "Hello"
 
+    def test_stream_helper_records_token_usage(
+        self, tracer, collecting_exporter, sse_sync_openai_client
+    ):
+        client = sse_sync_openai_client
+        wrap_chat_completions_create_sync(client)
+        with client.chat.completions.stream(model="gpt-4", messages=MESSAGES) as stream:
+            stream.get_final_completion()
+
+        span = _api_spans(collecting_exporter)[0]
+        assert span.attributes.get(AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS) == 7
+
     @pytest.mark.parametrize("how", ["close", "with"])
     def test_closed_unread_stream_ends_span(
         self, tracer, collecting_exporter, sse_sync_openai_client, how
@@ -347,6 +358,20 @@ class TestAsyncStreamObject:
         spans = _api_spans(collecting_exporter)
         assert len(spans) == 1
         assert spans[0].attributes.get(AttributeKeys.GEN_AI_COMPLETION) == "Hello"
+
+    @pytest.mark.asyncio
+    async def test_stream_helper_records_token_usage(
+        self, tracer, collecting_exporter, sse_async_openai_client
+    ):
+        client = sse_async_openai_client
+        wrap_chat_completions_create_async(client)
+        async with client.chat.completions.stream(
+            model="gpt-4", messages=MESSAGES
+        ) as stream:
+            await stream.get_final_completion()
+
+        span = _api_spans(collecting_exporter)[0]
+        assert span.attributes.get(AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS) == 7
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("how", ["close", "with"])
