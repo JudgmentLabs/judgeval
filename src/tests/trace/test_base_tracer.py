@@ -301,13 +301,19 @@ class TestTestCase:
                     with BaseTracer.start_as_current_span(f"child-{case_id}"):
                         await asyncio.sleep(0.01)
 
-        await asyncio.gather(*(run_case(f"case-{i}") for i in range(5)))
+        case_ids = [f"case-{i}" for i in range(5)]
+        await asyncio.gather(*(run_case(case_id) for case_id in case_ids))
 
-        spans = [s for s in collecting_exporter.spans if s.name[-1].isdigit()]
-        assert len(spans) == 10
-        for span in spans:
-            assert span.attributes[self.RUN] == "run-1"
-            assert span.attributes[self.CASE] == span.name.split("-", 1)[1]
+        expected = {
+            f"{kind}-{case_id}": ("run-1", case_id)
+            for case_id in case_ids
+            for kind in ("root", "child")
+        }
+        actual = {
+            s.name: (s.attributes[self.RUN], s.attributes[self.CASE])
+            for s in collecting_exporter.spans
+        }
+        assert actual == expected
 
 
 class TestLinkedTraceTracing:
