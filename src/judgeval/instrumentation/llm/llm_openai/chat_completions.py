@@ -1,4 +1,5 @@
 from __future__ import annotations
+import weakref
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -9,6 +10,7 @@ from typing import (
     AsyncIterator,
     Generator,
     AsyncGenerator,
+    cast,
 )
 from packaging import version
 
@@ -41,6 +43,110 @@ def _supports_stream_options() -> bool:
         return version.parse(openai.__version__) >= version.parse("1.26.0")
     except Exception:
         return False
+
+
+def _end_span(span: Any) -> None:
+    if span is not None and span.is_recording():
+        span.end()
+
+
+class _TracedStream:
+    """Iterates a ``Stream`` through the tracing hooks while keeping the SDK's
+    stream API (``with``, ``.response``, ``.close()``) available. A stream that
+    is dropped without being read to the end or closed ends its span when it is
+    garbage-collected."""
+
+    __slots__ = ("_stream", "_iterator", "_span", "__weakref__")
+
+    def __init__(
+        self, stream: Any, iterator: Generator[Any, None, None], span: Any
+    ) -> None:
+        self._stream = stream
+        self._iterator = iterator
+        self._span = span
+        weakref.finalize(self, _end_span, span)
+
+    def __iter__(self) -> _TracedStream:
+        return self
+
+    def __next__(self) -> Any:
+        return next(self._iterator)
+
+    def __enter__(self) -> _TracedStream:
+        return self
+
+    def __exit__(self, *exc_info: Any) -> None:
+        self.close()
+
+    def close(self) -> None:
+        """Close the stream and end the span, even if it was never read."""
+        try:
+            close = getattr(self._stream, "close", None)
+            if close is not None:
+                close()
+        finally:
+            try:
+                self._iterator.close()
+            except ValueError:
+                # Another thread is reading; its loop ends the span once it
+                # sees the closed stream.
+                pass
+            else:
+                _end_span(self._span)
+
+    def __getattr__(self, name: str) -> Any:
+        if name in _TracedStream.__slots__:
+            raise AttributeError(name)
+        return getattr(self._stream, name)
+
+
+class _AsyncTracedStream:
+    """Async counterpart of ``_TracedStream`` for ``AsyncStream``."""
+
+    __slots__ = ("_stream", "_iterator", "_span", "__weakref__")
+
+    def __init__(
+        self, stream: Any, iterator: AsyncGenerator[Any, None], span: Any
+    ) -> None:
+        self._stream = stream
+        self._iterator = iterator
+        self._span = span
+        weakref.finalize(self, _end_span, span)
+
+    def __aiter__(self) -> _AsyncTracedStream:
+        return self
+
+    async def __anext__(self) -> Any:
+        return await self._iterator.__anext__()
+
+    async def __aenter__(self) -> _AsyncTracedStream:
+        return self
+
+    async def __aexit__(self, *exc_info: Any) -> None:
+        await self.close()
+
+    async def close(self) -> None:
+        """Close the stream and end the span, even if it was never read."""
+        try:
+            close = getattr(self._stream, "close", None)
+            if close is not None:
+                await close()
+        finally:
+            try:
+                await self._iterator.aclose()
+            except RuntimeError:
+                # Another task is reading; its loop ends the span once it
+                # sees the closed stream.
+                pass
+            else:
+                _end_span(self._span)
+
+    aclose = close
+
+    def __getattr__(self, name: str) -> Any:
+        if name in _AsyncTracedStream.__slots__:
+            raise AttributeError(name)
+        return getattr(self._stream, name)
 
 
 def wrap_chat_completions_create_sync(client: OpenAI) -> None:
@@ -243,9 +349,7 @@ def _wrap_streaming_sync(
                 span.set_status(Status(StatusCode.ERROR))
 
         def finally_hook_inner(inner_ctx: Dict[str, Any]) -> None:
-            span = ctx.get("span")
-            if span:
-                span.end()
+            _end_span(ctx.get("span"))
 
         wrapped_generator = immutable_wrap_sync_iterator(
             traced_generator,
@@ -255,7 +359,11 @@ def _wrap_streaming_sync(
             finally_hook=finally_hook_inner,
         )
 
-        return wrapped_generator()
+        return _TracedStream(
+            result,
+            cast("Generator[ChatCompletionChunk, None, None]", wrapped_generator()),
+            ctx.get("span"),
+        )
 
     def error_hook(ctx: Dict[str, Any], error: Exception) -> None:
         span = ctx.get("span")
@@ -472,9 +580,7 @@ def _wrap_streaming_async(
                 span.set_status(Status(StatusCode.ERROR))
 
         def finally_hook_inner(inner_ctx: Dict[str, Any]) -> None:
-            span = ctx.get("span")
-            if span:
-                span.end()
+            _end_span(ctx.get("span"))
 
         wrapped_generator = immutable_wrap_async_iterator(
             traced_generator,
@@ -484,7 +590,11 @@ def _wrap_streaming_async(
             finally_hook=finally_hook_inner,
         )
 
-        return wrapped_generator()
+        return _AsyncTracedStream(
+            result,
+            cast("AsyncGenerator[ChatCompletionChunk, None]", wrapped_generator()),
+            ctx.get("span"),
+        )
 
     def error_hook(ctx: Dict[str, Any], error: Exception) -> None:
         span = ctx.get("span")
