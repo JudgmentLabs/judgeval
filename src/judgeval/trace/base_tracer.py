@@ -483,6 +483,10 @@ class BaseTracer(ABC):
         current span and on every span started inside the block, including
         the trace root, so Judgment can attach the trace to the run's case.
 
+        Each case must be its own trace: Judgment reads the ids off the root
+        span. Run concurrent cases outside any active span, not inside a
+        shared parent span (the parent would take the last case's ids).
+
         ```python
         with Tracer.test_case(run.id, case.id):
             support_agent(case.input)
