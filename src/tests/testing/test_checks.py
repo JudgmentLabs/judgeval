@@ -14,14 +14,12 @@ import pytest
 from typer.testing import CliRunner
 
 from judgeval.cli import app
-from judgeval.tests import EvaluatorParseError, parse_checks
+from judgeval.testing import EvaluatorParseError, parse_checks
 
-HEADER = (
-    "from judgeval.tests import evaluator, select, classify, judge\nev = evaluator()\n"
-)
+HEADER = "from judgeval.testing import evaluator, select, classify, judge\nev = evaluator()\n"
 
 CANONICAL = """\
-from judgeval.tests import evaluator, select, classify, judge, passed, failed
+from judgeval.testing import evaluator, select, classify, judge, passed, failed
 
 ev = evaluator()
 
@@ -196,9 +194,9 @@ def test_metric_with_module_level_function_takes_its_primitives():
 
 def test_primitives_resolve_through_imports_only():
     source = dedent("""\
-        import judgeval.tests as jt
-        import judgeval.tests
-        from judgeval.tests import evaluator as make, judge as llm_judge
+        import judgeval.testing as jt
+        import judgeval.testing
+        from judgeval.testing import evaluator as make, judge as llm_judge
 
         ev = make()
 
@@ -207,7 +205,7 @@ def test_primitives_resolve_through_imports_only():
             trace.select("not ours")
             classify("not imported")
             jt.select(trace)
-            judgeval.tests.classify(trace)
+            judgeval.testing.classify(trace)
             return llm_judge(trace)
     """)
     assert parsed(source) == [
@@ -217,7 +215,7 @@ def test_primitives_resolve_through_imports_only():
 
 def test_star_import():
     source = dedent("""\
-        from judgeval.tests import *
+        from judgeval.testing import *
         ev = evaluator()
 
         @ev.check("a")

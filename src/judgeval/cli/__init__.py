@@ -224,7 +224,7 @@ def checks(
     evaluator_path: Path = typer.Argument(help="Path to the evaluator Python file"),
 ):
     """List the checks an evaluator declares, as JSON. Parses without running it."""
-    from judgeval.tests import EvaluatorParseError, parse_checks
+    from judgeval.testing import EvaluatorParseError, parse_checks
 
     try:
         parsed = parse_checks(evaluator_path.read_text())

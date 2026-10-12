@@ -2,7 +2,7 @@
 
 An evaluator declares checks with literal options only::
 
-    from judgeval.tests import evaluator, classify
+    from judgeval.testing import evaluator, classify
 
     ev = evaluator()
 
@@ -26,7 +26,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Literal, Optional, TypeGuard, Union
 
-SDK_MODULE = "judgeval.tests"
+SDK_MODULE = "judgeval.testing"
 PRIMITIVES = frozenset({"select", "classify", "judge"})
 APPLIES = ("always", "when_declared")
 ROLLUPS = ("p50", "p95", "mean", "sum", "max")
