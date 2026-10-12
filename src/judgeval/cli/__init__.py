@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
+import json
 import os
 import subprocess
 import sys
 import typer
 import re
+from dataclasses import asdict
 from pathlib import Path
 from typing import Literal
 from dotenv import load_dotenv
@@ -42,6 +44,17 @@ scorer_app = typer.Typer(
 )
 
 app.add_typer(scorer_app, name="scorer", help="Commands to manage custom scorers")
+
+test_app = typer.Typer(
+    no_args_is_help=True,
+    pretty_exceptions_enable=False,
+    pretty_exceptions_show_locals=False,
+    pretty_exceptions_short=False,
+    rich_help_panel=None,
+    rich_markup_mode=None,
+)
+
+app.add_typer(test_app, name="test", help="Commands for agent tests")
 
 
 @app.command(
@@ -204,6 +217,21 @@ def init(
     with open(scorer_path, "w") as f:
         f.write(template)
     typer.echo(f"Scorer initialized successfully:\n{os.path.abspath(scorer_path)}")
+
+
+@test_app.command()
+def checks(
+    evaluator_path: Path = typer.Argument(help="Path to the evaluator Python file"),
+):
+    """List the checks an evaluator declares, as JSON. Parses without running it."""
+    from judgeval.tests import EvaluatorParseError, parse_checks
+
+    try:
+        parsed = parse_checks(evaluator_path.read_text())
+    except EvaluatorParseError as e:
+        typer.echo(f"{evaluator_path}:{e.line}: {e.message}", err=True)
+        raise typer.Exit(1)
+    typer.echo(json.dumps([asdict(check) for check in parsed], indent=2))
 
 
 @app.command()
