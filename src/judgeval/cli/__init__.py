@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 
+import json
 import os
 import subprocess
 import sys
 import typer
 import re
 from pathlib import Path
-from typing import Literal
+from typing import Literal, NoReturn
 from dotenv import load_dotenv
 from judgeval.utils import resolve_project_id
 from judgeval.internal.api import JudgmentSyncClient
 from judgeval.env import JUDGMENT_API_URL
 from judgeval.logger import judgeval_logger
-from judgeval.exceptions import JudgmentAPIError
+from judgeval.exceptions import JudgmentAPIError, JudgmentProjectNotFoundError
 from judgeval.version import get_version
 from judgeval.utils.url import url_for
 from judgeval.hosted.templates import (
@@ -204,6 +205,66 @@ def init(
     with open(scorer_path, "w") as f:
         f.write(template)
     typer.echo(f"Scorer initialized successfully:\n{os.path.abspath(scorer_path)}")
+
+
+def _exit_with_api_error(error: Exception) -> NoReturn:
+    typer.echo(f"Error: {error}", err=True)
+    hint = getattr(error, "hint", None)
+    if hint:
+        typer.echo(f"Hint: {hint}", err=True)
+    raise typer.Exit(1)
+
+
+@app.command()
+def sql(
+    query: str = typer.Argument(
+        help="One read-only SELECT against the virtual schema (see `judgeval schema`)."
+    ),
+    project_name: str = typer.Option(..., "--project", "-p", help="Project name"),
+    api_key: str = typer.Option(None, envvar="JUDGMENT_API_KEY"),
+    organization_id: str = typer.Option(None, envvar="JUDGMENT_ORG_ID"),
+):
+    """Run a read-only SQL query against a project and print the JSON result.
+
+    Prints {catalog_version, columns, rows, row_count, elapsed_ms} to stdout,
+    e.g. `judgeval sql -p my-project "SELECT count() AS n FROM telemetry.traces" | jq .rows`.
+    Results are capped at 1,000 rows and 5 MiB; use WHERE and LIMIT to narrow.
+    Requires public SQL access enabled for the organization. On error, prints
+    the server message to stderr and exits 1.
+    """
+    from judgeval.judgeval import Judgeval
+
+    if not api_key or not organization_id:
+        raise typer.BadParameter("JUDGMENT_API_KEY and JUDGMENT_ORG_ID required")
+
+    client = Judgeval(
+        project_name=project_name, api_key=api_key, organization_id=organization_id
+    )
+    try:
+        result = client.sql(query)
+    except (JudgmentAPIError, JudgmentProjectNotFoundError) as e:
+        _exit_with_api_error(e)
+    typer.echo(json.dumps(result, indent=2))
+
+
+@app.command()
+def schema(
+    api_key: str = typer.Option(None, envvar="JUDGMENT_API_KEY"),
+    organization_id: str = typer.Option(None, envvar="JUDGMENT_ORG_ID"),
+):
+    """Print the SQL schema reference (tables, columns, examples, limits) as Markdown.
+
+    Read this before writing queries for `judgeval sql`. Contains no project data.
+    """
+    if not api_key or not organization_id:
+        raise typer.BadParameter("JUDGMENT_API_KEY and JUDGMENT_ORG_ID required")
+
+    client = JudgmentSyncClient(JUDGMENT_API_URL, api_key, organization_id)
+    try:
+        response = client._request("GET", url_for("/v1/sql/schema"), {})
+    except JudgmentAPIError as e:
+        _exit_with_api_error(e)
+    typer.echo(response["schema"])
 
 
 @app.command()
