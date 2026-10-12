@@ -12,7 +12,7 @@ from judgeval.evaluation.hosted_evaluation import HostedEvaluatorRunner
 
 
 class Evaluation:
-    """Score a batch of examples using hosted scorers or custom judges.
+    """Score a batch of examples using hosted scorers or Code judges.
 
     Create an `Evaluation` via `client.evaluation.create()`, then call
     `.run()` to execute scorers against your examples.
@@ -22,7 +22,7 @@ class Evaluation:
     - **Hosted scorers** -- pass scorer names as strings (e.g.
       `"faithfulness"`, `"answer_relevancy"`). Evaluation runs server-side
       on the Judgment platform.
-    - **Custom judges** -- pass `Judge` subclass instances for in-process
+    - **Code judges** -- pass `Judge` subclass instances for in-process
       evaluation with your own scoring logic.
 
     Examples:
@@ -39,7 +39,7 @@ class Evaluation:
             print(result.scorers_data)
         ```
 
-        Using a custom judge:
+        Using a Code judge:
 
         ```python
         evaluation = client.evaluation.create()
@@ -72,8 +72,8 @@ class Evaluation:
     ) -> List[ScoringResult]:
         """Run scorers against your examples and return results.
 
-        Pass **either** hosted scorer names (strings) **or** custom `Judge`
-        instances. Mixing both in one call is not supported.
+        Pass **either** hosted scorer names (strings) **or** Code judge
+        (`Judge`) instances. Mixing both in one call is not supported.
 
         Args:
             examples: The `Example` objects to evaluate.
