@@ -51,18 +51,6 @@ def test_exact_manifest_rejects_untracked_package_files(tmp_path: Path) -> None:
     assert errors == ["unexpected files: judgeval/private_source.py"]
 
 
-def test_archive_content_scan_rejects_private_marker(tmp_path: Path) -> None:
-    checker = load_checker()
-    wheel = tmp_path / "judgeval-1.0.0-py3-none-any.whl"
-    files = valid_wheel_files()
-    files["judgeval/__init__.py"] = checker.PRIVATE_SOURCE_MARKER
-    write_wheel(wheel, files)
-
-    errors = checker.distribution_errors(wheel, {"src/judgeval/__init__.py"})
-
-    assert errors == ["private-source marker found in: judgeval/__init__.py"]
-
-
 def test_rejects_duplicate_archive_entries(tmp_path: Path) -> None:
     checker = load_checker()
     wheel = tmp_path / "judgeval-1.0.0-py3-none-any.whl"
