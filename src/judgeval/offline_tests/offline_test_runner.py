@@ -236,11 +236,13 @@ class OfflineTestRunner:
                 matches `dataset_version`.
         """
         try:
-            response = (
+            # Versions are returned as plain dicts by this public method.
+            response = cast(
+                Dict[str, Any],
                 self._client.get_projects_datasets_by_dataset_identifier_versions(
                     project_id=self._project_id,
                     dataset_identifier=test_config.dataset_id,
-                )
+                ),
             )
         except JudgmentAPIError as e:
             raise map_judgment_api_error(
