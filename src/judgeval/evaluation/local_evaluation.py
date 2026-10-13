@@ -15,6 +15,7 @@ from judgeval.hosted.responses import ScorerResponse
 from judgeval.internal.api.models import (
     ExampleEvaluationRun,
     OfflineTestsLocalScorerResult,
+    OfflineTestsLocalScorerResultScorersDatum,
 )
 from judgeval.evaluation.evaluation_base import EvaluatorRunner
 
@@ -74,7 +75,7 @@ class LocalEvaluatorRunner(EvaluatorRunner[Judge]):
 
         api_results: List[OfflineTestsLocalScorerResult] = []
         for i, example in enumerate(examples):
-            scorer_entries: List[Dict[str, Any]] = []
+            scorer_entries: List[OfflineTestsLocalScorerResultScorersDatum] = []
             for scorer_name, res, exc in results_by_example[i]:
                 if exc is not None:
                     scorer_entries.append(
@@ -86,14 +87,20 @@ class LocalEvaluatorRunner(EvaluatorRunner[Judge]):
                         }
                     )
                 elif res is not None:
-                    entry: Dict[str, Any] = {
+                    entry: OfflineTestsLocalScorerResultScorersDatum = {
                         "scorer_name": scorer_name,
                         "value": res.value,
                         "reason": res.reason,
                         "error": None,
                     }
                     if res.citations is not None:
-                        entry["citations"] = res.citations
+                        entry["citations"] = [
+                            {
+                                "span_id": citation.span_id,
+                                "span_attribute": citation.span_attribute,
+                            }
+                            for citation in res.citations
+                        ]
                     scorer_entries.append(entry)
 
             api_results.append(
