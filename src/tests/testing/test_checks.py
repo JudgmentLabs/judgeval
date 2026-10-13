@@ -113,7 +113,9 @@ def test_label_check_keeps_declared_label_order():
             return "calm"
     """)
     assert parsed(source) == [
-        row("tone", 3, 5, kind="label", gating=False, label_set=["curt", "calm", "warm"])
+        row(
+            "tone", 3, 5, kind="label", gating=False, label_set=["curt", "calm", "warm"]
+        )
     ]
 
 
