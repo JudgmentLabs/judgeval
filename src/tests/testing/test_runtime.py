@@ -117,7 +117,6 @@ def test_score_runs_requested_checks(
         case_id="c1",
         trace_id="t-abc",
         organization_id="org-1",
-        project_id="proj-1",
         input={"topic": "billing"},
         metadata={"checks": {"tool_budget": {"max": 1}}},
         checks=[
@@ -154,9 +153,7 @@ def test_score_runs_requested_checks(
     ]
     # Gating: has_output, mentions_input, tool_budget, wrong_kind, tool_calls.
     assert (response.value, response.reason) == (False, "3/5 gating checks passed")
-    assert {r[:2] for r in requests} == {
-        ("POST", "https://api.example/v1/projects/proj-1/sql")
-    }
-    assert {(r[2]["trace_ids"][0], r[3], r[4]) for r in requests} == {
-        ("t-abc", "run-token", "org-1")
+    # The run token alone scopes the query to the case's trace.
+    assert {(r[0], r[1], tuple(r[2]), r[3], r[4]) for r in requests} == {
+        ("POST", "https://api.example/v1/testing/sql", ("sql",), "run-token", "org-1")
     }

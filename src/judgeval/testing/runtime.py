@@ -60,10 +60,13 @@ class Case:
 
 @dataclass(frozen=True)
 class Trace:
-    """The case's output trace. Spans are read with `select`, never shipped to the sandbox."""
+    """The case's output trace. Spans are read with `select`, never shipped to the sandbox.
+
+    The client's credential is a run token bound to this trace; the server takes the
+    trace from the token, not from the request.
+    """
 
     id: str
-    project_id: str
     client: JudgmentSyncClient
 
 
@@ -87,9 +90,7 @@ def failed(reason: Optional[str] = None) -> Result:
 def select(trace: Trace, sql: str) -> list[dict[str, Any]]:
     """Run one read-only virtual SQL SELECT over this trace's spans; returns the rows."""
     response = trace.client._request(
-        "POST",
-        url_for(f"/v1/projects/{trace.project_id}/sql", trace.client.base_url),
-        {"sql": sql, "trace_ids": [trace.id]},
+        "POST", url_for("/v1/testing/sql", trace.client.base_url), {"sql": sql}
     )
     return list(response["rows"])
 
@@ -119,7 +120,6 @@ class EvaluatorJudge(Judge[EvaluatorResponse]):
         )
         trace = Trace(
             id=data["trace_id"],
-            project_id=data["project_id"],
             client=JudgmentSyncClient(
                 os.environ["JUDGMENT_TESTING_API_URL"],
                 os.environ["JUDGMENT_TESTING_TOKEN"],
