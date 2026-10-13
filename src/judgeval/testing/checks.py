@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from typing import Any, Literal, Optional, TypeGuard, Union
 
 SDK_MODULE = "judgeval.testing"
-PRIMITIVES = frozenset({"select", "classify", "judge"})
+PRIMITIVES = frozenset({"select", "classify", "llm_judge"})
 APPLIES = ("always", "when_declared")
 ROLLUPS = ("p50", "p95", "mean", "sum", "max")
 BETTER = ("lower", "higher")
@@ -204,19 +204,24 @@ class _Parser:
                 )
             if len(set(labels)) != len(labels):
                 raise EvaluatorParseError(call.lineno, "labels must be unique")
+        if labels and options.get("gates"):
+            raise EvaluatorParseError(
+                call.lineno,
+                "a label check can't gate: it has no pass/fail unless it returns Result(passed=...)",
+            )
         start = fn.decorator_list[0].lineno
         assert fn.end_lineno is not None
         return Check(
             name=name,
             kind="label" if labels else "pass_fail",
-            gating=options.get("gates", True),
+            gating=options.get("gates", not labels),
             applies=options.get("applies", "always"),
             label_set=list(labels or []),
             metric=None,
             primitives=self._primitives(fn),
             line_start=start,
             line_end=fn.end_lineno,
-            body_hash=self._hash((start, fn.end_lineno)),
+            body_hash=self._hash((start, fn.end_lineno), *self._helper_spans(fn)),
         )
 
     def _metric(self, call: ast.Call, stmt: ast.Expr) -> Check:
@@ -276,7 +281,7 @@ class _Parser:
             primitives=self._primitives(body),
             line_start=stmt.lineno,
             line_end=stmt.end_lineno,
-            body_hash=self._hash(*spans),
+            body_hash=self._hash(*spans, *self._helper_spans(body)),
         )
 
     def _name(self, call: ast.Call, positional: int) -> str:
@@ -321,6 +326,28 @@ class _Parser:
             if isinstance(call, ast.Call)
         )
         return sorted(PRIMITIVES.intersection(called))
+
+    def _helper_spans(self, root: ast.AST) -> list[tuple[int, int]]:
+        """Line spans of the module-level functions `root` calls, transitively, in source order."""
+        seen: dict[str, FunctionNode] = {}
+        pending = [root]
+        while pending:
+            for call in ast.walk(pending.pop()):
+                if (
+                    isinstance(call, ast.Call)
+                    and isinstance(call.func, ast.Name)
+                    and call.func.id in self.functions
+                    and call.func.id not in seen
+                    and self.functions[call.func.id] is not root
+                ):
+                    fn = seen[call.func.id] = self.functions[call.func.id]
+                    pending.append(fn)
+        spans = []
+        for fn in sorted(seen.values(), key=lambda f: f.lineno):
+            assert fn.end_lineno is not None
+            start = fn.decorator_list[0].lineno if fn.decorator_list else fn.lineno
+            spans.append((start, fn.end_lineno))
+        return spans
 
     def _hash(self, *spans: tuple[int, int]) -> str:
         # Trailing whitespace is ignored; everything outside the spans can't affect the hash.

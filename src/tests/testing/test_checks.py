@@ -16,10 +16,10 @@ from typer.testing import CliRunner
 from judgeval.cli import app
 from judgeval.testing import EvaluatorParseError, parse_checks
 
-HEADER = "from judgeval.testing import evaluator, select, classify, judge\nev = evaluator()\n"
+HEADER = "from judgeval.testing import evaluator, select, classify, llm_judge\nev = evaluator()\n"
 
 CANONICAL = """\
-from judgeval.testing import evaluator, select, classify, judge, passed, failed
+from judgeval.testing import evaluator, select, classify, llm_judge, passed, failed
 
 ev = evaluator()
 
@@ -37,7 +37,7 @@ def tool_sequence(case, trace, settings):
 
 @ev.check("tone", labels=["calm", "curt"], gates=False)
 def tone(case, trace):
-    return judge(trace, "Which tone?")
+    return llm_judge(trace, "Which tone?")
 
 
 ev.metric("execution_time_ms", lambda case, trace: trace.duration_ms, rollup="p95", better="lower")
@@ -91,8 +91,8 @@ def test_canonical_evaluator():
             kind="label",
             gating=False,
             label_set=["calm", "curt"],
-            primitives=["judge"],
-            body_hash="6a24c34249518ea23e287800d9aaae90c8877dea6fce5fbcfb2d113e2cc757b0",
+            primitives=["llm_judge"],
+            body_hash="6cc25b1b6f1c2a4c7aef9c5c3c80f18b2aa515640abc1334e62458408ffbfa66",
         ),
         row(
             "execution_time_ms",
@@ -113,7 +113,7 @@ def test_label_check_keeps_declared_label_order():
             return "calm"
     """)
     assert parsed(source) == [
-        row("tone", 3, 5, kind="label", label_set=["curt", "calm", "warm"])
+        row("tone", 3, 5, kind="label", gating=False, label_set=["curt", "calm", "warm"])
     ]
 
 
@@ -196,7 +196,7 @@ def test_primitives_resolve_through_imports_only():
     source = dedent("""\
         import judgeval.testing as jt
         import judgeval.testing
-        from judgeval.testing import evaluator as make, judge as llm_judge
+        from judgeval.testing import evaluator as make, llm_judge as lj
 
         ev = make()
 
@@ -206,10 +206,10 @@ def test_primitives_resolve_through_imports_only():
             classify("not imported")
             jt.select(trace)
             judgeval.testing.classify(trace)
-            return llm_judge(trace)
+            return lj(trace)
     """)
     assert parsed(source) == [
-        row("mixed", 7, 13, primitives=["classify", "judge", "select"])
+        row("mixed", 7, 13, primitives=["classify", "llm_judge", "select"])
     ]
 
 
@@ -220,9 +220,9 @@ def test_star_import():
 
         @ev.check("a")
         def a(case, trace):
-            return judge(trace)
+            return llm_judge(trace)
     """)
-    assert parsed(source) == [row("a", 4, 6, primitives=["judge"])]
+    assert parsed(source) == [row("a", 4, 6, primitives=["llm_judge"])]
 
 
 def test_source_without_an_evaluator_has_no_checks():
@@ -523,7 +523,7 @@ ROUND_TRIP_CONFIGS = [
     {
         "name": "tone",
         "kind": "label",
-        "gating": True,
+        "gating": False,
         "applies": "always",
         "label_set": ["calm", "it's curt"],
     },
@@ -558,3 +558,48 @@ def test_generated_check_round_trips(config: dict[str, Any]):
     expected = {"label_set": [], "metric": None, **config}
     [check] = parsed(HEADER + render(expected))
     assert {k: check[k] for k in CONFIG_FIELDS} == expected
+
+
+def test_label_checks_cannot_gate():
+    with pytest.raises(EvaluatorParseError, match="line 3: a label check can't gate"):
+        parse_checks(
+            HEADER
+            + dedent("""\
+                @ev.check("tone", labels=["calm", "curt"], gates=True)
+                def tone(case, trace):
+                    return "calm"
+            """)
+        )
+
+
+HELPERS = HEADER + dedent("""\
+    def normalize(text):
+        return text.strip().lower()
+
+    def final_reply(trace):
+        return normalize(select(trace, "SELECT span_id, output FROM telemetry.spans")[0]["output"])
+
+    def unused():
+        return 1
+
+    @ev.check("polite")
+    def polite(case, trace):
+        return "please" in final_reply(trace)
+
+    ev.metric("reply_len", lambda case, trace: len(final_reply(trace)), rollup="mean", better="higher")
+""")
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "changed"),
+    [
+        # A helper the checks call, directly or through another helper.
+        ("text.strip().lower()", "text.lower()", {"polite", "reply_len"}),
+        ('[0]["output"]', '[-1]["output"]', {"polite", "reply_len"}),
+        # A function nothing calls.
+        ("return 1", "return 2", set()),
+    ],
+)
+def test_body_hash_covers_called_helpers(old: str, new: str, changed: set[str]):
+    before, after = hashes(HELPERS), hashes(HELPERS.replace(old, new))
+    assert {name for name in before if before[name] != after[name]} == changed
