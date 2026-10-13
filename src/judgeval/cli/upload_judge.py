@@ -257,7 +257,10 @@ def upload_judge(
         "class_name": class_name,
         "response_type": response_type,
         "version": 4,
-        "categories": [category.model_dump() for category in categories]
+        "categories": [
+            {"value": category.value, "description": category.description}
+            for category in categories
+        ]
         if categories
         else None,
         "bump_major": bump_major,

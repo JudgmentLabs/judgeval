@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, cast
 
 from judgeval.agent_judges.agent_judge import AgentJudge, ScoreType
 from judgeval.internal.api import JudgmentSyncClient
-from judgeval.internal.api.models import (
+from judgeval.internal.api.legacy_judges import (
     SDKCreateAgentJudgeRequest,
     SDKUpdateAgentJudgeRequest,
 )
