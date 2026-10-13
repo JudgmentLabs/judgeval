@@ -10,7 +10,6 @@ from judgeval.exceptions import JudgmentAPIError
 from judgeval.utils.url import url_for
 from judgeval.utils.serialize import json_encoder
 from judgeval.internal.api.models import *
-from judgeval.internal.api.legacy_judges import *
 from judgeval.logger import judgeval_logger as logger
 
 
@@ -413,8 +412,8 @@ class JudgmentSyncClient:
         )
 
     def post_projects_judges(
-        self, project_id: str, payload: SDKCreateAgentJudgeRequest
-    ) -> SDKCreateAgentJudgeResponse:
+        self, project_id: str, payload: CreateJudgeRequest
+    ) -> CreateJudgeResponse:
         return self._request(
             "POST",
             url_for(f"/v1/projects/{project_id}/judges", self.base_url),
@@ -422,11 +421,22 @@ class JudgmentSyncClient:
         )
 
     def patch_projects_judges_by_judge_id(
-        self, project_id: str, judge_id: str, payload: SDKUpdateAgentJudgeRequest
-    ) -> SDKUpdateAgentJudgeResponse:
+        self, project_id: str, judge_id: str, payload: UpdateJudgeRequest
+    ) -> UpdateJudgeResponse:
         return self._request(
             "PATCH",
             url_for(f"/v1/projects/{project_id}/judges/{judge_id}", self.base_url),
+            payload,
+        )
+
+    def post_projects_judges_by_judge_id_lookup(
+        self, project_id: str, judge_id: str, payload: JudgeLookupRequest
+    ) -> JudgeLookupResponse:
+        return self._request(
+            "POST",
+            url_for(
+                f"/v1/projects/{project_id}/judges/{judge_id}/lookup", self.base_url
+            ),
             payload,
         )
 

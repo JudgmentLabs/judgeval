@@ -1,5 +1,4 @@
 from judgeval.internal.api.api_client import JudgmentSyncClient
-from judgeval.internal.api.legacy_judges import *
 from judgeval.internal.api.models import *
 
 __all__ = [
