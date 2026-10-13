@@ -87,8 +87,9 @@ def test_row_verdict_lives_on_the_record_not_on_each_grader():
     example = Example(example_id="example-2", created_at="2026-09-07T00:00:00Z")
     original = ScoringResult(
         scorers_data=[
-            # a full-marks scorer on a row whose pass condition failed: the
-            # grader verified its own outcome, the row verdict is false
+            # a full-marks scorer on a row whose pass condition failed: with
+            # no threshold the numeric grader falls back to the row's own
+            # success verdict for that scorer, so it does not pass either
             ScorerData(
                 name="accuracy",
                 value=5.0,
@@ -107,12 +108,72 @@ def test_row_verdict_lives_on_the_record_not_on_each_grader():
     record = result_set["results"][0]
     numeric, binary = record["grader_results"]
     assert numeric["score"] == 1.0
-    assert numeric["passed"] is True
+    assert numeric["passed"] is False
+    assert numeric["metadata"]["judgeval"]["passed_basis"] == "row_success"
     assert binary["score"] == 0.0
     assert binary["passed"] is False
     assert record["passed"] is False
 
     assert from_openeval_result_set(result_set) == [original]
+
+
+def test_numeric_passed_uses_thresholds_and_records_the_basis():
+    def numeric_scorer(success: bool, value: float = 75.0) -> ScorerData:
+        return ScorerData(
+            name="accuracy",
+            value=value,
+            score_type="numeric",
+            minimum_score_range=0,
+            maximum_score_range=100,
+            id="accuracy-1",
+            success=success,
+        )
+
+    thresholded = ScoringResult(
+        scorers_data=[numeric_scorer(success=False)],
+        data_object=Example(example_id="t-1", created_at="2026-09-07T00:00:00Z"),
+    )
+    result_set = _result_set([thresholded], pass_thresholds={"accuracy": 0.8})
+    grader = result_set["results"][0]["grader_results"][0]
+    # 0.75 is below the 0.8 threshold even though the row's success verdict
+    # is False here and the value itself was produced without error
+    assert grader["score"] == 0.75
+    assert grader["passed"] is False
+    assert grader["metadata"]["judgeval"]["passed_basis"] == "threshold"
+
+    met = _result_set(
+        [
+            ScoringResult(
+                scorers_data=[numeric_scorer(success=False, value=90.0)],
+                data_object=Example(
+                    example_id="t-2", created_at="2026-09-07T00:00:00Z"
+                ),
+            )
+        ],
+        pass_thresholds={"accuracy": 0.8},
+    )
+    grader = met["results"][0]["grader_results"][0]
+    assert grader["score"] == 0.9
+    assert grader["passed"] is True
+    assert grader["metadata"]["judgeval"]["passed_basis"] == "threshold"
+
+    # no threshold: the row's own success verdict for the scorer decides
+    fallback = _result_set(
+        [
+            ScoringResult(
+                scorers_data=[numeric_scorer(success=True)],
+                data_object=Example(
+                    example_id="t-3", created_at="2026-09-07T00:00:00Z"
+                ),
+            )
+        ]
+    )
+    grader = fallback["results"][0]["grader_results"][0]
+    assert grader["passed"] is True
+    assert grader["metadata"]["judgeval"]["passed_basis"] == "row_success"
+
+    with pytest.raises(Exception, match="within \\[0, 1\\]"):
+        _result_set([fallback], pass_thresholds={"accuracy": 1.5})
 
 
 def test_unscored_rows_and_empty_scorers_are_not_passes():

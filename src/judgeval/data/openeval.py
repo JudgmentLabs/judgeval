@@ -91,27 +91,58 @@ def _data_object_metadata(data_object: Example | TraceSpan) -> Dict[str, Any]:
 def _own_outcome(scorer: ScorerData) -> bool:
     """The grader's own pass state, independent of the row's pass condition.
 
-    Binary yes/no maps directly, a numeric value the scorer actually produced
-    is a verified outcome, and everything else — an error, a categorical
+    Binary yes/no maps directly, and everything else — an error, a categorical
     value, an unmapped binary — is unverifiable and must not pass (EvalPort
-    Rule 6: a null score means "not verified").
+    Rule 6: a null score means "not verified"). Numeric values carry no pass
+    state of their own: the normalized score is exported and ``passed`` is
+    decided by the threshold/row-success fallback in ``_grader_result``.
     """
     if scorer.error is not None:
         return False
     if scorer.score_type == "binary" and isinstance(scorer.value, str):
         return scorer.value.lower() == "yes"
-    return (
-        scorer.score_type == "numeric"
-        and not isinstance(scorer.value, bool)
-        and isinstance(scorer.value, Real)
-    )
+    return False
 
 
-def _grader_result(scorer: ScorerData) -> Dict[str, Any]:
+def _numeric_passed(
+    scorer: ScorerData, score: float | None, pass_thresholds: Mapping[str, float] | None
+) -> tuple[bool, str | None]:
+    """Decide a numeric grader's pass state, naming the basis used.
+
+    A threshold from ``pass_thresholds`` (compared against the normalized
+    [0, 1] score this adapter exports) is authoritative; without one the
+    row's own ``success`` verdict for that scorer is the fallback, since a
+    bare numeric value says how well it went, not whether that was enough.
+    """
+    if score is None:
+        return False, "none"
+    threshold = (pass_thresholds or {}).get(scorer.name)
+    if threshold is not None:
+        return score >= threshold, "threshold"
+    return scorer.success is True, "row_success"
+
+
+def _grader_result(
+    scorer: ScorerData, pass_thresholds: Mapping[str, float] | None = None
+) -> Dict[str, Any]:
     _require(bool(scorer.name), "scorer name must be a non-empty string")
     errored = scorer.error is not None
     score = None if errored else _score(scorer)
-    metadata: Dict[str, Any] = {_METADATA_NAMESPACE: {"scorer_data": scorer.to_dict()}}
+    numeric = (
+        scorer.score_type == "numeric"
+        and not isinstance(scorer.value, bool)
+        and isinstance(scorer.value, Real)
+        and errored is False
+    )
+    passed_basis: str | None = None
+    if numeric:
+        passed, passed_basis = _numeric_passed(scorer, score, pass_thresholds)
+    else:
+        passed = _own_outcome(scorer)
+    namespace: Dict[str, Any] = {"scorer_data": scorer.to_dict()}
+    if passed_basis is not None:
+        namespace["passed_basis"] = passed_basis
+    metadata: Dict[str, Any] = {_METADATA_NAMESPACE: namespace}
     if errored:
         metadata["error"] = scorer.error
     elif (
@@ -127,14 +158,18 @@ def _grader_result(scorer: ScorerData) -> Dict[str, Any]:
         "grader_id": scorer.name,
         "type": "llm_judge" if scorer.evaluation_model else "custom",
         "score": score,
-        "passed": _own_outcome(scorer),
+        "passed": passed,
         "metadata": metadata,
     }
 
 
-def _result_record(result: ScoringResult) -> Dict[str, Any]:
+def _result_record(
+    result: ScoringResult, pass_thresholds: Mapping[str, float] | None = None
+) -> Dict[str, Any]:
     data_object = result.data_object
-    graders = [_grader_result(scorer) for scorer in result.scorers_data]
+    graders = [
+        _grader_result(scorer, pass_thresholds) for scorer in result.scorers_data
+    ]
     row_passed = all(scorer.success is True for scorer in result.scorers_data)
     record: Dict[str, Any] = {
         "test_case_id": data_object.example_id
@@ -172,20 +207,36 @@ def to_openeval_result_set(
     run_id: str,
     started_at: str,
     completed_at: str | None = None,
+    pass_thresholds: Mapping[str, float] | None = None,
 ) -> Dict[str, Any]:
     """Export Judgeval results to the portable EvalPort ResultSet shape.
 
     Numeric values are clamped to [0, 1] with the native value preserved in
     the reserved ``openeval.raw_score`` metadata key, binary values map to 1
     or 0, and categorical values use ``null`` because EvalPort scores are
-    numeric. Each grader's ``passed`` reflects its own outcome (EvalPort
-    Rule 6: a null score is "not verified" and must not pass); the row's pass
-    condition is reported only on ``Result.passed``. An errored scorer
-    exports ``score: null`` with its error in grader metadata instead of
-    aborting the export. Raw Judgeval data stays in ``metadata["judgeval"]``
-    for import.
+    numeric. A numeric grader's ``passed`` is decided by ``pass_thresholds``
+    (scorer name to a threshold on the normalized [0, 1] score); a numeric
+    scorer without a threshold falls back to the row's own ``success``
+    verdict for that scorer, and the basis used is recorded as
+    ``passed_basis`` in the grader's ``metadata["judgeval"]``. Binary
+    graders map yes/no directly; everything else — an error, a categorical
+    value, an unmapped binary — is unverifiable and must not pass (EvalPort
+    Rule 6: a null score is "not verified"). The row's pass condition is
+    reported only on ``Result.passed``. An errored scorer exports ``score:
+    null`` with its error in grader metadata instead of aborting the export.
+    Raw Judgeval data stays in ``metadata["judgeval"]`` for import.
     """
-    records = [_result_record(result) for result in results]
+    if pass_thresholds:
+        for name, threshold in pass_thresholds.items():
+            _require(
+                isinstance(threshold, (int, float)) and not isinstance(threshold, bool),
+                f"pass threshold for {name!r} must be a number",
+            )
+            _require(
+                0.0 <= float(threshold) <= 1.0,
+                f"pass threshold for {name!r} must be within [0, 1]",
+            )
+    records = [_result_record(result, pass_thresholds) for result in results]
     result_set: Dict[str, Any] = {
         "version": OPENEVAL_VERSION,
         "suite_id": suite_id,
