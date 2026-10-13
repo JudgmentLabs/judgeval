@@ -21,6 +21,44 @@ ROOT = Path(__file__).resolve().parent.parent
 SPEC = ROOT / "openapi" / "public-api.json"
 OUTPUT = ROOT / "src" / "judgeval" / "internal" / "api" / "models.py"
 
+# Inline route bodies the SDK types against. The spec gives them no `$id`, so
+# they are named here: name -> (path, method, "request" | "response").
+INLINE_SCHEMAS = {
+    "CreateJudgeRequest": ("/v1/projects/{projectId}/judges", "post", "request"),
+    "CreateJudgeResponse": ("/v1/projects/{projectId}/judges", "post", "response"),
+    "UpdateJudgeRequest": (
+        "/v1/projects/{projectId}/judges/{judgeId}",
+        "patch",
+        "request",
+    ),
+    "UpdateJudgeResponse": (
+        "/v1/projects/{projectId}/judges/{judgeId}",
+        "patch",
+        "response",
+    ),
+    "JudgeLookupRequest": (
+        "/v1/projects/{projectId}/judges/{judgeId}/lookup",
+        "post",
+        "request",
+    ),
+    "JudgeLookupResponse": (
+        "/v1/projects/{projectId}/judges/{judgeId}/lookup",
+        "post",
+        "response",
+    ),
+}
+
+
+def name_inline_schemas(spec: dict[str, Any]) -> None:
+    for name, (path, method, kind) in INLINE_SCHEMAS.items():
+        operation = spec["paths"][path][method]
+        body = (
+            operation["requestBody"]
+            if kind == "request"
+            else operation["responses"]["200"]
+        )
+        body["content"]["application/json"]["schema"]["$id"] = name
+
 
 def hoist_named_schemas(spec: dict[str, Any]) -> dict[str, Any]:
     named: dict[str, Any] = {}
@@ -47,7 +85,9 @@ def hoist_named_schemas(spec: dict[str, Any]) -> dict[str, Any]:
 
 
 def main() -> None:
-    spec = hoist_named_schemas(json.loads(SPEC.read_text()))
+    spec = json.loads(SPEC.read_text())
+    name_inline_schemas(spec)
+    spec = hoist_named_schemas(spec)
     with tempfile.NamedTemporaryFile("w", suffix=".json") as hoisted:
         json.dump(spec, hoisted)
         hoisted.flush()
