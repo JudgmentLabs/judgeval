@@ -12,7 +12,7 @@ R = TypeVar("R", bound=BaseResponse)
 
 
 class Judge(ABC, Generic[R]):
-    """Base class for building custom evaluation scorers.
+    """Base class for building Code judges.
 
     Subclass `Judge` and implement the `score` method to create your own
     scorer that runs locally. The type parameter `R` determines the response
@@ -22,7 +22,7 @@ class Judge(ABC, Generic[R]):
     - `Judge[NumericResponse]` -- numeric scoring (e.g. 0.0 to 1.0)
     - `Judge[CategoricalResponse]` -- classification into categories
 
-    Custom judges are passed to `Evaluation.run()` just like hosted scorers.
+    Code judges are passed to `Evaluation.run()` just like hosted scorers.
 
     Examples:
         A simple binary scorer:
