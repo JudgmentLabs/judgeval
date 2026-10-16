@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
+import json
 import re
 from collections import deque
 from decimal import Decimal
@@ -162,6 +163,15 @@ def test_deque():
 
 def test_bytes():
     assert json_encoder(b"hello") == "hello"
+
+
+def test_non_utf8_bytes_do_not_raise():
+    assert json_encoder(b"\x89PNG\xff") == "\ufffdPNG\ufffd"
+
+
+def test_safe_serialize_non_utf8_bytes_keeps_rest_of_payload():
+    result = json.loads(safe_serialize({"id": 1, "blob": b"\x89PNG\xff"}))
+    assert result == {"id": 1, "blob": "\ufffdPNG\ufffd"}
 
 
 def test_date():

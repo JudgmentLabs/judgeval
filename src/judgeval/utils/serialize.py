@@ -230,7 +230,7 @@ def decimal_encoder(dec_value: Decimal) -> Union[int, float]:
 
 
 ENCODERS_BY_TYPE: Dict[Type[Any], Callable[[Any], Any]] = {
-    bytes: lambda o: o.decode(),
+    bytes: lambda o: o.decode(errors="replace"),
     datetime.date: iso_format,
     datetime.datetime: iso_format,
     datetime.time: iso_format,
