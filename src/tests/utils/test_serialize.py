@@ -174,6 +174,123 @@ def test_safe_serialize_non_utf8_bytes_keeps_rest_of_payload():
     assert result == {"id": 1, "blob": "\ufffdPNG\ufffd"}
 
 
+def test_pydantic_non_utf8_bytes_preserve_json_serializers_and_original():
+    from pydantic import ConfigDict, Field, field_serializer
+
+    class Payload(BaseModel):
+        model_config = ConfigDict(serialize_by_alias=True)
+        blob: bytes = Field(serialization_alias="binary")
+        amount: Decimal = Decimal("12.50")
+        duration: datetime.timedelta = datetime.timedelta(seconds=90)
+        label: str = "value"
+        opaque: bytes = b"\xfe"
+
+        @field_serializer("label", when_used="json")
+        def serialize_label(self, value):
+            return value.upper()
+
+        @field_serializer("opaque", when_used="json")
+        def serialize_opaque(self, value):
+            return value.hex()
+
+    original = Payload(blob=b"\xff")
+    control = original.model_copy(update={"blob": b"valid"}).model_dump(mode="json")
+    control["binary"] = "\ufffd"
+    result = json.loads(safe_serialize({"id": 1, "model": original}))
+    assert result == {"id": 1, "model": control}
+    assert original.blob == b"\xff"
+    assert original.opaque == b"\xfe"
+
+
+def test_pydantic_nested_non_utf8_bytes_preserve_field_json_modes():
+    class InnerPayload(BaseModel):
+        blob: bytes
+        amount: Decimal = Decimal("12.50")
+
+    class Payload(BaseModel):
+        children: list[InnerPayload]
+
+    child = InnerPayload(blob=b"\xff")
+    model = Payload(children=[child])
+    assert json.loads(safe_serialize(model)) == {
+        "children": [{"blob": "\ufffd", "amount": "12.50"}]
+    }
+    assert child.blob == b"\xff"
+
+
+def test_failing_custom_model_serializer_keeps_original_repr():
+    from pydantic import model_serializer
+
+    class Payload(BaseModel):
+        blob: bytes
+        opaque: bytes
+
+        @model_serializer
+        def serialize_model(self):
+            return {"blob": self.blob, "opaque": self.opaque.hex()}
+
+    model = Payload(blob=b"\xff", opaque=b"\xfe")
+    assert safe_serialize(model) == repr(model)
+    assert model.opaque == b"\xfe"
+
+
+def test_pydantic_fallback_does_not_drop_coerced_dictionary_keys():
+    class Payload(BaseModel):
+        blob: bytes
+        fields: dict[bytes | str, int]
+
+    model = Payload(blob=b"\xff", fields={b"a": 1, "a": 2})
+    assert safe_serialize(model) == repr(model)
+    assert len(model.fields) == 2
+
+
+@pytest.mark.parametrize("container", ["deque", "dataclass"])
+def test_pydantic_fallback_keeps_mapping_keys_in_nested_containers(container):
+    @dataclasses.dataclass
+    class Fields:
+        data: dict[bytes | str, int]
+
+    class Payload(BaseModel):
+        blob: bytes
+        items: object
+
+    data = {b"a": 1, "a": 2}
+    items = deque([data]) if container == "deque" else Fields(data)
+    model = Payload(blob=b"\xff", items=items)
+    assert safe_serialize(model) == repr(model)
+    assert len(data) == 2
+
+
+def test_pydantic_fallback_preserves_successful_nested_model_serializer():
+    from pydantic import model_serializer
+
+    class Encoded(BaseModel):
+        opaque: bytes
+
+        @model_serializer
+        def serialize_model(self):
+            return {"hex": self.opaque.hex()}
+
+    class Raw(BaseModel):
+        blob: bytes
+
+    class Payload(BaseModel):
+        children: list[Encoded | Raw]
+
+    model = Payload(children=[Encoded(opaque=b"\xfe"), Raw(blob=b"\xff")])
+    assert json.loads(safe_serialize(model)) == {
+        "children": [{"hex": "fe"}, {"blob": "\ufffd"}],
+    }
+
+
+@pytest.mark.parametrize("other_key", [b"\xfe", "\ufffd"])
+def test_colliding_byte_keys_are_rejected_instead_of_dropping_fields(other_key):
+    payload = {b"\xff": 1, other_key: 2}
+    with pytest.raises(ValueError, match="collid"):
+        json_encoder(payload)
+    assert safe_serialize(payload) == repr(payload)
+
+
 def test_date():
     d = datetime.date(2024, 1, 15)
     assert json_encoder(d) == "2024-01-15"

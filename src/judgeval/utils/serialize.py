@@ -129,6 +129,69 @@ def json_encoder(
     )
 
 
+def _has_non_string_keys(obj: Any) -> bool:
+    if _HAS_PYDANTIC and isinstance(obj, BaseModel):
+        return _has_non_string_keys(vars(obj)) or _has_non_string_keys(
+            obj.model_extra or {}
+        )
+    if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
+        return any(
+            _has_non_string_keys(getattr(obj, field.name))
+            for field in dataclasses.fields(obj)
+        )
+    if isinstance(obj, dict):
+        return any(
+            not isinstance(key, str) or _has_non_string_keys(value)
+            for key, value in obj.items()
+        )
+    if isinstance(obj, (list, tuple, set, frozenset, deque)):
+        return any(_has_non_string_keys(value) for value in obj)
+    return False
+
+
+def _replace_invalid_utf8(obj: Any) -> Any:
+    """Repair failing byte values on copies, retaining model JSON serializers."""
+    if isinstance(obj, bytes):
+        return obj.decode(errors="replace").encode()
+    if _HAS_PYDANTIC and isinstance(obj, BaseModel):
+        # Model serializers can ignore include, and JSON key coercion can lose
+        # entries before our dictionary encoder sees them. Keep the repr fallback
+        # when the failing byte field cannot be repaired without guessing.
+        if _has_non_string_keys(obj):
+            raise ValueError(
+                "Cannot safely repair model with non-string dictionary keys"
+            )
+        try:
+            _model_dump(obj, mode="json")
+        except UnicodeDecodeError:
+            pass
+        else:
+            return obj
+        if type(obj).__pydantic_decorators__.model_serializers:
+            raise ValueError("Cannot safely repair bytes in a custom model serializer")
+        updates = {}
+        for name in (*type(obj).model_fields, *(obj.model_extra or {})):
+            try:
+                _model_dump(obj, mode="json", include={name})
+            except UnicodeDecodeError:
+                updates[name] = _replace_invalid_utf8(getattr(obj, name))
+        return obj.model_copy(update=updates)
+    if isinstance(obj, dict):
+        result = {}
+        encoded_keys = set()
+        for key, value in obj.items():
+            repaired_key = _replace_invalid_utf8(key)
+            encoded_key = json_encoder(repaired_key)
+            if encoded_key in encoded_keys:
+                raise ValueError("Dictionary keys collide after JSON encoding")
+            encoded_keys.add(encoded_key)
+            result[repaired_key] = _replace_invalid_utf8(value)
+        return result
+    if isinstance(obj, (list, tuple)):
+        return type(obj)(_replace_invalid_utf8(value) for value in obj)
+    return obj
+
+
 def _dump_base_model(
     *,
     obj: Any,
@@ -136,10 +199,10 @@ def _dump_base_model(
     """
     Dump a BaseModel object to a dict, using the same parameters as jsonable_encoder
     """
-    obj_dict = _model_dump(
-        obj,
-        mode="json",
-    )
+    try:
+        obj_dict = _model_dump(obj, mode="json")
+    except UnicodeDecodeError:
+        obj_dict = _model_dump(_replace_invalid_utf8(obj), mode="json")
     if "__root__" in obj_dict:
         obj_dict = obj_dict["__root__"]
 
@@ -162,6 +225,8 @@ def _dump_dict(
             encoded_key = json_encoder(
                 key,
             )
+            if encoded_key in encoded_dict:
+                raise ValueError("Dictionary keys collide after JSON encoding")
             encoded_value = json_encoder(
                 value,
             )
