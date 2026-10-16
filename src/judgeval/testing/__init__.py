@@ -1,8 +1,8 @@
-"""Tests: versioned test cases scored by judges against your agent's traces.
+"""Test suites: versioned test cases scored by judges against your agent's traces.
 
-A test holds cases. Each case has an ``input`` for your agent and an
+A test suite holds cases. Each case has an ``input`` for your agent and an
 ``expected`` mapping that names the judges to run on the case's trace and
-what each judge's output must compare to. Edit cases in the test's draft,
+what each judge's output must compare to. Edit cases in the suite's draft,
 publish a version, then start runs against it.
 """
 
@@ -31,14 +31,14 @@ class StartedCase(TypedDict):
 
 class StartedRun(TypedDict):
     run_id: str
-    test_version: int
+    test_suite_version: int
     cases: List[StartedCase]
 
 
 class RunSummary(TypedDict):
     run_id: str
-    test_id: str
-    test_version: int
+    test_suite_id: str
+    test_suite_version: int
     scored_from_run_id: Optional[str]
     candidate: Optional[str]
     candidate_meta: Dict[str, Any]
@@ -103,7 +103,7 @@ class _ProjectScoped:
                 f"Project '{self._project_name}' not found"
             )
         url = url_for(
-            f"/v1/projects/{self._project_id}/tests{path}", self._client.base_url
+            f"/v1/projects/{self._project_id}/test-suites{path}", self._client.base_url
         )
         try:
             # TODO: switch to the generated client once it covers these routes (judgeval#805).
@@ -122,19 +122,19 @@ def _without_none(values: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in values.items() if value is not None}
 
 
-class TestsFactory(_ProjectScoped):
-    """Create tests and edit their cases. Access via ``client.tests``.
+class TestSuitesFactory(_ProjectScoped):
+    """Create test suites and edit their cases. Access via ``client.test_suites``.
 
-    Cases change only in a test's draft (version + 1). New cases go straight
+    Cases change only in a suite's draft (version + 1). New cases go straight
     into the draft; to edit or remove published cases, call ``create_draft``
     first.
     ``publish`` freezes the draft as the next version.
 
     Examples:
         ```python
-        test = client.tests.create(name="support-agent-regressions")
-        client.tests.add_cases(
-            test["test_id"],
+        suite = client.test_suites.create(name="support-agent-regressions")
+        client.test_suites.add_cases(
+            suite["test_suite_id"],
             [
                 {
                     "input": {"prompt": "I want a refund"},
@@ -150,7 +150,7 @@ class TestsFactory(_ProjectScoped):
                 }
             ],
         )
-        client.tests.publish(test["test_id"])
+        client.test_suites.publish(suite["test_suite_id"])
         ```
     """
 
@@ -163,7 +163,7 @@ class TestsFactory(_ProjectScoped):
         description: Optional[str] = None,
         labels: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
-        """Create an empty test."""
+        """Create an empty test suite."""
         return self._call(
             "POST",
             "",
@@ -171,16 +171,16 @@ class TestsFactory(_ProjectScoped):
         )
 
     def list(self, offset: int = 0, limit: int = 50) -> Dict[str, Any]:
-        """List the project's tests, newest first (``tests`` and ``next_offset``)."""
+        """List the project's test suites, newest first (``test_suites`` and ``next_offset``)."""
         return self._call("GET", "", params={"offset": offset, "limit": limit})
 
-    def delete(self, test_id: str) -> Dict[str, Any]:
-        """Delete a test with all its versions, runs and results."""
-        return self._call("DELETE", f"/{test_id}")
+    def delete(self, test_suite_id: str) -> Dict[str, Any]:
+        """Delete a test suite with all its versions, runs and results."""
+        return self._call("DELETE", f"/{test_suite_id}")
 
     def list_cases(
         self,
-        test_id: str,
+        test_suite_id: str,
         version: Optional[int | Literal["draft"]] = None,
         offset: int = 0,
         limit: int = 100,
@@ -189,9 +189,11 @@ class TestsFactory(_ProjectScoped):
         params: Dict[str, Any] = {"offset": offset, "limit": limit}
         if version is not None:
             params["version"] = str(version)
-        return self._call("GET", f"/{test_id}/cases", params=params)
+        return self._call("GET", f"/{test_suite_id}/cases", params=params)
 
-    def add_cases(self, test_id: str, cases: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def add_cases(
+        self, test_suite_id: str, cases: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         """Add cases to the draft. Returns their ``case_ids`` in order.
 
         Each case is ``{"input": ..., "expected": {judge_id: check}, "tags": [...],
@@ -199,33 +201,33 @@ class TestsFactory(_ProjectScoped):
         ``{"judge_major_version", "judge_minor_version", "op", "expected"}``,
         where ``op`` is one of eq, ne, lt, lte, gt, gte, in, not_in.
         """
-        return self._call("POST", f"/{test_id}/cases", {"cases": cases})
+        return self._call("POST", f"/{test_suite_id}/cases", {"cases": cases})
 
     def update_case(
-        self, test_id: str, case_id: str, case: Dict[str, Any]
+        self, test_suite_id: str, case_id: str, case: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Replace a case in the draft. Call ``create_draft`` first for published cases."""
-        return self._call("PUT", f"/{test_id}/cases/{case_id}", case)
+        return self._call("PUT", f"/{test_suite_id}/cases/{case_id}", case)
 
-    def remove_case(self, test_id: str, case_id: str) -> Dict[str, Any]:
+    def remove_case(self, test_suite_id: str, case_id: str) -> Dict[str, Any]:
         """Remove a case from the draft. Call ``create_draft`` first for published cases."""
-        return self._call("DELETE", f"/{test_id}/cases/{case_id}")
+        return self._call("DELETE", f"/{test_suite_id}/cases/{case_id}")
 
-    def create_draft(self, test_id: str) -> Dict[str, Any]:
+    def create_draft(self, test_suite_id: str) -> Dict[str, Any]:
         """Copy the published cases into the draft so they can be edited."""
-        return self._call("POST", f"/{test_id}/draft")
+        return self._call("POST", f"/{test_suite_id}/draft")
 
-    def publish(self, test_id: str) -> Dict[str, Any]:
+    def publish(self, test_suite_id: str) -> Dict[str, Any]:
         """Freeze the draft as the next version. Returns the new ``version``."""
-        return self._call("POST", f"/{test_id}/publish")
+        return self._call("POST", f"/{test_suite_id}/publish")
 
-    def discard(self, test_id: str) -> Dict[str, Any]:
+    def discard(self, test_suite_id: str) -> Dict[str, Any]:
         """Throw away the draft's changes."""
-        return self._call("POST", f"/{test_id}/discard")
+        return self._call("POST", f"/{test_suite_id}/discard")
 
 
 class TestRunsFactory(_ProjectScoped):
-    """Run tests and read results. Access via ``client.test_runs``.
+    """Run test suites and read results. Access via ``client.test_runs``.
 
     A run returns the cases to execute. Run your agent once per case on your
     normal tracer with the run and case ids on the trace's root span, using
@@ -235,7 +237,7 @@ class TestRunsFactory(_ProjectScoped):
     Examples:
         ```python
         run = client.test_runs.start(
-            test_id,
+            test_suite_id,
             case_filter={"kind": "tags", "tags": ["billing"]},
             candidate=os.environ["GIT_SHA"],
         )
@@ -252,20 +254,20 @@ class TestRunsFactory(_ProjectScoped):
 
     def start(
         self,
-        test_id: str,
+        test_suite_id: str,
         case_filter: Optional[Dict[str, Any]] = None,
         candidate: Optional[str] = None,
         candidate_meta: Optional[Dict[str, Any]] = None,
         trigger: Optional[Literal["manual", "ci", "schedule", "api"]] = None,
     ) -> StartedRun:
-        """Start a run of the test's latest published version.
+        """Start a run of the test suite's latest published version.
 
-        Returns ``run_id``, ``test_version`` and ``cases`` (each with
+        Returns ``run_id``, ``test_suite_version`` and ``cases`` (each with
         ``case_id``, ``input`` and tagging ``headers``).
         """
         response = self._call(
             "POST",
-            f"/{test_id}/runs",
+            f"/{test_suite_id}/runs",
             _without_none(
                 {
                     "case_filter": case_filter,
@@ -277,10 +279,12 @@ class TestRunsFactory(_ProjectScoped):
         )
         return cast(StartedRun, response)
 
-    def list(self, test_id: str, offset: int = 0, limit: int = 50) -> Dict[str, Any]:
-        """List a test's runs, newest first (``runs`` and ``next_offset``)."""
+    def list(
+        self, test_suite_id: str, offset: int = 0, limit: int = 50
+    ) -> Dict[str, Any]:
+        """List a test suite's runs, newest first (``runs`` and ``next_offset``)."""
         return self._call(
-            "GET", f"/{test_id}/runs", params={"offset": offset, "limit": limit}
+            "GET", f"/{test_suite_id}/runs", params={"offset": offset, "limit": limit}
         )
 
     def get(self, run_id: str) -> RunSummary:
@@ -308,5 +312,5 @@ __all__ = (
     "StartedCase",
     "StartedRun",
     "TestRunsFactory",
-    "TestsFactory",
+    "TestSuitesFactory",
 )

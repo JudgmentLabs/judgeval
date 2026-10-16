@@ -18,7 +18,7 @@ def _client(response=None):
 
 
 def test_start_posts_to_the_test_and_drops_unset_fields():
-    client = _client({"run_id": "r1", "test_version": 2, "cases": []})
+    client = _client({"run_id": "r1", "test_suite_version": 2, "cases": []})
     runs = testing.TestRunsFactory(client, "p1", "proj")
 
     run = runs.start("t1", candidate="abc123")
@@ -26,24 +26,24 @@ def test_start_posts_to_the_test_and_drops_unset_fields():
     assert run["run_id"] == "r1"
     client._request.assert_called_once_with(
         "POST",
-        "https://api.example.com/v1/projects/p1/tests/t1/runs",
+        "https://api.example.com/v1/projects/p1/test-suites/t1/runs",
         {"candidate": "abc123"},
         None,
     )
 
 
-def test_an_id_that_leaves_the_tests_route_is_rejected():
+def test_an_id_that_leaves_the_test_suites_route_is_rejected():
     client = _client()
-    tests = testing.TestsFactory(client, "p1", "proj")
+    suites = testing.TestSuitesFactory(client, "p1", "proj")
 
     with pytest.raises(ValueError):
-        tests.delete("../../projects/p2")
+        suites.delete("../../projects/p2")
     client._request.assert_not_called()
 
 
 def test_a_missing_project_raises_before_calling_the_api():
     client = _client()
-    tests = testing.TestsFactory(client, None, "proj")
+    tests = testing.TestSuitesFactory(client, None, "proj")
 
     with pytest.raises(JudgmentProjectNotFoundError):
         tests.list()

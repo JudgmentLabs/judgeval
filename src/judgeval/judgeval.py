@@ -313,16 +313,16 @@ class Judgeval:
         )
 
     @property
-    def tests(self):
-        """Create tests and edit their versioned cases.
+    def test_suites(self):
+        """Create test suites and edit their versioned cases.
 
         Returns:
-            TestsFactory: create and list tests, add or edit cases in
-                a test's draft, and publish versions.
+            TestSuitesFactory: create and list test suites, add or edit cases
+                in a suite's draft, and publish versions.
         """
-        from judgeval.testing import TestsFactory
+        from judgeval.testing import TestSuitesFactory
 
-        return TestsFactory(
+        return TestSuitesFactory(
             client=self._internal_client,
             project_id=self._project_id,
             project_name=self._project_name,
@@ -330,11 +330,11 @@ class Judgeval:
 
     @property
     def test_runs(self):
-        """Run tests and read their results.
+        """Run test suites and read their results.
 
         Returns:
             TestRunsFactory: start a run, then read it, its results,
-                or re-score it.
+                or score it again.
         """
         from judgeval.testing import TestRunsFactory
 
@@ -346,7 +346,7 @@ class Judgeval:
 
     @property
     def offline_tests(self):
-        """**Deprecated.** Use `tests` and `test_runs` instead.
+        """**Deprecated.** Use `test_suites` and `test_runs` instead.
 
         Access offline tests: test configs and dataset-backed test runs.
 
