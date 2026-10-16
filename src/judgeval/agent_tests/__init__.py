@@ -75,7 +75,8 @@ class AgentTestsFactory(_ProjectScoped):
     """Create tests and edit their cases. Access via ``client.tests``.
 
     Cases change only in a test's draft (version + 1). New cases go straight
-    into the draft; to edit published cases, call ``create_draft`` first.
+    into the draft; to edit or remove published cases, call ``create_draft``
+    first.
     ``publish`` freezes the draft as the next version.
 
     Examples:
@@ -153,6 +154,10 @@ class AgentTestsFactory(_ProjectScoped):
     ) -> Dict[str, Any]:
         """Replace a case in the draft. Call ``create_draft`` first for published cases."""
         return self._call("PUT", f"/{test_id}/cases/{case_id}", case)
+
+    def remove_case(self, test_id: str, case_id: str) -> Dict[str, Any]:
+        """Remove a case from the draft. Call ``create_draft`` first for published cases."""
+        return self._call("DELETE", f"/{test_id}/cases/{case_id}")
 
     def create_draft(self, test_id: str) -> Dict[str, Any]:
         """Copy the published cases into the draft so they can be edited."""
