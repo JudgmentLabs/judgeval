@@ -167,6 +167,10 @@ class AgentTestsFactory(_ProjectScoped):
         """Freeze the draft as the next version. Returns the new ``version``."""
         return self._call("POST", f"/{test_id}/publish")
 
+    def discard(self, test_id: str) -> Dict[str, Any]:
+        """Throw away the draft's changes."""
+        return self._call("POST", f"/{test_id}/discard")
+
 
 class AgentTestRunsFactory(_ProjectScoped):
     """Run tests and read results. Access via ``client.test_runs``.
