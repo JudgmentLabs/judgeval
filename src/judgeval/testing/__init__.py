@@ -38,7 +38,7 @@ class RunSummary(TypedDict):
     run_id: str
     test_id: str
     test_version: int
-    rescored_from_run_id: Optional[str]
+    scored_from_run_id: Optional[str]
     candidate: Optional[str]
     candidate_meta: Dict[str, Any]
     trigger: str
@@ -287,13 +287,13 @@ class TestRunsFactory(_ProjectScoped):
         """Get each case's trace, outcome and per-judge check results."""
         return cast(RunResults, self._call("GET", f"/runs/{run_id}/results"))
 
-    def rescore(self, run_id: str) -> Dict[str, Any]:
-        """Score a run's traces again with the latest published version.
+    def score(self, run_id: str) -> Dict[str, Any]:
+        """Trigger scoring of an existing run's traces with the latest published version.
 
         Returns the new run's ``run_id`` right away; its cases are scored in the
         background, so poll ``get`` for progress. The agent doesn't run again.
         """
-        return self._call("POST", f"/runs/{run_id}/rescore")
+        return self._call("POST", f"/runs/{run_id}/score")
 
 
 __all__ = (
