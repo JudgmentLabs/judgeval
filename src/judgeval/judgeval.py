@@ -1,7 +1,5 @@
 from __future__ import annotations
 import warnings
-
-from judgeval.agent_tests import OFFLINE_TESTS_DEPRECATION
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, cast
 
 from judgeval.internal.api import JudgmentSyncClient
@@ -315,15 +313,15 @@ class Judgeval:
 
     @property
     def tests(self):
-        """Create agent tests and edit their versioned cases.
+        """Create tests and edit their versioned cases.
 
         Returns:
-            AgentTestsFactory: create and list tests, add or edit cases in
+            TestsFactory: create and list tests, add or edit cases in
                 a test's draft, and publish versions.
         """
-        from judgeval.agent_tests import AgentTestsFactory
+        from judgeval.testing import TestsFactory
 
-        return AgentTestsFactory(
+        return TestsFactory(
             client=self._internal_client,
             project_id=self._project_id,
             project_name=self._project_name,
@@ -331,15 +329,15 @@ class Judgeval:
 
     @property
     def test_runs(self):
-        """Run agent tests and read their results.
+        """Run tests and read their results.
 
         Returns:
-            AgentTestRunsFactory: start a run, then read it, its results,
+            TestRunsFactory: start a run, then read it, its results,
                 or re-score it.
         """
-        from judgeval.agent_tests import AgentTestRunsFactory
+        from judgeval.testing import TestRunsFactory
 
-        return AgentTestRunsFactory(
+        return TestRunsFactory(
             client=self._internal_client,
             project_id=self._project_id,
             project_name=self._project_name,
@@ -375,12 +373,12 @@ class Judgeval:
             )
             ```
         """
-        warnings.warn(
+        from judgeval.offline_tests import (
             OFFLINE_TESTS_DEPRECATION,
-            DeprecationWarning,
-            stacklevel=2,
+            OfflineTestsFactory,
         )
-        from judgeval.offline_tests.offline_tests_factory import OfflineTestsFactory
+
+        warnings.warn(OFFLINE_TESTS_DEPRECATION, DeprecationWarning, stacklevel=2)
 
         return OfflineTestsFactory(
             client=self._internal_client,

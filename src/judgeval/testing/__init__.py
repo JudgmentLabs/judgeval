@@ -1,4 +1,4 @@
-"""Agent tests: versioned test cases scored by judges against your agent's traces.
+"""Tests: versioned test cases scored by judges against your agent's traces.
 
 A test holds cases. Each case has an ``input`` for your agent and an
 ``expected`` mapping that names the judges to run on the case's trace and
@@ -8,7 +8,7 @@ publish a version, then start runs against it.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Optional, cast
+from typing import Any, Dict, List, Literal, Optional, TypedDict, cast
 
 from judgeval.exceptions import (
     JudgmentAPIError,
@@ -20,10 +20,58 @@ from judgeval.utils.url import url_for
 
 Method = Literal["GET", "POST", "PUT", "PATCH", "DELETE"]
 
-OFFLINE_TESTS_DEPRECATION = (
-    "Offline tests and OfflineTracer are deprecated. Use client.tests and "
-    "client.test_runs, and tag your normal Tracer's traces with Tracer.test_case."
-)
+
+class StartedCase(TypedDict):
+    case_id: str
+    input: Any
+    #: Headers that tag a deployed agent's trace with this run and case.
+    headers: Dict[str, str]
+
+
+class StartedRun(TypedDict):
+    run_id: str
+    test_version: int
+    cases: List[StartedCase]
+
+
+class RunSummary(TypedDict):
+    run_id: str
+    test_id: str
+    test_version: int
+    rescored_from_run_id: Optional[str]
+    candidate: Optional[str]
+    candidate_meta: Dict[str, Any]
+    trigger: str
+    case_filter: Dict[str, Any]
+    cases_total: int
+    cases_with_output: int
+    cases_scored: int
+    cases_passed: int
+    created_at: str
+
+
+class CheckResult(TypedDict):
+    judge_id: str
+    judge_major_version: int
+    judge_minor_version: int
+    op: str
+    expected: Any
+    judge_output: Any
+    passed: bool
+    reason: Optional[str]
+    error_message: Optional[str]
+
+
+class CaseResult(TypedDict):
+    case_id: str
+    trace_id: Optional[str]
+    scored_at: Optional[str]
+    passed: Optional[bool]
+    checks: List[CheckResult]
+
+
+class RunResults(TypedDict):
+    results: List[CaseResult]
 
 
 class _ProjectScoped:
@@ -54,8 +102,7 @@ class _ProjectScoped:
             f"/v1/projects/{self._project_id}/tests{path}", self._client.base_url
         )
         try:
-            # ponytail: hand-written over _request until the generated client
-            # covers the /v1 tests routes (judgeval#805).
+            # TODO: switch to the generated client once it covers these routes (judgeval#805).
             response = self._client._request(
                 method,  # type: ignore[arg-type]
                 url,
@@ -71,7 +118,7 @@ def _without_none(values: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in values.items() if value is not None}
 
 
-class AgentTestsFactory(_ProjectScoped):
+class TestsFactory(_ProjectScoped):
     """Create tests and edit their cases. Access via ``client.tests``.
 
     Cases change only in a test's draft (version + 1). New cases go straight
@@ -104,6 +151,7 @@ class AgentTestsFactory(_ProjectScoped):
     """
 
     __slots__ = ()
+    __test__ = False  # not a pytest test class
 
     def create(
         self,
@@ -172,7 +220,7 @@ class AgentTestsFactory(_ProjectScoped):
         return self._call("POST", f"/{test_id}/discard")
 
 
-class AgentTestRunsFactory(_ProjectScoped):
+class TestRunsFactory(_ProjectScoped):
     """Run tests and read results. Access via ``client.test_runs``.
 
     A run returns the cases to execute. Run your agent once per case on your
@@ -196,6 +244,7 @@ class AgentTestRunsFactory(_ProjectScoped):
     """
 
     __slots__ = ()
+    __test__ = False  # not a pytest test class
 
     def start(
         self,
@@ -204,13 +253,13 @@ class AgentTestRunsFactory(_ProjectScoped):
         candidate: Optional[str] = None,
         candidate_meta: Optional[Dict[str, Any]] = None,
         trigger: Optional[Literal["manual", "ci", "schedule", "api"]] = None,
-    ) -> Dict[str, Any]:
+    ) -> StartedRun:
         """Start a run of the test's latest published version.
 
         Returns ``run_id``, ``test_version`` and ``cases`` (each with
         ``case_id``, ``input`` and tagging ``headers``).
         """
-        return self._call(
+        response = self._call(
             "POST",
             f"/{test_id}/runs",
             _without_none(
@@ -222,6 +271,7 @@ class AgentTestRunsFactory(_ProjectScoped):
                 }
             ),
         )
+        return cast(StartedRun, response)
 
     def list(self, test_id: str, offset: int = 0, limit: int = 50) -> Dict[str, Any]:
         """List a test's runs, newest first (``runs`` and ``next_offset``)."""
@@ -229,20 +279,30 @@ class AgentTestRunsFactory(_ProjectScoped):
             "GET", f"/{test_id}/runs", params={"offset": offset, "limit": limit}
         )
 
-    def get(self, run_id: str) -> Dict[str, Any]:
+    def get(self, run_id: str) -> RunSummary:
         """Get a run and how many of its cases have a trace, are scored and passed."""
-        return self._call("GET", f"/runs/{run_id}")
+        return cast(RunSummary, self._call("GET", f"/runs/{run_id}"))
 
-    def results(self, run_id: str) -> Dict[str, Any]:
+    def results(self, run_id: str) -> RunResults:
         """Get each case's trace, outcome and per-judge check results."""
-        return self._call("GET", f"/runs/{run_id}/results")
+        return cast(RunResults, self._call("GET", f"/runs/{run_id}/results"))
 
     def rescore(self, run_id: str) -> Dict[str, Any]:
         """Score a run's traces again with the latest published version.
 
-        Returns the new run's ``run_id``; the agent doesn't run again.
+        Returns the new run's ``run_id`` right away; its cases are scored in the
+        background, so poll ``get`` for progress. The agent doesn't run again.
         """
         return self._call("POST", f"/runs/{run_id}/rescore")
 
 
-__all__ = ("AgentTestsFactory", "AgentTestRunsFactory", "OFFLINE_TESTS_DEPRECATION")
+__all__ = (
+    "CaseResult",
+    "CheckResult",
+    "RunResults",
+    "RunSummary",
+    "StartedCase",
+    "StartedRun",
+    "TestRunsFactory",
+    "TestsFactory",
+)
