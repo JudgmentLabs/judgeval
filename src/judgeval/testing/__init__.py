@@ -8,6 +8,7 @@ publish a version, then start runs against it.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List, Literal, Optional, TypedDict, cast
 
 from judgeval.exceptions import (
@@ -94,6 +95,9 @@ class _ProjectScoped:
         payload: Any = None,
         params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
+        # Ids land in the path, so "..", "?" or "#" could reach another route.
+        if not re.fullmatch(r"(/[\w-]+)*", path):
+            raise ValueError(f"Invalid id in API path: {path!r}")
         if not self._project_id:
             raise JudgmentProjectNotFoundError(
                 f"Project '{self._project_name}' not found"

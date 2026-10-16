@@ -70,11 +70,6 @@ class OfflineTracer(Tracer):
         dataset: List[Example],
         example_fields: Optional[Dict[str, Any]],
     ):
-        warnings.warn(
-            OFFLINE_TESTS_DEPRECATION,
-            DeprecationWarning,
-            stacklevel=2,
-        )
         super().__init__(
             project_name=project_name,
             project_id=project_id,
@@ -107,6 +102,7 @@ class OfflineTracer(Tracer):
         *,
         dataset: List[Example],
         example_fields: Optional[Dict[str, Any]] = None,
+        _stacklevel: int = 2,
     ) -> "OfflineTracer":
         """Create and activate a new `OfflineTracer`.
 
@@ -120,6 +116,10 @@ class OfflineTracer(Tracer):
                 `api_url` cannot be resolved (explicit arg or env var), or
                 if the project cannot be found on the backend.
         """
+        # Point the warning at the caller; Python hides DeprecationWarnings raised inside libraries.
+        warnings.warn(
+            OFFLINE_TESTS_DEPRECATION, DeprecationWarning, stacklevel=_stacklevel
+        )
         api_key = api_key or JUDGMENT_API_KEY
         organization_id = organization_id or JUDGMENT_ORG_ID
         api_url = api_url or JUDGMENT_API_URL

@@ -192,6 +192,7 @@ class Judgeval:
             span_processors=span_processors,
             dataset=dataset,
             example_fields=example_fields,
+            _stacklevel=3,
         )
 
     def query(

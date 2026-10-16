@@ -32,14 +32,13 @@ def test_start_posts_to_the_test_and_drops_unset_fields():
     )
 
 
-def test_results_reads_the_run():
-    client = _client({"results": []})
-    testing.TestRunsFactory(client, "p1", "proj").results("r1")
+def test_an_id_that_leaves_the_tests_route_is_rejected():
+    client = _client()
+    tests = testing.TestsFactory(client, "p1", "proj")
 
-    assert client._request.call_args.args[:2] == (
-        "GET",
-        "https://api.example.com/v1/projects/p1/tests/runs/r1/results",
-    )
+    with pytest.raises(ValueError):
+        tests.delete("../../projects/p2")
+    client._request.assert_not_called()
 
 
 def test_a_missing_project_raises_before_calling_the_api():
