@@ -75,8 +75,8 @@ class AgentTestsFactory(_ProjectScoped):
     """Create tests and edit their cases. Access via ``client.tests``.
 
     Cases change only in a test's draft (version + 1). New cases go straight
-    into the draft; to edit or remove published cases, call ``create_draft``
-    first. ``publish`` freezes the draft as the next version.
+    into the draft; to edit published cases, call ``create_draft`` first.
+    ``publish`` freezes the draft as the next version.
 
     Examples:
         ```python
@@ -121,24 +121,6 @@ class AgentTestsFactory(_ProjectScoped):
         """List the project's tests, newest first (``tests`` and ``next_offset``)."""
         return self._call("GET", "", params={"offset": offset, "limit": limit})
 
-    def get(self, test_id: str) -> Dict[str, Any]:
-        """Get a test, including its latest published ``version``."""
-        return self._call("GET", f"/{test_id}")
-
-    def update(
-        self,
-        test_id: str,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        labels: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
-        """Rename, describe or relabel a test."""
-        return self._call(
-            "PATCH",
-            f"/{test_id}",
-            _without_none({"name": name, "description": description, "labels": labels}),
-        )
-
     def delete(self, test_id: str) -> Dict[str, Any]:
         """Delete a test with all its versions, runs and results."""
         return self._call("DELETE", f"/{test_id}")
@@ -172,10 +154,6 @@ class AgentTestsFactory(_ProjectScoped):
         """Replace a case in the draft. Call ``create_draft`` first for published cases."""
         return self._call("PUT", f"/{test_id}/cases/{case_id}", case)
 
-    def remove_case(self, test_id: str, case_id: str) -> Dict[str, Any]:
-        """Remove a case from the draft. Published versions keep it."""
-        return self._call("DELETE", f"/{test_id}/cases/{case_id}")
-
     def create_draft(self, test_id: str) -> Dict[str, Any]:
         """Copy the published cases into the draft so they can be edited."""
         return self._call("POST", f"/{test_id}/draft")
@@ -183,10 +161,6 @@ class AgentTestsFactory(_ProjectScoped):
     def publish(self, test_id: str) -> Dict[str, Any]:
         """Freeze the draft as the next version. Returns the new ``version``."""
         return self._call("POST", f"/{test_id}/publish")
-
-    def discard(self, test_id: str) -> Dict[str, Any]:
-        """Throw away the draft's changes."""
-        return self._call("POST", f"/{test_id}/discard")
 
 
 class AgentTestRunsFactory(_ProjectScoped):
