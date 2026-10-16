@@ -1,4 +1,7 @@
 from __future__ import annotations
+import warnings
+
+from judgeval.agent_tests import OFFLINE_TESTS_DEPRECATION
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, cast
 
 from judgeval.internal.api import JudgmentSyncClient
@@ -141,7 +144,9 @@ class Judgeval:
         span_limits: Optional["SpanLimits"] = None,
         span_processors: Optional[Sequence["SpanProcessor"]] = None,
     ) -> "OfflineTracer":
-        """Create and activate an ``OfflineTracer`` for this project.
+        """**Deprecated.** Use the normal ``Tracer`` with ``Tracer.test_case``.
+
+        Create and activate an ``OfflineTracer`` for this project.
 
         Reuses the credentials supplied to this ``Judgeval`` instance. Each
         completed root span appends an ``Example`` to ``dataset``, carrying
@@ -309,8 +314,42 @@ class Judgeval:
         )
 
     @property
+    def tests(self):
+        """Create agent tests and edit their versioned cases.
+
+        Returns:
+            AgentTestsFactory: create and list tests, add or edit cases in
+                a test's draft, and publish versions.
+        """
+        from judgeval.agent_tests import AgentTestsFactory
+
+        return AgentTestsFactory(
+            client=self._internal_client,
+            project_id=self._project_id,
+            project_name=self._project_name,
+        )
+
+    @property
+    def test_runs(self):
+        """Run agent tests and read their results.
+
+        Returns:
+            AgentTestRunsFactory: start a run, then read it, its results,
+                or re-score it.
+        """
+        from judgeval.agent_tests import AgentTestRunsFactory
+
+        return AgentTestRunsFactory(
+            client=self._internal_client,
+            project_id=self._project_id,
+            project_name=self._project_name,
+        )
+
+    @property
     def offline_tests(self):
-        """Access offline tests: test configs and dataset-backed test runs.
+        """**Deprecated.** Use `tests` and `test_runs` instead.
+
+        Access offline tests: test configs and dataset-backed test runs.
 
         Returns:
             OfflineTestsFactory: Use `.create_config()` to bind a dataset
@@ -336,6 +375,11 @@ class Judgeval:
             )
             ```
         """
+        warnings.warn(
+            OFFLINE_TESTS_DEPRECATION,
+            DeprecationWarning,
+            stacklevel=2,
+        )
         from judgeval.offline_tests.offline_tests_factory import OfflineTestsFactory
 
         return OfflineTestsFactory(

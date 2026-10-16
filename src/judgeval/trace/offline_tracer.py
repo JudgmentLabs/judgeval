@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import warnings
+
+from judgeval.agent_tests import OFFLINE_TESTS_DEPRECATION
 from typing import Any, Callable, ClassVar, Dict, List, Optional, Sequence
 
 from opentelemetry.sdk.resources import Resource
@@ -25,7 +28,10 @@ OFFLINE_TRACES_PATH = "otel/v1/offline-traces"
 
 
 class OfflineTracer(Tracer):
-    """Tracer for offline / experiment-style runs.
+    """**Deprecated.** Use the normal `Tracer` with `Tracer.test_case` and
+    `client.test_runs` instead.
+
+    Tracer for offline / experiment-style runs.
 
     Behaves like `Tracer` for span creation and `@Tracer.observe`, with
     two differences:
@@ -65,6 +71,11 @@ class OfflineTracer(Tracer):
         dataset: List[Example],
         example_fields: Optional[Dict[str, Any]],
     ):
+        warnings.warn(
+            OFFLINE_TESTS_DEPRECATION,
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__(
             project_name=project_name,
             project_id=project_id,
