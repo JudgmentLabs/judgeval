@@ -70,6 +70,50 @@ class TestObserveSync:
         span = next(s for s in collecting_exporter.spans if s.name == "boom")
         assert span.status.status_code.name == "ERROR"
 
+    @pytest.mark.parametrize(
+        "exc",
+        [KeyboardInterrupt(), SystemExit(0), SystemExit(1), GeneratorExit()],
+        ids=["kbi", "exit0", "exit1", "generator_exit"],
+    )
+    def test_base_exception_ends_span_and_reraises(
+        self, tracer, collecting_exporter, exc
+    ):
+        @BaseTracer.observe
+        def stop():
+            raise exc
+
+        with pytest.raises(type(exc)):
+            stop()
+
+        spans = [s for s in collecting_exporter.spans if s.name == "stop"]
+        assert len(spans) == 1
+        assert spans[0].status.status_code.name == "UNSET"
+        assert not spans[0].events
+
+    @pytest.mark.parametrize(
+        "exc", [KeyboardInterrupt(), SystemExit(1)], ids=["kbi", "exit1"]
+    )
+    def test_fork_base_exception_ends_both_spans(
+        self, tracer, collecting_exporter, exc
+    ):
+        @BaseTracer.observe(span_type="agent")
+        def parent():
+            @BaseTracer.observe(fork=True)
+            def child():
+                raise exc
+
+            child()
+
+        with pytest.raises(type(exc)):
+            parent()
+
+        child_spans = [s for s in collecting_exporter.spans if s.name == "child"]
+        assert len(child_spans) == 2
+        for span in child_spans:
+            assert span.status.status_code.name == "UNSET"
+            assert not span.events
+        assert any(s.name == "parent" for s in collecting_exporter.spans)
+
     def test_span_type_attribute(self, tracer, collecting_exporter):
         @BaseTracer.observe(span_type="tool")
         def my_tool():
