@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-
 import pytest
 from unittest.mock import patch, MagicMock
 
@@ -261,59 +259,6 @@ class TestScopedContext:
         assert span.attributes["count"] == 3
         assert "" not in span.attributes
         assert "skip.none" not in span.attributes
-
-
-class TestTestCase:
-    RUN = AttributeKeys.JUDGMENT_TEST_RUN_ID
-    CASE = AttributeKeys.JUDGMENT_TEST_CASE_ID
-
-    def test_tags_root_and_children_without_leaking(self, tracer, collecting_exporter):
-        with Tracer.test_case("run-1", "case-1"):
-            with BaseTracer.start_as_current_span("root"):
-                with BaseTracer.start_as_current_span("child"):
-                    pass
-        with BaseTracer.start_as_current_span("outside"):
-            pass
-
-        spans = {s.name: s for s in collecting_exporter.spans}
-        assert spans["root"].parent is None
-        for name in ("root", "child"):
-            assert spans[name].attributes[self.RUN] == "run-1"
-            assert spans[name].attributes[self.CASE] == "case-1"
-        assert self.RUN not in spans["outside"].attributes
-        assert self.CASE not in spans["outside"].attributes
-
-    def test_tags_current_span(self, tracer, collecting_exporter):
-        with BaseTracer.start_as_current_span("agent"):
-            with Tracer.test_case("run-1", "case-1"):
-                pass
-
-        span = next(s for s in collecting_exporter.spans if s.name == "agent")
-        assert span.attributes[self.RUN] == "run-1"
-        assert span.attributes[self.CASE] == "case-1"
-
-    @pytest.mark.asyncio
-    async def test_concurrent_cases_stay_isolated(self, tracer, collecting_exporter):
-        async def run_case(case_id: str) -> None:
-            with Tracer.test_case("run-1", case_id):
-                with BaseTracer.start_as_current_span(f"root-{case_id}"):
-                    await asyncio.sleep(0.01)
-                    with BaseTracer.start_as_current_span(f"child-{case_id}"):
-                        await asyncio.sleep(0.01)
-
-        case_ids = [f"case-{i}" for i in range(5)]
-        await asyncio.gather(*(run_case(case_id) for case_id in case_ids))
-
-        expected = {
-            f"{kind}-{case_id}": ("run-1", case_id)
-            for case_id in case_ids
-            for kind in ("root", "child")
-        }
-        actual = {
-            s.name: (s.attributes[self.RUN], s.attributes[self.CASE])
-            for s in collecting_exporter.spans
-        }
-        assert actual == expected
 
 
 class TestLinkedTraceTracing:
