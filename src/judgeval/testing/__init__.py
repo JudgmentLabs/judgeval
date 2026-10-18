@@ -75,18 +75,25 @@ class RunResults(TypedDict):
     results: List[CaseResult]
 
 
-class _ProjectScoped:
-    __slots__ = ("_client", "_project_id", "_project_name")
+def _segment(value: str) -> str:
+    # Ids land in the URL path, so "..", "?" or "#" could reach another route.
+    if not re.fullmatch(r"[\w-]+", value):
+        raise ValueError(f"Invalid id in API path: {value!r}")
+    return value
 
-    def __init__(
-        self,
-        client: JudgmentSyncClient,
-        project_id: Optional[str],
-        project_name: str,
-    ):
+
+class TestSuitesClient:
+    """HTTP calls for the test suite routes, named as the generated client names them.
+
+    TODO: delete once ``JudgmentSyncClient`` is generated from the committed /v1
+    spec (judgeval#805); the factories then call its methods directly.
+    """
+
+    __slots__ = ("_client",)
+    __test__ = False  # not a pytest test class
+
+    def __init__(self, client: JudgmentSyncClient):
         self._client = client
-        self._project_id = project_id
-        self._project_name = project_name
 
     def _call(
         self,
@@ -95,18 +102,8 @@ class _ProjectScoped:
         payload: Any = None,
         params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        # Ids land in the path, so "..", "?" or "#" could reach another route.
-        if not re.fullmatch(r"(/[\w-]+)*", path):
-            raise ValueError(f"Invalid id in API path: {path!r}")
-        if not self._project_id:
-            raise JudgmentProjectNotFoundError(
-                f"Project '{self._project_name}' not found"
-            )
-        url = url_for(
-            f"/v1/projects/{self._project_id}/test-suites{path}", self._client.base_url
-        )
+        url = url_for(f"/v1/projects/{path}", self._client.base_url)
         try:
-            # TODO: switch to the generated client once it covers these routes (judgeval#805).
             response = self._client._request(
                 method,  # type: ignore[arg-type]
                 url,
@@ -117,12 +114,159 @@ class _ProjectScoped:
             raise map_judgment_api_error(e) from e
         return cast(Dict[str, Any], response)
 
+    def post_projects_test_suites(
+        self, project_id: str, payload: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        return self._call("POST", f"{_segment(project_id)}/test-suites", payload)
+
+    def get_projects_test_suites(
+        self, project_id: str, params: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        return self._call("GET", f"{_segment(project_id)}/test-suites", params=params)
+
+    def delete_projects_test_suites_by_test_suite_id(
+        self, project_id: str, test_suite_id: str
+    ) -> Dict[str, Any]:
+        return self._call(
+            "DELETE", f"{_segment(project_id)}/test-suites/{_segment(test_suite_id)}"
+        )
+
+    def get_projects_test_suites_by_test_suite_id_cases(
+        self, project_id: str, test_suite_id: str, params: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        return self._call(
+            "GET",
+            f"{_segment(project_id)}/test-suites/{_segment(test_suite_id)}/cases",
+            params=params,
+        )
+
+    def post_projects_test_suites_by_test_suite_id_cases(
+        self, project_id: str, test_suite_id: str, payload: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        return self._call(
+            "POST",
+            f"{_segment(project_id)}/test-suites/{_segment(test_suite_id)}/cases",
+            payload,
+        )
+
+    def put_projects_test_suites_by_test_suite_id_cases_by_case_id(
+        self,
+        project_id: str,
+        test_suite_id: str,
+        case_id: str,
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        return self._call(
+            "PUT",
+            f"{_segment(project_id)}/test-suites/{_segment(test_suite_id)}"
+            f"/cases/{_segment(case_id)}",
+            payload,
+        )
+
+    def delete_projects_test_suites_by_test_suite_id_cases_by_case_id(
+        self, project_id: str, test_suite_id: str, case_id: str
+    ) -> Dict[str, Any]:
+        return self._call(
+            "DELETE",
+            f"{_segment(project_id)}/test-suites/{_segment(test_suite_id)}"
+            f"/cases/{_segment(case_id)}",
+        )
+
+    def post_projects_test_suites_by_test_suite_id_draft(
+        self, project_id: str, test_suite_id: str
+    ) -> Dict[str, Any]:
+        return self._call(
+            "POST",
+            f"{_segment(project_id)}/test-suites/{_segment(test_suite_id)}/draft",
+        )
+
+    def post_projects_test_suites_by_test_suite_id_publish(
+        self, project_id: str, test_suite_id: str
+    ) -> Dict[str, Any]:
+        return self._call(
+            "POST",
+            f"{_segment(project_id)}/test-suites/{_segment(test_suite_id)}/publish",
+        )
+
+    def post_projects_test_suites_by_test_suite_id_discard(
+        self, project_id: str, test_suite_id: str
+    ) -> Dict[str, Any]:
+        return self._call(
+            "POST",
+            f"{_segment(project_id)}/test-suites/{_segment(test_suite_id)}/discard",
+        )
+
+    def post_projects_test_suites_by_test_suite_id_runs(
+        self, project_id: str, test_suite_id: str, payload: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        return self._call(
+            "POST",
+            f"{_segment(project_id)}/test-suites/{_segment(test_suite_id)}/runs",
+            payload,
+        )
+
+    def get_projects_test_suites_by_test_suite_id_runs(
+        self, project_id: str, test_suite_id: str, params: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        return self._call(
+            "GET",
+            f"{_segment(project_id)}/test-suites/{_segment(test_suite_id)}/runs",
+            params=params,
+        )
+
+    def get_projects_test_suites_runs_by_run_id(
+        self, project_id: str, run_id: str
+    ) -> Dict[str, Any]:
+        return self._call(
+            "GET", f"{_segment(project_id)}/test-suites/runs/{_segment(run_id)}"
+        )
+
+    def get_projects_test_suites_runs_by_run_id_results(
+        self, project_id: str, run_id: str
+    ) -> Dict[str, Any]:
+        return self._call(
+            "GET",
+            f"{_segment(project_id)}/test-suites/runs/{_segment(run_id)}/results",
+        )
+
+    def post_projects_test_suites_runs_by_run_id_score(
+        self, project_id: str, run_id: str
+    ) -> Dict[str, Any]:
+        return self._call(
+            "POST",
+            f"{_segment(project_id)}/test-suites/runs/{_segment(run_id)}/score",
+        )
+
+
+class ProjectScopedFactory:
+    """Base for the test suite factories: the project they act on and its client."""
+
+    __slots__ = ("_api", "_project_id", "_project_name")
+
+    def __init__(
+        self,
+        client: JudgmentSyncClient,
+        project_id: Optional[str],
+        project_name: str,
+    ):
+        self._api = TestSuitesClient(client)
+        self._project_id = project_id
+        self._project_name = project_name
+
+    @property
+    def _project(self) -> str:
+        if not self._project_id:
+            raise JudgmentProjectNotFoundError(
+                f"Project '{self._project_name}' not found"
+            )
+        return self._project_id
+
 
 def _without_none(values: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in values.items() if value is not None}
 
 
-class TestSuitesFactory(_ProjectScoped):
+class TestSuitesFactory(ProjectScopedFactory):
     """Create test suites and edit their cases. Access via ``client.test_suites``.
 
     Cases change only in a suite's draft (version + 1). New cases go straight
@@ -164,19 +308,22 @@ class TestSuitesFactory(_ProjectScoped):
         labels: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Create an empty test suite."""
-        return self._call(
-            "POST",
-            "",
+        return self._api.post_projects_test_suites(
+            self._project,
             _without_none({"name": name, "description": description, "labels": labels}),
         )
 
     def list(self, offset: int = 0, limit: int = 50) -> Dict[str, Any]:
         """List the project's test suites, newest first (``test_suites`` and ``next_offset``)."""
-        return self._call("GET", "", params={"offset": offset, "limit": limit})
+        return self._api.get_projects_test_suites(
+            self._project, {"offset": offset, "limit": limit}
+        )
 
     def delete(self, test_suite_id: str) -> Dict[str, Any]:
         """Delete a test suite with all its versions, runs and results."""
-        return self._call("DELETE", f"/{test_suite_id}")
+        return self._api.delete_projects_test_suites_by_test_suite_id(
+            self._project, test_suite_id
+        )
 
     def list_cases(
         self,
@@ -189,7 +336,9 @@ class TestSuitesFactory(_ProjectScoped):
         params: Dict[str, Any] = {"offset": offset, "limit": limit}
         if version is not None:
             params["version"] = str(version)
-        return self._call("GET", f"/{test_suite_id}/cases", params=params)
+        return self._api.get_projects_test_suites_by_test_suite_id_cases(
+            self._project, test_suite_id, params
+        )
 
     def add_cases(
         self, test_suite_id: str, cases: List[Dict[str, Any]]
@@ -201,32 +350,44 @@ class TestSuitesFactory(_ProjectScoped):
         ``{"judge_major_version", "judge_minor_version", "op", "expected"}``,
         where ``op`` is one of eq, ne, lt, lte, gt, gte, in, not_in.
         """
-        return self._call("POST", f"/{test_suite_id}/cases", {"cases": cases})
+        return self._api.post_projects_test_suites_by_test_suite_id_cases(
+            self._project, test_suite_id, {"cases": cases}
+        )
 
     def update_case(
         self, test_suite_id: str, case_id: str, case: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Replace a case in the draft. Call ``create_draft`` first for published cases."""
-        return self._call("PUT", f"/{test_suite_id}/cases/{case_id}", case)
+        return self._api.put_projects_test_suites_by_test_suite_id_cases_by_case_id(
+            self._project, test_suite_id, case_id, case
+        )
 
     def remove_case(self, test_suite_id: str, case_id: str) -> Dict[str, Any]:
         """Remove a case from the draft. Call ``create_draft`` first for published cases."""
-        return self._call("DELETE", f"/{test_suite_id}/cases/{case_id}")
+        return self._api.delete_projects_test_suites_by_test_suite_id_cases_by_case_id(
+            self._project, test_suite_id, case_id
+        )
 
     def create_draft(self, test_suite_id: str) -> Dict[str, Any]:
         """Copy the published cases into the draft so they can be edited."""
-        return self._call("POST", f"/{test_suite_id}/draft")
+        return self._api.post_projects_test_suites_by_test_suite_id_draft(
+            self._project, test_suite_id
+        )
 
     def publish(self, test_suite_id: str) -> Dict[str, Any]:
         """Freeze the draft as the next version. Returns the new ``version``."""
-        return self._call("POST", f"/{test_suite_id}/publish")
+        return self._api.post_projects_test_suites_by_test_suite_id_publish(
+            self._project, test_suite_id
+        )
 
     def discard(self, test_suite_id: str) -> Dict[str, Any]:
         """Throw away the draft's changes."""
-        return self._call("POST", f"/{test_suite_id}/discard")
+        return self._api.post_projects_test_suites_by_test_suite_id_discard(
+            self._project, test_suite_id
+        )
 
 
-class TestRunsFactory(_ProjectScoped):
+class TestRunsFactory(ProjectScopedFactory):
     """Run test suites and read results. Access via ``client.test_runs``.
 
     A run returns the cases to execute. Run your agent once per case on your
@@ -265,9 +426,9 @@ class TestRunsFactory(_ProjectScoped):
         Returns ``run_id``, ``test_suite_version`` and ``cases`` (each with
         ``case_id``, ``input`` and tagging ``headers``).
         """
-        response = self._call(
-            "POST",
-            f"/{test_suite_id}/runs",
+        response = self._api.post_projects_test_suites_by_test_suite_id_runs(
+            self._project,
+            test_suite_id,
             _without_none(
                 {
                     "case_filter": case_filter,
@@ -283,17 +444,25 @@ class TestRunsFactory(_ProjectScoped):
         self, test_suite_id: str, offset: int = 0, limit: int = 50
     ) -> Dict[str, Any]:
         """List a test suite's runs, newest first (``runs`` and ``next_offset``)."""
-        return self._call(
-            "GET", f"/{test_suite_id}/runs", params={"offset": offset, "limit": limit}
+        return self._api.get_projects_test_suites_by_test_suite_id_runs(
+            self._project, test_suite_id, {"offset": offset, "limit": limit}
         )
 
     def get(self, run_id: str) -> RunSummary:
         """Get a run and how many of its cases have a trace, are scored and passed."""
-        return cast(RunSummary, self._call("GET", f"/runs/{run_id}"))
+        return cast(
+            RunSummary,
+            self._api.get_projects_test_suites_runs_by_run_id(self._project, run_id),
+        )
 
     def results(self, run_id: str) -> RunResults:
         """Get each case's trace, outcome and per-judge check results."""
-        return cast(RunResults, self._call("GET", f"/runs/{run_id}/results"))
+        return cast(
+            RunResults,
+            self._api.get_projects_test_suites_runs_by_run_id_results(
+                self._project, run_id
+            ),
+        )
 
     def score(self, run_id: str) -> Dict[str, Any]:
         """Trigger scoring of an existing run's traces with the latest published version.
@@ -301,7 +470,9 @@ class TestRunsFactory(_ProjectScoped):
         Returns the new run's ``run_id`` right away; its cases are scored in the
         background, so poll ``get`` for progress. The agent doesn't run again.
         """
-        return self._call("POST", f"/runs/{run_id}/score")
+        return self._api.post_projects_test_suites_runs_by_run_id_score(
+            self._project, run_id
+        )
 
 
 __all__ = (
@@ -311,6 +482,8 @@ __all__ = (
     "RunSummary",
     "StartedCase",
     "StartedRun",
+    "ProjectScopedFactory",
     "TestRunsFactory",
+    "TestSuitesClient",
     "TestSuitesFactory",
 )

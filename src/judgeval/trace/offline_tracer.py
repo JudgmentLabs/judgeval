@@ -10,7 +10,7 @@ from opentelemetry.sdk.trace.sampling import Sampler
 from judgeval.data.example import Example
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
 from judgeval.internal.api import JudgmentSyncClient
-from judgeval.offline_tests import OFFLINE_TESTS_DEPRECATION
+from judgeval.offline_tests.deprecation import OFFLINE_TESTS_DEPRECATION
 from judgeval.trace.exporters.judgment_span_exporter import JudgmentSpanExporter
 from judgeval.trace.id_generator import IsolatedRandomIdGenerator
 from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
