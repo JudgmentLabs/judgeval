@@ -301,7 +301,7 @@ class AgentJudgeFactory:
         if judge["judge_type"] != "prompt":
             raise ValueError(
                 f"Judge {judge_id} is a {judge['judge_type']} judge; only "
-                "prompt-based Agent judges are supported."
+                "prompt-based agent judges are supported."
             )
         return judge
 
