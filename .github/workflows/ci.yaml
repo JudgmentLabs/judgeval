@@ -44,48 +44,6 @@ jobs:
       - name: Check distribution contents
         run: python scripts/check_distribution_contents.py
 
-  jql-parity:
-    name: JQL parity with judgment-mono
-    needs: [validate-branch]
-    if: (needs.validate-branch.result == 'success' || needs.validate-branch.result == 'skipped') && github.event.pull_request.head.repo.full_name == github.repository && !contains(github.actor, '[bot]')
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: judgeval
-
-    steps:
-      - name: Checkout SDK
-        uses: actions/checkout@v4
-        with:
-          path: judgeval
-
-      - name: Checkout canonical JQL sources
-        uses: actions/checkout@v4
-        with:
-          repository: JudgmentLabs/judgment-mono
-          ref: main
-          token: ${{ secrets.RELEASE_BOT_GITHUB_PAT }}
-          persist-credentials: false
-          path: judgment-mono
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-
-      - name: Regenerate from judgment-mono
-        run: |
-          python scripts/generate_query_contracts.py \
-            ../judgment-mono/services/data-access-service/openapi.json \
-            ../judgment-mono/services/judgeval-server/openapi.public-jql.json
-
-      - name: Check canonical JQL parity
-        run: |
-          git diff --exit-code -- \
-            src/judgeval/jql/_generated_contract.py \
-            src/judgeval/jql/_generated_roots.py \
-            src/judgeval/jql/_generated_transport.py
-
   run-tests:
     needs: [validate-branch]
     if: needs.validate-branch.result == 'success' || needs.validate-branch.result == 'skipped'

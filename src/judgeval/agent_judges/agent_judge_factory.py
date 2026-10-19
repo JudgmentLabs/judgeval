@@ -35,7 +35,7 @@ PromptVersion = Union[
 
 
 class AgentJudgeFactory:
-    """Create and update prompt-based Agent Judges on the Judgment platform.
+    """Create and update prompt-based Agent judges on the Judgment platform.
 
     Access this via `client.agent_judges` — you don't instantiate it directly.
 
@@ -82,11 +82,11 @@ class AgentJudgeFactory:
         min_score: Optional[float] = None,
         max_score: Optional[float] = None,
     ) -> Optional[AgentJudge]:
-        """Create a new Agent Judge.
+        """Create a new Agent judge.
 
         Args:
             name: Unique judge name within the project.
-            prompt: Rubric prompt template used by the agent judge.
+            prompt: Rubric prompt template used by the Agent judge.
             score_type: One of `"numeric"`, `"binary"`, or `"categorical"`.
             model: Deprecated and ignored; the platform picks the model
                 from `reasoning_level`.
@@ -149,7 +149,7 @@ class AgentJudgeFactory:
                 payload=payload,
             )
         except Exception as e:
-            judgeval_logger.error(f"Failed to create agent judge: {e}")
+            judgeval_logger.error(f"Failed to create Agent judge: {e}")
             raise
 
         return _agent_judge(self._lookup(project_id, response["judge_id"]))
@@ -172,7 +172,7 @@ class AgentJudgeFactory:
         target_major_version: Optional[int] = None,
         target_minor_version: Optional[int] = None,
     ) -> Optional[AgentJudge]:
-        """Update an existing Agent Judge.
+        """Update an existing Agent judge.
 
         Passing any version field (`prompt`, `reasoning_level`, `score_type`,
         `description`, `categories`, `min_score`, `max_score`, or a
@@ -285,7 +285,7 @@ class AgentJudgeFactory:
                 payload={"update": update},
             )
         except Exception as e:
-            judgeval_logger.error(f"Failed to update agent judge: {e}")
+            judgeval_logger.error(f"Failed to update Agent judge: {e}")
             raise
 
         return _agent_judge(self._lookup(project_id, judge_id, written))
@@ -301,7 +301,7 @@ class AgentJudgeFactory:
         if judge["judge_type"] != "prompt":
             raise ValueError(
                 f"Judge {judge_id} is a {judge['judge_type']} judge; only "
-                "prompt-based agent judges are supported."
+                "prompt-based Agent judges are supported."
             )
         return judge
 

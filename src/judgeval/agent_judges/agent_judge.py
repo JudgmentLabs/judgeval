@@ -10,17 +10,17 @@ ReasoningLevel = Literal["lite", "normal", "high"]
 
 @dataclass
 class AgentJudge:
-    """A prompt-based Agent Judge stored on the Judgment platform.
+    """A prompt-based Agent judge stored on the Judgment platform.
 
-    Agent Judges are LLM-driven scorers. The `prompt` field is the **rubric
-    prompt** used by the agent-judge harness when scoring an output. Versions
+    Agent judges are LLM-driven scorers. The `prompt` field is the **rubric
+    prompt** used by the Agent judge harness when scoring an output. Versions
     are managed implicitly — calling `.update()` writes a new minor version of
     the judge (matching the default "save" flow in the UI).
 
     Attributes:
         judge_id: Unique judge identifier on the Judgment platform.
         name: Human-readable name of the judge (unique per project).
-        prompt: Rubric prompt template used by the agent judge.
+        prompt: Rubric prompt template used by the Agent judge.
         model: Model the platform resolved from `reasoning_level`.
         score_type: One of `"numeric"`, `"binary"`, or `"categorical"`.
         description: Optional description stored on the judge version.
