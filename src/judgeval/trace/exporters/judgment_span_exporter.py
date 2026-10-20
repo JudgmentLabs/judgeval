@@ -68,7 +68,7 @@ class JudgmentSpanExporter(BaseSpanExporter):
     def _report_billing_error(self, response: requests.Response, **kwargs) -> None:
         # Some OTel versions log only the HTTP reason, omitting the response body.
         try:
-            if response.ok:
+            if 200 <= response.status_code < 300:
                 self._billing_error_reported = False
                 return
             if response.status_code != 402 or self._billing_error_reported:

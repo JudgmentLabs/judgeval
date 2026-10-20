@@ -95,11 +95,16 @@ class TestJudgmentSpanExporter:
     def test_billing_diagnostics_through_http_export(self, body, message):
         exporter = self._make_exporter()
         responses = []
-        for status in [402, 402, 200, 402, 403]:
+        for status in [402, 307, 402, 307, 402, 200, 402, 403]:
             response = requests.Response()
             response.status_code = status
             response.reason = "Payment Required" if status == 402 else "OK"
             response._content = body
+            if status == 307:
+                response.headers["Location"] = "https://example.com/otel/v1/traces"
+                response.request = requests.Request(
+                    "POST", "https://example.com/otel/v1/traces"
+                ).prepare()
             responses.append(response)
         try:
             with (
@@ -108,10 +113,11 @@ class TestJudgmentSpanExporter:
                     "judgeval.trace.exporters.judgment_span_exporter.judgeval_logger.error"
                 ) as log,
             ):
-                results = [exporter.export([]) for _ in responses]
+                results = [exporter.export([]) for _ in range(6)]
 
             assert (results, log.call_args_list) == (
                 [
+                    SpanExportResult.FAILURE,
                     SpanExportResult.FAILURE,
                     SpanExportResult.FAILURE,
                     SpanExportResult.SUCCESS,
