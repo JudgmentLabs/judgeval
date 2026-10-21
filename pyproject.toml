@@ -19,6 +19,7 @@ license-files = ["LICENSE.md"]
 
 dependencies = [
     "httpx>=0.28.1",
+    "requests>=2.0",
     "opentelemetry-exporter-otlp>=1.36.0",
     "opentelemetry-sdk>=1.36.0",
     "orjson>=3.9.0",

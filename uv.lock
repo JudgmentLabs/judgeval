@@ -1797,6 +1797,7 @@ dependencies = [
     { name = "orjson" },
     { name = "packaging" },
     { name = "pathspec" },
+    { name = "requests" },
     { name = "typer" },
 ]
 
@@ -1840,6 +1841,7 @@ requires-dist = [
     { name = "orjson", specifier = ">=3.9.0" },
     { name = "packaging", specifier = ">=25.0" },
     { name = "pathspec", specifier = ">=1.0.4" },
+    { name = "requests", specifier = ">=2.0" },
     { name = "typer", specifier = ">=0.9.0" },
 ]
 provides-extras = ["s3"]
