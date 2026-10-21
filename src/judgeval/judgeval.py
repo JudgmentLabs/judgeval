@@ -1,4 +1,5 @@
 from __future__ import annotations
+import warnings
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, cast
 
 from judgeval.internal.api import JudgmentSyncClient
@@ -140,7 +141,9 @@ class Judgeval:
         span_limits: Optional["SpanLimits"] = None,
         span_processors: Optional[Sequence["SpanProcessor"]] = None,
     ) -> "OfflineTracer":
-        """Create and activate an ``OfflineTracer`` for this project.
+        """**Deprecated.** Use the normal ``Tracer`` with ``Tracer.test_case``.
+
+        Create and activate an ``OfflineTracer`` for this project.
 
         Reuses the credentials supplied to this ``Judgeval`` instance. Each
         completed root span appends an ``Example`` to ``dataset``, carrying
@@ -188,6 +191,7 @@ class Judgeval:
             span_processors=span_processors,
             dataset=dataset,
             example_fields=example_fields,
+            _stacklevel=3,
         )
 
     def query(
@@ -365,7 +369,7 @@ class Judgeval:
 
     @property
     def evaluation(self):
-        """Access evaluations for scoring examples with hosted or custom judges.
+        """Access evaluations for scoring examples with hosted scorers or Code judges.
 
         Returns:
             EvaluationFactory: Use `.create()` to get an `Evaluation` you
@@ -390,8 +394,42 @@ class Judgeval:
         )
 
     @property
+    def test_suites(self):
+        """Create test suites and edit their versioned cases.
+
+        Returns:
+            TestSuitesFactory: create and list test suites, add or edit cases
+                in a suite's draft, and publish versions.
+        """
+        from judgeval.testing import TestSuitesFactory
+
+        return TestSuitesFactory(
+            client=self._internal_client,
+            project_id=self._project_id,
+            project_name=self._project_name,
+        )
+
+    @property
+    def test_runs(self):
+        """Run test suites and read their results.
+
+        Returns:
+            TestRunsFactory: start a run, then read it, its results,
+                or score it again.
+        """
+        from judgeval.testing import TestRunsFactory
+
+        return TestRunsFactory(
+            client=self._internal_client,
+            project_id=self._project_id,
+            project_name=self._project_name,
+        )
+
+    @property
     def offline_tests(self):
-        """Access offline tests: test configs and dataset-backed test runs.
+        """**Deprecated.** Use `test_suites` and `test_runs` instead.
+
+        Access offline tests: test configs and dataset-backed test runs.
 
         Returns:
             OfflineTestsFactory: Use `.create_config()` to bind a dataset
@@ -417,7 +455,12 @@ class Judgeval:
             )
             ```
         """
-        from judgeval.offline_tests.offline_tests_factory import OfflineTestsFactory
+        from judgeval.offline_tests import (
+            OFFLINE_TESTS_DEPRECATION,
+            OfflineTestsFactory,
+        )
+
+        warnings.warn(OFFLINE_TESTS_DEPRECATION, DeprecationWarning, stacklevel=2)
 
         return OfflineTestsFactory(
             client=self._internal_client,
@@ -486,11 +529,11 @@ class Judgeval:
 
     @property
     def agent_judges(self):
-        """Manage Agent Judges (prompt-based scorers) on the platform.
+        """Manage Agent judges (prompt-based scorers) on the platform.
 
         Returns:
             AgentJudgeFactory: Use `.create()` or `.update()` to create
-                and update prompt-based Agent Judges.
+                and update prompt-based Agent judges.
 
         Examples:
             ```python

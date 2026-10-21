@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from typing import Any, Callable, ClassVar, Dict, List, Optional, Sequence
 
 from opentelemetry.sdk.resources import Resource
@@ -9,6 +10,7 @@ from opentelemetry.sdk.trace.sampling import Sampler
 from judgeval.data.example import Example
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
 from judgeval.internal.api import JudgmentSyncClient
+from judgeval.offline_tests.deprecation import OFFLINE_TESTS_DEPRECATION
 from judgeval.trace.exporters.judgment_span_exporter import JudgmentSpanExporter
 from judgeval.trace.id_generator import IsolatedRandomIdGenerator
 from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
@@ -25,7 +27,10 @@ OFFLINE_TRACES_PATH = "otel/v1/offline-traces"
 
 
 class OfflineTracer(Tracer):
-    """Tracer for offline / experiment-style runs.
+    """**Deprecated.** Use the normal `Tracer` with `Tracer.test_case` and
+    `client.test_runs` instead.
+
+    Tracer for offline / experiment-style runs.
 
     Behaves like `Tracer` for span creation and `@Tracer.observe`, with
     two differences:
@@ -97,6 +102,7 @@ class OfflineTracer(Tracer):
         *,
         dataset: List[Example],
         example_fields: Optional[Dict[str, Any]] = None,
+        _stacklevel: int = 2,
     ) -> "OfflineTracer":
         """Create and activate a new `OfflineTracer`.
 
@@ -110,6 +116,10 @@ class OfflineTracer(Tracer):
                 `api_url` cannot be resolved (explicit arg or env var), or
                 if the project cannot be found on the backend.
         """
+        # Point the warning at the caller; Python hides DeprecationWarnings raised inside libraries.
+        warnings.warn(
+            OFFLINE_TESTS_DEPRECATION, DeprecationWarning, stacklevel=_stacklevel
+        )
         api_key = api_key or JUDGMENT_API_KEY
         organization_id = organization_id or JUDGMENT_ORG_ID
         api_url = api_url or JUDGMENT_API_URL
