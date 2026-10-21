@@ -8,9 +8,8 @@ from judgeval.internal.api.models import (
     CreateJudgeRequest,
     CreateJudgeRequestJudge,
     CreateJudgeRequestJudgeConfig,
-    CreateJudgeRequestJudgeInitialVersion,
-    CreateJudgeRequestJudgeInitialVersion1,
     CreateJudgeRequestJudgeInitialVersion2,
+    CreateJudgeRequestJudgeInitialVersion2Output,
     JudgeLookupRequestVersion,
     JudgeLookupResponseJudge,
     UpdateJudgeRequestUpdate,
@@ -25,6 +24,13 @@ from judgeval.internal.api.models import (
 )
 from judgeval.logger import judgeval_logger
 from judgeval.utils.guards import expect_project_id
+
+# The platform creates only categorical judges (judgment-mono#5377), so a
+# binary judge is created as two categorical outputs.
+_BINARY_OUTPUTS: List[CreateJudgeRequestJudgeInitialVersion2Output] = [
+    {"name": "Pass", "description": "The output meets the rubric."},
+    {"name": "Fail", "description": "The output does not meet the rubric."},
+]
 
 JudgeVersion = Union[Literal["latest", "production"], JudgeLookupRequestVersion]
 PromptVersion = Union[
@@ -45,8 +51,8 @@ class AgentJudgeFactory:
 
         judge = client.agent_judges.create(
             name="helpfulness",
-            prompt="Rate the assistant's helpfulness on a scale of 0 to 1.",
-            score_type="numeric",
+            prompt="Did the assistant answer the user's question?",
+            score_type="binary",
         )
 
         client.agent_judges.update(
@@ -87,19 +93,30 @@ class AgentJudgeFactory:
         Args:
             name: Unique judge name within the project.
             prompt: Rubric prompt template used by the Agent judge.
-            score_type: One of `"numeric"`, `"binary"`, or `"categorical"`.
+            score_type: `"categorical"`, or `"binary"` for a categorical judge
+                with `Pass` / `Fail` outputs. New judges cannot be `"numeric"`;
+                existing numeric judges can still be updated.
             model: Deprecated and ignored; the platform picks the model
                 from `reasoning_level`.
             reasoning_level: `"lite"` (default), `"normal"`, or `"high"`.
             description: Description stored on the initial judge version.
             judge_description: Description shown in the UI.
             categories: Choice list for `categorical` judges (at least two).
-            min_score: Lower bound for `numeric` judges (defaults to `0`).
-            max_score: Upper bound for `numeric` judges (defaults to `1`).
+            min_score: Lower score bound stored on the version.
+            max_score: Upper score bound stored on the version.
 
         Returns:
             The created `AgentJudge`, or `None` if the project is unresolved.
+
+        Raises:
+            ValueError: If `score_type` is `"numeric"`.
         """
+        if score_type == "numeric":
+            raise ValueError(
+                "New Agent judges must be categorical. Use "
+                "score_type='categorical' with categories, or 'binary' for "
+                "Pass / Fail."
+            )
         project_id = expect_project_id(self._project_id)
         if not project_id:
             return None
@@ -115,23 +132,15 @@ class AgentJudgeFactory:
         if max_score is not None:
             config["maxScore"] = max_score
 
-        initial_version: Union[
-            CreateJudgeRequestJudgeInitialVersion,
-            CreateJudgeRequestJudgeInitialVersion1,
-            CreateJudgeRequestJudgeInitialVersion2,
-        ]
-        if score_type == "categorical":
-            initial_version = {
-                "scoreType": "categorical",
-                "outputs": [
-                    {"name": c["name"], "description": c["description"]}
-                    for c in categories or []
-                ],
-            }
-        elif score_type == "binary":
-            initial_version = {"scoreType": "binary"}
-        else:
-            initial_version = {"scoreType": "numeric"}
+        initial_version: CreateJudgeRequestJudgeInitialVersion2 = {
+            "scoreType": "categorical",
+            "outputs": _BINARY_OUTPUTS
+            if score_type == "binary"
+            else [
+                {"name": c["name"], "description": c["description"]}
+                for c in categories or []
+            ],
+        }
 
         judge: CreateJudgeRequestJudge = {
             "name": name,
