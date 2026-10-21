@@ -211,8 +211,7 @@ class Judgeval:
         Mirrors MCP ``discover_schema``: published tables, column types and
         descriptions, row semantics, examples, and query limits. Fetches the
         server's generated catalog using this client's credentials. Contains
-        no project data and does not require a resolved project or public
-        query opt-in.
+        no project data and does not require a resolved project.
 
         Returns:
             The virtual schema reference as a Markdown string.
@@ -233,7 +232,7 @@ class Judgeval:
         The server derives tenant scope from the client's credentials and
         resolved project.
         Call `discover_schema()` for supported tables and columns. Requires
-        viewer access and public SDK/API queries enabled for the organization.
+        viewer access.
 
         Results are capped by the server at 1,000 rows and 5 MiB; exceeding
         either cap returns an error. Use SQL predicates and LIMIT to narrow

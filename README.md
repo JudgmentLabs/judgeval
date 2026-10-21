@@ -98,8 +98,8 @@ print(result["rows"])
 `client.discover_schema()` returns a Markdown string with the server's generated
 tables, column types and descriptions, row semantics, examples, and query limits,
 using the same reference as MCP `discover_schema`. It contains no project data
-and requires organization viewer access, but no resolved project or public query
-opt-in. The HTTP equivalent is `GET /v1/sql/schema`, which returns
+and requires organization viewer access, but no resolved project. The HTTP
+equivalent is `GET /v1/sql/schema`, which returns
 `{"schema": "...Markdown reference..."}`.
 
 For query execution, use `POST /v1/projects/{projectId}/sql` with
