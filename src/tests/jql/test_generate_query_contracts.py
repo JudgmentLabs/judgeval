@@ -6,8 +6,10 @@ from types import ModuleType
 
 
 def load_generator() -> ModuleType:
-    path = Path(__file__).resolve().parents[3] / "scripts" / "generate_jql.py"
-    spec = importlib.util.spec_from_file_location("generate_jql", path)
+    path = (
+        Path(__file__).resolve().parents[3] / "scripts" / "generate_query_contracts.py"
+    )
+    spec = importlib.util.spec_from_file_location("generate_query_contracts", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -47,9 +49,11 @@ def test_typed_dict_source_respects_required_fields_and_documents_refs() -> None
         },
     )
 
-    assert "class ExampleResponseRequired(TypedDict):" in source
-    assert "required_value: str" in source
-    assert "class ExampleResponse(ExampleResponseRequired, total=False):" in source
-    assert "optional_value: Any  # OpenAPI $ref: TimeSpec" in source
+    assert source == (
+        "class ExampleResponseRequired(TypedDict):\n"
+        "    required_value: str\n\n\n"
+        "class ExampleResponse(ExampleResponseRequired, total=False):\n"
+        "    optional_value: Any  # OpenAPI $ref: TimeSpec"
+    )
 
     compile("from typing import Any, TypedDict\n\n" + source, "<generated>", "exec")

@@ -8,7 +8,7 @@ from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
 
 class CustomBuildHook(BuildHookInterface):
-    """Regenerate deterministic JQL artifacts before building a distribution."""
+    """Regenerate deterministic query contracts before building a distribution."""
 
     def initialize(self, version: str, build_data: dict[str, object]) -> None:
         # Generated files are checked in. Regenerate only in a repository checkout;
@@ -16,7 +16,10 @@ class CustomBuildHook(BuildHookInterface):
         if not (Path(self.root) / ".git").exists():
             return
         subprocess.run(
-            [sys.executable, str(Path(self.root) / "scripts" / "generate_jql.py")],
+            [
+                sys.executable,
+                str(Path(self.root) / "scripts" / "generate_query_contracts.py"),
+            ],
             cwd=self.root,
             check=True,
         )

@@ -78,34 +78,48 @@ def run_agent(question: str) -> str:
 run_agent("What is the capital of the United States?")
 ```
 
-### JQL
+### SQL
 
-JQL queries use the same API key, organization, and project configuration as the
-rest of Judgeval. Tenant identifiers are not part of the query payload.
+Use `Judgeval.sql(sql_text)` for read-only queries against Judgment's virtual
+schema, which abstracts the underlying storage. The server validates incoming
+queries, rejects writes, and enforces organization and project scope. The client
+uses its existing API key, organization membership, and resolved project.
+Viewer access and the public query rate limit apply.
 
 ```python
 from judgeval import Judgeval
-from judgeval.jql import spans
 
 client = Judgeval(project_name="my-project")
-result = client.query(spans().rows(), trace_ids=["trace-123"])
+print(client.discover_schema())
+result = client.sql("SELECT count() AS run_count FROM telemetry.traces")
+print(result["rows"])
 ```
 
-`trace_ids` and `session_ids` are mutually exclusive options outside the JQL
-query object. Trace IDs narrow the query directly. Judgment resolves session IDs
-within the authenticated organization and project, then narrows every part of
-the query to their traces. If no session resolves, the request fails instead of
-falling back to the whole project. Both options work with `present()` and
-`discover()`.
+`client.discover_schema()` returns a Markdown string with the server's generated
+tables, column types and descriptions, row semantics, examples, and query limits,
+using the same reference as MCP `discover_schema`. It contains no project data
+and requires organization viewer access, but no resolved project or public query
+opt-in. The HTTP equivalent is `GET /v1/sql/schema`, which returns
+`{"schema": "...Markdown reference..."}`.
 
-Use `offline_traces()` or `offline_spans()` to query traces captured by an
-offline test:
+For query execution, use `POST /v1/projects/{projectId}/sql` with
+`Authorization: Bearer <api-key>`, `X-Organization-Id: <organization-id>`, and
+JSON body `{"sql": "SELECT count() AS run_count FROM telemetry.traces"}`.
+Organization and project scope are derived by the server. Use SQL predicates on
+supported catalog columns and `LIMIT` to narrow results. Physical tables,
+writes, multiple statements, and caller-specified execution limits are
+unsupported. DAL catalog allowlists, tenant isolation, and result limits of
+1,000 rows and 5 MiB apply; over-limit results return an error. SQL text must
+contain a non-whitespace character and cannot exceed 50,000 characters.
 
-```python
-from judgeval.jql import offline_traces
-
-offline_result = client.query(offline_traces().rows())
-```
+The response contains `catalog_version`, `columns` (name, type, nullable),
+`rows`, `row_count`, and `elapsed_ms`.
+SQL integers outside JavaScript's safe range (`-(2**53 - 1)` to `2**53 - 1`)
+arrive as exact decimal strings, including inside nested arrays and objects.
+For example, `9007199254740993` arrives as `"9007199254740993"`; use `int(value)`
+when you need a Python integer. Small integers and floating-point values remain
+numbers, and column types retain their original SQL types.
+Validation and execution errors use the SDK's existing exception mapping.
 
 ## Integrations
 
