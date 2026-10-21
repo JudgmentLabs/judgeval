@@ -47,6 +47,15 @@ def _judge_detail(**overrides):
     }
 
 
+PASS_FAIL = {
+    "scoreType": "categorical",
+    "outputs": [
+        {"name": "Pass", "description": "The output meets the rubric."},
+        {"name": "Fail", "description": "The output does not meet the rubric."},
+    ],
+}
+
+
 CATEGORICAL = _judge_detail(
     score_type="categorical",
     outputs=[
@@ -86,7 +95,7 @@ class TestAgentJudgeFactoryCreate:
         factory.create(
             name="n",
             prompt="p",
-            score_type="numeric",
+            score_type="binary",
             reasoning_level="high",
             description="d",
             judge_description="jd",
@@ -100,7 +109,7 @@ class TestAgentJudgeFactoryCreate:
                     "name": "n",
                     "judgeDescription": "jd",
                     "judgeType": "prompt",
-                    "initialVersion": {"scoreType": "numeric"},
+                    "initialVersion": PASS_FAIL,
                     "config": {
                         "prompt": "p",
                         "description": "d",
@@ -120,7 +129,7 @@ class TestAgentJudgeFactoryCreate:
             "judge": {
                 "name": "n",
                 "judgeType": "prompt",
-                "initialVersion": {"scoreType": "binary"},
+                "initialVersion": PASS_FAIL,
                 "config": {"prompt": "p"},
             }
         }
@@ -140,13 +149,19 @@ class TestAgentJudgeFactoryCreate:
             "outputs": categories,
         }
 
+    def test_create_rejects_numeric_before_calling_the_api(self):
+        factory, client = _make_factory()
+        with pytest.raises(ValueError, match="must be categorical"):
+            factory.create(name="n", prompt="p", score_type="numeric")
+        client.post_projects_judges.assert_not_called()
+
     def test_create_returns_judge_as_looked_up(self):
         factory, _ = _make_factory()
         result = factory.create(
             name="helpfulness",
             prompt="Rate helpfulness 0-1.",
             model="ignored",
-            score_type="numeric",
+            score_type="binary",
         )
         assert result == AgentJudge(
             judge_id="judge-1",
@@ -166,18 +181,18 @@ class TestAgentJudgeFactoryCreate:
 
     def test_create_returns_none_when_project_unresolved(self):
         factory, _ = _make_factory(project_id=None)
-        assert factory.create(name="n", prompt="p", score_type="numeric") is None
+        assert factory.create(name="n", prompt="p", score_type="binary") is None
 
     def test_create_skips_api_when_project_unresolved(self):
         factory, client = _make_factory(project_id=None)
-        factory.create(name="n", prompt="p", score_type="numeric")
+        factory.create(name="n", prompt="p", score_type="binary")
         client.post_projects_judges.assert_not_called()
 
     def test_create_propagates_errors(self):
         factory, client = _make_factory()
         client.post_projects_judges.side_effect = RuntimeError("boom")
         with pytest.raises(RuntimeError):
-            factory.create(name="n", prompt="p", score_type="numeric")
+            factory.create(name="n", prompt="p", score_type="binary")
 
 
 class TestAgentJudgeFactoryUpdate:

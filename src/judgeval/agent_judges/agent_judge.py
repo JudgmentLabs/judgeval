@@ -38,8 +38,8 @@ class AgentJudge:
         client = Judgeval(project_name="my-project")
         judge = client.agent_judges.create(
             name="helpfulness",
-            prompt="Score the assistant's helpfulness from 0 to 1.",
-            score_type="numeric",
+            prompt="Did the assistant answer the user's question?",
+            score_type="binary",
         )
 
         judge = client.agent_judges.update(
