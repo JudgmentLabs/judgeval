@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import warnings
+
 import pytest
 
 from judgeval.data.example import Example
@@ -59,3 +61,26 @@ class TestExample:
         e = Example.create(val=1)
         e._properties["val"] = 2
         assert e["val"] == 2
+
+    @pytest.mark.parametrize(
+        "key",
+        ["example_id", "created_at", "name", "trace"],
+    )
+    def test_create_rejects_reserved_keys(self, key):
+        with pytest.raises(ValueError, match=f"Invalid property '{key}'"):
+            Example.create(**{key: "value"})
+
+    def test_create_suggests_typo_fix(self):
+        with pytest.raises(ValueError, match="Did you mean 'actual_output'"):
+            Example.create(actual_outpt="oops")
+
+    def test_create_allows_custom_keys(self):
+        e = Example.create(output="a", question="q", custom_metric=0.9)
+        assert e["output"] == "a"
+        assert e["question"] == "q"
+        assert e["custom_metric"] == 0.9
+
+    def test_create_no_deprecation_warning(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            Example()
