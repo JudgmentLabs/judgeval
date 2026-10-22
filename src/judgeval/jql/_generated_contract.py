@@ -63,15 +63,11 @@ QUERY_SOURCES = (
     "traces",
     "spans",
     "sessions",
-    "offline_traces",
-    "offline_spans",
 )
 QuerySource = Literal[
     "traces",
     "spans",
     "sessions",
-    "offline_traces",
-    "offline_spans",
 ]
 DiscoveryKind = Literal[
     "judges",
