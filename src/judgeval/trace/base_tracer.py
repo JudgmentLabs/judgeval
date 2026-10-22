@@ -789,15 +789,16 @@ class BaseTracer(ABC):
                                     )
                                 BaseTracer._emit_partial()
                                 result = f(*args, **kwargs)
-                            except Exception as e:
-                                linked_root_span.record_exception(e)
-                                linked_root_span.set_status(
-                                    Status(StatusCode.ERROR, str(e))
-                                )
-                                invocation_span.record_exception(e)
-                                invocation_span.set_status(
-                                    Status(StatusCode.ERROR, str(e))
-                                )
+                            except BaseException as e:
+                                if isinstance(e, Exception):
+                                    linked_root_span.record_exception(e)
+                                    linked_root_span.set_status(
+                                        Status(StatusCode.ERROR, str(e))
+                                    )
+                                    invocation_span.record_exception(e)
+                                    invocation_span.set_status(
+                                        Status(StatusCode.ERROR, str(e))
+                                    )
                                 try:
                                     linked_root_span.end()
                                 finally:
@@ -884,9 +885,10 @@ class BaseTracer(ABC):
                                 )
                             BaseTracer._emit_partial()
                             result = f(*args, **kwargs)
-                        except Exception as e:
-                            span.record_exception(e)
-                            span.set_status(Status(StatusCode.ERROR, str(e)))
+                        except BaseException as e:
+                            if isinstance(e, Exception):
+                                span.record_exception(e)
+                                span.set_status(Status(StatusCode.ERROR, str(e)))
                             span.end()
                             raise
 
