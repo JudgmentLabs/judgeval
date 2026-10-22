@@ -274,6 +274,7 @@ class Example(TypedDict):
     example_id: str
     created_at: str
     name: NotRequired[str | None]
+    conversation_id: NotRequired[str | None]
     trace_id: NotRequired[str | None]
     span_id: NotRequired[str | None]
     offline_trace_id: NotRequired[str | None]
@@ -301,103 +302,6 @@ class AddToRunEvalQueueExamplesResponse(TypedDict):
     success: bool
     status: str
     message: str
-
-
-class PreflightResultPreflightResultSery(TypedDict):
-    timestamp: str
-    candidate_count: int
-    matching_count: int
-    estimated_eval_count: float
-
-
-class PreflightResultPreflightResultForecastItem(TypedDict):
-    timestamp: str
-    candidate_count: int
-    matching_count: int
-    estimated_eval_count: float
-
-
-class PreflightResultPreflightResult(TypedDict):
-    matches: bool
-    predicate_translatable: bool
-    capped: bool
-    warnings: list[str]
-    unit: Literal["traces"]
-    trace_count: int
-    trace_ids: NotRequired[list[str]]
-    ids_capped: NotRequired[bool]
-    sampling_rate: float
-    estimated_run_count: int
-    series: NotRequired[list[PreflightResultPreflightResultSery]]
-    forecast: NotRequired[list[PreflightResultPreflightResultForecastItem]]
-    forecast_method: NotRequired[Literal["seasonal_weekly", "linear", "mean"]]
-
-
-PreflightResultPreflightResult1SessionEvaluationMinCandidateTraces: TypeAlias = int
-
-
-PreflightResultPreflightResult1SessionEvaluationMaxWaitMinutes: TypeAlias = int
-
-
-class PreflightResultPreflightResult1Sery(TypedDict):
-    timestamp: str
-    candidate_count: int
-    matching_count: int
-    estimated_eval_count: float
-
-
-class PreflightResultPreflightResult1ForecastItem(TypedDict):
-    timestamp: str
-    candidate_count: int
-    matching_count: int
-    estimated_eval_count: float
-
-
-class PreflightResultPreflightResult1(TypedDict):
-    matches: bool
-    predicate_translatable: bool
-    capped: bool
-    warnings: list[str]
-    session_evaluation_count_enabled: bool
-    session_evaluation_idle_enabled: bool
-    session_evaluation_min_candidate_traces: (
-        PreflightResultPreflightResult1SessionEvaluationMinCandidateTraces
-    )
-    session_evaluation_max_wait_minutes: (
-        PreflightResultPreflightResult1SessionEvaluationMaxWaitMinutes
-    )
-    unit: Literal["sessions"]
-    session_count: int
-    session_ids: NotRequired[list[str]]
-    trace_count: int
-    candidate_trace_count: int
-    sampled_session_count: int
-    sampled_candidate_trace_count: int
-    trace_ids: NotRequired[list[str]]
-    ids_capped: NotRequired[bool]
-    sampling_rate: float
-    estimated_run_count: int
-    series: NotRequired[list[PreflightResultPreflightResult1Sery]]
-    forecast: NotRequired[list[PreflightResultPreflightResult1ForecastItem]]
-    forecast_method: NotRequired[Literal["seasonal_weekly", "linear", "mean"]]
-
-
-class PreflightResultPreflightResult2(TypedDict):
-    matches: bool
-    predicate_translatable: bool
-    capped: bool
-    warnings: list[str]
-    unit: Literal["examples"]
-    example_count: int
-    judge_count: int
-    run_count: int
-
-
-PreflightResult: TypeAlias = (
-    PreflightResultPreflightResult
-    | PreflightResultPreflightResult1
-    | PreflightResultPreflightResult2
-)
 
 
 TraceEvaluationRunTraceAndSpanId: TypeAlias = list[str]
@@ -445,8 +349,8 @@ class ScorersDatum1(TypedDict):
     error: NotRequired[str | None]
     score_type: Literal["numeric"]
     num_value: float
-    minimum_score_range: NotRequired[str | float]
-    maximum_score_range: NotRequired[str | float]
+    minimum_score_range: NotRequired[float]
+    maximum_score_range: NotRequired[float]
 
 
 class ScorersDatum2ReasonCitation(TypedDict):
@@ -572,8 +476,8 @@ class ScorersDatum41(TypedDict):
     error: NotRequired[str | None]
     score_type: Literal["numeric"]
     num_value: float
-    minimum_score_range: NotRequired[str | float]
-    maximum_score_range: NotRequired[str | float]
+    minimum_score_range: NotRequired[float]
+    maximum_score_range: NotRequired[float]
 
 
 class ScorersDatum42ReasonCitation(TypedDict):
@@ -778,6 +682,108 @@ class FetchTestRunViaExperimentAliasResponse(TypedDict):
     ui_results_url: str | None
 
 
+class JudgeActionJudgeActionConfig(TypedDict, closed=True):
+    email_address: str
+
+
+class JudgeActionJudgeAction(TypedDict, closed=True):
+    id: str
+    enabled: bool
+    type: Literal["email"]
+    config: JudgeActionJudgeActionConfig
+
+
+class JudgeActionJudgeAction1Config(TypedDict, closed=True):
+    team_id: NotRequired[str]
+    channel_id: NotRequired[str]
+    message: NotRequired[str]
+    custom_attribute_keys: NotRequired[list[str]]
+
+
+class JudgeActionJudgeAction1(TypedDict, closed=True):
+    id: str
+    enabled: bool
+    type: Literal["slack"]
+    config: JudgeActionJudgeAction1Config
+
+
+class JudgeActionJudgeAction2Config(TypedDict, closed=True):
+    dataset_id: str
+
+
+class JudgeActionJudgeAction2(TypedDict, closed=True):
+    id: str
+    enabled: bool
+    type: Literal["dataset"]
+    config: JudgeActionJudgeAction2Config
+
+
+JudgeActionJudgeAction3ConfigJudgeId: TypeAlias = str
+
+
+class JudgeActionJudgeAction3Config(TypedDict, closed=True):
+    judge_ids: list[JudgeActionJudgeAction3ConfigJudgeId]
+
+
+class JudgeActionJudgeAction3(TypedDict, closed=True):
+    id: str
+    enabled: bool
+    type: Literal["run_behavior"]
+    config: JudgeActionJudgeAction3Config
+
+
+JudgeAction: TypeAlias = (
+    JudgeActionJudgeAction
+    | JudgeActionJudgeAction1
+    | JudgeActionJudgeAction2
+    | JudgeActionJudgeAction3
+)
+
+
+class JudgeActionGroupWhen(TypedDict, closed=True):
+    kind: Literal["any"]
+
+
+class JudgeActionGroupWhen1(TypedDict, closed=True):
+    kind: Literal["binary"]
+    value: bool
+
+
+JudgeActionGroupWhen2Value: TypeAlias = str
+
+
+class JudgeActionGroupWhen2(TypedDict, closed=True):
+    kind: Literal["categorical"]
+    values: list[JudgeActionGroupWhen2Value]
+
+
+class JudgeActionGroupWhen3(TypedDict, closed=True):
+    kind: Literal["numeric"]
+    operator: Literal["lt", "lte", "eq", "gte", "gt"]
+    value: float
+
+
+class JudgeActionGroupFrequency(TypedDict, closed=True):
+    count: int
+    window_seconds: int
+
+
+class JudgeActionGroup(TypedDict, closed=True):
+    id: str
+    name: str
+    enabled: bool
+    environment_names: list[str]
+    when: (
+        JudgeActionGroupWhen
+        | JudgeActionGroupWhen1
+        | JudgeActionGroupWhen2
+        | JudgeActionGroupWhen3
+    )
+    frequency: JudgeActionGroupFrequency
+    cooldown_seconds: int
+    actions: list[JudgeAction]
+
+
 class InsertPromptRequest(TypedDict):
     name: str
     prompt: str
@@ -830,39 +836,6 @@ class UntagPromptResponse(TypedDict):
 
 class GetPromptVersionsResponse(TypedDict):
     versions: list[PromptCommitInfo]
-
-
-PublicJqlRequestTraceId: TypeAlias = str
-
-
-PublicJqlRequestSessionId: TypeAlias = str
-
-
-class PublicJqlRequest(TypedDict, closed=True):
-    query: Any
-    limit: NotRequired[int]
-    trace_ids: NotRequired[list[PublicJqlRequestTraceId]]
-    session_ids: NotRequired[list[PublicJqlRequestSessionId]]
-
-
-class PublicJqlQueryResponse(TypedDict):
-    query_id: str
-    rows: list[dict[str, Any]] | None
-    row_count: int | None
-    elapsed_ms: float
-
-
-class PublicJqlErrorResponse(TypedDict):
-    error: str
-    message: str
-    hint: NotRequired[str]
-
-
-class PublicJqlPresentationResponse(TypedDict):
-    query_id: str
-    presentation: Any
-    frame: Any
-    elapsed_ms: float
 
 
 class FetchPromptScorersResponseScorerCategory(TypedDict):
@@ -949,6 +922,12 @@ class PublicSqlResponse(TypedDict):
     rows: list[dict[str, Any]]
     row_count: int
     elapsed_ms: float
+
+
+class PublicJqlErrorResponse(TypedDict):
+    error: str
+    message: str
+    hint: NotRequired[str]
 
 
 class TestConfigsResponseTestConfigJudgeJudge(TypedDict):
@@ -1045,18 +1024,6 @@ class DeleteTestConfigResponse(TypedDict):
     message: str
 
 
-class TestRunsResponseTestRunJudge(TypedDict):
-    judge_id: str
-    judge_name: str | None
-    judge_major_version: float
-    judge_minor_version: float
-
-
-class TestRunsResponseTestRunSuccessSummary(TypedDict):
-    passed: float
-    failed: float
-
-
 class TestRunsResponseTestRun(TypedDict):
     id: str
     organization_id: NotRequired[str]
@@ -1073,9 +1040,6 @@ class TestRunsResponseTestRun(TypedDict):
     updated_at: NotRequired[str]
     started_at: NotRequired[str | None]
     completed_at: NotRequired[str | None]
-    dataset_version_number: NotRequired[float | None]
-    judges: NotRequired[list[TestRunsResponseTestRunJudge]]
-    success_summary: NotRequired[TestRunsResponseTestRunSuccessSummary | None]
 
 
 class TestRunsResponse(TypedDict):
@@ -1299,6 +1263,178 @@ class ApplyTestRunSuccessRequest(TypedDict):
 
 class ApplyTestRunSuccessResponse(TypedDict):
     updated: float
+
+
+class CreateTestSuiteRequest(TypedDict, closed=True):
+    name: str
+    description: NotRequired[str]
+    labels: NotRequired[list[str]]
+
+
+class TestSuite(TypedDict):
+    test_suite_id: str
+    name: str
+    description: str | None
+    labels: list[str]
+    version: int
+    created_at: str
+    updated_at: str
+
+
+class ListTestSuitesResponse(TypedDict):
+    test_suites: list[TestSuite]
+    next_offset: int | None
+
+
+class TestCaseExpected(TypedDict, closed=True):
+    judge_major_version: float
+    judge_minor_version: float
+    op: Literal["eq", "ne", "lt", "lte", "gt", "gte", "in", "not_in"]
+    expected: Any
+
+
+class TestCase(TypedDict):
+    case_id: str
+    name: str | None
+    input: Any
+    expected: dict[str, TestCaseExpected]
+    tags: list[str]
+    metadata: dict[str, Any]
+    version_added: int
+
+
+class ListTestCasesResponse(TypedDict):
+    version: int
+    cases: list[TestCase]
+    next_offset: int | None
+
+
+class TestCaseInputExpected(TypedDict, closed=True):
+    judge_major_version: float
+    judge_minor_version: float
+    op: Literal["eq", "ne", "lt", "lte", "gt", "gte", "in", "not_in"]
+    expected: Any
+
+
+class TestCaseInput(TypedDict, closed=True):
+    name: NotRequired[str | None]
+    input: Any
+    expected: NotRequired[dict[str, TestCaseInputExpected]]
+    tags: NotRequired[list[str]]
+    metadata: NotRequired[dict[str, Any]]
+
+
+class AddTestCasesRequest(TypedDict, closed=True):
+    cases: list[TestCaseInput]
+
+
+class TestCaseFilterTestCaseFilter(TypedDict, closed=True):
+    kind: Literal["all"]
+
+
+class TestCaseFilterTestCaseFilter1(TypedDict, closed=True):
+    kind: Literal["tags"]
+    tags: list[str]
+
+
+class TestCaseFilterTestCaseFilter2(TypedDict, closed=True):
+    kind: Literal["case_ids"]
+    case_ids: list[str]
+
+
+class TestCaseFilterTestCaseFilter3(TypedDict, closed=True):
+    kind: Literal["last_failures"]
+    run_id: str
+
+
+TestCaseFilter: TypeAlias = (
+    TestCaseFilterTestCaseFilter
+    | TestCaseFilterTestCaseFilter1
+    | TestCaseFilterTestCaseFilter2
+    | TestCaseFilterTestCaseFilter3
+)
+
+
+class StartTestRunRequest(TypedDict, closed=True):
+    case_filter: NotRequired[TestCaseFilter]
+    candidate: NotRequired[str]
+    candidate_meta: NotRequired[dict[str, Any]]
+    trigger: NotRequired[Literal["manual", "ci", "schedule", "api"]]
+
+
+class StartTestRunResponseCase(TypedDict):
+    case_id: str
+    input: Any
+    headers: dict[str, str]
+
+
+class StartTestRunResponse(TypedDict):
+    run_id: str
+    test_suite_version: int
+    cases: list[StartTestRunResponseCase]
+
+
+class TestRun(TypedDict):
+    run_id: str
+    test_suite_id: str
+    test_suite_version: int
+    scored_from_run_id: str | None
+    candidate: str | None
+    candidate_meta: dict[str, Any]
+    trigger: str
+    case_filter: TestCaseFilter
+    cases_total: int
+    cases_with_output: int
+    cases_scored: int
+    cases_passed: int
+    cases_failed: int
+    created_at: str
+
+
+class ListTestRunsResponse(TypedDict):
+    runs: list[TestRun]
+    next_offset: int | None
+
+
+class TestResultsResponseResultCheck(TypedDict):
+    judge_id: str
+    judge_major_version: float
+    judge_minor_version: float
+    op: Literal["eq", "ne", "lt", "lte", "gt", "gte", "in", "not_in"]
+    expected: Any
+    judge_output: Any
+    passed: bool
+    reason: str | None
+    error_message: str | None
+
+
+class TestResultsResponseResultPendingCheck(TypedDict):
+    judge_id: str
+    judge_major_version: float
+    judge_minor_version: float
+    status: Literal[
+        "not_queued", "pending", "running", "completed", "error", "cancelled"
+    ]
+    queued_at: str | None
+    started_at: str | None
+    error_message: str | None
+
+
+class TestResultsResponseResult(TypedDict):
+    case_id: str
+    trace_id: str | None
+    scored_at: str | None
+    passed: bool | None
+    checks: list[TestResultsResponseResultCheck]
+    pending_checks: list[TestResultsResponseResultPendingCheck]
+
+
+class TestResultsResponse(TypedDict):
+    results: list[TestResultsResponseResult]
+
+
+class ScoreTestRunResponse(TypedDict):
+    run_id: str
 
 
 class AddTraceTagsRequest(TypedDict):
