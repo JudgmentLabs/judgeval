@@ -8,8 +8,8 @@ from judgeval.internal.api.models import (
     CreateJudgeRequest,
     CreateJudgeRequestJudge,
     CreateJudgeRequestJudgeConfig,
-    CreateJudgeRequestJudgeInitialVersion2,
-    CreateJudgeRequestJudgeInitialVersion2Output,
+    CreateJudgeRequestJudgeInitialVersion,
+    CreateJudgeRequestJudgeInitialVersionOutput,
     JudgeLookupRequestVersion,
     JudgeLookupResponseJudge,
     UpdateJudgeRequestUpdate,
@@ -27,7 +27,7 @@ from judgeval.utils.guards import expect_project_id
 
 # The platform creates only categorical judges (judgment-mono#5377), so a
 # binary judge is created as two categorical outputs.
-_BINARY_OUTPUTS: List[CreateJudgeRequestJudgeInitialVersion2Output] = [
+_BINARY_OUTPUTS: List[CreateJudgeRequestJudgeInitialVersionOutput] = [
     {"name": "Pass", "description": "The output meets the rubric."},
     {"name": "Fail", "description": "The output does not meet the rubric."},
 ]
@@ -132,7 +132,7 @@ class AgentJudgeFactory:
         if max_score is not None:
             config["maxScore"] = max_score
 
-        initial_version: CreateJudgeRequestJudgeInitialVersion2 = {
+        initial_version: CreateJudgeRequestJudgeInitialVersion = {
             "scoreType": "categorical",
             "outputs": _BINARY_OUTPUTS
             if score_type == "binary"

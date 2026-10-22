@@ -119,6 +119,20 @@ class JudgmentSyncClient:
         logger.debug(f"HTTP {method} (multipart) {url} -> {r.status_code}")
         return _handle_response(r)
 
+    def post_projects(self, payload: AddProjectRequest) -> AddProjectResponse:
+        return self._request(
+            "POST",
+            url_for("/v1/projects", self.base_url),
+            payload,
+        )
+
+    def delete_projects(self, project_id: str) -> DeleteProjectResponse:
+        return self._request(
+            "DELETE",
+            url_for(f"/v1/projects/{project_id}", self.base_url),
+            {},
+        )
+
     def post_projects_resolve(
         self, payload: ResolveProjectRequest
     ) -> ResolveProjectResponse:
