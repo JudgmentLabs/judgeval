@@ -8,4 +8,5 @@ class ProviderType(Enum):
     ANTHROPIC = "anthropic"
     TOGETHER = "together"
     GOOGLE = "google"
+    ORCAROUTER = "orcarouter"
     DEFAULT = "default"
