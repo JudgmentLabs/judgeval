@@ -1455,3 +1455,841 @@ class ResolveProjectResponse(TypedDict):
 
 class PublicSqlSchemaResponse(TypedDict):
     schema: str
+
+
+class CreateJudgeRequestJudgeInitialVersionActionConfig(TypedDict, closed=True):
+    action_groups: list[JudgeActionGroup]
+
+
+class CreateJudgeRequestJudgeInitialVersionOutput(TypedDict, closed=True):
+    name: str
+    description: str
+
+
+class CreateJudgeRequestJudgeInitialVersionAdvancedSettingsOnlineSpanTriggers(
+    TypedDict, closed=True
+):
+    kind: Literal["and", "or"]
+    conditions: list[Any]
+
+
+class CreateJudgeRequestJudgeInitialVersionAdvancedSettings(TypedDict, closed=True):
+    online_environment_names: list[str]
+    online_evaluation_mode: Literal["continuous", "on_demand"]
+    online_sampling_rate: float
+    online_span_triggers: (
+        Any | CreateJudgeRequestJudgeInitialVersionAdvancedSettingsOnlineSpanTriggers
+    )
+    online_session_scoring: bool
+    session_evaluation_count_enabled: NotRequired[bool]
+    session_evaluation_idle_enabled: NotRequired[bool]
+    session_evaluation_min_candidate_traces: NotRequired[float]
+    session_evaluation_max_wait_minutes: NotRequired[float]
+
+
+class CreateJudgeRequestJudgeInitialVersion(TypedDict, closed=True):
+    actionConfig: NotRequired[CreateJudgeRequestJudgeInitialVersionActionConfig]
+    scoreType: Literal["categorical"]
+    outputs: list[CreateJudgeRequestJudgeInitialVersionOutput]
+    advancedSettings: NotRequired[CreateJudgeRequestJudgeInitialVersionAdvancedSettings]
+
+
+class CreateJudgeRequestJudgeConfig(TypedDict, closed=True):
+    prompt: str
+    description: NotRequired[str]
+    reasoningLevel: NotRequired[Literal["lite", "normal", "high"]]
+    minScore: NotRequired[float]
+    maxScore: NotRequired[float]
+
+
+class CreateJudgeRequestJudge(TypedDict, closed=True):
+    name: str
+    judgeDescription: NotRequired[str]
+    judgeType: Literal["prompt"]
+    initialVersion: CreateJudgeRequestJudgeInitialVersion
+    config: CreateJudgeRequestJudgeConfig
+
+
+class CreateJudgeRequestJudge1InitialVersionActionConfig(TypedDict, closed=True):
+    action_groups: list[JudgeActionGroup]
+
+
+class CreateJudgeRequestJudge1InitialVersionOutput(TypedDict, closed=True):
+    name: str
+    description: str
+
+
+class CreateJudgeRequestJudge1InitialVersionAdvancedSettingsOnlineSpanTriggers(
+    TypedDict, closed=True
+):
+    kind: Literal["and", "or"]
+    conditions: list[Any]
+
+
+class CreateJudgeRequestJudge1InitialVersionAdvancedSettings(TypedDict, closed=True):
+    online_environment_names: list[str]
+    online_evaluation_mode: Literal["continuous", "on_demand"]
+    online_sampling_rate: float
+    online_span_triggers: (
+        Any | CreateJudgeRequestJudge1InitialVersionAdvancedSettingsOnlineSpanTriggers
+    )
+    online_session_scoring: bool
+    session_evaluation_count_enabled: NotRequired[bool]
+    session_evaluation_idle_enabled: NotRequired[bool]
+    session_evaluation_min_candidate_traces: NotRequired[float]
+    session_evaluation_max_wait_minutes: NotRequired[float]
+
+
+class CreateJudgeRequestJudge1InitialVersion(TypedDict, closed=True):
+    actionConfig: NotRequired[CreateJudgeRequestJudge1InitialVersionActionConfig]
+    scoreType: Literal["categorical"]
+    outputs: list[CreateJudgeRequestJudge1InitialVersionOutput]
+    advancedSettings: NotRequired[
+        CreateJudgeRequestJudge1InitialVersionAdvancedSettings
+    ]
+
+
+class CreateJudgeRequestJudge1Config(TypedDict, closed=True):
+    bundleBase64: str
+    entrypointPath: str
+    requirementsPath: NotRequired[str]
+    className: str
+    scorerType: NotRequired[Literal["example", "trace"]]
+    sdkVersion: NotRequired[int]
+    description: NotRequired[str]
+
+
+class CreateJudgeRequestJudge1(TypedDict, closed=True):
+    name: str
+    judgeDescription: NotRequired[str]
+    judgeType: Literal["custom"]
+    initialVersion: CreateJudgeRequestJudge1InitialVersion
+    config: CreateJudgeRequestJudge1Config
+
+
+class CreateJudgeRequestJudge2InitialVersionActionConfig(TypedDict, closed=True):
+    action_groups: list[JudgeActionGroup]
+
+
+class CreateJudgeRequestJudge2InitialVersionOutput(TypedDict, closed=True):
+    name: str
+    description: str
+
+
+class CreateJudgeRequestJudge2InitialVersionAdvancedSettingsOnlineSpanTriggers(
+    TypedDict, closed=True
+):
+    kind: Literal["and", "or"]
+    conditions: list[Any]
+
+
+class CreateJudgeRequestJudge2InitialVersionAdvancedSettings(TypedDict, closed=True):
+    online_environment_names: list[str]
+    online_evaluation_mode: Literal["continuous", "on_demand"]
+    online_sampling_rate: float
+    online_span_triggers: (
+        Any | CreateJudgeRequestJudge2InitialVersionAdvancedSettingsOnlineSpanTriggers
+    )
+    online_session_scoring: bool
+    session_evaluation_count_enabled: NotRequired[bool]
+    session_evaluation_idle_enabled: NotRequired[bool]
+    session_evaluation_min_candidate_traces: NotRequired[float]
+    session_evaluation_max_wait_minutes: NotRequired[float]
+
+
+class CreateJudgeRequestJudge2InitialVersion(TypedDict, closed=True):
+    actionConfig: NotRequired[CreateJudgeRequestJudge2InitialVersionActionConfig]
+    scoreType: Literal["categorical"]
+    outputs: list[CreateJudgeRequestJudge2InitialVersionOutput]
+    advancedSettings: NotRequired[
+        CreateJudgeRequestJudge2InitialVersionAdvancedSettings
+    ]
+
+
+class CreateJudgeRequestJudge2Config(TypedDict, closed=True):
+    expression: Any
+
+
+class CreateJudgeRequestJudge2(TypedDict, closed=True):
+    name: str
+    judgeDescription: NotRequired[str]
+    judgeType: Literal["deterministic"]
+    initialVersion: CreateJudgeRequestJudge2InitialVersion
+    config: CreateJudgeRequestJudge2Config
+
+
+class CreateJudgeRequest(TypedDict, closed=True):
+    judge: CreateJudgeRequestJudge | CreateJudgeRequestJudge1 | CreateJudgeRequestJudge2
+
+
+class CreateJudgeResponse(TypedDict, closed=True):
+    judge_id: str
+    judge_version_id: str
+    implementation_id: str
+
+
+class UpdateJudgeRequestUpdateNewVersionActionConfig(TypedDict, closed=True):
+    action_groups: list[JudgeActionGroup]
+
+
+class UpdateJudgeRequestUpdateNewVersionTargetVersion(TypedDict, closed=True):
+    major: int
+    minor: int
+
+
+class UpdateJudgeRequestUpdateNewVersionAdvancedSettingsOnlineSpanTriggers(
+    TypedDict, closed=True
+):
+    kind: Literal["and", "or"]
+    conditions: list[Any]
+
+
+class UpdateJudgeRequestUpdateNewVersionAdvancedSettings(TypedDict, closed=True):
+    online_environment_names: list[str]
+    online_evaluation_mode: Literal["continuous", "on_demand"]
+    online_sampling_rate: float
+    online_span_triggers: (
+        Any | UpdateJudgeRequestUpdateNewVersionAdvancedSettingsOnlineSpanTriggers
+    )
+    online_session_scoring: bool
+    session_evaluation_count_enabled: bool
+    session_evaluation_idle_enabled: bool
+    session_evaluation_min_candidate_traces: float
+    session_evaluation_max_wait_minutes: float
+
+
+class UpdateJudgeRequestUpdateNewVersionConfig(TypedDict, closed=True):
+    prompt: str
+    description: str
+    reasoningLevel: Literal["lite", "normal", "high"]
+    minScore: float
+    maxScore: float
+
+
+class UpdateJudgeRequestUpdateNewVersion(TypedDict, closed=True):
+    actionConfig: NotRequired[UpdateJudgeRequestUpdateNewVersionActionConfig]
+    targetVersion: UpdateJudgeRequestUpdateNewVersionTargetVersion
+    promoteToProduction: bool
+    advancedSettings: UpdateJudgeRequestUpdateNewVersionAdvancedSettings
+    judgeType: Literal["prompt"]
+    config: UpdateJudgeRequestUpdateNewVersionConfig
+    scoreType: Literal["binary"]
+
+
+class UpdateJudgeRequestUpdateNewVersion1ActionConfig(TypedDict, closed=True):
+    action_groups: list[JudgeActionGroup]
+
+
+class UpdateJudgeRequestUpdateNewVersion1TargetVersion(TypedDict, closed=True):
+    major: int
+    minor: int
+
+
+class UpdateJudgeRequestUpdateNewVersion1AdvancedSettingsOnlineSpanTriggers(
+    TypedDict, closed=True
+):
+    kind: Literal["and", "or"]
+    conditions: list[Any]
+
+
+class UpdateJudgeRequestUpdateNewVersion1AdvancedSettings(TypedDict, closed=True):
+    online_environment_names: list[str]
+    online_evaluation_mode: Literal["continuous", "on_demand"]
+    online_sampling_rate: float
+    online_span_triggers: (
+        Any | UpdateJudgeRequestUpdateNewVersion1AdvancedSettingsOnlineSpanTriggers
+    )
+    online_session_scoring: bool
+    session_evaluation_count_enabled: bool
+    session_evaluation_idle_enabled: bool
+    session_evaluation_min_candidate_traces: float
+    session_evaluation_max_wait_minutes: float
+
+
+class UpdateJudgeRequestUpdateNewVersion1Config(TypedDict, closed=True):
+    prompt: str
+    description: str
+    reasoningLevel: Literal["lite", "normal", "high"]
+    minScore: float
+    maxScore: float
+
+
+class UpdateJudgeRequestUpdateNewVersion1(TypedDict, closed=True):
+    actionConfig: NotRequired[UpdateJudgeRequestUpdateNewVersion1ActionConfig]
+    targetVersion: UpdateJudgeRequestUpdateNewVersion1TargetVersion
+    promoteToProduction: bool
+    advancedSettings: UpdateJudgeRequestUpdateNewVersion1AdvancedSettings
+    judgeType: Literal["prompt"]
+    config: UpdateJudgeRequestUpdateNewVersion1Config
+    scoreType: Literal["numeric"]
+
+
+class UpdateJudgeRequestUpdateNewVersion2ActionConfig(TypedDict, closed=True):
+    action_groups: list[JudgeActionGroup]
+
+
+class UpdateJudgeRequestUpdateNewVersion2TargetVersion(TypedDict, closed=True):
+    major: int
+    minor: int
+
+
+class UpdateJudgeRequestUpdateNewVersion2AdvancedSettingsOnlineSpanTriggers(
+    TypedDict, closed=True
+):
+    kind: Literal["and", "or"]
+    conditions: list[Any]
+
+
+class UpdateJudgeRequestUpdateNewVersion2AdvancedSettings(TypedDict, closed=True):
+    online_environment_names: list[str]
+    online_evaluation_mode: Literal["continuous", "on_demand"]
+    online_sampling_rate: float
+    online_span_triggers: (
+        Any | UpdateJudgeRequestUpdateNewVersion2AdvancedSettingsOnlineSpanTriggers
+    )
+    online_session_scoring: bool
+    session_evaluation_count_enabled: bool
+    session_evaluation_idle_enabled: bool
+    session_evaluation_min_candidate_traces: float
+    session_evaluation_max_wait_minutes: float
+
+
+class UpdateJudgeRequestUpdateNewVersion2Config(TypedDict, closed=True):
+    prompt: str
+    description: str
+    reasoningLevel: Literal["lite", "normal", "high"]
+    minScore: float
+    maxScore: float
+
+
+class UpdateJudgeRequestUpdateNewVersion2Outputs(TypedDict, closed=True):
+    behaviorId: str
+
+
+class UpdateJudgeRequestUpdateNewVersion2Outputs1(TypedDict, closed=True):
+    name: str
+    description: str
+    categoryIds: NotRequired[list[str]]
+
+
+class UpdateJudgeRequestUpdateNewVersion2(TypedDict, closed=True):
+    actionConfig: NotRequired[UpdateJudgeRequestUpdateNewVersion2ActionConfig]
+    targetVersion: UpdateJudgeRequestUpdateNewVersion2TargetVersion
+    promoteToProduction: bool
+    advancedSettings: UpdateJudgeRequestUpdateNewVersion2AdvancedSettings
+    judgeType: Literal["prompt"]
+    config: UpdateJudgeRequestUpdateNewVersion2Config
+    scoreType: Literal["categorical"]
+    outputs: list[
+        UpdateJudgeRequestUpdateNewVersion2Outputs
+        | UpdateJudgeRequestUpdateNewVersion2Outputs1
+    ]
+
+
+class UpdateJudgeRequestUpdateNewVersion3ActionConfig(TypedDict, closed=True):
+    action_groups: list[JudgeActionGroup]
+
+
+class UpdateJudgeRequestUpdateNewVersion3TargetVersion(TypedDict, closed=True):
+    major: int
+    minor: int
+
+
+class UpdateJudgeRequestUpdateNewVersion3AdvancedSettingsOnlineSpanTriggers(
+    TypedDict, closed=True
+):
+    kind: Literal["and", "or"]
+    conditions: list[Any]
+
+
+class UpdateJudgeRequestUpdateNewVersion3AdvancedSettings(TypedDict, closed=True):
+    online_environment_names: list[str]
+    online_evaluation_mode: Literal["continuous", "on_demand"]
+    online_sampling_rate: float
+    online_span_triggers: (
+        Any | UpdateJudgeRequestUpdateNewVersion3AdvancedSettingsOnlineSpanTriggers
+    )
+    online_session_scoring: bool
+    session_evaluation_count_enabled: bool
+    session_evaluation_idle_enabled: bool
+    session_evaluation_min_candidate_traces: float
+    session_evaluation_max_wait_minutes: float
+
+
+class UpdateJudgeRequestUpdateNewVersion3Config(TypedDict, closed=True):
+    bundleBase64: str
+    entrypointPath: str
+    requirementsPath: NotRequired[str]
+    className: str
+    scorerType: NotRequired[Literal["example", "trace"]]
+    sdkVersion: NotRequired[int]
+    description: NotRequired[str]
+
+
+class UpdateJudgeRequestUpdateNewVersion3(TypedDict, closed=True):
+    actionConfig: NotRequired[UpdateJudgeRequestUpdateNewVersion3ActionConfig]
+    targetVersion: UpdateJudgeRequestUpdateNewVersion3TargetVersion
+    promoteToProduction: bool
+    advancedSettings: UpdateJudgeRequestUpdateNewVersion3AdvancedSettings
+    judgeType: Literal["custom"]
+    config: UpdateJudgeRequestUpdateNewVersion3Config
+    scoreType: Literal["binary"]
+
+
+class UpdateJudgeRequestUpdateNewVersion4ActionConfig(TypedDict, closed=True):
+    action_groups: list[JudgeActionGroup]
+
+
+class UpdateJudgeRequestUpdateNewVersion4TargetVersion(TypedDict, closed=True):
+    major: int
+    minor: int
+
+
+class UpdateJudgeRequestUpdateNewVersion4AdvancedSettingsOnlineSpanTriggers(
+    TypedDict, closed=True
+):
+    kind: Literal["and", "or"]
+    conditions: list[Any]
+
+
+class UpdateJudgeRequestUpdateNewVersion4AdvancedSettings(TypedDict, closed=True):
+    online_environment_names: list[str]
+    online_evaluation_mode: Literal["continuous", "on_demand"]
+    online_sampling_rate: float
+    online_span_triggers: (
+        Any | UpdateJudgeRequestUpdateNewVersion4AdvancedSettingsOnlineSpanTriggers
+    )
+    online_session_scoring: bool
+    session_evaluation_count_enabled: bool
+    session_evaluation_idle_enabled: bool
+    session_evaluation_min_candidate_traces: float
+    session_evaluation_max_wait_minutes: float
+
+
+class UpdateJudgeRequestUpdateNewVersion4Config(TypedDict, closed=True):
+    bundleBase64: str
+    entrypointPath: str
+    requirementsPath: NotRequired[str]
+    className: str
+    scorerType: NotRequired[Literal["example", "trace"]]
+    sdkVersion: NotRequired[int]
+    description: NotRequired[str]
+
+
+class UpdateJudgeRequestUpdateNewVersion4(TypedDict, closed=True):
+    actionConfig: NotRequired[UpdateJudgeRequestUpdateNewVersion4ActionConfig]
+    targetVersion: UpdateJudgeRequestUpdateNewVersion4TargetVersion
+    promoteToProduction: bool
+    advancedSettings: UpdateJudgeRequestUpdateNewVersion4AdvancedSettings
+    judgeType: Literal["custom"]
+    config: UpdateJudgeRequestUpdateNewVersion4Config
+    scoreType: Literal["numeric"]
+
+
+class UpdateJudgeRequestUpdateNewVersion5ActionConfig(TypedDict, closed=True):
+    action_groups: list[JudgeActionGroup]
+
+
+class UpdateJudgeRequestUpdateNewVersion5TargetVersion(TypedDict, closed=True):
+    major: int
+    minor: int
+
+
+class UpdateJudgeRequestUpdateNewVersion5AdvancedSettingsOnlineSpanTriggers(
+    TypedDict, closed=True
+):
+    kind: Literal["and", "or"]
+    conditions: list[Any]
+
+
+class UpdateJudgeRequestUpdateNewVersion5AdvancedSettings(TypedDict, closed=True):
+    online_environment_names: list[str]
+    online_evaluation_mode: Literal["continuous", "on_demand"]
+    online_sampling_rate: float
+    online_span_triggers: (
+        Any | UpdateJudgeRequestUpdateNewVersion5AdvancedSettingsOnlineSpanTriggers
+    )
+    online_session_scoring: bool
+    session_evaluation_count_enabled: bool
+    session_evaluation_idle_enabled: bool
+    session_evaluation_min_candidate_traces: float
+    session_evaluation_max_wait_minutes: float
+
+
+class UpdateJudgeRequestUpdateNewVersion5Config(TypedDict, closed=True):
+    bundleBase64: str
+    entrypointPath: str
+    requirementsPath: NotRequired[str]
+    className: str
+    scorerType: NotRequired[Literal["example", "trace"]]
+    sdkVersion: NotRequired[int]
+    description: NotRequired[str]
+
+
+class UpdateJudgeRequestUpdateNewVersion5Outputs(TypedDict, closed=True):
+    behaviorId: str
+
+
+class UpdateJudgeRequestUpdateNewVersion5Outputs1(TypedDict, closed=True):
+    name: str
+    description: str
+    categoryIds: NotRequired[list[str]]
+
+
+class UpdateJudgeRequestUpdateNewVersion5(TypedDict, closed=True):
+    actionConfig: NotRequired[UpdateJudgeRequestUpdateNewVersion5ActionConfig]
+    targetVersion: UpdateJudgeRequestUpdateNewVersion5TargetVersion
+    promoteToProduction: bool
+    advancedSettings: UpdateJudgeRequestUpdateNewVersion5AdvancedSettings
+    judgeType: Literal["custom"]
+    config: UpdateJudgeRequestUpdateNewVersion5Config
+    scoreType: Literal["categorical"]
+    outputs: list[
+        UpdateJudgeRequestUpdateNewVersion5Outputs
+        | UpdateJudgeRequestUpdateNewVersion5Outputs1
+    ]
+
+
+class UpdateJudgeRequestUpdateNewVersion6ActionConfig(TypedDict, closed=True):
+    action_groups: list[JudgeActionGroup]
+
+
+class UpdateJudgeRequestUpdateNewVersion6TargetVersion(TypedDict, closed=True):
+    major: int
+    minor: int
+
+
+class UpdateJudgeRequestUpdateNewVersion6AdvancedSettingsOnlineSpanTriggers(
+    TypedDict, closed=True
+):
+    kind: Literal["and", "or"]
+    conditions: list[Any]
+
+
+class UpdateJudgeRequestUpdateNewVersion6AdvancedSettings(TypedDict, closed=True):
+    online_environment_names: list[str]
+    online_evaluation_mode: Literal["continuous", "on_demand"]
+    online_sampling_rate: float
+    online_span_triggers: (
+        Any | UpdateJudgeRequestUpdateNewVersion6AdvancedSettingsOnlineSpanTriggers
+    )
+    online_session_scoring: bool
+    session_evaluation_count_enabled: bool
+    session_evaluation_idle_enabled: bool
+    session_evaluation_min_candidate_traces: float
+    session_evaluation_max_wait_minutes: float
+
+
+class UpdateJudgeRequestUpdateNewVersion6Config(TypedDict, closed=True):
+    expression: Any
+
+
+class UpdateJudgeRequestUpdateNewVersion6(TypedDict, closed=True):
+    actionConfig: NotRequired[UpdateJudgeRequestUpdateNewVersion6ActionConfig]
+    targetVersion: UpdateJudgeRequestUpdateNewVersion6TargetVersion
+    promoteToProduction: bool
+    advancedSettings: UpdateJudgeRequestUpdateNewVersion6AdvancedSettings
+    judgeType: Literal["deterministic"]
+    config: UpdateJudgeRequestUpdateNewVersion6Config
+    scoreType: Literal["binary"]
+
+
+class UpdateJudgeRequestUpdateNewVersion7ActionConfig(TypedDict, closed=True):
+    action_groups: list[JudgeActionGroup]
+
+
+class UpdateJudgeRequestUpdateNewVersion7TargetVersion(TypedDict, closed=True):
+    major: int
+    minor: int
+
+
+class UpdateJudgeRequestUpdateNewVersion7AdvancedSettingsOnlineSpanTriggers(
+    TypedDict, closed=True
+):
+    kind: Literal["and", "or"]
+    conditions: list[Any]
+
+
+class UpdateJudgeRequestUpdateNewVersion7AdvancedSettings(TypedDict, closed=True):
+    online_environment_names: list[str]
+    online_evaluation_mode: Literal["continuous", "on_demand"]
+    online_sampling_rate: float
+    online_span_triggers: (
+        Any | UpdateJudgeRequestUpdateNewVersion7AdvancedSettingsOnlineSpanTriggers
+    )
+    online_session_scoring: bool
+    session_evaluation_count_enabled: bool
+    session_evaluation_idle_enabled: bool
+    session_evaluation_min_candidate_traces: float
+    session_evaluation_max_wait_minutes: float
+
+
+class UpdateJudgeRequestUpdateNewVersion7Config(TypedDict, closed=True):
+    expression: Any
+
+
+class UpdateJudgeRequestUpdateNewVersion7Outputs(TypedDict, closed=True):
+    behaviorId: str
+
+
+class UpdateJudgeRequestUpdateNewVersion7Outputs1(TypedDict, closed=True):
+    name: str
+    description: str
+    categoryIds: NotRequired[list[str]]
+
+
+class UpdateJudgeRequestUpdateNewVersion7(TypedDict, closed=True):
+    actionConfig: NotRequired[UpdateJudgeRequestUpdateNewVersion7ActionConfig]
+    targetVersion: UpdateJudgeRequestUpdateNewVersion7TargetVersion
+    promoteToProduction: bool
+    advancedSettings: UpdateJudgeRequestUpdateNewVersion7AdvancedSettings
+    judgeType: Literal["deterministic"]
+    config: UpdateJudgeRequestUpdateNewVersion7Config
+    scoreType: Literal["categorical"]
+    outputs: list[
+        UpdateJudgeRequestUpdateNewVersion7Outputs
+        | UpdateJudgeRequestUpdateNewVersion7Outputs1
+    ]
+
+
+class UpdateJudgeRequestUpdate(TypedDict, closed=True):
+    judgeDescription: NotRequired[str]
+    newVersion: NotRequired[
+        UpdateJudgeRequestUpdateNewVersion
+        | UpdateJudgeRequestUpdateNewVersion1
+        | UpdateJudgeRequestUpdateNewVersion2
+        | UpdateJudgeRequestUpdateNewVersion3
+        | UpdateJudgeRequestUpdateNewVersion4
+        | UpdateJudgeRequestUpdateNewVersion5
+        | UpdateJudgeRequestUpdateNewVersion6
+        | UpdateJudgeRequestUpdateNewVersion7
+    ]
+
+
+class UpdateJudgeRequest(TypedDict, closed=True):
+    update: UpdateJudgeRequestUpdate
+
+
+class UpdateJudgeResponse(TypedDict, closed=True):
+    judge_id: str
+    judge_version_id: str
+    implementation_id: str
+
+
+class JudgeLookupRequestVersion(TypedDict, closed=True):
+    major: int
+    minor: int
+
+
+class JudgeLookupRequest(TypedDict, closed=True):
+    include_code_url: NotRequired[bool]
+    version: NotRequired[Literal["latest", "production"] | JudgeLookupRequestVersion]
+
+
+class JudgeLookupResponseOptimisticEvalEligibility(TypedDict, closed=True):
+    supported: bool
+    byok_enabled: bool
+    saas_runtime: bool
+    blockers: list[
+        Literal[
+            "unsupported_runtime",
+            "byok_enabled",
+            "unsupported_judge_type",
+            "unsupported_output_type",
+            "missing_categorical_outputs",
+            "session_scope",
+        ]
+    ]
+
+
+class JudgeLookupResponseJudgeOutput(TypedDict, closed=True):
+    behavior_id: str
+    name: str
+    description: str
+
+
+class JudgeLookupResponseJudgeUpdatedBy(TypedDict, closed=True):
+    user_id: str
+    first_name: str
+    last_name: str
+    user_email: str
+
+
+class JudgeLookupResponseJudgeActionConfig(TypedDict, closed=True):
+    action_groups: list[JudgeActionGroup]
+
+
+class JudgeLookupResponseJudgeOnlineSpanTriggers(TypedDict, closed=True):
+    kind: Literal["and", "or"]
+    conditions: list[Any]
+
+
+class JudgeLookupResponseJudgeDefinition(TypedDict, closed=True):
+    id: str
+    description: str
+    prompt: str
+    reasoning_level: Literal["lite", "normal", "high"]
+    min_score: float
+    max_score: float
+    model: str
+    threshold: float
+
+
+class JudgeLookupResponseJudge(TypedDict, closed=True):
+    id: str
+    name: str
+    judge_description: str
+    knowledge_file_id: str
+    score_type: Literal["numeric", "binary", "categorical"]
+    outputs: list[JudgeLookupResponseJudgeOutput]
+    judge_version_id: str
+    judge_major_version: float
+    judge_minor_version: float
+    is_latest: bool
+    is_production: bool
+    optimistic_eval_enabled: bool
+    preprocessor_artifact_revision_id: str
+    version_created_at: str
+    version_updated_at: str
+    updated_by: JudgeLookupResponseJudgeUpdatedBy
+    online_environment_names: list[str]
+    online_evaluation_mode: Literal["continuous", "on_demand"]
+    action_config: NotRequired[JudgeLookupResponseJudgeActionConfig]
+    online_sampling_rate: float
+    online_span_triggers: Any | JudgeLookupResponseJudgeOnlineSpanTriggers
+    online_session_scoring: bool
+    session_evaluation_count_enabled: bool
+    session_evaluation_idle_enabled: bool
+    session_evaluation_min_candidate_traces: float
+    session_evaluation_max_wait_minutes: float
+    judge_type: Literal["prompt"]
+    definition: JudgeLookupResponseJudgeDefinition
+
+
+class JudgeLookupResponseJudge1Output(TypedDict, closed=True):
+    behavior_id: str
+    name: str
+    description: str
+
+
+class JudgeLookupResponseJudge1UpdatedBy(TypedDict, closed=True):
+    user_id: str
+    first_name: str
+    last_name: str
+    user_email: str
+
+
+class JudgeLookupResponseJudge1ActionConfig(TypedDict, closed=True):
+    action_groups: list[JudgeActionGroup]
+
+
+class JudgeLookupResponseJudge1OnlineSpanTriggers(TypedDict, closed=True):
+    kind: Literal["and", "or"]
+    conditions: list[Any]
+
+
+class JudgeLookupResponseJudge1Definition(TypedDict, closed=True):
+    id: str
+    description: str
+    class_name: str
+    entrypoint_path: str
+    requirements_path: str
+    scorer_type: Literal["example", "trace"]
+    sdk_version: float
+    code_url: NotRequired[str]
+
+
+class JudgeLookupResponseJudge1(TypedDict, closed=True):
+    id: str
+    name: str
+    judge_description: str
+    knowledge_file_id: str
+    score_type: Literal["numeric", "binary", "categorical"]
+    outputs: list[JudgeLookupResponseJudge1Output]
+    judge_version_id: str
+    judge_major_version: float
+    judge_minor_version: float
+    is_latest: bool
+    is_production: bool
+    optimistic_eval_enabled: bool
+    preprocessor_artifact_revision_id: str
+    version_created_at: str
+    version_updated_at: str
+    updated_by: JudgeLookupResponseJudge1UpdatedBy
+    online_environment_names: list[str]
+    online_evaluation_mode: Literal["continuous", "on_demand"]
+    action_config: NotRequired[JudgeLookupResponseJudge1ActionConfig]
+    online_sampling_rate: float
+    online_span_triggers: Any | JudgeLookupResponseJudge1OnlineSpanTriggers
+    online_session_scoring: bool
+    session_evaluation_count_enabled: bool
+    session_evaluation_idle_enabled: bool
+    session_evaluation_min_candidate_traces: float
+    session_evaluation_max_wait_minutes: float
+    judge_type: Literal["custom"]
+    definition: JudgeLookupResponseJudge1Definition
+
+
+class JudgeLookupResponseJudge2Output(TypedDict, closed=True):
+    behavior_id: str
+    name: str
+    description: str
+
+
+class JudgeLookupResponseJudge2UpdatedBy(TypedDict, closed=True):
+    user_id: str
+    first_name: str
+    last_name: str
+    user_email: str
+
+
+class JudgeLookupResponseJudge2ActionConfig(TypedDict, closed=True):
+    action_groups: list[JudgeActionGroup]
+
+
+class JudgeLookupResponseJudge2OnlineSpanTriggers(TypedDict, closed=True):
+    kind: Literal["and", "or"]
+    conditions: list[Any]
+
+
+class JudgeLookupResponseJudge2Definition(TypedDict, closed=True):
+    id: str
+    expression: Any
+
+
+class JudgeLookupResponseJudge2(TypedDict, closed=True):
+    id: str
+    name: str
+    judge_description: str
+    knowledge_file_id: str
+    score_type: Literal["numeric", "binary", "categorical"]
+    outputs: list[JudgeLookupResponseJudge2Output]
+    judge_version_id: str
+    judge_major_version: float
+    judge_minor_version: float
+    is_latest: bool
+    is_production: bool
+    optimistic_eval_enabled: bool
+    preprocessor_artifact_revision_id: str
+    version_created_at: str
+    version_updated_at: str
+    updated_by: JudgeLookupResponseJudge2UpdatedBy
+    online_environment_names: list[str]
+    online_evaluation_mode: Literal["continuous", "on_demand"]
+    action_config: NotRequired[JudgeLookupResponseJudge2ActionConfig]
+    online_sampling_rate: float
+    online_span_triggers: Any | JudgeLookupResponseJudge2OnlineSpanTriggers
+    online_session_scoring: bool
+    session_evaluation_count_enabled: bool
+    session_evaluation_idle_enabled: bool
+    session_evaluation_min_candidate_traces: float
+    session_evaluation_max_wait_minutes: float
+    judge_type: Literal["deterministic"]
+    definition: JudgeLookupResponseJudge2Definition
+
+
+class JudgeLookupResponse(TypedDict, closed=True):
+    optimistic_eval_eligibility: JudgeLookupResponseOptimisticEvalEligibility
+    judge: (
+        JudgeLookupResponseJudge | JudgeLookupResponseJudge1 | JudgeLookupResponseJudge2
+    )

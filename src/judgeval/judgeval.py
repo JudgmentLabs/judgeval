@@ -458,9 +458,8 @@ class Judgeval:
             ```python
             judge = client.agent_judges.create(
                 name="helpfulness",
-                prompt="Score the assistant's helpfulness from 0 to 1.",
-                model="gpt-5.2",
-                score_type="numeric",
+                prompt="Did the assistant answer the user's question?",
+                score_type="binary",
             )
 
             client.agent_judges.update(
