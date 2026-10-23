@@ -48,6 +48,7 @@ class RunSummary(TypedDict):
     cases_with_output: int
     cases_scored: int
     cases_passed: int
+    cancelled_at: Optional[str]
     created_at: str
 
 
@@ -235,6 +236,14 @@ class TestSuitesClient:
         return self._call(
             "POST",
             f"{_segment(project_id)}/test-suites/runs/{_segment(run_id)}/score",
+        )
+
+    def post_projects_test_suites_runs_by_run_id_cancel(
+        self, project_id: str, run_id: str
+    ) -> Dict[str, Any]:
+        return self._call(
+            "POST",
+            f"{_segment(project_id)}/test-suites/runs/{_segment(run_id)}/cancel",
         )
 
 
@@ -472,6 +481,19 @@ class TestRunsFactory(ProjectScopedFactory):
         """
         return self._api.post_projects_test_suites_runs_by_run_id_score(
             self._project, run_id
+        )
+
+    def cancel(self, run_id: str) -> RunSummary:
+        """Cancel a run so its unscored cases aren't scored.
+
+        Traces can still arrive, but they aren't scored. Cases already scored stay
+        scored. Call ``score`` later to score the traces in a new run.
+        """
+        return cast(
+            RunSummary,
+            self._api.post_projects_test_suites_runs_by_run_id_cancel(
+                self._project, run_id
+            ),
         )
 
 
