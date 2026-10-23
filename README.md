@@ -35,7 +35,7 @@ To get started, dive into the [docs](https://docs.judgmentlabs.ai/documentation)
 
 **Online monitoring** -- Automatically score live production traffic server-side with no latency impact. When a judge applies a label, that label surfaces as a structured signal — configure Slack alerts so regressions and recurrences never go unnoticed.
 
-**Broad integrations** -- Auto-instrumentation for OpenAI, Anthropic, Google GenAI, and Together AI. Framework support for LangGraph, OpenLit, and Claude Agent SDK.
+**Broad integrations** -- Auto-instrumentation for OpenAI, Anthropic, Google GenAI, and Together AI. Framework support for LangGraph, and Claude Agent SDK.
 
 ## Quickstart
 
@@ -123,7 +123,7 @@ Validation and execution errors use the SDK's existing exception mapping.
 
 ## Integrations
 
-Supports OpenAI, Anthropic, Google GenAI, Together AI, LangGraph, OpenLit, and Claude Agent SDK. See the full [integrations docs](https://docs.judgmentlabs.ai/documentation/integrations/introduction).
+Supports OpenAI, Anthropic, Google GenAI, Together AI, LangGraph, and Claude Agent SDK. See the full [integrations docs](https://docs.judgmentlabs.ai/documentation/integrations/introduction).
 
 ## CLI
 
