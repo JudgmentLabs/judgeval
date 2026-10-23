@@ -32,6 +32,21 @@ def test_start_posts_to_the_test_and_drops_unset_fields():
     )
 
 
+def test_cancel_posts_to_the_run_and_returns_it():
+    client = _client({"run_id": "r1", "cancelled_at": "2026-10-22T00:00:00Z"})
+    runs = testing.TestRunsFactory(client, "p1", "proj")
+
+    run = runs.cancel("r1")
+
+    assert run == {"run_id": "r1", "cancelled_at": "2026-10-22T00:00:00Z"}
+    client._request.assert_called_once_with(
+        "POST",
+        "https://api.example.com/v1/projects/p1/test-suites/runs/r1/cancel",
+        {},
+        None,
+    )
+
+
 def test_an_id_that_leaves_the_test_suites_route_is_rejected():
     client = _client()
     suites = testing.TestSuitesFactory(client, "p1", "proj")
