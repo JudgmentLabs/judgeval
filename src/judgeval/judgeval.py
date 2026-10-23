@@ -1,6 +1,16 @@
 from __future__ import annotations
 import warnings
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    TypedDict,
+    cast,
+)
 
 from judgeval.internal.api import JudgmentSyncClient
 from judgeval.exceptions import (
@@ -20,13 +30,14 @@ if TYPE_CHECKING:
 
     from judgeval.data.example import Example
     from judgeval.trace.offline_tracer import OfflineTracer
-    from judgeval.jql import (
-        DiscoveryKind,
-        JqlPresentationResponse,
-        JqlQueryResponse,
-        SqlResponse,
-        QueryInput,
-    )
+
+
+class SqlResponse(TypedDict):
+    catalog_version: str
+    columns: List[Dict[str, Any]]
+    rows: List[Dict[str, Any]]
+    row_count: int
+    elapsed_ms: float
 
 
 class Judgeval:
@@ -194,34 +205,13 @@ class Judgeval:
             _stacklevel=3,
         )
 
-    def query(
-        self,
-        query: "QueryInput",
-        *,
-        limit: Optional[int] = None,
-        trace_ids: Optional[Sequence[str]] = None,
-        session_ids: Optional[Sequence[str]] = None,
-    ) -> "JqlQueryResponse":
-        """Run a legacy JQL query, optionally narrowed by trace or session IDs.
-
-        **Deprecated.** Use [`sql()`](#sql) for new integrations, with SQL
-        predicates to narrow results. Existing JQL calls remain supported.
-        """
-        from judgeval.jql import to_json
-
-        return cast(
-            "JqlQueryResponse",
-            self._run_jql("query", to_json(query), limit, trace_ids, session_ids),
-        )
-
     def discover_schema(self) -> str:
         """Return the SQL schema reference as Markdown.
 
         Mirrors MCP ``discover_schema``: published tables, column types and
         descriptions, row semantics, examples, and query limits. Fetches the
         server's generated catalog using this client's credentials. Contains
-        no project data and does not require a resolved project or public
-        query opt-in.
+        no project data and does not require a resolved project.
 
         Returns:
             The virtual schema reference as a Markdown string.
@@ -236,13 +226,13 @@ class Judgeval:
         )
         return cast(str, response["schema"])
 
-    def sql(self, sql_text: str) -> "SqlResponse":
+    def sql(self, sql_text: str) -> SqlResponse:
         """Run one read-only SQL SELECT for this organization and project.
 
-        Prefer this method for new read-only queries. The server derives tenant
-        scope from the client's credentials and resolved project.
+        The server derives tenant scope from the client's credentials and
+        resolved project.
         Call `discover_schema()` for supported tables and columns. Requires
-        viewer access and public SDK/API queries enabled for the organization.
+        viewer access.
 
         Results are capped by the server at 1,000 rows and 5 MiB; exceeding
         either cap returns an error. Use SQL predicates and LIMIT to narrow
@@ -267,7 +257,7 @@ class Judgeval:
         project_id = self._require_query_project_id()
         try:
             return cast(
-                "SqlResponse",
+                SqlResponse,
                 self._internal_client._request(
                     "POST",
                     url_for(f"/v1/projects/{project_id}/sql", self._api_url),
@@ -279,85 +269,6 @@ class Judgeval:
             if mapped is error:
                 raise
             raise mapped from error
-
-    def present(
-        self,
-        query: "QueryInput",
-        *,
-        limit: Optional[int] = None,
-        trace_ids: Optional[Sequence[str]] = None,
-        session_ids: Optional[Sequence[str]] = None,
-    ) -> "JqlPresentationResponse":
-        """Run a legacy JQL chart or table query.
-
-        **Deprecated.** Use [`sql()`](#sql) for new queries and render its
-        rows as charts or tables in your application. SQL does not return a
-        JQL presentation frame. Existing presentation calls and their frame
-        responses remain supported.
-        """
-        from judgeval.jql import to_json
-
-        return cast(
-            "JqlPresentationResponse",
-            self._run_jql(
-                "query/presentation", to_json(query), limit, trace_ids, session_ids
-            ),
-        )
-
-    def _run_jql(
-        self,
-        path: str,
-        query: Dict[str, Any],
-        limit: Optional[int],
-        trace_ids: Optional[Sequence[str]],
-        session_ids: Optional[Sequence[str]],
-    ) -> Any:
-        if trace_ids is not None and session_ids is not None:
-            raise ValueError("trace_ids and session_ids are mutually exclusive")
-        project_id = self._require_query_project_id()
-        payload: Dict[str, Any] = {"query": query}
-        if limit is not None:
-            payload["limit"] = limit
-        if trace_ids is not None:
-            payload["trace_ids"] = list(trace_ids)
-        if session_ids is not None:
-            payload["session_ids"] = list(session_ids)
-        try:
-            return self._internal_client._request(
-                "POST",
-                url_for(f"/v1/projects/{project_id}/{path}", self._api_url),
-                payload,
-            )
-        except JudgmentAPIError as error:
-            mapped = map_judgment_api_error(error)
-            if mapped is error:
-                raise
-            raise mapped from error
-
-    def discover(
-        self,
-        kind: "DiscoveryKind",
-        *,
-        limit: Optional[int] = None,
-        trace_ids: Optional[Sequence[str]] = None,
-        session_ids: Optional[Sequence[str]] = None,
-        **options: Any,
-    ) -> "JqlQueryResponse":
-        """Discover project-scoped judges, fields, models, and related values.
-
-        **Deprecated.** Use [`discover_schema()`](#discover_schema) to inspect
-        the SQL tables and columns, then [`sql()`](#sql) to query project values.
-        Schema discovery returns documentation, not project data. Existing
-        JQL discovery calls remain supported; SQL returns a different row schema.
-        """
-        from judgeval.jql import discovery
-
-        return self.query(
-            discovery(kind, **options),
-            limit=limit,
-            trace_ids=trace_ids,
-            session_ids=session_ids,
-        )
 
     def _require_query_project_id(self) -> str:
         if not self._project_id:

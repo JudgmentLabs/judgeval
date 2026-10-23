@@ -4,13 +4,11 @@
 from __future__ import annotations
 
 import subprocess
-import sys
 import tarfile
 import zipfile
 from pathlib import Path
 
 
-PRIVATE_SOURCE_MARKER = b"PRIVATE MONOREPO CONTENT"
 MAX_ARCHIVE_FILES = 1_000
 MAX_ARCHIVE_BYTES = 5 * 1024 * 1024
 MAX_UNPACKED_BYTES = 10 * 1024 * 1024
@@ -18,7 +16,6 @@ SDIST_METADATA = {
     ".gitignore",
     "LICENSE.md",
     "README.md",
-    "hatch_build.py",
     "pyproject.toml",
     "PKG-INFO",
 }
@@ -121,19 +118,7 @@ def distribution_errors(path: Path, tracked: set[str]) -> list[str]:
         errors.append(
             f"unpacked size is {unpacked_bytes} bytes; limit is {MAX_UNPACKED_BYTES}"
         )
-
-    marked = sorted(
-        name for name, content in files.items() if PRIVATE_SOURCE_MARKER in content
-    )
-    if marked:
-        errors.append(f"private-source marker found in: {', '.join(marked)}")
     return errors
-
-
-def plant_marker() -> None:
-    marker = Path(".jql-source/judgment-mono/PRIVATE_SOURCE_MARKER")
-    marker.parent.mkdir(parents=True, exist_ok=True)
-    marker.write_bytes(PRIVATE_SOURCE_MARKER)
 
 
 def main() -> None:
@@ -154,7 +139,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    if "--plant" in sys.argv:
-        plant_marker()
-    else:
-        main()
+    main()
