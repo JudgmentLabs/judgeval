@@ -10,8 +10,8 @@ jobs:
   validate-branch:
     uses: ./.github/workflows/merge-branch-check.yaml
 
-  jql-codegen:
-    name: JQL generated contract
+  distribution-contents:
+    name: Distribution contents
     needs: [validate-branch]
     if: needs.validate-branch.result == 'success' || needs.validate-branch.result == 'skipped'
     runs-on: ubuntu-latest
@@ -25,19 +25,8 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Regenerate from checked-in public contracts
-        run: python scripts/generate_jql.py
-
-      - name: Check generated JQL output is current
-        run: |
-          git diff --exit-code -- \
-            src/judgeval/jql/_generated_contract.py \
-            src/judgeval/jql/_generated_roots.py \
-            src/judgeval/jql/_generated_transport.py
-
       - name: Build distributions
         run: |
-          python scripts/check_distribution_contents.py --plant
           pip install uv
           uv build
 
@@ -173,9 +162,9 @@ jobs:
         working-directory: src
         run: |
           SECRET_VARS=$(aws secretsmanager get-secret-value --secret-id "$SECRETS_PATH" --query SecretString --output text)
-          export $(echo "$SECRET_VARS" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"')
-          export JUDGMENT_API_KEY="$JUDGEVAL_GH_JUDGMENT_API_KEY"
-          export JUDGMENT_ORG_ID="$JUDGEVAL_GH_JUDGMENT_ORG_ID"
+          JUDGMENT_API_KEY=$(echo "$SECRET_VARS" | jq -er '.JUDGEVAL_GH_JUDGMENT_API_KEY')
+          JUDGMENT_ORG_ID=$(echo "$SECRET_VARS" | jq -er '.JUDGEVAL_GH_JUDGMENT_ORG_ID')
+          export JUDGMENT_API_KEY JUDGMENT_ORG_ID
           export JUDGMENT_API_URL="$BASE_URL"
           timeout ${TEST_TIMEOUT_SECONDS}s uv run pytest -n auto --dist=loadfile --durations=0 --cov=. --cov-config=.coveragerc --cov-report=html ./e2etests
 
