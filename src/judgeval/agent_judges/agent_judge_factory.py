@@ -207,11 +207,12 @@ class AgentJudgeFactory:
             source_major_version: Major version to copy unspecified fields
                 from. Defaults to the latest version.
             source_minor_version: Minor version to copy unspecified fields
-                from. Defaults to the latest version.
+                from. Defaults to the latest version; required when
+                `source_major_version` is an older major.
             target_major_version: Major version to write to. Defaults to
                 the current latest major.
             target_minor_version: Minor version to write to. Defaults to
-                `latest minor + 1`.
+                `latest minor + 1` in the latest major, else 0.
 
         Returns:
             The updated `AgentJudge`, or `None` if the project is unresolved.
@@ -241,33 +242,42 @@ class AgentJudgeFactory:
         if any(field is not None for field in version_fields):
             latest = self._lookup(project_id, judge_id)
             latest_major = int(latest["judge_major_version"])
+            latest_minor = int(latest["judge_minor_version"])
+            source_major = (
+                latest_major if source_major_version is None else source_major_version
+            )
+            # The lookup route takes an exact version, so an older major's
+            # latest minor can't be resolved.
+            if source_minor_version is None and source_major != latest_major:
+                raise ValueError(
+                    "source_minor_version is required when source_major_version "
+                    "is not the latest major"
+                )
             source = (
                 latest
-                if source_major_version is None and source_minor_version is None
+                if source_minor_version is None
                 else self._lookup(
                     project_id,
                     judge_id,
-                    {
-                        "major": latest_major
-                        if source_major_version is None
-                        else source_major_version,
-                        "minor": source_minor_version or 0,
-                    },
+                    {"major": source_major, "minor": source_minor_version},
                 )
             )
-            target: UpdateJudgeRequestUpdateNewVersionTargetVersion = (
-                {
-                    "major": latest_major,
-                    "minor": int(latest["judge_minor_version"]) + 1,
-                }
-                if target_major_version is None and target_minor_version is None
-                else {
-                    "major": latest_major
-                    if target_major_version is None
-                    else target_major_version,
-                    "minor": target_minor_version or 0,
-                }
+            target_major = (
+                latest_major if target_major_version is None else target_major_version
             )
+            if target_minor_version is not None:
+                target_minor = target_minor_version
+            elif target_major == latest_major:
+                target_minor = latest_minor + 1
+            else:
+                target_minor = 0
+            target: UpdateJudgeRequestUpdateNewVersionTargetVersion = {
+                "major": target_major,
+                "minor": target_minor,
+            }
+            # create() writes `binary` as a Pass/Fail categorical judge.
+            if score_type == "binary" and source["score_type"] == "categorical":
+                score_type = "categorical"
             new_version = _prompt_version(
                 source,
                 target,

@@ -238,6 +238,27 @@ class TestAgentJudgeFactoryUpdate:
         factory.update(judge_id="judge-1", source_minor_version=1)
         assert _lookup_versions(client)[1] == {"major": 1, "minor": 1}
 
+    def test_update_target_major_alone_bumps_latest_minor(self):
+        factory, client = _make_factory()
+        factory.update(judge_id="judge-1", prompt="x", target_major_version=1)
+        assert _patch_body(client)["update"]["newVersion"]["targetVersion"] == {
+            "major": 1,
+            "minor": 3,
+        }
+
+    def test_update_requires_source_minor_for_an_older_major(self):
+        factory, client = _make_factory()
+        with pytest.raises(ValueError, match="source_minor_version is required"):
+            factory.update(judge_id="judge-1", source_major_version=0)
+        client.patch_projects_judges_by_judge_id.assert_not_called()
+
+    def test_update_binary_on_a_pass_fail_judge_stays_categorical(self):
+        factory, client = _make_factory(lookups=[CATEGORICAL])
+        factory.update(judge_id="judge-1", prompt="x", score_type="binary")
+        assert _patch_body(client)["update"]["newVersion"]["scoreType"] == (
+            "categorical"
+        )
+
     def test_update_reuses_behaviors_for_matching_category_names(self):
         factory, client = _make_factory(lookups=[CATEGORICAL])
         factory.update(
