@@ -10,8 +10,8 @@ from judgeval.internal.api.models import (
     CreateJudgeRequestJudgeConfig,
     CreateJudgeRequestJudgeInitialVersion,
     CreateJudgeRequestJudgeInitialVersionOutput,
-    JudgeLookupRequestVersion,
-    JudgeLookupResponseJudge,
+    GetJudgeRequestVersion,
+    GetJudgeResponseJudge,
     UpdateJudgeRequestUpdate,
     UpdateJudgeRequestUpdateNewVersion,
     UpdateJudgeRequestUpdateNewVersion1,
@@ -32,7 +32,7 @@ _BINARY_OUTPUTS: List[CreateJudgeRequestJudgeInitialVersionOutput] = [
     {"name": "Fail", "description": "The output does not meet the rubric."},
 ]
 
-JudgeVersion = Union[Literal["latest", "production"], JudgeLookupRequestVersion]
+JudgeVersion = Union[Literal["latest", "production"], GetJudgeRequestVersion]
 PromptVersion = Union[
     UpdateJudgeRequestUpdateNewVersion,
     UpdateJudgeRequestUpdateNewVersion1,
@@ -239,18 +239,22 @@ class AgentJudgeFactory:
             target_minor_version,
         )
         if any(field is not None for field in version_fields):
-            has_source = (
-                source_major_version is not None or source_minor_version is not None
-            )
-            source = self._lookup(
-                project_id,
-                judge_id,
-                {"major": source_major_version or 0, "minor": source_minor_version or 0}
-                if has_source
-                else "latest",
-            )
-            latest = self._lookup(project_id, judge_id) if has_source else source
+            latest = self._lookup(project_id, judge_id)
             latest_major = int(latest["judge_major_version"])
+            source = (
+                latest
+                if source_major_version is None and source_minor_version is None
+                else self._lookup(
+                    project_id,
+                    judge_id,
+                    {
+                        "major": latest_major
+                        if source_major_version is None
+                        else source_major_version,
+                        "minor": source_minor_version or 0,
+                    },
+                )
+            )
             target: UpdateJudgeRequestUpdateNewVersionTargetVersion = (
                 {
                     "major": latest_major,
@@ -301,7 +305,7 @@ class AgentJudgeFactory:
 
     def _lookup(
         self, project_id: str, judge_id: str, version: JudgeVersion = "latest"
-    ) -> JudgeLookupResponseJudge:
+    ) -> GetJudgeResponseJudge:
         judge = self._client.post_projects_judges_by_judge_id_lookup(
             project_id=project_id,
             judge_id=judge_id,
@@ -316,7 +320,7 @@ class AgentJudgeFactory:
 
 
 def _prompt_version(
-    source: JudgeLookupResponseJudge,
+    source: GetJudgeResponseJudge,
     target: UpdateJudgeRequestUpdateNewVersionTargetVersion,
     score_type: ScoreType,
     categories: Optional[List[Dict[str, Any]]],
@@ -390,7 +394,7 @@ def _warn_if_model(model: Optional[str]) -> None:
         )
 
 
-def _agent_judge(judge: JudgeLookupResponseJudge) -> AgentJudge:
+def _agent_judge(judge: GetJudgeResponseJudge) -> AgentJudge:
     definition = judge["definition"]
     return AgentJudge(
         judge_id=judge["id"],

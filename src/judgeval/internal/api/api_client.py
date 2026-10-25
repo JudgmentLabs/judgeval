@@ -430,8 +430,8 @@ class JudgmentSyncClient:
         )
 
     def post_projects_judges_by_judge_id_lookup(
-        self, project_id: str, judge_id: str, payload: JudgeLookupRequest
-    ) -> JudgeLookupResponse:
+        self, project_id: str, judge_id: str, payload: GetJudgeRequest
+    ) -> GetJudgeResponse:
         return self._request(
             "POST",
             url_for(
