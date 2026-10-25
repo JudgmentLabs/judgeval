@@ -35,7 +35,7 @@ To get started, dive into the [docs](https://docs.judgmentlabs.ai/documentation)
 
 **Online monitoring** -- Automatically score live production traffic server-side with no latency impact. When a judge applies a label, that label surfaces as a structured signal — configure Slack alerts so regressions and recurrences never go unnoticed.
 
-**Broad integrations** -- Auto-instrumentation for OpenAI, Anthropic, Google GenAI, and Together AI. Framework support for LangGraph, OpenLit, and Claude Agent SDK.
+**Broad integrations** -- Auto-instrumentation for OpenAI, Anthropic, Google GenAI, and Together AI. Framework support for LangGraph, and Claude Agent SDK.
 
 ## Quickstart
 
@@ -98,8 +98,8 @@ print(result["rows"])
 `client.discover_schema()` returns a Markdown string with the server's generated
 tables, column types and descriptions, row semantics, examples, and query limits,
 using the same reference as MCP `discover_schema`. It contains no project data
-and requires organization viewer access, but no resolved project or public query
-opt-in. The HTTP equivalent is `GET /v1/sql/schema`, which returns
+and requires organization viewer access, but no resolved project. The HTTP
+equivalent is `GET /v1/sql/schema`, which returns
 `{"schema": "...Markdown reference..."}`.
 
 For query execution, use `POST /v1/projects/{projectId}/sql` with
@@ -123,7 +123,7 @@ Validation and execution errors use the SDK's existing exception mapping.
 
 ## Integrations
 
-Supports OpenAI, Anthropic, Google GenAI, Together AI, LangGraph, OpenLit, and Claude Agent SDK. See the full [integrations docs](https://docs.judgmentlabs.ai/documentation/integrations/introduction).
+Supports OpenAI, Anthropic, Google GenAI, Together AI, LangGraph, and Claude Agent SDK. See the full [integrations docs](https://docs.judgmentlabs.ai/documentation/integrations/introduction).
 
 ## CLI
 
