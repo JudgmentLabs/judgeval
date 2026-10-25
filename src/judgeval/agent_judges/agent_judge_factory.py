@@ -201,7 +201,7 @@ class AgentJudgeFactory:
             description: New judge-version description.
             judge_description: New UI-facing description.
             categories: New choices for `categorical` judges; names matching
-                an existing choice keep it.
+                an existing choice keep it, and its description must match.
             min_score: New lower bound for `numeric` judges.
             max_score: New upper bound for `numeric` judges.
             source_major_version: Major version to copy unspecified fields
@@ -298,6 +298,9 @@ class AgentJudgeFactory:
                     else max_score,
                 },
             )
+            # Omitted, the route keeps the latest version's action groups.
+            if "action_config" in source:
+                new_version["actionConfig"] = source["action_config"]
             update["newVersion"] = new_version
             written = target
 
@@ -371,7 +374,7 @@ def _prompt_version(
             "scoreType": "numeric",
         }
 
-    existing = {o["name"]: o["behavior_id"] for o in source["outputs"]}
+    existing = {o["name"]: o for o in source["outputs"]}
     outputs: List[
         Union[
             UpdateJudgeRequestUpdateNewVersion2Outputs,
@@ -381,10 +384,16 @@ def _prompt_version(
     if categories is None:
         outputs = [{"behaviorId": o["behavior_id"]} for o in source["outputs"]]
     for c in categories or []:
-        if c["name"] in existing:
-            outputs.append({"behaviorId": existing[c["name"]]})
-        else:
+        output = existing.get(c["name"])
+        if output is None:
             outputs.append({"name": c["name"], "description": c["description"]})
+        elif output["description"] != c["description"]:
+            raise ValueError(
+                f"Category {c['name']!r} already exists with a different "
+                "description; a new version cannot change it."
+            )
+        else:
+            outputs.append({"behaviorId": output["behavior_id"]})
     return {
         "targetVersion": target,
         "promoteToProduction": True,

@@ -273,6 +273,25 @@ class TestAgentJudgeFactoryUpdate:
             {"name": "Maybe", "description": "m"},
         ]
 
+    def test_update_rejects_a_changed_category_description(self):
+        factory, client = _make_factory(lookups=[CATEGORICAL])
+        with pytest.raises(ValueError, match="different description"):
+            factory.update(
+                judge_id="judge-1",
+                categories=[{"name": "Yes", "description": "changed"}],
+            )
+        client.patch_projects_judges_by_judge_id.assert_not_called()
+
+    def test_update_copies_action_config_from_source(self):
+        groups = {"action_groups": []}
+        factory, client = _make_factory(
+            lookups=[_judge_detail(), _judge_detail(action_config=groups)]
+        )
+        factory.update(
+            judge_id="judge-1", source_major_version=1, source_minor_version=0
+        )
+        assert _patch_body(client)["update"]["newVersion"]["actionConfig"] == groups
+
     def test_update_keeps_existing_outputs_without_categories(self):
         factory, client = _make_factory(lookups=[CATEGORICAL])
         factory.update(judge_id="judge-1", prompt="x")
