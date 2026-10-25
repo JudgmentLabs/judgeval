@@ -33,6 +33,30 @@ jobs:
       - name: Check distribution contents
         run: python scripts/check_distribution_contents.py
 
+  api-codegen:
+    name: API generated client
+    needs: [validate-branch]
+    if: needs.validate-branch.result == 'success' || needs.validate-branch.result == 'skipped'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Regenerate from the committed /v1 spec
+        run: |
+          pip install uv
+          uv sync --dev
+          uv run python scripts/generate_api_models.py
+
+      - name: Check generated API output is current
+        run: git diff --exit-code -- src/judgeval/internal/api/models.py src/judgeval/api.py
+
   run-tests:
     needs: [validate-branch]
     if: needs.validate-branch.result == 'success' || needs.validate-branch.result == 'skipped'

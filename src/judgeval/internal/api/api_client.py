@@ -66,7 +66,7 @@ class JudgmentSyncClient:
 
     def _request(
         self,
-        method: Literal["POST", "PATCH", "GET", "DELETE"],
+        method: Literal["POST", "PATCH", "PUT", "GET", "DELETE"],
         url: str,
         payload: Any,
         params: Optional[Dict[str, Any]] = None,
