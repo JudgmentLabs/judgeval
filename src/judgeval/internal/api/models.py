@@ -27,18 +27,6 @@ class PendingEvalPayload(TypedDict):
     is_behavior: bool
 
 
-class E2EFetchSpanScoreRequest(TypedDict):
-    project_name: str
-    trace_id: str
-    span_id: str
-
-
-E2EFetchSpanScoreResponse: TypeAlias = list[dict[str, Any]]
-
-
-E2EFetchTraceResponse: TypeAlias = list[dict[str, Any]]
-
-
 class AddProjectRequest(TypedDict):
     project_name: str
 
@@ -51,8 +39,8 @@ class AddProjectResponseProject(TypedDict):
 
 
 class AddProjectResponse(TypedDict):
-    project_id: str
     project: AddProjectResponseProject
+    project_id: str
 
 
 class DeleteProjectResponse(TypedDict):
@@ -84,7 +72,6 @@ class CreateOfflineDatasetResponseDataset(TypedDict):
     creator_id: str | None
     entries: NotRequired[float]
     test_config_count: NotRequired[float]
-    test_run_count: NotRequired[float]
 
 
 class CreateOfflineDatasetResponse(TypedDict):
@@ -105,7 +92,6 @@ class PullAllOfflineDatasetsResponsePullAllOfflineDatasetsResponseItem(TypedDict
     creator_id: str | None
     entries: NotRequired[float]
     test_config_count: NotRequired[float]
-    test_run_count: NotRequired[float]
 
 
 PullAllOfflineDatasetsResponse: TypeAlias = list[
@@ -144,7 +130,6 @@ class PullOfflineDatasetResponse(TypedDict):
     creator_id: str | None
     entries: NotRequired[float]
     test_config_count: NotRequired[float]
-    test_run_count: NotRequired[float]
     dataset_kind: DatasetKind
     examples: list[PullOfflineDatasetResponseExample]
 
@@ -156,15 +141,6 @@ class InsertOfflineDatasetExamplesRequest(TypedDict):
 class AddDatasetItemsResponse(TypedDict):
     example_ids: list[str]
     version_added: float
-
-
-class RemoveDatasetExamplesRequest(TypedDict):
-    example_ids: list[str]
-
-
-class RemoveDatasetExamplesResponse(TypedDict):
-    removed_example_ids: list[str]
-    version_created: float
 
 
 class OfflineDatasetPageResponseDataset(TypedDict):
@@ -179,7 +155,6 @@ class OfflineDatasetPageResponseDataset(TypedDict):
     creator_id: str | None
     entries: NotRequired[float]
     test_config_count: NotRequired[float]
-    test_run_count: NotRequired[float]
 
 
 class OfflineDatasetPageResponseEntryItem(TypedDict):
@@ -188,7 +163,6 @@ class OfflineDatasetPageResponseEntryItem(TypedDict):
     project_id: str
     dataset_id: str
     version_added: float
-    version_removed: NotRequired[float | None]
     example_id: str
     created_at: str
     user_id: str
@@ -682,108 +656,6 @@ class FetchTestRunViaExperimentAliasResponse(TypedDict):
     ui_results_url: str | None
 
 
-class JudgeActionJudgeActionConfig(TypedDict, closed=True):
-    email_address: str
-
-
-class JudgeActionJudgeAction(TypedDict, closed=True):
-    id: str
-    enabled: bool
-    type: Literal["email"]
-    config: JudgeActionJudgeActionConfig
-
-
-class JudgeActionJudgeAction1Config(TypedDict, closed=True):
-    team_id: NotRequired[str]
-    channel_id: NotRequired[str]
-    message: NotRequired[str]
-    custom_attribute_keys: NotRequired[list[str]]
-
-
-class JudgeActionJudgeAction1(TypedDict, closed=True):
-    id: str
-    enabled: bool
-    type: Literal["slack"]
-    config: JudgeActionJudgeAction1Config
-
-
-class JudgeActionJudgeAction2Config(TypedDict, closed=True):
-    dataset_id: str
-
-
-class JudgeActionJudgeAction2(TypedDict, closed=True):
-    id: str
-    enabled: bool
-    type: Literal["dataset"]
-    config: JudgeActionJudgeAction2Config
-
-
-JudgeActionJudgeAction3ConfigJudgeId: TypeAlias = str
-
-
-class JudgeActionJudgeAction3Config(TypedDict, closed=True):
-    judge_ids: list[JudgeActionJudgeAction3ConfigJudgeId]
-
-
-class JudgeActionJudgeAction3(TypedDict, closed=True):
-    id: str
-    enabled: bool
-    type: Literal["run_behavior"]
-    config: JudgeActionJudgeAction3Config
-
-
-JudgeAction: TypeAlias = (
-    JudgeActionJudgeAction
-    | JudgeActionJudgeAction1
-    | JudgeActionJudgeAction2
-    | JudgeActionJudgeAction3
-)
-
-
-class JudgeActionGroupWhen(TypedDict, closed=True):
-    kind: Literal["any"]
-
-
-class JudgeActionGroupWhen1(TypedDict, closed=True):
-    kind: Literal["binary"]
-    value: bool
-
-
-JudgeActionGroupWhen2Value: TypeAlias = str
-
-
-class JudgeActionGroupWhen2(TypedDict, closed=True):
-    kind: Literal["categorical"]
-    values: list[JudgeActionGroupWhen2Value]
-
-
-class JudgeActionGroupWhen3(TypedDict, closed=True):
-    kind: Literal["numeric"]
-    operator: Literal["lt", "lte", "eq", "gte", "gt"]
-    value: float
-
-
-class JudgeActionGroupFrequency(TypedDict, closed=True):
-    count: int
-    window_seconds: int
-
-
-class JudgeActionGroup(TypedDict, closed=True):
-    id: str
-    name: str
-    enabled: bool
-    environment_names: list[str]
-    when: (
-        JudgeActionGroupWhen
-        | JudgeActionGroupWhen1
-        | JudgeActionGroupWhen2
-        | JudgeActionGroupWhen3
-    )
-    frequency: JudgeActionGroupFrequency
-    cooldown_seconds: int
-    actions: list[JudgeAction]
-
-
 class InsertPromptRequest(TypedDict):
     name: str
     prompt: str
@@ -1106,7 +978,6 @@ class PreparedTestRunResponseDataset(TypedDict):
     creator_id: str | None
     entries: NotRequired[float]
     test_config_count: NotRequired[float]
-    test_run_count: NotRequired[float]
 
 
 class PreparedTestRunResponseDatasetVersion(TypedDict):
