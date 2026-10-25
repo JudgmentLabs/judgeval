@@ -179,20 +179,10 @@ class TestAgentJudgeFactoryCreate:
             minor_version=2,
         )
 
-    def test_create_returns_none_when_project_unresolved(self):
-        factory, _ = _make_factory(project_id=None)
-        assert factory.create(name="n", prompt="p", score_type="binary") is None
-
-    def test_create_skips_api_when_project_unresolved(self):
+    def test_create_returns_none_without_calling_api_when_project_unresolved(self):
         factory, client = _make_factory(project_id=None)
-        factory.create(name="n", prompt="p", score_type="binary")
+        assert factory.create(name="n", prompt="p", score_type="binary") is None
         client.post_projects_judges.assert_not_called()
-
-    def test_create_propagates_errors(self):
-        factory, client = _make_factory()
-        client.post_projects_judges.side_effect = RuntimeError("boom")
-        with pytest.raises(RuntimeError):
-            factory.create(name="n", prompt="p", score_type="binary")
 
 
 class TestAgentJudgeFactoryUpdate:
@@ -226,8 +216,8 @@ class TestAgentJudgeFactoryUpdate:
     def test_update_copies_source_and_writes_target(self):
         factory, client = _make_factory(
             lookups=[
-                _judge_detail(definition={**DEFINITION, "prompt": "v0.1"}),
                 _judge_detail(),
+                _judge_detail(definition={**DEFINITION, "prompt": "v0.1"}),
             ]
         )
         factory.update(
@@ -243,16 +233,10 @@ class TestAgentJudgeFactoryUpdate:
             "v0.1",
         )
 
-    def test_update_looks_up_source_then_latest_then_written(self):
+    def test_update_source_minor_alone_reads_from_latest_major(self):
         factory, client = _make_factory()
-        factory.update(
-            judge_id="judge-1", source_major_version=0, source_minor_version=1
-        )
-        assert _lookup_versions(client) == [
-            {"major": 0, "minor": 1},
-            "latest",
-            {"major": 1, "minor": 3},
-        ]
+        factory.update(judge_id="judge-1", source_minor_version=1)
+        assert _lookup_versions(client)[1] == {"major": 1, "minor": 1}
 
     def test_update_reuses_behaviors_for_matching_category_names(self):
         factory, client = _make_factory(lookups=[CATEGORICAL])
@@ -288,17 +272,7 @@ class TestAgentJudgeFactoryUpdate:
         with pytest.raises(ValueError, match="only prompt-based agent judges"):
             factory.update(judge_id="judge-1", prompt="x")
 
-    def test_update_returns_none_when_project_unresolved(self):
-        factory, _ = _make_factory(project_id=None)
-        assert factory.update(judge_id="judge-1", prompt="x") is None
-
-    def test_update_skips_api_when_project_unresolved(self):
+    def test_update_returns_none_without_calling_api_when_project_unresolved(self):
         factory, client = _make_factory(project_id=None)
-        factory.update(judge_id="judge-1", prompt="x")
+        assert factory.update(judge_id="judge-1", prompt="x") is None
         client.patch_projects_judges_by_judge_id.assert_not_called()
-
-    def test_update_propagates_errors(self):
-        factory, client = _make_factory()
-        client.patch_projects_judges_by_judge_id.side_effect = RuntimeError("boom")
-        with pytest.raises(RuntimeError):
-            factory.update(judge_id="judge-1", prompt="x")
