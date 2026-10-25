@@ -15,10 +15,12 @@ def test_generated_method_sends_method_path_and_body():
     client = JudgmentApiClient("https://api.test", "key", "org")
     client.client = httpx.Client(transport=httpx.MockTransport(handler))
 
-    assert client.update_judge("p1", "j1", {"name": "tone"}) == {"id": "j1"}
+    assert client.update_judge(
+        "p1", "j1", {"update": {"judgeDescription": "tone"}}
+    ) == {"id": "j1"}
     [request] = requests
     assert (request.method, request.url.path, json.loads(request.content)) == (
         "PATCH",
         "/v1/projects/p1/judges/j1",
-        {"name": "tone"},
+        {"update": {"judgeDescription": "tone"}},
     )
