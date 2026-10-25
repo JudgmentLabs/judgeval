@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import quote
 
 from judgeval.internal.api.api_client import JudgmentSyncClient
 from judgeval.internal.api.models import (
@@ -122,6 +123,13 @@ from judgeval.internal.api.models import (
 from judgeval.utils.url import url_for
 
 
+def _segment(value: str) -> str:
+    """Encodes a path parameter so an ID can't change the route or host."""
+    if value in (".", ".."):
+        raise ValueError(f"Invalid path parameter: {value!r}")
+    return quote(value, safe="")
+
+
 def _drop_none(params: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in params.items() if value is not None}
 
@@ -158,7 +166,9 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Get artifact revision (`GET /v1/projects/{projectId}/artifact-revisions`)."""
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{project_id}/artifact-revisions", self.base_url),
+            url_for(
+                f"/v1/projects/{_segment(project_id)}/artifact-revisions", self.base_url
+            ),
             {},
             _drop_none(
                 {
@@ -175,7 +185,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Create artifact (`POST /v1/projects/{projectId}/artifacts`)."""
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/artifacts", self.base_url),
+            url_for(f"/v1/projects/{_segment(project_id)}/artifacts", self.base_url),
             payload,
             None,
         )
@@ -190,7 +200,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "POST",
             url_for(
-                f"/v1/projects/{project_id}/artifacts/{artifact_id}/revisions",
+                f"/v1/projects/{_segment(project_id)}/artifacts/{_segment(artifact_id)}/revisions",
                 self.base_url,
             ),
             payload,
@@ -204,7 +214,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "POST",
             url_for(
-                f"/v1/projects/{project_id}/artifacts/optimistic-eval-tests",
+                f"/v1/projects/{_segment(project_id)}/artifacts/optimistic-eval-tests",
                 self.base_url,
             ),
             payload,
@@ -218,7 +228,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "POST",
             url_for(
-                f"/v1/projects/{project_id}/artifacts/preprocessing-tests",
+                f"/v1/projects/{_segment(project_id)}/artifacts/preprocessing-tests",
                 self.base_url,
             ),
             payload,
@@ -229,7 +239,9 @@ class JudgmentApiClient(JudgmentSyncClient):
         """List attribute mappers (`GET /v1/projects/{projectId}/attribute-mappers`)."""
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{project_id}/attribute-mappers", self.base_url),
+            url_for(
+                f"/v1/projects/{_segment(project_id)}/attribute-mappers", self.base_url
+            ),
             {},
             None,
         )
@@ -240,7 +252,9 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Create attribute mapper (`POST /v1/projects/{projectId}/attribute-mappers`)."""
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/attribute-mappers", self.base_url),
+            url_for(
+                f"/v1/projects/{_segment(project_id)}/attribute-mappers", self.base_url
+            ),
             payload,
             None,
         )
@@ -250,7 +264,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "GET",
             url_for(
-                f"/v1/projects/{project_id}/attribute-mappers/{config_id}",
+                f"/v1/projects/{_segment(project_id)}/attribute-mappers/{_segment(config_id)}",
                 self.base_url,
             ),
             {},
@@ -264,7 +278,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "PATCH",
             url_for(
-                f"/v1/projects/{project_id}/attribute-mappers/{config_id}",
+                f"/v1/projects/{_segment(project_id)}/attribute-mappers/{_segment(config_id)}",
                 self.base_url,
             ),
             payload,
@@ -276,7 +290,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "DELETE",
             url_for(
-                f"/v1/projects/{project_id}/attribute-mappers/{config_id}",
+                f"/v1/projects/{_segment(project_id)}/attribute-mappers/{_segment(config_id)}",
                 self.base_url,
             ),
             {},
@@ -290,7 +304,8 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "PATCH",
             url_for(
-                f"/v1/projects/{project_id}/behaviors/{behavior_id}", self.base_url
+                f"/v1/projects/{_segment(project_id)}/behaviors/{_segment(behavior_id)}",
+                self.base_url,
             ),
             payload,
             None,
@@ -308,7 +323,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "GET",
             url_for(
-                f"/v1/projects/{project_id}/behaviors/{behavior_id}/analytics",
+                f"/v1/projects/{_segment(project_id)}/behaviors/{_segment(behavior_id)}/analytics",
                 self.base_url,
             ),
             {},
@@ -322,7 +337,8 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "GET",
             url_for(
-                f"/v1/projects/{project_id}/conversation-display-rules", self.base_url
+                f"/v1/projects/{_segment(project_id)}/conversation-display-rules",
+                self.base_url,
             ),
             {},
             None,
@@ -335,7 +351,8 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "PUT",
             url_for(
-                f"/v1/projects/{project_id}/conversation-display-rules", self.base_url
+                f"/v1/projects/{_segment(project_id)}/conversation-display-rules",
+                self.base_url,
             ),
             payload,
             None,
@@ -347,7 +364,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Create offline-test dataset (`POST /v1/projects/{projectId}/datasets`)."""
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/datasets", self.base_url),
+            url_for(f"/v1/projects/{_segment(project_id)}/datasets", self.base_url),
             payload,
             None,
         )
@@ -356,7 +373,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Fetch offline-test datasets (`GET /v1/projects/{projectId}/datasets`)."""
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{project_id}/datasets", self.base_url),
+            url_for(f"/v1/projects/{_segment(project_id)}/datasets", self.base_url),
             {},
             None,
         )
@@ -368,7 +385,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "DELETE",
             url_for(
-                f"/v1/projects/{project_id}/datasets/{dataset_identifier}",
+                f"/v1/projects/{_segment(project_id)}/datasets/{_segment(dataset_identifier)}",
                 self.base_url,
             ),
             {},
@@ -385,7 +402,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "POST",
             url_for(
-                f"/v1/projects/{project_id}/datasets/{dataset_identifier}/examples",
+                f"/v1/projects/{_segment(project_id)}/datasets/{_segment(dataset_identifier)}/examples",
                 self.base_url,
             ),
             payload,
@@ -402,7 +419,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "POST",
             url_for(
-                f"/v1/projects/{project_id}/datasets/{dataset_identifier}/examples/remove",
+                f"/v1/projects/{_segment(project_id)}/datasets/{_segment(dataset_identifier)}/examples/remove",
                 self.base_url,
             ),
             payload,
@@ -423,7 +440,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "GET",
             url_for(
-                f"/v1/projects/{project_id}/datasets/{dataset_identifier}/page",
+                f"/v1/projects/{_segment(project_id)}/datasets/{_segment(dataset_identifier)}/page",
                 self.base_url,
             ),
             {},
@@ -448,7 +465,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         """List issues (`GET /v1/projects/{projectId}/issues`)."""
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{project_id}/issues", self.base_url),
+            url_for(f"/v1/projects/{_segment(project_id)}/issues", self.base_url),
             {},
             _drop_none(
                 {
@@ -465,7 +482,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Create issue (`POST /v1/projects/{projectId}/issues`)."""
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/issues", self.base_url),
+            url_for(f"/v1/projects/{_segment(project_id)}/issues", self.base_url),
             payload,
             None,
         )
@@ -474,7 +491,10 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Get issue (`GET /v1/projects/{projectId}/issues/{issueId}`)."""
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{project_id}/issues/{issue_id}", self.base_url),
+            url_for(
+                f"/v1/projects/{_segment(project_id)}/issues/{_segment(issue_id)}",
+                self.base_url,
+            ),
             {},
             None,
         )
@@ -485,7 +505,10 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Update issue (`PATCH /v1/projects/{projectId}/issues/{issueId}`)."""
         return self._request(
             "PATCH",
-            url_for(f"/v1/projects/{project_id}/issues/{issue_id}", self.base_url),
+            url_for(
+                f"/v1/projects/{_segment(project_id)}/issues/{_segment(issue_id)}",
+                self.base_url,
+            ),
             payload,
             None,
         )
@@ -496,7 +519,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         """List judges (`GET /v1/projects/{projectId}/judges`)."""
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{project_id}/judges", self.base_url),
+            url_for(f"/v1/projects/{_segment(project_id)}/judges", self.base_url),
             {},
             _drop_none({"version": version}),
         )
@@ -507,7 +530,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Create judge (`POST /v1/projects/{projectId}/judges`)."""
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/judges", self.base_url),
+            url_for(f"/v1/projects/{_segment(project_id)}/judges", self.base_url),
             payload,
             None,
         )
@@ -518,7 +541,10 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Update judge (`PATCH /v1/projects/{projectId}/judges/{judgeId}`)."""
         return self._request(
             "PATCH",
-            url_for(f"/v1/projects/{project_id}/judges/{judge_id}", self.base_url),
+            url_for(
+                f"/v1/projects/{_segment(project_id)}/judges/{_segment(judge_id)}",
+                self.base_url,
+            ),
             payload,
             None,
         )
@@ -527,7 +553,10 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Delete judge (`DELETE /v1/projects/{projectId}/judges/{judgeId}`)."""
         return self._request(
             "DELETE",
-            url_for(f"/v1/projects/{project_id}/judges/{judge_id}", self.base_url),
+            url_for(
+                f"/v1/projects/{_segment(project_id)}/judges/{_segment(judge_id)}",
+                self.base_url,
+            ),
             {},
             None,
         )
@@ -539,7 +568,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "POST",
             url_for(
-                f"/v1/projects/{project_id}/judges/{judge_id}/action-groups",
+                f"/v1/projects/{_segment(project_id)}/judges/{_segment(judge_id)}/action-groups",
                 self.base_url,
             ),
             payload,
@@ -553,7 +582,8 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "POST",
             url_for(
-                f"/v1/projects/{project_id}/judges/{judge_id}/lookup", self.base_url
+                f"/v1/projects/{_segment(project_id)}/judges/{_segment(judge_id)}/lookup",
+                self.base_url,
             ),
             payload,
             None,
@@ -570,7 +600,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "PUT",
             url_for(
-                f"/v1/projects/{project_id}/judges/{judge_id}/versions/{judge_version_id}/optimistic-eval",
+                f"/v1/projects/{_segment(project_id)}/judges/{_segment(judge_id)}/versions/{_segment(judge_version_id)}/optimistic-eval",
                 self.base_url,
             ),
             payload,
@@ -588,7 +618,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "PUT",
             url_for(
-                f"/v1/projects/{project_id}/judges/{judge_id}/versions/{judge_version_id}/preprocessor-artifact-revision",
+                f"/v1/projects/{_segment(project_id)}/judges/{_segment(judge_id)}/versions/{_segment(judge_version_id)}/preprocessor-artifact-revision",
                 self.base_url,
             ),
             payload,
@@ -601,7 +631,10 @@ class JudgmentApiClient(JudgmentSyncClient):
         """List judge action groups (`GET /v1/projects/{projectId}/judges/action-groups`)."""
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{project_id}/judges/action-groups", self.base_url),
+            url_for(
+                f"/v1/projects/{_segment(project_id)}/judges/action-groups",
+                self.base_url,
+            ),
             {},
             _drop_none({"version": version}),
         )
@@ -610,7 +643,9 @@ class JudgmentApiClient(JudgmentSyncClient):
         """List memory entries (`GET /v1/projects/{projectId}/memory/entries`)."""
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{project_id}/memory/entries", self.base_url),
+            url_for(
+                f"/v1/projects/{_segment(project_id)}/memory/entries", self.base_url
+            ),
             {},
             None,
         )
@@ -621,7 +656,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Write a memory file (`PUT /v1/projects/{projectId}/memory/files`)."""
         return self._request(
             "PUT",
-            url_for(f"/v1/projects/{project_id}/memory/files", self.base_url),
+            url_for(f"/v1/projects/{_segment(project_id)}/memory/files", self.base_url),
             payload,
             None,
         )
@@ -632,7 +667,9 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Fetch memory files (`POST /v1/projects/{projectId}/memory/files/fetch`)."""
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/memory/files/fetch", self.base_url),
+            url_for(
+                f"/v1/projects/{_segment(project_id)}/memory/files/fetch", self.base_url
+            ),
             payload,
             None,
         )
@@ -643,7 +680,9 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Search memory files (`POST /v1/projects/{projectId}/memory/search`)."""
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/memory/search", self.base_url),
+            url_for(
+                f"/v1/projects/{_segment(project_id)}/memory/search", self.base_url
+            ),
             payload,
             None,
         )
@@ -652,7 +691,9 @@ class JudgmentApiClient(JudgmentSyncClient):
         """List scheduled tasks (`GET /v1/projects/{projectId}/scheduled-tasks`)."""
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{project_id}/scheduled-tasks", self.base_url),
+            url_for(
+                f"/v1/projects/{_segment(project_id)}/scheduled-tasks", self.base_url
+            ),
             {},
             None,
         )
@@ -663,7 +704,9 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Create a scheduled task (`POST /v1/projects/{projectId}/scheduled-tasks`)."""
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/scheduled-tasks", self.base_url),
+            url_for(
+                f"/v1/projects/{_segment(project_id)}/scheduled-tasks", self.base_url
+            ),
             payload,
             None,
         )
@@ -675,7 +718,8 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "GET",
             url_for(
-                f"/v1/projects/{project_id}/scheduled-tasks/{task_id}", self.base_url
+                f"/v1/projects/{_segment(project_id)}/scheduled-tasks/{_segment(task_id)}",
+                self.base_url,
             ),
             {},
             None,
@@ -688,7 +732,8 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "PATCH",
             url_for(
-                f"/v1/projects/{project_id}/scheduled-tasks/{task_id}", self.base_url
+                f"/v1/projects/{_segment(project_id)}/scheduled-tasks/{_segment(task_id)}",
+                self.base_url,
             ),
             payload,
             None,
@@ -700,7 +745,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Run a tenant-scoped virtual SQL query (`POST /v1/projects/{projectId}/sql`)."""
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/sql", self.base_url),
+            url_for(f"/v1/projects/{_segment(project_id)}/sql", self.base_url),
             payload,
             None,
         )
@@ -711,7 +756,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Fetch test configs (`GET /v1/projects/{projectId}/test-configs`)."""
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{project_id}/test-configs", self.base_url),
+            url_for(f"/v1/projects/{_segment(project_id)}/test-configs", self.base_url),
             {},
             _drop_none({"dataset_id": dataset_id}),
         )
@@ -722,7 +767,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Create test config (`POST /v1/projects/{projectId}/test-configs`)."""
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/test-configs", self.base_url),
+            url_for(f"/v1/projects/{_segment(project_id)}/test-configs", self.base_url),
             payload,
             None,
         )
@@ -734,7 +779,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "PATCH",
             url_for(
-                f"/v1/projects/{project_id}/test-configs/{test_config_id}",
+                f"/v1/projects/{_segment(project_id)}/test-configs/{_segment(test_config_id)}",
                 self.base_url,
             ),
             payload,
@@ -748,7 +793,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "DELETE",
             url_for(
-                f"/v1/projects/{project_id}/test-configs/{test_config_id}",
+                f"/v1/projects/{_segment(project_id)}/test-configs/{_segment(test_config_id)}",
                 self.base_url,
             ),
             {},
@@ -767,7 +812,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Fetch test runs (`GET /v1/projects/{projectId}/test-runs`)."""
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{project_id}/test-runs", self.base_url),
+            url_for(f"/v1/projects/{_segment(project_id)}/test-runs", self.base_url),
             {},
             _drop_none(
                 {
@@ -785,7 +830,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Prepare and queue test run (`POST /v1/projects/{projectId}/test-runs`)."""
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/test-runs", self.base_url),
+            url_for(f"/v1/projects/{_segment(project_id)}/test-runs", self.base_url),
             payload,
             None,
         )
@@ -795,7 +840,8 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "GET",
             url_for(
-                f"/v1/projects/{project_id}/test-runs/{test_run_id}", self.base_url
+                f"/v1/projects/{_segment(project_id)}/test-runs/{_segment(test_run_id)}",
+                self.base_url,
             ),
             {},
             None,
@@ -808,7 +854,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "POST",
             url_for(
-                f"/v1/projects/{project_id}/test-runs/{test_run_id}/cancel",
+                f"/v1/projects/{_segment(project_id)}/test-runs/{_segment(test_run_id)}/cancel",
                 self.base_url,
             ),
             {},
@@ -827,7 +873,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "GET",
             url_for(
-                f"/v1/projects/{project_id}/test-runs/{test_run_id}/items",
+                f"/v1/projects/{_segment(project_id)}/test-runs/{_segment(test_run_id)}/items",
                 self.base_url,
             ),
             {},
@@ -840,7 +886,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Create a test suite (`POST /v1/projects/{projectId}/test-suites`)."""
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/test-suites", self.base_url),
+            url_for(f"/v1/projects/{_segment(project_id)}/test-suites", self.base_url),
             payload,
             None,
         )
@@ -851,7 +897,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         """List test suites (`GET /v1/projects/{projectId}/test-suites`)."""
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{project_id}/test-suites", self.base_url),
+            url_for(f"/v1/projects/{_segment(project_id)}/test-suites", self.base_url),
             {},
             _drop_none({"offset": offset, "limit": limit}),
         )
@@ -863,7 +909,8 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "DELETE",
             url_for(
-                f"/v1/projects/{project_id}/test-suites/{test_suite_id}", self.base_url
+                f"/v1/projects/{_segment(project_id)}/test-suites/{_segment(test_suite_id)}",
+                self.base_url,
             ),
             {},
             None,
@@ -882,7 +929,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "GET",
             url_for(
-                f"/v1/projects/{project_id}/test-suites/{test_suite_id}/cases",
+                f"/v1/projects/{_segment(project_id)}/test-suites/{_segment(test_suite_id)}/cases",
                 self.base_url,
             ),
             {},
@@ -896,7 +943,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "POST",
             url_for(
-                f"/v1/projects/{project_id}/test-suites/{test_suite_id}/cases",
+                f"/v1/projects/{_segment(project_id)}/test-suites/{_segment(test_suite_id)}/cases",
                 self.base_url,
             ),
             payload,
@@ -910,7 +957,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "PUT",
             url_for(
-                f"/v1/projects/{project_id}/test-suites/{test_suite_id}/cases/{case_id}",
+                f"/v1/projects/{_segment(project_id)}/test-suites/{_segment(test_suite_id)}/cases/{_segment(case_id)}",
                 self.base_url,
             ),
             payload,
@@ -924,7 +971,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "DELETE",
             url_for(
-                f"/v1/projects/{project_id}/test-suites/{test_suite_id}/cases/{case_id}",
+                f"/v1/projects/{_segment(project_id)}/test-suites/{_segment(test_suite_id)}/cases/{_segment(case_id)}",
                 self.base_url,
             ),
             {},
@@ -938,7 +985,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "POST",
             url_for(
-                f"/v1/projects/{project_id}/test-suites/{test_suite_id}/discard",
+                f"/v1/projects/{_segment(project_id)}/test-suites/{_segment(test_suite_id)}/discard",
                 self.base_url,
             ),
             {},
@@ -952,7 +999,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "POST",
             url_for(
-                f"/v1/projects/{project_id}/test-suites/{test_suite_id}/draft",
+                f"/v1/projects/{_segment(project_id)}/test-suites/{_segment(test_suite_id)}/draft",
                 self.base_url,
             ),
             {},
@@ -966,7 +1013,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "POST",
             url_for(
-                f"/v1/projects/{project_id}/test-suites/{test_suite_id}/publish",
+                f"/v1/projects/{_segment(project_id)}/test-suites/{_segment(test_suite_id)}/publish",
                 self.base_url,
             ),
             {},
@@ -980,7 +1027,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "POST",
             url_for(
-                f"/v1/projects/{project_id}/test-suites/{test_suite_id}/runs",
+                f"/v1/projects/{_segment(project_id)}/test-suites/{_segment(test_suite_id)}/runs",
                 self.base_url,
             ),
             payload,
@@ -999,7 +1046,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "GET",
             url_for(
-                f"/v1/projects/{project_id}/test-suites/{test_suite_id}/runs",
+                f"/v1/projects/{_segment(project_id)}/test-suites/{_segment(test_suite_id)}/runs",
                 self.base_url,
             ),
             {},
@@ -1013,7 +1060,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "GET",
             url_for(
-                f"/v1/projects/{project_id}/test-suites/runs/{run_id}/results",
+                f"/v1/projects/{_segment(project_id)}/test-suites/runs/{_segment(run_id)}/results",
                 self.base_url,
             ),
             {},
@@ -1025,7 +1072,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "POST",
             url_for(
-                f"/v1/projects/{project_id}/test-suites/runs/{run_id}/score",
+                f"/v1/projects/{_segment(project_id)}/test-suites/runs/{_segment(run_id)}/score",
                 self.base_url,
             ),
             {},
@@ -1048,7 +1095,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "GET",
             url_for(
-                f"/v1/projects/{project_id}/trace-health/checks/{check_id}/traces",
+                f"/v1/projects/{_segment(project_id)}/trace-health/checks/{_segment(check_id)}/traces",
                 self.base_url,
             ),
             {},
@@ -1075,7 +1122,10 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Get trace health summary (`GET /v1/projects/{projectId}/trace-health/summary`)."""
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{project_id}/trace-health/summary", self.base_url),
+            url_for(
+                f"/v1/projects/{_segment(project_id)}/trace-health/summary",
+                self.base_url,
+            ),
             {},
             _drop_none(
                 {"category": category, "start_time": start_time, "end_time": end_time}
@@ -1089,7 +1139,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         return self._request(
             "GET",
             url_for(
-                f"/v1/projects/{project_id}/trace-health/traces/{trace_id}",
+                f"/v1/projects/{_segment(project_id)}/trace-health/traces/{_segment(trace_id)}",
                 self.base_url,
             ),
             {},
@@ -1102,7 +1152,9 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Evaluate stored traces (`POST /v1/projects/{projectId}/traces/evaluate`)."""
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/traces/evaluate", self.base_url),
+            url_for(
+                f"/v1/projects/{_segment(project_id)}/traces/evaluate", self.base_url
+            ),
             payload,
             None,
         )
@@ -1113,7 +1165,10 @@ class JudgmentApiClient(JudgmentSyncClient):
         """Evaluate recent traces (`POST /v1/projects/{projectId}/traces/evaluate-all`)."""
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/traces/evaluate-all", self.base_url),
+            url_for(
+                f"/v1/projects/{_segment(project_id)}/traces/evaluate-all",
+                self.base_url,
+            ),
             payload,
             None,
         )

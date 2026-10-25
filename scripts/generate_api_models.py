@@ -89,7 +89,7 @@ def render_method(path: str, method: str, op: dict[str, Any], models: set[str]) 
             if p.get("required")
             else f"{p['name']}: {type_} | None = None"
         )
-    url = re.sub(r"\{(\w+)\}", lambda m: "{" + snake_case(m[1]) + "}", path)
+    url = re.sub(r"\{(\w+)\}", lambda m: "{_segment(" + snake_case(m[1]) + ")}", path)
     params_arg = "{" + ", ".join(f'"{p["name"]}": {p["name"]}' for p in query) + "}"
     return f'''
     def {op["x-mcp"]["tool"]}({", ".join(args)}) -> {model_name(response, models)}:
@@ -119,10 +119,18 @@ def render_client(spec: dict[str, Any]) -> str:
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import quote
 
 from judgeval.internal.api.api_client import JudgmentSyncClient
 from judgeval.internal.api.models import {", ".join(sorted(models))}
 from judgeval.utils.url import url_for
+
+
+def _segment(value: str) -> str:
+    """Encodes a path parameter so an ID can't change the route or host."""
+    if value in (".", ".."):
+        raise ValueError(f"Invalid path parameter: {{value!r}}")
+    return quote(value, safe="")
 
 
 def _drop_none(params: dict[str, Any]) -> dict[str, Any]:
