@@ -1,3 +1,5 @@
+import os
+
 from judgeval.internal.api import JudgmentSyncClient
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_ORG_ID, JUDGMENT_API_URL
 
@@ -20,6 +22,10 @@ def delete_project(project_name: str):
 
 
 def create_project(project_name: str):
+    registry_path = os.getenv("E2E_CREATED_PROJECTS_FILE")
+    if registry_path:
+        with open(registry_path, "a") as registry:
+            registry.write(project_name + "\n")
     client.post_projects(payload={"project_name": project_name})
 
 
