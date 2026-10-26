@@ -26,4 +26,4 @@ def test_client_routes_exist_in_committed_spec():
         )
     }
 
-    assert (len(client_routes), sorted(client_routes - spec_routes)) == (28, [])
+    assert (len(client_routes), sorted(client_routes - spec_routes)) == (29, [])

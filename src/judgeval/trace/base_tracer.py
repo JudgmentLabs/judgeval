@@ -488,8 +488,10 @@ class BaseTracer(ABC):
         shared parent span (the parent would take the last case's ids).
 
         ```python
-        with Tracer.test_case(run.id, case.id):
-            support_agent(case.input)
+        run = client.test_runs.start(test_suite_id)
+        for case in run["cases"]:
+            with Tracer.test_case(run["run_id"], case["case_id"]):
+                support_agent(case["input"])
         ```
         """
         with BaseTracer.scoped_context(
