@@ -1,10 +1,11 @@
 """Generates src/judgeval/internal/api/models.py from the committed public spec.
 
 The spec (openapi/public-api.json, copied from judgment-mono's
-packages/shared/public-api/openapi.json) names shared schemas in
-`components.schemas`, which datamodel-codegen emits as named TypedDicts, e.g.
-`ExampleEvaluationRun`. Inline bodies of `x-mcp` routes are named after their
-MCP tool first, e.g. `CreateJudgeRequest`.
+packages/shared/public-api/openapi.json) lists its named schemas under
+`components.schemas`; datamodel-codegen emits one TypedDict per entry, e.g.
+`ExampleEvaluationRun`. Request and response bodies written inline on a route
+have no name, so they would get no model; for each MCP-backed (`x-mcp`) route
+we name them after its MCP tool first, e.g. `CreateJudgeRequest`.
 
     uv run python scripts/generate_api_models.py
 """
@@ -24,8 +25,13 @@ OUTPUT = ROOT / "src" / "judgeval" / "internal" / "api" / "models.py"
 
 
 def name_inline_bodies(spec: dict[str, Any]) -> dict[str, Any]:
-    """Moves each x-mcp route's inline JSON request/200 body into
-    components.schemas as `<Tool>Request` / `<Tool>Response`."""
+    """Gives each x-mcp route's unnamed request and response bodies a model name.
+
+    A body written inline on the route is added to the named schemas as
+    `<ToolName>Request` / `<ToolName>Response` (e.g. `create_judge` ->
+    `CreateJudgeRequest`), and the route points to it, so datamodel-codegen
+    emits a TypedDict for it. Bodies that already reference a named schema
+    are left alone."""
     schemas = spec["components"]["schemas"]
     for operations in spec["paths"].values():
         for op in operations.values():
