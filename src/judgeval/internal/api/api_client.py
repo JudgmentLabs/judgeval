@@ -483,7 +483,8 @@ class JudgmentSyncClient:
         return self._request(
             "POST",
             url_for(
-                f"/v1/projects/{project_id}/judges/{judge_id}/lookup", self.base_url
+                f"/v1/projects/{encode_path_segment(project_id)}/judges/{encode_path_segment(judge_id)}/lookup",
+                self.base_url,
             ),
             payload,
         )
