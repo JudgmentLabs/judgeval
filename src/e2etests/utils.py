@@ -24,19 +24,11 @@ def create_project(project_name: str):
     client.post_projects(payload={"project_name": project_name})
 
 
-# The e2e fetch routes are hidden from the public spec, so they are not on the
-# client; call them through its request helper.
+# The e2e fetch route is hidden from the public spec, so it is not on the
+# client; call it through its request helper.
 def retrieve_trace(project_name: str, trace_id: str):
     return client._request(
         "GET",
         url_for(f"/v1/e2e_fetch_trace/{project_name}/{trace_id}", client.base_url),
         {},
-    )
-
-
-def retrieve_score(project_name: str, span_id: str, trace_id: str):
-    return client._request(
-        "POST",
-        url_for("/v1/e2e_fetch_span_score/", client.base_url),
-        {"project_name": project_name, "span_id": span_id, "trace_id": trace_id},
     )
