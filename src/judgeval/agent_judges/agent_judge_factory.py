@@ -18,7 +18,6 @@ from judgeval.internal.api.models import (
     UpdateJudgeRequestUpdateNewVersion2,
     UpdateJudgeRequestUpdateNewVersion2Outputs,
     UpdateJudgeRequestUpdateNewVersion2Outputs1,
-    UpdateJudgeRequestUpdateNewVersionAdvancedSettings,
     UpdateJudgeRequestUpdateNewVersionConfig,
     UpdateJudgeRequestUpdateNewVersionTargetVersion,
 )
@@ -33,10 +32,19 @@ _BINARY_OUTPUTS: List[CreateJudgeRequestJudgeInitialVersionOutput] = [
 ]
 
 JudgeVersion = Union[Literal["latest", "production"], GetJudgeRequestVersion]
-PromptVersion = Union[
-    UpdateJudgeRequestUpdateNewVersion,
-    UpdateJudgeRequestUpdateNewVersion1,
-    UpdateJudgeRequestUpdateNewVersion2,
+VersionConfig = UpdateJudgeRequestUpdateNewVersionConfig
+TargetVersion = UpdateJudgeRequestUpdateNewVersionTargetVersion
+
+# The update route's `newVersion` is a union the spec leaves unnamed, so the
+# generator numbers its members. These are the prompt-judge ones, by score type.
+BinaryVersion = UpdateJudgeRequestUpdateNewVersion
+NumericVersion = UpdateJudgeRequestUpdateNewVersion1
+CategoricalVersion = UpdateJudgeRequestUpdateNewVersion2
+PromptJudgeVersion = Union[BinaryVersion, NumericVersion, CategoricalVersion]
+# A categorical output: an existing one by ID, or a new one by name/description.
+CategoryOutput = Union[
+    UpdateJudgeRequestUpdateNewVersion2Outputs,
+    UpdateJudgeRequestUpdateNewVersion2Outputs1,
 ]
 
 
@@ -161,7 +169,7 @@ class AgentJudgeFactory:
             judgeval_logger.error(f"Failed to create Agent judge: {e}")
             raise
 
-        return _agent_judge(self._lookup(project_id, response["judge_id"]))
+        return _to_agent_judge(self._fetch_judge(project_id, response["judge_id"]))
 
     def update(
         self,
@@ -240,68 +248,28 @@ class AgentJudgeFactory:
             target_minor_version,
         )
         if any(field is not None for field in version_fields):
-            latest = self._lookup(project_id, judge_id)
-            latest_major = int(latest["judge_major_version"])
-            latest_minor = int(latest["judge_minor_version"])
-            source_major = (
-                latest_major if source_major_version is None else source_major_version
+            latest = self._fetch_judge(project_id, judge_id)
+            source = self._fetch_source_version(
+                project_id, judge_id, latest, source_major_version, source_minor_version
             )
-            # The lookup route takes an exact version, so an older major's
-            # latest minor can't be resolved.
-            if source_minor_version is None and source_major != latest_major:
-                raise ValueError(
-                    "source_minor_version is required when source_major_version "
-                    "is not the latest major"
-                )
-            source = (
-                latest
-                if source_minor_version is None
-                else self._lookup(
-                    project_id,
-                    judge_id,
-                    {"major": source_major, "minor": source_minor_version},
-                )
+            target = _resolve_target_version(
+                latest, target_major_version, target_minor_version
             )
-            target_major = (
-                latest_major if target_major_version is None else target_major_version
+            config = _build_version_config(
+                source,
+                prompt=prompt,
+                description=description,
+                reasoning_level=reasoning_level,
+                min_score=min_score,
+                max_score=max_score,
             )
-            if target_minor_version is not None:
-                target_minor = target_minor_version
-            elif target_major == latest_major:
-                target_minor = latest_minor + 1
-            else:
-                target_minor = 0
-            target: UpdateJudgeRequestUpdateNewVersionTargetVersion = {
-                "major": target_major,
-                "minor": target_minor,
-            }
-            # create() writes `binary` as a Pass/Fail categorical judge.
-            if score_type == "binary" and source["score_type"] == "categorical":
-                score_type = "categorical"
-            new_version = _prompt_version(
+            update["newVersion"] = _build_prompt_version(
                 source,
                 target,
-                score_type or source["score_type"],
+                _resolve_score_type(score_type, source),
                 categories,
-                {
-                    "prompt": prompt or source["definition"]["prompt"],
-                    "description": source["definition"]["description"]
-                    if description is None
-                    else description,
-                    "reasoningLevel": reasoning_level
-                    or source["definition"]["reasoning_level"],
-                    "minScore": source["definition"]["min_score"]
-                    if min_score is None
-                    else min_score,
-                    "maxScore": source["definition"]["max_score"]
-                    if max_score is None
-                    else max_score,
-                },
+                config,
             )
-            # Omitted, the route keeps the latest version's action groups.
-            if "action_config" in source:
-                new_version["actionConfig"] = source["action_config"]
-            update["newVersion"] = new_version
             written = target
 
         try:
@@ -314,9 +282,9 @@ class AgentJudgeFactory:
             judgeval_logger.error(f"Failed to update Agent judge: {e}")
             raise
 
-        return _agent_judge(self._lookup(project_id, judge_id, written))
+        return _to_agent_judge(self._fetch_judge(project_id, judge_id, written))
 
-    def _lookup(
+    def _fetch_judge(
         self, project_id: str, judge_id: str, version: JudgeVersion = "latest"
     ) -> GetJudgeResponseJudge:
         judge = self._client.post_projects_judges_by_judge_id_lookup(
@@ -331,59 +299,135 @@ class AgentJudgeFactory:
             )
         return judge
 
+    def _fetch_source_version(
+        self,
+        project_id: str,
+        judge_id: str,
+        latest: GetJudgeResponseJudge,
+        major: Optional[int],
+        minor: Optional[int],
+    ) -> GetJudgeResponseJudge:
+        """The version to copy unspecified fields from; `latest` by default."""
+        latest_major = int(latest["judge_major_version"])
+        major = latest_major if major is None else major
+        if minor is None:
+            # The lookup route takes an exact version, so an older major's
+            # latest minor can't be resolved.
+            if major != latest_major:
+                raise ValueError(
+                    "source_minor_version is required when source_major_version "
+                    "is not the latest major"
+                )
+            return latest
+        return self._fetch_judge(project_id, judge_id, {"major": major, "minor": minor})
 
-def _prompt_version(
+
+def _resolve_target_version(
+    latest: GetJudgeResponseJudge, major: Optional[int], minor: Optional[int]
+) -> TargetVersion:
+    """The version to write: `latest minor + 1` in the latest major by default."""
+    latest_major = int(latest["judge_major_version"])
+    major = latest_major if major is None else major
+    if minor is None:
+        minor = int(latest["judge_minor_version"]) + 1 if major == latest_major else 0
+    return {"major": major, "minor": minor}
+
+
+def _build_version_config(
     source: GetJudgeResponseJudge,
-    target: UpdateJudgeRequestUpdateNewVersionTargetVersion,
+    *,
+    prompt: Optional[str],
+    description: Optional[str],
+    reasoning_level: Optional[ReasoningLevel],
+    min_score: Optional[float],
+    max_score: Optional[float],
+) -> VersionConfig:
+    """The requested rubric fields, the rest copied from `source`."""
+    definition = source["definition"]
+    return {
+        "prompt": prompt or definition["prompt"],
+        "description": definition["description"]
+        if description is None
+        else description,
+        "reasoningLevel": reasoning_level or definition["reasoning_level"],
+        "minScore": definition["min_score"] if min_score is None else min_score,
+        "maxScore": definition["max_score"] if max_score is None else max_score,
+    }
+
+
+def _resolve_score_type(
+    requested: Optional[ScoreType], source: GetJudgeResponseJudge
+) -> ScoreType:
+    """The judge's own score type; `binary` also names create()'s Pass/Fail
+    categorical judges."""
+    if requested is None or (
+        requested == "binary" and source["score_type"] == "categorical"
+    ):
+        return source["score_type"]
+    return requested
+
+
+def _build_prompt_version(
+    source: GetJudgeResponseJudge,
+    target: TargetVersion,
     score_type: ScoreType,
     categories: Optional[List[Dict[str, Any]]],
-    config: UpdateJudgeRequestUpdateNewVersionConfig,
-) -> PromptVersion:
-    """A complete prompt-judge version, monitoring settings copied from `source`."""
-    settings: UpdateJudgeRequestUpdateNewVersionAdvancedSettings = {
-        "online_environment_names": source["online_environment_names"],
-        "online_evaluation_mode": source["online_evaluation_mode"],
-        "online_sampling_rate": source["online_sampling_rate"],
-        "online_span_triggers": source["online_span_triggers"],
-        "online_session_scoring": source["online_session_scoring"],
-        "session_evaluation_count_enabled": source["session_evaluation_count_enabled"],
-        "session_evaluation_idle_enabled": source["session_evaluation_idle_enabled"],
-        "session_evaluation_min_candidate_traces": source[
-            "session_evaluation_min_candidate_traces"
-        ],
-        "session_evaluation_max_wait_minutes": source[
-            "session_evaluation_max_wait_minutes"
-        ],
+    config: VersionConfig,
+) -> PromptJudgeVersion:
+    """A complete new version; monitoring settings and action groups come from
+    `source`."""
+    version: BinaryVersion = {
+        "targetVersion": target,
+        "promoteToProduction": True,
+        "judgeType": "prompt",
+        "config": config,
+        "scoreType": "binary",
+        "advancedSettings": {
+            "online_environment_names": source["online_environment_names"],
+            "online_evaluation_mode": source["online_evaluation_mode"],
+            "online_sampling_rate": source["online_sampling_rate"],
+            "online_span_triggers": source["online_span_triggers"],
+            "online_session_scoring": source["online_session_scoring"],
+            "session_evaluation_count_enabled": source[
+                "session_evaluation_count_enabled"
+            ],
+            "session_evaluation_idle_enabled": source[
+                "session_evaluation_idle_enabled"
+            ],
+            "session_evaluation_min_candidate_traces": source[
+                "session_evaluation_min_candidate_traces"
+            ],
+            "session_evaluation_max_wait_minutes": source[
+                "session_evaluation_max_wait_minutes"
+            ],
+        },
     }
-    if score_type == "binary":
-        return {
-            "targetVersion": target,
-            "promoteToProduction": True,
-            "advancedSettings": settings,
-            "judgeType": "prompt",
-            "config": config,
-            "scoreType": "binary",
-        }
+    # Omitted, the route keeps the latest version's action groups.
+    if "action_config" in source:
+        version["actionConfig"] = source["action_config"]
     if score_type == "numeric":
-        return {
-            "targetVersion": target,
-            "promoteToProduction": True,
-            "advancedSettings": settings,
-            "judgeType": "prompt",
-            "config": config,
-            "scoreType": "numeric",
+        numeric: NumericVersion = {**version, "scoreType": "numeric"}
+        return numeric
+    if score_type == "categorical":
+        categorical: CategoricalVersion = {
+            **version,
+            "scoreType": "categorical",
+            "outputs": _build_category_outputs(source, categories),
         }
+        return categorical
+    return version
 
-    existing = {o["name"]: o for o in source["outputs"]}
-    outputs: List[
-        Union[
-            UpdateJudgeRequestUpdateNewVersion2Outputs,
-            UpdateJudgeRequestUpdateNewVersion2Outputs1,
-        ]
-    ] = []
+
+def _build_category_outputs(
+    source: GetJudgeResponseJudge, categories: Optional[List[Dict[str, Any]]]
+) -> List[CategoryOutput]:
+    """Existing outputs by ID (all of them when `categories` is None), new
+    names by name and description."""
     if categories is None:
-        outputs = [{"behaviorId": o["behavior_id"]} for o in source["outputs"]]
-    for c in categories or []:
+        return [{"behaviorId": o["behavior_id"]} for o in source["outputs"]]
+    existing = {o["name"]: o for o in source["outputs"]}
+    outputs: List[CategoryOutput] = []
+    for c in categories:
         output = existing.get(c["name"])
         if output is None:
             outputs.append({"name": c["name"], "description": c["description"]})
@@ -394,15 +438,7 @@ def _prompt_version(
             )
         else:
             outputs.append({"behaviorId": output["behavior_id"]})
-    return {
-        "targetVersion": target,
-        "promoteToProduction": True,
-        "advancedSettings": settings,
-        "judgeType": "prompt",
-        "config": config,
-        "scoreType": "categorical",
-        "outputs": outputs,
-    }
+    return outputs
 
 
 def _warn_if_model(model: Optional[str]) -> None:
@@ -413,7 +449,7 @@ def _warn_if_model(model: Optional[str]) -> None:
         )
 
 
-def _agent_judge(judge: GetJudgeResponseJudge) -> AgentJudge:
+def _to_agent_judge(judge: GetJudgeResponseJudge) -> AgentJudge:
     definition = judge["definition"]
     return AgentJudge(
         judge_id=judge["id"],
