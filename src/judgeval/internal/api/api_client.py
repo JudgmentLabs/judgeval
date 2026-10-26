@@ -7,7 +7,7 @@ import json
 import httpx
 from httpx import Response
 from judgeval.exceptions import JudgmentAPIError
-from judgeval.utils.url import url_for
+from judgeval.utils.url import encode_path_segment, url_for
 from judgeval.utils.serialize import json_encoder
 from judgeval.internal.api.models import *
 from judgeval.logger import judgeval_logger as logger
@@ -129,7 +129,7 @@ class JudgmentSyncClient:
     def delete_projects(self, project_id: str) -> DeleteProjectResponse:
         return self._request(
             "DELETE",
-            url_for(f"/v1/projects/{project_id}", self.base_url),
+            url_for(f"/v1/projects/{encode_path_segment(project_id)}", self.base_url),
             {},
         )
 
@@ -147,14 +147,20 @@ class JudgmentSyncClient:
     ) -> CreateOfflineDatasetResponse:
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/datasets", self.base_url),
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/datasets",
+                self.base_url,
+            ),
             payload,
         )
 
     def get_projects_datasets(self, project_id: str) -> PullAllOfflineDatasetsResponse:
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{project_id}/datasets", self.base_url),
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/datasets",
+                self.base_url,
+            ),
             {},
         )
 
@@ -164,7 +170,7 @@ class JudgmentSyncClient:
         return self._request(
             "GET",
             url_for(
-                f"/v1/projects/{project_id}/datasets/{dataset_identifier}/versions",
+                f"/v1/projects/{encode_path_segment(project_id)}/datasets/{encode_path_segment(dataset_identifier)}/versions",
                 self.base_url,
             ),
             {},
@@ -191,7 +197,7 @@ class JudgmentSyncClient:
         return self._request(
             "GET",
             url_for(
-                f"/v1/projects/{project_id}/datasets/{dataset_identifier}/page",
+                f"/v1/projects/{encode_path_segment(project_id)}/datasets/{encode_path_segment(dataset_identifier)}/page",
                 self.base_url,
             ),
             query_params,
@@ -206,7 +212,7 @@ class JudgmentSyncClient:
         return self._request(
             "POST",
             url_for(
-                f"/v1/projects/{project_id}/datasets/{dataset_identifier}/examples",
+                f"/v1/projects/{encode_path_segment(project_id)}/datasets/{encode_path_segment(dataset_identifier)}/examples",
                 self.base_url,
             ),
             payload,
@@ -218,7 +224,7 @@ class JudgmentSyncClient:
         return self._request(
             "DELETE",
             url_for(
-                f"/v1/projects/{project_id}/datasets/{dataset_identifier}",
+                f"/v1/projects/{encode_path_segment(project_id)}/datasets/{encode_path_segment(dataset_identifier)}",
                 self.base_url,
             ),
             {},
@@ -230,7 +236,7 @@ class JudgmentSyncClient:
         return self._request(
             "GET",
             url_for(
-                f"/v1/projects/{project_id}/datasets/{dataset_identifier}",
+                f"/v1/projects/{encode_path_segment(project_id)}/datasets/{encode_path_segment(dataset_identifier)}",
                 self.base_url,
             ),
             {},
@@ -244,7 +250,10 @@ class JudgmentSyncClient:
             query_params["dataset_id"] = dataset_id
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{project_id}/test-configs", self.base_url),
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/test-configs",
+                self.base_url,
+            ),
             query_params,
         )
 
@@ -253,7 +262,10 @@ class JudgmentSyncClient:
     ) -> TestConfigResponse:
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/test-configs", self.base_url),
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/test-configs",
+                self.base_url,
+            ),
             payload,
         )
 
@@ -263,7 +275,7 @@ class JudgmentSyncClient:
         return self._request(
             "GET",
             url_for(
-                f"/v1/projects/{project_id}/test-configs/{test_config_id}",
+                f"/v1/projects/{encode_path_segment(project_id)}/test-configs/{encode_path_segment(test_config_id)}",
                 self.base_url,
             ),
             {},
@@ -275,7 +287,7 @@ class JudgmentSyncClient:
         return self._request(
             "DELETE",
             url_for(
-                f"/v1/projects/{project_id}/test-configs/{test_config_id}",
+                f"/v1/projects/{encode_path_segment(project_id)}/test-configs/{encode_path_segment(test_config_id)}",
                 self.base_url,
             ),
             {},
@@ -286,7 +298,10 @@ class JudgmentSyncClient:
     ) -> PreparedTestRunResponse:
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/test-runs", self.base_url),
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/test-runs",
+                self.base_url,
+            ),
             payload,
         )
 
@@ -296,7 +311,8 @@ class JudgmentSyncClient:
         return self._request(
             "GET",
             url_for(
-                f"/v1/projects/{project_id}/test-runs/{test_run_id}", self.base_url
+                f"/v1/projects/{encode_path_segment(project_id)}/test-runs/{encode_path_segment(test_run_id)}",
+                self.base_url,
             ),
             {},
         )
@@ -315,7 +331,10 @@ class JudgmentSyncClient:
             query_params["cursor"] = cursor
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{project_id}/experiments/{run_id}", self.base_url),
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/experiments/{encode_path_segment(run_id)}",
+                self.base_url,
+            ),
             query_params,
         )
 
@@ -324,7 +343,10 @@ class JudgmentSyncClient:
     ) -> OfflineTestsLogEvalResultsExamplesResponse:
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/eval-results/examples", self.base_url),
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/eval-results/examples",
+                self.base_url,
+            ),
             payload,
         )
 
@@ -333,7 +355,10 @@ class JudgmentSyncClient:
     ) -> AddToRunEvalQueueExamplesResponse:
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/eval-queue/examples", self.base_url),
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/eval-queue/examples",
+                self.base_url,
+            ),
             payload,
         )
 
@@ -351,7 +376,10 @@ class JudgmentSyncClient:
             query_params["tag"] = tag
         return self._request(
             "GET",
-            url_for(f"/v1/projects/{project_id}/prompts/{name}", self.base_url),
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/prompts/{encode_path_segment(name)}",
+                self.base_url,
+            ),
             query_params,
         )
 
@@ -360,7 +388,9 @@ class JudgmentSyncClient:
     ) -> InsertPromptResponse:
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/prompts", self.base_url),
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/prompts", self.base_url
+            ),
             payload,
         )
 
@@ -369,7 +399,10 @@ class JudgmentSyncClient:
     ) -> TagPromptResponse:
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/prompts/{name}/tags", self.base_url),
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/prompts/{encode_path_segment(name)}/tags",
+                self.base_url,
+            ),
             payload,
         )
 
@@ -378,7 +411,10 @@ class JudgmentSyncClient:
     ) -> UntagPromptResponse:
         return self._request(
             "DELETE",
-            url_for(f"/v1/projects/{project_id}/prompts/{name}/tags", self.base_url),
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/prompts/{encode_path_segment(name)}/tags",
+                self.base_url,
+            ),
             payload,
         )
 
@@ -388,7 +424,8 @@ class JudgmentSyncClient:
         return self._request(
             "GET",
             url_for(
-                f"/v1/projects/{project_id}/prompts/{name}/versions", self.base_url
+                f"/v1/projects/{encode_path_segment(project_id)}/prompts/{encode_path_segment(name)}/versions",
+                self.base_url,
             ),
             {},
         )
@@ -398,7 +435,10 @@ class JudgmentSyncClient:
     ) -> UploadCustomScorerResponse:
         return self._multipart_request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/scorers/custom/bundle", self.base_url),
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/scorers/custom/bundle",
+                self.base_url,
+            ),
             payload,
         )
 
@@ -407,7 +447,10 @@ class JudgmentSyncClient:
     ) -> AddTraceTagsResponse:
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/traces/{trace_id}/tags", self.base_url),
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/traces/{encode_path_segment(trace_id)}/tags",
+                self.base_url,
+            ),
             payload,
         )
 
@@ -416,7 +459,9 @@ class JudgmentSyncClient:
     ) -> CreateJudgeResponse:
         return self._request(
             "POST",
-            url_for(f"/v1/projects/{project_id}/judges", self.base_url),
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/judges", self.base_url
+            ),
             payload,
         )
 
@@ -425,7 +470,10 @@ class JudgmentSyncClient:
     ) -> UpdateJudgeResponse:
         return self._request(
             "PATCH",
-            url_for(f"/v1/projects/{project_id}/judges/{judge_id}", self.base_url),
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/judges/{encode_path_segment(judge_id)}",
+                self.base_url,
+            ),
             payload,
         )
 

@@ -6,8 +6,10 @@ packages/shared/public-api/openapi.json) lists its named schemas under
 `components.schemas`; datamodel-codegen emits one TypedDict per entry, e.g.
 `ExampleEvaluationRun`. Request and response bodies written inline on a route
 have no name, so they would get no model; for each MCP-backed (`x-mcp`) route
-we name them after its MCP tool first, e.g. `CreateJudgeRequest`. api.py gets one JudgmentApiClient
-method per `x-mcp` operation, named after its MCP tool (e.g. `list_judges`).
+we name them after its MCP tool first, e.g. `CreateJudgeRequest`.
+
+api.py gets one JudgmentApiClient method per `x-mcp` route, named after its
+MCP tool (e.g. `list_judges`).
 
     uv run python scripts/generate_api_models.py
 """
@@ -89,7 +91,9 @@ def render_method(path: str, method: str, op: dict[str, Any], models: set[str]) 
             if p.get("required")
             else f"{p['name']}: {type_} | None = None"
         )
-    url = re.sub(r"\{(\w+)\}", lambda m: "{_segment(" + snake_case(m[1]) + ")}", path)
+    url = re.sub(
+        r"\{(\w+)\}", lambda m: "{encode_path_segment(" + snake_case(m[1]) + ")}", path
+    )
     params_arg = "{" + ", ".join(f'"{p["name"]}": {p["name"]}' for p in query) + "}"
     return f'''
     def {op["x-mcp"]["tool"]}({", ".join(args)}) -> {model_name(response, models)}:
@@ -112,25 +116,16 @@ def render_client(spec: dict[str, Any]) -> str:
         if "x-mcp" in op
     )
     return f'''{HEADER}
-# _request returns parsed JSON (Any); the annotations come from the spec.
 # mypy: disable-error-code="no-any-return"
 """Client for the public /v1 API: one method per Judgment MCP tool."""
 
 from __future__ import annotations
 
 from typing import Any
-from urllib.parse import quote
 
 from judgeval.internal.api.api_client import JudgmentSyncClient
 from judgeval.internal.api.models import {", ".join(sorted(models))}
-from judgeval.utils.url import url_for
-
-
-def _segment(value: str) -> str:
-    """Encodes a path parameter so an ID can't change the route or host."""
-    if value in (".", ".."):
-        raise ValueError(f"Invalid path parameter: {{value!r}}")
-    return quote(value, safe="")
+from judgeval.utils.url import encode_path_segment, url_for
 
 
 def _drop_none(params: dict[str, Any]) -> dict[str, Any]:
