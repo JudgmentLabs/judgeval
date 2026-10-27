@@ -24,9 +24,11 @@ class BackgroundQueue:
         self._semaphore = threading.Semaphore(max_queue_size)
         self._futures: set[Future[Any]] = set()
         self._state_lock = threading.Lock()
+        self._worker_context = threading.local()
         self._executor = ThreadPoolExecutor(
             max_workers=workers,
             thread_name_prefix="judgeval-bg",
+            initializer=self._mark_worker,
         )
         self._shutdown = False
         atexit.register(self.shutdown)
@@ -72,6 +74,10 @@ class BackgroundQueue:
         return True
 
     # --- Completion and drain helpers ---
+    def _mark_worker(self) -> None:
+        """Identify queue-owned threads through jobs and completion callbacks."""
+        self._worker_context.is_worker = True
+
     def _on_done(self, future: Future[Any]) -> None:
         self._semaphore.release()
         with self._state_lock:
@@ -112,8 +118,13 @@ class BackgroundQueue:
     def shutdown(self, timeout_ms: int = 30000) -> None:
         """Flush pending jobs and shut down the thread pool.
 
+        An external caller initiating shutdown waits for accepted jobs. This
+        queue's workers do not wait, so queued jobs can run after they return.
+        Once shutdown has started, subsequent calls return immediately.
+
         Args:
-            timeout_ms: Maximum time in milliseconds to wait for flush.
+            timeout_ms: Maximum flush wait when initiated outside this queue's
+                workers.
         """
         with self._state_lock:
             if self._shutdown:
@@ -121,7 +132,8 @@ class BackgroundQueue:
             self._shutdown = True
             futures = tuple(self._futures)
         try:
-            self._wait_for_futures(futures, timeout_ms)
+            if not getattr(self._worker_context, "is_worker", False):
+                self._wait_for_futures(futures, timeout_ms)
         finally:
             self._executor.shutdown(wait=False)
 

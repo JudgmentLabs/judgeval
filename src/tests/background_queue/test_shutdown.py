@@ -238,3 +238,84 @@ def test_failed_job_releases_capacity(monkeypatch):
         assert ran.is_set()
     finally:
         queue.shutdown()
+
+
+@pytest.mark.parametrize("from_callback", [False, True], ids=["job", "callback"])
+def test_worker_shutdown_leaves_queued_work_runnable(
+    monkeypatch, caplog, from_callback
+):
+    queue = BackgroundQueue(workers=1, max_queue_size=2)
+    started = threading.Event()
+    release = threading.Event()
+    shutdown_returned = threading.Event()
+    queued_finished = threading.Event()
+    outcomes = []
+
+    # --- Controlled scheduling helpers ---
+    def shutdown():
+        queue.shutdown(timeout_ms=100)
+        outcomes.append("shutdown returned")
+        shutdown_returned.set()
+
+    def job():
+        started.set()
+        assert release.wait(5)
+        if from_callback:
+            raise ValueError("trigger completion callback")
+        shutdown()
+
+    def queued_job():
+        outcomes.append("queued job ran")
+        queued_finished.set()
+
+    # --- End controlled scheduling helpers ---
+    if from_callback:
+        monkeypatch.setattr(queue_module.judgeval_logger, "error", lambda _: shutdown())
+    try:
+        assert queue.enqueue(job)
+        assert started.wait(5)
+        assert queue.enqueue(queued_job)
+        release.set()
+        assert shutdown_returned.wait(5)
+        assert queued_finished.wait(5)
+        assert outcomes == ["shutdown returned", "queued job ran"]
+        assert queue.enqueue(lambda: None) is False
+        assert "Flush timed out" not in caplog.text
+    finally:
+        release.set()
+        queue.shutdown(timeout_ms=0)
+
+
+def test_worker_of_another_queue_still_drains_external_shutdown():
+    caller = BackgroundQueue(workers=1, max_queue_size=1)
+    target = BackgroundQueue(workers=1, max_queue_size=1)
+    started = threading.Event()
+    release = threading.Event()
+    finished = threading.Event()
+    returned = threading.Event()
+    finished_at_return = []
+
+    # --- Controlled scheduling helpers ---
+    def target_job():
+        started.set()
+        assert release.wait(5)
+        finished.set()
+
+    def shutdown_target():
+        target.shutdown(timeout_ms=3000)
+        finished_at_return.append(finished.is_set())
+        returned.set()
+
+    # --- End controlled scheduling helpers ---
+    try:
+        assert target.enqueue(target_job)
+        assert started.wait(5)
+        assert caller.enqueue(shutdown_target)
+        returned.wait(0.1)
+        release.set()
+        assert returned.wait(5)
+        assert finished_at_return == [True]
+    finally:
+        release.set()
+        caller.shutdown()
+        target.shutdown()
