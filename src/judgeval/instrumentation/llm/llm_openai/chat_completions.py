@@ -15,6 +15,7 @@ from packaging import version
 from opentelemetry.trace import Status, StatusCode
 from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.utils.serialize import safe_serialize
+from judgeval.utils.decorators.dont_throw import dont_throw
 from judgeval.utils.wrappers import (
     immutable_wrap_async,
     immutable_wrap_sync,
@@ -32,6 +33,43 @@ from judgeval.trace import BaseTracer
 if TYPE_CHECKING:
     from openai import OpenAI, AsyncOpenAI
     from openai.types.chat import ChatCompletion, ChatCompletionChunk
+
+
+@dont_throw
+def _accumulate_chat(ctx: Dict[str, Any], chunk: ChatCompletionChunk) -> None:
+    if ctx.get("capture_failed"):
+        return
+    try:
+        from openai.lib.streaming.chat import ChatCompletionStreamState
+
+        if "completion_state" not in ctx:
+            ctx["completion_state"] = ChatCompletionStreamState()
+        ctx["completion_state"].handle_chunk(chunk)
+    except Exception:
+        ctx["capture_failed"] = True
+        raise
+
+
+def _record_chat(ctx: Dict[str, Any]) -> None:
+    if ctx.get("capture_failed") or "completion_state" not in ctx:
+        return
+    # Use the SDK snapshot without parsing structured outputs. Parsing helpers can
+    # raise on length/content_filter finishes that create(stream=True) accepts.
+    completion = ctx["completion_state"].current_completion_snapshot
+    if len(completion.choices) != ctx["expected_choices"] or not all(
+        choice.finish_reason is not None for choice in completion.choices
+    ):
+        return
+    # Parsed snapshots add SDK-only fields to otherwise native responses. In
+    # particular, parsed_arguments is not accepted by the tool-call wire schema.
+    payload = completion.model_dump(mode="json")
+    for choice in payload["choices"]:
+        message = choice["message"]
+        message.pop("parsed", None)
+        for tool in message.get("tool_calls") or []:
+            if tool["type"] == "function":
+                tool["function"].pop("parsed_arguments", None)
+    ctx["span"].set_attribute(AttributeKeys.GEN_AI_COMPLETION, safe_serialize(payload))
 
 
 def _supports_stream_options() -> bool:
@@ -161,7 +199,7 @@ def _wrap_streaming_sync(
         ctx["span"].set_attribute(
             AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
         )
-        ctx["accumulated_content"] = ""
+        ctx["expected_choices"] = kwargs.get("n") or 1
 
     def mutate_kwargs_hook(ctx: Dict[str, Any], kwargs: Any) -> Any:
         if "stream_options" not in kwargs and _supports_stream_options():
@@ -182,12 +220,9 @@ def _wrap_streaming_sync(
             if not span:
                 return
 
-            if chunk.choices and len(chunk.choices) > 0:
-                delta = chunk.choices[0].delta
-                if delta and delta.content:
-                    ctx["accumulated_content"] = (
-                        ctx.get("accumulated_content", "") + delta.content
-                    )
+            _accumulate_chat(ctx, chunk)
+            if chunk.model:
+                span.set_attribute(AttributeKeys.JUDGMENT_LLM_MODEL_NAME, chunk.model)
 
             if hasattr(chunk, "usage") and chunk.usage:
                 prompt_tokens = chunk.usage.prompt_tokens or 0
@@ -233,8 +268,7 @@ def _wrap_streaming_sync(
         def post_hook_inner(inner_ctx: Dict[str, Any]) -> None:
             span = ctx.get("span")
             if span:
-                accumulated = ctx.get("accumulated_content", "")
-                span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, accumulated)
+                _record_chat(ctx)
 
         def error_hook_inner(inner_ctx: Dict[str, Any], error: Exception) -> None:
             span = ctx.get("span")
@@ -262,6 +296,7 @@ def _wrap_streaming_sync(
         if span:
             span.record_exception(error)
             span.set_status(Status(StatusCode.ERROR))
+            span.end()
 
     return mutable_wrap_sync(
         original_func,
@@ -390,7 +425,7 @@ def _wrap_streaming_async(
         ctx["span"].set_attribute(
             AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
         )
-        ctx["accumulated_content"] = ""
+        ctx["expected_choices"] = kwargs.get("n") or 1
 
     def mutate_kwargs_hook(ctx: Dict[str, Any], kwargs: Any) -> Any:
         if "stream_options" not in kwargs and _supports_stream_options():
@@ -411,12 +446,9 @@ def _wrap_streaming_async(
             if not span:
                 return
 
-            if chunk.choices and len(chunk.choices) > 0:
-                delta = chunk.choices[0].delta
-                if delta and delta.content:
-                    ctx["accumulated_content"] = (
-                        ctx.get("accumulated_content", "") + delta.content
-                    )
+            _accumulate_chat(ctx, chunk)
+            if chunk.model:
+                span.set_attribute(AttributeKeys.JUDGMENT_LLM_MODEL_NAME, chunk.model)
 
             if hasattr(chunk, "usage") and chunk.usage:
                 prompt_tokens = chunk.usage.prompt_tokens or 0
@@ -462,8 +494,7 @@ def _wrap_streaming_async(
         def post_hook_inner(inner_ctx: Dict[str, Any]) -> None:
             span = ctx.get("span")
             if span:
-                accumulated = ctx.get("accumulated_content", "")
-                span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, accumulated)
+                _record_chat(ctx)
 
         def error_hook_inner(inner_ctx: Dict[str, Any], error: Exception) -> None:
             span = ctx.get("span")
@@ -491,6 +522,7 @@ def _wrap_streaming_async(
         if span:
             span.record_exception(error)
             span.set_status(Status(StatusCode.ERROR))
+            span.end()
 
     return mutable_wrap_async(
         original_func,

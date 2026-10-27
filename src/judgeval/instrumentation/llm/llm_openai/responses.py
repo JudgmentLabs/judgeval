@@ -151,7 +151,6 @@ def _wrap_responses_streaming_sync(
         ctx["span"].set_attribute(
             AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
         )
-        ctx["accumulated_content"] = ""
 
     def mutate_hook(ctx: Dict[str, Any], result: Iterator[Any]) -> Iterator[Any]:
         def traced_generator() -> Generator[Any, None, None]:
@@ -163,14 +162,17 @@ def _wrap_responses_streaming_sync(
             if not span:
                 return
 
-            if hasattr(chunk, "type") and chunk.type == "response.output_text.delta":
-                delta = getattr(chunk, "delta", None)
-                if delta:
-                    ctx["accumulated_content"] = (
-                        ctx.get("accumulated_content", "") + delta
+            event_type = getattr(chunk, "type", None)
+            if event_type in ("response.failed", "response.incomplete", "error"):
+                ctx["response_failed"] = True
+            if event_type == "response.completed":
+                # The terminal event carries the authoritative complete response,
+                # including tool arguments and reasoning, without local assembly.
+                ctx["response"] = chunk.response
+                if chunk.response.model:
+                    span.set_attribute(
+                        AttributeKeys.JUDGMENT_LLM_MODEL_NAME, chunk.response.model
                     )
-
-            if hasattr(chunk, "type") and chunk.type == "response.completed":
                 if (
                     hasattr(chunk, "response")
                     and chunk.response
@@ -223,9 +225,21 @@ def _wrap_responses_streaming_sync(
 
         def post_hook_inner(inner_ctx: Dict[str, Any]) -> None:
             span = ctx.get("span")
-            if span:
-                accumulated = ctx.get("accumulated_content", "")
-                span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, accumulated)
+            response = ctx.get("response")
+            if (
+                span
+                and response is not None
+                and response.status == "completed"
+                and not ctx.get("response_failed")
+            ):
+                # Omit SDK defaults absent from the wire (e.g. reasoning
+                # content=None); retain explicitly returned fields and nulls.
+                span.set_attribute(
+                    AttributeKeys.GEN_AI_COMPLETION,
+                    safe_serialize(
+                        response.model_dump(mode="json", exclude_unset=True)
+                    ),
+                )
 
         def error_hook_inner(inner_ctx: Dict[str, Any], error: Exception) -> None:
             span = ctx.get("span")
@@ -253,6 +267,7 @@ def _wrap_responses_streaming_sync(
         if span:
             span.record_exception(error)
             span.set_status(Status(StatusCode.ERROR))
+            span.end()
 
     return mutable_wrap_sync(
         original_func,
@@ -377,7 +392,6 @@ def _wrap_responses_streaming_async(
         ctx["span"].set_attribute(
             AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
         )
-        ctx["accumulated_content"] = ""
 
     def mutate_hook(
         ctx: Dict[str, Any], result: AsyncIterator[Any]
@@ -391,14 +405,17 @@ def _wrap_responses_streaming_async(
             if not span:
                 return
 
-            if hasattr(chunk, "type") and chunk.type == "response.output_text.delta":
-                delta = getattr(chunk, "delta", None)
-                if delta:
-                    ctx["accumulated_content"] = (
-                        ctx.get("accumulated_content", "") + delta
+            event_type = getattr(chunk, "type", None)
+            if event_type in ("response.failed", "response.incomplete", "error"):
+                ctx["response_failed"] = True
+            if event_type == "response.completed":
+                # The terminal event carries the authoritative complete response,
+                # including tool arguments and reasoning, without local assembly.
+                ctx["response"] = chunk.response
+                if chunk.response.model:
+                    span.set_attribute(
+                        AttributeKeys.JUDGMENT_LLM_MODEL_NAME, chunk.response.model
                     )
-
-            if hasattr(chunk, "type") and chunk.type == "response.completed":
                 if (
                     hasattr(chunk, "response")
                     and chunk.response
@@ -451,9 +468,21 @@ def _wrap_responses_streaming_async(
 
         def post_hook_inner(inner_ctx: Dict[str, Any]) -> None:
             span = ctx.get("span")
-            if span:
-                accumulated = ctx.get("accumulated_content", "")
-                span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, accumulated)
+            response = ctx.get("response")
+            if (
+                span
+                and response is not None
+                and response.status == "completed"
+                and not ctx.get("response_failed")
+            ):
+                # Omit SDK defaults absent from the wire (e.g. reasoning
+                # content=None); retain explicitly returned fields and nulls.
+                span.set_attribute(
+                    AttributeKeys.GEN_AI_COMPLETION,
+                    safe_serialize(
+                        response.model_dump(mode="json", exclude_unset=True)
+                    ),
+                )
 
         def error_hook_inner(inner_ctx: Dict[str, Any], error: Exception) -> None:
             span = ctx.get("span")
@@ -481,6 +510,7 @@ def _wrap_responses_streaming_async(
         if span:
             span.record_exception(error)
             span.set_status(Status(StatusCode.ERROR))
+            span.end()
 
     return mutable_wrap_async(
         original_func,

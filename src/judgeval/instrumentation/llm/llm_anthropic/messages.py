@@ -1,4 +1,5 @@
 from __future__ import annotations
+from inspect import signature
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -15,6 +16,7 @@ from typing import (
 from opentelemetry.trace import Status, StatusCode
 from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.utils.serialize import safe_serialize
+from judgeval.utils.decorators.dont_throw import dont_throw
 from judgeval.utils.wrappers import (
     immutable_wrap_sync,
     immutable_wrap_async,
@@ -35,12 +37,57 @@ if TYPE_CHECKING:
     )
 
 
-def _extract_anthropic_content(chunk: RawMessageStreamEvent) -> str:
-    if chunk.type == "content_block_delta":
-        delta = chunk.delta
-        if delta.type == "text_delta" and delta.text:
-            return delta.text
-    return ""
+@dont_throw
+def _accumulate_message(ctx: Dict[str, Any], chunk: RawMessageStreamEvent) -> None:
+    # Use the same accumulator as messages.stream(), without consuming ahead.
+    # A failed capture must never be published as a complete response.
+    if ctx.get("capture_failed"):
+        return
+    try:
+        from anthropic.lib.streaming._messages import accumulate_event
+
+        if "accumulator_kwargs" not in ctx:
+            # Anthropic 2.x moved tool JSON buffers out of content blocks.
+            ctx["accumulator_kwargs"] = (
+                {"json_bufs": {}}
+                if "json_bufs" in signature(accumulate_event).parameters
+                else {}
+            )
+        ctx["message"] = accumulate_event(
+            event=chunk,
+            current_snapshot=ctx.get("message"),
+            **ctx["accumulator_kwargs"],
+        )
+        if chunk.type == "message_stop":
+            ctx["message_complete"] = True
+    except Exception:
+        ctx["capture_failed"] = True
+        raise
+
+
+def _record_message(span: Any, message: Message, *, complete: bool) -> None:
+    if complete:
+        # Exclude SDK accumulation/parsing internals, retaining native wire fields.
+        payload = message.model_dump(
+            mode="json",
+            exclude={"content": {"__all__": {"__json_buf", "parsed_output"}}},
+        )
+        span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, safe_serialize(payload))
+    if message.usage:
+        prompt, output, cache_read, cache_creation = _extract_anthropic_tokens(
+            message.usage
+        )
+        for key, value in (
+            (AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS, prompt),
+            (AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, output),
+            (AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read),
+            (AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, cache_creation),
+        ):
+            span.set_attribute(key, value)
+        span.set_attribute(
+            AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(message.usage)
+        )
+    span.set_attribute(AttributeKeys.JUDGMENT_LLM_MODEL_NAME, message.model)
 
 
 def _extract_anthropic_tokens(
@@ -159,7 +206,6 @@ def _wrap_streaming_sync(
         ctx["span"].set_attribute(
             AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
         )
-        ctx["accumulated_content"] = ""
 
     def mutate_hook(
         ctx: Dict[str, Any], result: Iterator[RawMessageStreamEvent]
@@ -173,13 +219,17 @@ def _wrap_streaming_sync(
             if not span:
                 return
 
-            content = _extract_anthropic_content(chunk)
-            if content:
-                ctx["accumulated_content"] = (
-                    ctx.get("accumulated_content", "") + content
-                )
+            _accumulate_message(ctx, chunk)
 
+            if chunk.type == "message_start":
+                span.set_attribute(
+                    AttributeKeys.JUDGMENT_LLM_MODEL_NAME, chunk.message.model
+                )
             usage_data = _extract_anthropic_chunk_usage(chunk)
+            if usage_data and not ctx.get("capture_failed"):
+                # The SDK merges cumulative usage without zeroing fields omitted
+                # from message_delta (notably input and cache tokens).
+                usage_data = ctx["message"].usage
             if usage_data:
                 prompt_tokens, completion_tokens, cache_read, cache_creation = (
                     _extract_anthropic_tokens(usage_data)
@@ -203,9 +253,13 @@ def _wrap_streaming_sync(
 
         def post_hook_inner(inner_ctx: Dict[str, Any]) -> None:
             span = ctx.get("span")
-            if span:
-                accumulated = ctx.get("accumulated_content", "")
-                span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, accumulated)
+            if span and ctx.get("message") is not None:
+                _record_message(
+                    span,
+                    ctx["message"],
+                    complete=bool(ctx.get("message_complete"))
+                    and not ctx.get("capture_failed", False),
+                )
 
         def error_hook_inner(inner_ctx: Dict[str, Any], error: Exception) -> None:
             span = ctx.get("span")
@@ -233,6 +287,7 @@ def _wrap_streaming_sync(
         if span:
             span.record_exception(error)
             span.set_status(Status(StatusCode.ERROR))
+            span.end()
 
     return mutable_wrap_sync(
         original_func,
@@ -330,7 +385,6 @@ def _wrap_streaming_async(
         ctx["span"].set_attribute(
             AttributeKeys.JUDGMENT_LLM_MODEL_NAME, ctx["model_name"]
         )
-        ctx["accumulated_content"] = ""
 
     def mutate_hook(
         ctx: Dict[str, Any], result: AsyncIterator[RawMessageStreamEvent]
@@ -344,13 +398,17 @@ def _wrap_streaming_async(
             if not span:
                 return
 
-            content = _extract_anthropic_content(chunk)
-            if content:
-                ctx["accumulated_content"] = (
-                    ctx.get("accumulated_content", "") + content
-                )
+            _accumulate_message(ctx, chunk)
 
+            if chunk.type == "message_start":
+                span.set_attribute(
+                    AttributeKeys.JUDGMENT_LLM_MODEL_NAME, chunk.message.model
+                )
             usage_data = _extract_anthropic_chunk_usage(chunk)
+            if usage_data and not ctx.get("capture_failed"):
+                # The SDK merges cumulative usage without zeroing fields omitted
+                # from message_delta (notably input and cache tokens).
+                usage_data = ctx["message"].usage
             if usage_data:
                 prompt_tokens, completion_tokens, cache_read, cache_creation = (
                     _extract_anthropic_tokens(usage_data)
@@ -374,9 +432,13 @@ def _wrap_streaming_async(
 
         def post_hook_inner(inner_ctx: Dict[str, Any]) -> None:
             span = ctx.get("span")
-            if span:
-                accumulated = ctx.get("accumulated_content", "")
-                span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, accumulated)
+            if span and ctx.get("message") is not None:
+                _record_message(
+                    span,
+                    ctx["message"],
+                    complete=bool(ctx.get("message_complete"))
+                    and not ctx.get("capture_failed", False),
+                )
 
         def error_hook_inner(inner_ctx: Dict[str, Any], error: Exception) -> None:
             span = ctx.get("span")
@@ -404,6 +466,7 @@ def _wrap_streaming_async(
         if span:
             span.record_exception(error)
             span.set_status(Status(StatusCode.ERROR))
+            span.end()
 
     return mutable_wrap_async(
         original_func,

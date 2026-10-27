@@ -125,6 +125,39 @@ Validation and execution errors use the SDK's existing exception mapping.
 
 Supports OpenAI, Anthropic, Google GenAI, Together AI, LangGraph, and Claude Agent SDK. See the full [integrations docs](https://docs.judgmentlabs.ai/documentation/integrations/introduction).
 
+### Streaming capture
+
+The Anthropic Messages and OpenAI Chat Completions/Responses wrappers record one
+structured response after successful stream consumption, including text, tool
+call IDs, names, arguments, and provider reasoning fields. Sync and async paths
+follow the same rules. Anthropic `messages.stream()` also captures calls consumed
+through `text_stream`, event iteration, `until_done()`, or `get_final_message()`;
+its response is recorded when the stream context exits normally.
+
+A response requires the provider's completion signal: Anthropic `message_stop`,
+a finish reason for every requested Chat Completions choice, or Responses
+`response.completed` with completed status. Raw streams must also exhaust
+normally. A finish reason such as Chat Completions `length` is retained as sent;
+it does not mean that the model finished its answer without a token limit.
+
+Abandoned, truncated, cancelled, and failed streams do not get a completed output.
+Responses `response.incomplete` likewise produces no completed output. Available
+model and usage metadata is retained; missing final usage is not estimated.
+Instrumentation never drains a stream on close or context exit. Fully consume
+streams to capture output. Close partially consumed iterators (`close()` or
+`aclose()`) and use the Anthropic helper's context manager to finalize spans;
+simply breaking iteration does not guarantee immediate span finalization. A raw
+stream that is never iterated retains the existing lazy iterator lifecycle and
+may leave its span unfinished.
+
+Conversation ingestion of native Anthropic responses and Python Responses text
+requires the server changes in
+[JudgmentLabs/judgment-mono#6164](https://github.com/JudgmentLabs/judgment-mono/pull/6164).
+Capture preserves provider fields even when the conversation mapper does not yet
+support them: for example, redacted Anthropic thinking and multiple Chat
+Completions choices. Chat Completions `reasoning_content` remains in the trace;
+the current mapper does not turn it into a reasoning item.
+
 ## CLI
 
 Manage agents, traces, judges, labels, and evaluations from the terminal. Query trace history, deploy judges, review the labels judges applied, and run evals against production data — all without leaving your shell. See the [CLI repo](https://github.com/JudgmentLabs/cli/) and [docs](https://docs.judgmentlabs.ai/documentation/cli).

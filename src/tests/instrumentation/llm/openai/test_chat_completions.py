@@ -102,7 +102,11 @@ class TestSyncStreaming:
     def test_streaming_accumulates_content(
         self, tracer, collecting_exporter, sync_openai_client
     ):
-        chunks = [make_chunk(content="Hello"), make_chunk(content=" world")]
+        chunks = [
+            make_chunk(content="Hello"),
+            make_chunk(content=" world"),
+            make_chunk(finish_reason="stop"),
+        ]
         sync_openai_client.chat.completions.create = MagicMock(
             return_value=iter(chunks)
         )

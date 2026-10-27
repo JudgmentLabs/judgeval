@@ -24,14 +24,19 @@ def make_chat_completion(
     )
 
 
-def make_chunk(content=None, usage=None):
-    chunk = MagicMock(spec=ChatCompletionChunk)
-    if content is not None:
-        chunk.choices = [MagicMock(delta=MagicMock(content=content))]
-    else:
-        chunk.choices = []
-    chunk.usage = usage
-    return chunk
+def make_chunk(content=None, usage=None, finish_reason=None):
+    return ChatCompletionChunk(
+        id="chat_test",
+        object="chat.completion.chunk",
+        created=1,
+        model="gpt-4",
+        choices=[
+            {"index": 0, "delta": {"content": content}, "finish_reason": finish_reason}
+        ]
+        if content is not None or finish_reason
+        else [],
+        usage=usage,
+    )
 
 
 @pytest.fixture
