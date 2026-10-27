@@ -23,9 +23,12 @@ class BackgroundQueue:
         self._max_queue_size = max_queue_size
         self._semaphore = threading.Semaphore(max_queue_size)
         self._futures: set[Future[Any]] = set()
+        self._state_lock = threading.Lock()
+        self._worker_context = threading.local()
         self._executor = ThreadPoolExecutor(
             max_workers=workers,
             thread_name_prefix="judgeval-bg",
+            initializer=self._mark_worker,
         )
         self._shutdown = False
         atexit.register(self.shutdown)
@@ -51,22 +54,51 @@ class BackgroundQueue:
         Returns:
             True if the job was accepted, False if the queue is full or shut down.
         """
-        if self._shutdown:
-            return False
-        if not self._semaphore.acquire(blocking=False):
+        with self._state_lock:
+            if self._shutdown:
+                return False
+            accepted = self._semaphore.acquire(blocking=False)
+            if accepted:
+                try:
+                    future = self._executor.submit(fn)
+                except BaseException:
+                    self._semaphore.release()
+                    raise
+                self._futures.add(future)
+        if not accepted:
             judgeval_logger.warning("[BackgroundQueue] Queue full, dropping job")
             return False
-        future = self._executor.submit(fn)
-        self._futures.add(future)
+        # A completed future runs its callback immediately, so register it
+        # outside the state lock that the callback itself acquires.
         future.add_done_callback(self._on_done)
         return True
 
+    # --- Completion and drain helpers ---
+    def _mark_worker(self) -> None:
+        """Identify queue-owned threads through jobs and completion callbacks."""
+        self._worker_context.is_worker = True
+
     def _on_done(self, future: Future[Any]) -> None:
         self._semaphore.release()
-        self._futures.discard(future)
+        with self._state_lock:
+            self._futures.discard(future)
         exc = future.exception()
         if exc is not None:
             judgeval_logger.error(f"[BackgroundQueue] Job failed: {repr(exc)}")
+
+    def _wait_for_futures(
+        self, futures: tuple[Future[Any], ...], timeout_ms: int
+    ) -> bool:
+        """Drain a stable snapshot without blocking admission or callbacks."""
+        _, not_done = wait(futures, timeout=timeout_ms / 1000.0)
+        if not_done:
+            judgeval_logger.warning(
+                f"[BackgroundQueue] Flush timed out, {len(not_done)} jobs still pending"
+            )
+            return False
+        return True
+
+    # --- End completion and drain helpers ---
 
     def force_flush(self, timeout_ms: int = 30000) -> bool:
         """Wait for all pending jobs to complete.
@@ -77,29 +109,33 @@ class BackgroundQueue:
         Returns:
             True if all jobs completed within the timeout.
         """
-        if self._shutdown:
-            return False
-        if not self._futures:
-            return True
-        _, not_done = wait(self._futures, timeout=timeout_ms / 1000.0)
-        if not_done:
-            judgeval_logger.warning(
-                f"[BackgroundQueue] Flush timed out, {len(not_done)} jobs still pending"
-            )
-            return False
-        return True
+        with self._state_lock:
+            if self._shutdown:
+                return False
+            futures = tuple(self._futures)
+        return self._wait_for_futures(futures, timeout_ms)
 
     def shutdown(self, timeout_ms: int = 30000) -> None:
         """Flush pending jobs and shut down the thread pool.
 
+        An external caller initiating shutdown waits for accepted jobs. This
+        queue's workers do not wait, so queued jobs can run after they return.
+        Once shutdown has started, subsequent calls return immediately.
+
         Args:
-            timeout_ms: Maximum time in milliseconds to wait for flush.
+            timeout_ms: Maximum flush wait when initiated outside this queue's
+                workers.
         """
-        if self._shutdown:
-            return
-        self._shutdown = True
-        self.force_flush(timeout_ms)
-        self._executor.shutdown(wait=False)
+        with self._state_lock:
+            if self._shutdown:
+                return
+            self._shutdown = True
+            futures = tuple(self._futures)
+        try:
+            if not getattr(self._worker_context, "is_worker", False):
+                self._wait_for_futures(futures, timeout_ms)
+        finally:
+            self._executor.shutdown(wait=False)
 
 
 def enqueue(fn: Callable[[], Any]) -> bool:
