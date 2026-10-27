@@ -45,19 +45,17 @@ def _extract_anthropic_content(chunk: RawMessageStreamEvent) -> str:
 
 def _extract_anthropic_tokens(
     usage: Usage | MessageDeltaUsage,
-) -> Tuple[int, int, int, int]:
-    input_tokens = usage.input_tokens if usage.input_tokens is not None else 0
-    output_tokens = usage.output_tokens if usage.output_tokens is not None else 0
-    cache_read = (
-        usage.cache_read_input_tokens
-        if usage.cache_read_input_tokens is not None
-        else 0
-    )
-    cache_creation = (
-        usage.cache_creation_input_tokens
-        if usage.cache_creation_input_tokens is not None
-        else 0
-    )
+) -> Tuple[int | None, int | None, int | None, int | None]:
+    """Extract token counts from a Usage or MessageDeltaUsage object.
+
+    Returns None for fields absent on the object (e.g. MessageDeltaUsage only
+    carries output_tokens; all other fields are absent, not zero). Callers
+    that need a guaranteed int should apply ``or 0`` at the call site.
+    """
+    input_tokens = getattr(usage, "input_tokens", None)
+    output_tokens = getattr(usage, "output_tokens", None)
+    cache_read = getattr(usage, "cache_read_input_tokens", None)
+    cache_creation = getattr(usage, "cache_creation_input_tokens", None)
     return (input_tokens, output_tokens, cache_read, cache_creation)
 
 
@@ -69,6 +67,34 @@ def _extract_anthropic_chunk_usage(
     elif chunk.type == "message_delta":
         return chunk.usage if hasattr(chunk, "usage") else None
     return None
+
+
+def _apply_usage_to_span(span: Any, usage: Usage | MessageDeltaUsage) -> None:
+    """Write only the token fields present on *usage* to the span.
+
+    This is called from the streaming yield_hook for both message_start
+    (full Usage) and message_delta (MessageDeltaUsage, output_tokens only).
+    Skipping None values ensures a message_delta never zeroes out the
+    input_tokens that message_start already recorded.
+    """
+    input_tokens, output_tokens, cache_read, cache_creation = (
+        _extract_anthropic_tokens(usage)
+    )
+    if input_tokens is not None:
+        span.set_attribute(
+            AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS, input_tokens
+        )
+    if output_tokens is not None:
+        span.set_attribute(AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, output_tokens)
+    if cache_read is not None:
+        span.set_attribute(
+            AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
+        )
+    if cache_creation is not None:
+        span.set_attribute(
+            AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS, cache_creation
+        )
+    span.set_attribute(AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(usage))
 
 
 def wrap_messages_create_sync(client: Anthropic) -> None:
@@ -108,17 +134,17 @@ def _wrap_non_streaming_sync(
             )
             span.set_attribute(
                 AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
-                prompt_tokens,
+                prompt_tokens or 0,
             )
             span.set_attribute(
-                AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
+                AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens or 0
             )
             span.set_attribute(
-                AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
+                AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read or 0
             )
             span.set_attribute(
                 AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS,
-                cache_creation,
+                cache_creation or 0,
             )
             span.set_attribute(
                 AttributeKeys.JUDGMENT_USAGE_METADATA,
@@ -181,25 +207,7 @@ def _wrap_streaming_sync(
 
             usage_data = _extract_anthropic_chunk_usage(chunk)
             if usage_data:
-                prompt_tokens, completion_tokens, cache_read, cache_creation = (
-                    _extract_anthropic_tokens(usage_data)
-                )
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS, prompt_tokens
-                )
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
-                )
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
-                )
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS,
-                    cache_creation,
-                )
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(usage_data)
-                )
+                _apply_usage_to_span(span, usage_data)
 
         def post_hook_inner(inner_ctx: Dict[str, Any]) -> None:
             span = ctx.get("span")
@@ -279,17 +287,17 @@ def _wrap_non_streaming_async(
             )
             span.set_attribute(
                 AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
-                prompt_tokens,
+                prompt_tokens or 0,
             )
             span.set_attribute(
-                AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
+                AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens or 0
             )
             span.set_attribute(
-                AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
+                AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read or 0
             )
             span.set_attribute(
                 AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS,
-                cache_creation,
+                cache_creation or 0,
             )
             span.set_attribute(
                 AttributeKeys.JUDGMENT_USAGE_METADATA,
@@ -352,25 +360,7 @@ def _wrap_streaming_async(
 
             usage_data = _extract_anthropic_chunk_usage(chunk)
             if usage_data:
-                prompt_tokens, completion_tokens, cache_read, cache_creation = (
-                    _extract_anthropic_tokens(usage_data)
-                )
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS, prompt_tokens
-                )
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens
-                )
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS, cache_read
-                )
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_USAGE_CACHE_CREATION_INPUT_TOKENS,
-                    cache_creation,
-                )
-                span.set_attribute(
-                    AttributeKeys.JUDGMENT_USAGE_METADATA, safe_serialize(usage_data)
-                )
+                _apply_usage_to_span(span, usage_data)
 
         def post_hook_inner(inner_ctx: Dict[str, Any]) -> None:
             span = ctx.get("span")
