@@ -12,7 +12,7 @@ from typing import (
     cast,
 )
 
-from judgeval.internal.api import JudgmentSyncClient
+from judgeval.api import JudgmentApiClient
 from judgeval.exceptions import (
     JudgmentAPIError,
     JudgmentProjectNotFoundError,
@@ -124,7 +124,7 @@ class Judgeval:
         self._api_url = api_url
         self._project_name = project_name
 
-        self._internal_client = JudgmentSyncClient(
+        self._internal_client = JudgmentApiClient(
             self._api_url,
             self._api_key,
             self._organization_id,
@@ -277,6 +277,17 @@ class Judgeval:
                 "Public queries require a resolved project."
             )
         return self._project_id
+
+    @property
+    def api(self) -> JudgmentApiClient:
+        """The /v1 API, one method per Judgment MCP tool.
+
+        Examples:
+            ```python
+            projects = client.api.list_projects()
+            ```
+        """
+        return self._internal_client
 
     @property
     def evaluation(self):
@@ -450,9 +461,8 @@ class Judgeval:
             ```python
             judge = client.agent_judges.create(
                 name="helpfulness",
-                prompt="Score the assistant's helpfulness from 0 to 1.",
-                model="gpt-5.2",
-                score_type="numeric",
+                prompt="Did the assistant answer the user's question?",
+                score_type="binary",
             )
 
             client.agent_judges.update(
