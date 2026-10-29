@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, Generator, List, Tuple
@@ -18,6 +19,15 @@ from judgeval.internal.api.models import (
     OfflineTestsLocalScorerResultScorersDatum,
 )
 from judgeval.evaluation.evaluation_base import EvaluatorRunner
+
+
+def _scalar_value(
+    value: bool | float | str | Dict[str, Any] | List[Any],
+) -> bool | float | str:
+    """Sends a literal judge's object or array as JSON text, as hosted judges do."""
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, sort_keys=True, separators=(",", ":"))
+    return value
 
 
 class LocalEvaluatorRunner(EvaluatorRunner[Judge]):
@@ -89,7 +99,7 @@ class LocalEvaluatorRunner(EvaluatorRunner[Judge]):
                 elif res is not None:
                     entry: OfflineTestsLocalScorerResultScorersDatum = {
                         "scorer_name": scorer_name,
-                        "value": res.value,
+                        "value": _scalar_value(res.value),
                         "reason": res.reason,
                         "error": None,
                     }

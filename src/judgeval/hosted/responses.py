@@ -1,4 +1,4 @@
-from typing import ClassVar, List, Literal, Optional, Union
+from typing import Any, ClassVar, Dict, List, Literal, Optional, Union
 from abc import ABC
 from pydantic import BaseModel, TypeAdapter, ValidationError, model_validator
 from typing_extensions import final
@@ -45,7 +45,7 @@ class BaseResponse(BaseModel, ABC):
         citations: Optional references to specific trace spans.
     """
 
-    value: Union[bool, str, float]
+    value: Union[bool, str, float, Dict[str, Any], List[Any]]
     reason: str
     citations: Optional[List[Citation]] = None
     _return_type: ClassVar[ReturnType]
@@ -154,7 +154,8 @@ class LiteralResponse(BaseResponse):
     monitoring.
 
     Attributes:
-        value: The extracted value (bool, int, float, or str).
+        value: The extracted value (bool, int, float, str, or a JSON object
+            or array as a dict or list).
 
     Examples:
         ```python
@@ -172,7 +173,7 @@ class LiteralResponse(BaseResponse):
         ```
     """
 
-    value: Union[bool, int, float, str]
+    value: Union[bool, int, float, str, Dict[str, Any], List[Any]]
     _return_type: ClassVar[Literal["literal"]] = "literal"
 
 
