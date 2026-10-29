@@ -8,17 +8,18 @@ from typing import List, Literal, Optional, Tuple
 
 from judgeval.cli.utils import TarFilter
 from judgeval.logger import judgeval_logger
-from judgeval.hosted.responses import Category
+from judgeval.hosted.responses import Category, ReturnType
 from judgeval.internal.api import JudgmentSyncClient
 from judgeval.internal.api.models import (
     UploadCustomScorerBundleMetadata,
     UploadCustomScorerBundleRequest,
 )
 
-RESPONSE_TYPE_MAP: dict[str, Literal["binary", "categorical", "numeric"]] = {
+RESPONSE_TYPE_MAP: dict[str, ReturnType] = {
     "BinaryResponse": "binary",
     "CategoricalResponse": "categorical",
     "NumericResponse": "numeric",
+    "LiteralResponse": "literal",
 }
 
 V2_SCORER_BASES = {"TraceCustomScorer", "ExampleCustomScorer"}
@@ -106,7 +107,7 @@ def parse_judge(
     Tuple[
         str,
         Optional[Literal["trace", "example"]],
-        Literal["binary", "categorical", "numeric"],
+        ReturnType,
         Optional[List[Category]],
     ]
 ]:

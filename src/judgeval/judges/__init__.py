@@ -6,6 +6,7 @@ from judgeval.hosted.responses import (
     CategoricalResponse,
     Citation,
     NumericResponse,
+    LiteralResponse,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "CategoricalResponse",
     "Citation",
     "NumericResponse",
+    "LiteralResponse",
 ]

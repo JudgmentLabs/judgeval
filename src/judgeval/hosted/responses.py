@@ -3,7 +3,7 @@ from abc import ABC
 from pydantic import BaseModel, TypeAdapter, ValidationError, model_validator
 from typing_extensions import final
 
-ReturnType = Literal["binary", "categorical", "numeric"]
+ReturnType = Literal["binary", "categorical", "numeric", "literal"]
 
 
 class Citation(BaseModel):
@@ -48,7 +48,7 @@ class BaseResponse(BaseModel, ABC):
     value: Union[bool, str, float]
     reason: str
     citations: Optional[List[Citation]] = None
-    _return_type: ClassVar[Literal["binary", "categorical", "numeric"]]
+    _return_type: ClassVar[ReturnType]
 
 
 @final
@@ -145,4 +145,37 @@ class NumericResponse(BaseResponse):
     _return_type: ClassVar[Literal["numeric"]] = "numeric"
 
 
-ScorerResponse = Union[BinaryResponse, CategoricalResponse, NumericResponse]
+@final
+class LiteralResponse(BaseResponse):
+    """Response for judges that return a raw value instead of a score.
+
+    Test suites compare the value against each check's expected value with the
+    check's operator. Literal judges run in test suites only, not in online
+    monitoring.
+
+    Attributes:
+        value: The extracted value (bool, int, float, or str).
+
+    Examples:
+        ```python
+        class ToolCallCount(Judge[LiteralResponse]):
+            async def score(self, data: Example) -> LiteralResponse:
+                spans = data.trace.spans if data.trace else []
+                count = sum(
+                    span["span_attributes"].get("judgment.span_kind") == "tool"
+                    for span in spans
+                )
+                return LiteralResponse(
+                    value=count,
+                    reason=f"The agent made {count} tool calls.",
+                )
+        ```
+    """
+
+    value: Union[bool, int, float, str]
+    _return_type: ClassVar[Literal["literal"]] = "literal"
+
+
+ScorerResponse = Union[
+    BinaryResponse, CategoricalResponse, NumericResponse, LiteralResponse
+]
