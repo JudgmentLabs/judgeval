@@ -37,10 +37,10 @@ class BaseResponse(BaseModel, ABC):
     """Base class for all scorer response types.
 
     You don't use this directly -- use `BinaryResponse`, `NumericResponse`,
-    or a `CategoricalResponse` subclass instead.
+    `LiteralResponse`, or a `CategoricalResponse` subclass instead.
 
     Attributes:
-        value: The score (bool, str, or float depending on type).
+        value: The score; its type depends on the response type.
         reason: Explanation of why this score was given.
         citations: Optional references to specific trace spans.
     """
