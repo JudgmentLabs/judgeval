@@ -1176,9 +1176,7 @@ class TestCase(TypedDict):
 
 class ListTestCasesResponse(TypedDict):
     version: int
-    draft: bool
     cases: list[TestCase]
-    judge_names: dict[str, str]
     next_offset: int | None
 
 
@@ -1271,7 +1269,6 @@ class ListTestRunsResponse(TypedDict):
 
 class TestResultsResponseResultCheck(TypedDict):
     judge_id: str
-    judge_name: str | None
     judge_major_version: float
     judge_minor_version: float
     op: Literal["eq", "ne", "lt", "lte", "gt", "gte", "in", "not_in"]
@@ -1284,7 +1281,6 @@ class TestResultsResponseResultCheck(TypedDict):
 
 class TestResultsResponseResultPendingCheck(TypedDict):
     judge_id: str
-    judge_name: str | None
     judge_major_version: float
     judge_minor_version: float
     status: Literal[
@@ -1306,7 +1302,6 @@ class TestResultsResponseResult(TypedDict):
 
 class TestResultsResponse(TypedDict):
     results: list[TestResultsResponseResult]
-    next_offset: int | None
 
 
 class ScoreTestRunResponse(TypedDict):
@@ -1331,6 +1326,37 @@ class ResolveProjectResponse(TypedDict):
 
 class PublicSqlSchemaResponse(TypedDict):
     schema: str
+
+
+class ListOrganizationsResponseOrganizationDetailProject(TypedDict):
+    count: float
+
+
+class ListOrganizationsResponseOrganizationDetailUserOrganization(TypedDict):
+    count: float
+
+
+class ListOrganizationsResponseOrganizationDetail(TypedDict):
+    name: str
+    created_at: str
+    projects: list[ListOrganizationsResponseOrganizationDetailProject]
+    user_organizations: list[
+        ListOrganizationsResponseOrganizationDetailUserOrganization
+    ]
+
+
+class ListOrganizationsResponseOrganization(TypedDict):
+    created_at: str
+    agentic_tour_completed_at: str | None
+    onboarded: bool
+    organization_id: str
+    role: Literal["admin", "developer", "owner", "viewer"]
+    user_id: str
+    detail: ListOrganizationsResponseOrganizationDetail
+
+
+class ListOrganizationsResponse(TypedDict):
+    organizations: list[ListOrganizationsResponseOrganization]
 
 
 class GetArtifactRevisionResponseRevision(TypedDict):
@@ -1731,7 +1757,6 @@ class ListIssuesResponseIssue(TypedDict):
 
 class ListIssuesResponse(TypedDict):
     issues: list[ListIssuesResponseIssue]
-    next_offset: int | None
 
 
 class CreateIssueRequestCitedItem(TypedDict):
@@ -1807,8 +1832,6 @@ class GetIssueResponseIssue(TypedDict):
     created_at: str
     updated_at: str
     cited_items: list[GetIssueResponseIssueCitedItem]
-    cited_items_total: int
-    events_total: int
     events: list[GetIssueResponseIssueEvent]
 
 
@@ -1861,155 +1884,127 @@ class UpdateIssueResponse(TypedDict):
     issue: UpdateIssueResponseIssue
 
 
-class ListJudgesResponseJudge(TypedDict):
-    id: str
-    name: str
-    judge_type: Literal["prompt", "custom", "agent", "deterministic"]
-    score_type: Literal["numeric", "binary", "categorical", "literal"]
-    judge_major_version: float
-    judge_minor_version: float
-    is_production: bool
-    online_evaluation_mode: Literal["continuous", "on_demand"]
-    online_environment_names: list[str] | None
-    online_sampling_rate: float
-
-
-class ListJudgesResponseJudge1Output(TypedDict):
+class ListJudgesResponseJudgeOutput(TypedDict):
     behavior_id: str
     name: str
     description: str
 
 
-class ListJudgesResponseJudge1ActionConfigActionGroupWhen(TypedDict):
+class ListJudgesResponseJudgeActionConfigActionGroupWhen(TypedDict):
     kind: Literal["any"]
 
 
-class ListJudgesResponseJudge1ActionConfigActionGroupWhen1(TypedDict):
+class ListJudgesResponseJudgeActionConfigActionGroupWhen1(TypedDict):
     kind: Literal["binary"]
     value: bool
 
 
-ListJudgesResponseJudge1ActionConfigActionGroupWhen2Value: TypeAlias = str
+ListJudgesResponseJudgeActionConfigActionGroupWhen2Value: TypeAlias = str
 
 
-class ListJudgesResponseJudge1ActionConfigActionGroupWhen2(TypedDict):
+class ListJudgesResponseJudgeActionConfigActionGroupWhen2(TypedDict):
     kind: Literal["categorical"]
-    values: list[ListJudgesResponseJudge1ActionConfigActionGroupWhen2Value]
+    values: list[ListJudgesResponseJudgeActionConfigActionGroupWhen2Value]
 
 
-class ListJudgesResponseJudge1ActionConfigActionGroupWhen3(TypedDict):
+class ListJudgesResponseJudgeActionConfigActionGroupWhen3(TypedDict):
     kind: Literal["numeric"]
     operator: Literal["lt", "lte", "eq", "gte", "gt"]
     value: float
 
 
-class ListJudgesResponseJudge1ActionConfigActionGroupFrequency(TypedDict):
+class ListJudgesResponseJudgeActionConfigActionGroupFrequency(TypedDict):
     count: int
     window_seconds: int
 
 
-class ListJudgesResponseJudge1ActionConfigActionGroupActionsConfig(TypedDict):
-    url: str
-    secret: str
-
-
-class ListJudgesResponseJudge1ActionConfigActionGroupActions(TypedDict):
-    id: str
-    enabled: bool
-    type: Literal["webhook"]
-    config: ListJudgesResponseJudge1ActionConfigActionGroupActionsConfig
-
-
-class ListJudgesResponseJudge1ActionConfigActionGroupActions1Config(TypedDict):
+class ListJudgesResponseJudgeActionConfigActionGroupActionsConfig(TypedDict):
     email_address: str
 
 
-class ListJudgesResponseJudge1ActionConfigActionGroupActions1(TypedDict):
+class ListJudgesResponseJudgeActionConfigActionGroupActions(TypedDict):
     id: str
     enabled: bool
     type: Literal["email"]
-    config: ListJudgesResponseJudge1ActionConfigActionGroupActions1Config
+    config: ListJudgesResponseJudgeActionConfigActionGroupActionsConfig
 
 
-class ListJudgesResponseJudge1ActionConfigActionGroupActions2Config(TypedDict):
+class ListJudgesResponseJudgeActionConfigActionGroupActions1Config(TypedDict):
     team_id: NotRequired[str]
     channel_id: NotRequired[str]
     message: NotRequired[str]
     custom_attribute_keys: NotRequired[list[str]]
 
 
-class ListJudgesResponseJudge1ActionConfigActionGroupActions2(TypedDict):
+class ListJudgesResponseJudgeActionConfigActionGroupActions1(TypedDict):
     id: str
     enabled: bool
     type: Literal["slack"]
-    config: ListJudgesResponseJudge1ActionConfigActionGroupActions2Config
+    config: ListJudgesResponseJudgeActionConfigActionGroupActions1Config
 
 
-class ListJudgesResponseJudge1ActionConfigActionGroupActions3Config(TypedDict):
+class ListJudgesResponseJudgeActionConfigActionGroupActions2Config(TypedDict):
     dataset_id: str
 
 
-class ListJudgesResponseJudge1ActionConfigActionGroupActions3(TypedDict):
+class ListJudgesResponseJudgeActionConfigActionGroupActions2(TypedDict):
     id: str
     enabled: bool
     type: Literal["dataset"]
-    config: ListJudgesResponseJudge1ActionConfigActionGroupActions3Config
+    config: ListJudgesResponseJudgeActionConfigActionGroupActions2Config
 
 
-ListJudgesResponseJudge1ActionConfigActionGroupActions4ConfigJudgeId: TypeAlias = str
+ListJudgesResponseJudgeActionConfigActionGroupActions3ConfigJudgeId: TypeAlias = str
 
 
-class ListJudgesResponseJudge1ActionConfigActionGroupActions4Config(TypedDict):
-    judge_ids: list[
-        ListJudgesResponseJudge1ActionConfigActionGroupActions4ConfigJudgeId
-    ]
+class ListJudgesResponseJudgeActionConfigActionGroupActions3Config(TypedDict):
+    judge_ids: list[ListJudgesResponseJudgeActionConfigActionGroupActions3ConfigJudgeId]
 
 
-class ListJudgesResponseJudge1ActionConfigActionGroupActions4(TypedDict):
+class ListJudgesResponseJudgeActionConfigActionGroupActions3(TypedDict):
     id: str
     enabled: bool
     type: Literal["run_behavior"]
-    config: ListJudgesResponseJudge1ActionConfigActionGroupActions4Config
+    config: ListJudgesResponseJudgeActionConfigActionGroupActions3Config
 
 
-class ListJudgesResponseJudge1ActionConfigActionGroup(TypedDict):
+class ListJudgesResponseJudgeActionConfigActionGroup(TypedDict):
     id: str
     name: str
     enabled: bool
     environment_names: list[str]
     when: (
-        ListJudgesResponseJudge1ActionConfigActionGroupWhen
-        | ListJudgesResponseJudge1ActionConfigActionGroupWhen1
-        | ListJudgesResponseJudge1ActionConfigActionGroupWhen2
-        | ListJudgesResponseJudge1ActionConfigActionGroupWhen3
+        ListJudgesResponseJudgeActionConfigActionGroupWhen
+        | ListJudgesResponseJudgeActionConfigActionGroupWhen1
+        | ListJudgesResponseJudgeActionConfigActionGroupWhen2
+        | ListJudgesResponseJudgeActionConfigActionGroupWhen3
     )
-    frequency: ListJudgesResponseJudge1ActionConfigActionGroupFrequency
+    frequency: ListJudgesResponseJudgeActionConfigActionGroupFrequency
     cooldown_seconds: int
     actions: list[
-        ListJudgesResponseJudge1ActionConfigActionGroupActions
-        | ListJudgesResponseJudge1ActionConfigActionGroupActions1
-        | ListJudgesResponseJudge1ActionConfigActionGroupActions2
-        | ListJudgesResponseJudge1ActionConfigActionGroupActions3
-        | ListJudgesResponseJudge1ActionConfigActionGroupActions4
+        ListJudgesResponseJudgeActionConfigActionGroupActions
+        | ListJudgesResponseJudgeActionConfigActionGroupActions1
+        | ListJudgesResponseJudgeActionConfigActionGroupActions2
+        | ListJudgesResponseJudgeActionConfigActionGroupActions3
     ]
 
 
-class ListJudgesResponseJudge1ActionConfig(TypedDict):
-    action_groups: list[ListJudgesResponseJudge1ActionConfigActionGroup]
+class ListJudgesResponseJudgeActionConfig(TypedDict):
+    action_groups: list[ListJudgesResponseJudgeActionConfigActionGroup]
 
 
-class ListJudgesResponseJudge1OnlineSpanTriggers(TypedDict):
+class ListJudgesResponseJudgeOnlineSpanTriggers(TypedDict):
     kind: Literal["and", "or"]
     conditions: list[Any]
 
 
-class ListJudgesResponseJudge1(TypedDict):
+class ListJudgesResponseJudge(TypedDict):
     id: str
     name: str
     judge_description: str | None
     judge_type: Literal["prompt", "custom", "agent", "deterministic"]
     knowledge_file_id: str | None
-    score_type: Literal["numeric", "binary", "categorical", "literal"]
+    score_type: Literal["numeric", "binary", "categorical"]
     updated_at: str
     judge_version_id: str
     judge_major_version: float
@@ -2018,17 +2013,17 @@ class ListJudgesResponseJudge1(TypedDict):
     is_production: bool
     optimistic_eval_enabled: bool
     reasoning_level: Literal["lite", "normal", "high"] | None
-    outputs: list[ListJudgesResponseJudge1Output]
+    outputs: list[ListJudgesResponseJudgeOutput]
     online_environment_names: list[str] | None
     online_evaluation_mode: Literal["continuous", "on_demand"]
-    action_config: NotRequired[ListJudgesResponseJudge1ActionConfig | None]
+    action_config: NotRequired[ListJudgesResponseJudgeActionConfig | None]
     online_sampling_rate: float
-    online_span_triggers: Any | ListJudgesResponseJudge1OnlineSpanTriggers
+    online_span_triggers: Any | ListJudgesResponseJudgeOnlineSpanTriggers
     online_session_scoring: bool
 
 
 class ListJudgesResponse(TypedDict):
-    judges: list[ListJudgesResponseJudge] | list[ListJudgesResponseJudge1]
+    judges: list[ListJudgesResponseJudge]
 
 
 class CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupWhen(TypedDict):
@@ -2062,31 +2057,17 @@ class CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupFrequency(Type
 class CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActionsConfig(
     TypedDict
 ):
-    url: str
-    secret: str
+    email_address: str
 
 
 class CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions(TypedDict):
     id: str
     enabled: bool
-    type: Literal["webhook"]
+    type: Literal["email"]
     config: CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActionsConfig
 
 
 class CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions1Config(
-    TypedDict
-):
-    email_address: str
-
-
-class CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions1(TypedDict):
-    id: str
-    enabled: bool
-    type: Literal["email"]
-    config: CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions1Config
-
-
-class CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions2Config(
     TypedDict
 ):
     team_id: NotRequired[str]
@@ -2095,42 +2076,42 @@ class CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions2Config
     custom_attribute_keys: NotRequired[list[str]]
 
 
-class CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions2(TypedDict):
+class CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions1(TypedDict):
     id: str
     enabled: bool
     type: Literal["slack"]
-    config: CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions2Config
+    config: CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions1Config
 
 
-class CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions3Config(
+class CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions2Config(
     TypedDict
 ):
     dataset_id: str
 
 
-class CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions3(TypedDict):
+class CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions2(TypedDict):
     id: str
     enabled: bool
     type: Literal["dataset"]
-    config: CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions3Config
+    config: CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions2Config
 
 
-CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions4ConfigJudgeId: TypeAlias = str
+CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions3ConfigJudgeId: TypeAlias = str
 
 
-class CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions4Config(
+class CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions3Config(
     TypedDict
 ):
     judge_ids: list[
-        CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions4ConfigJudgeId
+        CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions3ConfigJudgeId
     ]
 
 
-class CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions4(TypedDict):
+class CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions3(TypedDict):
     id: str
     enabled: bool
     type: Literal["run_behavior"]
-    config: CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions4Config
+    config: CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions3Config
 
 
 class CreateJudgeRequestJudgeInitialVersionActionConfigActionGroup(TypedDict):
@@ -2151,7 +2132,6 @@ class CreateJudgeRequestJudgeInitialVersionActionConfigActionGroup(TypedDict):
         | CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions1
         | CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions2
         | CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions3
-        | CreateJudgeRequestJudgeInitialVersionActionConfigActionGroupActions4
     ]
 
 
@@ -2241,31 +2221,17 @@ class CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupFrequency(Typ
 class CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActionsConfig(
     TypedDict
 ):
-    url: str
-    secret: str
+    email_address: str
 
 
 class CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions(TypedDict):
     id: str
     enabled: bool
-    type: Literal["webhook"]
+    type: Literal["email"]
     config: CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActionsConfig
 
 
 class CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions1Config(
-    TypedDict
-):
-    email_address: str
-
-
-class CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions1(TypedDict):
-    id: str
-    enabled: bool
-    type: Literal["email"]
-    config: CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions1Config
-
-
-class CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions2Config(
     TypedDict
 ):
     team_id: NotRequired[str]
@@ -2274,42 +2240,42 @@ class CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions2Confi
     custom_attribute_keys: NotRequired[list[str]]
 
 
-class CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions2(TypedDict):
+class CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions1(TypedDict):
     id: str
     enabled: bool
     type: Literal["slack"]
-    config: CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions2Config
+    config: CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions1Config
 
 
-class CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions3Config(
+class CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions2Config(
     TypedDict
 ):
     dataset_id: str
 
 
-class CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions3(TypedDict):
+class CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions2(TypedDict):
     id: str
     enabled: bool
     type: Literal["dataset"]
-    config: CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions3Config
+    config: CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions2Config
 
 
-CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions4ConfigJudgeId: TypeAlias = str
+CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions3ConfigJudgeId: TypeAlias = str
 
 
-class CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions4Config(
+class CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions3Config(
     TypedDict
 ):
     judge_ids: list[
-        CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions4ConfigJudgeId
+        CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions3ConfigJudgeId
     ]
 
 
-class CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions4(TypedDict):
+class CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions3(TypedDict):
     id: str
     enabled: bool
     type: Literal["run_behavior"]
-    config: CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions4Config
+    config: CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions3Config
 
 
 class CreateJudgeRequestJudge1InitialVersionActionConfigActionGroup(TypedDict):
@@ -2330,7 +2296,6 @@ class CreateJudgeRequestJudge1InitialVersionActionConfigActionGroup(TypedDict):
         | CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions1
         | CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions2
         | CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions3
-        | CreateJudgeRequestJudge1InitialVersionActionConfigActionGroupActions4
     ]
 
 
@@ -2424,31 +2389,17 @@ class CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupFrequency(Typ
 class CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActionsConfig(
     TypedDict
 ):
-    url: str
-    secret: str
+    email_address: str
 
 
 class CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions(TypedDict):
     id: str
     enabled: bool
-    type: Literal["webhook"]
+    type: Literal["email"]
     config: CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActionsConfig
 
 
 class CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions1Config(
-    TypedDict
-):
-    email_address: str
-
-
-class CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions1(TypedDict):
-    id: str
-    enabled: bool
-    type: Literal["email"]
-    config: CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions1Config
-
-
-class CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions2Config(
     TypedDict
 ):
     team_id: NotRequired[str]
@@ -2457,42 +2408,42 @@ class CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions2Confi
     custom_attribute_keys: NotRequired[list[str]]
 
 
-class CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions2(TypedDict):
+class CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions1(TypedDict):
     id: str
     enabled: bool
     type: Literal["slack"]
-    config: CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions2Config
+    config: CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions1Config
 
 
-class CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions3Config(
+class CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions2Config(
     TypedDict
 ):
     dataset_id: str
 
 
-class CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions3(TypedDict):
+class CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions2(TypedDict):
     id: str
     enabled: bool
     type: Literal["dataset"]
-    config: CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions3Config
+    config: CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions2Config
 
 
-CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions4ConfigJudgeId: TypeAlias = str
+CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions3ConfigJudgeId: TypeAlias = str
 
 
-class CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions4Config(
+class CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions3Config(
     TypedDict
 ):
     judge_ids: list[
-        CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions4ConfigJudgeId
+        CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions3ConfigJudgeId
     ]
 
 
-class CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions4(TypedDict):
+class CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions3(TypedDict):
     id: str
     enabled: bool
     type: Literal["run_behavior"]
-    config: CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions4Config
+    config: CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions3Config
 
 
 class CreateJudgeRequestJudge2InitialVersionActionConfigActionGroup(TypedDict):
@@ -2513,7 +2464,6 @@ class CreateJudgeRequestJudge2InitialVersionActionConfigActionGroup(TypedDict):
         | CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions1
         | CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions2
         | CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions3
-        | CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupActions4
     ]
 
 
@@ -2607,31 +2557,17 @@ class UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupFrequency(TypedDi
 
 
 class UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActionsConfig(TypedDict):
-    url: str
-    secret: str
+    email_address: str
 
 
 class UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions(TypedDict):
     id: str
     enabled: bool
-    type: Literal["webhook"]
+    type: Literal["email"]
     config: UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActionsConfig
 
 
 class UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions1Config(
-    TypedDict
-):
-    email_address: str
-
-
-class UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions1(TypedDict):
-    id: str
-    enabled: bool
-    type: Literal["email"]
-    config: UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions1Config
-
-
-class UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions2Config(
     TypedDict
 ):
     team_id: NotRequired[str]
@@ -2640,42 +2576,42 @@ class UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions2Config(
     custom_attribute_keys: NotRequired[list[str]]
 
 
-class UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions2(TypedDict):
+class UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions1(TypedDict):
     id: str
     enabled: bool
     type: Literal["slack"]
-    config: UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions2Config
+    config: UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions1Config
 
 
-class UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions3Config(
+class UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions2Config(
     TypedDict
 ):
     dataset_id: str
 
 
-class UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions3(TypedDict):
+class UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions2(TypedDict):
     id: str
     enabled: bool
     type: Literal["dataset"]
-    config: UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions3Config
+    config: UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions2Config
 
 
-UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions4ConfigJudgeId: TypeAlias = str
+UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions3ConfigJudgeId: TypeAlias = str
 
 
-class UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions4Config(
+class UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions3Config(
     TypedDict
 ):
     judge_ids: list[
-        UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions4ConfigJudgeId
+        UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions3ConfigJudgeId
     ]
 
 
-class UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions4(TypedDict):
+class UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions3(TypedDict):
     id: str
     enabled: bool
     type: Literal["run_behavior"]
-    config: UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions4Config
+    config: UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions3Config
 
 
 class UpdateJudgeRequestUpdateNewVersionActionConfigActionGroup(TypedDict):
@@ -2696,7 +2632,6 @@ class UpdateJudgeRequestUpdateNewVersionActionConfigActionGroup(TypedDict):
         | UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions1
         | UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions2
         | UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions3
-        | UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupActions4
     ]
 
 
@@ -2777,31 +2712,17 @@ class UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupFrequency(TypedD
 class UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActionsConfig(
     TypedDict
 ):
-    url: str
-    secret: str
+    email_address: str
 
 
 class UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions(TypedDict):
     id: str
     enabled: bool
-    type: Literal["webhook"]
+    type: Literal["email"]
     config: UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActionsConfig
 
 
 class UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions1Config(
-    TypedDict
-):
-    email_address: str
-
-
-class UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions1(TypedDict):
-    id: str
-    enabled: bool
-    type: Literal["email"]
-    config: UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions1Config
-
-
-class UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions2Config(
     TypedDict
 ):
     team_id: NotRequired[str]
@@ -2810,42 +2731,42 @@ class UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions2Config(
     custom_attribute_keys: NotRequired[list[str]]
 
 
-class UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions2(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions1(TypedDict):
     id: str
     enabled: bool
     type: Literal["slack"]
-    config: UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions2Config
+    config: UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions1Config
 
 
-class UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions3Config(
+class UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions2Config(
     TypedDict
 ):
     dataset_id: str
 
 
-class UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions3(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions2(TypedDict):
     id: str
     enabled: bool
     type: Literal["dataset"]
-    config: UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions3Config
+    config: UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions2Config
 
 
-UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions4ConfigJudgeId: TypeAlias = str
+UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions3ConfigJudgeId: TypeAlias = str
 
 
-class UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions4Config(
+class UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions3Config(
     TypedDict
 ):
     judge_ids: list[
-        UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions4ConfigJudgeId
+        UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions3ConfigJudgeId
     ]
 
 
-class UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions4(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions3(TypedDict):
     id: str
     enabled: bool
     type: Literal["run_behavior"]
-    config: UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions4Config
+    config: UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions3Config
 
 
 class UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroup(TypedDict):
@@ -2866,7 +2787,6 @@ class UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroup(TypedDict):
         | UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions1
         | UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions2
         | UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions3
-        | UpdateJudgeRequestUpdateNewVersion1ActionConfigActionGroupActions4
     ]
 
 
@@ -2947,31 +2867,17 @@ class UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupFrequency(TypedD
 class UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActionsConfig(
     TypedDict
 ):
-    url: str
-    secret: str
+    email_address: str
 
 
 class UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions(TypedDict):
     id: str
     enabled: bool
-    type: Literal["webhook"]
+    type: Literal["email"]
     config: UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActionsConfig
 
 
 class UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions1Config(
-    TypedDict
-):
-    email_address: str
-
-
-class UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions1(TypedDict):
-    id: str
-    enabled: bool
-    type: Literal["email"]
-    config: UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions1Config
-
-
-class UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions2Config(
     TypedDict
 ):
     team_id: NotRequired[str]
@@ -2980,42 +2886,42 @@ class UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions2Config(
     custom_attribute_keys: NotRequired[list[str]]
 
 
-class UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions2(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions1(TypedDict):
     id: str
     enabled: bool
     type: Literal["slack"]
-    config: UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions2Config
+    config: UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions1Config
 
 
-class UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions3Config(
+class UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions2Config(
     TypedDict
 ):
     dataset_id: str
 
 
-class UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions3(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions2(TypedDict):
     id: str
     enabled: bool
     type: Literal["dataset"]
-    config: UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions3Config
+    config: UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions2Config
 
 
-UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions4ConfigJudgeId: TypeAlias = str
+UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions3ConfigJudgeId: TypeAlias = str
 
 
-class UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions4Config(
+class UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions3Config(
     TypedDict
 ):
     judge_ids: list[
-        UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions4ConfigJudgeId
+        UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions3ConfigJudgeId
     ]
 
 
-class UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions4(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions3(TypedDict):
     id: str
     enabled: bool
     type: Literal["run_behavior"]
-    config: UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions4Config
+    config: UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions3Config
 
 
 class UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroup(TypedDict):
@@ -3036,7 +2942,6 @@ class UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroup(TypedDict):
         | UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions1
         | UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions2
         | UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions3
-        | UpdateJudgeRequestUpdateNewVersion2ActionConfigActionGroupActions4
     ]
 
 
@@ -3131,31 +3036,17 @@ class UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupFrequency(TypedD
 class UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActionsConfig(
     TypedDict
 ):
-    url: str
-    secret: str
+    email_address: str
 
 
 class UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions(TypedDict):
     id: str
     enabled: bool
-    type: Literal["webhook"]
+    type: Literal["email"]
     config: UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActionsConfig
 
 
 class UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions1Config(
-    TypedDict
-):
-    email_address: str
-
-
-class UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions1(TypedDict):
-    id: str
-    enabled: bool
-    type: Literal["email"]
-    config: UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions1Config
-
-
-class UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions2Config(
     TypedDict
 ):
     team_id: NotRequired[str]
@@ -3164,42 +3055,42 @@ class UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions2Config(
     custom_attribute_keys: NotRequired[list[str]]
 
 
-class UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions2(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions1(TypedDict):
     id: str
     enabled: bool
     type: Literal["slack"]
-    config: UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions2Config
+    config: UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions1Config
 
 
-class UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions3Config(
+class UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions2Config(
     TypedDict
 ):
     dataset_id: str
 
 
-class UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions3(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions2(TypedDict):
     id: str
     enabled: bool
     type: Literal["dataset"]
-    config: UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions3Config
+    config: UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions2Config
 
 
-UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions4ConfigJudgeId: TypeAlias = str
+UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions3ConfigJudgeId: TypeAlias = str
 
 
-class UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions4Config(
+class UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions3Config(
     TypedDict
 ):
     judge_ids: list[
-        UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions4ConfigJudgeId
+        UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions3ConfigJudgeId
     ]
 
 
-class UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions4(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions3(TypedDict):
     id: str
     enabled: bool
     type: Literal["run_behavior"]
-    config: UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions4Config
+    config: UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions3Config
 
 
 class UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroup(TypedDict):
@@ -3220,7 +3111,6 @@ class UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroup(TypedDict):
         | UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions1
         | UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions2
         | UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions3
-        | UpdateJudgeRequestUpdateNewVersion3ActionConfigActionGroupActions4
     ]
 
 
@@ -3315,31 +3205,17 @@ class UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupFrequency(TypedD
 class UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActionsConfig(
     TypedDict
 ):
-    url: str
-    secret: str
+    email_address: str
 
 
 class UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions(TypedDict):
     id: str
     enabled: bool
-    type: Literal["webhook"]
+    type: Literal["email"]
     config: UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActionsConfig
 
 
 class UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions1Config(
-    TypedDict
-):
-    email_address: str
-
-
-class UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions1(TypedDict):
-    id: str
-    enabled: bool
-    type: Literal["email"]
-    config: UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions1Config
-
-
-class UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions2Config(
     TypedDict
 ):
     team_id: NotRequired[str]
@@ -3348,42 +3224,42 @@ class UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions2Config(
     custom_attribute_keys: NotRequired[list[str]]
 
 
-class UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions2(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions1(TypedDict):
     id: str
     enabled: bool
     type: Literal["slack"]
-    config: UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions2Config
+    config: UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions1Config
 
 
-class UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions3Config(
+class UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions2Config(
     TypedDict
 ):
     dataset_id: str
 
 
-class UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions3(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions2(TypedDict):
     id: str
     enabled: bool
     type: Literal["dataset"]
-    config: UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions3Config
+    config: UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions2Config
 
 
-UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions4ConfigJudgeId: TypeAlias = str
+UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions3ConfigJudgeId: TypeAlias = str
 
 
-class UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions4Config(
+class UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions3Config(
     TypedDict
 ):
     judge_ids: list[
-        UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions4ConfigJudgeId
+        UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions3ConfigJudgeId
     ]
 
 
-class UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions4(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions3(TypedDict):
     id: str
     enabled: bool
     type: Literal["run_behavior"]
-    config: UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions4Config
+    config: UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions3Config
 
 
 class UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroup(TypedDict):
@@ -3404,7 +3280,6 @@ class UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroup(TypedDict):
         | UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions1
         | UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions2
         | UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions3
-        | UpdateJudgeRequestUpdateNewVersion4ActionConfigActionGroupActions4
     ]
 
 
@@ -3499,31 +3374,17 @@ class UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupFrequency(TypedD
 class UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActionsConfig(
     TypedDict
 ):
-    url: str
-    secret: str
+    email_address: str
 
 
 class UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions(TypedDict):
     id: str
     enabled: bool
-    type: Literal["webhook"]
+    type: Literal["email"]
     config: UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActionsConfig
 
 
 class UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions1Config(
-    TypedDict
-):
-    email_address: str
-
-
-class UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions1(TypedDict):
-    id: str
-    enabled: bool
-    type: Literal["email"]
-    config: UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions1Config
-
-
-class UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions2Config(
     TypedDict
 ):
     team_id: NotRequired[str]
@@ -3532,42 +3393,42 @@ class UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions2Config(
     custom_attribute_keys: NotRequired[list[str]]
 
 
-class UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions2(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions1(TypedDict):
     id: str
     enabled: bool
     type: Literal["slack"]
-    config: UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions2Config
+    config: UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions1Config
 
 
-class UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions3Config(
+class UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions2Config(
     TypedDict
 ):
     dataset_id: str
 
 
-class UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions3(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions2(TypedDict):
     id: str
     enabled: bool
     type: Literal["dataset"]
-    config: UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions3Config
+    config: UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions2Config
 
 
-UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions4ConfigJudgeId: TypeAlias = str
+UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions3ConfigJudgeId: TypeAlias = str
 
 
-class UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions4Config(
+class UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions3Config(
     TypedDict
 ):
     judge_ids: list[
-        UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions4ConfigJudgeId
+        UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions3ConfigJudgeId
     ]
 
 
-class UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions4(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions3(TypedDict):
     id: str
     enabled: bool
     type: Literal["run_behavior"]
-    config: UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions4Config
+    config: UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions3Config
 
 
 class UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroup(TypedDict):
@@ -3588,7 +3449,6 @@ class UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroup(TypedDict):
         | UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions1
         | UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions2
         | UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions3
-        | UpdateJudgeRequestUpdateNewVersion5ActionConfigActionGroupActions4
     ]
 
 
@@ -3697,31 +3557,17 @@ class UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupFrequency(TypedD
 class UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActionsConfig(
     TypedDict
 ):
-    url: str
-    secret: str
+    email_address: str
 
 
 class UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions(TypedDict):
     id: str
     enabled: bool
-    type: Literal["webhook"]
+    type: Literal["email"]
     config: UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActionsConfig
 
 
 class UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions1Config(
-    TypedDict
-):
-    email_address: str
-
-
-class UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions1(TypedDict):
-    id: str
-    enabled: bool
-    type: Literal["email"]
-    config: UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions1Config
-
-
-class UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions2Config(
     TypedDict
 ):
     team_id: NotRequired[str]
@@ -3730,42 +3576,42 @@ class UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions2Config(
     custom_attribute_keys: NotRequired[list[str]]
 
 
-class UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions2(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions1(TypedDict):
     id: str
     enabled: bool
     type: Literal["slack"]
-    config: UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions2Config
+    config: UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions1Config
 
 
-class UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions3Config(
+class UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions2Config(
     TypedDict
 ):
     dataset_id: str
 
 
-class UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions3(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions2(TypedDict):
     id: str
     enabled: bool
     type: Literal["dataset"]
-    config: UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions3Config
+    config: UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions2Config
 
 
-UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions4ConfigJudgeId: TypeAlias = str
+UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions3ConfigJudgeId: TypeAlias = str
 
 
-class UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions4Config(
+class UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions3Config(
     TypedDict
 ):
     judge_ids: list[
-        UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions4ConfigJudgeId
+        UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions3ConfigJudgeId
     ]
 
 
-class UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions4(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions3(TypedDict):
     id: str
     enabled: bool
     type: Literal["run_behavior"]
-    config: UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions4Config
+    config: UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions3Config
 
 
 class UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroup(TypedDict):
@@ -3786,7 +3632,6 @@ class UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroup(TypedDict):
         | UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions1
         | UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions2
         | UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions3
-        | UpdateJudgeRequestUpdateNewVersion6ActionConfigActionGroupActions4
     ]
 
 
@@ -3863,31 +3708,17 @@ class UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupFrequency(TypedD
 class UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActionsConfig(
     TypedDict
 ):
-    url: str
-    secret: str
+    email_address: str
 
 
 class UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions(TypedDict):
     id: str
     enabled: bool
-    type: Literal["webhook"]
+    type: Literal["email"]
     config: UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActionsConfig
 
 
 class UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions1Config(
-    TypedDict
-):
-    email_address: str
-
-
-class UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions1(TypedDict):
-    id: str
-    enabled: bool
-    type: Literal["email"]
-    config: UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions1Config
-
-
-class UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions2Config(
     TypedDict
 ):
     team_id: NotRequired[str]
@@ -3896,42 +3727,42 @@ class UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions2Config(
     custom_attribute_keys: NotRequired[list[str]]
 
 
-class UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions2(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions1(TypedDict):
     id: str
     enabled: bool
     type: Literal["slack"]
-    config: UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions2Config
+    config: UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions1Config
 
 
-class UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions3Config(
+class UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions2Config(
     TypedDict
 ):
     dataset_id: str
 
 
-class UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions3(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions2(TypedDict):
     id: str
     enabled: bool
     type: Literal["dataset"]
-    config: UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions3Config
+    config: UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions2Config
 
 
-UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions4ConfigJudgeId: TypeAlias = str
+UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions3ConfigJudgeId: TypeAlias = str
 
 
-class UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions4Config(
+class UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions3Config(
     TypedDict
 ):
     judge_ids: list[
-        UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions4ConfigJudgeId
+        UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions3ConfigJudgeId
     ]
 
 
-class UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions4(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions3(TypedDict):
     id: str
     enabled: bool
     type: Literal["run_behavior"]
-    config: UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions4Config
+    config: UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions3Config
 
 
 class UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroup(TypedDict):
@@ -3952,7 +3783,6 @@ class UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroup(TypedDict):
         | UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions1
         | UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions2
         | UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions3
-        | UpdateJudgeRequestUpdateNewVersion7ActionConfigActionGroupActions4
     ]
 
 
@@ -4012,79 +3842,6 @@ class UpdateJudgeRequestUpdateNewVersion7(TypedDict):
     ]
 
 
-class UpdateJudgeRequestUpdateNewVersionFromSourceSourceVersion(TypedDict):
-    major: int
-    minor: int
-
-
-class UpdateJudgeRequestUpdateNewVersionFromSourceTargetVersion(TypedDict):
-    major: int
-    minor: int
-
-
-class UpdateJudgeRequestUpdateNewVersionFromSourceAdvancedSettingsOnlineSpanTriggers(
-    TypedDict
-):
-    kind: Literal["and", "or"]
-    conditions: list[Any]
-
-
-class UpdateJudgeRequestUpdateNewVersionFromSourceAdvancedSettings(TypedDict):
-    online_environment_names: NotRequired[list[str] | None]
-    online_evaluation_mode: NotRequired[Literal["continuous", "on_demand"]]
-    online_sampling_rate: NotRequired[float]
-    online_span_triggers: NotRequired[
-        Any
-        | UpdateJudgeRequestUpdateNewVersionFromSourceAdvancedSettingsOnlineSpanTriggers
-    ]
-    online_session_scoring: NotRequired[bool]
-    session_evaluation_count_enabled: NotRequired[bool | None]
-    session_evaluation_idle_enabled: NotRequired[bool | None]
-    session_evaluation_min_candidate_traces: NotRequired[float | None]
-    session_evaluation_max_wait_minutes: NotRequired[float | None]
-
-
-class UpdateJudgeRequestUpdateNewVersionFromSourceOutputs(TypedDict):
-    behaviorId: str
-
-
-class UpdateJudgeRequestUpdateNewVersionFromSourceOutputs1(TypedDict):
-    name: str
-    description: str
-    categoryIds: NotRequired[list[str]]
-
-
-class UpdateJudgeRequestUpdateNewVersionFromSourceConfig(TypedDict):
-    prompt: NotRequired[str]
-    description: NotRequired[str | None]
-    reasoningLevel: NotRequired[Literal["lite", "normal", "high"]]
-    minScore: NotRequired[float]
-    maxScore: NotRequired[float]
-    bundleBase64: NotRequired[str]
-    entrypointPath: NotRequired[str]
-    requirementsPath: NotRequired[str]
-    className: NotRequired[str]
-    scorerType: NotRequired[Literal["example", "trace"]]
-    sdkVersion: NotRequired[int]
-    expression: NotRequired[Any]
-
-
-class UpdateJudgeRequestUpdateNewVersionFromSource(TypedDict):
-    sourceVersion: UpdateJudgeRequestUpdateNewVersionFromSourceSourceVersion
-    targetVersion: UpdateJudgeRequestUpdateNewVersionFromSourceTargetVersion
-    promoteToProduction: bool
-    advancedSettings: NotRequired[
-        UpdateJudgeRequestUpdateNewVersionFromSourceAdvancedSettings
-    ]
-    outputs: NotRequired[
-        list[
-            UpdateJudgeRequestUpdateNewVersionFromSourceOutputs
-            | UpdateJudgeRequestUpdateNewVersionFromSourceOutputs1
-        ]
-    ]
-    config: NotRequired[UpdateJudgeRequestUpdateNewVersionFromSourceConfig]
-
-
 class UpdateJudgeRequestUpdate(TypedDict):
     judgeDescription: NotRequired[str | None]
     newVersion: NotRequired[
@@ -4097,7 +3854,6 @@ class UpdateJudgeRequestUpdate(TypedDict):
         | UpdateJudgeRequestUpdateNewVersion6
         | UpdateJudgeRequestUpdateNewVersion7
     ]
-    newVersionFromSource: NotRequired[UpdateJudgeRequestUpdateNewVersionFromSource]
 
 
 class UpdateJudgeRequest(TypedDict):
@@ -4153,65 +3909,53 @@ class SetJudgeActionGroupsRequestActionGroupFrequency(TypedDict):
 
 
 class SetJudgeActionGroupsRequestActionGroupActionsConfig(TypedDict):
-    url: str
-    secret: str
+    email_address: str
 
 
 class SetJudgeActionGroupsRequestActionGroupActions(TypedDict):
     id: str
     enabled: bool
-    type: Literal["webhook"]
+    type: Literal["email"]
     config: SetJudgeActionGroupsRequestActionGroupActionsConfig
 
 
 class SetJudgeActionGroupsRequestActionGroupActions1Config(TypedDict):
-    email_address: str
-
-
-class SetJudgeActionGroupsRequestActionGroupActions1(TypedDict):
-    id: str
-    enabled: bool
-    type: Literal["email"]
-    config: SetJudgeActionGroupsRequestActionGroupActions1Config
-
-
-class SetJudgeActionGroupsRequestActionGroupActions2Config(TypedDict):
     team_id: NotRequired[str]
     channel_id: NotRequired[str]
     message: NotRequired[str]
     custom_attribute_keys: NotRequired[list[str]]
 
 
-class SetJudgeActionGroupsRequestActionGroupActions2(TypedDict):
+class SetJudgeActionGroupsRequestActionGroupActions1(TypedDict):
     id: str
     enabled: bool
     type: Literal["slack"]
+    config: SetJudgeActionGroupsRequestActionGroupActions1Config
+
+
+class SetJudgeActionGroupsRequestActionGroupActions2Config(TypedDict):
+    dataset_id: str
+
+
+class SetJudgeActionGroupsRequestActionGroupActions2(TypedDict):
+    id: str
+    enabled: bool
+    type: Literal["dataset"]
     config: SetJudgeActionGroupsRequestActionGroupActions2Config
 
 
+SetJudgeActionGroupsRequestActionGroupActions3ConfigJudgeId: TypeAlias = str
+
+
 class SetJudgeActionGroupsRequestActionGroupActions3Config(TypedDict):
-    dataset_id: str
+    judge_ids: list[SetJudgeActionGroupsRequestActionGroupActions3ConfigJudgeId]
 
 
 class SetJudgeActionGroupsRequestActionGroupActions3(TypedDict):
     id: str
     enabled: bool
-    type: Literal["dataset"]
-    config: SetJudgeActionGroupsRequestActionGroupActions3Config
-
-
-SetJudgeActionGroupsRequestActionGroupActions4ConfigJudgeId: TypeAlias = str
-
-
-class SetJudgeActionGroupsRequestActionGroupActions4Config(TypedDict):
-    judge_ids: list[SetJudgeActionGroupsRequestActionGroupActions4ConfigJudgeId]
-
-
-class SetJudgeActionGroupsRequestActionGroupActions4(TypedDict):
-    id: str
-    enabled: bool
     type: Literal["run_behavior"]
-    config: SetJudgeActionGroupsRequestActionGroupActions4Config
+    config: SetJudgeActionGroupsRequestActionGroupActions3Config
 
 
 class SetJudgeActionGroupsRequestActionGroup(TypedDict):
@@ -4232,7 +3976,6 @@ class SetJudgeActionGroupsRequestActionGroup(TypedDict):
         | SetJudgeActionGroupsRequestActionGroupActions1
         | SetJudgeActionGroupsRequestActionGroupActions2
         | SetJudgeActionGroupsRequestActionGroupActions3
-        | SetJudgeActionGroupsRequestActionGroupActions4
     ]
 
 
@@ -4241,7 +3984,6 @@ class SetJudgeActionGroupsRequest(TypedDict):
     target_version: SetJudgeActionGroupsRequestTargetVersion
     promote_to_production: bool
     action_groups: list[SetJudgeActionGroupsRequestActionGroup]
-    clear_all_action_groups: NotRequired[bool]
 
 
 class SetJudgeActionGroupsResponse(TypedDict):
@@ -4317,65 +4059,53 @@ class GetJudgeResponseJudgeActionConfigActionGroupFrequency(TypedDict):
 
 
 class GetJudgeResponseJudgeActionConfigActionGroupActionsConfig(TypedDict):
-    url: str
-    secret: str
+    email_address: str
 
 
 class GetJudgeResponseJudgeActionConfigActionGroupActions(TypedDict):
     id: str
     enabled: bool
-    type: Literal["webhook"]
+    type: Literal["email"]
     config: GetJudgeResponseJudgeActionConfigActionGroupActionsConfig
 
 
 class GetJudgeResponseJudgeActionConfigActionGroupActions1Config(TypedDict):
-    email_address: str
-
-
-class GetJudgeResponseJudgeActionConfigActionGroupActions1(TypedDict):
-    id: str
-    enabled: bool
-    type: Literal["email"]
-    config: GetJudgeResponseJudgeActionConfigActionGroupActions1Config
-
-
-class GetJudgeResponseJudgeActionConfigActionGroupActions2Config(TypedDict):
     team_id: NotRequired[str]
     channel_id: NotRequired[str]
     message: NotRequired[str]
     custom_attribute_keys: NotRequired[list[str]]
 
 
-class GetJudgeResponseJudgeActionConfigActionGroupActions2(TypedDict):
+class GetJudgeResponseJudgeActionConfigActionGroupActions1(TypedDict):
     id: str
     enabled: bool
     type: Literal["slack"]
+    config: GetJudgeResponseJudgeActionConfigActionGroupActions1Config
+
+
+class GetJudgeResponseJudgeActionConfigActionGroupActions2Config(TypedDict):
+    dataset_id: str
+
+
+class GetJudgeResponseJudgeActionConfigActionGroupActions2(TypedDict):
+    id: str
+    enabled: bool
+    type: Literal["dataset"]
     config: GetJudgeResponseJudgeActionConfigActionGroupActions2Config
 
 
+GetJudgeResponseJudgeActionConfigActionGroupActions3ConfigJudgeId: TypeAlias = str
+
+
 class GetJudgeResponseJudgeActionConfigActionGroupActions3Config(TypedDict):
-    dataset_id: str
+    judge_ids: list[GetJudgeResponseJudgeActionConfigActionGroupActions3ConfigJudgeId]
 
 
 class GetJudgeResponseJudgeActionConfigActionGroupActions3(TypedDict):
     id: str
     enabled: bool
-    type: Literal["dataset"]
-    config: GetJudgeResponseJudgeActionConfigActionGroupActions3Config
-
-
-GetJudgeResponseJudgeActionConfigActionGroupActions4ConfigJudgeId: TypeAlias = str
-
-
-class GetJudgeResponseJudgeActionConfigActionGroupActions4Config(TypedDict):
-    judge_ids: list[GetJudgeResponseJudgeActionConfigActionGroupActions4ConfigJudgeId]
-
-
-class GetJudgeResponseJudgeActionConfigActionGroupActions4(TypedDict):
-    id: str
-    enabled: bool
     type: Literal["run_behavior"]
-    config: GetJudgeResponseJudgeActionConfigActionGroupActions4Config
+    config: GetJudgeResponseJudgeActionConfigActionGroupActions3Config
 
 
 class GetJudgeResponseJudgeActionConfigActionGroup(TypedDict):
@@ -4396,7 +4126,6 @@ class GetJudgeResponseJudgeActionConfigActionGroup(TypedDict):
         | GetJudgeResponseJudgeActionConfigActionGroupActions1
         | GetJudgeResponseJudgeActionConfigActionGroupActions2
         | GetJudgeResponseJudgeActionConfigActionGroupActions3
-        | GetJudgeResponseJudgeActionConfigActionGroupActions4
     ]
 
 
@@ -4493,65 +4222,53 @@ class GetJudgeResponseJudge1ActionConfigActionGroupFrequency(TypedDict):
 
 
 class GetJudgeResponseJudge1ActionConfigActionGroupActionsConfig(TypedDict):
-    url: str
-    secret: str
+    email_address: str
 
 
 class GetJudgeResponseJudge1ActionConfigActionGroupActions(TypedDict):
     id: str
     enabled: bool
-    type: Literal["webhook"]
+    type: Literal["email"]
     config: GetJudgeResponseJudge1ActionConfigActionGroupActionsConfig
 
 
 class GetJudgeResponseJudge1ActionConfigActionGroupActions1Config(TypedDict):
-    email_address: str
-
-
-class GetJudgeResponseJudge1ActionConfigActionGroupActions1(TypedDict):
-    id: str
-    enabled: bool
-    type: Literal["email"]
-    config: GetJudgeResponseJudge1ActionConfigActionGroupActions1Config
-
-
-class GetJudgeResponseJudge1ActionConfigActionGroupActions2Config(TypedDict):
     team_id: NotRequired[str]
     channel_id: NotRequired[str]
     message: NotRequired[str]
     custom_attribute_keys: NotRequired[list[str]]
 
 
-class GetJudgeResponseJudge1ActionConfigActionGroupActions2(TypedDict):
+class GetJudgeResponseJudge1ActionConfigActionGroupActions1(TypedDict):
     id: str
     enabled: bool
     type: Literal["slack"]
+    config: GetJudgeResponseJudge1ActionConfigActionGroupActions1Config
+
+
+class GetJudgeResponseJudge1ActionConfigActionGroupActions2Config(TypedDict):
+    dataset_id: str
+
+
+class GetJudgeResponseJudge1ActionConfigActionGroupActions2(TypedDict):
+    id: str
+    enabled: bool
+    type: Literal["dataset"]
     config: GetJudgeResponseJudge1ActionConfigActionGroupActions2Config
 
 
+GetJudgeResponseJudge1ActionConfigActionGroupActions3ConfigJudgeId: TypeAlias = str
+
+
 class GetJudgeResponseJudge1ActionConfigActionGroupActions3Config(TypedDict):
-    dataset_id: str
+    judge_ids: list[GetJudgeResponseJudge1ActionConfigActionGroupActions3ConfigJudgeId]
 
 
 class GetJudgeResponseJudge1ActionConfigActionGroupActions3(TypedDict):
     id: str
     enabled: bool
-    type: Literal["dataset"]
-    config: GetJudgeResponseJudge1ActionConfigActionGroupActions3Config
-
-
-GetJudgeResponseJudge1ActionConfigActionGroupActions4ConfigJudgeId: TypeAlias = str
-
-
-class GetJudgeResponseJudge1ActionConfigActionGroupActions4Config(TypedDict):
-    judge_ids: list[GetJudgeResponseJudge1ActionConfigActionGroupActions4ConfigJudgeId]
-
-
-class GetJudgeResponseJudge1ActionConfigActionGroupActions4(TypedDict):
-    id: str
-    enabled: bool
     type: Literal["run_behavior"]
-    config: GetJudgeResponseJudge1ActionConfigActionGroupActions4Config
+    config: GetJudgeResponseJudge1ActionConfigActionGroupActions3Config
 
 
 class GetJudgeResponseJudge1ActionConfigActionGroup(TypedDict):
@@ -4572,7 +4289,6 @@ class GetJudgeResponseJudge1ActionConfigActionGroup(TypedDict):
         | GetJudgeResponseJudge1ActionConfigActionGroupActions1
         | GetJudgeResponseJudge1ActionConfigActionGroupActions2
         | GetJudgeResponseJudge1ActionConfigActionGroupActions3
-        | GetJudgeResponseJudge1ActionConfigActionGroupActions4
     ]
 
 
@@ -4601,7 +4317,7 @@ class GetJudgeResponseJudge1(TypedDict):
     name: str
     judge_description: str | None
     knowledge_file_id: str | None
-    score_type: Literal["numeric", "binary", "categorical", "literal"]
+    score_type: Literal["numeric", "binary", "categorical"]
     outputs: list[GetJudgeResponseJudge1Output]
     judge_version_id: str
     judge_major_version: float
@@ -4669,65 +4385,53 @@ class GetJudgeResponseJudge2ActionConfigActionGroupFrequency(TypedDict):
 
 
 class GetJudgeResponseJudge2ActionConfigActionGroupActionsConfig(TypedDict):
-    url: str
-    secret: str
+    email_address: str
 
 
 class GetJudgeResponseJudge2ActionConfigActionGroupActions(TypedDict):
     id: str
     enabled: bool
-    type: Literal["webhook"]
+    type: Literal["email"]
     config: GetJudgeResponseJudge2ActionConfigActionGroupActionsConfig
 
 
 class GetJudgeResponseJudge2ActionConfigActionGroupActions1Config(TypedDict):
-    email_address: str
-
-
-class GetJudgeResponseJudge2ActionConfigActionGroupActions1(TypedDict):
-    id: str
-    enabled: bool
-    type: Literal["email"]
-    config: GetJudgeResponseJudge2ActionConfigActionGroupActions1Config
-
-
-class GetJudgeResponseJudge2ActionConfigActionGroupActions2Config(TypedDict):
     team_id: NotRequired[str]
     channel_id: NotRequired[str]
     message: NotRequired[str]
     custom_attribute_keys: NotRequired[list[str]]
 
 
-class GetJudgeResponseJudge2ActionConfigActionGroupActions2(TypedDict):
+class GetJudgeResponseJudge2ActionConfigActionGroupActions1(TypedDict):
     id: str
     enabled: bool
     type: Literal["slack"]
+    config: GetJudgeResponseJudge2ActionConfigActionGroupActions1Config
+
+
+class GetJudgeResponseJudge2ActionConfigActionGroupActions2Config(TypedDict):
+    dataset_id: str
+
+
+class GetJudgeResponseJudge2ActionConfigActionGroupActions2(TypedDict):
+    id: str
+    enabled: bool
+    type: Literal["dataset"]
     config: GetJudgeResponseJudge2ActionConfigActionGroupActions2Config
 
 
+GetJudgeResponseJudge2ActionConfigActionGroupActions3ConfigJudgeId: TypeAlias = str
+
+
 class GetJudgeResponseJudge2ActionConfigActionGroupActions3Config(TypedDict):
-    dataset_id: str
+    judge_ids: list[GetJudgeResponseJudge2ActionConfigActionGroupActions3ConfigJudgeId]
 
 
 class GetJudgeResponseJudge2ActionConfigActionGroupActions3(TypedDict):
     id: str
     enabled: bool
-    type: Literal["dataset"]
-    config: GetJudgeResponseJudge2ActionConfigActionGroupActions3Config
-
-
-GetJudgeResponseJudge2ActionConfigActionGroupActions4ConfigJudgeId: TypeAlias = str
-
-
-class GetJudgeResponseJudge2ActionConfigActionGroupActions4Config(TypedDict):
-    judge_ids: list[GetJudgeResponseJudge2ActionConfigActionGroupActions4ConfigJudgeId]
-
-
-class GetJudgeResponseJudge2ActionConfigActionGroupActions4(TypedDict):
-    id: str
-    enabled: bool
     type: Literal["run_behavior"]
-    config: GetJudgeResponseJudge2ActionConfigActionGroupActions4Config
+    config: GetJudgeResponseJudge2ActionConfigActionGroupActions3Config
 
 
 class GetJudgeResponseJudge2ActionConfigActionGroup(TypedDict):
@@ -4748,7 +4452,6 @@ class GetJudgeResponseJudge2ActionConfigActionGroup(TypedDict):
         | GetJudgeResponseJudge2ActionConfigActionGroupActions1
         | GetJudgeResponseJudge2ActionConfigActionGroupActions2
         | GetJudgeResponseJudge2ActionConfigActionGroupActions3
-        | GetJudgeResponseJudge2ActionConfigActionGroupActions4
     ]
 
 
@@ -4852,69 +4555,57 @@ class ListJudgeActionGroupsResponseActionGroupActionGroupFrequency(TypedDict):
 
 
 class ListJudgeActionGroupsResponseActionGroupActionGroupActionsConfig(TypedDict):
-    url: str
-    secret: str
+    email_address: str
 
 
 class ListJudgeActionGroupsResponseActionGroupActionGroupActions(TypedDict):
     id: str
     enabled: bool
-    type: Literal["webhook"]
+    type: Literal["email"]
     config: ListJudgeActionGroupsResponseActionGroupActionGroupActionsConfig
 
 
 class ListJudgeActionGroupsResponseActionGroupActionGroupActions1Config(TypedDict):
-    email_address: str
-
-
-class ListJudgeActionGroupsResponseActionGroupActionGroupActions1(TypedDict):
-    id: str
-    enabled: bool
-    type: Literal["email"]
-    config: ListJudgeActionGroupsResponseActionGroupActionGroupActions1Config
-
-
-class ListJudgeActionGroupsResponseActionGroupActionGroupActions2Config(TypedDict):
     team_id: NotRequired[str]
     channel_id: NotRequired[str]
     message: NotRequired[str]
     custom_attribute_keys: NotRequired[list[str]]
 
 
-class ListJudgeActionGroupsResponseActionGroupActionGroupActions2(TypedDict):
+class ListJudgeActionGroupsResponseActionGroupActionGroupActions1(TypedDict):
     id: str
     enabled: bool
     type: Literal["slack"]
+    config: ListJudgeActionGroupsResponseActionGroupActionGroupActions1Config
+
+
+class ListJudgeActionGroupsResponseActionGroupActionGroupActions2Config(TypedDict):
+    dataset_id: str
+
+
+class ListJudgeActionGroupsResponseActionGroupActionGroupActions2(TypedDict):
+    id: str
+    enabled: bool
+    type: Literal["dataset"]
     config: ListJudgeActionGroupsResponseActionGroupActionGroupActions2Config
 
 
+ListJudgeActionGroupsResponseActionGroupActionGroupActions3ConfigJudgeId: TypeAlias = (
+    str
+)
+
+
 class ListJudgeActionGroupsResponseActionGroupActionGroupActions3Config(TypedDict):
-    dataset_id: str
+    judge_ids: list[
+        ListJudgeActionGroupsResponseActionGroupActionGroupActions3ConfigJudgeId
+    ]
 
 
 class ListJudgeActionGroupsResponseActionGroupActionGroupActions3(TypedDict):
     id: str
     enabled: bool
-    type: Literal["dataset"]
-    config: ListJudgeActionGroupsResponseActionGroupActionGroupActions3Config
-
-
-ListJudgeActionGroupsResponseActionGroupActionGroupActions4ConfigJudgeId: TypeAlias = (
-    str
-)
-
-
-class ListJudgeActionGroupsResponseActionGroupActionGroupActions4Config(TypedDict):
-    judge_ids: list[
-        ListJudgeActionGroupsResponseActionGroupActionGroupActions4ConfigJudgeId
-    ]
-
-
-class ListJudgeActionGroupsResponseActionGroupActionGroupActions4(TypedDict):
-    id: str
-    enabled: bool
     type: Literal["run_behavior"]
-    config: ListJudgeActionGroupsResponseActionGroupActionGroupActions4Config
+    config: ListJudgeActionGroupsResponseActionGroupActionGroupActions3Config
 
 
 class ListJudgeActionGroupsResponseActionGroupActionGroup(TypedDict):
@@ -4935,7 +4626,6 @@ class ListJudgeActionGroupsResponseActionGroupActionGroup(TypedDict):
         | ListJudgeActionGroupsResponseActionGroupActionGroupActions1
         | ListJudgeActionGroupsResponseActionGroupActionGroupActions2
         | ListJudgeActionGroupsResponseActionGroupActionGroupActions3
-        | ListJudgeActionGroupsResponseActionGroupActionGroupActions4
     ]
 
 
@@ -5427,8 +5117,6 @@ class ListTraceHealthFailuresResponseNextCursor(TypedDict):
 
 
 class ListTraceHealthFailuresResponse(TypedDict):
-    start_time: str
-    end_time: str
     traces: list[ListTraceHealthFailuresResponseTrace]
     has_more: bool
     next_cursor: ListTraceHealthFailuresResponseNextCursor | None
@@ -5466,8 +5154,7 @@ class GetTraceHealthSummaryResponseSummary(TypedDict):
     start_time: str
     end_time: str
     sampling_interval_seconds: float
-    status: Literal["healthy", "unhealthy", "no_data"]
-    latest_trace_at: NotRequired[str | None]
+    status: Literal["healthy", "unhealthy"]
     checks: list[GetTraceHealthSummaryResponseSummaryCheck]
 
 
@@ -5523,32 +5210,9 @@ class EvaluateTracesRequest(TypedDict):
     judge_names: NotRequired[list[str]]
 
 
-class EvaluateTracesResponseTraceSkippedItem(TypedDict):
-    judge: str
-    reason: Literal[
-        "on_demand_not_requested",
-        "sampled_out",
-        "trigger_not_matched",
-        "environment_not_matched",
-        "no_session",
-        "session_already_claimed",
-        "usage_limited",
-        "rate_limited",
-    ]
-
-
-class EvaluateTracesResponseTrace(TypedDict):
-    trace_id: str
-    admitted: list[str]
-    skipped: list[EvaluateTracesResponseTraceSkippedItem]
-
-
 class EvaluateTracesResponse(TypedDict):
     enqueued: bool
     trace_count: float
-    traces: list[EvaluateTracesResponseTrace]
-    unknown_trace_ids: list[str]
-    unknown_judge_names: list[str]
 
 
 class EvaluateAllTracesRequest(TypedDict):
@@ -5556,31 +5220,9 @@ class EvaluateAllTracesRequest(TypedDict):
     limit: NotRequired[int]
 
 
-class EvaluateAllTracesResponseTraceSkippedItem(TypedDict):
-    judge: str
-    reason: Literal[
-        "on_demand_not_requested",
-        "sampled_out",
-        "trigger_not_matched",
-        "environment_not_matched",
-        "no_session",
-        "session_already_claimed",
-        "usage_limited",
-        "rate_limited",
-    ]
-
-
-class EvaluateAllTracesResponseTrace(TypedDict):
-    trace_id: str
-    admitted: list[str]
-    skipped: list[EvaluateAllTracesResponseTraceSkippedItem]
-
-
 class EvaluateAllTracesResponse(TypedDict):
     enqueued: bool
     limit: float
-    traces: list[EvaluateAllTracesResponseTrace]
-    unknown_judge_names: list[str]
 
 
 class ListProjectsResponseProject(TypedDict):
