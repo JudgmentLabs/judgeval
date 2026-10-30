@@ -1,9 +1,9 @@
-from typing import ClassVar, List, Literal, Optional, Union
+from typing import Any, ClassVar, Dict, List, Literal, Optional, Union
 from abc import ABC
 from pydantic import BaseModel, TypeAdapter, ValidationError, model_validator
 from typing_extensions import final
 
-ReturnType = Literal["binary", "categorical", "numeric"]
+ReturnType = Literal["binary", "categorical", "numeric", "arbitrary"]
 
 
 class Citation(BaseModel):
@@ -37,18 +37,18 @@ class BaseResponse(BaseModel, ABC):
     """Base class for all scorer response types.
 
     You don't use this directly -- use `BinaryResponse`, `NumericResponse`,
-    or a `CategoricalResponse` subclass instead.
+    `ArbitraryResponse`, or a `CategoricalResponse` subclass instead.
 
     Attributes:
-        value: The score (bool, str, or float depending on type).
+        value: The score; its type depends on the response type.
         reason: Explanation of why this score was given.
         citations: Optional references to specific trace spans.
     """
 
-    value: Union[bool, str, float]
+    value: Union[bool, str, float, Dict[str, Any], List[Any]]
     reason: str
     citations: Optional[List[Citation]] = None
-    _return_type: ClassVar[Literal["binary", "categorical", "numeric"]]
+    _return_type: ClassVar[ReturnType]
 
 
 @final
@@ -145,4 +145,38 @@ class NumericResponse(BaseResponse):
     _return_type: ClassVar[Literal["numeric"]] = "numeric"
 
 
-ScorerResponse = Union[BinaryResponse, CategoricalResponse, NumericResponse]
+@final
+class ArbitraryResponse(BaseResponse):
+    """Response for judges that return a raw value instead of a score.
+
+    Test suites compare the value against each check's expected value with the
+    check's operator. Arbitrary judges run in test suites only, not in online
+    monitoring.
+
+    Attributes:
+        value: The extracted value (bool, int, float, str, or a JSON object
+            or array as a dict or list).
+
+    Examples:
+        ```python
+        class ToolCallCount(Judge[ArbitraryResponse]):
+            async def score(self, data: Example) -> ArbitraryResponse:
+                spans = data.trace.spans if data.trace else []
+                count = sum(
+                    span["span_attributes"].get("judgment.span_kind") == "tool"
+                    for span in spans
+                )
+                return ArbitraryResponse(
+                    value=count,
+                    reason=f"The agent made {count} tool calls.",
+                )
+        ```
+    """
+
+    value: Union[bool, int, float, str, Dict[str, Any], List[Any]]
+    _return_type: ClassVar[Literal["arbitrary"]] = "arbitrary"
+
+
+ScorerResponse = Union[
+    BinaryResponse, CategoricalResponse, NumericResponse, ArbitraryResponse
+]

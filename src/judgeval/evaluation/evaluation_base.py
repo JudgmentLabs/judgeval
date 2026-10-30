@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Generic, List, Mapping, Optional, TypeVar, cast
 
 from rich.console import Console
+from rich.markup import escape
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 
 from judgeval.logger import judgeval_logger
@@ -220,7 +221,7 @@ class EvaluatorRunner(ABC, Generic[S]):
                 if value_str is None:
                     value_str = "N/A"
                 console.print(
-                    f"  [dim]{scorer_data.name}:[/dim] [cyan]{value_str}[/cyan]"
+                    f"  [dim]{scorer_data.name}:[/dim] [cyan]{escape(str(value_str))}[/cyan]"
                 )
                 if scorer_data.error:
                     console.print(f"    [red]{scorer_data.error}[/red]")
