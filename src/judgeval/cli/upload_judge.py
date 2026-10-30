@@ -19,7 +19,7 @@ RESPONSE_TYPE_MAP: dict[str, ReturnType] = {
     "BinaryResponse": "binary",
     "CategoricalResponse": "categorical",
     "NumericResponse": "numeric",
-    "LiteralResponse": "literal",
+    "ArbitraryResponse": "arbitrary",
 }
 
 V2_SCORER_BASES = {"TraceCustomScorer", "ExampleCustomScorer"}

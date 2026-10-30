@@ -3,7 +3,7 @@ from abc import ABC
 from pydantic import BaseModel, TypeAdapter, ValidationError, model_validator
 from typing_extensions import final
 
-ReturnType = Literal["binary", "categorical", "numeric", "literal"]
+ReturnType = Literal["binary", "categorical", "numeric", "arbitrary"]
 
 
 class Citation(BaseModel):
@@ -37,7 +37,7 @@ class BaseResponse(BaseModel, ABC):
     """Base class for all scorer response types.
 
     You don't use this directly -- use `BinaryResponse`, `NumericResponse`,
-    `LiteralResponse`, or a `CategoricalResponse` subclass instead.
+    `ArbitraryResponse`, or a `CategoricalResponse` subclass instead.
 
     Attributes:
         value: The score; its type depends on the response type.
@@ -146,11 +146,11 @@ class NumericResponse(BaseResponse):
 
 
 @final
-class LiteralResponse(BaseResponse):
+class ArbitraryResponse(BaseResponse):
     """Response for judges that return a raw value instead of a score.
 
     Test suites compare the value against each check's expected value with the
-    check's operator. Literal judges run in test suites only, not in online
+    check's operator. Arbitrary judges run in test suites only, not in online
     monitoring.
 
     Attributes:
@@ -159,14 +159,14 @@ class LiteralResponse(BaseResponse):
 
     Examples:
         ```python
-        class ToolCallCount(Judge[LiteralResponse]):
-            async def score(self, data: Example) -> LiteralResponse:
+        class ToolCallCount(Judge[ArbitraryResponse]):
+            async def score(self, data: Example) -> ArbitraryResponse:
                 spans = data.trace.spans if data.trace else []
                 count = sum(
                     span["span_attributes"].get("judgment.span_kind") == "tool"
                     for span in spans
                 )
-                return LiteralResponse(
+                return ArbitraryResponse(
                     value=count,
                     reason=f"The agent made {count} tool calls.",
                 )
@@ -174,9 +174,9 @@ class LiteralResponse(BaseResponse):
     """
 
     value: Union[bool, int, float, str, Dict[str, Any], List[Any]]
-    _return_type: ClassVar[Literal["literal"]] = "literal"
+    _return_type: ClassVar[Literal["arbitrary"]] = "arbitrary"
 
 
 ScorerResponse = Union[
-    BinaryResponse, CategoricalResponse, NumericResponse, LiteralResponse
+    BinaryResponse, CategoricalResponse, NumericResponse, ArbitraryResponse
 ]

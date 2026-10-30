@@ -761,7 +761,7 @@ class UploadCustomScorerBundleMetadata(TypedDict):
     requirements_path: NotRequired[str]
     class_name: str
     scorer_type: NotRequired[Literal["example", "trace"] | None]
-    response_type: Literal["binary", "categorical", "numeric", "literal"]
+    response_type: Literal["binary", "categorical", "numeric", "arbitrary"]
     version: NotRequired[float]
     bump_major: NotRequired[bool]
     categories: NotRequired[list[UploadCustomScorerBundleMetadataCategory] | None]

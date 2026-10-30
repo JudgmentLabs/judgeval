@@ -21,7 +21,7 @@ class Judge(ABC, Generic[R]):
     - `Judge[BinaryResponse]` -- pass/fail scoring
     - `Judge[NumericResponse]` -- numeric scoring (e.g. 0.0 to 1.0)
     - `Judge[CategoricalResponse]` -- classification into categories
-    - `Judge[LiteralResponse]` -- a raw value (bool, int, float, str, dict
+    - `Judge[ArbitraryResponse]` -- a raw value (bool, int, float, str, dict
       or list), used in test suites only
 
     Code judges are passed to `Evaluation.run()` just like hosted scorers.
@@ -82,7 +82,7 @@ class Judge(ABC, Generic[R]):
 
         Returns:
             A response object (`BinaryResponse`, `NumericResponse`,
-            `LiteralResponse`, or your `CategoricalResponse` subclass) with
+            `ArbitraryResponse`, or your `CategoricalResponse` subclass) with
             the score and reason.
         """
         pass

@@ -24,7 +24,7 @@ from judgeval.evaluation.evaluation_base import EvaluatorRunner
 def _scalar_value(
     value: bool | float | str | Dict[str, Any] | List[Any],
 ) -> bool | float | str:
-    """Sends a literal judge's object or array as JSON text, as hosted judges do."""
+    """Sends an arbitrary judge's object or array as JSON text, as hosted judges do."""
     if isinstance(value, (dict, list)):
         return json.dumps(value, sort_keys=True, separators=(",", ":"))
     return value

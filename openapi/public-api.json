@@ -3032,7 +3032,7 @@
           },
           "response_type": {
             "type": "string",
-            "enum": ["binary", "categorical", "numeric", "literal"]
+            "enum": ["binary", "categorical", "numeric", "arbitrary"]
           },
           "version": {
             "type": "number"
