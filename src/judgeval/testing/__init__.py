@@ -196,6 +196,15 @@ class TestSuitesClient:
             f"{_segment(project_id)}/test-suites/{_segment(test_suite_id)}/discard",
         )
 
+    def post_projects_test_suites_by_test_suite_id_repin(
+        self, project_id: str, test_suite_id: str, payload: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        return self._call(
+            "POST",
+            f"{_segment(project_id)}/test-suites/{_segment(test_suite_id)}/repin",
+            payload,
+        )
+
     def post_projects_test_suites_by_test_suite_id_runs(
         self, project_id: str, test_suite_id: str, payload: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -384,6 +393,29 @@ class TestSuitesFactory(ProjectScopedFactory):
         """Throw away the draft's changes."""
         return self._api.post_projects_test_suites_by_test_suite_id_discard(
             self._project, test_suite_id
+        )
+
+    def repin_checks(
+        self,
+        test_suite_id: str,
+        judge_id: str,
+        judge_major_version: int,
+        judge_minor_version: int,
+    ) -> Dict[str, Any]:
+        """Move every check by one judge to another version of it, in the draft.
+
+        Moves nothing if the version doesn't exist or never returns a case's
+        expected value. Returns the moved ``case_ids`` and the
+        ``skipped_case_ids`` edited or removed concurrently.
+        """
+        return self._api.post_projects_test_suites_by_test_suite_id_repin(
+            self._project,
+            test_suite_id,
+            {
+                "judge_id": judge_id,
+                "judge_major_version": judge_major_version,
+                "judge_minor_version": judge_minor_version,
+            },
         )
 
 
