@@ -23,7 +23,7 @@ Detect failures, triage root causes, and ship fixes backed by production data.
 
 ## Overview
 
-Judgeval is an open-source Python SDK for agent improvement. It provides tracing and agent-judge evaluation for LLM-powered applications — so you can detect failures, understand what went wrong, and validate fixes against real production cases before shipping.
+Judgeval is an open-source Python SDK for agent improvement. It provides tracing and Agent judge evaluation for LLM-powered applications — so you can detect failures, understand what went wrong, and validate fixes against real production cases before shipping.
 
 To get started, dive into the [docs](https://docs.judgmentlabs.ai/documentation).
 
@@ -31,11 +31,11 @@ To get started, dive into the [docs](https://docs.judgmentlabs.ai/documentation)
 
 **OpenTelemetry-based tracing** -- Instrument any function with `@Tracer.observe()`. Automatically captures inputs, outputs, and LLM token usage. Built on OpenTelemetry for full compatibility with existing observability stacks.
 
-**Agent judges** -- Define prompt-based scorers to evaluate agent behaviors at scale. Judges produce structured behaviors — scored, labeled outputs that describe how your agent acted — which accumulate into a searchable record of agent behavior over time. Run judges against live production traffic or replay them on historical traces to validate fixes before shipping.
+**Agent judges** -- Define prompt-based scorers to evaluate traces at scale. Judges apply labels to traces — a binary judge applies its label when true, and a classification judge applies the chosen option — and those labels accumulate into a searchable record of how your agent acted over time. Run judges against live production traffic or replay them on historical traces to validate fixes before shipping.
 
-**Online monitoring** -- Automatically score live production traffic server-side with no latency impact. Detected behaviors surface as structured signals — configure Slack alerts so regressions and recurrences never go unnoticed.
+**Online monitoring** -- Automatically score live production traffic server-side with no latency impact. When a judge applies a label, that label surfaces as a structured signal — configure Slack alerts so regressions and recurrences never go unnoticed.
 
-**Broad integrations** -- Auto-instrumentation for OpenAI, Anthropic, Google GenAI, and Together AI. Framework support for LangGraph, OpenLit, and Claude Agent SDK.
+**Broad integrations** -- Auto-instrumentation for OpenAI, Anthropic, Google GenAI, and Together AI. Framework support for LangGraph, and Claude Agent SDK.
 
 ## Quickstart
 
@@ -78,46 +78,60 @@ def run_agent(question: str) -> str:
 run_agent("What is the capital of the United States?")
 ```
 
-### JQL
+### SQL
 
-JQL queries use the same API key, organization, and project configuration as the
-rest of Judgeval. Tenant identifiers are not part of the query payload.
+Use `Judgeval.sql(sql_text)` for read-only queries against Judgment's virtual
+schema, which abstracts the underlying storage. The server validates incoming
+queries, rejects writes, and enforces organization and project scope. The client
+uses its existing API key, organization membership, and resolved project.
+Viewer access and the public query rate limit apply.
 
 ```python
 from judgeval import Judgeval
-from judgeval.jql import spans
 
 client = Judgeval(project_name="my-project")
-result = client.query(spans().rows(), trace_ids=["trace-123"])
+print(client.discover_schema())
+result = client.sql("SELECT count() AS run_count FROM telemetry.traces")
+print(result["rows"])
 ```
 
-`trace_ids` and `session_ids` are mutually exclusive options outside the JQL
-query object. Trace IDs narrow the query directly. Judgment resolves session IDs
-within the authenticated organization and project, then narrows every part of
-the query to their traces. If no session resolves, the request fails instead of
-falling back to the whole project. Both options work with `present()` and
-`discover()`.
+`client.discover_schema()` returns a Markdown string with the server's generated
+tables, column types and descriptions, row semantics, examples, and query limits,
+using the same reference as MCP `discover_schema`. It contains no project data
+and requires organization viewer access, but no resolved project. The HTTP
+equivalent is `GET /v1/sql/schema`, which returns
+`{"schema": "...Markdown reference..."}`.
 
-Use `offline_traces()` or `offline_spans()` to query traces captured by an
-offline test:
+For query execution, use `POST /v1/projects/{projectId}/sql` with
+`Authorization: Bearer <api-key>`, `X-Organization-Id: <organization-id>`, and
+JSON body `{"sql": "SELECT count() AS run_count FROM telemetry.traces"}`.
+Organization and project scope are derived by the server. Use SQL predicates on
+supported catalog columns and `LIMIT` to narrow results. Physical tables,
+writes, multiple statements, and caller-specified execution limits are
+unsupported. DAL catalog allowlists, tenant isolation, and result limits of
+1,000 rows and 5 MiB apply; over-limit results return an error. SQL text must
+contain a non-whitespace character and cannot exceed 50,000 characters.
 
-```python
-from judgeval.jql import offline_traces
-
-offline_result = client.query(offline_traces().rows())
-```
+The response contains `catalog_version`, `columns` (name, type, nullable),
+`rows`, `row_count`, and `elapsed_ms`.
+SQL integers outside JavaScript's safe range (`-(2**53 - 1)` to `2**53 - 1`)
+arrive as exact decimal strings, including inside nested arrays and objects.
+For example, `9007199254740993` arrives as `"9007199254740993"`; use `int(value)`
+when you need a Python integer. Small integers and floating-point values remain
+numbers, and column types retain their original SQL types.
+Validation and execution errors use the SDK's existing exception mapping.
 
 ## Integrations
 
-Supports OpenAI, Anthropic, Google GenAI, Together AI, LangGraph, OpenLit, and Claude Agent SDK. See the full [integrations docs](https://docs.judgmentlabs.ai/documentation/integrations/introduction).
+Supports OpenAI, Anthropic, Google GenAI, Together AI, LangGraph, and Claude Agent SDK. See the full [integrations docs](https://docs.judgmentlabs.ai/documentation/integrations/introduction).
 
 ## CLI
 
-Manage agents, traces, judges, behaviors, and evaluations from the terminal. Query trace history, deploy judges, inspect detected behaviors, and run evals against production data — all without leaving your shell. See the [CLI repo](https://github.com/JudgmentLabs/cli/) and [docs](https://docs.judgmentlabs.ai/documentation/cli).
+Manage agents, traces, judges, labels, and evaluations from the terminal. Query trace history, deploy judges, review the labels judges applied, and run evals against production data — all without leaving your shell. See the [CLI repo](https://github.com/JudgmentLabs/cli/) and [docs](https://docs.judgmentlabs.ai/documentation/cli).
 
 ## MCP Server
 
-Connect Judgment to any MCP-compatible AI tool. Query agent traces, invoke judges, browse detected behaviors, and surface failures directly inside your AI assistant or IDE. See the [docs](https://docs.judgmentlabs.ai/documentation/mcp-server).
+Connect Judgment to any MCP-compatible AI tool. Query agent traces, invoke judges, browse the labels judges applied, and surface failures directly inside your AI assistant or IDE. See the [docs](https://docs.judgmentlabs.ai/documentation/mcp-server).
 
 ## Links
 

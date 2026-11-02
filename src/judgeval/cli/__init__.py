@@ -41,7 +41,7 @@ scorer_app = typer.Typer(
     rich_markup_mode=None,
 )
 
-app.add_typer(scorer_app, name="scorer", help="Commands to manage custom scorers")
+app.add_typer(scorer_app, name="scorer", help="Commands to manage Code judges")
 
 
 @app.command(
@@ -81,7 +81,9 @@ def load_otel_env(
 
 @scorer_app.command()
 def upload(
-    entrypoint_path: str = typer.Argument(help="Path to scorer entrypoint Python file"),
+    entrypoint_path: str = typer.Argument(
+        help="Path to the Code judge entrypoint Python file"
+    ),
     project_name: str = typer.Option(..., "--project", "-p", help="Project name"),
     requirements_file_path: str = typer.Option(
         None, "--requirements", "-r", help="Path to requirements.txt file"
@@ -96,7 +98,7 @@ def upload(
         None,
         "--name",
         "-n",
-        help="Custom scorer name (auto-detected if not provided)",
+        help="Code judge name (auto-detected if not provided)",
     ),
     bump_major: bool = typer.Option(
         False, "--bump-major", "-m", help="Bump major version"
@@ -105,12 +107,12 @@ def upload(
     organization_id: str = typer.Option(None, envvar="JUDGMENT_ORG_ID"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ):
-    """Upload custom scorer to Judgment."""
+    """Upload a Code judge to Judgment."""
     from judgeval.cli.upload_judge import upload_judge
 
     scorer_path = Path(entrypoint_path)
     if not scorer_path.exists():
-        raise typer.BadParameter(f"Scorer file not found: {entrypoint_path}")
+        raise typer.BadParameter(f"Code judge file not found: {entrypoint_path}")
 
     if not api_key or not organization_id:
         raise typer.BadParameter("JUDGMENT_API_KEY and JUDGMENT_ORG_ID required")
@@ -134,7 +136,7 @@ def upload(
         )
         if not result:
             raise typer.Abort()
-        typer.echo(f"Custom scorer uploaded successfully to project '{project_name}'!")
+        typer.echo(f"Code judge uploaded successfully to project '{project_name}'!")
     except JudgmentAPIError as e:
         if e.status_code == 409:
             judgeval_logger.error(e.detail)
@@ -153,20 +155,20 @@ def init(
     include_requirements: bool = typer.Option(
         False, "--include-requirements", "-r", help="Include requirements.txt file"
     ),
-    scorer_name: str = typer.Option(..., "--name", "-n", help="Scorer class name"),
+    scorer_name: str = typer.Option(..., "--name", "-n", help="Code judge class name"),
     init_path: str = typer.Option(
-        ".", "--init-path", "-p", help="Path to initialize the scorer"
+        ".", "--init-path", "-p", help="Path to initialize the Code judge"
     ),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ):
-    """Initialize skeleton code for a new custom scorer."""
+    """Initialize skeleton code for a new Code judge."""
     if not scorer_name.isidentifier():
-        raise typer.BadParameter("Scorer name must be a valid Python identifier")
+        raise typer.BadParameter("Code judge name must be a valid Python identifier")
     scorer_path = Path(
         init_path, f"{re.sub(r'(?<!^)(?=[A-Z])', '_', scorer_name).lower()}.py"
     )
     if scorer_path.exists():
-        raise typer.BadParameter(f"Scorer file already exists: {scorer_name}")
+        raise typer.BadParameter(f"Code judge file already exists: {scorer_name}")
 
     scorer_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -198,12 +200,12 @@ def init(
 
     if not yes:
         typer.confirm(
-            f"Are you sure you want to initialize a {response_type} judge file at:\n{os.path.abspath(scorer_path)}?",
+            f"Are you sure you want to initialize a {response_type} Code judge file at:\n{os.path.abspath(scorer_path)}?",
             abort=True,
         )
     with open(scorer_path, "w") as f:
         f.write(template)
-    typer.echo(f"Scorer initialized successfully:\n{os.path.abspath(scorer_path)}")
+    typer.echo(f"Code judge initialized successfully:\n{os.path.abspath(scorer_path)}")
 
 
 @app.command()
