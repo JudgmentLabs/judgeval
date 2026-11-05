@@ -67,6 +67,453 @@
           }
         }
       },
+      "ConversationJson": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          },
+          {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConversationJson"
+            }
+          },
+          {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ConversationJson"
+            }
+          }
+        ]
+      },
+      "ConversationError": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "stacktrace": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConversationUrlSource": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "url"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": ["type", "url"],
+        "additionalProperties": false
+      },
+      "ConversationBase64Source": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "base64"
+          },
+          "data": {
+            "type": "string",
+            "description": "The content, base64-encoded"
+          }
+        },
+        "required": ["type", "data"],
+        "additionalProperties": false
+      },
+      "ConversationMediaSource": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ConversationUrlSource"
+          },
+          {
+            "$ref": "#/components/schemas/ConversationBase64Source"
+          }
+        ],
+        "description": "Where the media comes from: a URL, or its content as base64"
+      },
+      "ConversationTextPart": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "text"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": ["type", "text"],
+        "additionalProperties": false
+      },
+      "ConversationMediaPart": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["image", "audio", "file"]
+          },
+          "source": {
+            "$ref": "#/components/schemas/ConversationMediaSource"
+          },
+          "media_type": {
+            "description": "The IANA media type, such as image/png",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          }
+        },
+        "required": ["type", "source"],
+        "additionalProperties": false
+      },
+      "ConversationJsonPart": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "json"
+          },
+          "value": {
+            "$ref": "#/components/schemas/ConversationJson"
+          }
+        },
+        "required": ["type", "value"],
+        "additionalProperties": false
+      },
+      "ConversationCustomPart": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "custom"
+          },
+          "kind": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "Names what the data is, such as acme:citation"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ConversationJson"
+          }
+        },
+        "required": ["type", "kind", "data"],
+        "additionalProperties": false
+      },
+      "ConversationPart": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ConversationTextPart"
+          },
+          {
+            "$ref": "#/components/schemas/ConversationMediaPart"
+          },
+          {
+            "$ref": "#/components/schemas/ConversationJsonPart"
+          },
+          {
+            "$ref": "#/components/schemas/ConversationCustomPart"
+          }
+        ]
+      },
+      "ConversationMessage": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "message"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["system", "user", "assistant"]
+          },
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConversationPart"
+            }
+          }
+        },
+        "required": ["type", "role", "content"],
+        "additionalProperties": false
+      },
+      "ConversationToolCall": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "tool_call"
+          },
+          "call_id": {
+            "description": "Links the call to its result; absent when the source has none",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "arguments": {
+            "$ref": "#/components/schemas/ConversationJson"
+          }
+        },
+        "required": ["type", "name", "arguments"],
+        "additionalProperties": false
+      },
+      "ConversationToolResult": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "tool_result"
+          },
+          "call_id": {
+            "description": "The call_id of the tool call this answers",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "output": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConversationPart"
+            }
+          },
+          "error": {
+            "description": "A recorded tool failure",
+            "$ref": "#/components/schemas/ConversationError"
+          }
+        },
+        "required": ["type", "output"],
+        "additionalProperties": false
+      },
+      "ConversationReasoning": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "reasoning"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": ["type", "text"],
+        "additionalProperties": false
+      },
+      "ConversationCustomItem": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "custom"
+          },
+          "kind": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "Names what the data is, such as acme:handoff"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ConversationJson"
+          }
+        },
+        "required": ["type", "kind", "data"],
+        "additionalProperties": false
+      },
+      "ConversationItem": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ConversationMessage"
+          },
+          {
+            "$ref": "#/components/schemas/ConversationToolCall"
+          },
+          {
+            "$ref": "#/components/schemas/ConversationToolResult"
+          },
+          {
+            "$ref": "#/components/schemas/ConversationReasoning"
+          },
+          {
+            "$ref": "#/components/schemas/ConversationCustomItem"
+          }
+        ]
+      },
+      "ConversationTool": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "description": {
+            "type": "string"
+          },
+          "parameters": {
+            "description": "The JSON Schema of its arguments",
+            "$ref": "#/components/schemas/ConversationJson"
+          },
+          "metadata": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ConversationJson"
+            }
+          }
+        },
+        "required": ["name"],
+        "additionalProperties": false
+      },
+      "ConversationUsage": {
+        "type": "object",
+        "properties": {
+          "non_cached_input_tokens": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "non_cached_input_image_tokens": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "cache_read_input_tokens": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "cache_creation_input_tokens": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "output_tokens": {
+            "description": "Generated tokens, excluding reasoning",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "output_image_tokens": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "reasoning_tokens": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "total_cost_usd": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConversationObservation": {
+        "type": "object",
+        "properties": {
+          "conversation_id": {
+            "description": "The thread of context the call belongs to; defaults to the span's judgment.session_id",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "customer_id": {
+            "description": "The customer the call ran for; defaults to the span's judgment.customer_id",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "user_id": {
+            "description": "The user the call ran for; defaults to the span's judgment.customer_user_id",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "input": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConversationItem"
+            },
+            "description": "Everything the model was given, in order"
+          },
+          "output": {
+            "description": "What the model produced, when recorded",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConversationItem"
+            }
+          },
+          "tools": {
+            "description": "The tools the model could call",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConversationTool"
+            }
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "finish_reason": {
+            "description": "Why the model stopped, as the source reported it",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "usage": {
+            "description": "What the call consumed; defaults to the span's judgment.usage.* attributes",
+            "$ref": "#/components/schemas/ConversationUsage"
+          },
+          "error": {
+            "description": "A recorded model-call failure",
+            "$ref": "#/components/schemas/ConversationError"
+          },
+          "metadata": {
+            "description": "Any other facts about this call",
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ConversationJson"
+            }
+          }
+        },
+        "required": ["input"],
+        "additionalProperties": false,
+        "description": "One model call, sent as JSON text in the judgment.conversation.observation span attribute"
+      },
       "AddProjectRequest": {
         "type": "object",
         "required": ["project_name"],

@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, TypeAlias
+from typing import Any, Literal, Optional, TypeAlias, Union
 from typing_extensions import NotRequired, TypedDict
 
 
@@ -25,6 +25,132 @@ class PendingEvalPayload(TypedDict):
     examples: list[PendingEvalPayloadExample]
     is_offline: bool
     is_behavior: bool
+
+
+ConversationJson: TypeAlias = Optional[
+    Union[str, float, bool, list["ConversationJson"], dict[str, "ConversationJson"]]
+]
+
+
+class ConversationError(TypedDict, closed=True):
+    type: NotRequired[str]
+    message: NotRequired[str]
+    stacktrace: NotRequired[str]
+
+
+class ConversationUrlSource(TypedDict, closed=True):
+    type: Literal["url"]
+    url: str
+
+
+class ConversationBase64Source(TypedDict, closed=True):
+    type: Literal["base64"]
+    data: str
+
+
+ConversationMediaSource: TypeAlias = ConversationUrlSource | ConversationBase64Source
+
+
+class ConversationTextPart(TypedDict, closed=True):
+    type: Literal["text"]
+    text: str
+
+
+class ConversationMediaPart(TypedDict, closed=True):
+    type: Literal["image", "audio", "file"]
+    source: ConversationMediaSource
+    media_type: NotRequired[str]
+
+
+class ConversationJsonPart(TypedDict, closed=True):
+    type: Literal["json"]
+    value: ConversationJson
+
+
+class ConversationCustomPart(TypedDict, closed=True):
+    type: Literal["custom"]
+    kind: str
+    data: ConversationJson
+
+
+ConversationPart: TypeAlias = (
+    ConversationTextPart
+    | ConversationMediaPart
+    | ConversationJsonPart
+    | ConversationCustomPart
+)
+
+
+class ConversationMessage(TypedDict, closed=True):
+    type: Literal["message"]
+    role: Literal["system", "user", "assistant"]
+    content: list[ConversationPart]
+
+
+class ConversationToolCall(TypedDict, closed=True):
+    type: Literal["tool_call"]
+    call_id: NotRequired[str]
+    name: str
+    arguments: ConversationJson
+
+
+class ConversationToolResult(TypedDict, closed=True):
+    type: Literal["tool_result"]
+    call_id: NotRequired[str]
+    output: list[ConversationPart]
+    error: NotRequired[ConversationError]
+
+
+class ConversationReasoning(TypedDict, closed=True):
+    type: Literal["reasoning"]
+    text: str
+
+
+class ConversationCustomItem(TypedDict, closed=True):
+    type: Literal["custom"]
+    kind: str
+    data: ConversationJson
+
+
+ConversationItem: TypeAlias = (
+    ConversationMessage
+    | ConversationToolCall
+    | ConversationToolResult
+    | ConversationReasoning
+    | ConversationCustomItem
+)
+
+
+class ConversationTool(TypedDict, closed=True):
+    name: str
+    description: NotRequired[str]
+    parameters: NotRequired[ConversationJson]
+    metadata: NotRequired[dict[str, ConversationJson]]
+
+
+class ConversationUsage(TypedDict, closed=True):
+    non_cached_input_tokens: NotRequired[int]
+    non_cached_input_image_tokens: NotRequired[int]
+    cache_read_input_tokens: NotRequired[int]
+    cache_creation_input_tokens: NotRequired[int]
+    output_tokens: NotRequired[int]
+    output_image_tokens: NotRequired[int]
+    reasoning_tokens: NotRequired[int]
+    total_cost_usd: NotRequired[float]
+
+
+class ConversationObservation(TypedDict, closed=True):
+    conversation_id: NotRequired[str]
+    customer_id: NotRequired[str]
+    user_id: NotRequired[str]
+    input: list[ConversationItem]
+    output: NotRequired[list[ConversationItem]]
+    tools: NotRequired[list[ConversationTool]]
+    model: NotRequired[str]
+    finish_reason: NotRequired[str]
+    usage: NotRequired[ConversationUsage]
+    error: NotRequired[ConversationError]
+    metadata: NotRequired[dict[str, ConversationJson]]
 
 
 class AddProjectRequest(TypedDict):
