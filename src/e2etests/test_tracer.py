@@ -22,15 +22,15 @@ project_name = "e2e-tests-" + "".join(
     random.choices(string.ascii_letters + string.digits, k=12)
 )
 
-delete_project(project_name=project_name)
-create_project(project_name=project_name)
 
+@pytest.fixture(scope="module", autouse=True)
+def tracer_project():
+    create_project(project_name=project_name)
+    try:
+        yield Tracer.init(project_name=project_name)
+    finally:
+        delete_project(project_name=project_name)
 
-def teardown_module(module):
-    delete_project(project_name=project_name)
-
-
-tracer = Tracer.init(project_name=project_name)
 
 openai_client = wrap(OpenAI())
 anthropic_client = wrap(Anthropic())

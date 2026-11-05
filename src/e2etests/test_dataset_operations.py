@@ -33,19 +33,21 @@ def test_create_dataset_with_example(client: Judgeval, random_name: str):
 
 def test_create_dataset_across_projects(client: Judgeval, random_name: str):
     create_project(project_name=random_name)
-    dataset = client.datasets.create(
-        name=random_name,
-        examples=[Example.create(input="input 1", actual_output="output 1")],
-    )
-    assert dataset, "Failed to push dataset"
+    try:
+        dataset = client.datasets.create(
+            name=random_name,
+            examples=[Example.create(input="input 1", actual_output="output 1")],
+        )
+        assert dataset, "Failed to push dataset"
 
-    client2 = Judgeval(project_name=random_name)
-    dataset2 = client2.datasets.create(
-        name=random_name,
-        examples=[Example.create(input="input 1", actual_output="output 1")],
-    )
-    assert dataset2, "Failed to push dataset"
-    delete_project(project_name=random_name)
+        client2 = Judgeval(project_name=random_name)
+        dataset2 = client2.datasets.create(
+            name=random_name,
+            examples=[Example.create(input="input 1", actual_output="output 1")],
+        )
+        assert dataset2, "Failed to push dataset"
+    finally:
+        delete_project(project_name=random_name)
 
 
 def test_create_dataset_error(client: Judgeval, random_name: str):
