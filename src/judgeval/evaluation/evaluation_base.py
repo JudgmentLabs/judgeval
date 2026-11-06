@@ -134,13 +134,7 @@ class EvaluatorRunner(ABC, Generic[S]):
             if elapsed > timeout_seconds:
                 raise TimeoutError(f"Evaluation timed out after {timeout_seconds}s")
 
-            response = self._client.get_projects_experiments_by_run_id(
-                project_id=project_id,
-                run_id=eval_id,
-            )
-            results_data = cast(
-                List[ExperimentRunItem], response.get("results", []) or []
-            )
+            results_data, url = self._fetch_results(project_id, eval_id)
             poll_count += 1
 
             completed = len(results_data)
@@ -162,10 +156,38 @@ class EvaluatorRunner(ABC, Generic[S]):
         )
         judgeval_logger.info(f"Evals completed and saved in {elapsed:.1f}s")
 
-        url = (
-            response.get("ui_results_url", "Failed to get UI results URL")
-            or "Failed to get UI results URL"
-        )
+        return results_data, url
+
+    def _fetch_results(
+        self, project_id: str, eval_id: str
+    ) -> tuple[list[ExperimentRunItem], str]:
+        """Fetch every result row for the run.
+
+        The v1 endpoint is keyset-paginated by ``example_id`` (200 rows per
+        page by default), so keep following ``next_cursor`` until
+        ``has_more`` is false. The legacy fallback does not paginate and
+        omits both fields, which ends the loop after one page.
+        """
+        results_data: List[ExperimentRunItem] = []
+        url = "Failed to get UI results URL"
+        cursor: Optional[str] = None
+
+        while True:
+            response = self._client.get_projects_experiments_by_run_id(
+                project_id=project_id,
+                run_id=eval_id,
+                cursor=cursor,
+            )
+            results_data.extend(
+                cast(List[ExperimentRunItem], response.get("results", []) or [])
+            )
+            url = response.get("ui_results_url") or url
+
+            next_cursor = response.get("next_cursor")
+            if not response.get("has_more") or not next_cursor or next_cursor == cursor:
+                break
+            cursor = str(next_cursor)
+
         return results_data, url
 
     def _display_results(
@@ -188,7 +210,22 @@ class EvaluatorRunner(ABC, Generic[S]):
                 "evaluation result payload."
             )
 
-        for i, res in enumerate(results_data):
+        # Rows come back ordered by example_id, not in submission order, so
+        # pair them with examples by id. Fall back to position only if the
+        # ids do not line up with what was submitted.
+        rows_by_id = {res.get("example_id"): res for res in results_data}
+        if len(rows_by_id) == len(examples) and all(
+            example.example_id in rows_by_id for example in examples
+        ):
+            pairs = [(example, rows_by_id[example.example_id]) for example in examples]
+        else:
+            judgeval_logger.warning(
+                "Could not match results to examples by example_id; "
+                "pairing them by position instead."
+            )
+            pairs = list(zip(examples, results_data))
+
+        for i, (example, res) in enumerate(pairs):
             judgeval_logger.info(f"Processing result {i + 1}: {res.keys()}")
 
             scorers_raw = res.get("scorers", [])
@@ -228,7 +265,7 @@ class EvaluatorRunner(ABC, Generic[S]):
             results.append(
                 ScoringResult(
                     scorers_data=scorers_data,
-                    data_object=examples[i],
+                    data_object=example,
                 )
             )
 

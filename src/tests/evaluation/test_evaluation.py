@@ -95,6 +95,85 @@ class TestHostedSubmitAndPoll:
         assert scorer.value == "Yes"
         assert scorer.success is True
 
+    def _echo_rows(self, examples):
+        # The server orders rows by example_id, not by submission order.
+        rows = [
+            {
+                "example_id": example.example_id,
+                "scorers": [
+                    {
+                        "judge_name": "echo",
+                        "score_type": "categorical",
+                        "str_value": example["input"],
+                    }
+                ],
+            }
+            for example in examples
+        ]
+        return sorted(rows, key=lambda row: row["example_id"])
+
+    def _examples(self):
+        examples = [Example.create(input=f"q{i}") for i in range(3)]
+        for example, example_id in zip(examples, ["ex-3", "ex-1", "ex-2"]):
+            example.example_id = example_id
+        return examples
+
+    def test_hosted_results_are_matched_to_examples_by_id(self):
+        client = MagicMock()
+        eval_ = Evaluation(
+            client=client, project_id="proj-1", project_name="test-project"
+        )
+        examples = self._examples()
+        client.get_projects_experiments_by_run_id.return_value = {
+            "results": self._echo_rows(examples),
+            "has_more": False,
+            "next_cursor": None,
+            "ui_results_url": "https://app/experiments/run-1",
+        }
+        results = eval_.run(
+            examples=examples,
+            scorers=["echo"],
+            eval_run_name="run-1",
+        )
+        for result in results:
+            assert result.scorers_data[0].value == result.data_object["input"]
+        assert [r.data_object for r in results] == examples
+
+    def test_hosted_results_follow_next_cursor(self):
+        client = MagicMock()
+        eval_ = Evaluation(
+            client=client, project_id="proj-1", project_name="test-project"
+        )
+        examples = self._examples()
+        rows = self._echo_rows(examples)
+        pages = {
+            None: {
+                "results": rows[:2],
+                "has_more": True,
+                "next_cursor": rows[1]["example_id"],
+                "ui_results_url": "https://app/experiments/run-1",
+            },
+            rows[1]["example_id"]: {
+                "results": rows[2:],
+                "has_more": False,
+                "next_cursor": None,
+                "ui_results_url": "https://app/experiments/run-1",
+            },
+        }
+
+        def get_page(project_id, run_id, limit=None, cursor=None):
+            return pages[cursor]
+
+        client.get_projects_experiments_by_run_id.side_effect = get_page
+        results = eval_.run(
+            examples=examples,
+            scorers=["echo"],
+            eval_run_name="run-1",
+            timeout_seconds=1,
+        )
+        assert len(results) == 3
+        assert [r.scorers_data[0].value for r in results] == ["q0", "q1", "q2"]
+
 
 class TestEvaluationFactory:
     def test_create_returns_evaluation(self):
