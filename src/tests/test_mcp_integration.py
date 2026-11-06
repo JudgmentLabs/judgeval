@@ -65,7 +65,11 @@ def test_a_failing_identify_never_affects_the_call():
     def identify(_ctx):
         raise RuntimeError("identify failed")
 
-    assert call_tool(identify).get("mcp.method.name") == "tools/call"
+    attributes = call_tool(identify)
+    assert {
+        "method": attributes.get("mcp.method.name"),
+        "server": attributes.get("judgment.mcp.server.name"),
+    } == {"method": "tools/call", "server": "orders"}
 
 
 def test_warns_instead_of_failing_on_a_server_without_middleware():

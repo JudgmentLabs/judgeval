@@ -57,7 +57,7 @@ class JudgmentMcpMiddleware:
         span = trace.get_current_span()
         client = _client_info(ctx)
         headers = getattr(getattr(ctx, "request", None), "headers", None)
-        caller = self._identify(ctx) if self._identify is not None else None
+        caller = self._caller(ctx)
         attributes = {
             "judgment.mcp.server.name": self._server_name,
             "judgment.mcp.client.name": _read(client, "name"),
@@ -70,6 +70,15 @@ class JudgmentMcpMiddleware:
         for key, value in attributes.items():
             if isinstance(value, str) and value:
                 span.set_attribute(key, value)
+
+    def _caller(self, ctx: Any) -> Optional[McpCaller]:
+        if self._identify is None:
+            return None
+        try:
+            return self._identify(ctx)
+        except Exception as error:
+            judgeval_logger.debug(f"MCP identify failed: {error}")
+            return None
 
 
 def instrument_mcp_server(
