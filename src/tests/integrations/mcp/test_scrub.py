@@ -65,6 +65,35 @@ class TestScrubErrorMessage:
         )
 
     @pytest.mark.parametrize(
+        ("message", "arguments", "expected"),
+        [
+            (
+                "Cannot reopen ticket 7: status open is not allowed",
+                {"status": "open"},
+                "Cannot reopen ticket 7: status [argument] is not allowed",
+            ),
+            (
+                "Invalid timezone: 'No time zone found with key time'",
+                {"timezone": "time"},
+                "Invalid timezone: 'No [argument] zone found with key [argument]'",
+            ),
+            (
+                "Access denied: /home/ana/a.pdf not in /srv",
+                {"path": "/home/ana/a.pdf"},
+                "Access denied: [argument] not in /srv",
+            ),
+            (
+                "unknown key sk_live_abc in sk_live_abc.cfg",
+                {"key": "sk_live_abc"},
+                "unknown key [argument] in [argument].cfg",
+            ),
+        ],
+    )
+    def test_replaces_values_only_as_whole_words(self, message, arguments, expected):
+        values = argument_values({"arguments": arguments})
+        assert scrub_error_message(message, values) == expected
+
+    @pytest.mark.parametrize(
         "rejected",
         [
             "input_value='tok-123', input_type=str",

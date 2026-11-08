@@ -91,12 +91,30 @@ def scrub_error_message(message: str, values: Sequence[str]) -> str:
     same failure group together across calls.
     """
     text = message[:_MAX_ECHO_SCANNED_LENGTH]
-    for value in values:
-        text = text.replace(value, ARGUMENT_PLACEHOLDER)
+    echoed = [value for value in values if value in text]
+    if echoed:
+        text = _echo_pattern(echoed).sub(ARGUMENT_PLACEHOLDER, text)
     text = _PYDANTIC_INPUT.sub(
         f"input_value={ARGUMENT_PLACEHOLDER}", text[:_MAX_SCANNED_LENGTH]
     )
     return scrub_identifiers(text)
+
+
+def _echo_pattern(values: Sequence[str]) -> "re.Pattern[str]":
+    """Matches any of the values, but not inside a longer word.
+
+    Without the word check, an argument ``open`` would turn "reopen" into
+    "re[argument]".
+    """
+
+    def alternative(value: str) -> str:
+        start = r"(?<!\w)" if re.match(r"\w", value[0]) else ""
+        end = r"(?!\w)" if re.match(r"\w", value[-1]) else ""
+        return f"{start}{re.escape(value)}{end}"
+
+    # Longest first, so a value containing another is replaced whole.
+    ordered = sorted(values, key=len, reverse=True)
+    return re.compile("|".join(alternative(value) for value in ordered))
 
 
 def _is_luhn_valid(digits: str) -> bool:

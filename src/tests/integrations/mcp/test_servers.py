@@ -649,6 +649,32 @@ async def test_trace_context_in_meta_parents_the_span(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("style", styles())
+async def test_a_span_around_the_server_is_not_the_parent(
+    style, tracer, collecting_exporter
+):
+    from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
+
+    orders = build_server(style)
+    instrument_mcp_server(orders.server)
+    app_tracer = JudgmentTracerProvider.get_instance().get_tracer("app")
+
+    with app_tracer.start_as_current_span("server main"):
+        async with connect(orders) as client:
+            await client.list_tools()
+            await client.call("add", {"a": 1, "b": 2})
+            await client.call(
+                "add", {"a": 1, "b": 2}, meta={"traceparent": TRACEPARENT}
+            )
+            await client.call("add", {"a": 1, "b": 2})
+
+    first, joined, second = spans(collecting_exporter, "tools/call add")
+    assert first.parent is None and second.parent is None
+    assert first.context.trace_id != second.context.trace_id
+    assert format(joined.parent.span_id, "016x") == TRACEPARENT.split("-")[2]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("style", styles())
 async def test_spans_started_by_a_tool_are_its_children(
     style, tracer, collecting_exporter
 ):

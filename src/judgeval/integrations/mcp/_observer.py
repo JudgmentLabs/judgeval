@@ -28,7 +28,14 @@ from typing import (
     TypeVar,
 )
 
-from opentelemetry.trace import Span, SpanKind, Status, StatusCode
+from opentelemetry.trace import (
+    INVALID_SPAN,
+    Span,
+    SpanKind,
+    Status,
+    StatusCode,
+    set_span_in_context,
+)
 from opentelemetry.trace.propagation.tracecontext import (
     TraceContextTextMapPropagator,
 )
@@ -516,7 +523,11 @@ class McpObserver:
 
         provider = JudgmentTracerProvider.get_instance()
         meta = _mapping(facts.params.get("_meta"))
-        current = provider.get_current_context()
+        # Only the caller's ``_meta`` trace context can be the parent. A span
+        # that happens to be current, such as one around the whole server or
+        # the HTTP request that opened the session, would otherwise put every
+        # call into one trace. Baggage is kept.
+        current = set_span_in_context(INVALID_SPAN, provider.get_current_context())
         parent = (
             _propagator.extract(
                 {key: value for key, value in meta.items() if isinstance(value, str)},
