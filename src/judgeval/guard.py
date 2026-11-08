@@ -57,6 +57,9 @@ class GuardTripped(Exception):
         self.decision = decision
 
 
+_CHECK_FAILED = "Guard check failed"
+
+
 def _refusal(decision: GuardDecision) -> str:
     return f"Blocked by guardrail: {decision.reason}"
 
@@ -171,39 +174,54 @@ class Guard:
 
                 @functools.wraps(f)
                 async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-                    if position == "tool_input":
-                        decision = await asyncio.to_thread(
-                            self._run, position, build_evidence(args, kwargs)
+                    if position == "tool_input" and (
+                        blocked := await asyncio.to_thread(
+                            self._blocking_decision,
+                            position,
+                            build_evidence(args, kwargs),
                         )
-                        if decision is not None and decision.blocked:
-                            return refuse(decision)
-                        return await f(*args, **kwargs)
+                    ):
+                        return refuse(blocked)
                     result = await f(*args, **kwargs)
-                    decision = await asyncio.to_thread(
-                        self._run, position, build_evidence(args, kwargs, result)
-                    )
-                    if decision is not None and decision.blocked:
-                        return refuse(decision)
+                    if position == "tool_output" and (
+                        blocked := await asyncio.to_thread(
+                            self._blocking_decision,
+                            position,
+                            build_evidence(args, kwargs, result),
+                        )
+                    ):
+                        return refuse(blocked)
                     return result
 
                 return cast(C, async_wrapper)
 
             @functools.wraps(f)
             def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-                if position == "tool_input":
-                    decision = self._run(position, build_evidence(args, kwargs))
-                    if decision is not None and decision.blocked:
-                        return refuse(decision)
-                    return f(*args, **kwargs)
+                if position == "tool_input" and (
+                    blocked := self._blocking_decision(
+                        position, build_evidence(args, kwargs)
+                    )
+                ):
+                    return refuse(blocked)
                 result = f(*args, **kwargs)
-                decision = self._run(position, build_evidence(args, kwargs, result))
-                if decision is not None and decision.blocked:
-                    return refuse(decision)
+                if position == "tool_output" and (
+                    blocked := self._blocking_decision(
+                        position, build_evidence(args, kwargs, result)
+                    )
+                ):
+                    return refuse(blocked)
                 return result
 
             return cast(C, sync_wrapper)
 
         return decorator
+
+    def _blocking_decision(
+        self, position: Position, evidence: Any
+    ) -> Optional[GuardDecision]:
+        """Runs the check and returns its decision only when it blocks."""
+        decision = self._run(position, evidence)
+        return decision if decision is not None and decision.blocked else None
 
     def _run(self, position: Position, evidence: Any) -> Optional[GuardDecision]:
         """Starts the check's span under the current span, then evaluates
@@ -221,17 +239,15 @@ class Guard:
                 ),
             },
         )
-        started = time.perf_counter()
         request = self._request(position, evidence)
 
         if self.mode == "enforce":
             return self._evaluate(
                 span,
-                started,
                 lambda: _enforce_pool.submit(request).result(timeout=self.timeout_s),
             )
-        if not bg_enqueue(lambda: self._evaluate(span, started, request)):
-            self._evaluate(span, started, _raise_queue_full)
+        if not bg_enqueue(lambda: self._evaluate(span, request)):
+            self._evaluate(span, _raise_queue_full)
         return None
 
     def _request(
@@ -254,9 +270,10 @@ class Guard:
         return request
 
     def _evaluate(
-        self, span: Span, started: float, request: Callable[[], GuardResponse]
+        self, span: Span, request: Callable[[], GuardResponse]
     ) -> GuardDecision:
         """Runs the request, decides, and records the decision on the span."""
+        started = time.perf_counter()
         response: Optional[GuardResponse]
         try:
             response = request()
@@ -268,9 +285,9 @@ class Guard:
         except Exception as e:
             judgeval_logger.warning(f"[Guard] Check on {self.judge_id} failed: {e!r}")
             response = None
-            reason = f"Guard check failed: {e!r}"
+            reason = _CHECK_FAILED
             span.record_exception(e)
-            span.set_status(Status(StatusCode.ERROR, reason))
+            span.set_status(Status(StatusCode.ERROR, repr(e)))
 
         decision = self._decide(response, reason)
         span.set_attribute(AttributeKeys.JUDGMENT_GUARD_OUTCOME, decision.outcome)

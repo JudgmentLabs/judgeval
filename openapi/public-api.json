@@ -5208,25 +5208,28 @@
       },
       "GuardRequest": {
         "type": "object",
-        "required": ["judge_id", "position", "evidence"],
         "properties": {
           "judge_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "Binary prompt-backed judge in this project"
           },
           "position": {
             "type": "string",
-            "enum": ["input", "tool_input", "tool_output", "output"]
+            "enum": ["input", "tool_input", "tool_output", "output"],
+            "description": "Where in the agent run the evidence was taken"
           },
           "evidence": {}
-        }
+        },
+        "required": ["judge_id", "position", "evidence"]
       },
       "GuardResponse": {
         "type": "object",
-        "required": ["result", "confidence", "reason"],
         "properties": {
           "result": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "True when the judge applies its label (a violation)"
           },
           "confidence": {
             "type": "number",
@@ -5236,7 +5239,8 @@
           "reason": {
             "type": "string"
           }
-        }
+        },
+        "required": ["result", "confidence", "reason"]
       }
     },
     "securitySchemes": {
@@ -26312,7 +26316,7 @@
       "post": {
         "tags": ["V1"],
         "summary": "Check a guard",
-        "description": "Run a guard judge on caller-supplied evidence",
+        "description": "Run a binary judge's production rubric on caller-supplied evidence with JEV and return its verdict and confidence. Used by SDK guardrails at agent input, tool input, tool output and final output. Consumes evaluation usage; saves no scores.",
         "parameters": [
           {
             "name": "projectId",
@@ -26320,7 +26324,8 @@
             "required": true,
             "schema": {
               "type": "string"
-            }
+            },
+            "example": "YOUR_PROJECT_ID"
           }
         ],
         "requestBody": {
