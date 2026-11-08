@@ -65,18 +65,20 @@ def _refusal(decision: GuardDecision) -> str:
 
 
 class Guard:
-    """A live guardrail: a binary Judgment judge checked inline on agent input,
+    """A live guardrail: a Judgment prompt judge checked inline on agent input,
     tool calls or output.
 
-    The judge is written as a violation detector (`true` = violation). Only a
-    confident violation (`confidence >= threshold`) fails; low confidence and
-    errors follow `fail_mode`. In `shadow` mode (the default) the check runs in
-    the background and never blocks; in `enforce` mode it waits up to
-    `timeout_s` and blocks. Each check is recorded as a `judgment.guard` child
-    span of the current span.
+    The judge is written as a violation detector: a binary judge where `true`
+    is the violation, or a two-output categorical judge whose first output is
+    the violation. Only a confident violation (`confidence >= threshold`)
+    fails; low confidence and errors follow `fail_mode`. In `shadow` mode (the
+    default) the check runs in the background and never blocks; in `enforce`
+    mode it waits up to `timeout_s` and blocks. Each check is recorded as a
+    `judgment.guard` child span of the current span.
 
     Args:
-        judge_id: ID of a binary, prompt-backed judge in the tracer's project.
+        judge_id: ID of a prompt judge in the tracer's project: binary, or
+            two-output categorical (first output = violation).
         mode: `"shadow"` (record only) or `"enforce"` (block).
         fail_mode: `"open"` lets unsure or failed checks through,
             `"closed"` blocks them.
