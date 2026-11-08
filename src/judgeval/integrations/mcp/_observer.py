@@ -38,6 +38,7 @@ from judgeval.version import get_version
 
 from ._arguments import (
     AGENT_ARGUMENTS,
+    CONVERSATION_ARGUMENT,
     ReportedArguments,
     ToolContract,
     conversation_id_prompt,
@@ -47,6 +48,7 @@ from ._arguments import (
     tool_contract,
     without_agent_arguments,
 )
+from ._scrub import argument_values, scrub_error_message
 
 T = TypeVar("T")
 
@@ -419,7 +421,7 @@ class McpObserver:
         contract = self._contracts.get(name)
         if contract is None or contract.open or not isinstance(schema, Mapping):
             return None
-        return schema_with_agent_arguments(schema)
+        return schema_with_agent_arguments(schema, contract.declared)
 
     async def _prepare(
         self, facts: RequestFacts, list_tools: Optional[ListTools]
@@ -449,6 +451,8 @@ class McpObserver:
         minted = (
             mint_conversation_id()
             if injected
+            # A tool's own conversation_id argument isn't one the agent can echo.
+            and CONVERSATION_ARGUMENT not in declared
             and facts.session_id is None
             and reported.conversation_id is None
             else None
@@ -551,7 +555,7 @@ class McpObserver:
             if cancelled:
                 span.set_attribute("judgment.mcp.cancelled", "true")
             elif result is None or adapter.is_error(result):
-                self._record_failure(span, record, result, adapter)
+                self._record_failure(span, record, result, facts, adapter)
 
         attempt(annotate)
         attempt(span.end)
@@ -583,6 +587,7 @@ class McpObserver:
         span: Span,
         record: _CallRecord,
         result: Any,
+        facts: RequestFacts,
         adapter: ResultAdapter,
     ) -> None:
         error = record.error
@@ -591,13 +596,13 @@ class McpObserver:
         )
         if message is None and error is not None:
             message = _error_message(error)
-        recorded = (
-            None
-            if not self.options.capture_error_messages or message is None
-            else self._redacted(message)
-        )
         span.set_attribute(
             "error.type", self._error_type(error, result is not None, message)
+        )
+        recorded = (
+            self._recorded_message(message, facts.params)
+            if self.options.capture_error_messages and message is not None
+            else None
         )
         span.set_status(
             Status(
@@ -605,6 +610,15 @@ class McpObserver:
                 None if recorded is None else recorded[:_MAX_ERROR_MESSAGE_LENGTH],
             )
         )
+
+    def _recorded_message(
+        self, message: str, params: Mapping[str, Any]
+    ) -> Optional[str]:
+        """The failure text a span keeps. None if it can't be made safe to keep."""
+        scrubbed = attempt(
+            lambda: scrub_error_message(message, argument_values(params))
+        )
+        return None if scrubbed is None else self._redacted(scrubbed)
 
     def _error_type(
         self, error: Optional[BaseException], has_result: bool, message: Optional[str]

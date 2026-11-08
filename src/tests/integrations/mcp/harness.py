@@ -141,6 +141,11 @@ def _closed(properties: Dict[str, Any], required: List[str]) -> Dict[str, Any]:
 
 
 _STRING = {"type": "string"}
+# A failure that carries someone's details from the server's own data.
+OWNER_ERROR = (
+    "order {order_id} belongs to ana@example.com, last seen from 10.0.0.7 "
+    "at 2026-11-08 01:16:19"
+)
 
 # The tools a low-level server lists, in their wire shape.
 LOWLEVEL_TOOLS: List[Dict[str, Any]] = [
@@ -160,11 +165,33 @@ LOWLEVEL_TOOLS: List[Dict[str, Any]] = [
         ),
     },
     {
+        "name": "own_conversation",
+        "description": "Declares its own conversation_id argument.",
+        "inputSchema": _closed({"conversation_id": _STRING}, ["conversation_id"]),
+    },
+    {
+        # Requires a context argument without defining it, which JSON Schema allows.
+        "name": "required_context",
+        "inputSchema": {"type": "object", "required": ["context"]},
+    },
+    {
+        "name": "pattern_context",
+        "inputSchema": {
+            "type": "object",
+            "patternProperties": {"^context$": _STRING},
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "lookup",
         "inputSchema": _closed({"order_id": _STRING}, ["order_id"]),
     },
     {
         "name": "lookup_marked",
+        "inputSchema": _closed({"order_id": _STRING}, ["order_id"]),
+    },
+    {
+        "name": "owner",
         "inputSchema": _closed({"order_id": _STRING}, ["order_id"]),
     },
     {"name": "coded", "inputSchema": _closed({}, [])},
@@ -209,12 +236,20 @@ async def run_lowlevel_tool(
     if name == "own_context":
         orders.calls.append((name, dict(arguments)))
         return f"context={arguments['context']}", False
+    if name == "own_conversation":
+        orders.calls.append((name, dict(arguments)))
+        return f"thread={arguments['conversation_id']}", False
+    if name in ("required_context", "pattern_context"):
+        orders.calls.append((name, dict(arguments)))
+        return f"context={arguments.get('context')}", False
     if name == "lookup":
         raise OrderNotFound(f"order {arguments['order_id']} not found")
     if name == "lookup_marked":
         error = OrderNotFound(f"order {arguments['order_id']} not found")
         mark_mcp_call_error(error)
         return str(error), True
+    if name == "owner":
+        raise OrderNotFound(OWNER_ERROR.format(order_id=arguments["order_id"]))
     if name == "coded":
         return json.dumps({"error": "rate_limited", "retry_after_seconds": 3}), True
     if name == "whoami":
@@ -251,6 +286,12 @@ def _register_high_level(server: Any, orders: Orders) -> None:
         return f"context={context}"
 
     @server.tool()
+    def own_conversation(conversation_id: str) -> str:
+        """Declares its own conversation_id argument."""
+        orders.calls.append(("own_conversation", {"conversation_id": conversation_id}))
+        return f"thread={conversation_id}"
+
+    @server.tool()
     def lookup(order_id: str) -> str:
         raise OrderNotFound(f"order {order_id} not found")
 
@@ -259,6 +300,10 @@ def _register_high_level(server: Any, orders: Orders) -> None:
         error = OrderNotFound(f"order {order_id} not found")
         mark_mcp_call_error(error)
         raise error
+
+    @server.tool()
+    def owner(order_id: str) -> str:
+        raise OrderNotFound(OWNER_ERROR.format(order_id=order_id))
 
     @server.tool()
     def whoami() -> str:

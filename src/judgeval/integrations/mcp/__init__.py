@@ -68,10 +68,12 @@ def instrument_mcp_server(
             and model, and of sessions for clients that send no session ID.
         identify: Returns the end user or customer of a request. Called once
             the request finishes. Exceptions are ignored.
-        capture_error_messages: Records the text of a failure. False keeps only
-            its type.
+        capture_error_messages: Records the text of a failure, without the
+            call's argument values. False keeps only its type.
         redact: Rewrites failure messages, reported intent and resource URIs
-            before they leave the process.
+            before they leave the process. Failure messages and intent arrive
+            with emails, SSNs, card and phone numbers, and IP addresses
+            already replaced.
 
     Returns:
         True if the server is traced. On an unsupported server it logs a

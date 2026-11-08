@@ -52,6 +52,16 @@ class TestSanitizeIntent:
             ("Server 192.168.0.1 is down", "Server [ip] is down"),
             ("Server fe80::1ff:fe23:4567:890a is down", "Server [ip] is down"),
             ("Hosts 2001:db8::1 and ::1 are down", "Hosts [ip] and [ip] are down"),
+            (
+                "Server 2001:0db8:85a3:0000:0000:8a2e:0370:7334 is down",
+                "Server [ip] is down",
+            ),
+            (
+                "Timed out at 10:30:00 after 30000 ms",
+                "Timed out at 10:30:00 after 30000 ms",
+            ),
+            ("Expired 2026-11-08 01:16:19 UTC", "Expired 2026-11-08 01:16:19 UTC"),
+            ("MAC 00:1a:2b:3c:4d:5e and a :: b", "MAC 00:1a:2b:3c:4d:5e and a :: b"),
             ("Calling Foo::bar and std::vector", "Calling Foo::bar and std::vector"),
             ("Meeting at 10:30 today", "Meeting at 10:30 today"),
             ("Call +1 (415) 555-0100 back", "Call [phone] back"),
@@ -65,6 +75,15 @@ class TestSanitizeIntent:
 
     def test_is_capped(self):
         assert len(sanitize_intent("word " * 400)) == 500
+
+    @pytest.mark.parametrize(
+        "text", ["a" * 1_000_000, "1." * 500_000, "a@" * 500_000, "1 " * 500_000]
+    )
+    def test_long_text_takes_bounded_time(self, text):
+        # Each pattern used to retry a long run of characters from every position.
+        started = time.perf_counter()
+        sanitize_intent(text)
+        assert time.perf_counter() - started < 0.5
 
 
 class TestToolContract:
@@ -87,11 +106,37 @@ class TestToolContract:
         assert contract.open is False
 
     @pytest.mark.parametrize("additional", [True, {"type": "string"}])
-    def test_accepting_other_keys_is_open(self, additional):
+    @pytest.mark.parametrize(
+        "keyword", ["additionalProperties", "unevaluatedProperties"]
+    )
+    def test_accepting_other_keys_is_open(self, keyword, additional):
         contract = tool_contract(
-            {"type": "object", "properties": {}, "additionalProperties": additional}
+            {"type": "object", "properties": {}, keyword: additional}
         )
         assert contract is not None and contract.open is True
+
+    def test_required_names_are_declared(self):
+        contract = tool_contract(
+            {"type": "object", "properties": {"a": {}}, "required": ["a", "context"]}
+        )
+        assert contract is not None
+        assert contract.declared == frozenset({"a", "context"})
+
+    @pytest.mark.parametrize(
+        "pattern, declared",
+        [
+            ("^context$", {"context"}),
+            ("^con", {"context", "conversation_id"}),
+            ("_", {"llm_model", "conversation_id"}),
+            ("^x-", set()),
+        ],
+    )
+    def test_names_pattern_properties_match_are_declared(self, pattern, declared):
+        contract = tool_contract(
+            {"type": "object", "patternProperties": {pattern: {"type": "string"}}}
+        )
+        assert contract is not None
+        assert contract.declared == frozenset(declared)
 
     @pytest.mark.parametrize(
         "schema",
@@ -104,6 +149,14 @@ class TestToolContract:
             {"type": "object", "anyOf": [{}]},
             {"type": "object", "allOf": [{}]},
             {"type": "object", "$ref": "#/$defs/Input"},
+            {"type": "object", "not": {"required": ["context"]}},
+            {"type": "object", "if": {}, "then": {"required": ["context"]}},
+            {"type": "object", "dependentRequired": {"a": ["context"]}},
+            {"type": "object", "dependentSchemas": {"a": {}}},
+            {"type": "object", "dependencies": {"a": ["context"]}},
+            {"type": "object", "propertyNames": {"maxLength": 3}},
+            # JavaScript syntax Python can't read, so what it matches is unknown.
+            {"type": "object", "patternProperties": {"(?<name>x)": {}}},
         ],
     )
     def test_unsafe_schemas_get_no_contract(self, schema):
@@ -178,7 +231,7 @@ class TestSchemaWithAgentArguments:
             "required": ["a"],
             "additionalProperties": False,
         }
-        updated = schema_with_agent_arguments(schema)
+        updated = schema_with_agent_arguments(schema, frozenset({"a"}))
         assert updated["required"] == ["a"]
         assert updated["additionalProperties"] is False
         assert updated["properties"]["a"] == {"type": "integer"}
@@ -193,12 +246,18 @@ class TestSchemaWithAgentArguments:
     def test_the_tools_own_definition_wins(self):
         own = {"type": "integer", "description": "Mine."}
         updated = schema_with_agent_arguments(
-            {"type": "object", "properties": {"context": own}}
+            {"type": "object", "properties": {"context": own}}, frozenset({"context"})
         )
         assert updated["properties"]["context"] == own
 
+    def test_declared_names_without_a_definition_are_not_added(self):
+        schema = {"type": "object", "required": ["context"]}
+        updated = schema_with_agent_arguments(schema, frozenset({"context"}))
+        assert set(updated["properties"]) == {"llm_model", "conversation_id"}
+        assert updated["required"] == ["context"]
+
     def test_schema_without_properties(self):
-        updated = schema_with_agent_arguments({"type": "object"})
+        updated = schema_with_agent_arguments({"type": "object"}, frozenset())
         assert set(updated["properties"]) == set(AGENT_ARGUMENTS)
 
 

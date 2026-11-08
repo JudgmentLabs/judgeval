@@ -14,6 +14,8 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, FrozenSet, Mapping, Optional
 
+from ._scrub import scrub_identifiers
+
 INTENT_ARGUMENT = "context"
 MODEL_ARGUMENT = "llm_model"
 CONVERSATION_ARGUMENT = "conversation_id"
@@ -42,19 +44,22 @@ AGENT_ARGUMENT_DESCRIPTIONS: Mapping[str, str] = {
 
 AGENT_ARGUMENTS: FrozenSet[str] = frozenset(AGENT_ARGUMENT_DESCRIPTIONS)
 
-# Schema keywords whose meaning could change if a property were added.
-_COMPOSITION_KEYWORDS = ("oneOf", "anyOf", "allOf", "$ref")
-
-_EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
-_SSN = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
-# 13 to 19 digits, optionally grouped, without taking the space after them.
-_CARD = re.compile(r"\d(?:[ -]?\d){12,18}")
-_IPV4 = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
-# Includes compressed forms such as ``2001:db8::1`` and ``::1``.
-_IPV6 = re.compile(
-    r"(?<![\w:])(?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}(?![\w:])", re.IGNORECASE
+# Keywords that can accept, require or rule out a property without listing it
+# under ``properties``. A schema using one is left as it is.
+_UNSUPPORTED_KEYWORDS = (
+    "oneOf",
+    "anyOf",
+    "allOf",
+    "$ref",
+    "not",
+    "if",
+    "then",
+    "else",
+    "dependentSchemas",
+    "dependentRequired",
+    "dependencies",
+    "propertyNames",
 )
-_PHONE = re.compile(r"(?<![\w.])\+?\d[\d ().-]{7,}\d\b")
 
 
 @dataclass(frozen=True)
@@ -86,53 +91,53 @@ def mint_conversation_id(now_ms: Optional[int] = None) -> str:
 
 
 def sanitize_intent(text: str) -> str:
-    """Removes well-defined personal identifiers from free text.
+    """Removes well-defined personal identifiers from an agent's stated intent.
 
-    It can't recognize free-form data such as names, so the argument's
-    description also tells agents not to send them.
+    Names can't be recognized, so the argument's description also tells agents
+    not to send them.
     """
-    text = _EMAIL.sub("[email]", text)
-    text = _SSN.sub("[ssn]", text)
-    text = _CARD.sub(
-        lambda match: "[card]"
-        if _is_luhn_valid(re.sub(r"[ -]", "", match.group(0)))
-        else match.group(0),
-        text,
-    )
-    text = _IPV4.sub("[ip]", text)
-    text = _IPV6.sub("[ip]", text)
-    text = _PHONE.sub("[phone]", text)
-    return text[:_MAX_INTENT_LENGTH]
-
-
-def _is_luhn_valid(digits: str) -> bool:
-    total = 0
-    for index, character in enumerate(reversed(digits)):
-        digit = int(character)
-        if index % 2 == 0:
-            total += digit
-        else:
-            total += digit * 2 - 9 if digit > 4 else digit * 2
-    return total % 10 == 0
+    return scrub_identifiers(text)[:_MAX_INTENT_LENGTH]
 
 
 def tool_contract(schema: Any) -> Optional[ToolContract]:
-    """Reads a listed tool's JSON input schema. None if injection isn't safe."""
+    """Reads a listed tool's JSON input schema. None if injection isn't safe.
+
+    An absent ``additionalProperties`` counts as closed: most generated schemas
+    leave it out, and removing the injected arguments gives the tool exactly
+    the arguments it declares. A name the schema requires or matches with
+    ``patternProperties`` is the tool's own, like one under ``properties``.
+    """
     if not isinstance(schema, Mapping) or schema.get("type") != "object":
         return None
-    if any(keyword in schema for keyword in _COMPOSITION_KEYWORDS):
+    if any(keyword in schema for keyword in _UNSUPPORTED_KEYWORDS):
         return None
-    properties = schema.get("properties")
-    declared = (
-        frozenset(name for name in properties if isinstance(name, str))
-        if isinstance(properties, Mapping)
-        else frozenset()
-    )
-    additional = schema.get("additionalProperties")
+    declared = set(_names(schema.get("properties")))
+    required = schema.get("required")
+    if isinstance(required, list):
+        declared.update(name for name in required if isinstance(name, str))
+    for pattern in _names(schema.get("patternProperties")):
+        try:
+            declared.update(
+                name for name in AGENT_ARGUMENTS if re.search(pattern, name)
+            )
+        except re.error:
+            # A pattern Python can't read might match one of them.
+            return None
     return ToolContract(
-        declared=declared,
-        open=additional is True or isinstance(additional, Mapping),
+        declared=frozenset(declared),
+        open=_accepts_other_keys(schema.get("additionalProperties"))
+        or _accepts_other_keys(schema.get("unevaluatedProperties")),
     )
+
+
+def _names(properties: Any) -> FrozenSet[str]:
+    if not isinstance(properties, Mapping):
+        return frozenset()
+    return frozenset(name for name in properties if isinstance(name, str))
+
+
+def _accepts_other_keys(keyword: Any) -> bool:
+    return keyword is True or isinstance(keyword, Mapping)
 
 
 def read_reported_arguments(
@@ -169,8 +174,10 @@ def without_agent_arguments(
     }
 
 
-def schema_with_agent_arguments(schema: Mapping[str, Any]) -> Dict[str, Any]:
-    """Adds the optional arguments. A tool's own property of the same name wins."""
+def schema_with_agent_arguments(
+    schema: Mapping[str, Any], declared: FrozenSet[str]
+) -> Dict[str, Any]:
+    """Adds the optional arguments the tool doesn't already declare."""
     properties = schema.get("properties")
     return {
         **schema,
@@ -178,6 +185,7 @@ def schema_with_agent_arguments(schema: Mapping[str, Any]) -> Dict[str, Any]:
             **{
                 name: {"type": "string", "description": description}
                 for name, description in AGENT_ARGUMENT_DESCRIPTIONS.items()
+                if name not in declared
             },
             **(properties if isinstance(properties, Mapping) else {}),
         },

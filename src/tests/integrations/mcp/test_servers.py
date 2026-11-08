@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import anyio
 import pytest
@@ -245,6 +245,61 @@ async def test_tool_argument_named_like_an_agent_argument_is_the_tools(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("style", styles())
+async def test_tool_owned_conversation_id_is_neither_minted_nor_read(
+    style, tracer, collecting_exporter
+):
+    orders = build_server(style)
+    instrument_mcp_server(orders.server)
+
+    async with connect(orders) as client:
+        tools = await client.all_tools()
+        outcome = await client.call(
+            "own_conversation",
+            {"conversation_id": "thread-7", "context": "Reading an earlier thread"},
+        )
+
+    listed = _schema_properties(tools["own_conversation"])
+    assert "analytics" not in listed["conversation_id"].get("description", "")
+    assert "analytics" in listed["context"]["description"]
+    # No conversation ID is appended for the agent to put in the tool's argument.
+    assert outcome.texts == ["thread=thread-7"]
+    assert orders.received("own_conversation") == [{"conversation_id": "thread-7"}]
+    found = attributes(only_span(collecting_exporter, "tools/call own_conversation"))
+    assert found["judgment.mcp.intent"] == "Reading an earlier thread"
+    assert "judgment.mcp.conversation_id" not in found
+    assert found["judgment.mcp.argument_keys"] == "conversation_id"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("style", styles(*sorted(LOW_LEVEL)))
+async def test_names_a_schema_requires_or_matches_are_the_tools(
+    style, tracer, collecting_exporter
+):
+    names = ("required_context", "pattern_context")
+    orders = build_server(style)
+    instrument_mcp_server(orders.server)
+
+    async with connect(orders) as client:
+        tools = await client.all_tools()
+        outcomes = [
+            await client.call(name, {"context": "warehouse 7", "llm_model": "gpt-6"})
+            for name in names
+        ]
+
+    for name, outcome in zip(names, outcomes):
+        listed = _schema_properties(tools[name])
+        assert "context" not in listed
+        assert {"llm_model", "conversation_id"} <= set(listed)
+        assert outcome.texts[0] == "context=warehouse 7"
+        assert orders.received(name) == [{"context": "warehouse 7"}]
+        found = attributes(only_span(collecting_exporter, f"tools/call {name}"))
+        assert "judgment.mcp.intent" not in found
+        assert found["judgment.mcp.model"] == "gpt-6"
+        assert found["judgment.mcp.argument_keys"] == "context"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("style", styles())
 async def test_call_before_listing_still_hides_agent_arguments(
     style, tracer, collecting_exporter
 ):
@@ -306,8 +361,13 @@ def _expected_error_type(style: str, case: str) -> str:
 
 
 ERROR_CASES = {
-    "lookup": ("lookup", {"order_id": "o-404"}, "order o-404 not found"),
-    "lookup_marked": ("lookup_marked", {"order_id": "o-404"}, "order o-404 not found"),
+    # The order ID is the call's own argument, so it is left out.
+    "lookup": ("lookup", {"order_id": "o-404"}, "order [argument] not found"),
+    "lookup_marked": (
+        "lookup_marked",
+        {"order_id": "o-404"},
+        "order [argument] not found",
+    ),
     "unknown": ("nope", {}, "nope"),
     "invalid": ("add", {"a": "one", "b": 2}, None),
     "coded": ("coded", {}, "rate_limited"),
@@ -350,6 +410,53 @@ async def test_failed_calls_record_why(style, case, tracer, collecting_exporter)
         message = f"Error executing tool {tool}"
     if message is not None:
         assert message in (span.status.description or "")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("style", styles())
+async def test_error_messages_leave_out_argument_values_and_identifiers(
+    style, tracer, collecting_exporter
+):
+    redacted: List[str] = []
+
+    def redact(text: str) -> str:
+        redacted.append(text)
+        return text
+
+    orders = build_server(style)
+    instrument_mcp_server(orders.server, redact=redact)
+
+    async with connect(orders) as client:
+        await client.list_tools()
+        await client.call(
+            "add", {"a": "sk-live-4f9a8b7c", "b": {"note": "it's\nnested-secret"}}
+        )
+        await client.call("lookup", {"order_id": "o-77 for ana@example.com"})
+        await client.call("owner", {"order_id": "o-1"})
+
+    failed = [
+        span
+        for span in spans(collecting_exporter)
+        if span.status.status_code.name == "ERROR"
+    ]
+    assert len(failed) == 3
+    recorded = [span.status.description or "" for span in failed]
+    for text in recorded + redacted:
+        for secret in ("sk-live", "nested-secret", "o-77", "ana@", "10.0.0.7"):
+            assert secret not in text, (secret, text)
+    # The built-in scrubbing runs before the builder's own redaction.
+    assert len(redacted) == 3
+    lookup = only_span(collecting_exporter, "tools/call lookup")
+    owner = only_span(collecting_exporter, "tools/call owner")
+    assert attributes(lookup)["error.type"] == _expected_error_type(style, "lookup")
+    assert attributes(owner)["error.type"] == _expected_error_type(style, "lookup")
+    if style != "mcp2-mcpserver":
+        assert "order [argument] not found" in (lookup.status.description or "")
+        # Dates and times stay; short arguments such as "o-1" are kept.
+        assert (
+            "order o-1 belongs to [email], last seen from [ip] at 2026-11-08 01:16:19"
+            in (owner.status.description or "")
+        )
 
 
 @pytest.mark.asyncio
