@@ -1328,6 +1328,18 @@ class PublicSqlSchemaResponse(TypedDict):
     schema: str
 
 
+class GuardRequest(TypedDict):
+    judge_id: str
+    position: Literal["input", "tool_input", "tool_output", "output"]
+    evidence: Any
+
+
+class GuardResponse(TypedDict):
+    result: bool
+    confidence: float
+    reason: str
+
+
 class ListOrganizationsResponseOrganizationDetailProject(TypedDict):
     count: float
 

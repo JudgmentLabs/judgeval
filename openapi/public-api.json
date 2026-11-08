@@ -5205,6 +5205,38 @@
             "type": "string"
           }
         }
+      },
+      "GuardRequest": {
+        "type": "object",
+        "required": ["judge_id", "position", "evidence"],
+        "properties": {
+          "judge_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "position": {
+            "type": "string",
+            "enum": ["input", "tool_input", "tool_output", "output"]
+          },
+          "evidence": {}
+        }
+      },
+      "GuardResponse": {
+        "type": "object",
+        "required": ["result", "confidence", "reason"],
+        "properties": {
+          "result": {
+            "type": "boolean"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
       }
     },
     "securitySchemes": {
@@ -26272,6 +26304,52 @@
           "security": {
             "access": "organization",
             "role": "viewer"
+          }
+        }
+      }
+    },
+    "/v1/projects/{projectId}/guard": {
+      "post": {
+        "tags": ["V1"],
+        "summary": "Check a guard",
+        "description": "Run a guard judge on caller-supplied evidence",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuardRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuardResponse"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postV1ProjectsByProjectIdGuard",
+        "x-meta": {
+          "security": {
+            "access": "organization",
+            "role": "developer"
           }
         }
       }
