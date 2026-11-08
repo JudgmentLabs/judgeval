@@ -22,7 +22,7 @@ class ColorFormatter(logging.Formatter):
 
     def __init__(self, fmt=None, datefmt=None, use_color=True):
         super().__init__(fmt=fmt, datefmt=datefmt)
-        self.use_color = use_color and sys.stdout.isatty()
+        self.use_color = use_color and sys.stderr.isatty()
 
     def format(self, record):
         message = super().format(record)
@@ -47,10 +47,12 @@ def _parse_log_level(level_str: str) -> int:
 
 @use_once
 def _setup_judgeval_logger():
-    use_color = sys.stdout.isatty() and JUDGMENT_NO_COLOR is None
+    use_color = sys.stderr.isatty() and JUDGMENT_NO_COLOR is None
     log_level = _parse_log_level(JUDGMENT_LOG_LEVEL)
 
-    handler = logging.StreamHandler(sys.stdout)
+    # Not stdout: a program's stdout can be its output or protocol, such as an
+    # MCP server's stdio transport.
+    handler = logging.StreamHandler(sys.stderr)
     handler.setLevel(log_level)
     handler.setFormatter(
         ColorFormatter(
