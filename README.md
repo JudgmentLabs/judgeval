@@ -109,7 +109,7 @@ Organization and project scope are derived by the server. Use SQL predicates on
 supported catalog columns and `LIMIT` to narrow results. Physical tables,
 writes, multiple statements, and caller-specified execution limits are
 unsupported. DAL catalog allowlists, tenant isolation, and result limits of
-1,000 rows and 5 MiB apply; over-limit results return an error. SQL text must
+10,000 rows and 25 MiB apply; over-limit results return an error. SQL text must
 contain a non-whitespace character and cannot exceed 50,000 characters.
 
 The response contains `catalog_version`, `columns` (name, type, nullable),

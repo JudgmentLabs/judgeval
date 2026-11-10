@@ -21890,7 +21890,7 @@
           "tool": "sql_query",
           "toolset": "sql"
         },
-        "description": "Runs one read-only SELECT against the virtual catalog for the authenticated organization and project. DAL catalog restrictions and limits of 1,000 rows and 5 MiB apply.",
+        "description": "Runs one read-only SELECT against the virtual catalog for the authenticated organization and project. DAL catalog restrictions and limits of 10,000 rows and 25 MiB apply.",
         "parameters": [
           {
             "name": "projectId",
