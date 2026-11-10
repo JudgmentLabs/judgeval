@@ -98,6 +98,12 @@ class ExternalJudgeFactory:
             )
             ```
         """
+        if score_type not in ("binary", "numeric", "categorical"):
+            raise ValueError("score_type must be binary, numeric, or categorical")
+        name = name.strip()
+        if outputs is not None:
+            outputs = [{**output, "name": output["name"].strip()} for output in outputs]
+
         project_id = expect_project_id(self._project_id)
         if not project_id:
             return None

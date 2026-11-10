@@ -246,3 +246,61 @@ def test_numeric_feedback_roundtrips_through_the_public_http_client():
             ),
         ],
     )
+
+
+def test_rejects_unknown_score_types_instead_of_creating_numeric_judges():
+    factory, _ = _make_factory()
+    with pytest.raises(ValueError, match="score_type"):
+        factory.create(name="feedback", score_type="numerical")
+
+
+def test_created_names_can_be_used_to_submit_categorical_feedback():
+    stored = {}
+
+    def handler(request):
+        payload = json.loads(request.content)
+        if request.url.path.endswith("/judges"):
+            judge = payload["judge"]
+            stored["name"] = judge["name"].strip()
+            stored["outputs"] = [
+                {**output, "name": output["name"].strip()}
+                for output in judge["initialVersion"]["outputs"]
+            ]
+            return httpx.Response(
+                200,
+                json={
+                    "judge_id": "j",
+                    "judge_version_id": "v",
+                    "implementation_id": None,
+                },
+            )
+        if (
+            payload["judge_name"] != stored["name"]
+            or payload["value"] != stored["outputs"][0]["name"]
+        ):
+            return httpx.Response(404, json={"message": "Judge or output not found"})
+        return httpx.Response(200, json={"id": "feedback-1"})
+
+    client = JudgmentSyncClient("https://api.test", "key", "org")
+    client.client = httpx.Client(transport=httpx.MockTransport(handler))
+    factory = ExternalJudgeFactory(client, "project", "test")
+    judge = factory.create(
+        name=" topic ",
+        score_type="categorical",
+        outputs=[
+            {"name": " good ", "description": "Good"},
+            {"name": " bad ", "description": "Bad"},
+        ],
+    )
+    assert judge is not None and judge.outputs is not None
+    result = factory.submit_result(
+        judge_name=judge.name, trace_id="trace", value=judge.outputs[0]["name"]
+    )
+    assert (judge.name, judge.outputs, result) == (
+        "topic",
+        [
+            {"name": "good", "description": "Good"},
+            {"name": "bad", "description": "Bad"},
+        ],
+        "feedback-1",
+    )
