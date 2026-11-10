@@ -476,6 +476,34 @@ class BaseTracer(ABC):
 
     @staticmethod
     @contextmanager
+    def test_case(run_id: str, case_id: str) -> Iterator[None]:
+        """Tag every span in the block as one case of a test run.
+
+        Sets ``judgment.test.run_id`` and ``judgment.test.case_id`` on the
+        current span and on every span started inside the block, including
+        the trace root, so Judgment can attach the trace to the run's case.
+
+        Each case must be its own trace: Judgment reads the ids off the root
+        span. Run concurrent cases outside any active span, not inside a
+        shared parent span (the parent would take the last case's ids).
+
+        ```python
+        run = client.test_runs.start(test_suite_id)
+        for case in run["cases"]:
+            with Tracer.test_case(run["run_id"], case["case_id"]):
+                support_agent(case["input"])
+        ```
+        """
+        with BaseTracer.scoped_context(
+            attributes={
+                AttributeKeys.JUDGMENT_TEST_RUN_ID: run_id,
+                AttributeKeys.JUDGMENT_TEST_CASE_ID: case_id,
+            }
+        ):
+            yield
+
+    @staticmethod
+    @contextmanager
     def start_linked_trace(
         name: str,
         attributes: Optional[Dict[str, Any]] = None,

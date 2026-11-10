@@ -1,10 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Literal, Optional
+from typing import List, Literal, Optional, TypedDict
 
 
 ScoreType = Literal["binary", "numeric", "categorical"]
+
+
+class ExternalJudgeOutput(TypedDict):
+    """One named categorical result accepted by an external judge."""
+
+    name: str
+    description: str
 
 
 @dataclass
@@ -35,6 +42,6 @@ class ExternalJudge:
     name: str
     score_type: ScoreType
     judge_description: Optional[str] = None
-    outputs: Optional[List[Dict[str, Any]]] = None
+    outputs: Optional[List[ExternalJudgeOutput]] = None
     major_version: int = 0
     minor_version: int = 0

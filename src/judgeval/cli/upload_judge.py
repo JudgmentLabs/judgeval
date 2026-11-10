@@ -135,7 +135,9 @@ def _build_bundle(
     requirements_file_path: str | None,
 ) -> tuple[bytes, str, str | None, int]:
     if not os.path.exists(entrypoint_path):
-        raise FileNotFoundError(f"Scorer entrypoint file not found: {entrypoint_path}")
+        raise FileNotFoundError(
+            f"Code judge entrypoint file not found: {entrypoint_path}"
+        )
     all_abs: list[str] = [os.path.abspath(entrypoint_path)]
 
     for p in included_files_paths:
@@ -194,7 +196,7 @@ def upload_judge(
         included_files_paths = []
 
     if not os.path.exists(entrypoint_path):
-        raise FileNotFoundError(f"Scorer file not found: {entrypoint_path}")
+        raise FileNotFoundError(f"Code judge file not found: {entrypoint_path}")
 
     with open(entrypoint_path, "r") as f:
         scorer_code = f.read()
@@ -243,7 +245,7 @@ def upload_judge(
 
         display_name = f"'{project_name}'" if project_name else project_id
         typer.confirm(
-            f"Are you sure you want to upload {response_type} code judge '{unique_name}' to project {display_name}? "
+            f"Are you sure you want to upload {response_type} Code judge '{unique_name}' to project {display_name}? "
             f"In total, {file_count} files will be uploaded.\n"
             f"If this judge already exists in the project, a new version will be created.",
             abort=True,
@@ -255,7 +257,10 @@ def upload_judge(
         "class_name": class_name,
         "response_type": response_type,
         "version": 4,
-        "categories": [category.model_dump() for category in categories]
+        "categories": [
+            {"value": category.value, "description": category.description}
+            for category in categories
+        ]
         if categories
         else None,
         "bump_major": bump_major,
@@ -274,8 +279,8 @@ def upload_judge(
     )
 
     if response.get("status") == "success":
-        judgeval_logger.info(f"Successfully uploaded custom judge: {unique_name}")
+        judgeval_logger.info(f"Successfully uploaded Code judge: {unique_name}")
         return True
     else:
-        judgeval_logger.error(f"Failed to upload custom judge: {unique_name}")
+        judgeval_logger.error(f"Failed to upload Code judge: {unique_name}")
         return False

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional
 
 from judgeval.data.scoring_result import ScoringResult
 
@@ -33,7 +33,7 @@ class TestConfig:
     judges: List[Dict[str, Any]] = field(default_factory=list)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> TestConfig:
+    def from_dict(cls, data: Mapping[str, Any]) -> TestConfig:
         return cls(
             id=data.get("id", ""),
             name=data.get("name", ""),

@@ -1,12 +1,19 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import List, Optional, Union
 
-from judgeval.external_judges.external_judge import ExternalJudge, ScoreType
+from judgeval.external_judges.external_judge import (
+    ExternalJudge,
+    ExternalJudgeOutput,
+    ScoreType,
+)
 from judgeval.exceptions import JudgmentAPIError, map_judgment_api_error
 from judgeval.internal.api import JudgmentSyncClient
 from judgeval.internal.api.models import (
-    CreateExternalJudgeInput,
+    CreateJudgeRequest,
+    CreateJudgeRequestJudge3InitialVersion,
+    CreateJudgeRequestJudge3InitialVersion1,
+    CreateJudgeRequestJudge3InitialVersion2,
     SubmitExternalJudgeResult,
 )
 from judgeval.logger import judgeval_logger
@@ -54,7 +61,7 @@ class ExternalJudgeFactory:
         name: str,
         score_type: ScoreType,
         judge_description: Optional[str] = None,
-        outputs: Optional[List[Dict[str, Any]]] = None,
+        outputs: Optional[List[ExternalJudgeOutput]] = None,
     ) -> Optional[ExternalJudge]:
         """Create a new external judge and its first version.
 
@@ -95,12 +102,17 @@ class ExternalJudgeFactory:
         if not project_id:
             return None
 
+        initial_version: Union[
+            CreateJudgeRequestJudge3InitialVersion,
+            CreateJudgeRequestJudge3InitialVersion1,
+            CreateJudgeRequestJudge3InitialVersion2,
+        ]
         if score_type == "categorical":
             if not outputs or len(outputs) < 2:
                 raise ValueError(
                     "outputs must have at least 2 entries for a 'categorical' judge"
                 )
-            initial_version: Dict[str, Any] = {
+            initial_version = {
                 "scoreType": "categorical",
                 "outputs": outputs,
             }
@@ -109,15 +121,21 @@ class ExternalJudgeFactory:
                 raise ValueError(
                     f"outputs is only valid when score_type='categorical' (got {score_type!r})"
                 )
-            initial_version = {"scoreType": score_type}
+            initial_version = (
+                {"scoreType": "binary"}
+                if score_type == "binary"
+                else {"scoreType": "numeric"}
+            )
 
-        payload: CreateExternalJudgeInput = {
-            "name": name,
-            "judgeType": "external",
-            "initialVersion": initial_version,
+        payload: CreateJudgeRequest = {
+            "judge": {
+                "name": name,
+                "executionMode": "submitted",
+                "initialVersion": initial_version,
+            }
         }
         if judge_description is not None:
-            payload["judgeDescription"] = judge_description
+            payload["judge"]["judgeDescription"] = judge_description
 
         try:
             response = self._client.post_projects_judges(
@@ -131,8 +149,8 @@ class ExternalJudgeFactory:
 
         judgeval_logger.info(f"Created external judge {name}")
         return ExternalJudge(
-            judge_id=response["judgeId"],
-            judge_version_id=response["judgeVersionId"],
+            judge_id=response["judge_id"],
+            judge_version_id=response["judge_version_id"],
             name=name,
             score_type=score_type,
             judge_description=judge_description,
@@ -195,26 +213,21 @@ class ExternalJudgeFactory:
         if not project_id:
             return None
 
-        payload: Dict[str, Any] = {"trace_id": trace_id, "value": value}
+        payload: SubmitExternalJudgeResult
         if judge_id is not None:
-            payload["judge_id"] = judge_id
+            payload = {"trace_id": trace_id, "value": value, "judge_id": judge_id}
         else:
-            payload["judge_name"] = judge_name
+            assert judge_name is not None
+            payload = {"trace_id": trace_id, "value": value, "judge_name": judge_name}
         if session_id is not None:
             payload["session_id"] = session_id
         if reason is not None:
             payload["reason"] = reason
 
         try:
-            # SubmitExternalJudgeResult is a top-level discriminated union in
-            # the OpenAPI spec (judge_id XOR judge_name); the client
-            # generator can't expand top-level unions into a real TypedDict
-            # (same limitation as the already-shipped ScoringResult model),
-            # so it generates an empty stub. The payload above is correct
-            # per the backend contract regardless.
             response = self._client.post_projects_judge_results(
                 project_id=project_id,
-                payload=cast(SubmitExternalJudgeResult, payload),
+                payload=payload,
             )
         except JudgmentAPIError as e:
             raise map_judgment_api_error(

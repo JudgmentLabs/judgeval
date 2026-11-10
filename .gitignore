@@ -115,7 +115,4 @@ demo
 # OpenAPI json file
 src/judgeval/data/openapi_new.json
 
-# Private source checkouts used only for JQL contract parity checks
-.jql-source/
-
 CLAUDE.md

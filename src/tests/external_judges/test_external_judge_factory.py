@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from unittest.mock import MagicMock
+import json
+import httpx
 
 import pytest
 
@@ -11,6 +13,7 @@ from judgeval.exceptions import (
 )
 from judgeval.external_judges.external_judge import ExternalJudge
 from judgeval.external_judges.external_judge_factory import ExternalJudgeFactory
+from judgeval.internal.api import JudgmentSyncClient
 
 
 def _make_factory(project_id="proj-1"):
@@ -24,9 +27,9 @@ class TestExternalJudgeFactoryCreate:
     def test_create_returns_external_judge(self):
         factory, client = _make_factory()
         client.post_projects_judges.return_value = {
-            "judgeId": "judge-1",
-            "judgeVersionId": "version-1",
-            "implementationId": None,
+            "judge_id": "judge-1",
+            "judge_version_id": "version-1",
+            "implementation_id": None,
         }
         result = factory.create(name="human-thumbs-up", score_type="binary")
         assert isinstance(result, ExternalJudge)
@@ -38,35 +41,37 @@ class TestExternalJudgeFactoryCreate:
     def test_create_binary_payload_shape(self):
         factory, client = _make_factory()
         client.post_projects_judges.return_value = {
-            "judgeId": "judge-1",
-            "judgeVersionId": "version-1",
-            "implementationId": None,
+            "judge_id": "judge-1",
+            "judge_version_id": "version-1",
+            "implementation_id": None,
         }
         factory.create(name="n", score_type="binary")
         payload = client.post_projects_judges.call_args.kwargs["payload"]
         assert payload == {
-            "name": "n",
-            "judgeType": "external",
-            "initialVersion": {"scoreType": "binary"},
+            "judge": {
+                "name": "n",
+                "executionMode": "submitted",
+                "initialVersion": {"scoreType": "binary"},
+            },
         }
 
     def test_create_includes_judge_description_when_provided(self):
         factory, client = _make_factory()
         client.post_projects_judges.return_value = {
-            "judgeId": "judge-1",
-            "judgeVersionId": "version-1",
-            "implementationId": None,
+            "judge_id": "judge-1",
+            "judge_version_id": "version-1",
+            "implementation_id": None,
         }
         factory.create(name="n", score_type="numeric", judge_description="d")
         payload = client.post_projects_judges.call_args.kwargs["payload"]
-        assert payload["judgeDescription"] == "d"
+        assert payload["judge"]["judgeDescription"] == "d"
 
     def test_create_categorical_includes_outputs(self):
         factory, client = _make_factory()
         client.post_projects_judges.return_value = {
-            "judgeId": "judge-1",
-            "judgeVersionId": "version-1",
-            "implementationId": None,
+            "judge_id": "judge-1",
+            "judge_version_id": "version-1",
+            "implementation_id": None,
         }
         outputs = [
             {"name": "good", "description": "Good response"},
@@ -74,7 +79,7 @@ class TestExternalJudgeFactoryCreate:
         ]
         factory.create(name="n", score_type="categorical", outputs=outputs)
         payload = client.post_projects_judges.call_args.kwargs["payload"]
-        assert payload["initialVersion"] == {
+        assert payload["judge"]["initialVersion"] == {
             "scoreType": "categorical",
             "outputs": outputs,
         }
@@ -189,3 +194,55 @@ class TestExternalJudgeFactorySubmitResult:
         )
         with pytest.raises(JudgmentAPIError):
             factory.submit_result(judge_id="judge-1", trace_id="trace-1", value=True)
+
+
+def test_numeric_feedback_roundtrips_through_the_public_http_client():
+    requests = []
+
+    def handler(request):
+        requests.append((request.method, request.url.path, json.loads(request.content)))
+        return httpx.Response(
+            200,
+            json={
+                "judge_id": "judge-1",
+                "judge_version_id": "version-1",
+                "implementation_id": None,
+            }
+            if request.url.path.endswith("/judges")
+            else {"id": "result-1"},
+        )
+
+    client = JudgmentSyncClient("https://api.test", "key", "org")
+    client.client = httpx.Client(transport=httpx.MockTransport(handler))
+    factory = ExternalJudgeFactory(client, "proj-1", "test")
+    judge = factory.create(name="rating", score_type="numeric")
+    result = factory.submit_result(
+        judge_id="judge-1", trace_id="trace-1", session_id="session-1", value=4.5
+    )
+    assert (judge, result, requests) == (
+        ExternalJudge("judge-1", "version-1", "rating", "numeric"),
+        "result-1",
+        [
+            (
+                "POST",
+                "/v1/projects/proj-1/judges",
+                {
+                    "judge": {
+                        "name": "rating",
+                        "executionMode": "submitted",
+                        "initialVersion": {"scoreType": "numeric"},
+                    }
+                },
+            ),
+            (
+                "POST",
+                "/v1/projects/proj-1/judge-results",
+                {
+                    "judge_id": "judge-1",
+                    "trace_id": "trace-1",
+                    "session_id": "session-1",
+                    "value": 4.5,
+                },
+            ),
+        ],
+    )

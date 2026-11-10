@@ -5,7 +5,7 @@ import orjson
 import os
 import yaml
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Optional, Iterable, Iterator
+from typing import Any, Dict, List, Literal, Mapping, Optional, Iterable, Iterator
 from itertools import islice
 from rich.progress import (
     Progress,
@@ -53,7 +53,7 @@ def example_to_dataset_entry(example: Example) -> Dict[str, Any]:
     return entry
 
 
-def example_from_dataset_entry(entry: Dict[str, Any]) -> Example:
+def example_from_dataset_entry(entry: Mapping[str, Any]) -> Example:
     """Build an `Example` from a server dataset example payload.
 
     The server returns examples as `{example_id, created_at, data,
@@ -110,7 +110,7 @@ class DatasetInfo:
     schema: Optional[Dict[str, Any]] = None
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> DatasetInfo:
+    def from_dict(cls, data: Mapping[str, Any]) -> DatasetInfo:
         return cls(
             dataset_id=data.get("dataset_id", ""),
             name=data.get("name", ""),
@@ -146,7 +146,7 @@ class DatasetVersion:
     user_id: Optional[str] = None
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> DatasetVersion:
+    def from_dict(cls, data: Mapping[str, Any]) -> DatasetVersion:
         return cls(
             version_id=data.get("version_id", ""),
             dataset_id=data.get("dataset_id", ""),

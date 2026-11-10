@@ -1,7 +1,18 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, cast
+import warnings
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    TypedDict,
+    cast,
+)
 
-from judgeval.internal.api import JudgmentSyncClient
+from judgeval.api import JudgmentApiClient
 from judgeval.exceptions import (
     JudgmentAPIError,
     JudgmentProjectNotFoundError,
@@ -19,20 +30,21 @@ if TYPE_CHECKING:
 
     from judgeval.data.example import Example
     from judgeval.trace.offline_tracer import OfflineTracer
-    from judgeval.jql import (
-        DiscoveryKind,
-        JqlPresentationResponse,
-        JqlQueryResponse,
-        QueryInput,
-    )
+
+
+class SqlResponse(TypedDict):
+    catalog_version: str
+    columns: List[Dict[str, Any]]
+    rows: List[Dict[str, Any]]
+    row_count: int
+    elapsed_ms: float
 
 
 class Judgeval:
     """The main entry point for interacting with the Judgment platform.
 
     `Judgeval` connects to your Judgment project and gives you access to
-    **evaluations**, **datasets**, and **prompt versioning** through
-    convenient properties.
+    **SQL queries**, **evaluations**, and **datasets**.
 
     Credentials are resolved in order: explicit arguments first, then
     environment variables `JUDGMENT_API_KEY`, `JUDGMENT_ORG_ID`, and
@@ -69,13 +81,12 @@ class Judgeval:
         )
         ```
 
-        Once initialized, use the `evaluation`, `datasets`, and `prompts`
+        Once initialized, use the `evaluation` and `datasets`
         properties:
 
         ```python
         eval_runner = client.evaluation.create()
         dataset = client.datasets.get(name="golden-set")
-        prompt = client.prompts.get(name="system-prompt", tag="production")
         ```
     """
 
@@ -113,7 +124,7 @@ class Judgeval:
         self._api_url = api_url
         self._project_name = project_name
 
-        self._internal_client = JudgmentSyncClient(
+        self._internal_client = JudgmentApiClient(
             self._api_url,
             self._api_key,
             self._organization_id,
@@ -141,7 +152,9 @@ class Judgeval:
         span_limits: Optional["SpanLimits"] = None,
         span_processors: Optional[Sequence["SpanProcessor"]] = None,
     ) -> "OfflineTracer":
-        """Create and activate an ``OfflineTracer`` for this project.
+        """**Deprecated.** Use the normal ``Tracer`` with ``Tracer.test_case``.
+
+        Create and activate an ``OfflineTracer`` for this project.
 
         Reuses the credentials supplied to this ``Judgeval`` instance. Each
         completed root span appends an ``Example`` to ``dataset``, carrying
@@ -189,65 +202,67 @@ class Judgeval:
             span_processors=span_processors,
             dataset=dataset,
             example_fields=example_fields,
+            _stacklevel=3,
         )
 
-    def query(
-        self,
-        query: "QueryInput",
-        *,
-        limit: Optional[int] = None,
-        trace_ids: Optional[Sequence[str]] = None,
-        session_ids: Optional[Sequence[str]] = None,
-    ) -> "JqlQueryResponse":
-        """Run JQL for this project, optionally narrowed by trace or session IDs."""
-        from judgeval.jql import to_json
+    def discover_schema(self) -> str:
+        """Return the SQL schema reference as Markdown.
 
-        return cast(
-            "JqlQueryResponse",
-            self._run_jql("query", to_json(query), limit, trace_ids, session_ids),
+        Mirrors MCP ``discover_schema``: published tables, column types and
+        descriptions, row semantics, examples, and query limits. Fetches the
+        server's generated catalog using this client's credentials. Contains
+        no project data and does not require a resolved project.
+
+        Returns:
+            The virtual schema reference as a Markdown string.
+
+        Examples:
+            ```python
+            print(client.discover_schema())
+            ```
+        """
+        response = self._internal_client._request(
+            "GET", url_for("/v1/sql/schema", self._api_url), {}
         )
+        return cast(str, response["schema"])
 
-    def present(
-        self,
-        query: "QueryInput",
-        *,
-        limit: Optional[int] = None,
-        trace_ids: Optional[Sequence[str]] = None,
-        session_ids: Optional[Sequence[str]] = None,
-    ) -> "JqlPresentationResponse":
-        """Run a chart or table JQL query, optionally narrowed by trace or session IDs."""
-        from judgeval.jql import to_json
+    def sql(self, sql_text: str) -> SqlResponse:
+        """Run one read-only SQL SELECT for this organization and project.
 
-        return cast(
-            "JqlPresentationResponse",
-            self._run_jql(
-                "query/presentation", to_json(query), limit, trace_ids, session_ids
-            ),
-        )
+        The server derives tenant scope from the client's credentials and
+        resolved project.
+        Call `discover_schema()` for supported tables and columns. Requires
+        viewer access.
 
-    def _run_jql(
-        self,
-        path: str,
-        query: Dict[str, Any],
-        limit: Optional[int],
-        trace_ids: Optional[Sequence[str]],
-        session_ids: Optional[Sequence[str]],
-    ) -> Any:
-        if trace_ids is not None and session_ids is not None:
-            raise ValueError("trace_ids and session_ids are mutually exclusive")
-        project_id = self._require_jql_project_id()
-        payload: Dict[str, Any] = {"query": query}
-        if limit is not None:
-            payload["limit"] = limit
-        if trace_ids is not None:
-            payload["trace_ids"] = list(trace_ids)
-        if session_ids is not None:
-            payload["session_ids"] = list(session_ids)
+        Results are capped by the server at 1,000 rows and 5 MiB; exceeding
+        either cap returns an error. Use SQL predicates and LIMIT to narrow
+        results.
+
+        Args:
+            sql_text: One SELECT against the virtual schema, at most 50,000
+                characters. Use SQL predicates to narrow the results.
+
+        Returns:
+            A dictionary with `catalog_version`, `columns` (name, type, nullable),
+            `rows` (dictionaries keyed by column name), `row_count`, and
+            `elapsed_ms`. Integers outside JavaScript's safe range arrive as
+            exact decimal strings.
+
+        Examples:
+            ```python
+            result = client.sql("SELECT count() AS run_count FROM telemetry.traces")
+            print(result["rows"])
+            ```
+        """
+        project_id = self._require_query_project_id()
         try:
-            return self._internal_client._request(
-                "POST",
-                url_for(f"/v1/projects/{project_id}/{path}", self._api_url),
-                payload,
+            return cast(
+                SqlResponse,
+                self._internal_client._request(
+                    "POST",
+                    url_for(f"/v1/projects/{project_id}/sql", self._api_url),
+                    {"sql": sql_text},
+                ),
             )
         except JudgmentAPIError as error:
             mapped = map_judgment_api_error(error)
@@ -255,36 +270,28 @@ class Judgeval:
                 raise
             raise mapped from error
 
-    def discover(
-        self,
-        kind: "DiscoveryKind",
-        *,
-        limit: Optional[int] = None,
-        trace_ids: Optional[Sequence[str]] = None,
-        session_ids: Optional[Sequence[str]] = None,
-        **options: Any,
-    ) -> "JqlQueryResponse":
-        """Discover project-scoped judges, fields, models, and related values."""
-        from judgeval.jql import discovery
-
-        return self.query(
-            discovery(kind, **options),
-            limit=limit,
-            trace_ids=trace_ids,
-            session_ids=session_ids,
-        )
-
-    def _require_jql_project_id(self) -> str:
+    def _require_query_project_id(self) -> str:
         if not self._project_id:
             raise JudgmentProjectNotFoundError(
                 f"Project '{self._project_name}' was not found for this organization; "
-                "JQL queries require a resolved project."
+                "Public queries require a resolved project."
             )
         return self._project_id
 
     @property
+    def api(self) -> JudgmentApiClient:
+        """The /v1 API, one method per Judgment MCP tool.
+
+        Examples:
+            ```python
+            projects = client.api.list_projects()
+            ```
+        """
+        return self._internal_client
+
+    @property
     def evaluation(self):
-        """Access evaluations for scoring examples with hosted or custom judges.
+        """Access evaluations for scoring examples with hosted scorers or Code judges.
 
         Returns:
             EvaluationFactory: Use `.create()` to get an `Evaluation` you
@@ -309,8 +316,42 @@ class Judgeval:
         )
 
     @property
+    def test_suites(self):
+        """Create test suites and edit their versioned cases.
+
+        Returns:
+            TestSuitesFactory: create and list test suites, add or edit cases
+                in a suite's draft, and publish versions.
+        """
+        from judgeval.testing import TestSuitesFactory
+
+        return TestSuitesFactory(
+            client=self._internal_client,
+            project_id=self._project_id,
+            project_name=self._project_name,
+        )
+
+    @property
+    def test_runs(self):
+        """Run test suites and read their results.
+
+        Returns:
+            TestRunsFactory: start a run, then read it, its results,
+                or score it again.
+        """
+        from judgeval.testing import TestRunsFactory
+
+        return TestRunsFactory(
+            client=self._internal_client,
+            project_id=self._project_id,
+            project_name=self._project_name,
+        )
+
+    @property
     def offline_tests(self):
-        """Access offline tests: test configs and dataset-backed test runs.
+        """**Deprecated.** Use `test_suites` and `test_runs` instead.
+
+        Access offline tests: test configs and dataset-backed test runs.
 
         Returns:
             OfflineTestsFactory: Use `.create_config()` to bind a dataset
@@ -336,7 +377,12 @@ class Judgeval:
             )
             ```
         """
-        from judgeval.offline_tests.offline_tests_factory import OfflineTestsFactory
+        from judgeval.offline_tests import (
+            OFFLINE_TESTS_DEPRECATION,
+            OfflineTestsFactory,
+        )
+
+        warnings.warn(OFFLINE_TESTS_DEPRECATION, DeprecationWarning, stacklevel=2)
 
         return OfflineTestsFactory(
             client=self._internal_client,
@@ -404,31 +450,39 @@ class Judgeval:
         )
 
     @property
-    def external_judges(self):
-        """Create external judges and submit their results on the platform.
+    def agent_judges(self):
+        """Manage Agent judges (prompt-based scorers) on the platform.
 
         Returns:
-            ExternalJudgeFactory: Use `.create()` to register an external
-                judge, then `.submit_result()` to attach scores your own
-                evaluation code produced to a trace or session.
+            AgentJudgeFactory: Use `.create()` or `.update()` to create
+                and update prompt-based Agent judges.
 
         Examples:
             ```python
-            judge = client.external_judges.create(
-                name="human-thumbs-up",
+            judge = client.agent_judges.create(
+                name="helpfulness",
+                prompt="Did the assistant answer the user's question?",
                 score_type="binary",
             )
 
-            client.external_judges.submit_result(
+            client.agent_judges.update(
                 judge_id=judge.judge_id,
-                trace_id="<trace_id>",
-                value=True,
+                prompt="Updated rubric prompt.",
             )
             ```
         """
-        from judgeval.external_judges.external_judge_factory import (
-            ExternalJudgeFactory,
+        from judgeval.agent_judges.agent_judge_factory import AgentJudgeFactory
+
+        return AgentJudgeFactory(
+            client=self._internal_client,
+            project_id=self._project_id,
+            project_name=self._project_name,
         )
+
+    @property
+    def external_judges(self):
+        """Creates external judges and submits feedback from your application."""
+        from judgeval.external_judges.external_judge_factory import ExternalJudgeFactory
 
         return ExternalJudgeFactory(
             client=self._internal_client,

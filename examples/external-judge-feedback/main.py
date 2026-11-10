@@ -11,6 +11,8 @@ judge = client.external_judges.create(
     score_type="binary",
     judge_description="Whether a human reviewer approved the response.",
 )
+if judge is None:
+    raise RuntimeError("Project could not be resolved")
 print(f"Created external judge: {judge.judge_id}")
 
 # Replace with the id of a trace you've already ingested (e.g. from a
@@ -36,8 +38,22 @@ topic_judge = client.external_judges.create(
     ],
 )
 
+if topic_judge is None:
+    raise RuntimeError("Project could not be resolved")
 client.external_judges.submit_result(
     judge_name=topic_judge.name,
     trace_id=trace_id,
     value="billing",
+)
+
+
+rating = client.external_judges.create(name="review-rating", score_type="numeric")
+if rating is None:
+    raise RuntimeError("Project could not be resolved")
+# Use the stored session ID of this trace to attach session-level feedback.
+client.external_judges.submit_result(
+    judge_id=rating.judge_id,
+    trace_id=trace_id,
+    session_id="<session_id>",
+    value=4.5,
 )

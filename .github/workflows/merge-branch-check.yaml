@@ -7,10 +7,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check branch name
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
+          SOURCE_BRANCH: ${{ github.head_ref }}
         run: |
-          BASE_BRANCH="${{ github.base_ref }}"
-          SOURCE_BRANCH="${{ github.head_ref }}"
-
           echo "BASE_BRANCH: $BASE_BRANCH"
           echo "SOURCE_BRANCH: $SOURCE_BRANCH"
           
