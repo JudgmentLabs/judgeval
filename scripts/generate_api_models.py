@@ -72,12 +72,35 @@ def model_name(content: dict[str, Any], models: set[str]) -> str:
     return name
 
 
-def render_method(path: str, method: str, op: dict[str, Any], models: set[str]) -> str:
+def example_call(
+    tool: str,
+    path_params: list[str],
+    body_schema: dict[str, Any] | None,
+    query: list[dict[str, Any]],
+) -> str:
+    """The docstring example: a call with each required value left as `...`."""
+    args = [snake_case(name) for name in path_params]
+    if body_schema is not None:
+        keys = body_schema.get("required", [])
+        args.append("{" + ", ".join(f'"{key}": ...' for key in keys) + "}")
+    args += [f"{p['name']}=..." for p in query if p.get("required")]
+    return f"client.api.{tool}({', '.join(args)})"
+
+
+def render_method(
+    path: str,
+    method: str,
+    op: dict[str, Any],
+    models: set[str],
+    schemas: dict[str, Any],
+) -> str:
     params = op.get("parameters", [])
     path_params = [p["name"] for p in params if p["in"] == "path"]
     query = [p for p in params if p["in"] == "query"]
     body = op.get("requestBody", {}).get("content", {}).get("application/json")
     response = op["responses"]["200"]["content"]["application/json"]
+    tool = op["x-mcp"]["tool"]
+    body_schema = schemas[body["schema"]["$ref"].rsplit("/", 1)[-1]] if body else None
 
     args = ["self", *(f"{snake_case(name)}: str" for name in path_params)]
     if body:
@@ -96,8 +119,14 @@ def render_method(path: str, method: str, op: dict[str, Any], models: set[str]) 
     )
     params_arg = "{" + ", ".join(f'"{p["name"]}": {p["name"]}' for p in query) + "}"
     return f'''
-    def {op["x-mcp"]["tool"]}({", ".join(args)}) -> {model_name(response, models)}:
-        """{op["summary"]} (`{method.upper()} {path}`)."""
+    def {tool}({", ".join(args)}) -> {model_name(response, models)}:
+        """{op["summary"]} (`{method.upper()} {path}`).
+
+        Examples:
+            ```python
+            {example_call(tool, path_params, body_schema, query)}
+            ```
+        """
         return self._request(
             "{method.upper()}",
             url_for({"f" if "{" in url else ""}"{url}", self.base_url),
@@ -109,15 +138,15 @@ def render_method(path: str, method: str, op: dict[str, Any], models: set[str]) 
 
 def render_client(spec: dict[str, Any]) -> str:
     models: set[str] = set()
+    schemas = spec["components"]["schemas"]
     methods = "".join(
-        render_method(path, method, op, models)
+        render_method(path, method, op, models, schemas)
         for path, operations in spec["paths"].items()
         for method, op in operations.items()
         if "x-mcp" in op
     )
     return f'''{HEADER}
 # mypy: disable-error-code="no-any-return"
-"""Client for the public /v1 API: one method per Judgment MCP tool."""
 
 from __future__ import annotations
 
@@ -133,6 +162,34 @@ def _drop_none(params: dict[str, Any]) -> dict[str, Any]:
 
 
 class JudgmentApiClient(JudgmentSyncClient):
+    """Client for the public /v1 API: one method per Judgment MCP tool.
+
+    Reach it as `client.api` on a `Judgeval` client, which supplies the
+    credentials. Methods on project resources take the project's ID, which
+    `list_projects()` returns. Request bodies are dicts and responses are dicts.
+
+    Examples:
+        ```python
+        from judgeval import Judgeval
+
+        client = Judgeval(project_name="search-assistant")
+
+        projects = client.api.list_projects()["projects"]
+        project_id = next(
+            p["project_id"]
+            for p in projects
+            if p["project_name"] == "search-assistant"
+        )
+
+        judges = client.api.list_judges(project_id)
+        result = client.api.sql_query(
+            project_id,
+            {{"sql": "SELECT trace_id, status FROM telemetry.traces LIMIT 5"}},
+        )
+        print(result["rows"])
+        ```
+    """
+
     __slots__ = ()
 {methods}
 
