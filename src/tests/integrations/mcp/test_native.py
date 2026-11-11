@@ -1,5 +1,7 @@
 import json
 import threading
+import gc
+import weakref
 
 import httpx
 import pytest
@@ -20,6 +22,25 @@ COMPLETED_CALL = {
     "server_name": "custom",
     "tool_name": "lookup",
 }
+
+
+def test_exporter_flushes_and_closes_when_its_owner_is_collected(native_requests):
+    class Owner:
+        pass
+
+    owner = Owner()
+    reference = weakref.ref(owner)
+    exporter = McpCallExporter("http://localhost", "key", "org", "project")
+    exporter.enqueue({**COMPLETED_CALL, "call_id": "collected-owner"})
+    provider = JudgmentTracerProvider.get_instance()
+    provider.add_background_exporter(exporter, owner)
+    del owner
+    gc.collect()
+    assert (reference(), exporter.closed, native_requests) == (
+        None,
+        True,
+        [{"calls": [{**COMPLETED_CALL, "call_id": "collected-owner"}]}],
+    )
 
 
 def test_background_delivery_recovers_after_flush_contention(

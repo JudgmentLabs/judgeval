@@ -328,7 +328,9 @@ class McpObserver:
         self.options = options
         self._server_name = options.server_name or server_name
         self._server_version = server_version
-        self._contracts: Dict[str, Optional[ToolContract]] = {}
+        self._request_contracts: contextvars.ContextVar[
+            Optional[Dict[str, Optional[ToolContract]]]
+        ] = contextvars.ContextVar("mcp_tool_contracts", default=None)
         self._tool_manager = tool_manager
         # Requests can run where the tracer set by `Tracer.init()` isn't
         # active, such as a server running in another thread.
@@ -337,6 +339,14 @@ class McpObserver:
     @property
     def inject(self) -> bool:
         return self.options.inject_agent_arguments
+
+    @property
+    def _contracts(self) -> Dict[str, Optional[ToolContract]]:
+        contracts = self._request_contracts.get()
+        if contracts is None:
+            contracts = {}
+            self._request_contracts.set(contracts)
+        return contracts
 
     def remember_listing(self, tools: Optional[ListedTools]) -> None:
         """Keeps what each listed tool declares, before injection changes it."""
@@ -362,7 +372,7 @@ class McpObserver:
     async def contract_for(
         self, name: str, list_tools: Optional[ListTools]
     ) -> Optional[ToolContract]:
-        """The tool's contract, listing the server's tools once if it's unknown.
+        """The current caller's contract, listing tools within this request.
 
         A call can reach a server that never listed its tools, such as another
         replica of a stateless server.
@@ -399,9 +409,11 @@ class McpObserver:
     ) -> Any:
         """Runs one request inside a span. Tracing failures never reach the call."""
         token = attempt(self._activate_tracer)
+        contracts_token = self._request_contracts.set({})
         try:
             return await self._observe(facts, invoke, adapter, list_tools)
         finally:
+            self._request_contracts.reset(contracts_token)
             if token is not None:
                 attempt(lambda: _active_tracer_var().reset(token))
 
@@ -941,7 +953,9 @@ def _active_exporter() -> Optional[McpCallExporter]:
                 tracer.project_id,
             )
             _exporters[tracer] = exporter
-            JudgmentTracerProvider.get_instance().add_background_exporter(exporter)
+            JudgmentTracerProvider.get_instance().add_background_exporter(
+                exporter, tracer
+            )
         return None if exporter.closed else exporter
 
 

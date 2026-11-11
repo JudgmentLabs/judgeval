@@ -47,6 +47,8 @@ class ModelResults:
     def with_text(self, result: Any, text: str, tool_name: Any) -> Any:
         root = _root(result)
         content = getattr(root, "content", None)
+        if content is None:
+            content = []
         if not isinstance(content, list):
             return result
         from mcp import types

@@ -1,6 +1,7 @@
 """Shared classification and transport facts; adapter smoke tests cover wiring."""
 
 import asyncio
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -15,7 +16,88 @@ from judgeval.integrations.mcp._observer import (
     RequestFacts,
 )
 from judgeval.integrations.mcp._v1 import ModelResults
+from judgeval.integrations.mcp._v2 import WireResults
 from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
+
+
+@pytest.mark.parametrize("style", ["model-v1", "wire-v2", "model-v2"])
+def test_structured_only_handoff_preserves_output_without_content(style):
+    from mcp.types import CallToolResult
+    from pydantic import create_model
+    from judgeval.integrations.mcp._arguments import conversation_id_prompt
+
+    payload = {"ok": True}
+    if style == "model-v1":
+        adapter = ModelResults()
+        original = CallToolResult.model_construct(structuredContent=payload)
+    elif style == "wire-v2":
+        adapter = WireResults()
+        original = {"structuredContent": payload}
+    else:
+        adapter = WireResults()
+        model = create_model("StructuredResult", structured_content=(dict, ...))
+        original = model(structured_content=payload)
+    adapter._structured_tools.add("lookup")
+    prompt = conversation_id_prompt("id")
+    result = adapter.with_text(original, prompt, "lookup")
+    if style == "wire-v2":
+        structured, content = result["structuredContent"], result["content"]
+    else:
+        structured = getattr(
+            result, "structuredContent" if style == "model-v1" else "structured_content"
+        )
+        content = [item.model_dump(exclude_none=True) for item in result.content]
+    assert (structured, content, payload) == (
+        {"ok": True, "_judgment": json.loads(prompt)},
+        [{"type": "text", "text": prompt}],
+        {"ok": True},
+    )
+
+
+@pytest.mark.asyncio
+async def test_call_contracts_follow_current_caller_and_fail_open(tracer):
+    from mcp.types import CallToolResult
+
+    observer = McpObserver(McpOptions(), "test", None)
+    forwarded = []
+    facts = RequestFacts(
+        "tools/call",
+        {"name": "lookup", "arguments": {"context": "business"}},
+        None,
+        None,
+        {},
+        {},
+        None,
+        None,
+        None,
+    )
+
+    async def invoke(arguments):
+        forwarded.append(arguments)
+        return CallToolResult(content=[])
+
+    async def first_caller(_):
+        return [("lookup", {"type": "object", "additionalProperties": False})], None
+
+    async def second_caller(_):
+        return [
+            (
+                "lookup",
+                {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {"context": {"type": "string"}},
+                },
+            )
+        ], None
+
+    async def unavailable(_):
+        raise RuntimeError("listing unavailable")
+
+    await observer.observe(facts, invoke, ModelResults(), first_caller)
+    await observer.observe(facts, invoke, ModelResults(), second_caller)
+    await observer.observe(facts, invoke, ModelResults(), unavailable)
+    assert forwarded == [{}, {"context": "business"}, None]
 
 
 @pytest.mark.asyncio

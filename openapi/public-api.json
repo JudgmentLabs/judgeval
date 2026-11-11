@@ -5336,6 +5336,13 @@
       }
     },
     "securitySchemes": {
+      "ingestKeyAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "An ingest API key from Settings > Ingest API Keys, sent as `Bearer <key>`. It belongs to one organization, so no X-Organization-Id is needed.",
+        "x-label": "Ingest API key",
+        "x-placeholder": "YOUR_INGEST_API_KEY"
+      },
       "apiKeyAuth": {
         "type": "http",
         "scheme": "bearer",

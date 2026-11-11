@@ -59,7 +59,12 @@ class WireResults:
         return text if isinstance(text, str) else None
 
     def with_text(self, result: Any, text: str, tool_name: Any) -> Any:
-        if isinstance(result, Mapping) and isinstance(result.get("content"), list):
+        if isinstance(result, Mapping):
+            content = result.get("content")
+            if content is None:
+                content = []
+            if not isinstance(content, list):
+                return result
             updates = {}
             if tool_name in self._structured_tools:
                 structured = structured_with_prompt(
@@ -70,9 +75,11 @@ class WireResults:
             return {
                 **result,
                 **updates,
-                "content": [*result["content"], {"type": "text", "text": text}],
+                "content": [*content, {"type": "text", "text": text}],
             }
         content = getattr(result, "content", None)
+        if content is None:
+            content = []
         if isinstance(content, list) and hasattr(result, "model_copy"):
             item = _text_item(text)
             updates = {"content": [*content, item]}
