@@ -100,7 +100,9 @@ async def test_mcp1_fastmcp_over_http(style, transport, tracer, collecting_expor
     orders = build_server(style)
     if transport == "stateless":
         orders.server.settings.stateless_http = True
-    instrument_mcp_server(orders.server, identify=_identify_from_headers)
+    instrument_mcp_server(
+        orders.server, record_spans=True, identify=_identify_from_headers
+    )
     app = (
         orders.server.sse_app()
         if transport == "sse"
@@ -128,7 +130,7 @@ async def test_mcp1_fastmcp_over_http(style, transport, tracer, collecting_expor
     else:
         assert first["mcp.session.id"]
         assert first["mcp.session.id"] == second["mcp.session.id"]
-        assert "judgment.mcp.conversation_id" not in first
+        assert first["judgment.mcp.conversation_id"] != first["mcp.session.id"]
     assert _conversation_key(first) == _conversation_key(second)
 
 
@@ -145,7 +147,9 @@ async def test_mcp2_mcpserver_over_streamable_http(
     from mcp.client.client import Client
 
     orders = build_server(style)
-    instrument_mcp_server(orders.server, identify=_identify_from_headers)
+    instrument_mcp_server(
+        orders.server, record_spans=True, identify=_identify_from_headers
+    )
     app = orders.server.streamable_http_app(
         stateless_http=transport.startswith("stateless")
     )
@@ -167,7 +171,7 @@ async def test_mcp2_mcpserver_over_streamable_http(
     if transport == "stateful-legacy":
         assert first["mcp.session.id"]
         assert first["mcp.session.id"] == second["mcp.session.id"]
-        assert "judgment.mcp.conversation_id" not in first
+        assert first["judgment.mcp.conversation_id"] != first["mcp.session.id"]
         assert first["judgment.mcp.client.name"] == CLIENT_NAME
     else:
         # The 2026-07-28 protocol and stateless servers have no session.
@@ -189,7 +193,7 @@ async def test_mcp2_mcpserver_over_sse(style, tracer, collecting_exporter):
     from mcp.client.sse import sse_client
 
     orders = build_server(style)
-    instrument_mcp_server(orders.server)
+    instrument_mcp_server(orders.server, record_spans=True)
 
     with serve(orders.server.sse_app()) as url:
         with anyio.fail_after(30):
@@ -206,7 +210,7 @@ async def test_mcp2_mcpserver_over_sse(style, tracer, collecting_exporter):
     assert first["mcp.session.id"]
     assert first["mcp.session.id"] == second["mcp.session.id"]
     assert first["judgment.mcp.client.name"] == CLIENT_NAME
-    assert "judgment.mcp.conversation_id" not in first
+    assert first["judgment.mcp.conversation_id"] != first["mcp.session.id"]
 
 
 @pytest.mark.asyncio
@@ -215,7 +219,7 @@ async def test_fastmcp_over_http(style, tracer, collecting_exporter):
     from fastmcp import Client as FastMCPClient
 
     orders = build_server(style)
-    instrument_mcp_server(orders.server)
+    instrument_mcp_server(orders.server, record_spans=True)
 
     with serve(orders.server.http_app()) as url:
         with anyio.fail_after(30):

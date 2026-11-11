@@ -7,23 +7,26 @@
     server = FastMCP("orders")
     instrument_mcp_server(server)
 
-Each request becomes an OpenTelemetry SERVER span that follows the MCP
-semantic conventions and adds ``judgment.mcp.*`` attributes: client, server,
-argument names, and the intent, model and conversation the agent reports.
-A call joins the agent's trace when ``params._meta`` carries one.
+Completed tool calls go directly to the native MCP endpoint, independently
+of OTel sampling. ``record_spans=True`` additionally creates request spans;
+do not map those spans back into MCP calls, which would duplicate events.
 
 Supported servers: ``FastMCP`` and the low-level ``Server`` from `mcp` 1.x,
 ``MCPServer`` and the low-level ``Server`` from `mcp` 2.x, and the standalone
-``fastmcp`` package. Argument values and results are never recorded, and a
-failure in tracing never affects a call.
+``fastmcp`` package. Input/output capture is opt-in. Telemetry failures never
+affect tool execution. Call ``Tracer.force_flush()`` before serverless return
+or ``Tracer.shutdown()`` when stopping. Bounded best-effort queues retry
+transient errors three times with stable IDs/data. Hung or terminated calls
+may never emit a completed event.
 """
 
 from __future__ import annotations
 
 import weakref
-from typing import Any, Optional
+from typing import Any, Optional, Callable
 
 from judgeval.logger import judgeval_logger
+from ._exporter import McpCall, RedactPayload, OMITTED
 
 from ._observer import (
     Identify,
@@ -34,6 +37,7 @@ from ._observer import (
     Redact,
     mark_mcp_call_error,
     set_mcp_caller,
+    capture_mcp_call,
 )
 
 _instrumented: "weakref.WeakSet[Any]" = weakref.WeakSet()
@@ -48,15 +52,22 @@ def instrument_mcp_server(
     identify: Optional[Identify] = None,
     capture_error_messages: bool = True,
     redact: Optional[Redact] = None,
+    capture_input: bool = False,
+    capture_output: bool = False,
+    redact_payload: Optional[RedactPayload] = None,
+    record_spans: bool = False,
+    session_id: Optional[Callable[[McpRequestInfo], Optional[str]]] = None,
 ) -> bool:
-    """Traces every request an MCP server handles, through the active tracer.
+    """Exports completed native MCP calls using the active tracer's settings.
 
     Call it once per server, after ``Tracer.init()`` and before the server
     starts. It changes your server in one way by default: each tool's published
     schema gets optional ``context``, ``llm_model`` and ``conversation_id``
     arguments, which are removed before your tool runs. When a call has no
-    session, its result also gets a short text item with a conversation ID for
-    the agent to send back.
+    logical session, its result gets an ID in supplemental text and compatible
+    existing ``structuredContent._judgment``. Compatible output schemas gain
+    the matching optional property. Text-only/unsupported/colliding outputs
+    retain text handoff. Transport sessions never define logical sessions.
 
     Args:
         server: A ``FastMCP``, ``MCPServer`` or low-level ``Server`` from `mcp`,
@@ -74,6 +85,14 @@ def instrument_mcp_server(
             before they leave the process. Failure messages and intent arrive
             with emails, SSNs, card and phone numbers, and IP addresses
             already replaced.
+        capture_input: Capture business arguments; defaults to False.
+        capture_output: Capture the original MCP result; defaults to False.
+        redact_payload: Transform a detached JSON input/output snapshot.
+            Raise or return OMITTED to omit it; None captures JSON null.
+            Non-JSON/oversized payloads (128 KiB) are omitted.
+        record_spans: Also create OTel request spans; defaults to False.
+        session_id: Returns an authoritative application session ID without
+            relying on agent echo. Receives McpRequestInfo.
 
     Returns:
         True if the server is traced. On an unsupported server it logs a
@@ -89,6 +108,11 @@ def instrument_mcp_server(
                 identify=identify,
                 capture_error_messages=capture_error_messages,
                 redact=redact,
+                capture_input=capture_input,
+                capture_output=capture_output,
+                redact_payload=redact_payload,
+                record_spans=record_spans,
+                session_id=session_id,
             ),
         )
     except Exception as error:
@@ -136,6 +160,9 @@ def _text(value: Any) -> Optional[str]:
 
 
 __all__ = [
+    "OMITTED",
+    "McpCall",
+    "capture_mcp_call",
     "McpCaller",
     "McpRequestInfo",
     "instrument_mcp_server",

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, Optional, Tuple
 
+from ._arguments import conversation_output_schema, structured_with_prompt
 from ._observer import (
     ListedTools,
     McpObserver,
@@ -27,8 +28,14 @@ _WRAPPED_MARKER = "__judgeval_mcp_wrapped__"
 class ModelResults:
     """Results as 1.x handlers return them: ``ServerResult`` wrapping a model."""
 
+    def __init__(self) -> None:
+        self._structured_tools: set[str] = set()
+
     def is_error(self, result: Any) -> bool:
         return getattr(_root(result), "isError", None) is True
+
+    def payload(self, result: Any) -> Any:
+        return _root(result).model_dump(mode="json", by_alias=True, exclude_none=True)
 
     def first_text(self, result: Any) -> Optional[str]:
         content = getattr(_root(result), "content", None)
@@ -37,16 +44,23 @@ class ModelResults:
         text = getattr(content[0], "text", None)
         return text if isinstance(text, str) else None
 
-    def with_text(self, result: Any, text: str) -> Any:
+    def with_text(self, result: Any, text: str, tool_name: Any) -> Any:
         root = _root(result)
         content = getattr(root, "content", None)
         if not isinstance(content, list):
             return result
         from mcp import types
 
-        updated = root.model_copy(
-            update={"content": [*content, types.TextContent(type="text", text=text)]}
-        )
+        updates: Dict[str, Any] = {
+            "content": [*content, types.TextContent(type="text", text=text)]
+        }
+        if tool_name in self._structured_tools:
+            structured = structured_with_prompt(
+                getattr(root, "structuredContent", None), text
+            )
+            if structured is not None:
+                updates["structuredContent"] = structured
+        updated = root.model_copy(update=updates)
         return _rewrap(result, updated)
 
     def listed_tools(self, result: Any) -> Optional[ListedTools]:
@@ -69,12 +83,16 @@ class ModelResults:
         updated = []
         for tool in tools:
             schema = schema_for(tool.name, getattr(tool, "inputSchema", None))
+            updates = {"inputSchema": schema}
+            output = getattr(tool, "outputSchema", None)
+            extended = conversation_output_schema(output)
+            self._structured_tools.discard(tool.name)
+            if schema is not None and (output is None or extended is not None):
+                self._structured_tools.add(tool.name)
+            if extended is not None:
+                updates["outputSchema"] = extended
             # A copy, so a tool object the server reuses keeps its own schema.
-            updated.append(
-                tool
-                if schema is None
-                else tool.model_copy(update={"inputSchema": schema})
-            )
+            updated.append(tool if schema is None else tool.model_copy(update=updates))
         return _rewrap(result, root.model_copy(update={"tools": updated}))
 
 
@@ -114,7 +132,11 @@ def instrument(observer: McpObserver, lowlevel: Any) -> bool:
         return False
     try:
         from mcp import types
-        from mcp.server.lowlevel.server import request_ctx
+        from mcp.server.lowlevel import server as server_module
+
+        request_ctx = getattr(server_module, "request_ctx", None)
+        if request_ctx is None:
+            return False
     except Exception:
         return False
     results = ModelResults()
@@ -130,6 +152,7 @@ def instrument(observer: McpObserver, lowlevel: Any) -> bool:
         if cursor is not None:
             request["params"] = {"cursor": cursor}
         result = await original(types.ListToolsRequest.model_validate(request))
+        observer.shape_listing(result, results)
         next_cursor = getattr(_root(result), "nextCursor", None)
         return results.listed_tools(result) or [], (
             next_cursor if isinstance(next_cursor, str) else None

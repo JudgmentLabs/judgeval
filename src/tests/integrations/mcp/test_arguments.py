@@ -10,17 +10,40 @@ from judgeval.integrations.mcp._arguments import (
     AGENT_ARGUMENT_DESCRIPTIONS,
     AGENT_ARGUMENTS,
     conversation_id_prompt,
+    conversation_output_schema,
     mint_conversation_id,
     read_reported_arguments,
     sanitize_intent,
     schema_with_agent_arguments,
     tool_contract,
+    structured_with_prompt,
     without_agent_arguments,
 )
 
 UUID_V7 = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
 )
+
+
+@pytest.mark.parametrize(
+    "constraints",
+    [
+        {"properties": {"_judgment": {"type": "string"}}},
+        {"oneOf": []},
+        {"maxProperties": 1},
+        {"const": {"ok": True}},
+        {"enum": [{"ok": True}]},
+    ],
+)
+def test_incompatible_output_schema_is_preserved(constraints):
+    assert conversation_output_schema({"type": "object", **constraints}) is None
+
+
+@pytest.mark.parametrize("structured", [None, {"_judgment": "developer-owned"}])
+def test_structured_handoff_preserves_text_only_results_and_collisions(structured):
+    assert (
+        structured_with_prompt(structured, conversation_id_prompt("id")) == structured
+    )
 
 
 class TestMintConversationId:

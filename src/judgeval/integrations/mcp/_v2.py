@@ -12,6 +12,7 @@ from __future__ import annotations
 import dataclasses
 from typing import Any, Awaitable, Callable, Dict, List, Mapping, Optional, Tuple
 
+from ._arguments import conversation_output_schema, structured_with_prompt
 from ._observer import (
     ListedTools,
     McpObserver,
@@ -25,6 +26,16 @@ from ._observer import (
 
 class WireResults:
     """Results in the shape the 2.x runner sends: dicts with wire names."""
+
+    def __init__(self) -> None:
+        self._structured_tools: set[str] = set()
+
+    def payload(self, result: Any) -> Any:
+        return (
+            dict(result)
+            if isinstance(result, Mapping)
+            else result.model_dump(mode="json", by_alias=True, exclude_none=True)
+        )
 
     def is_error(self, result: Any) -> bool:
         if isinstance(result, Mapping):
@@ -47,16 +58,31 @@ class WireResults:
         )
         return text if isinstance(text, str) else None
 
-    def with_text(self, result: Any, text: str) -> Any:
+    def with_text(self, result: Any, text: str, tool_name: Any) -> Any:
         if isinstance(result, Mapping) and isinstance(result.get("content"), list):
+            updates = {}
+            if tool_name in self._structured_tools:
+                structured = structured_with_prompt(
+                    result.get("structuredContent"), text
+                )
+                if structured is not None:
+                    updates["structuredContent"] = structured
             return {
                 **result,
+                **updates,
                 "content": [*result["content"], {"type": "text", "text": text}],
             }
         content = getattr(result, "content", None)
         if isinstance(content, list) and hasattr(result, "model_copy"):
             item = _text_item(text)
-            return result.model_copy(update={"content": [*content, item]})
+            updates = {"content": [*content, item]}
+            if tool_name in self._structured_tools:
+                structured = structured_with_prompt(
+                    getattr(result, "structured_content", None), text
+                )
+                if structured is not None:
+                    updates["structured_content"] = structured
+            return result.model_copy(update=updates)
         return result
 
     def listed_tools(self, result: Any) -> Optional[ListedTools]:
@@ -94,8 +120,13 @@ class WireResults:
                 )
                 tools.append(
                     tool
-                    if schema is None or not isinstance(tool, Mapping)
-                    else {**tool, "inputSchema": schema}
+                    if schema is None
+                    or not isinstance(tool, Mapping)
+                    or not isinstance(name, str)
+                    else {
+                        **tool,
+                        **self._schema_updates(name, schema, tool.get("outputSchema")),
+                    }
                 )
             return {**result, "tools": tools}
         tools_attribute = getattr(result, "tools", None)
@@ -106,10 +137,27 @@ class WireResults:
                 updated.append(
                     tool
                     if schema is None
-                    else tool.model_copy(update={"input_schema": schema})
+                    else tool.model_copy(
+                        update={
+                            key.replace("Schema", "_schema"): value
+                            for key, value in self._schema_updates(
+                                tool.name, schema, getattr(tool, "output_schema", None)
+                            ).items()
+                        }
+                    )
                 )
             return result.model_copy(update={"tools": updated})
         return result
+
+    def _schema_updates(self, name: str, schema: Any, output: Any) -> Dict[str, Any]:
+        extended = conversation_output_schema(output)
+        self._structured_tools.discard(name)
+        if output is None or extended is not None:
+            self._structured_tools.add(name)
+        return {
+            "inputSchema": schema,
+            **({"outputSchema": extended} if extended is not None else {}),
+        }
 
 
 def _text_item(text: str) -> Any:
@@ -178,6 +226,7 @@ class JudgmentMcpMiddleware:
             dataclasses.replace(ctx, method="tools/list", params=params)
         )
         tools = self._results.listed_tools(result) or []
+        self._observer.shape_listing(result, self._results)
         next_cursor = (
             result.get("nextCursor")
             if isinstance(result, Mapping)

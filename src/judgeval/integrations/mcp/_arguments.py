@@ -19,6 +19,7 @@ from ._scrub import scrub_identifiers
 INTENT_ARGUMENT = "context"
 MODEL_ARGUMENT = "llm_model"
 CONVERSATION_ARGUMENT = "conversation_id"
+RESPONSE_CONTEXT = "_judgment"
 _MAX_INTENT_LENGTH = 500
 _UUID_V7 = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
@@ -37,7 +38,8 @@ AGENT_ARGUMENT_DESCRIPTIONS: Mapping[str, str] = {
     ),
     CONVERSATION_ARGUMENT: (
         "Optional, for analytics only. Pass the conversation_id from the server's "
-        "earlier response, unchanged, on later calls in this conversation. Omit it "
+        "earlier response text or structuredContent._judgment, unchanged, on later "
+        "calls in this conversation. Omit it "
         "on the first call, and do not invent one."
     ),
 }
@@ -193,11 +195,7 @@ def schema_with_agent_arguments(
 
 
 def conversation_id_prompt(conversation_id: str) -> str:
-    """The text appended to a tool result so the agent sends the ID next time.
-
-    It goes in ``content`` only: changing ``structuredContent`` could break a
-    client validating against an output schema it listed earlier.
-    """
+    """The handoff shared by text and structured-output clients."""
     return json.dumps(
         {
             CONVERSATION_ARGUMENT: conversation_id,
@@ -205,3 +203,45 @@ def conversation_id_prompt(conversation_id: str) -> str:
         },
         separators=(",", ":"),
     )
+
+
+def conversation_output_schema(schema: Any) -> Optional[Dict[str, Any]]:
+    """Extends simple object outputs without claiming a developer's field."""
+    if not isinstance(schema, Mapping) or schema.get("type") != "object":
+        return None
+    if any(
+        key in schema
+        for key in (
+            *_UNSUPPORTED_KEYWORDS,
+            "patternProperties",
+            "maxProperties",
+            "const",
+            "enum",
+        )
+    ):
+        return None
+    properties = schema.get("properties", {})
+    if RESPONSE_CONTEXT in properties or RESPONSE_CONTEXT in schema.get("required", []):
+        return None
+    return {
+        **schema,
+        "properties": {
+            **properties,
+            RESPONSE_CONTEXT: {
+                "type": "object",
+                "properties": {
+                    "conversation_id": {"type": "string"},
+                    "note": {"type": "string"},
+                },
+                "required": ["conversation_id", "note"],
+                "additionalProperties": False,
+            },
+        },
+    }
+
+
+def structured_with_prompt(structured: Any, text: str) -> Any:
+    """Preserves business fields and never creates structured output from text."""
+    if not isinstance(structured, Mapping) or RESPONSE_CONTEXT in structured:
+        return structured
+    return {**structured, RESPONSE_CONTEXT: json.loads(text)}

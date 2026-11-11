@@ -22,7 +22,11 @@ from judgeval.integrations.mcp._observer import (
 
 
 def _observer(**options: Any) -> McpObserver:
-    return McpObserver(McpOptions(**options), server_name="orders", server_version="1")
+    return McpObserver(
+        McpOptions(record_spans=True, **options),
+        server_name="orders",
+        server_version="1",
+    )
 
 
 class OrderNotFound(Exception):

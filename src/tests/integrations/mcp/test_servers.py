@@ -54,7 +54,7 @@ async def test_listing_adds_optional_agent_arguments(style, tracer):
     if style in LOW_LEVEL:
         async with connect(build_server(style)) as client:
             original = await client.all_tools()
-    assert instrument_mcp_server(orders.server) is True
+    assert instrument_mcp_server(orders.server, record_spans=True) is True
 
     async with connect(orders) as client:
         tools = await client.all_tools()
@@ -82,7 +82,7 @@ async def test_call_records_reported_arguments_and_hides_them_from_the_tool(
     style, tracer, collecting_exporter
 ):
     orders = build_server(style)
-    instrument_mcp_server(orders.server, server_build="build-42")
+    instrument_mcp_server(orders.server, record_spans=True, server_build="build-42")
 
     async with connect(orders) as client:
         await client.list_tools()
@@ -129,16 +129,22 @@ async def test_call_records_reported_arguments_and_hides_them_from_the_tool(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("style", styles())
+@pytest.mark.parametrize("list_first", [True, False])
 async def test_conversation_id_is_minted_then_echoed(
-    style, tracer, collecting_exporter
+    style, list_first, tracer, collecting_exporter
 ):
     orders = build_server(style)
-    instrument_mcp_server(orders.server)
+    instrument_mcp_server(orders.server, record_spans=True)
 
     async with connect(orders) as client:
-        await client.list_tools()
+        if list_first:
+            await client.list_tools()
         first = await client.call("add", {"a": 1, "b": 2})
-        conversation_id = first.conversation_id
+        conversation_id = (
+            first.structured["_judgment"]["conversation_id"]
+            if first.structured is not None
+            else first.conversation_id
+        )
         assert conversation_id is not None and UUID_V7.match(conversation_id)
         # The prompt is appended after the tool's own content.
         assert first.texts[0] == "3"
@@ -150,8 +156,10 @@ async def test_conversation_id_is_minted_then_echoed(
     assert second.texts == ["5"]
     assert second.conversation_id is None
     if first.structured is not None:
-        # Structured output stays exactly what the tool's output schema says.
-        assert first.structured == {"result": 3}
+        assert first.structured == {
+            "result": 3,
+            "_judgment": json.loads(first.texts[-1]),
+        }
     assert orders.received("add") == [{"a": 1, "b": 2}, {"a": 2, "b": 3}]
     minted, echoed = [
         attributes(span) for span in spans(collecting_exporter, "tools/call add")
@@ -177,7 +185,7 @@ async def test_unrecognized_conversation_id_is_replaced(
     style, reported, tracer, collecting_exporter
 ):
     orders = build_server(style)
-    instrument_mcp_server(orders.server)
+    instrument_mcp_server(orders.server, record_spans=True)
 
     async with connect(orders) as client:
         await client.list_tools()
@@ -199,7 +207,7 @@ async def test_unknown_model_and_personal_details_are_not_recorded(
     style, tracer, collecting_exporter
 ):
     orders = build_server(style)
-    instrument_mcp_server(orders.server)
+    instrument_mcp_server(orders.server, record_spans=True)
 
     async with connect(orders) as client:
         await client.list_tools()
@@ -227,7 +235,7 @@ async def test_tool_argument_named_like_an_agent_argument_is_the_tools(
     style, tracer, collecting_exporter
 ):
     orders = build_server(style)
-    instrument_mcp_server(orders.server)
+    instrument_mcp_server(orders.server, record_spans=True)
 
     async with connect(orders) as client:
         await client.list_tools()
@@ -249,7 +257,7 @@ async def test_tool_owned_conversation_id_is_neither_minted_nor_read(
     style, tracer, collecting_exporter
 ):
     orders = build_server(style)
-    instrument_mcp_server(orders.server)
+    instrument_mcp_server(orders.server, record_spans=True)
 
     async with connect(orders) as client:
         tools = await client.all_tools()
@@ -277,7 +285,7 @@ async def test_names_a_schema_requires_or_matches_are_the_tools(
 ):
     names = ("required_context", "pattern_context")
     orders = build_server(style)
-    instrument_mcp_server(orders.server)
+    instrument_mcp_server(orders.server, record_spans=True)
 
     async with connect(orders) as client:
         tools = await client.all_tools()
@@ -305,7 +313,7 @@ async def test_call_before_listing_still_hides_agent_arguments(
 ):
     """A call can reach a server that never listed its tools, like a replica."""
     orders = build_server(style)
-    instrument_mcp_server(orders.server)
+    instrument_mcp_server(orders.server, record_spans=True)
 
     async with connect(orders) as client:
         outcome = await client.call(
@@ -327,7 +335,7 @@ async def test_tools_added_after_instrumenting_are_traced(
     style, tracer, collecting_exporter
 ):
     orders = build_server(style)
-    instrument_mcp_server(orders.server)
+    instrument_mcp_server(orders.server, record_spans=True)
 
     @orders.server.tool()
     def ship(order_id: str) -> str:
@@ -388,7 +396,7 @@ async def test_failed_calls_record_why(style, case, tracer, collecting_exporter)
         pytest.skip("this `mcp` doesn't check arguments against the schema")
     tool, arguments, message = ERROR_CASES[case]
     orders = build_server(style)
-    instrument_mcp_server(orders.server)
+    instrument_mcp_server(orders.server, record_spans=True)
 
     async with connect(orders) as client:
         await client.list_tools()
@@ -424,7 +432,7 @@ async def test_error_messages_leave_out_argument_values_and_identifiers(
         return text
 
     orders = build_server(style)
-    instrument_mcp_server(orders.server, redact=redact)
+    instrument_mcp_server(orders.server, record_spans=True, redact=redact)
 
     async with connect(orders) as client:
         await client.list_tools()
@@ -463,7 +471,9 @@ async def test_error_messages_leave_out_argument_values_and_identifiers(
 @pytest.mark.parametrize("style", styles())
 async def test_error_messages_can_be_left_out(style, tracer, collecting_exporter):
     orders = build_server(style)
-    instrument_mcp_server(orders.server, capture_error_messages=False)
+    instrument_mcp_server(
+        orders.server, record_spans=True, capture_error_messages=False
+    )
 
     async with connect(orders) as client:
         await client.list_tools()
@@ -487,7 +497,9 @@ async def test_error_messages_can_be_left_out(style, tracer, collecting_exporter
 async def test_redact_rewrites_messages_and_intent(style, tracer, collecting_exporter):
     orders = build_server(style)
     instrument_mcp_server(
-        orders.server, redact=lambda text: text.replace("o-404", "[order]")
+        orders.server,
+        record_spans=True,
+        redact=lambda text: text.replace("o-404", "[order]"),
     )
 
     async with connect(orders) as client:
@@ -514,7 +526,7 @@ async def test_failing_redact_drops_the_text_but_not_the_call(
         raise RuntimeError("redaction service down")
 
     orders = build_server(style)
-    instrument_mcp_server(orders.server, redact=redact)
+    instrument_mcp_server(orders.server, record_spans=True, redact=redact)
 
     async with connect(orders) as client:
         await client.list_tools()
@@ -541,7 +553,7 @@ async def test_identify_and_set_mcp_caller(style, tracer, collecting_exporter):
         return McpCaller(user_id="user-from-identify", customer_id="acme")
 
     orders = build_server(style)
-    instrument_mcp_server(orders.server, identify=identify)
+    instrument_mcp_server(orders.server, record_spans=True, identify=identify)
 
     async with connect(orders) as client:
         await client.list_tools()
@@ -572,7 +584,7 @@ async def test_identify_problems_never_reach_the_call(
     style, identify, tracer, collecting_exporter
 ):
     orders = build_server(style)
-    instrument_mcp_server(orders.server, identify=identify)
+    instrument_mcp_server(orders.server, record_spans=True, identify=identify)
 
     async with connect(orders) as client:
         await client.list_tools()
@@ -589,7 +601,7 @@ async def test_concurrent_calls_keep_their_own_caller(
     style, tracer, collecting_exporter
 ):
     orders = build_server(style)
-    instrument_mcp_server(orders.server)
+    instrument_mcp_server(orders.server, record_spans=True)
     tags = [f"user-{index}" for index in range(6)]
 
     async with connect(orders) as client:
@@ -609,7 +621,9 @@ async def test_injection_can_be_turned_off(style, tracer, collecting_exporter):
     original = None
     async with connect(build_server(style)) as client:
         original = await client.all_tools()
-    instrument_mcp_server(orders.server, inject_agent_arguments=False)
+    instrument_mcp_server(
+        orders.server, record_spans=True, inject_agent_arguments=False
+    )
 
     async with connect(orders) as client:
         tools = await client.all_tools()
@@ -633,7 +647,7 @@ async def test_trace_context_in_meta_parents_the_span(
     style, tracer, collecting_exporter
 ):
     orders = build_server(style)
-    instrument_mcp_server(orders.server)
+    instrument_mcp_server(orders.server, record_spans=True)
 
     async with connect(orders) as client:
         await client.list_tools()
@@ -655,7 +669,7 @@ async def test_a_span_around_the_server_is_not_the_parent(
     from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
 
     orders = build_server(style)
-    instrument_mcp_server(orders.server)
+    instrument_mcp_server(orders.server, record_spans=True)
     app_tracer = JudgmentTracerProvider.get_instance().get_tracer("app")
 
     with app_tracer.start_as_current_span("server main"):
@@ -679,7 +693,7 @@ async def test_spans_started_by_a_tool_are_its_children(
     style, tracer, collecting_exporter
 ):
     orders = build_server(style)
-    instrument_mcp_server(orders.server)
+    instrument_mcp_server(orders.server, record_spans=True)
 
     async with connect(orders) as client:
         await client.list_tools()
@@ -693,9 +707,11 @@ async def test_spans_started_by_a_tool_are_its_children(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("style", styles())
-async def test_cancelled_call_is_marked_cancelled(style, tracer, collecting_exporter):
+async def test_cancelled_call_is_marked_cancelled(
+    style, tracer, collecting_exporter, native_requests
+):
     orders = build_server(style)
-    instrument_mcp_server(orders.server)
+    instrument_mcp_server(orders.server, record_spans=True)
     orders.events["started"] = anyio.Event()
 
     async with connect(orders) as client:
@@ -736,8 +752,20 @@ async def test_cancelled_call_is_marked_cancelled(style, tracer, collecting_expo
         after = await client.call("add", {"a": 1, "b": 1})
 
     slow = attributes(only_span(collecting_exporter, "tools/call slow"))
-    assert slow["judgment.mcp.cancelled"] == "true"
-    assert "error.type" not in slow
+    from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
+
+    JudgmentTracerProvider.get_instance().force_flush()
+    cancelled = [
+        call
+        for batch in native_requests
+        for call in batch["calls"]
+        if call["tool_name"] == "slow"
+    ]
+    assert {
+        "span_cancelled": slow["judgment.mcp.cancelled"],
+        "span_error": slow.get("error.type"),
+        "events": [(call["outcome"], call.get("error_type")) for call in cancelled],
+    } == {"span_cancelled": "true", "span_error": None, "events": [("cancelled", None)]}
     if MCP_MAJOR > 1 or MCP_RELEASE >= (1, 20):
         # Older `mcp` releases can't serve a call after a cancellation, traced or not.
         assert after.texts[0] == "2"
@@ -747,7 +775,7 @@ async def test_cancelled_call_is_marked_cancelled(style, tracer, collecting_expo
 @pytest.mark.parametrize("style", styles())
 async def test_resources_and_prompts_are_traced(style, tracer, collecting_exporter):
     orders = build_server(style)
-    instrument_mcp_server(orders.server)
+    instrument_mcp_server(orders.server, record_spans=True)
 
     async with connect(orders) as client:
         await client.read_resource("orders://o-1?token=secret-token#details")
@@ -765,8 +793,11 @@ async def test_resources_and_prompts_are_traced(style, tracer, collecting_export
 @pytest.mark.parametrize("style", styles())
 async def test_instrumenting_twice_traces_once(style, tracer, collecting_exporter):
     orders = build_server(style)
-    assert instrument_mcp_server(orders.server) is True
-    assert instrument_mcp_server(orders.server, server_name="other") is True
+    assert instrument_mcp_server(orders.server, record_spans=True) is True
+    assert (
+        instrument_mcp_server(orders.server, record_spans=True, server_name="other")
+        is True
+    )
 
     async with connect(orders) as client:
         tools = await client.all_tools()
@@ -782,7 +813,7 @@ async def test_instrumenting_twice_traces_once(style, tracer, collecting_exporte
 @pytest.mark.parametrize("style", styles())
 async def test_every_request_gets_a_span(style, tracer, collecting_exporter):
     orders = build_server(style)
-    instrument_mcp_server(orders.server, server_name="orders-prod")
+    instrument_mcp_server(orders.server, record_spans=True, server_name="orders-prod")
 
     async with connect(orders) as client:
         await client.list_tools()
@@ -809,7 +840,7 @@ async def test_tracing_failures_never_reach_the_call(
         raise RuntimeError("tracing broke")
 
     orders = build_server(style)
-    instrument_mcp_server(orders.server)
+    instrument_mcp_server(orders.server, record_spans=True)
     monkeypatch.setattr(_observer.McpObserver, broken, fail)
 
     async with connect(orders) as client:
@@ -828,7 +859,7 @@ async def test_tracing_failures_never_reach_the_call(
 @pytest.mark.parametrize("style", styles())
 async def test_without_a_tracer_calls_still_work(style):
     orders = build_server(style)
-    assert instrument_mcp_server(orders.server) is True
+    assert instrument_mcp_server(orders.server, record_spans=True) is True
 
     async with connect(orders) as client:
         tools = await client.all_tools()
@@ -845,7 +876,7 @@ async def test_open_and_composed_schemas_pass_arguments_through(
     style, tracer, collecting_exporter
 ):
     orders = build_server(style)
-    instrument_mcp_server(orders.server)
+    instrument_mcp_server(orders.server, record_spans=True)
 
     async with connect(orders) as client:
         await client.list_tools()
@@ -866,6 +897,6 @@ def test_unsupported_objects_are_left_untraced(tracer, caplog):
     class NotAServer:
         middleware = "not a list"
 
-    assert instrument_mcp_server(NotAServer()) is False
-    assert instrument_mcp_server(object()) is False
-    assert instrument_mcp_server(None) is False
+    assert instrument_mcp_server(NotAServer(), record_spans=True) is False
+    assert instrument_mcp_server(object(), record_spans=True) is False
+    assert instrument_mcp_server(None, record_spans=True) is False
