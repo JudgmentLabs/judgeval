@@ -113,25 +113,9 @@ class Conversations:
         api_key = api_key or JUDGMENT_API_KEY
         organization_id = organization_id or JUDGMENT_ORG_ID
         api_url = api_url or JUDGMENT_API_URL
-        missing = [
-            name
-            for name, value in [
-                ("project_name", project_name),
-                ("api_key", api_key),
-                ("organization_id", organization_id),
-                ("api_url", api_url),
-            ]
-            if not value
-        ]
         client: Optional[JudgmentSyncClient] = None
         project_id: Optional[str] = None
-        if missing:
-            judgeval_logger.warning(
-                f"{', '.join(missing)} not provided. "
-                "Conversations will not record observations."
-            )
-        else:
-            assert project_name and api_key and organization_id and api_url
+        if project_name and api_key and organization_id and api_url:
             client = JudgmentSyncClient(api_url, api_key, organization_id)
             project_id = resolve_project_id(client, project_name)
             if not project_id:
@@ -139,6 +123,21 @@ class Conversations:
                     f"Project '{project_name}' not found. "
                     "Conversations will not record observations."
                 )
+        else:
+            missing = [
+                name
+                for name, value in [
+                    ("project_name", project_name),
+                    ("api_key", api_key),
+                    ("organization_id", organization_id),
+                    ("api_url", api_url),
+                ]
+                if not value
+            ]
+            judgeval_logger.warning(
+                f"{', '.join(missing)} not provided. "
+                "Conversations will not record observations."
+            )
         previous = cls._active
         cls._active = cls(client, project_id, environment)
         if previous is not None:
