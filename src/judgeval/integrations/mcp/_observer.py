@@ -180,6 +180,7 @@ class _CallRecord:
     identified: bool = False
     failure: Optional[Tuple[str, Optional[str]]] = None
     argument_keys: List[str] = field(default_factory=list)
+    argument_values: Optional[List[str]] = None
     environment: Optional[str] = None
 
 
@@ -407,7 +408,9 @@ class McpObserver:
             result = await invoke(arguments)
             return self._shaped(facts, result, adapter, None)
 
-        record = _CallRecord()
+        record = _CallRecord(
+            argument_values=attempt(lambda: argument_values(facts.params))
+        )
         span = (
             attempt(lambda: self._start_span(facts, prepared))
             if self.options.record_spans
@@ -817,7 +820,7 @@ class McpObserver:
         if message is None and error is not None:
             message = _error_message(error)
         recorded = (
-            self._recorded_message(message, facts.params)
+            self._recorded_message(message, facts.params, record.argument_values)
             if self.options.capture_error_messages and message is not None
             else None
         )
@@ -828,11 +831,16 @@ class McpObserver:
         return record.failure
 
     def _recorded_message(
-        self, message: str, params: Mapping[str, Any]
+        self,
+        message: str,
+        params: Mapping[str, Any],
+        values: Optional[List[str]] = None,
     ) -> Optional[str]:
         """The failure text a span keeps. None if it can't be made safe to keep."""
         scrubbed = attempt(
-            lambda: scrub_error_message(message, argument_values(params))
+            lambda: scrub_error_message(
+                message, argument_values(params) if values is None else values
+            )
         )
         return None if scrubbed is None else self._redacted(scrubbed)
 

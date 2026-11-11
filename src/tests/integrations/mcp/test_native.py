@@ -124,11 +124,11 @@ def test_delivery_retries_identical_batches_and_stops_on_permanent_errors(monkey
     bodies = []
     statuses = iter([503, 200, 400])
 
-    def post(client, url, **kwargs):
+    def post(client, method, url, **kwargs):
         bodies.append(kwargs["content"])
-        return httpx.Response(next(statuses))
+        return httpx.Response(next(statuses), json={})
 
-    monkeypatch.setattr(httpx.Client, "post", post)
+    monkeypatch.setattr(httpx.Client, "request", post)
     monkeypatch.setattr(
         "judgeval.integrations.mcp._exporter.time.sleep", lambda _: None
     )
@@ -172,6 +172,64 @@ def test_capture_detaches_and_omits_unsafe_payloads():
         "oversized": OMITTED,
         "null": None,
     }
+
+
+@pytest.mark.parametrize("mode", ["deadline", "cooldown"])
+def test_delivery_retains_unattempted_calls_and_respects_retry_after(mode, monkeypatch):
+    clock = {"monotonic": 0, "wall": 1000}
+    bodies = []
+    monkeypatch.setattr(
+        "judgeval.integrations.mcp._exporter.time.monotonic", lambda: clock["monotonic"]
+    )
+    monkeypatch.setattr(
+        "judgeval.integrations.mcp._exporter.time.time", lambda: clock["wall"]
+    )
+
+    def request(client, method, url, **kwargs):
+        bodies.append(kwargs["content"])
+        if len(bodies) == 1 and mode == "deadline":
+            clock["monotonic"] = 31
+        return httpx.Response(
+            429 if len(bodies) == 1 and mode == "cooldown" else 200,
+            json={},
+            headers={"Retry-After": "120"},
+        )
+
+    monkeypatch.setattr(httpx.Client, "request", request)
+    exporter = McpCallExporter("http://localhost", "key", "org", "project")
+    for n in range(101):
+        exporter.enqueue({"call_id": str(n)})
+    first_flush = exporter.force_flush()
+    first_attempts = len(bodies)
+    clock.update(monotonic=0, wall=1121)
+    exporter.shutdown()
+    assert {
+        "first_flush": first_flush,
+        "first_attempts": first_attempts,
+        "sizes": [len(json.loads(body)["calls"]) for body in bodies],
+        "identical": mode == "deadline" or bodies[0] == bodies[1],
+    } == {
+        "first_flush": False,
+        "first_attempts": 1,
+        "sizes": [100, 1] if mode == "deadline" else [100, 100, 1],
+        "identical": True,
+    }
+
+
+def test_v2_capture_preserves_existing_middleware():
+    from types import SimpleNamespace
+    from judgeval.integrations.mcp._observer import McpObserver, McpOptions
+    from judgeval.integrations.mcp._v2 import instrument, JudgmentMcpMiddleware
+
+    upstream = object()
+    server = SimpleNamespace(middleware=[upstream], get_request_handler=lambda _: None)
+    observer = McpObserver(McpOptions(), server_name="test", server_version="1")
+    instrument(observer, server)
+    instrument(observer, server)
+    assert {
+        "native": isinstance(server.middleware[0], JudgmentMcpMiddleware),
+        "remaining": server.middleware[1:],
+    } == {"native": True, "remaining": [upstream]}
 
 
 @pytest.mark.parametrize("count", [101, 1001])

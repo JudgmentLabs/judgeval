@@ -145,29 +145,41 @@ async def test_conversation_id_is_minted_then_echoed(
             if first.structured is not None
             else first.conversation_id
         )
-        assert conversation_id is not None and UUID_V7.match(conversation_id)
-        # The prompt is appended after the tool's own content.
-        assert first.texts[0] == "3"
-        assert first.texts[-1].startswith('{"conversation_id"')
         second = await client.call(
             "add", {"a": 2, "b": 3, "conversation_id": conversation_id}
         )
 
-    assert second.texts == ["5"]
-    assert second.conversation_id is None
-    if first.structured is not None:
-        assert first.structured == {
-            "result": 3,
-            "_judgment": json.loads(first.texts[-1]),
-        }
-    assert orders.received("add") == [{"a": 1, "b": 2}, {"a": 2, "b": 3}]
     minted, echoed = [
         attributes(span) for span in spans(collecting_exporter, "tools/call add")
     ]
-    assert minted["judgment.mcp.conversation_id"] == conversation_id
-    assert minted["judgment.mcp.conversation_id_source"] == "minted"
-    assert echoed["judgment.mcp.conversation_id"] == conversation_id
-    assert echoed["judgment.mcp.conversation_id_source"] == "echoed"
+    assert {
+        "valid_id": bool(conversation_id and UUID_V7.match(conversation_id)),
+        "first_text": first.texts[0],
+        "handoff": first.texts[-1].startswith('{"conversation_id"'),
+        "second": (second.texts, second.conversation_id),
+        "structured_preserved": first.structured is None
+        or first.structured
+        == {
+            "result": 3,
+            "_judgment": json.loads(first.texts[-1]),
+        },
+        "received": orders.received("add"),
+        "sessions": [
+            (
+                span["judgment.mcp.conversation_id"],
+                span["judgment.mcp.conversation_id_source"],
+            )
+            for span in (minted, echoed)
+        ],
+    } == {
+        "valid_id": True,
+        "first_text": "3",
+        "handoff": True,
+        "second": (["5"], None),
+        "structured_preserved": True,
+        "received": [{"a": 1, "b": 2}, {"a": 2, "b": 3}],
+        "sessions": [(conversation_id, "minted"), (conversation_id, "echoed")],
+    }
 
 
 @pytest.mark.asyncio

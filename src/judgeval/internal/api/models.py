@@ -7,6 +7,36 @@ from typing import Any, Literal, TypeAlias
 from typing_extensions import NotRequired, TypedDict
 
 
+IngestMcpCallsRequestCallArgumentKey: TypeAlias = str
+
+
+class IngestMcpCallsRequestCall(TypedDict):
+    call_id: str
+    session_id: NotRequired[str]
+    timestamp: str
+    duration_ms: float
+    outcome: Literal["success", "error", "cancelled"]
+    server_name: str
+    tool_name: str
+    environment_name: NotRequired[str]
+    client_name: NotRequired[str]
+    user_id: NotRequired[str]
+    intent: NotRequired[str]
+    model: NotRequired[str]
+    argument_keys: NotRequired[list[IngestMcpCallsRequestCallArgumentKey]]
+    error_type: NotRequired[str]
+    error_message: NotRequired[str]
+    input: NotRequired[Any]
+    output: NotRequired[Any]
+    trace_id: NotRequired[str]
+    span_id: NotRequired[str]
+    metadata: NotRequired[dict[str, Any]]
+
+
+class IngestMcpCallsRequest(TypedDict):
+    calls: list[IngestMcpCallsRequestCall]
+
+
 class PendingEvalPayloadJudge(TypedDict):
     name: str
 

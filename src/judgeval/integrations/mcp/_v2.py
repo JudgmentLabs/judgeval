@@ -267,31 +267,14 @@ def _facts(ctx: Any) -> RequestFacts:
 
 
 def instrument(observer: McpObserver, lowlevel: Any) -> bool:
-    """Puts the tracing middleware first and removes `mcp`'s own span middleware.
-
-    `mcp` 2.x adds an ``OpenTelemetryMiddleware`` to every server. Its spans
-    carry a subset of what this records, so keeping both would trace each
-    request twice.
-    """
+    """Puts native capture first, preserving the server's existing telemetry."""
     middleware = getattr(lowlevel, "middleware", None)
     if not isinstance(middleware, list) or not callable(
         getattr(lowlevel, "get_request_handler", None)
     ):
         return False
-    try:
-        from mcp.server._otel import (  # type: ignore[import-not-found,unused-ignore]
-            OpenTelemetryMiddleware,
-        )
-    except Exception:
-        OpenTelemetryMiddleware = None  # type: ignore[assignment,misc]
     kept = [
-        entry
-        for entry in middleware
-        if not (
-            OpenTelemetryMiddleware is not None
-            and isinstance(entry, OpenTelemetryMiddleware)
-        )
-        and not isinstance(entry, JudgmentMcpMiddleware)
+        entry for entry in middleware if not isinstance(entry, JudgmentMcpMiddleware)
     ]
     middleware[:] = [JudgmentMcpMiddleware(observer), *kept]
     return True

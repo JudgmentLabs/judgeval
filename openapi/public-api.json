@@ -7,6 +7,134 @@
   },
   "components": {
     "schemas": {
+      "IngestMcpCallsRequest": {
+        "type": "object",
+        "properties": {
+          "calls": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "call_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512,
+                  "description": "Opaque invocation ID, not a content hash"
+                },
+                "session_id": {
+                  "description": "Logical session within the project; absent means standalone, with no fallback",
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                },
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                  "description": "Invocation start in RFC 3339; storage retains microsecond precision"
+                },
+                "duration_ms": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Monotonic elapsed milliseconds"
+                },
+                "outcome": {
+                  "type": "string",
+                  "enum": [
+                    "success",
+                    "error",
+                    "cancelled"
+                  ]
+                },
+                "server_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "tool_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "environment_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "client_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "user_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                },
+                "intent": {
+                  "type": "string",
+                  "maxLength": 2048
+                },
+                "model": {
+                  "description": "Unverified client/agent-reported model",
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "argument_keys": {
+                  "default": [],
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                },
+                "error_type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "error_message": {
+                  "type": "string",
+                  "maxLength": 8192
+                },
+                "input": {},
+                "output": {},
+                "trace_id": {
+                  "type": "string",
+                  "maxLength": 512
+                },
+                "span_id": {
+                  "type": "string",
+                  "maxLength": 512
+                },
+                "metadata": {
+                  "default": {},
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "call_id",
+                "timestamp",
+                "duration_ms",
+                "outcome",
+                "server_name",
+                "tool_name"
+              ]
+            }
+          }
+        },
+        "required": [
+          "calls"
+        ]
+      },
       "PendingEvalPayload": {
         "type": "object",
         "required": [
@@ -5227,6 +5355,74 @@
     }
   ],
   "paths": {
+    "/v1/projects/{projectId}/mcp/calls": {
+      "post": {
+        "tags": [
+          "V1"
+        ],
+        "summary": "Record completed MCP tool calls",
+        "description": "Retries must preserve every field and call ID. Re-execution requires a new ID.",
+        "security": [
+          {
+            "ingestKeyAuth": []
+          },
+          {
+            "apiKeyAuth": [],
+            "organizationHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngestMcpCallsRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "example": "YOUR_PROJECT_ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "status"
+                  ],
+                  "properties": {
+                    "status": {
+                      "const": "success",
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postV1ProjectsByProjectIdMcpCalls",
+        "x-meta": {
+          "security": {
+            "access": "organization",
+            "role": "viewer"
+          }
+        }
+      }
+    },
     "/otel/v1/offline-traces": {
       "post": {
         "tags": ["OTEL"],
