@@ -7,9 +7,8 @@
     server = FastMCP("orders")
     instrument_mcp_server(server)
 
-Completed tool calls go directly to the native MCP endpoint, independently
-of OTel sampling. ``record_spans=True`` additionally creates request spans;
-do not map those spans back into MCP calls, which would duplicate events.
+Completed tool calls go directly to the native MCP endpoint without creating
+OTel spans, independently of OTel sampling.
 
 Supported servers: ``FastMCP`` and the low-level ``Server`` from `mcp` 1.x,
 ``MCPServer`` and the low-level ``Server`` from `mcp` 2.x, and the standalone
@@ -55,7 +54,6 @@ def instrument_mcp_server(
     capture_input: bool = False,
     capture_output: bool = False,
     redact_payload: Optional[RedactPayload] = None,
-    record_spans: bool = False,
     session_id: Optional[Callable[[McpRequestInfo], Optional[str]]] = None,
 ) -> bool:
     """Exports completed native MCP calls using the active tracer's settings.
@@ -90,7 +88,6 @@ def instrument_mcp_server(
         redact_payload: Transform a detached JSON input/output snapshot.
             Raise or return OMITTED to omit it; None captures JSON null.
             Non-JSON/oversized payloads (128 KiB) are omitted.
-        record_spans: Also create OTel request spans; defaults to False.
         session_id: Returns an authoritative application session ID without
             relying on agent echo. Receives McpRequestInfo.
 
@@ -111,7 +108,6 @@ def instrument_mcp_server(
                 capture_input=capture_input,
                 capture_output=capture_output,
                 redact_payload=redact_payload,
-                record_spans=record_spans,
                 session_id=session_id,
             ),
         )

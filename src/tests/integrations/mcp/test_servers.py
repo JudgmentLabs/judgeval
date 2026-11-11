@@ -9,11 +9,11 @@ from tests.integrations.mcp.harness import build_server, connect, styles
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("style", styles())
-async def test_session_handoff_and_optional_spans(
+async def test_session_handoff_records_native_calls_without_spans(
     style, tracer, collecting_exporter, native_requests
 ):
     orders = build_server(style)
-    instrument_mcp_server(orders.server, record_spans=True)
+    instrument_mcp_server(orders.server)
     async with connect(orders) as client:
         await client.list_tools()
         first = await client.call(
@@ -25,36 +25,29 @@ async def test_session_handoff_and_optional_spans(
             else first.conversation_id
         )
         second = await client.call("add", {"a": 2, "b": 3, "conversation_id": session})
-    spans = [
-        span for span in collecting_exporter.spans if span.name == "tools/call add"
-    ]
     JudgmentTracerProvider.get_instance().force_flush()
+    calls = [call for batch in native_requests for call in batch["calls"]]
     assert {
         "results": (first.texts[0], second.texts),
         "received": orders.calls,
         "session": bool(session),
         "handoff": json.loads(first.texts[-1])["conversation_id"],
         "native_sessions": [
-            call["session_id"] for batch in native_requests for call in batch["calls"]
-        ],
-        "spans": [
             (
-                span.attributes["judgment.mcp.conversation_id"],
-                span.attributes["judgment.mcp.conversation_id_source"],
+                call["session_id"],
+                call["metadata"]["judgment.mcp.conversation_id_source"],
             )
-            for span in spans
+            for call in calls
         ],
-        "reported": (
-            spans[0].attributes["judgment.mcp.intent"],
-            spans[0].attributes["judgment.mcp.model"],
-        ),
+        "spans": collecting_exporter.spans,
+        "reported": (calls[0]["intent"], calls[0]["model"]),
     } == {
         "results": ("3", ["5"]),
         "received": [{"a": 1, "b": 2}, {"a": 2, "b": 3}],
         "session": True,
         "handoff": session,
-        "native_sessions": [session, session],
-        "spans": [(session, "minted"), (session, "echoed")],
+        "native_sessions": [(session, "minted"), (session, "echoed")],
+        "spans": [],
         "reported": ("Adding", "gpt-6"),
     }
 

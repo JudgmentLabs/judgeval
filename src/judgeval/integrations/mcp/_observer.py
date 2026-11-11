@@ -1,8 +1,8 @@
-"""Traces MCP requests, independent of which `mcp` version delivers them.
+"""Records native MCP calls, independent of which `mcp` version delivers them.
 
 The version adapters turn a request into :class:`RequestFacts` and hand
 :meth:`McpObserver.observe` a way to run it and to read and change its result.
-Everything a span records, and every change made to a request or its result,
+Everything a call records, and every change made to a request or its result,
 is decided here, so both `mcp` versions behave the same.
 """
 
@@ -34,18 +34,6 @@ from typing import (
     TypeVar,
 )
 
-from opentelemetry.trace import (
-    INVALID_SPAN,
-    Span,
-    SpanKind,
-    Status,
-    StatusCode,
-    set_span_in_context,
-)
-from opentelemetry.trace.propagation.tracecontext import (
-    TraceContextTextMapPropagator,
-)
-
 from judgeval.logger import judgeval_logger
 from judgeval.version import get_version
 
@@ -65,7 +53,6 @@ from ._exporter import McpCallExporter, OMITTED, RedactPayload, capture_payload
 
 T = TypeVar("T")
 
-TRACER_NAME = "judgeval-mcp"
 CLIENT_INFO_META_KEY = "io.modelcontextprotocol/clientInfo"
 PROTOCOL_VERSION_META_KEY = "io.modelcontextprotocol/protocolVersion"
 _MAX_ERROR_MESSAGE_LENGTH = 1_000
@@ -90,8 +77,6 @@ _PUBLIC_ERROR_CODE = re.compile(r"^[A-Za-z][A-Za-z_.:-]{0,39}$")
 _GENERIC_ERROR_NAMES = frozenset(
     {"Exception", "BaseException", "ToolError", "McpError", "MCPError"}
 )
-
-_propagator = TraceContextTextMapPropagator()
 
 
 @dataclass(frozen=True)
@@ -129,7 +114,6 @@ class McpOptions:
     capture_input: bool = False
     capture_output: bool = False
     redact_payload: Optional[RedactPayload] = None
-    record_spans: bool = False
     session_id: Optional[Callable[[McpRequestInfo], Optional[str]]] = None
 
 
@@ -189,7 +173,6 @@ class _PreparedCall:
     # Replaces the call's arguments when injected ones were removed.
     arguments: Optional[Dict[str, Any]]
     minted_conversation_id: Optional[str]
-    span_name: str
 
 
 _records: contextvars.ContextVar[Optional[_CallRecord]] = contextvars.ContextVar(
@@ -407,7 +390,7 @@ class McpObserver:
         adapter: ResultAdapter,
         list_tools: Optional[ListTools],
     ) -> Any:
-        """Runs one request inside a span. Tracing failures never reach the call."""
+        """Records a request without letting telemetry failures affect the call."""
         token = attempt(self._activate_tracer)
         contracts_token = self._request_contracts.set({})
         try:
@@ -438,11 +421,6 @@ class McpObserver:
             return self._shaped(facts, result, adapter, None)
 
         record = _CallRecord()
-        span = (
-            attempt(lambda: self._start_span(facts, prepared))
-            if self.options.record_spans
-            else None
-        )
         exporter = attempt(_active_exporter) if facts.method == "tools/call" else None
         arguments = (
             prepared.arguments
@@ -474,7 +452,6 @@ class McpObserver:
                         record,
                         result,
                         adapter,
-                        span,
                         timestamp,
                         started,
                         captured,
@@ -484,20 +461,16 @@ class McpObserver:
 
         token = _records.set(record)
         try:
-            result = await self._run(span, lambda: invoke(prepared.arguments))
+            result = await invoke(prepared.arguments)
         except BaseException as error:
             cancelled = is_cancellation(error)
             if record.error is None and not cancelled:
                 record.error = error
             complete(None, cancelled)
-            if span is not None:
-                self._finish(span, record, None, facts, adapter, cancelled)
             raise
         finally:
             _records.reset(token)
         complete(result, False)
-        if span is not None:
-            self._finish(span, record, result, facts, adapter, False)
         return self._shaped(facts, result, adapter, prepared.minted_conversation_id)
 
     def _export_call(
@@ -508,7 +481,6 @@ class McpObserver:
         record: _CallRecord,
         result: Any,
         adapter: ResultAdapter,
-        span: Optional[Span],
         timestamp: str,
         started: float,
         captured: Any,
@@ -577,22 +549,7 @@ class McpObserver:
             call["metadata"]["input_omitted"] = True
         if self.options.capture_output and result is not None and output is OMITTED:
             call["metadata"]["output_omitted"] = True
-        if span is not None and span.get_span_context().is_valid:
-            context = span.get_span_context()
-            call.update(
-                trace_id=f"{context.trace_id:032x}", span_id=f"{context.span_id:016x}"
-            )
         exporter.enqueue(call)
-
-    async def _run(
-        self, span: Optional[Span], call: Callable[[], Awaitable[Any]]
-    ) -> Any:
-        """Runs the request with its span current, so the tool's spans nest."""
-        scope = None if span is None else attempt(lambda: _span_scope(span))
-        if scope is None:
-            return await call()
-        with scope:
-            return await call()
 
     def _shaped(
         self,
@@ -728,67 +685,13 @@ class McpObserver:
                 "judgment.mcp.sdk_version": get_version(),
             }
         )
-        target = name if method in ("tools/call", "prompts/get") else None
         return _PreparedCall(
             attributes=attributes,
             arguments=without_agent_arguments(args, declared)
             if injected and any(key in AGENT_ARGUMENTS for key in args)
             else None,
             minted_conversation_id=minted,
-            span_name=f"{method} {target}" if target else method,
         )
-
-    def _start_span(self, facts: RequestFacts, prepared: _PreparedCall) -> Span:
-        from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
-
-        provider = JudgmentTracerProvider.get_instance()
-        meta = _mapping(facts.params.get("_meta"))
-        # Only the caller's ``_meta`` trace context can be the parent. A span
-        # that happens to be current, such as one around the whole server or
-        # the HTTP request that opened the session, would otherwise put every
-        # call into one trace. Baggage is kept.
-        current = set_span_in_context(INVALID_SPAN, provider.get_current_context())
-        parent = (
-            _propagator.extract(
-                {key: value for key, value in meta.items() if isinstance(value, str)},
-                context=current,
-            )
-            if isinstance(meta.get("traceparent"), str)
-            else current
-        )
-        return provider.get_tracer(TRACER_NAME).start_span(
-            prepared.span_name,
-            context=parent,
-            kind=SpanKind.SERVER,
-            attributes=prepared.attributes,
-        )
-
-    def _finish(
-        self,
-        span: Span,
-        record: _CallRecord,
-        result: Any,
-        facts: RequestFacts,
-        adapter: ResultAdapter,
-        cancelled: bool,
-    ) -> None:
-        def annotate() -> None:
-            caller = self._caller(record, facts)
-            span.set_attributes(
-                _defined(
-                    {
-                        "enduser.id": caller.get("user_id"),
-                        "judgment.customer_id": caller.get("customer_id"),
-                    }
-                )
-            )
-            if cancelled:
-                span.set_attribute("judgment.mcp.cancelled", "true")
-            elif result is None or adapter.is_error(result):
-                self._record_failure(span, record, result, facts, adapter)
-
-        attempt(annotate)
-        attempt(span.end)
 
     def _caller(
         self, record: _CallRecord, facts: RequestFacts
@@ -819,18 +722,6 @@ class McpObserver:
             )
             if isinstance(value, str) and value
         }
-
-    def _record_failure(
-        self,
-        span: Span,
-        record: _CallRecord,
-        result: Any,
-        facts: RequestFacts,
-        adapter: ResultAdapter,
-    ) -> None:
-        error_type, recorded = self._failure(record, result, facts, adapter)
-        span.set_attribute("error.type", error_type)
-        span.set_status(Status(StatusCode.ERROR, recorded))
 
     def _failure(
         self,
@@ -901,17 +792,6 @@ class McpObserver:
             return text
         value = attempt(lambda: redact(text))
         return value if isinstance(value, str) else None
-
-
-def _span_scope(span: Span) -> Any:
-    from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
-
-    return JudgmentTracerProvider.get_instance().use_span(
-        span,
-        end_on_exit=False,
-        record_exception=False,
-        set_status_on_exception=False,
-    )
 
 
 def _active_tracer_var() -> contextvars.ContextVar[Any]:

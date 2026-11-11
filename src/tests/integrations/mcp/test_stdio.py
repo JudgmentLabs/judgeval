@@ -29,7 +29,7 @@ from tests.integrations.mcp.harness import LOW_LEVEL, build_server
 style = sys.argv[1]
 judgeval_logger.warning("judgeval warning before the server starts")
 orders = build_server(style)
-instrument_mcp_server(orders.server, record_spans=True)
+instrument_mcp_server(orders.server)
 if style in LOW_LEVEL:
     from mcp.server.stdio import stdio_server
 
