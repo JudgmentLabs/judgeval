@@ -24,11 +24,20 @@ if TYPE_CHECKING:
 def _extract_google_tokens(
     usage: GenerateContentResponseUsageMetadata,
 ) -> Tuple[int, int, int, int]:
+    """Returns non-cached input, output, cache read and cache creation tokens.
+
+    Gemini reports ``prompt_token_count`` with the cached tokens included, and
+    ``candidates_token_count`` without the thinking tokens, which are billed as
+    output and reported in ``thoughts_token_count``.
+    """
     prompt_tokens = (
         usage.prompt_token_count if usage.prompt_token_count is not None else 0
     )
     completion_tokens = (
         usage.candidates_token_count if usage.candidates_token_count is not None else 0
+    )
+    thoughts_tokens = (
+        usage.thoughts_token_count if usage.thoughts_token_count is not None else 0
     )
     cache_read_input_tokens = (
         usage.cached_content_token_count
@@ -37,8 +46,8 @@ def _extract_google_tokens(
     )
     cache_creation_input_tokens = 0
     return (
-        prompt_tokens,
-        completion_tokens,
+        max(prompt_tokens - cache_read_input_tokens, 0),
+        completion_tokens + thoughts_tokens,
         cache_read_input_tokens,
         cache_creation_input_tokens,
     )
@@ -72,12 +81,12 @@ def wrap_generate_content_sync(client: Client) -> None:
         span.set_attribute(AttributeKeys.GEN_AI_COMPLETION, output)
 
         if usage_data:
-            prompt_tokens, completion_tokens, cache_read, cache_creation = (
+            non_cached_input, completion_tokens, cache_read, cache_creation = (
                 _extract_google_tokens(usage_data)
             )
             span.set_attribute(
                 AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS,
-                prompt_tokens,
+                non_cached_input,
             )
             span.set_attribute(
                 AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS, completion_tokens

@@ -44,6 +44,31 @@ class TestGoogleGenerateContent:
         )
         assert span.attributes.get(AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS) == 10
 
+    def test_thinking_tokens_count_as_output_and_cached_tokens_leave_input(
+        self, tracer, collecting_exporter, google_client
+    ):
+        response = make_google_response(
+            prompt_tokens=100,
+            completion_tokens=10,
+            cached_tokens=60,
+            thoughts_tokens=25,
+        )
+        google_client.models.generate_content = MagicMock(return_value=response)
+        wrap_generate_content_sync(google_client)
+        google_client.models.generate_content(
+            model="gemini-2.5-flash", contents="hello"
+        )
+        span = next(s for s in collecting_exporter.spans if s.name == "GOOGLE_API_CALL")
+        assert (
+            span.attributes.get(AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS)
+            == 40
+        )
+        assert span.attributes.get(AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS) == 35
+        assert (
+            span.attributes.get(AttributeKeys.JUDGMENT_USAGE_CACHE_READ_INPUT_TOKENS)
+            == 60
+        )
+
     def test_error_sets_error_status(self, tracer, collecting_exporter, google_client):
         google_client.models.generate_content = MagicMock(
             side_effect=RuntimeError("fail")
