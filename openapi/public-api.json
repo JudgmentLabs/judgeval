@@ -24596,6 +24596,189 @@
         }
       }
     },
+    "/v1/projects/{projectId}/test-suites/{testSuiteId}/repin": {
+      "post": {
+        "tags": ["V1"],
+        "summary": "Move one judge's checks to another version",
+        "description": "Move every check by one judge in the test suite to another version of that judge. Fails, moving nothing, when the target version doesn't exist (the error names the version) or never returns a case's expected value (the error names each case id). Edits land in the draft, which opens automatically. To grade earlier outputs with the new version, publish_test_suite, then score_test_suite_run on that run.",
+        "x-mcp": {
+          "tool": "repin_test_suite_checks",
+          "toolset": "test_suites"
+        },
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "example": "YOUR_PROJECT_ID"
+          },
+          {
+            "name": "testSuiteId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "example": "YOUR_TEST_SUITE_ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "judge_id",
+                  "judge_major_version",
+                  "judge_minor_version"
+                ],
+                "properties": {
+                  "judge_id": {
+                    "description": "Judge whose checks move.",
+                    "type": "string"
+                  },
+                  "judge_major_version": {
+                    "description": "Target major version.",
+                    "type": "number"
+                  },
+                  "judge_minor_version": {
+                    "description": "Target minor version.",
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["case_ids", "skipped_case_ids"],
+                  "properties": {
+                    "case_ids": {
+                      "description": "Cases moved to the target version. Empty when no case has a check by judge_id on another version.",
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "skipped_case_ids": {
+                      "description": "Cases edited or removed concurrently, left unchanged.",
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Response for status 404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["error"],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Response for status 409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["error"],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Response for status 422",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["error"],
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postV1ProjectsByProjectIdTest-suitesByTestSuiteIdRepin",
+        "x-meta": {
+          "security": {
+            "access": "organization",
+            "role": "developer"
+          }
+        }
+      }
+    },
     "/v1/projects/{projectId}/test-suites/{testSuiteId}/publish": {
       "post": {
         "tags": ["V1"],

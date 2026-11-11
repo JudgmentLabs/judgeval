@@ -5099,6 +5099,17 @@ class CreateTestSuiteDraftResponse(TypedDict):
     version: int
 
 
+class RepinTestSuiteChecksRequest(TypedDict, closed=True):
+    judge_id: str
+    judge_major_version: float
+    judge_minor_version: float
+
+
+class RepinTestSuiteChecksResponse(TypedDict):
+    case_ids: list[str]
+    skipped_case_ids: list[str]
+
+
 class PublishTestSuiteResponse(TypedDict):
     version: int
 

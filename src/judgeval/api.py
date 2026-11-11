@@ -78,6 +78,8 @@ from judgeval.internal.api.models import (
     RemoveExamplesFromDatasetRequest,
     RemoveExamplesFromDatasetResponse,
     RemoveTestCaseResponse,
+    RepinTestSuiteChecksRequest,
+    RepinTestSuiteChecksResponse,
     ScoreTestRunResponse,
     SearchMemoryFilesRequest,
     SearchMemoryFilesResponse,
@@ -1042,6 +1044,20 @@ class JudgmentApiClient(JudgmentSyncClient):
                 self.base_url,
             ),
             {},
+            None,
+        )
+
+    def repin_test_suite_checks(
+        self, project_id: str, test_suite_id: str, payload: RepinTestSuiteChecksRequest
+    ) -> RepinTestSuiteChecksResponse:
+        """Move one judge's checks to another version (`POST /v1/projects/{projectId}/test-suites/{testSuiteId}/repin`)."""
+        return self._request(
+            "POST",
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/test-suites/{encode_path_segment(test_suite_id)}/repin",
+                self.base_url,
+            ),
+            payload,
             None,
         )
 
