@@ -420,11 +420,17 @@ class TestRunsFactory(ProjectScopedFactory):
         candidate: Optional[str] = None,
         candidate_meta: Optional[Dict[str, Any]] = None,
         trigger: Optional[Literal["manual", "ci", "schedule", "api"]] = None,
+        stored_traces: Optional[bool] = None,
     ) -> StartedRun:
         """Start a run of the test suite's latest published version.
 
         Returns ``run_id``, ``test_suite_version`` and ``cases`` (each with
         ``case_id``, ``input`` and tagging ``headers``).
+
+        With ``stored_traces=True`` each case's stored trace, named by its
+        ``metadata.trace_id``, is scored instead of running the agent, so
+        there is nothing to run for the returned cases. Every published case
+        needs a trace in this project.
         """
         response = self._api.post_projects_test_suites_by_test_suite_id_runs(
             self._project,
@@ -435,6 +441,7 @@ class TestRunsFactory(ProjectScopedFactory):
                     "candidate": candidate,
                     "candidate_meta": candidate_meta,
                     "trigger": trigger,
+                    "stored_traces": stored_traces,
                 }
             ),
         )

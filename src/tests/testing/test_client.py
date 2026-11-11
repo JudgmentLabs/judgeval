@@ -21,13 +21,13 @@ def test_start_posts_to_the_test_and_drops_unset_fields():
     client = _client({"run_id": "r1", "test_suite_version": 2, "cases": []})
     runs = testing.TestRunsFactory(client, "p1", "proj")
 
-    run = runs.start("t1", candidate="abc123")
+    run = runs.start("t1", candidate="abc123", stored_traces=True)
 
     assert run["run_id"] == "r1"
     client._request.assert_called_once_with(
         "POST",
         "https://api.example.com/v1/projects/p1/test-suites/t1/runs",
-        {"candidate": "abc123"},
+        {"candidate": "abc123", "stored_traces": True},
         None,
     )
 
