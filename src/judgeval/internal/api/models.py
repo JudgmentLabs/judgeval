@@ -805,7 +805,7 @@ class PublicJqlErrorResponse(TypedDict):
 class TestConfigsResponseTestConfigJudgeJudge(TypedDict):
     id: str
     name: str
-    judge_type: str
+    judge_type: str | None
     score_type: str
 
 
@@ -854,7 +854,7 @@ class CreateTestConfigRequest(TypedDict):
 class TestConfigResponseTestConfigJudgeJudge(TypedDict):
     id: str
     name: str
-    judge_type: str
+    judge_type: str | None
     score_type: str
 
 
@@ -1888,7 +1888,7 @@ class ListJudgesResponseJudge(TypedDict):
     id: str
     name: str
     execution_mode: Literal["internal", "external"]
-    judge_type: Literal["prompt", "custom", "agent", "deterministic", "unspecified"]
+    judge_type: Literal["prompt", "custom", "agent", "deterministic"] | None
     score_type: Literal["numeric", "binary", "categorical"]
     judge_major_version: float
     judge_minor_version: float
@@ -2032,7 +2032,7 @@ class ListJudgesResponseJudge1(TypedDict):
     name: str
     judge_description: str | None
     execution_mode: Literal["internal", "external"]
-    judge_type: Literal["prompt", "custom", "agent", "deterministic", "unspecified"]
+    judge_type: Literal["prompt", "custom", "agent", "deterministic"] | None
     knowledge_file_id: str | None
     score_type: Literal["numeric", "binary", "categorical"]
     updated_at: str
@@ -2618,9 +2618,6 @@ class CreateJudgeRequestJudge3(TypedDict):
     name: str
     judgeDescription: NotRequired[str | None]
     executionMode: Literal["external"]
-    judgeType: NotRequired[
-        Literal["prompt", "custom", "agent", "deterministic", "unspecified"]
-    ]
     initialVersion: (
         CreateJudgeRequestJudge3InitialVersion
         | CreateJudgeRequestJudge3InitialVersion1
@@ -5026,7 +5023,7 @@ class GetJudgeResponseJudge3(TypedDict):
     session_evaluation_min_candidate_traces: float | None
     session_evaluation_max_wait_minutes: float | None
     execution_mode: Literal["external"]
-    judge_type: Literal["prompt", "custom", "agent", "deterministic", "unspecified"]
+    judge_type: None
     definition: None
 
 

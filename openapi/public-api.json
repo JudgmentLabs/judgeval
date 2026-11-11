@@ -3253,7 +3253,14 @@
                             "type": "string"
                           },
                           "judge_type": {
-                            "type": "string"
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           "score_type": {
                             "type": "string"
@@ -3395,7 +3402,14 @@
                           "type": "string"
                         },
                         "judge_type": {
-                          "type": "string"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         },
                         "score_type": {
                           "type": "string"
@@ -10049,13 +10063,19 @@
                                 "enum": ["internal", "external"]
                               },
                               "judge_type": {
-                                "type": "string",
-                                "enum": [
-                                  "prompt",
-                                  "custom",
-                                  "agent",
-                                  "deterministic",
-                                  "unspecified"
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "prompt",
+                                      "custom",
+                                      "agent",
+                                      "deterministic"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
                                 ]
                               },
                               "score_type": {
@@ -10127,13 +10147,19 @@
                                 "enum": ["internal", "external"]
                               },
                               "judge_type": {
-                                "type": "string",
-                                "enum": [
-                                  "prompt",
-                                  "custom",
-                                  "agent",
-                                  "deterministic",
-                                  "unspecified"
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "prompt",
+                                      "custom",
+                                      "agent",
+                                      "deterministic"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
                                 ],
                                 "description": "Agent judge (wire value `prompt`); Code judge (wire value `custom`); legacy Agent judge (wire value `agent`); Condition judge (wire value `deterministic`)"
                               },
@@ -12177,16 +12203,6 @@
                           "executionMode": {
                             "type": "string",
                             "const": "external"
-                          },
-                          "judgeType": {
-                            "type": "string",
-                            "enum": [
-                              "prompt",
-                              "custom",
-                              "agent",
-                              "deterministic",
-                              "unspecified"
-                            ]
                           },
                           "initialVersion": {
                             "oneOf": [
@@ -19629,14 +19645,7 @@
                               "const": "external"
                             },
                             "judge_type": {
-                              "type": "string",
-                              "enum": [
-                                "prompt",
-                                "custom",
-                                "agent",
-                                "deterministic",
-                                "unspecified"
-                              ]
+                              "type": "null"
                             },
                             "definition": {
                               "type": "null"

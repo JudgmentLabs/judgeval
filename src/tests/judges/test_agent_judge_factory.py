@@ -318,9 +318,11 @@ class TestAgentJudgeFactoryUpdate:
         client.patch_projects_judges_by_judge_id.assert_not_called()
 
 
-def test_rejects_external_judges_even_when_classified_as_prompt():
+def test_rejects_external_judges_with_no_executable_type():
     factory, _ = _make_factory(
-        lookups=[_judge_detail(execution_mode="external", definition=None)]
+        lookups=[
+            _judge_detail(execution_mode="external", judge_type=None, definition=None)
+        ]
     )
     with pytest.raises(
         ValueError, match="only prompt-based agent judges are supported"
