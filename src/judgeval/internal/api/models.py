@@ -1887,7 +1887,7 @@ class UpdateIssueResponse(TypedDict):
 class ListJudgesResponseJudge(TypedDict):
     id: str
     name: str
-    execution_mode: Literal["managed", "submitted"]
+    execution_mode: Literal["internal", "external"]
     judge_type: Literal["prompt", "custom", "agent", "deterministic", "unspecified"]
     score_type: Literal["numeric", "binary", "categorical"]
     judge_major_version: float
@@ -2031,7 +2031,7 @@ class ListJudgesResponseJudge1(TypedDict):
     id: str
     name: str
     judge_description: str | None
-    execution_mode: Literal["managed", "submitted"]
+    execution_mode: Literal["internal", "external"]
     judge_type: Literal["prompt", "custom", "agent", "deterministic", "unspecified"]
     knowledge_file_id: str | None
     score_type: Literal["numeric", "binary", "categorical"]
@@ -2228,7 +2228,7 @@ class CreateJudgeRequestJudgeConfig(TypedDict):
 class CreateJudgeRequestJudge(TypedDict):
     name: str
     judgeDescription: NotRequired[str | None]
-    executionMode: NotRequired[Literal["managed"]]
+    executionMode: NotRequired[Literal["internal"]]
     judgeType: Literal["prompt"]
     initialVersion: CreateJudgeRequestJudgeInitialVersion
     config: CreateJudgeRequestJudgeConfig
@@ -2412,7 +2412,7 @@ class CreateJudgeRequestJudge1Config(TypedDict):
 class CreateJudgeRequestJudge1(TypedDict):
     name: str
     judgeDescription: NotRequired[str | None]
-    executionMode: NotRequired[Literal["managed"]]
+    executionMode: NotRequired[Literal["internal"]]
     judgeType: Literal["custom"]
     initialVersion: CreateJudgeRequestJudge1InitialVersion
     config: CreateJudgeRequestJudge1Config
@@ -2590,7 +2590,7 @@ class CreateJudgeRequestJudge2Config(TypedDict):
 class CreateJudgeRequestJudge2(TypedDict):
     name: str
     judgeDescription: NotRequired[str | None]
-    executionMode: NotRequired[Literal["managed"]]
+    executionMode: NotRequired[Literal["internal"]]
     judgeType: Literal["deterministic"]
     initialVersion: CreateJudgeRequestJudge2InitialVersion
     config: CreateJudgeRequestJudge2Config
@@ -2617,7 +2617,7 @@ class CreateJudgeRequestJudge3InitialVersion2(TypedDict):
 class CreateJudgeRequestJudge3(TypedDict):
     name: str
     judgeDescription: NotRequired[str | None]
-    executionMode: Literal["submitted"]
+    executionMode: Literal["external"]
     judgeType: NotRequired[
         Literal["prompt", "custom", "agent", "deterministic", "unspecified"]
     ]
@@ -4511,7 +4511,7 @@ class GetJudgeResponseJudge(TypedDict):
     session_evaluation_idle_enabled: bool | None
     session_evaluation_min_candidate_traces: float | None
     session_evaluation_max_wait_minutes: float | None
-    execution_mode: NotRequired[Literal["managed"]]
+    execution_mode: NotRequired[Literal["internal"]]
     judge_type: Literal["prompt"]
     definition: GetJudgeResponseJudgeDefinition
 
@@ -4688,7 +4688,7 @@ class GetJudgeResponseJudge1(TypedDict):
     session_evaluation_idle_enabled: bool | None
     session_evaluation_min_candidate_traces: float | None
     session_evaluation_max_wait_minutes: float | None
-    execution_mode: NotRequired[Literal["managed"]]
+    execution_mode: NotRequired[Literal["internal"]]
     judge_type: Literal["custom"]
     definition: GetJudgeResponseJudge1Definition
 
@@ -4859,7 +4859,7 @@ class GetJudgeResponseJudge2(TypedDict):
     session_evaluation_idle_enabled: bool | None
     session_evaluation_min_candidate_traces: float | None
     session_evaluation_max_wait_minutes: float | None
-    execution_mode: NotRequired[Literal["managed"]]
+    execution_mode: NotRequired[Literal["internal"]]
     judge_type: Literal["deterministic"]
     definition: GetJudgeResponseJudge2Definition
 
@@ -5025,7 +5025,7 @@ class GetJudgeResponseJudge3(TypedDict):
     session_evaluation_idle_enabled: bool | None
     session_evaluation_min_candidate_traces: float | None
     session_evaluation_max_wait_minutes: float | None
-    execution_mode: Literal["submitted"]
+    execution_mode: Literal["external"]
     judge_type: Literal["prompt", "custom", "agent", "deterministic", "unspecified"]
     definition: None
 

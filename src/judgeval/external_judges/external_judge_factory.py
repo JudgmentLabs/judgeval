@@ -136,7 +136,7 @@ class ExternalJudgeFactory:
         payload: CreateJudgeRequest = {
             "judge": {
                 "name": name,
-                "executionMode": "submitted",
+                "executionMode": "external",
                 "initialVersion": initial_version,
             }
         }

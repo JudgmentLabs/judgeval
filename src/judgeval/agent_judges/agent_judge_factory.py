@@ -293,7 +293,7 @@ class AgentJudgeFactory:
             payload={"version": version},
         )["judge"]
         if (
-            "execution_mode" in judge and judge["execution_mode"] == "submitted"
+            "execution_mode" in judge and judge["execution_mode"] == "external"
         ) or judge["judge_type"] != "prompt":
             raise ValueError(
                 f"Judge {judge_id} is a {judge['judge_type']} judge; only "

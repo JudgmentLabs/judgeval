@@ -10046,7 +10046,7 @@
                               },
                               "execution_mode": {
                                 "type": "string",
-                                "enum": ["managed", "submitted"]
+                                "enum": ["internal", "external"]
                               },
                               "judge_type": {
                                 "type": "string",
@@ -10124,7 +10124,7 @@
                               },
                               "execution_mode": {
                                 "type": "string",
-                                "enum": ["managed", "submitted"]
+                                "enum": ["internal", "external"]
                               },
                               "judge_type": {
                                 "type": "string",
@@ -10634,7 +10634,7 @@
           "tool": "create_judge",
           "toolset": "judges"
         },
-        "description": "Create an Agent judge (wire value `prompt`), a Code judge (wire value `custom`), a deterministic judge with categorical outputs, or an external judge with executionMode submitted and binary, numeric, or categorical outputs, with its initial production version. Deterministic judges require two outputs ordered match, then miss. This call fixes the judge type for its lifetime. Agent judges require prompt configuration; Code judges require a base64-encoded tar.gz bundle and Python entrypoint metadata.",
+        "description": "Create an Agent judge (wire value `prompt`), a Code judge (wire value `custom`), a deterministic judge with categorical outputs, or an external judge with executionMode external and binary, numeric, or categorical outputs, with its initial production version. Deterministic judges require two outputs ordered match, then miss. This call fixes the judge type for its lifetime. Agent judges require prompt configuration; Code judges require a base64-encoded tar.gz bundle and Python entrypoint metadata.",
         "parameters": [
           {
             "name": "projectId",
@@ -10669,7 +10669,7 @@
                           },
                           "executionMode": {
                             "type": "string",
-                            "const": "managed"
+                            "const": "internal"
                           },
                           "judgeType": {
                             "type": "string",
@@ -11172,7 +11172,7 @@
                           },
                           "executionMode": {
                             "type": "string",
-                            "const": "managed"
+                            "const": "internal"
                           },
                           "judgeType": {
                             "type": "string",
@@ -11697,7 +11697,7 @@
                           },
                           "executionMode": {
                             "type": "string",
-                            "const": "managed"
+                            "const": "internal"
                           },
                           "judgeType": {
                             "type": "string",
@@ -12176,7 +12176,7 @@
                           },
                           "executionMode": {
                             "type": "string",
-                            "const": "submitted"
+                            "const": "external"
                           },
                           "judgeType": {
                             "type": "string",
@@ -17947,7 +17947,7 @@
                             },
                             "execution_mode": {
                               "type": "string",
-                              "const": "managed"
+                              "const": "internal"
                             },
                             "judge_type": {
                               "type": "string",
@@ -18514,7 +18514,7 @@
                             },
                             "execution_mode": {
                               "type": "string",
-                              "const": "managed"
+                              "const": "internal"
                             },
                             "judge_type": {
                               "type": "string",
@@ -19089,7 +19089,7 @@
                             },
                             "execution_mode": {
                               "type": "string",
-                              "const": "managed"
+                              "const": "internal"
                             },
                             "judge_type": {
                               "type": "string",
@@ -19626,7 +19626,7 @@
                             },
                             "execution_mode": {
                               "type": "string",
-                              "const": "submitted"
+                              "const": "external"
                             },
                             "judge_type": {
                               "type": "string",

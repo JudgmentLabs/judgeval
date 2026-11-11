@@ -50,7 +50,7 @@ class TestExternalJudgeFactoryCreate:
         assert payload == {
             "judge": {
                 "name": "n",
-                "executionMode": "submitted",
+                "executionMode": "external",
                 "initialVersion": {"scoreType": "binary"},
             },
         }
@@ -229,7 +229,7 @@ def test_numeric_feedback_roundtrips_through_the_public_http_client():
                 {
                     "judge": {
                         "name": "rating",
-                        "executionMode": "submitted",
+                        "executionMode": "external",
                         "initialVersion": {"scoreType": "numeric"},
                     }
                 },
