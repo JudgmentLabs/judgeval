@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import atexit
+import copy
 import threading
 import time
 from collections import deque
@@ -15,7 +16,6 @@ from judgeval.internal.api.models import (
 )
 from judgeval.logger import judgeval_logger
 from judgeval.utils.decorators.dont_throw import dont_throw
-from judgeval.utils.serialize import json_encoder
 
 # The most observations the server accepts in one request.
 MAX_BATCH_SIZE = 100
@@ -100,9 +100,9 @@ class ObservationsClient:
             )
             return
         sent: IngestObservationsRequestObservation = {
-            # Encoded now, as it will be sent, so a value that cannot be sent
-            # fails here and later changes to the caller's dict are not sent.
-            "observation": json_encoder(observation),
+            # Sent later, so copy it: changes the caller makes afterwards, such
+            # as appending to a shared message history, are not sent.
+            "observation": copy.deepcopy(observation),
             "observed_at": (observed_at or datetime.now(timezone.utc))
             .astimezone(timezone.utc)
             .isoformat(),
