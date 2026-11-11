@@ -199,3 +199,14 @@ def test_ignores_calls_recorded_after_shutdown(clients):
     observations.record(call())
     assert observations.flush(timeout_seconds=1)
     assert fake.attempts == 0
+
+
+def test_drops_calls_without_retrying_over_the_usage_limit(clients):
+    def over_limit(batch: list[Any]) -> None:
+        raise api_error(402)
+
+    fake = FakeClient(over_limit)
+    observations = clients(fake)
+    observations.record(call())
+    assert observations.flush(timeout_seconds=5)
+    assert fake.attempts == 1

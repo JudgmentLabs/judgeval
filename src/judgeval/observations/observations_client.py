@@ -216,6 +216,13 @@ class ObservationsClient:
                         "enabled for this organization",
                     )
                     return
+                if error.status_code == 402:
+                    self._report_once(
+                        "usage",
+                        "Observations are not stored: the organization is "
+                        "over its ingestion usage limit",
+                    )
+                    return
                 if (
                     error.status_code not in RETRYABLE_STATUSES
                     or attempt == MAX_ATTEMPTS
