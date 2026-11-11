@@ -284,6 +284,32 @@ class TestObserveGenerator:
 
         assert list(gen()) == [10, 20, 30]
 
+    def test_yield_spans_are_children_of_generator_span(
+        self, tracer, collecting_exporter
+    ):
+        @BaseTracer.observe
+        def gen():
+            yield 1
+            yield 2
+
+        assert list(gen()) == [1, 2]
+
+        root = next(
+            s
+            for s in collecting_exporter.spans
+            if s.attributes.get(AttributeKeys.JUDGMENT_SPAN_KIND) == "generator"
+        )
+        items = [
+            s
+            for s in collecting_exporter.spans
+            if s.attributes.get(AttributeKeys.JUDGMENT_SPAN_KIND) == "generator_item"
+        ]
+        assert len(items) == 2
+        for item in items:
+            assert item.context.trace_id == root.context.trace_id
+            assert item.parent is not None
+            assert item.parent.span_id == root.context.span_id
+
     def test_forked_generator_falls_back_to_same_trace(
         self, tracer, collecting_exporter
     ):
@@ -334,6 +360,36 @@ class TestObserveAsyncGenerator:
             and s.attributes.get(AttributeKeys.JUDGMENT_SPAN_KIND) == "generator"
         )
         assert root.attributes.get(AttributeKeys.JUDGMENT_OUTPUT) == "<async_generator>"
+
+    @pytest.mark.asyncio
+    async def test_yield_spans_are_children_of_generator_span(
+        self, tracer, collecting_exporter
+    ):
+        @BaseTracer.observe(span_type="agent")
+        async def consumer():
+            @BaseTracer.observe
+            async def agen():
+                yield 1
+                yield 2
+
+            return [value async for value in agen()]
+
+        assert await consumer() == [1, 2]
+
+        root = next(
+            s
+            for s in collecting_exporter.spans
+            if s.attributes.get(AttributeKeys.JUDGMENT_SPAN_KIND) == "generator"
+        )
+        items = [
+            s
+            for s in collecting_exporter.spans
+            if s.attributes.get(AttributeKeys.JUDGMENT_SPAN_KIND) == "generator_item"
+        ]
+        assert len(items) == 2
+        for item in items:
+            assert item.parent is not None
+            assert item.parent.span_id == root.context.span_id
 
     @pytest.mark.asyncio
     async def test_forked_async_generator_falls_back_to_same_trace(
