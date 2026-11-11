@@ -510,6 +510,10 @@
             "description": "A recorded model-call failure",
             "$ref": "#/components/schemas/ConversationError"
           },
+          "truncated": {
+            "description": "Whether the source cut the recorded content short, so the input or output is not all of the call",
+            "type": "boolean"
+          },
           "metadata": {
             "description": "Any other facts about this call",
             "type": "object",
@@ -3176,6 +3180,10 @@
               }
             },
             "description": "A recorded model-call failure"
+          },
+          "truncated": {
+            "description": "Whether the source cut the recorded content short, so the input or output is not all of the call",
+            "type": "boolean"
           },
           "metadata": {
             "description": "Any other facts about this call",

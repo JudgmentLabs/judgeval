@@ -151,6 +151,7 @@ class ConversationObservation(TypedDict, closed=True):
     finish_reason: NotRequired[str]
     usage: NotRequired[ConversationUsage]
     error: NotRequired[ConversationError]
+    truncated: NotRequired[bool]
     metadata: NotRequired[dict[str, ConversationJson]]
 
 
@@ -801,6 +802,7 @@ class Observation(TypedDict):
     finish_reason: NotRequired[str]
     usage: NotRequired[ConversationUsage]
     error: NotRequired[ObservationError]
+    truncated: NotRequired[bool]
     metadata: NotRequired[dict[str, Any]]
 
 
