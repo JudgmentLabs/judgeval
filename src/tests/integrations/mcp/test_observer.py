@@ -22,14 +22,14 @@ from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
 
 @pytest.mark.parametrize("style", ["model-v1", "wire-v2", "model-v2"])
 def test_structured_only_handoff_preserves_output_without_content(style):
-    from mcp.types import CallToolResult
     from pydantic import create_model
     from judgeval.integrations.mcp._arguments import conversation_id_prompt
 
     payload = {"ok": True}
     if style == "model-v1":
         adapter = ModelResults()
-        original = CallToolResult.model_construct(structuredContent=payload)
+        model = create_model("StructuredV1Result", structuredContent=(dict, ...))
+        original = model(structuredContent=payload)
     elif style == "wire-v2":
         adapter = WireResults()
         original = {"structuredContent": payload}
