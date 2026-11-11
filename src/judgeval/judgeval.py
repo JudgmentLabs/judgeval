@@ -25,6 +25,7 @@ from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
 from judgeval.logger import judgeval_logger
 
 if TYPE_CHECKING:
+    from judgeval.observations import ObservationsClient
     from opentelemetry.sdk.trace import SpanLimits, SpanProcessor
     from opentelemetry.sdk.trace.sampling import Sampler
 
@@ -97,6 +98,7 @@ class Judgeval:
         "_internal_client",
         "_project_name",
         "_project_id",
+        "_observations",
     )
 
     def __init__(
@@ -138,6 +140,7 @@ class Judgeval:
                 f"Project '{project_name}' not found. "
                 "Some operations requiring project_id will be skipped."
             )
+        self._observations: Optional["ObservationsClient"] = None
 
     def offline_tracer(
         self,
@@ -288,6 +291,37 @@ class Judgeval:
             ```
         """
         return self._internal_client
+
+    @property
+    def observations(self) -> "ObservationsClient":
+        """Send model calls to Judgment without traces.
+
+        Returns:
+            ObservationsClient: Use `.record()` to queue a call in the
+                conversation format; calls are sent in the background, in
+                batches, and stored and evaluated as calls recorded from
+                traces are. The same client is returned every time.
+
+        Examples:
+            ```python
+            client.observations.record({
+                "conversation_id": "ticket-4812",
+                "input": [{
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "text", "text": "Where is my order?"}],
+                }],
+            })
+            client.observations.flush()
+            ```
+        """
+        if self._observations is None:
+            from judgeval.observations import ObservationsClient
+
+            self._observations = ObservationsClient(
+                self._internal_client, self._project_id
+            )
+        return self._observations
 
     @property
     def evaluation(self):
