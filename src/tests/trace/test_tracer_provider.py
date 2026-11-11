@@ -124,19 +124,24 @@ class TestAttachDetach:
 
 
 class TestGlobalContextBridge:
-    """When installed as the global provider, the active span must be visible
-    to third-party OTel instrumentation that reads the current span from the
-    global context via trace.get_current_span(). When embedded (not the global
-    provider), Judgment's context stays isolated from the host's."""
+    """When installed as the global provider, Judgment's active span is mirrored
+    into the global OTel context (WRITE direction) so third-party
+    instrumentation that reads the current span via trace.get_current_span()
+    nests UNDER Judgment. Crucially, this is decoupled from the READ direction:
+    Judgment still selects the parent for its own spans from its private
+    context, so it never adopts a foreign ambient parent by default. When
+    embedded (not the global provider), Judgment's context stays isolated."""
 
-    def test_active_span_visible_to_external_when_global(
+    def test_active_span_mirrored_to_global_for_external_nesting(
         self, tracer, collecting_exporter
     ):
         from opentelemetry import trace as otel_trace
         from judgeval.trace.base_tracer import BaseTracer
 
         provider = JudgmentTracerProvider.get_instance()
-        provider._use_global_context = True  # set by install_as_global_*
+        # State after install_as_global_tracer_provider(): WRITE on, READ off.
+        provider._mirror_active_span_to_global = True
+        assert provider._use_global_context is False
 
         with BaseTracer.start_as_current_span("work"):
             external = otel_trace.get_current_span()  # reads the GLOBAL context
@@ -154,16 +159,18 @@ class TestGlobalContextBridge:
 
         provider = JudgmentTracerProvider.get_instance()
         assert provider._use_global_context is False  # default
+        assert provider._mirror_active_span_to_global is False  # default
 
         with BaseTracer.start_as_current_span("work"):
             # Judgment's active span must not leak into the global context
             assert otel_trace.get_current_span().is_recording() is False
 
-    def test_install_as_global_sets_flag(self):
+    def test_install_as_global_enables_write_not_read(self):
         from unittest.mock import patch
 
         provider = JudgmentTracerProvider.get_instance()
         assert provider._use_global_context is False
+        assert provider._mirror_active_span_to_global is False
         with (
             patch.object(JudgmentTracerProvider, "get_instance", return_value=provider),
             patch(
@@ -175,4 +182,118 @@ class TestGlobalContextBridge:
             ),
         ):
             assert JudgmentTracerProvider.install_as_global_tracer_provider() is True
-        assert provider._use_global_context is True
+        # WRITE enabled (external libs nest under Judgment)...
+        assert provider._mirror_active_span_to_global is True
+        # ...but READ (foreign-parent adoption) stays off by default.
+        assert provider._use_global_context is False
+
+
+class TestForeignParentDecoupling:
+    """Regression tests for the #749 fix: Judgment must not adopt a foreign
+    ambient parent sitting in the global OTel context (the Google ADK / Vertex
+    Agent Engine scenario), while still exporting its own spans and preserving
+    intra-Judgment nesting."""
+
+    @staticmethod
+    def _foreign_unsampled_global_context():
+        """Attach an unsampled foreign span into the GLOBAL OTel context,
+        mimicking an ambient ADK/Vertex request span. Returns
+        (foreign_span_context, detach_token)."""
+        from opentelemetry import context as context_api
+        from opentelemetry import trace as otel_trace
+        from opentelemetry.trace import (
+            NonRecordingSpan,
+            SpanContext,
+            TraceFlags,
+        )
+
+        foreign_ctx = SpanContext(
+            trace_id=0x11111111111111111111111111111111,
+            span_id=0x2222222222222222,
+            is_remote=True,
+            trace_flags=TraceFlags(TraceFlags.DEFAULT),  # NOT sampled
+        )
+        assert foreign_ctx.trace_flags.sampled is False
+        foreign_span = NonRecordingSpan(foreign_ctx)
+        global_ctx = otel_trace.set_span_in_context(foreign_span)
+        token = context_api.attach(global_ctx)
+        return foreign_ctx, token
+
+    def test_span_under_unsampled_ambient_parent_still_exports_as_judgment_root(
+        self, tracer, collecting_exporter
+    ):
+        from opentelemetry import context as context_api
+        from judgeval.trace.base_tracer import BaseTracer
+
+        provider = JudgmentTracerProvider.get_instance()
+        # Simulate the production scenario: Judgment is installed as the global
+        # provider (WRITE mirroring on) and a foreign, unsampled parent is
+        # already active in the global context.
+        provider._mirror_active_span_to_global = True
+
+        foreign_ctx, token = self._foreign_unsampled_global_context()
+        try:
+            with BaseTracer.start_as_current_span("judgment-root") as span:
+                sc = span.get_span_context()
+                # (a) recording / sampled despite the unsampled ambient parent
+                assert span.is_recording()
+                assert sc.trace_flags.sampled is True
+                # (c) independent Judgment ROOT, not re-parented under the foreign span
+                assert sc.trace_id != foreign_ctx.trace_id
+                assert getattr(span, "parent", None) is None
+        finally:
+            context_api.detach(token)
+
+        # (b) the Judgment span was exported
+        assert len(collecting_exporter.spans) >= 1
+        exported = collecting_exporter.spans[-1]
+        assert exported.parent is None
+        assert exported.context.trace_id != foreign_ctx.trace_id
+
+    def test_intra_judgment_nesting_preserved(self, tracer):
+        from judgeval.trace.base_tracer import BaseTracer
+
+        provider = JudgmentTracerProvider.get_instance()
+        provider._mirror_active_span_to_global = True
+
+        with BaseTracer.start_as_current_span("parent") as parent:
+            parent_sc = parent.get_span_context()
+            with BaseTracer.start_as_current_span("child") as child:
+                child_sc = child.get_span_context()
+                # child correctly nests under the Judgment parent
+                assert child_sc.trace_id == parent_sc.trace_id
+                assert child.parent is not None
+                assert child.parent.span_id == parent_sc.span_id
+
+    def test_opt_in_use_global_context_restores_adoption(
+        self, tracer, collecting_exporter
+    ):
+        """With the explicit opt-in, Judgment reads the global context and DOES
+        adopt the ambient parent (restores full #749 read behavior)."""
+        from opentelemetry import context as context_api
+        from opentelemetry import trace as otel_trace
+        from opentelemetry.trace import SpanContext, TraceFlags, NonRecordingSpan
+        from judgeval.trace.base_tracer import BaseTracer
+
+        provider = JudgmentTracerProvider.get_instance()
+        provider._use_global_context = True  # explicit opt-in
+
+        # Use a SAMPLED foreign parent here so the child is recorded.
+        foreign_ctx = SpanContext(
+            trace_id=0x33333333333333333333333333333333,
+            span_id=0x4444444444444444,
+            is_remote=True,
+            trace_flags=TraceFlags(TraceFlags.SAMPLED),
+        )
+        token = context_api.attach(
+            otel_trace.set_span_in_context(NonRecordingSpan(foreign_ctx))
+        )
+        try:
+            with BaseTracer.start_as_current_span("adopted") as span:
+                sc = span.get_span_context()
+                # adopts the foreign trace and parents under the foreign span
+                assert sc.trace_id == foreign_ctx.trace_id
+                assert span.parent is not None
+                assert span.parent.span_id == foreign_ctx.span_id
+        finally:
+            context_api.detach(token)

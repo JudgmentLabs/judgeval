@@ -25,6 +25,25 @@ _active_tracer_var: ContextVar[Optional[JudgmentTracer]] = ContextVar(
 )
 
 
+class _DualContextToken:
+    """Holds the tokens returned when a context is attached to both Judgment's
+    private runtime context and (optionally) the global OTel context.
+
+    Returned by ``JudgmentTracerProvider.attach_context`` and consumed by
+    ``detach_context``. Kept opaque to callers, which only round-trip it.
+    """
+
+    __slots__ = ("private_token", "global_token")
+
+    def __init__(
+        self,
+        private_token: Token[Context],
+        global_token: Optional[Token[Context]] = None,
+    ):
+        self.private_token = private_token
+        self.global_token = global_token
+
+
 class ProxyTracer(Tracer):
     """Internal tracer that delegates to the currently active ``JudgmentTracer``.
 
@@ -127,6 +146,7 @@ class JudgmentTracerProvider(TracerProvider):
         "_judgment_tracers",
         "_external_span_processors",
         "_use_global_context",
+        "_mirror_active_span_to_global",
     )
 
     def __init__(self):
@@ -136,13 +156,26 @@ class JudgmentTracerProvider(TracerProvider):
         self._proxy_tracer = ProxyTracer(self)
         self._judgment_tracers: WeakSet[JudgmentTracer] = WeakSet()
         self._external_span_processors: list[SpanProcessor] = []
-        # When this provider is installed as the global provider it owns the
-        # global OTel context too, so active spans must be published there
-        # (not only in Judgment's private context). That lets third-party
-        # instrumentation that reads the current span via the standard API
-        # (trace.get_current_span()) target the live span. In the embedded
-        # case (a host app owns the global provider) we keep our context
-        # isolated so we don't interfere with the host.
+        # There are two independent directions of context propagation. Keeping
+        # them separate is what avoids the regression from #749 where Judgment
+        # spans silently adopted a foreign ambient parent (e.g. Google ADK /
+        # Vertex Agent Engine request spans sitting in the global OTel context).
+        #
+        # WRITE direction (``_mirror_active_span_to_global``): publish
+        # Judgment's currently-active span INTO the global OTel context so that
+        # third-party instrumentation that reads the current span via the
+        # standard API (``trace.get_current_span()``) nests UNDER Judgment's
+        # spans. This is the feature #749 intended, and is enabled when we own
+        # the global provider (see ``install_as_global_tracer_provider``).
+        self._mirror_active_span_to_global = False
+        # READ direction (``_use_global_context``): when selecting the PARENT
+        # for a new Judgment span, read the global OTel context instead of
+        # Judgment's private runtime context. This is what caused the #749
+        # regression, so it now defaults to False -- even after global install
+        # -- and is strictly opt-in for callers who genuinely want Judgment to
+        # adopt whatever ambient span happens to be current in the global
+        # context. The customer mitigation ``_use_global_context = False``
+        # remains valid (it is now the default) and harmless.
         self._use_global_context = False
 
     @classmethod
@@ -156,6 +189,18 @@ class JudgmentTracerProvider(TracerProvider):
     def install_as_global_tracer_provider(cls) -> bool:
         """Install this provider as the OpenTelemetry global tracer provider.
 
+        Once installed we own the global OTel context, so we enable the WRITE
+        direction (``_mirror_active_span_to_global``): Judgment's active span is
+        published into the global context so third-party instrumentation nests
+        under it. We deliberately do NOT enable the READ direction
+        (``_use_global_context``) here -- adopting whatever ambient span happens
+        to be current in the global context as the parent of Judgment's own
+        spans is opt-in only, because in long-lived servers (e.g. Google ADK on
+        Vertex Agent Engine) that ambient span is a foreign, often unsampled,
+        request span, and adopting it silently drops or re-parents Judgment's
+        traces (regression from #749). Set ``_use_global_context = True``
+        explicitly to restore that adoption behavior.
+
         Returns True if the provider was successfully installed, False if
         another provider was already set (OpenTelemetry enforces
         first-writer-wins semantics).
@@ -163,10 +208,10 @@ class JudgmentTracerProvider(TracerProvider):
         instance = cls.get_instance()
         trace_api.set_tracer_provider(instance)
         installed = trace_api.get_tracer_provider() is instance
-        # Once we own the global provider we also own the global context:
-        # mirror active spans there so third-party instrumentation that reads
-        # the current span via the standard OTel API sees the live span.
-        instance._use_global_context = installed
+        # WRITE direction only: mirror active spans into the global context so
+        # third-party instrumentation that reads the current span via the
+        # standard OTel API sees the live Judgment span and nests under it.
+        instance._mirror_active_span_to_global = installed
         if not installed:
             judgeval_logger.warning(
                 "Failed to install JudgmentTracerProvider as the global "
@@ -228,10 +273,27 @@ class JudgmentTracerProvider(TracerProvider):
         return _active_tracer_var.get()
 
     def get_current_context(self) -> Context:
-        """Return the current OpenTelemetry context."""
+        """Return the context used to select the parent for new Judgment spans.
+
+        READ direction. By default this is Judgment's own private runtime
+        context, so Judgment mints independent root traces and never adopts a
+        foreign ambient parent from the global OTel context. Opt in via
+        ``_use_global_context`` to read the global context instead (restores the
+        pre-fix / #749 behavior of adopting the ambient global parent).
+        """
         if self._use_global_context:
             return context_api.get_current()
         return self._runtime_context.get_current()
+
+    def _should_write_to_global_context(self) -> bool:
+        """Whether ``attach_context`` should also publish into the global context.
+
+        True when we mirror active spans for external instrumentation (WRITE
+        direction, enabled on global install), or when we read the parent from
+        the global context (so that intra-Judgment nesting is preserved there
+        as well).
+        """
+        return self._mirror_active_span_to_global or self._use_global_context
 
     def get_current_span(self) -> Span:
         """Return the span that is active in the current context."""
@@ -317,14 +379,29 @@ class JudgmentTracerProvider(TracerProvider):
                 span.end()
 
     def attach_context(self, ctx: Context) -> Token[Context]:
-        if self._use_global_context:
-            return context_api.attach(ctx)
-        return self._runtime_context.attach(ctx)
+        """Make ``ctx`` the current context.
+
+        Always attaches to Judgment's private runtime context (the READ source
+        by default), so intra-Judgment nesting works regardless of the global
+        context. When ``_should_write_to_global_context()`` is set, ALSO
+        attaches to the global OTel context (WRITE direction) so external
+        instrumentation nests under Judgment's active span. Both tokens are
+        tracked so ``detach_context`` can unwind both.
+        """
+        private_token = self._runtime_context.attach(ctx)
+        global_token: Optional[Token[Context]] = None
+        if self._should_write_to_global_context():
+            global_token = context_api.attach(ctx)
+        return _DualContextToken(private_token, global_token)  # type: ignore[return-value]
 
     def detach_context(self, token: Token[Context]) -> None:
-        if self._use_global_context:
-            context_api.detach(token)
+        if isinstance(token, _DualContextToken):
+            # Unwind in reverse order of attach (global first, then private).
+            if token.global_token is not None:
+                context_api.detach(token.global_token)
+            self._runtime_context.detach(token.private_token)
         else:
+            # Backward compatibility for a bare private-context token.
             self._runtime_context.detach(token)
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
