@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
@@ -66,6 +67,44 @@ class Judge(ABC, Generic[R]):
         )
         ```
     """
+
+    recorded_metrics: dict[str, float]
+    """Numbers recorded with `metric`; unset until the first call."""
+
+    def metric(self, name: str, value: float) -> None:
+        """Record a named number about the trace being scored.
+
+        Call this from `score` to report measurements such as tool calls,
+        cost or latency, separately from the score you return. Recording the
+        same name again replaces its value. Test suite runs show each metric
+        on the test case and summarize it across the run; other evaluations
+        ignore them.
+
+        Args:
+            name: The metric's name, for example `"tool_calls"`.
+            value: A finite number.
+
+        Raises:
+            ValueError: If `value` is not a finite number.
+
+        Examples:
+            ```python
+            class ToolUseJudge(Judge[BinaryResponse]):
+                async def score(self, data: Example) -> BinaryResponse:
+                    tool_spans = [s for s in data.trace.spans if s["span_kind"] == "tool"]
+                    self.metric("tool_calls", len(tool_spans))
+                    return BinaryResponse(
+                        value=len(tool_spans) <= 5,
+                        reason=f"{len(tool_spans)} tool calls",
+                    )
+            ```
+        """
+        number = float(value)
+        if not math.isfinite(number):
+            raise ValueError(f"Metric {name!r} must be a finite number, got {value!r}")
+        # Kept on the instance rather than set in __init__, which subclasses
+        # may override without calling super().
+        self.__dict__.setdefault("recorded_metrics", {})[name] = number
 
     @abstractmethod
     async def score(self, data: Example) -> R:
