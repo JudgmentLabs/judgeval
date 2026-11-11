@@ -86,12 +86,14 @@ class Judge(ABC, Generic[R]):
 
         Raises:
             ValueError: If `value` is not a finite number.
+            TypeError: If `value` cannot be converted to a number.
 
         Examples:
             ```python
             class ToolUseJudge(Judge[BinaryResponse]):
                 async def score(self, data: Example) -> BinaryResponse:
-                    tool_spans = [s for s in data.trace.spans if s["span_kind"] == "tool"]
+                    spans = data.trace.spans if data.trace else []
+                    tool_spans = [s for s in spans if s["span_kind"] == "tool"]
                     self.metric("tool_calls", len(tool_spans))
                     return BinaryResponse(
                         value=len(tool_spans) <= 5,
