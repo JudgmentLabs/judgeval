@@ -14,7 +14,6 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, FrozenSet, Mapping, Optional
 
-from ._scrub import scrub_identifiers
 
 INTENT_ARGUMENT = "context"
 MODEL_ARGUMENT = "llm_model"
@@ -92,21 +91,11 @@ def mint_conversation_id(now_ms: Optional[int] = None) -> str:
     return f"{text[:8]}-{text[8:12]}-{text[12:16]}-{text[16:20]}-{text[20:]}"
 
 
-def sanitize_intent(text: str) -> str:
-    """Removes well-defined personal identifiers from an agent's stated intent.
-
-    Names can't be recognized, so the argument's description also tells agents
-    not to send them.
-    """
-    return scrub_identifiers(text)[:_MAX_INTENT_LENGTH]
-
-
 def tool_contract(schema: Any) -> Optional[ToolContract]:
     """Reads a listed tool's JSON input schema. None if injection isn't safe.
 
-    An absent ``additionalProperties`` counts as closed: most generated schemas
-    leave it out, and removing the injected arguments gives the tool exactly
-    the arguments it declares. A name the schema requires or matches with
+    An absent ``additionalProperties`` permits undeclared business arguments.
+    A name the schema requires or matches with
     ``patternProperties`` is the tool's own, like one under ``properties``.
     """
     if not isinstance(schema, Mapping) or schema.get("type") != "object":
@@ -127,8 +116,8 @@ def tool_contract(schema: Any) -> Optional[ToolContract]:
             return None
     return ToolContract(
         declared=frozenset(declared),
-        open=_accepts_other_keys(schema.get("additionalProperties"))
-        or _accepts_other_keys(schema.get("unevaluatedProperties")),
+        open=schema.get("additionalProperties") is not False
+        and schema.get("unevaluatedProperties") is not False,
     )
 
 
@@ -136,10 +125,6 @@ def _names(properties: Any) -> FrozenSet[str]:
     if not isinstance(properties, Mapping):
         return frozenset()
     return frozenset(name for name in properties if isinstance(name, str))
-
-
-def _accepts_other_keys(keyword: Any) -> bool:
-    return keyword is True or isinstance(keyword, Mapping)
 
 
 def read_reported_arguments(
@@ -157,7 +142,7 @@ def read_reported_arguments(
     model = read(MODEL_ARGUMENT)
     conversation_id = read(CONVERSATION_ARGUMENT)
     return ReportedArguments(
-        intent=None if intent is None else sanitize_intent(intent),
+        intent=None if intent is None else intent[:_MAX_INTENT_LENGTH],
         model=None if model is None or model.lower() == "unknown" else model,
         conversation_id=conversation_id
         if conversation_id is not None and _UUID_V7.match(conversation_id)

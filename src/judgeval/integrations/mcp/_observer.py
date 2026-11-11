@@ -9,6 +9,7 @@ is decided here, so both `mcp` versions behave the same.
 from __future__ import annotations
 
 import contextvars
+import inspect
 import json
 import re
 import time
@@ -60,8 +61,7 @@ from ._arguments import (
     tool_contract,
     without_agent_arguments,
 )
-from ._scrub import argument_values, scrub_error_message
-from ._exporter import McpCall, McpCallExporter, OMITTED, RedactPayload, capture_payload
+from ._exporter import McpCallExporter, OMITTED, RedactPayload, capture_payload
 
 T = TypeVar("T")
 
@@ -124,7 +124,7 @@ class McpOptions:
     server_build: Optional[str] = None
     inject_agent_arguments: bool = True
     identify: Optional[Identify] = None
-    capture_error_messages: bool = True
+    capture_error_messages: bool = False
     redact: Optional[Redact] = None
     capture_input: bool = False
     capture_output: bool = False
@@ -180,7 +180,6 @@ class _CallRecord:
     identified: bool = False
     failure: Optional[Tuple[str, Optional[str]]] = None
     argument_keys: List[str] = field(default_factory=list)
-    argument_values: Optional[List[str]] = None
     environment: Optional[str] = None
 
 
@@ -225,7 +224,7 @@ def set_mcp_caller(
 
 
 def capture_mcp_call(
-    call: McpCall, *, redact_payload: Optional[RedactPayload] = None
+    call: Mapping[str, Any], *, redact_payload: Optional[RedactPayload] = None
 ) -> None:
     """Capture a completed custom-server call. Supplied payloads opt in to capture."""
 
@@ -324,11 +323,13 @@ class McpObserver:
         options: McpOptions,
         server_name: Optional[str],
         server_version: Optional[str],
+        tool_manager: Any = None,
     ) -> None:
         self.options = options
         self._server_name = options.server_name or server_name
         self._server_version = server_version
         self._contracts: Dict[str, Optional[ToolContract]] = {}
+        self._tool_manager = tool_manager
         # Requests can run where the tracer set by `Tracer.init()` isn't
         # active, such as a server running in another thread.
         self._tracer = attempt(_active_tracer)
@@ -340,6 +341,22 @@ class McpObserver:
     def remember_listing(self, tools: Optional[ListedTools]) -> None:
         """Keeps what each listed tool declares, before injection changes it."""
         for name, schema in tools or ():
+            tool = getattr(self._tool_manager, "_tools", {}).get(name)
+            model = getattr(getattr(tool, "fn_metadata", None), "arg_model", None)
+            function = getattr(tool, "fn", None)
+            closed = (
+                model.model_config.get("extra") != "allow"
+                if model is not None
+                else callable(function)
+                and all(
+                    parameter.kind != inspect.Parameter.VAR_KEYWORD
+                    for parameter in inspect.signature(function).parameters.values()
+                )
+            )
+            # FastMCP's generated Pydantic models ignore extras by default;
+            # raw JSON-schema servers must explicitly declare closed inputs.
+            if closed and isinstance(schema, Mapping):
+                schema = {**schema, "additionalProperties": False}
             self._contracts[name] = tool_contract(schema)
 
     async def contract_for(
@@ -408,9 +425,7 @@ class McpObserver:
             result = await invoke(arguments)
             return self._shaped(facts, result, adapter, None)
 
-        record = _CallRecord(
-            argument_values=attempt(lambda: argument_values(facts.params))
-        )
+        record = _CallRecord()
         span = (
             attempt(lambda: self._start_span(facts, prepared))
             if self.options.record_spans
@@ -533,7 +548,7 @@ class McpObserver:
             call["environment_name"] = _bounded(record.environment, 256)
         if failed and not cancelled:
             error_type, recorded = self._failure(record, result, facts, adapter)
-            call["error_type"] = _bounded(error_type, 256)
+            call["error_type"] = _bounded(error_type, 256) or "tool_error"
             if recorded is not None:
                 call["error_message"] = recorded
         output = (
@@ -635,7 +650,7 @@ class McpObserver:
             else ReportedArguments(None, None, None)
         )
         session_id = self.options.session_id
-        logical_session = (
+        provided_session = (
             attempt(
                 lambda: session_id(
                     McpRequestInfo(
@@ -645,7 +660,8 @@ class McpObserver:
             )
             if session_id is not None
             else None
-        ) or reported.conversation_id
+        )
+        logical_session = _text(provided_session) or reported.conversation_id
         minted = (
             mint_conversation_id()
             if injected
@@ -820,7 +836,7 @@ class McpObserver:
         if message is None and error is not None:
             message = _error_message(error)
         recorded = (
-            self._recorded_message(message, facts.params, record.argument_values)
+            self._redacted(message)
             if self.options.capture_error_messages and message is not None
             else None
         )
@@ -829,20 +845,6 @@ class McpObserver:
             None if recorded is None else recorded[:_MAX_ERROR_MESSAGE_LENGTH],
         )
         return record.failure
-
-    def _recorded_message(
-        self,
-        message: str,
-        params: Mapping[str, Any],
-        values: Optional[List[str]] = None,
-    ) -> Optional[str]:
-        """The failure text a span keeps. None if it can't be made safe to keep."""
-        scrubbed = attempt(
-            lambda: scrub_error_message(
-                message, argument_values(params) if values is None else values
-            )
-        )
-        return None if scrubbed is None else self._redacted(scrubbed)
 
     def _error_type(
         self, error: Optional[BaseException], has_result: bool, message: Optional[str]
@@ -912,7 +914,9 @@ def _active_tracer() -> Any:
 
 def _bounded(value: str, limit: int) -> str:
     """Match the native contract's JavaScript (UTF-16) string limits."""
-    return value.encode("utf-16-le")[: limit * 2].decode("utf-16-le", errors="ignore")
+    return value.encode("utf-16-le", errors="surrogatepass")[: limit * 2].decode(
+        "utf-16-le", errors="replace"
+    )
 
 
 def _active_exporter() -> Optional[McpCallExporter]:
@@ -938,7 +942,7 @@ def _active_exporter() -> Optional[McpCallExporter]:
             )
             _exporters[tracer] = exporter
             JudgmentTracerProvider.get_instance().add_background_exporter(exporter)
-        return exporter
+        return None if exporter.closed else exporter
 
 
 def _error_code(error: Optional[BaseException]) -> Any:

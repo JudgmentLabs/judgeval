@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
+import math
+import re
 import threading
 import time
 from dataclasses import dataclass
 from email.utils import parsedate_to_datetime
+from datetime import datetime, timezone
 from typing import Any, Callable, Literal, Optional, Mapping, cast
 
 from judgeval.exceptions import JudgmentAPIError
@@ -26,6 +29,7 @@ _BATCH_SIZE = 100
 _FLUSH_INTERVAL = 1.0
 _REQUEST_TIMEOUT = 5.0
 _MAX_ATTEMPTS = 3
+_WARNING_INTERVAL = 60.0
 OMITTED = object()
 
 
@@ -69,21 +73,44 @@ class McpCallExporter:
         self._timer: Optional[threading.Timer] = None
         self._closed = False
         self._batch: Optional[_Batch] = None
+        self._next_warning = 0.0
+
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
+    def _warn(self, message: str) -> None:
+        with self._lock:
+            now = time.monotonic()
+            if now < self._next_warning:
+                return
+            self._next_warning = now + _WARNING_INTERVAL
+        judgeval_logger.warning(message)
 
     def enqueue(self, call: Mapping[str, Any]) -> None:
-        serialized = json.dumps(call, ensure_ascii=False, allow_nan=False)
+        if self._closed:
+            return
+        serialized = (
+            json.dumps(call, ensure_ascii=False, allow_nan=False)
+            .encode("utf-8", errors="replace")
+            .decode("utf-8")
+        )
+        if not _valid_call(json.loads(serialized)):
+            self._warn("Invalid MCP event; dropping call")
+            return
         size = len(serialized.encode("utf-8"))
         with self._lock:
-            if (
-                self._closed
-                or len(self._queue) >= _MAX_QUEUE
-                or self._queued_bytes + size > _MAX_QUEUE_BYTES
-            ):
-                judgeval_logger.warning("MCP export queue unavailable; dropping call")
+            if self._closed:
                 return
-            self._queue.append(serialized)
-            self._queued_bytes += size
-            self._schedule()
+            if (
+                len(self._queue) < _MAX_QUEUE
+                and self._queued_bytes + size <= _MAX_QUEUE_BYTES
+            ):
+                self._queue.append(serialized)
+                self._queued_bytes += size
+                self._schedule()
+                return
+        self._warn("MCP export queue unavailable; dropping call")
 
     def _schedule(self) -> None:
         if (
@@ -96,10 +123,19 @@ class McpCallExporter:
             _FLUSH_INTERVAL, self._batch.retry_at - time.time() if self._batch else 0
         )
         self._timer = threading.Timer(
-            min(delay, threading.TIMEOUT_MAX), self.force_flush
+            min(delay, threading.TIMEOUT_MAX), self._flush_background
         )
         self._timer.daemon = True
         self._timer.start()
+
+    def _flush_background(self) -> None:
+        with self._lock:
+            self._timer = None
+        try:
+            self.force_flush()
+        finally:
+            with self._lock:
+                self._schedule()
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         deadline = time.monotonic() + timeout_millis / 1000
@@ -174,8 +210,93 @@ class McpCallExporter:
             batch.retry_at = time.time() + max(
                 retry_after, 0.25 * 2 ** (batch.attempts - 1)
             )
-        judgeval_logger.warning("MCP export failed; dropping batch")
+        self._warn("MCP export failed; dropping batch")
         return True
+
+
+_STRING_LIMITS = {
+    "call_id": (1, 512),
+    "session_id": (1, 512),
+    "user_id": (1, 512),
+    "server_name": (1, 256),
+    "tool_name": (1, 256),
+    "client_name": (1, 256),
+    "environment_name": (1, 256),
+    "model": (1, 256),
+    "error_type": (1, 256),
+    "intent": (0, 2048),
+    "error_message": (0, 8192),
+    "trace_id": (0, 512),
+    "span_id": (0, 512),
+}
+
+
+def _valid_call(call: Mapping[str, Any]) -> bool:
+    """Reject individual malformed events before they poison a delivery batch."""
+    required = {
+        "call_id",
+        "timestamp",
+        "duration_ms",
+        "outcome",
+        "server_name",
+        "tool_name",
+    }
+    other = {
+        "timestamp",
+        "duration_ms",
+        "outcome",
+        "argument_keys",
+        "input",
+        "output",
+        "metadata",
+    }
+    if not required.issubset(call) or call.keys() - _STRING_LIMITS.keys() - other:
+        return False
+    for key, value in call.items():
+        if key in _STRING_LIMITS:
+            lower, upper = _STRING_LIMITS[key]
+            if (
+                not isinstance(value, str)
+                or not lower <= len(value.encode("utf-16-le")) // 2 <= upper
+            ):
+                return False
+    timestamp = call["timestamp"]
+    if not isinstance(timestamp, str) or not re.fullmatch(
+        r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)", timestamp
+    ):
+        return False
+    try:
+        instant = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        if (
+            not datetime(1970, 1, 1, tzinfo=timezone.utc)
+            <= instant
+            < datetime(2100, 1, 1, tzinfo=timezone.utc)
+        ):
+            return False
+    except ValueError:
+        return False
+    duration = call["duration_ms"]
+    keys = call.get("argument_keys", [])
+    metadata = call.get("metadata", {})
+    return (
+        type(duration) in (int, float)
+        and math.isfinite(duration)
+        and duration >= 0
+        and call["outcome"] in ("success", "error", "cancelled")
+        and isinstance(keys, list)
+        and len(keys) <= 100
+        and all(
+            isinstance(key, str) and 0 < len(key.encode("utf-16-le")) // 2 <= 256
+            for key in keys
+        )
+        and all(
+            len(json.dumps(call[key], ensure_ascii=False).encode("utf-8")) <= 128 * 1024
+            for key in ("input", "output")
+            if key in call
+        )
+        and isinstance(metadata, dict)
+        and len(json.dumps(metadata, ensure_ascii=False).encode("utf-8")) <= 16 * 1024
+    )
 
 
 def _retry_delay(value: Optional[str]) -> float:

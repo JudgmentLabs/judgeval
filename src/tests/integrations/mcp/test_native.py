@@ -1,4 +1,5 @@
 import json
+import threading
 
 import httpx
 import pytest
@@ -11,6 +12,47 @@ from judgeval.integrations.mcp._exporter import (
 )
 from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
 from tests.integrations.mcp.harness import build_server, connect, styles
+
+COMPLETED_CALL = {
+    "timestamp": "2026-11-10T00:00:00Z",
+    "duration_ms": 1,
+    "outcome": "success",
+    "server_name": "custom",
+    "tool_name": "lookup",
+}
+
+
+def test_background_delivery_recovers_after_flush_contention(
+    monkeypatch, native_requests
+):
+    timers = []
+
+    class Timer:
+        def __init__(self, delay, callback):
+            self.callback = callback
+
+        def start(self):
+            timers.append(self.callback)
+
+        def cancel(self):
+            pass
+
+    monkeypatch.setattr(threading, "Timer", Timer)
+    flush = McpCallExporter.force_flush
+    outcomes = iter([False, True])
+
+    def contended_flush(exporter):
+        return flush(exporter) if next(outcomes) else False
+
+    monkeypatch.setattr(McpCallExporter, "force_flush", contended_flush)
+    exporter = McpCallExporter("http://localhost", "key", "org", "project")
+    exporter.enqueue({**COMPLETED_CALL, "call_id": "event"})
+    timers.pop(0)()
+    if timers:
+        timers.pop(0)()
+    monkeypatch.setattr(McpCallExporter, "force_flush", flush)
+    exporter.shutdown()
+    assert native_requests == [{"calls": [{**COMPLETED_CALL, "call_id": "event"}]}]
 
 
 @pytest.mark.asyncio
@@ -96,6 +138,7 @@ async def test_native_calls_without_spans(
                 "trace": call.get("trace_id"),
                 "output": "output" in call,
                 "duration": call["duration_ms"] >= 0,
+                "error_message": call.get("error_message"),
             }
             for call in calls
         ],
@@ -113,6 +156,7 @@ async def test_native_calls_without_spans(
                 "trace": None,
                 "output": outcome == "success" or style != "mcp2-lowlevel",
                 "duration": True,
+                "error_message": None,
             }
             for outcome in ("success", "error")
         ],
@@ -133,18 +177,30 @@ def test_delivery_retries_identical_batches_and_stops_on_permanent_errors(monkey
         "judgeval.integrations.mcp._exporter.time.sleep", lambda _: None
     )
     exporter = McpCallExporter("http://localhost", "key", "org", "project")
-    event = {"call_id": "stable", "input": {"key": "original"}}
+    event = {**COMPLETED_CALL, "call_id": "stable", "input": {"key": "original"}}
+    exporter.enqueue({**event, "error_type": ""})
     exporter.enqueue(event)
     event["input"]["key"] = "changed"
     exporter.force_flush()
-    exporter.enqueue({"call_id": "second"})
+    exporter.enqueue({**COMPLETED_CALL, "call_id": "second"})
     exporter.shutdown()
     assert {
         "bodies": [json.loads(body) for body in bodies],
         "identical": bodies[0] == bodies[1],
     } == {
-        "bodies": [{"calls": [{"call_id": "stable", "input": {"key": "original"}}]}] * 2
-        + [{"calls": [{"call_id": "second"}]}],
+        "bodies": [
+            {
+                "calls": [
+                    {
+                        **COMPLETED_CALL,
+                        "call_id": "stable",
+                        "input": {"key": "original"},
+                    }
+                ]
+            }
+        ]
+        * 2
+        + [{"calls": [{**COMPLETED_CALL, "call_id": "second"}]}],
         "identical": True,
     }
 
@@ -198,7 +254,7 @@ def test_delivery_retains_unattempted_calls_and_respects_retry_after(mode, monke
     monkeypatch.setattr(httpx.Client, "request", request)
     exporter = McpCallExporter("http://localhost", "key", "org", "project")
     for n in range(101):
-        exporter.enqueue({"call_id": str(n)})
+        exporter.enqueue({**COMPLETED_CALL, "call_id": str(n)})
     first_flush = exporter.force_flush()
     first_attempts = len(bodies)
     clock.update(monotonic=0, wall=1121)
@@ -232,13 +288,27 @@ def test_v2_capture_preserves_existing_middleware():
     } == {"native": True, "remaining": [upstream]}
 
 
-@pytest.mark.parametrize("count", [101, 1001])
-def test_delivery_bounds_batches_and_queue(count, native_requests):
+@pytest.mark.parametrize("count", [101, 1010])
+def test_delivery_bounds_batches_and_queue(count, native_requests, caplog, monkeypatch):
+    original = httpx.Client.request
+
+    def rejected(client, method, url, **kwargs):
+        original(client, method, url, **kwargs)
+        return httpx.Response(403, json={})
+
+    monkeypatch.setattr(httpx.Client, "request", rejected)
     exporter = McpCallExporter("http://localhost", "key", "org", "project")
     for index in range(count):
-        exporter.enqueue({"call_id": str(index)})
+        exporter.enqueue({**COMPLETED_CALL, "call_id": str(index)})
     exporter.shutdown()
+    exporter.enqueue({**COMPLETED_CALL, "call_id": "after-shutdown"})
     retained = min(count, 1000)
-    assert [len(batch["calls"]) for batch in native_requests] == [
-        min(100, retained - offset) for offset in range(0, retained, 100)
-    ]
+    assert {
+        "sizes": [len(batch["calls"]) for batch in native_requests],
+        "warnings": len(
+            [record for record in caplog.records if "MCP export" in record.message]
+        ),
+    } == {
+        "sizes": [min(100, retained - offset) for offset in range(0, retained, 100)],
+        "warnings": 1,
+    }

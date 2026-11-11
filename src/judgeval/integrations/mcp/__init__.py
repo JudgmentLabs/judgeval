@@ -50,7 +50,7 @@ def instrument_mcp_server(
     server_build: Optional[str] = None,
     inject_agent_arguments: bool = True,
     identify: Optional[Identify] = None,
-    capture_error_messages: bool = True,
+    capture_error_messages: bool = False,
     redact: Optional[Redact] = None,
     capture_input: bool = False,
     capture_output: bool = False,
@@ -79,14 +79,14 @@ def instrument_mcp_server(
             and model, and of sessions for clients that send no session ID.
         identify: Returns the end user or customer of a request. Called once
             the request finishes. Exceptions are ignored.
-        capture_error_messages: Records the text of a failure, without the
-            call's argument values. False keeps only its type.
+        capture_error_messages: Opt in to failure text; defaults to False.
+            Enabled text is sent as-is unless transformed by redact.
         redact: Rewrites failure messages, reported intent and resource URIs
-            before they leave the process. Failure messages and intent arrive
-            with emails, SSNs, card and phone numbers, and IP addresses
-            already replaced.
-        capture_input: Capture business arguments; defaults to False.
-        capture_output: Capture the original MCP result; defaults to False.
+            before they leave the process. No automatic PII scrubbing is applied.
+            Agent-reported intent is enabled by default; use this callback to
+            remove sensitive values or disable inject_agent_arguments.
+        capture_input: Capture business arguments as-is; defaults to False.
+        capture_output: Capture the original MCP result as-is; defaults to False.
         redact_payload: Transform a detached JSON input/output snapshot.
             Raise or return OMITTED to omit it; None captures JSON null.
             Non-JSON/oversized payloads (128 KiB) are omitted.
@@ -137,6 +137,7 @@ def _instrument(server: Any, options: McpOptions) -> bool:
         options,
         server_name=_text(getattr(lowlevel, "name", None)),
         server_version=_text(getattr(lowlevel, "version", None)),
+        tool_manager=getattr(server, "_tool_manager", None),
     )
     from . import _v1, _v2
 
