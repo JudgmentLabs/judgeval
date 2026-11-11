@@ -44,6 +44,13 @@ class AttributeKeys(str, Enum):
     JUDGMENT_LINK_TARGET_SPAN_ID = "judgment.link.target_span_id"
     JUDGMENT_TEST_RUN_ID = "judgment.test.run_id"
     JUDGMENT_TEST_CASE_ID = "judgment.test.case_id"
+    JUDGMENT_GUARD_JUDGE_ID = "judgment.guard.judge_id"
+    JUDGMENT_GUARD_POSITION = "judgment.guard.position"
+    JUDGMENT_GUARD_MODE = "judgment.guard.mode"
+    JUDGMENT_GUARD_OUTCOME = "judgment.guard.outcome"
+    JUDGMENT_GUARD_CONFIDENCE = "judgment.guard.confidence"
+    JUDGMENT_GUARD_WOULD_BLOCK = "judgment.guard.would_block"
+    JUDGMENT_GUARD_LATENCY_MS = "judgment.guard.latency_ms"
 
     GEN_AI_PROMPT = "gen_ai.prompt"
     GEN_AI_COMPLETION = "gen_ai.completion"

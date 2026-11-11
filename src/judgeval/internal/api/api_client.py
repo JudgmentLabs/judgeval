@@ -454,6 +454,17 @@ class JudgmentSyncClient:
             payload,
         )
 
+    def post_projects_guard(
+        self, project_id: str, payload: GuardRequest
+    ) -> GuardResponse:
+        return self._request(
+            "POST",
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/guard", self.base_url
+            ),
+            payload,
+        )
+
     def post_projects_judges(
         self, project_id: str, payload: CreateJudgeRequest
     ) -> CreateJudgeResponse:
