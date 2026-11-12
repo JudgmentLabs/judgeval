@@ -1231,6 +1231,7 @@ class StartTestRunRequest(TypedDict, closed=True):
     candidate: NotRequired[str]
     candidate_meta: NotRequired[dict[str, Any]]
     trigger: NotRequired[Literal["manual", "ci", "schedule", "api"]]
+    stored_traces: NotRequired[bool]
 
 
 class StartTestRunResponseCase(TypedDict):
