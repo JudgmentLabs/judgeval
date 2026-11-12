@@ -5,7 +5,8 @@ client = Judgeval(project_name="my-project")
 # External judges don't run on the Judgment platform -- you register the
 # judge's name and score shape once, then submit as many results as you
 # like from your own evaluation code (a human review queue, an offline
-# eval job, another LLM judge you already run elsewhere, etc.).
+# eval job, another LLM judge you already run elsewhere, etc.). Each judge
+# keeps one current score per trace or session; resubmitting replaces it.
 judge = client.external_judges.create(
     name="human-thumbs-up",
     score_type="binary",
@@ -21,7 +22,7 @@ trace_id = "<trace_id>"
 
 result_id = client.external_judges.submit_result(
     judge_id=judge.judge_id,
-    trace_id=trace_id,
+    target={"type": "trace", "trace_id": trace_id},
     value=True,
     reason="Reviewer approved the response.",
 )
@@ -42,7 +43,7 @@ if topic_judge is None:
     raise RuntimeError("Project could not be resolved")
 client.external_judges.submit_result(
     judge_name=topic_judge.name,
-    trace_id=trace_id,
+    target={"type": "trace", "trace_id": trace_id},
     value="billing",
 )
 
@@ -50,10 +51,9 @@ client.external_judges.submit_result(
 rating = client.external_judges.create(name="review-rating", score_type="numeric")
 if rating is None:
     raise RuntimeError("Project could not be resolved")
-# Use the stored session ID of this trace to attach session-level feedback.
+# Session feedback needs only the session ID. Resubmitting replaces its current score.
 client.external_judges.submit_result(
     judge_id=rating.judge_id,
-    trace_id=trace_id,
-    session_id="<session_id>",
+    target={"type": "session", "session_id": "<session_id>"},
     value=4.5,
 )

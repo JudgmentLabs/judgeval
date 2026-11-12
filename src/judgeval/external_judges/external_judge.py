@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Literal, Optional, TypedDict
+from typing import List, Literal, Optional, TypedDict, Union
 
 
 ScoreType = Literal["binary", "numeric", "categorical"]
@@ -12,6 +12,23 @@ class ExternalJudgeOutput(TypedDict):
 
     name: str
     description: str
+
+
+class ExternalJudgeTraceTarget(TypedDict):
+    """A trace whose current external judge score will be replaced."""
+
+    type: Literal["trace"]
+    trace_id: str
+
+
+class ExternalJudgeSessionTarget(TypedDict):
+    """A session whose current external judge score will be replaced."""
+
+    type: Literal["session"]
+    session_id: str
+
+
+ExternalJudgeTarget = Union[ExternalJudgeTraceTarget, ExternalJudgeSessionTarget]
 
 
 @dataclass

@@ -5788,17 +5788,41 @@ class ListProjectsResponse(TypedDict):
     projects: list[ListProjectsResponseProject]
 
 
-class SubmitExternalJudgeResultSubmitExternalJudgeResult(TypedDict):
+class SubmitExternalJudgeResultSubmitExternalJudgeResultTarget(TypedDict):
+    type: Literal["trace"]
     trace_id: str
-    session_id: NotRequired[str]
+
+
+class SubmitExternalJudgeResultSubmitExternalJudgeResultTarget1(TypedDict):
+    type: Literal["session"]
+    session_id: str
+
+
+class SubmitExternalJudgeResultSubmitExternalJudgeResult(TypedDict):
+    target: (
+        SubmitExternalJudgeResultSubmitExternalJudgeResultTarget
+        | SubmitExternalJudgeResultSubmitExternalJudgeResultTarget1
+    )
     value: bool | float | str
     reason: NotRequired[str]
     judge_id: str
 
 
-class SubmitExternalJudgeResultSubmitExternalJudgeResult1(TypedDict):
+class SubmitExternalJudgeResultSubmitExternalJudgeResult1Target(TypedDict):
+    type: Literal["trace"]
     trace_id: str
-    session_id: NotRequired[str]
+
+
+class SubmitExternalJudgeResultSubmitExternalJudgeResult1Target1(TypedDict):
+    type: Literal["session"]
+    session_id: str
+
+
+class SubmitExternalJudgeResultSubmitExternalJudgeResult1(TypedDict):
+    target: (
+        SubmitExternalJudgeResultSubmitExternalJudgeResult1Target
+        | SubmitExternalJudgeResultSubmitExternalJudgeResult1Target1
+    )
     value: bool | float | str
     reason: NotRequired[str]
     judge_name: str

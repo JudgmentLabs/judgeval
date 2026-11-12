@@ -134,7 +134,9 @@ class TestExternalJudgeFactorySubmitResult:
         factory, client = _make_factory()
         client.post_projects_judge_results.return_value = {"id": "result-1"}
         result = factory.submit_result(
-            judge_id="judge-1", trace_id="trace-1", value=True
+            judge_id="judge-1",
+            target={"type": "trace", "trace_id": "trace-1"},
+            value=True,
         )
         assert result == "result-1"
 
@@ -143,24 +145,24 @@ class TestExternalJudgeFactorySubmitResult:
         client.post_projects_judge_results.return_value = {"id": "result-1"}
         factory.submit_result(
             judge_name="human-thumbs-up",
-            trace_id="trace-1",
+            target={"type": "session", "session_id": "session-1"},
             value=True,
-            session_id="session-1",
             reason="Looked correct.",
         )
         payload = client.post_projects_judge_results.call_args.kwargs["payload"]
         assert payload == {
-            "trace_id": "trace-1",
+            "target": {"type": "session", "session_id": "session-1"},
             "value": True,
             "judge_name": "human-thumbs-up",
-            "session_id": "session-1",
             "reason": "Looked correct.",
         }
 
     def test_submit_result_requires_exactly_one_judge_identifier(self):
         factory, _ = _make_factory()
         with pytest.raises(ValueError, match="Exactly one"):
-            factory.submit_result(trace_id="trace-1", value=True)
+            factory.submit_result(
+                target={"type": "trace", "trace_id": "trace-1"}, value=True
+            )
 
     def test_submit_result_rejects_both_judge_identifiers(self):
         factory, _ = _make_factory()
@@ -168,14 +170,16 @@ class TestExternalJudgeFactorySubmitResult:
             factory.submit_result(
                 judge_id="judge-1",
                 judge_name="human-thumbs-up",
-                trace_id="trace-1",
+                target={"type": "trace", "trace_id": "trace-1"},
                 value=True,
             )
 
     def test_submit_result_missing_project_id_returns_none(self):
         factory, _ = _make_factory(project_id=None)
         result = factory.submit_result(
-            judge_id="judge-1", trace_id="trace-1", value=True
+            judge_id="judge-1",
+            target={"type": "trace", "trace_id": "trace-1"},
+            value=True,
         )
         assert result is None
 
@@ -185,7 +189,11 @@ class TestExternalJudgeFactorySubmitResult:
             422, "value does not match judge score type", None
         )
         with pytest.raises(JudgmentValidationError):
-            factory.submit_result(judge_id="judge-1", trace_id="trace-1", value=True)
+            factory.submit_result(
+                judge_id="judge-1",
+                target={"type": "trace", "trace_id": "trace-1"},
+                value=True,
+            )
 
     def test_submit_result_not_found_raises_raw_api_error(self):
         factory, client = _make_factory()
@@ -193,10 +201,14 @@ class TestExternalJudgeFactorySubmitResult:
             404, "trace not found", None
         )
         with pytest.raises(JudgmentAPIError):
-            factory.submit_result(judge_id="judge-1", trace_id="trace-1", value=True)
+            factory.submit_result(
+                judge_id="judge-1",
+                target={"type": "trace", "trace_id": "trace-1"},
+                value=True,
+            )
 
 
-def test_numeric_feedback_roundtrips_through_the_public_http_client():
+def test_session_score_can_be_resubmitted_without_a_trace():
     requests = []
 
     def handler(request):
@@ -217,10 +229,18 @@ def test_numeric_feedback_roundtrips_through_the_public_http_client():
     factory = ExternalJudgeFactory(client, "proj-1", "test")
     judge = factory.create(name="rating", score_type="numeric")
     result = factory.submit_result(
-        judge_id="judge-1", trace_id="trace-1", session_id="session-1", value=4.5
+        judge_id="judge-1",
+        target={"type": "session", "session_id": "session-1"},
+        value=4.5,
     )
-    assert (judge, result, requests) == (
+    updated = factory.submit_result(
+        judge_id="judge-1",
+        target={"type": "session", "session_id": "session-1"},
+        value=3,
+    )
+    assert (judge, result, updated, requests) == (
         ExternalJudge("judge-1", "version-1", "rating", "numeric"),
+        "result-1",
         "result-1",
         [
             (
@@ -239,9 +259,17 @@ def test_numeric_feedback_roundtrips_through_the_public_http_client():
                 "/v1/projects/proj-1/judge-results",
                 {
                     "judge_id": "judge-1",
-                    "trace_id": "trace-1",
-                    "session_id": "session-1",
+                    "target": {"type": "session", "session_id": "session-1"},
                     "value": 4.5,
+                },
+            ),
+            (
+                "POST",
+                "/v1/projects/proj-1/judge-results",
+                {
+                    "judge_id": "judge-1",
+                    "target": {"type": "session", "session_id": "session-1"},
+                    "value": 3,
                 },
             ),
         ],
@@ -294,7 +322,9 @@ def test_created_names_can_be_used_to_submit_categorical_feedback():
     )
     assert judge is not None and judge.outputs is not None
     result = factory.submit_result(
-        judge_name=judge.name, trace_id="trace", value=judge.outputs[0]["name"]
+        judge_name=judge.name,
+        target={"type": "trace", "trace_id": "trace"},
+        value=judge.outputs[0]["name"],
     )
     assert (judge.name, judge.outputs, result) == (
         "topic",
@@ -304,3 +334,13 @@ def test_created_names_can_be_used_to_submit_categorical_feedback():
         ],
         "feedback-1",
     )
+
+
+def test_rejects_ambiguous_targets_before_sending_feedback():
+    factory, _ = _make_factory()
+    with pytest.raises(ValueError, match="target"):
+        factory.submit_result(
+            judge_id="judge-1",
+            target={"type": "session", "session_id": "session", "trace_id": "trace"},
+            value=True,
+        )

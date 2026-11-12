@@ -5,6 +5,7 @@ from typing import List, Optional, Union
 from judgeval.external_judges.external_judge import (
     ExternalJudge,
     ExternalJudgeOutput,
+    ExternalJudgeTarget,
     ScoreType,
 )
 from judgeval.exceptions import JudgmentAPIError, map_judgment_api_error
@@ -37,7 +38,7 @@ class ExternalJudgeFactory:
 
         client.external_judges.submit_result(
             judge_id=judge.judge_id,
-            trace_id="<trace_id>",
+            target={"type": "trace", "trace_id": "<trace_id>"},
             value=True,
         )
         ```
@@ -168,14 +169,15 @@ class ExternalJudgeFactory:
     def submit_result(
         self,
         *,
-        trace_id: str,
+        target: ExternalJudgeTarget,
         value: Union[bool, float, str],
         judge_id: Optional[str] = None,
         judge_name: Optional[str] = None,
-        session_id: Optional[str] = None,
         reason: Optional[str] = None,
     ) -> Optional[str]:
-        """Submit an externally computed score to a trace or session.
+        """Set the current externally computed score for a trace or session.
+
+        Resubmitting for the same judge and target replaces its current score.
 
         Exactly one of `judge_id` or `judge_name` must be provided; the
         score is attached to that judge's production version. `value`
@@ -184,12 +186,10 @@ class ExternalJudgeFactory:
         names for `categorical`).
 
         Args:
-            trace_id: ID of the trace to score.
+            target: A trace or session target with its corresponding ID.
             value: The externally computed score.
             judge_id: ID of the judge to submit under.
             judge_name: Name of the judge to submit under.
-            session_id: If provided, scopes the result to this session
-                (must match the trace's session) instead of the trace alone.
             reason: Optional free-text explanation for the score.
 
         Returns:
@@ -198,15 +198,14 @@ class ExternalJudgeFactory:
 
         Raises:
             ValueError: If neither or both of `judge_id`/`judge_name` are
-                provided.
-            JudgmentValidationError: If `value`/`session_id` doesn't match
-                the judge or trace.
+                provided, or the target is invalid.
+            JudgmentValidationError: If the server rejects the value or target.
 
         Examples:
             ```python
             client.external_judges.submit_result(
                 judge_name="human-thumbs-up",
-                trace_id="<trace_id>",
+                target={"type": "trace", "trace_id": "<trace_id>"},
                 value=True,
                 reason="Reviewer approved the response.",
             )
@@ -215,18 +214,25 @@ class ExternalJudgeFactory:
         if (judge_id is None) == (judge_name is None):
             raise ValueError("Exactly one of judge_id or judge_name must be provided")
 
+        target_key = "trace_id" if target.get("type") == "trace" else "session_id"
+        if (
+            target.get("type") not in ("trace", "session")
+            or set(target) != {"type", target_key}
+            or not isinstance(target.get(target_key), str)
+            or not target.get(target_key)
+        ):
+            raise ValueError("target must contain exactly one trace or session ID")
+
         project_id = expect_project_id(self._project_id)
         if not project_id:
             return None
 
         payload: SubmitExternalJudgeResult
         if judge_id is not None:
-            payload = {"trace_id": trace_id, "value": value, "judge_id": judge_id}
+            payload = {"target": target, "value": value, "judge_id": judge_id}
         else:
             assert judge_name is not None
-            payload = {"trace_id": trace_id, "value": value, "judge_name": judge_name}
-        if session_id is not None:
-            payload["session_id"] = session_id
+            payload = {"target": target, "value": value, "judge_name": judge_name}
         if reason is not None:
             payload["reason"] = reason
 
