@@ -70,9 +70,6 @@ class JudgmentSyncClient:
         url: str,
         payload: Any,
         params: Optional[Dict[str, Any]] = None,
-        *,
-        content: Optional[bytes] = None,
-        timeout: Optional[float] = None,
     ) -> Any:
         logger.debug(f"HTTP {method} {url}")
         if method == "GET":
@@ -86,36 +83,12 @@ class JudgmentSyncClient:
             r = self.client.request(
                 method,
                 url,
-                **(
-                    {"json": json_encoder(payload)}
-                    if content is None
-                    else {"content": content}
-                ),
+                json=json_encoder(payload),
                 params=params,
                 headers=_headers(self.api_key, self.organization_id),
-                **({} if timeout is None else {"timeout": timeout}),
             )
         logger.debug(f"HTTP {method} {url} -> {r.status_code}")
         return _handle_response(r)
-
-    def post_projects_mcp_calls(
-        self,
-        project_id: str,
-        payload: IngestMcpCallsRequest,
-        *,
-        content: bytes,
-        timeout: float,
-    ) -> Any:
-        return self._request(
-            "POST",
-            url_for(
-                f"/v1/projects/{encode_path_segment(project_id)}/mcp/calls",
-                self.base_url,
-            ),
-            payload,
-            content=content,
-            timeout=timeout,
-        )
 
     def _multipart_request(
         self,

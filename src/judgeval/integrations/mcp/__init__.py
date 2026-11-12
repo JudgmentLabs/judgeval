@@ -7,16 +7,13 @@
     server = FastMCP("orders")
     instrument_mcp_server(server)
 
-Completed tool calls go directly to the native MCP endpoint without creating
-OTel spans, independently of OTel sampling.
+Each tool call creates an OTel span using the active Judgment tracer. Explicit
+incoming trace context is honored; otherwise calls start new traces. Instrumented
+work inside the tool becomes child spans.
 
-Supported servers: ``FastMCP`` and the low-level ``Server`` from `mcp` 1.x,
-``MCPServer`` and the low-level ``Server`` from `mcp` 2.x, and the standalone
-``fastmcp`` package. Input/output capture is opt-in. Telemetry failures never
-affect tool execution. Call ``Tracer.force_flush()`` before serverless return
-or ``Tracer.shutdown()`` when stopping. Bounded best-effort queues retry
-transient errors three times with stable IDs/data. Hung or terminated calls
-may never emit a completed event.
+Supported servers: MCP 1.x/2.x and standalone FastMCP. Input/output capture is
+opt-in. Telemetry failures never affect tool execution. Call Tracer.force_flush()
+before serverless return or Tracer.shutdown() when stopping.
 """
 
 from __future__ import annotations
@@ -25,7 +22,7 @@ import weakref
 from typing import Any, Optional, Callable
 
 from judgeval.logger import judgeval_logger
-from ._exporter import McpCall, RedactPayload, OMITTED
+from ._payload import RedactPayload, OMITTED
 
 from ._observer import (
     Identify,
@@ -36,7 +33,6 @@ from ._observer import (
     Redact,
     mark_mcp_call_error,
     set_mcp_caller,
-    capture_mcp_call,
 )
 
 _instrumented: "weakref.WeakSet[Any]" = weakref.WeakSet()
@@ -48,6 +44,7 @@ def instrument_mcp_server(
     server_name: Optional[str] = None,
     server_build: Optional[str] = None,
     inject_agent_arguments: bool = True,
+    inject_conversation_id: bool = True,
     identify: Optional[Identify] = None,
     capture_error_messages: bool = False,
     redact: Optional[Redact] = None,
@@ -56,16 +53,18 @@ def instrument_mcp_server(
     redact_payload: Optional[RedactPayload] = None,
     session_id: Optional[Callable[[McpRequestInfo], Optional[str]]] = None,
 ) -> bool:
-    """Exports completed native MCP calls using the active tracer's settings.
+    """Traces MCP tool calls using the active tracer's settings.
 
     Call it once per server, after ``Tracer.init()`` and before the server
     starts. It changes your server in one way by default: each tool's published
     schema gets optional ``context``, ``llm_model`` and ``conversation_id``
     arguments, which are removed before your tool runs. When a call has no
-    logical session, its result gets an ID in supplemental text and compatible
-    existing ``structuredContent._judgment``. Compatible output schemas gain
+    application, echoed or transport session, its result gets an ID in
+    supplemental text and compatible existing ``structuredContent._judgment``.
+    Compatible output schemas gain
     the matching optional property. Text-only/unsupported/colliding outputs
-    retain text handoff. Transport sessions never define logical sessions.
+    retain text handoff. Transport session IDs are used only when no application
+    or conversation session is available.
 
     Args:
         server: A ``FastMCP``, ``MCPServer`` or low-level ``Server`` from `mcp`,
@@ -75,11 +74,13 @@ def instrument_mcp_server(
         inject_agent_arguments: Set to False to leave your tools and their
             results exactly as they are, at the cost of agent-reported intent
             and model, and of sessions for clients that send no session ID.
+        inject_conversation_id: Set to False to disable conversation-ID schema
+            injection and handoff independently of intent/model injection.
         identify: Returns the end user or customer of a request. Called once
             the request finishes. Exceptions are ignored.
         capture_error_messages: Opt in to failure text; defaults to False.
             Enabled text is sent as-is unless transformed by redact.
-        redact: Rewrites failure messages, reported intent and resource URIs
+        redact: Rewrites failure messages and reported intent
             before they leave the process. No automatic PII scrubbing is applied.
             Agent-reported intent is enabled by default; use this callback to
             remove sensitive values or disable inject_agent_arguments.
@@ -89,7 +90,9 @@ def instrument_mcp_server(
             Raise or return OMITTED to omit it; None captures JSON null.
             Non-JSON/oversized payloads (128 KiB) are omitted.
         session_id: Returns an authoritative application session ID without
-            relying on agent echo. Receives McpRequestInfo.
+            relying on agent echo. Receives McpRequestInfo. Existing
+            set_session_id baggage is also authoritative; scope it to each
+            request rather than the lifetime of the server.
 
     Returns:
         True if the server is traced. On an unsupported server it logs a
@@ -102,6 +105,7 @@ def instrument_mcp_server(
                 server_name=server_name,
                 server_build=server_build,
                 inject_agent_arguments=inject_agent_arguments,
+                inject_conversation_id=inject_conversation_id,
                 identify=identify,
                 capture_error_messages=capture_error_messages,
                 redact=redact,
@@ -158,8 +162,6 @@ def _text(value: Any) -> Optional[str]:
 
 __all__ = [
     "OMITTED",
-    "McpCall",
-    "capture_mcp_call",
     "McpCaller",
     "McpRequestInfo",
     "instrument_mcp_server",

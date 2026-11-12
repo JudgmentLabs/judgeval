@@ -12,7 +12,11 @@ from __future__ import annotations
 import dataclasses
 from typing import Any, Awaitable, Callable, Dict, List, Mapping, Optional, Tuple
 
-from ._arguments import conversation_output_schema, structured_with_prompt
+from ._arguments import (
+    CONVERSATION_ARGUMENT,
+    conversation_output_schema,
+    structured_with_prompt,
+)
 from ._observer import (
     ListedTools,
     McpObserver,
@@ -27,7 +31,8 @@ from ._observer import (
 class WireResults:
     """Results in the shape the 2.x runner sends: dicts with wire names."""
 
-    def __init__(self) -> None:
+    def __init__(self, inject_conversation_id: bool = True) -> None:
+        self._inject_conversation_id = inject_conversation_id
         self._structured_tools: set[str] = set()
 
     def payload(self, result: Any) -> Any:
@@ -157,7 +162,12 @@ class WireResults:
         return result
 
     def _schema_updates(self, name: str, schema: Any, output: Any) -> Dict[str, Any]:
-        extended = conversation_output_schema(output)
+        extended = (
+            conversation_output_schema(output)
+            if self._inject_conversation_id
+            and CONVERSATION_ARGUMENT in schema.get("properties", {})
+            else None
+        )
         self._structured_tools.discard(name)
         if output is None or extended is not None:
             self._structured_tools.add(name)
@@ -178,7 +188,7 @@ class JudgmentMcpMiddleware:
 
     def __init__(self, observer: McpObserver) -> None:
         self._observer = observer
-        self._results = WireResults()
+        self._results = WireResults(observer.options.inject_conversation_id)
 
     async def __call__(
         self, ctx: Any, call_next: Callable[[Any], Awaitable[Any]]
@@ -274,7 +284,7 @@ def _facts(ctx: Any) -> RequestFacts:
 
 
 def instrument(observer: McpObserver, lowlevel: Any) -> bool:
-    """Puts native capture first, preserving the server's existing telemetry."""
+    """Makes the execution span current for the server's existing telemetry."""
     middleware = getattr(lowlevel, "middleware", None)
     if not isinstance(middleware, list) or not callable(
         getattr(lowlevel, "get_request_handler", None)

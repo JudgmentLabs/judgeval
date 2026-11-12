@@ -1,4 +1,4 @@
-"""Records native MCP calls, independent of which `mcp` version delivers them.
+"""Traces MCP calls, independent of which `mcp` version delivers them.
 
 The version adapters turn a request into :class:`RequestFacts` and hand
 :meth:`McpObserver.observe` a way to run it and to read and change its result.
@@ -12,11 +12,6 @@ import contextvars
 import inspect
 import json
 import re
-import time
-import uuid
-import threading
-from datetime import datetime, timezone
-from weakref import WeakKeyDictionary
 from dataclasses import dataclass, field
 from typing import (
     Any,
@@ -34,6 +29,16 @@ from typing import (
     TypeVar,
 )
 
+from opentelemetry.trace import (
+    INVALID_SPAN,
+    Span,
+    SpanKind,
+    Status,
+    StatusCode,
+    set_span_in_context,
+)
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.logger import judgeval_logger
 from judgeval.version import get_version
 
@@ -49,7 +54,10 @@ from ._arguments import (
     tool_contract,
     without_agent_arguments,
 )
-from ._exporter import McpCallExporter, OMITTED, RedactPayload, capture_payload
+from ._payload import OMITTED, RedactPayload, capture_payload
+
+_propagator = TraceContextTextMapPropagator()
+TRACER_NAME = "judgeval-mcp"
 
 T = TypeVar("T")
 
@@ -108,6 +116,7 @@ class McpOptions:
     server_name: Optional[str] = None
     server_build: Optional[str] = None
     inject_agent_arguments: bool = True
+    inject_conversation_id: bool = True
     identify: Optional[Identify] = None
     capture_error_messages: bool = False
     redact: Optional[Redact] = None
@@ -163,8 +172,6 @@ class _CallRecord:
     caller: Dict[str, Optional[str]] = field(default_factory=dict)
     identified: bool = False
     failure: Optional[Tuple[str, Optional[str]]] = None
-    argument_keys: List[str] = field(default_factory=list)
-    environment: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -178,8 +185,6 @@ class _PreparedCall:
 _records: contextvars.ContextVar[Optional[_CallRecord]] = contextvars.ContextVar(
     "judgeval_mcp_call", default=None
 )
-_exporters: WeakKeyDictionary[Any, McpCallExporter] = WeakKeyDictionary()
-_exporters_lock = threading.Lock()
 
 
 def mark_mcp_call_error(error: BaseException) -> None:
@@ -204,34 +209,6 @@ def set_mcp_caller(
         record.caller["user_id"] = user_id
     if customer_id is not None:
         record.caller["customer_id"] = customer_id
-
-
-def capture_mcp_call(
-    call: Mapping[str, Any], *, redact_payload: Optional[RedactPayload] = None
-) -> None:
-    """Capture a completed custom-server call. Supplied payloads opt in to capture."""
-
-    def capture() -> None:
-        exporter = _active_exporter()
-        if exporter is None:
-            return
-        event = {**call, "call_id": call.get("call_id", str(uuid.uuid4()))}
-        tracer = _active_tracer()
-        if (
-            "environment_name" not in event
-            and tracer is not None
-            and tracer.environment
-        ):
-            event["environment_name"] = _bounded(tracer.environment, 256)
-        for column in ("input", "output"):
-            if column in call:
-                payload = capture_payload(call[column], column, redact_payload)
-                event.pop(column, None)
-                if payload is not OMITTED:
-                    event[column] = payload
-        exporter.enqueue(event)
-
-    attempt(capture)
 
 
 def attempt(work: Callable[[], T]) -> Optional[T]:
@@ -391,6 +368,9 @@ class McpObserver:
         list_tools: Optional[ListTools],
     ) -> Any:
         """Records a request without letting telemetry failures affect the call."""
+        if facts.method != "tools/call":
+            result = await invoke(None)
+            return self._shaped(facts, result, adapter, None)
         token = attempt(self._activate_tracer)
         contracts_token = self._request_contracts.set({})
         try:
@@ -421,135 +401,50 @@ class McpObserver:
             return self._shaped(facts, result, adapter, None)
 
         record = _CallRecord()
-        exporter = attempt(_active_exporter) if facts.method == "tools/call" else None
+        span = attempt(lambda: self._start_span(facts, prepared))
         arguments = (
             prepared.arguments
             if prepared.arguments is not None
             else facts.params.get("arguments", {})
         )
-        captured = (
-            capture_payload(arguments, "input", self.options.redact_payload)
-            if self.options.capture_input and exporter is not None
-            else OMITTED
-        )
-        record.argument_keys = (
-            [_bounded(str(key), 256) for key in arguments if key][:100]
-            if isinstance(arguments, Mapping)
-            else []
-        )
-        tracer = _active_tracer()
-        record.environment = tracer.environment if tracer is not None else None
-        timestamp = datetime.now(timezone.utc).isoformat()
-        started = time.monotonic()
-
-        def complete(result: Any, cancelled: bool) -> None:
-            if facts.method == "tools/call" and exporter is not None:
-                attempt(
-                    lambda: self._export_call(
-                        exporter,
-                        facts,
-                        prepared,
-                        record,
-                        result,
-                        adapter,
-                        timestamp,
-                        started,
-                        captured,
-                        cancelled,
-                    )
-                )
-
+        if (
+            span is not None
+            and self.options.capture_input
+            and facts.method == "tools/call"
+        ):
+            attempt(lambda: self._payload(span, arguments, "input"))
         token = _records.set(record)
         try:
-            result = await invoke(prepared.arguments)
+            result = await self._run(
+                span,
+                lambda: invoke(prepared.arguments),
+                prepared.attributes.get("judgment.session_id"),
+            )
         except BaseException as error:
             cancelled = is_cancellation(error)
             if record.error is None and not cancelled:
                 record.error = error
-            complete(None, cancelled)
+            if span is not None:
+                self._finish(span, record, None, facts, adapter, cancelled)
             raise
         finally:
             _records.reset(token)
-        complete(result, False)
+        if span is not None:
+            self._finish(span, record, result, facts, adapter, False)
         return self._shaped(facts, result, adapter, prepared.minted_conversation_id)
 
-    def _export_call(
+    async def _run(
         self,
-        exporter: McpCallExporter,
-        facts: RequestFacts,
-        prepared: _PreparedCall,
-        record: _CallRecord,
-        result: Any,
-        adapter: ResultAdapter,
-        timestamp: str,
-        started: float,
-        captured: Any,
-        cancelled: bool,
-    ) -> None:
-        duration = max(0, (time.monotonic() - started) * 1000)
-        attributes = prepared.attributes
-        caller = self._caller(record, facts)
-        failed = result is None or adapter.is_error(result)
-        call: Dict[str, Any] = {
-            "call_id": str(uuid.uuid4()),
-            "timestamp": timestamp,
-            "duration_ms": duration,
-            "outcome": "cancelled" if cancelled else "error" if failed else "success",
-            "server_name": _bounded(self._server_name or "mcp", 256),
-            "tool_name": _bounded(str(facts.params.get("name") or "unknown"), 256),
-            "argument_keys": record.argument_keys,
-            "metadata": {
-                key: _bounded(value, 512)
-                for key, value in attributes.items()
-                if key
-                in {
-                    "mcp.session.id",
-                    "mcp.protocol.version",
-                    "jsonrpc.request.id",
-                    "judgment.mcp.server.version",
-                    "judgment.mcp.server.build",
-                    "judgment.mcp.client.version",
-                    "judgment.mcp.sdk_version",
-                    "judgment.mcp.conversation_id_source",
-                }
-            },
-        }
-        for column, key, limit in (
-            ("session_id", "judgment.mcp.conversation_id", 512),
-            ("client_name", "judgment.mcp.client.name", 256),
-            ("intent", "judgment.mcp.intent", 2048),
-            ("model", "judgment.mcp.model", 256),
-        ):
-            if key in attributes:
-                call[column] = _bounded(attributes[key], limit)
-        user_id = caller.get("user_id")
-        if user_id:
-            call["user_id"] = _bounded(user_id, 512)
-        customer_id = caller.get("customer_id")
-        if customer_id:
-            call["metadata"]["customer_id"] = _bounded(customer_id, 512)
-        if record.environment:
-            call["environment_name"] = _bounded(record.environment, 256)
-        if failed and not cancelled:
-            error_type, recorded = self._failure(record, result, facts, adapter)
-            call["error_type"] = _bounded(error_type, 256) or "tool_error"
-            if recorded is not None:
-                call["error_message"] = recorded
-        output = (
-            capture_payload(
-                adapter.payload(result), "output", self.options.redact_payload
-            )
-            if result is not None and self.options.capture_output
-            else OMITTED
-        )
-        for column, payload in (("input", captured), ("output", output)):
-            if payload is not OMITTED:
-                call[column] = payload
-        if self.options.capture_input and captured is OMITTED:
-            call["metadata"]["input_omitted"] = True
-        if self.options.capture_output and result is not None and output is OMITTED:
-            call["metadata"]["output_omitted"] = True
-        exporter.enqueue(call)
+        span: Optional[Span],
+        call: Callable[[], Awaitable[Any]],
+        session_id: Optional[str],
+    ) -> Any:
+        """Runs the request with its span current, so the tool's spans nest."""
+        scope = None if span is None else attempt(lambda: _span_scope(span, session_id))
+        if scope is None:
+            return await call()
+        with scope:
+            return await call()
 
     def _shaped(
         self,
@@ -591,7 +486,9 @@ class McpObserver:
         contract = self._contracts.get(name)
         if contract is None or contract.open or not isinstance(schema, Mapping):
             return None
-        return schema_with_agent_arguments(schema, contract.declared)
+        return schema_with_agent_arguments(
+            schema, contract.declared, self.options.inject_conversation_id
+        )
 
     async def _prepare(
         self, facts: RequestFacts, list_tools: Optional[ListTools]
@@ -630,13 +527,27 @@ class McpObserver:
             if session_id is not None
             else None
         )
-        logical_session = _text(provided_session) or reported.conversation_id
+        from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
+        from judgeval.trace.baggage import get_baggage
+
+        configured_session = _text(provided_session) or _text(
+            get_baggage(
+                AttributeKeys.JUDGMENT_SESSION_ID.value,
+                context=JudgmentTracerProvider.get_instance().get_current_context(),
+            )
+        )
+        conversation_id = (
+            reported.conversation_id if self.options.inject_conversation_id else None
+        )
+        logical_session = configured_session or conversation_id
+        session = logical_session or facts.session_id
         minted = (
             mint_conversation_id()
             if injected
+            and self.options.inject_conversation_id
             # A tool's own conversation_id argument isn't one the agent can echo.
             and CONVERSATION_ARGUMENT not in declared
-            and logical_session is None
+            and session is None
             else None
         )
         client = (
@@ -662,10 +573,12 @@ class McpObserver:
                 if method == "resources/read" and isinstance(uri, str)
                 else None,
                 "user_agent.original": facts.headers.get("user-agent"),
-                "judgment.mcp.server.name": self._server_name,
+                "judgment.mcp.server_name": self._server_name or "mcp",
+                "judgment.mcp.tool_name": tool_name,
+                "judgment.session_id": session or minted,
                 "judgment.mcp.server.version": self._server_version,
                 "judgment.mcp.server.build": self.options.server_build,
-                "judgment.mcp.client.name": _text(client.get("name")),
+                "judgment.mcp.client_name": _text(client.get("name")),
                 "judgment.mcp.client.version": _text(client.get("version")),
                 "judgment.mcp.argument_keys": _recorded_keys(
                     args, declared if injected else None
@@ -674,14 +587,16 @@ class McpObserver:
                 else None,
                 "judgment.mcp.conversation_id": logical_session or minted,
                 "judgment.mcp.conversation_id_source": "provided"
-                if logical_session and logical_session != reported.conversation_id
+                if configured_session
                 else "echoed"
-                if reported.conversation_id
+                if conversation_id
+                else "transport"
+                if facts.session_id
                 else "minted"
                 if minted
                 else None,
                 "judgment.mcp.intent": intent,
-                "judgment.mcp.model": reported.model,
+                "judgment.llm.model": reported.model,
                 "judgment.mcp.sdk_version": get_version(),
             }
         )
@@ -692,6 +607,97 @@ class McpObserver:
             else None,
             minted_conversation_id=minted,
         )
+
+    def _start_span(self, facts: RequestFacts, prepared: _PreparedCall) -> Span:
+        from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
+
+        provider = JudgmentTracerProvider.get_instance()
+        meta = _mapping(facts.params.get("_meta"))
+        # Only the caller's ``_meta`` trace context can be the parent. A span
+        # that happens to be current, such as one around the whole server or
+        # the HTTP request that opened the session, would otherwise put every
+        # call into one trace. Baggage is kept.
+        current = set_span_in_context(INVALID_SPAN, provider.get_current_context())
+        parent = (
+            _propagator.extract(
+                {key: value for key, value in meta.items() if isinstance(value, str)},
+                context=current,
+            )
+            if isinstance(meta.get("traceparent"), str)
+            else current
+        )
+        from judgeval.trace.baggage import set_baggage
+
+        session = prepared.attributes.get("judgment.session_id")
+        if session:
+            parent = set_baggage("judgment.session_id", session, context=parent)
+        return provider.get_tracer(TRACER_NAME).start_span(
+            f"{facts.method} {facts.params['name']}"
+            if isinstance(facts.params.get("name"), str)
+            else facts.method,
+            context=parent,
+            kind=SpanKind.SERVER,
+            attributes=prepared.attributes,
+        )
+
+    def _payload(self, span: Span, value: Any, field: Any) -> None:
+        payload = capture_payload(value, field, self.options.redact_payload)
+        if payload is OMITTED:
+            span.set_attribute(f"judgment.mcp.{field}_omitted", "true")
+        else:
+            span.set_attribute(
+                f"judgment.{field}",
+                json.dumps(payload, ensure_ascii=False, allow_nan=False),
+            )
+
+    def _finish(
+        self,
+        span: Span,
+        record: _CallRecord,
+        result: Any,
+        facts: RequestFacts,
+        adapter: ResultAdapter,
+        cancelled: bool,
+    ) -> None:
+        outcome = (
+            "cancelled"
+            if cancelled
+            else "error"
+            if record.error is not None or result is None
+            else "error"
+            if attempt(lambda: adapter.is_error(result)) is not False
+            else "success"
+        )
+        attempt(lambda: span.set_attribute("judgment.mcp.outcome", outcome))
+        if outcome == "error":
+            attempt(lambda: span.set_status(Status(StatusCode.ERROR)))
+
+        def annotate() -> None:
+            caller = self._caller(record, facts)
+            span.set_attributes(
+                _defined(
+                    {
+                        "judgment.customer_user_id": caller.get("user_id"),
+                        "judgment.customer_id": caller.get("customer_id"),
+                    }
+                )
+            )
+            if outcome == "error":
+                error_type, message = self._failure(record, result, facts, adapter)
+                span.set_attribute("error.type", error_type)
+                span.set_attribute("judgment.mcp.error_type", error_type)
+                if message is not None:
+                    span.set_attribute("judgment.mcp.error_message", message)
+                span.set_status(Status(StatusCode.ERROR, message))
+            if (
+                self.options.capture_output
+                and result is not None
+                and facts.method == "tools/call"
+            ):
+                self._payload(span, adapter.payload(result), "output")
+
+        attempt(annotate)
+        attempt(span.end)
 
     def _caller(
         self, record: _CallRecord, facts: RequestFacts
@@ -794,6 +800,33 @@ class McpObserver:
         return value if isinstance(value, str) else None
 
 
+def _span_scope(span: Span, session_id: Optional[str]) -> Any:
+    from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
+
+    from contextlib import contextmanager
+    from judgeval.trace.baggage import set_baggage
+
+    def attach():
+        provider = JudgmentTracerProvider.get_instance()
+        current = provider.get_current_context()
+        if session_id:
+            current = set_baggage("judgment.session_id", session_id, context=current)
+        token = provider.attach_context(set_span_in_context(span, current))
+        return provider, token
+
+    @contextmanager
+    def scope():
+        attached = attempt(attach)
+        try:
+            yield
+        finally:
+            if attached is not None:
+                provider, token = attached
+                attempt(lambda: provider.detach_context(token))
+
+    return scope()
+
+
 def _active_tracer_var() -> contextvars.ContextVar[Any]:
     from judgeval.trace.judgment_tracer_provider import _active_tracer_var
 
@@ -802,41 +835,6 @@ def _active_tracer_var() -> contextvars.ContextVar[Any]:
 
 def _active_tracer() -> Any:
     return _active_tracer_var().get()
-
-
-def _bounded(value: str, limit: int) -> str:
-    """Match the native contract's JavaScript (UTF-16) string limits."""
-    return value.encode("utf-16-le", errors="surrogatepass")[: limit * 2].decode(
-        "utf-16-le", errors="replace"
-    )
-
-
-def _active_exporter() -> Optional[McpCallExporter]:
-    from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
-
-    tracer = _active_tracer()
-    if (
-        tracer is None
-        or not tracer._enable_monitoring
-        or not all(
-            (tracer.api_url, tracer.api_key, tracer.organization_id, tracer.project_id)
-        )
-    ):
-        return None
-    with _exporters_lock:
-        exporter = _exporters.get(tracer)
-        if exporter is None:
-            exporter = McpCallExporter(
-                tracer.api_url,
-                tracer.api_key,
-                tracer.organization_id,
-                tracer.project_id,
-            )
-            _exporters[tracer] = exporter
-            JudgmentTracerProvider.get_instance().add_background_exporter(
-                exporter, tracer
-            )
-        return None if exporter.closed else exporter
 
 
 def _error_code(error: Optional[BaseException]) -> Any:
@@ -887,7 +885,7 @@ def _recorded_keys(
         if isinstance(key, str)
         and (declared is None or key not in AGENT_ARGUMENTS or key in declared)
     ][:_MAX_RECORDED_KEYS]
-    return ",".join(keys) if keys else None
+    return json.dumps(keys) if keys else None
 
 
 def _mapping(value: Any) -> Mapping[str, Any]:

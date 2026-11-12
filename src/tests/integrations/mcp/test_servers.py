@@ -9,8 +9,8 @@ from tests.integrations.mcp.harness import build_server, connect, styles
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("style", styles())
-async def test_session_handoff_records_native_calls_without_spans(
-    style, tracer, collecting_exporter, native_requests
+async def test_session_handoff_records_calls_as_separate_traces(
+    style, tracer, collecting_exporter
 ):
     orders = build_server(style)
     instrument_mcp_server(orders.server)
@@ -26,28 +26,54 @@ async def test_session_handoff_records_native_calls_without_spans(
         )
         second = await client.call("add", {"a": 2, "b": 3, "conversation_id": session})
     JudgmentTracerProvider.get_instance().force_flush()
-    calls = [call for batch in native_requests for call in batch["calls"]]
+    calls = [
+        span
+        for span in collecting_exporter.spans
+        if span.attributes.get("mcp.method.name") == "tools/call"
+    ]
     assert {
+        "protocol_spans": [
+            span.name
+            for span in collecting_exporter.spans
+            if span.attributes.get("mcp.method.name") not in (None, "tools/call")
+        ],
         "results": (first.texts[0], second.texts),
         "received": orders.calls,
         "session": bool(session),
         "handoff": json.loads(first.texts[-1])["conversation_id"],
-        "native_sessions": [
+        "sessions": [
             (
-                call["session_id"],
-                call["metadata"]["judgment.mcp.conversation_id_source"],
+                call.attributes["judgment.session_id"],
+                call.attributes["judgment.mcp.conversation_id_source"],
             )
             for call in calls
         ],
-        "spans": collecting_exporter.spans,
-        "reported": (calls[0]["intent"], calls[0]["model"]),
+        "roots": [span.parent is None for span in calls],
+        "distinct_traces": calls[0].context.trace_id != calls[1].context.trace_id,
+        "children": [
+            (
+                child.context.trace_id == call.context.trace_id,
+                child.parent.span_id == call.context.span_id,
+            )
+            for child, call in zip(
+                [span for span in collecting_exporter.spans if span.name == "database"],
+                calls,
+            )
+        ],
+        "reported": (
+            calls[0].attributes["judgment.mcp.intent"],
+            calls[0].attributes["judgment.llm.model"],
+        ),
     } == {
+        "protocol_spans": [],
         "results": ("3", ["5"]),
         "received": [{"a": 1, "b": 2}, {"a": 2, "b": 3}],
         "session": True,
         "handoff": session,
-        "native_sessions": [(session, "minted"), (session, "echoed")],
-        "spans": [],
+        "sessions": [(session, "minted"), (session, "echoed")],
+        "roots": [True, True],
+        "distinct_traces": True,
+        "children": [(True, True), (True, True)],
         "reported": ("Adding", "gpt-6"),
     }
 
@@ -70,3 +96,61 @@ async def test_callbacks_fail_open_and_instrumentation_is_idempotent(style, trac
         "3",
         [{"a": 1, "b": 2}],
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("style", styles())
+async def test_explicit_parent_and_application_session_with_conversation_injection_off(
+    style, tracer, collecting_exporter
+):
+    orders = build_server(style)
+    instrument_mcp_server(
+        orders.server,
+        inject_conversation_id=False,
+        session_id=lambda _: "application-session",
+        capture_input=True,
+        capture_output=True,
+        redact_payload=lambda value, field: {"captured": field},
+    )
+    provider = JudgmentTracerProvider.get_instance()
+    with provider.get_tracer("server").start_as_current_span("ambient"):
+        async with connect(orders) as client:
+            listing = (await client.all_tools())["add"]
+            first = await client.call("add", {"a": 1, "b": 2, "context": "Adding"})
+            await client.send(
+                "tools/call",
+                {
+                    "name": "add",
+                    "arguments": {"a": 2, "b": 3},
+                    "_meta": {"traceparent": f"00-{'a' * 32}-{'b' * 16}-01"},
+                },
+            )
+    tracer.force_flush()
+    calls = [
+        span
+        for span in collecting_exporter.spans
+        if span.attributes.get("mcp.method.name") == "tools/call"
+    ]
+    assert {
+        "arguments": sorted(listing["properties"]),
+        "handoff": first.conversation_id,
+        "received": orders.calls,
+        "root": calls[0].parent,
+        "remote": (calls[1].context.trace_id, calls[1].parent.span_id),
+        "sessions": [span.attributes["judgment.session_id"] for span in calls],
+        "payloads": [
+            (
+                json.loads(span.attributes["judgment.input"]),
+                json.loads(span.attributes["judgment.output"]),
+            )
+            for span in calls
+        ],
+    } == {
+        "arguments": ["a", "b", "context", "llm_model"],
+        "handoff": None,
+        "received": [{"a": 1, "b": 2}, {"a": 2, "b": 3}],
+        "root": None,
+        "remote": (int("a" * 32, 16), int("b" * 16, 16)),
+        "sessions": ["application-session", "application-session"],
+        "payloads": [({"captured": "input"}, {"captured": "output"})] * 2,
+    }

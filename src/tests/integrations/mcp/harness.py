@@ -61,7 +61,10 @@ def build_server(style):
         if not isinstance(a, int) or not isinstance(b, int):
             raise ValueError("a and b must be integers")
         orders.calls.append({"a": a, "b": b})
-        return a + b
+        from judgeval import Tracer
+
+        with Tracer.start_as_current_span("database"):
+            return a + b
 
     if style not in LOW_LEVEL:
         if style == "mcp1-fastmcp":

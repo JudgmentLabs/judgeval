@@ -101,15 +101,13 @@ async def test_call_contracts_follow_current_caller_and_fail_open(tracer):
 
 
 @pytest.mark.asyncio
-async def test_invalid_session_and_unicode_do_not_hide_native_cancellation(
-    tracer, native_requests
-):
+async def test_invalid_session_does_not_hide_cancellation(tracer, collecting_exporter):
     observer = McpObserver(
         McpOptions(inject_agent_arguments=False, session_id=lambda _: 123), "test", None
     )
     facts = RequestFacts(
         "tools/call",
-        {"name": "tool\ud800", "arguments": {"key\ud800": 1}},
+        {"name": "tool", "arguments": {"key": 1}},
         None,
         None,
         {},
@@ -125,23 +123,66 @@ async def test_invalid_session_and_unicode_do_not_hide_native_cancellation(
     with pytest.raises(asyncio.CancelledError):
         await observer.observe(facts, cancel, ModelResults(), None)
     JudgmentTracerProvider.get_instance().force_flush()
-    calls = [call for batch in native_requests for call in batch["calls"]]
+    calls = [span.attributes for span in collecting_exporter.spans]
     assert [
         (
-            call["outcome"],
-            call["tool_name"],
-            call["argument_keys"],
-            call.get("session_id"),
-            call["metadata"].get("judgment.mcp.conversation_id_source"),
-            call.get("error_type"),
+            call["judgment.mcp.outcome"],
+            call["gen_ai.tool.name"],
+            call["judgment.mcp.argument_keys"],
+            call.get("judgment.session_id"),
+            call.get("judgment.mcp.conversation_id_source"),
+            call.get("error.type"),
         )
         for call in calls
-    ] == [("cancelled", "tool�", ["key�"], None, None, None)]
+    ] == [("cancelled", "tool", '["key"]', None, None, None)]
 
 
 class McpError(Exception):
     def __init__(self, code):
         self.error = SimpleNamespace(code=code)
+
+
+@pytest.mark.asyncio
+async def test_transport_session_survives_failed_outcome_detection(
+    tracer, collecting_exporter
+):
+    class BrokenResults(ModelResults):
+        def is_error(self, result):
+            raise RuntimeError("classification unavailable")
+
+    from mcp.types import CallToolResult
+
+    observer = McpObserver(McpOptions(), "test", None)
+    facts = RequestFacts(
+        "tools/call",
+        {"name": "lookup", "arguments": {}},
+        None,
+        "transport-session",
+        {},
+        {},
+        None,
+        None,
+        None,
+    )
+
+    async def listing(_):
+        return [("lookup", {"type": "object", "additionalProperties": False})], None
+
+    original = CallToolResult(content=[], isError=True)
+
+    async def invoke(_):
+        return original
+
+    result = await observer.observe(facts, invoke, BrokenResults(), listing)
+    JudgmentTracerProvider.get_instance().force_flush()
+    call = collecting_exporter.spans[-1]
+    assert (
+        result is original,
+        call.attributes["judgment.session_id"],
+        call.attributes["judgment.mcp.conversation_id_source"],
+        call.attributes["judgment.mcp.outcome"],
+        call.status.status_code.name,
+    ) == (True, "transport-session", "transport", "error", "ERROR")
 
 
 @pytest.mark.parametrize(

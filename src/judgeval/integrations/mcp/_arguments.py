@@ -162,7 +162,9 @@ def without_agent_arguments(
 
 
 def schema_with_agent_arguments(
-    schema: Mapping[str, Any], declared: FrozenSet[str]
+    schema: Mapping[str, Any],
+    declared: FrozenSet[str],
+    inject_conversation_id: bool = True,
 ) -> Dict[str, Any]:
     """Adds the optional arguments the tool doesn't already declare."""
     properties = schema.get("properties")
@@ -173,6 +175,7 @@ def schema_with_agent_arguments(
                 name: {"type": "string", "description": description}
                 for name, description in AGENT_ARGUMENT_DESCRIPTIONS.items()
                 if name not in declared
+                and (inject_conversation_id or name != CONVERSATION_ARGUMENT)
             },
             **(properties if isinstance(properties, Mapping) else {}),
         },

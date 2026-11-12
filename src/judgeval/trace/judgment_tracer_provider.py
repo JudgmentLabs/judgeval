@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from contextvars import ContextVar, Token
-from typing import TYPE_CHECKING, ClassVar, Optional, Sequence, Protocol
-from weakref import WeakKeyDictionary, WeakSet, finalize
+from typing import TYPE_CHECKING, ClassVar, Optional, Sequence
+from weakref import WeakSet
 
 from opentelemetry import context as context_api
 from opentelemetry import trace as trace_api
@@ -20,13 +20,6 @@ if TYPE_CHECKING:
     from judgeval.trace.tracer import Tracer as JudgmentTracer
 
 _Links = Optional[Sequence[Link]]
-
-
-class BackgroundExporter(Protocol):
-    def force_flush(self, timeout_millis: int = 30000) -> bool: ...
-    def shutdown(self) -> None: ...
-
-
 _active_tracer_var: ContextVar[Optional[JudgmentTracer]] = ContextVar(
     "active_tracer", default=None
 )
@@ -134,7 +127,6 @@ class JudgmentTracerProvider(TracerProvider):
         "_judgment_tracers",
         "_external_span_processors",
         "_use_global_context",
-        "_background_exporters",
     )
 
     def __init__(self):
@@ -144,9 +136,6 @@ class JudgmentTracerProvider(TracerProvider):
         self._proxy_tracer = ProxyTracer(self)
         self._judgment_tracers: WeakSet[JudgmentTracer] = WeakSet()
         self._external_span_processors: list[SpanProcessor] = []
-        self._background_exporters: WeakKeyDictionary[
-            JudgmentTracer, set[BackgroundExporter]
-        ] = WeakKeyDictionary()
         # When this provider is installed as the global provider it owns the
         # global OTel context too, so active spans must be published there
         # (not only in Judgment's private context). That lets third-party
@@ -200,8 +189,6 @@ class JudgmentTracerProvider(TracerProvider):
     def deregister(self, tracer: JudgmentTracer) -> None:
         """Remove a tracer from the tracked set."""
         self._judgment_tracers.discard(tracer)
-        for exporter in self._background_exporters.pop(tracer, ()):
-            exporter.shutdown()
 
     def set_active(self, tracer: JudgmentTracer) -> bool:
         """Set a tracer as the active tracer for the current context.
@@ -340,12 +327,6 @@ class JudgmentTracerProvider(TracerProvider):
         else:
             self._runtime_context.detach(token)
 
-    def add_background_exporter(
-        self, exporter: BackgroundExporter, tracer: JudgmentTracer
-    ) -> None:
-        self._background_exporters.setdefault(tracer, set()).add(exporter)
-        finalize(tracer, exporter.shutdown)
-
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         """Flush pending spans from all registered tracers."""
         results = [
@@ -353,11 +334,6 @@ class JudgmentTracerProvider(TracerProvider):
             for t in self._judgment_tracers
         ]
         results.append(self._active_span_processor.force_flush(timeout_millis))
-        results.extend(
-            exporter.force_flush(timeout_millis)
-            for exporters in list(self._background_exporters.values())
-            for exporter in tuple(exporters)
-        )
         return all(results)
 
     def shutdown(self) -> None:
@@ -366,7 +342,3 @@ class JudgmentTracerProvider(TracerProvider):
             t._tracer_provider.shutdown()
         self._judgment_tracers.clear()
         self._active_span_processor.shutdown()
-        for exporters in list(self._background_exporters.values()):
-            for exporter in tuple(exporters):
-                exporter.shutdown()
-        self._background_exporters.clear()

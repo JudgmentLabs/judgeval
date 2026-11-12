@@ -11,7 +11,11 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, Optional, Tuple
 
-from ._arguments import conversation_output_schema, structured_with_prompt
+from ._arguments import (
+    CONVERSATION_ARGUMENT,
+    conversation_output_schema,
+    structured_with_prompt,
+)
 from ._observer import (
     ListedTools,
     McpObserver,
@@ -28,7 +32,8 @@ _WRAPPED_MARKER = "__judgeval_mcp_wrapped__"
 class ModelResults:
     """Results as 1.x handlers return them: ``ServerResult`` wrapping a model."""
 
-    def __init__(self) -> None:
+    def __init__(self, inject_conversation_id: bool = True) -> None:
+        self._inject_conversation_id = inject_conversation_id
         self._structured_tools: set[str] = set()
 
     def is_error(self, result: Any) -> bool:
@@ -87,7 +92,13 @@ class ModelResults:
             schema = schema_for(tool.name, getattr(tool, "inputSchema", None))
             updates = {"inputSchema": schema}
             output = getattr(tool, "outputSchema", None)
-            extended = conversation_output_schema(output)
+            extended = (
+                conversation_output_schema(output)
+                if self._inject_conversation_id
+                and schema is not None
+                and CONVERSATION_ARGUMENT in schema.get("properties", {})
+                else None
+            )
             self._structured_tools.discard(tool.name)
             if schema is not None and (output is None or extended is not None):
                 self._structured_tools.add(tool.name)
@@ -141,7 +152,7 @@ def instrument(observer: McpObserver, lowlevel: Any) -> bool:
             return False
     except Exception:
         return False
-    results = ModelResults()
+    results = ModelResults(observer.options.inject_conversation_id)
     list_request = getattr(types, "ListToolsRequest", None)
 
     async def list_tools(cursor: Optional[str]) -> Tuple[ListedTools, Optional[str]]:

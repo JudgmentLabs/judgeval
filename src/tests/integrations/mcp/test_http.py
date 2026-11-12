@@ -10,7 +10,7 @@ from tests.integrations.mcp.harness import MCP_MAJOR, McpClient, build_server, s
 
 
 @pytest.mark.asyncio
-async def test_http_calls_reach_the_active_tracer(tracer, native_requests):
+async def test_http_calls_reach_the_active_tracer(tracer, collecting_exporter):
     style = "mcp1-fastmcp" if MCP_MAJOR == 1 else "mcp2-mcpserver"
     orders = build_server(style)
     instrument_mcp_server(orders.server, session_id=lambda _: "http-session")
@@ -40,9 +40,12 @@ async def test_http_calls_reach_the_active_tracer(tracer, native_requests):
     assert (
         result.texts,
         [
-            (call["tool_name"], call["session_id"])
-            for batch in native_requests
-            for call in batch["calls"]
+            (
+                span.attributes["gen_ai.tool.name"],
+                span.attributes["judgment.session_id"],
+            )
+            for span in collecting_exporter.spans
+            if span.attributes.get("mcp.method.name") == "tools/call"
         ],
     ) == (
         ["3"],
