@@ -24,9 +24,9 @@ class Trajectory:
     """Records model calls in the conversation format, without traces.
 
     Call ``Trajectory.init`` once at startup, then ``Trajectory.record``
-    from anywhere. Each call is stored in its conversation and evaluated by
-    the project's conversation judges, as model calls recorded from traces
-    are. Nothing here raises into your code: ``init`` logs a warning and
+    from anywhere. Each call is added to its trajectory, the calls that
+    share its ``conversation_id``, and evaluated by the project's
+    conversation judges, as model calls recorded from traces are. Nothing here raises into your code: ``init`` logs a warning and
     leaves recording off when a credential is missing or the project is not
     found, and ``record`` queues the call and returns at once.
 
