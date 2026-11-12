@@ -5,10 +5,10 @@ import copy
 from datetime import datetime, timezone
 from typing import ClassVar, Optional
 
-from judgeval.conversations.batch_observation_processor import (
+from judgeval.trajectory.batch_observation_processor import (
     BatchObservationProcessor,
 )
-from judgeval.conversations.observation_exporter import ObservationExporter
+from judgeval.trajectory.observation_exporter import ObservationExporter
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
 from judgeval.internal.api.api_client import JudgmentSyncClient
 from judgeval.internal.api.models import (
@@ -20,10 +20,10 @@ from judgeval.utils import resolve_project_id
 from judgeval.utils.decorators.dont_throw import dont_throw
 
 
-class Conversations:
+class Trajectory:
     """Records model calls in the conversation format, without traces.
 
-    Call ``Conversations.init`` once at startup, then ``Conversations.record``
+    Call ``Trajectory.init`` once at startup, then ``Trajectory.record``
     from anywhere. Each call is stored in its conversation and evaluated by
     the project's conversation judges, as model calls recorded from traces
     are. Nothing here raises into your code: ``init`` logs a warning and
@@ -31,17 +31,17 @@ class Conversations:
     found, and ``record`` queues the call and returns at once.
 
     Calls are sent in the background, in batches. Call
-    ``Conversations.flush`` before a short-lived process, such as a
+    ``Trajectory.flush`` before a short-lived process, such as a
     serverless handler, returns; queued calls are also sent at interpreter
     exit.
 
     Examples:
         ```python
-        from judgeval import Conversations
+        from judgeval import Trajectory
 
-        Conversations.init(project_name="support-bot", environment="production")
+        Trajectory.init(project_name="support-bot", environment="production")
 
-        Conversations.record({
+        Trajectory.record({
             "conversation_id": "ticket-4812",
             "model": "my-model-v2",
             "input": [{
@@ -102,7 +102,7 @@ class Conversations:
             else:
                 judgeval_logger.warning(
                     f"Project '{project_name}' not found. "
-                    "Conversations will not record observations."
+                    "Trajectory will not record observations."
                 )
         else:
             missing = [
@@ -117,7 +117,7 @@ class Conversations:
             ]
             judgeval_logger.warning(
                 f"{', '.join(missing)} not provided. "
-                "Conversations will not record observations."
+                "Trajectory will not record observations."
             )
         previous = cls._processor
         cls._initialized = True
@@ -142,15 +142,15 @@ class Conversations:
                 datetime is read as local time. Two identical calls at
                 different times are two calls.
         """
-        if not Conversations._initialized:
-            if not Conversations._not_initialized_reported:
-                Conversations._not_initialized_reported = True
+        if not Trajectory._initialized:
+            if not Trajectory._not_initialized_reported:
+                Trajectory._not_initialized_reported = True
                 judgeval_logger.warning(
-                    "[Conversations] Conversations.init() was not called; "
+                    "[Trajectory] Trajectory.init() was not called; "
                     "observations are not recorded"
                 )
             return
-        processor = Conversations._processor
+        processor = Trajectory._processor
         if processor is None:
             return
         sent: IngestObservationsRequestObservation = {
@@ -161,8 +161,8 @@ class Conversations:
             .astimezone(timezone.utc)
             .isoformat(),
         }
-        if Conversations._environment is not None:
-            sent["environment"] = Conversations._environment
+        if Trajectory._environment is not None:
+            sent["environment"] = Trajectory._environment
         processor.emit(sent)
 
     @staticmethod
@@ -172,7 +172,7 @@ class Conversations:
         Returns:
             False if recording is shut down.
         """
-        processor = Conversations._processor
+        processor = Trajectory._processor
         return True if processor is None else processor.force_flush()
 
     @staticmethod
@@ -183,9 +183,9 @@ class Conversations:
         Args:
             timeout_seconds: The longest to wait for queued calls.
         """
-        processor = Conversations._processor
+        processor = Trajectory._processor
         if processor is not None:
             processor.shutdown(timeout_seconds)
 
 
-atexit.register(Conversations.shutdown)
+atexit.register(Trajectory.shutdown)

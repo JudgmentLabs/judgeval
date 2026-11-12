@@ -57,7 +57,7 @@ class ObservationExporter:
                     return
                 if not _is_retryable(status) or attempt == MAX_ATTEMPTS - 1:
                     judgeval_logger.error(
-                        f"[Conversations] Dropped {len(batch)} observations: "
+                        f"[Trajectory] Dropped {len(batch)} observations: "
                         f"{status} {error.detail}"
                     )
                     return
@@ -65,7 +65,7 @@ class ObservationExporter:
             except Exception as error:
                 if attempt == MAX_ATTEMPTS - 1:
                     judgeval_logger.error(
-                        f"[Conversations] Dropped {len(batch)} observations: {error!r}"
+                        f"[Trajectory] Dropped {len(batch)} observations: {error!r}"
                     )
                     return
                 _backoff(attempt, None)
@@ -79,6 +79,4 @@ class ObservationExporter:
             if status == 402
             else "conversations are not enabled for this organization"
         )
-        judgeval_logger.warning(
-            f"[Conversations] Observations are not stored: {reason}"
-        )
+        judgeval_logger.warning(f"[Trajectory] Observations are not stored: {reason}")

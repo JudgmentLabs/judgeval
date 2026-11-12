@@ -12,7 +12,7 @@ from opentelemetry.context import (
     set_value,
 )
 
-from judgeval.conversations.observation_exporter import ObservationExporter
+from judgeval.trajectory.observation_exporter import ObservationExporter
 from judgeval.internal.api.models import IngestObservationsRequestObservation
 from judgeval.logger import judgeval_logger
 
@@ -68,7 +68,7 @@ class BatchObservationProcessor:
         if len(self._queue) == MAX_QUEUE_SIZE and not self._dropped_reported:
             self._dropped_reported = True
             judgeval_logger.warning(
-                "[Conversations] Queue full, dropping the oldest observations"
+                "[Trajectory] Queue full, dropping the oldest observations"
             )
         # A full deque drops its oldest observation to make room.
         self._queue.append(observation)
@@ -128,7 +128,7 @@ class BatchObservationProcessor:
                     self._exporter.export(batch)
                 except Exception as error:
                     judgeval_logger.error(
-                        f"[Conversations] Failed to export {len(batch)} "
+                        f"[Trajectory] Failed to export {len(batch)} "
                         f"observations: {error!r}"
                     )
                 finally:

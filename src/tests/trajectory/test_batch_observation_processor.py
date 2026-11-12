@@ -6,8 +6,8 @@ from typing import Any
 import pytest
 from opentelemetry.context import _SUPPRESS_INSTRUMENTATION_KEY, get_value
 
-import judgeval.conversations.batch_observation_processor as batch_processor
-from judgeval.conversations.batch_observation_processor import (
+import judgeval.trajectory.batch_observation_processor as batch_processor
+from judgeval.trajectory.batch_observation_processor import (
     BatchObservationProcessor,
 )
 

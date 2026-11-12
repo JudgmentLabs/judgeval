@@ -4,8 +4,8 @@ from typing import Any, Callable, Optional
 
 import pytest
 
-import judgeval.conversations.observation_exporter as observation_exporter
-from judgeval.conversations.observation_exporter import ObservationExporter
+import judgeval.trajectory.observation_exporter as observation_exporter
+from judgeval.trajectory.observation_exporter import ObservationExporter
 from judgeval.exceptions import JudgmentAPIError
 
 
