@@ -3,6 +3,8 @@ from __future__ import annotations
 import time
 from typing import Optional
 
+import httpx
+
 from judgeval.exceptions import JudgmentAPIError
 from judgeval.internal.api.api_client import JudgmentSyncClient
 from judgeval.internal.api.models import IngestObservationsRequestObservation
@@ -48,9 +50,7 @@ class ObservationExporter:
                 if status == 400 and len(batch) > 1:
                     # The server rejects a request when any observation in it
                     # does not fit the format; find which by halving it.
-                    middle = len(batch) // 2
-                    self.export(batch[:middle])
-                    self.export(batch[middle:])
+                    self._split(batch)
                     return
                 if status in (402, 404):
                     self._report_once(status)
@@ -62,13 +62,28 @@ class ObservationExporter:
                     )
                     return
                 _backoff(attempt, error.retry_after_seconds)
-            except Exception as error:
+            except httpx.TransportError as error:
                 if attempt == MAX_ATTEMPTS - 1:
                     judgeval_logger.error(
                         f"[Trajectory] Dropped {len(batch)} observations: {error!r}"
                     )
                     return
                 _backoff(attempt, None)
+            except Exception as error:
+                # Raised before anything is sent, when an observation holds a
+                # value JSON cannot represent, such as NaN.
+                if len(batch) > 1:
+                    self._split(batch)
+                else:
+                    judgeval_logger.error(
+                        f"[Trajectory] Dropped 1 observation: {error!r}"
+                    )
+                return
+
+    def _split(self, batch: list[IngestObservationsRequestObservation]) -> None:
+        middle = len(batch) // 2
+        self.export(batch[:middle])
+        self.export(batch[middle:])
 
     def _report_once(self, status: int) -> None:
         if status in self._reported:

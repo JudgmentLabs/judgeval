@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Optional
 
+import httpx
 import pytest
 
 import judgeval.trajectory.observation_exporter as observation_exporter
@@ -81,7 +82,7 @@ def test_waits_at_least_as_long_as_retry_after_but_no_longer_than_the_cap(waits)
 
 def test_a_network_failure_is_dropped_after_the_last_attempt(waits):
     def network_down(batch: list[Any]) -> None:
-        raise ConnectionError("network down")
+        raise httpx.ConnectError("network down")
 
     fake = FakeClient(network_down)
     export(fake, [sent("a")])
@@ -111,3 +112,18 @@ def test_one_observation_that_does_not_fit_the_format_does_not_drop_the_others(w
         for item in batch
     )
     assert stored == ["a", "b", "c"]
+
+
+def test_an_observation_json_cannot_hold_does_not_drop_the_others(waits):
+    def encode(batch: list[Any]) -> None:
+        if any(item["observation"]["conversation_id"] == "bad" for item in batch):
+            raise ValueError("Out of range float values are not JSON compliant")
+
+    fake = FakeClient(encode)
+    export(fake, [sent(name) for name in ["a", "bad", "b", "c"]])
+    stored = sorted(
+        item["observation"]["conversation_id"]
+        for batch in fake.batches
+        for item in batch
+    )
+    assert (stored, waits) == (["a", "b", "c"], [])
