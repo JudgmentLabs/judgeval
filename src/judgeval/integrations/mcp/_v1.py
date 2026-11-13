@@ -13,6 +13,7 @@ from typing import Any, Callable, Dict, Optional, Tuple
 
 from ._arguments import (
     CONVERSATION_ARGUMENT,
+    ToolContract,
     conversation_output_schema,
     structured_with_prompt,
 )
@@ -54,7 +55,18 @@ class ModelResults:
         text = getattr(content[0], "text", None)
         return text if isinstance(text, str) else None
 
-    def with_text(self, result: Any, text: str, tool_name: Any) -> Any:
+    def with_text(
+        self,
+        result: Any,
+        text: str,
+        tool_name: Any,
+        contract: Optional[ToolContract] = None,
+    ) -> Any:
+        annotate = (
+            contract.structured_output
+            if contract is not None and contract.structured_output is not None
+            else tool_name in self._structured_tools
+        )
         root = _root(result)
         content = getattr(root, "content", None)
         if content is None:
@@ -66,7 +78,7 @@ class ModelResults:
         updates: Dict[str, Any] = {
             "content": [*content, types.TextContent(type="text", text=text)]
         }
-        if tool_name in self._structured_tools:
+        if annotate:
             structured = structured_with_prompt(
                 getattr(root, "structuredContent", None), text
             )

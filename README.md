@@ -91,6 +91,8 @@ instrument_mcp_server(server, intent_argument="intent", model_argument="judgment
 
 Explicit names reuse existing tool arguments without changing their schemas or removing them from handler inputs; when absent, they are injected into compatible schemas and stripped before execution. Defaults are `intent`, `llm_model`, and `conversation_id`. Without explicit configuration, same-name business arguments are preserved but not interpreted as telemetry. Explicit fields can be read with `inject_agent_arguments=False`; missing/non-string values are omitted. Existing conversation fields supply application sessions, while injected ones use generated UUIDv7 handles. Names must be non-empty and distinct.
 
+With conversation injection enabled, successful calls without an application or echoed conversation session offer a new ID even on stateful HTTP. The transport session groups calls until the agent echoes that ID. Error results receive no handoff; dictionary outputs stay unchanged and use supplemental text for handoff. Native per-tool lookup avoids full discovery where available; custom low-level servers retain caller-scoped listing.
+
 ### SQL
 
 Use `Judgeval.sql(sql_text)` for read-only queries against Judgment's virtual

@@ -14,6 +14,7 @@ from typing import Any, Awaitable, Callable, Dict, List, Mapping, Optional, Tupl
 
 from ._arguments import (
     CONVERSATION_ARGUMENT,
+    ToolContract,
     conversation_output_schema,
     structured_with_prompt,
 )
@@ -68,7 +69,18 @@ class WireResults:
         )
         return text if isinstance(text, str) else None
 
-    def with_text(self, result: Any, text: str, tool_name: Any) -> Any:
+    def with_text(
+        self,
+        result: Any,
+        text: str,
+        tool_name: Any,
+        contract: Optional[ToolContract] = None,
+    ) -> Any:
+        annotate = (
+            contract.structured_output
+            if contract is not None and contract.structured_output is not None
+            else tool_name in self._structured_tools
+        )
         if isinstance(result, Mapping):
             content = result.get("content")
             if content is None:
@@ -76,7 +88,7 @@ class WireResults:
             if not isinstance(content, list):
                 return result
             updates = {}
-            if tool_name in self._structured_tools:
+            if annotate:
                 structured = structured_with_prompt(
                     result.get("structuredContent"), text
                 )
@@ -93,7 +105,7 @@ class WireResults:
         if isinstance(content, list) and hasattr(result, "model_copy"):
             item = _text_item(text)
             updates = {"content": [*content, item]}
-            if tool_name in self._structured_tools:
+            if annotate:
                 structured = structured_with_prompt(
                     getattr(result, "structured_content", None), text
                 )

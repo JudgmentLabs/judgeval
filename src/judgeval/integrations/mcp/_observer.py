@@ -12,7 +12,7 @@ import contextvars
 import inspect
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import (
     Any,
     Awaitable,
@@ -46,6 +46,7 @@ from ._arguments import (
     AGENT_ARGUMENTS,
     ArgumentNames,
     ToolContract,
+    conversation_output_schema,
     conversation_id_prompt,
     mint_conversation_id,
     read_reported_arguments,
@@ -65,7 +66,6 @@ PROTOCOL_VERSION_META_KEY = "io.modelcontextprotocol/protocolVersion"
 _MAX_ERROR_MESSAGE_LENGTH = 1_000
 _MAX_RECORDED_KEYS = 30
 _MAX_RECORDED_KEY_LENGTH = 64
-_MAX_LISTING_PAGES = 20
 _INVALID_PARAMS_CODE = -32602
 # How each SDK words a call to a tool it doesn't have, or has turned off.
 _UNKNOWN_TOOL = re.compile(
@@ -156,7 +156,13 @@ class ResultAdapter(Protocol):
 
     def first_text(self, result: Any) -> Optional[str]: ...
 
-    def with_text(self, result: Any, text: str, tool_name: Any) -> Any: ...
+    def with_text(
+        self,
+        result: Any,
+        text: str,
+        tool_name: Any,
+        contract: Optional[ToolContract] = None,
+    ) -> Any: ...
 
     def listed_tools(self, result: Any) -> Optional[ListedTools]: ...
 
@@ -286,6 +292,7 @@ class McpObserver:
         server_name: Optional[str],
         server_version: Optional[str],
         tool_manager: Any = None,
+        tool_lookup: Optional[Callable[[str], Any]] = None,
     ) -> None:
         self.options = options
         self.argument_names = ArgumentNames(
@@ -299,6 +306,7 @@ class McpObserver:
             Optional[Dict[str, Optional[ToolContract]]]
         ] = contextvars.ContextVar("mcp_tool_contracts", default=None)
         self._tool_manager = tool_manager
+        self._tool_lookup = tool_lookup
         # Requests can run where the tracer set by `Tracer.init()` isn't
         # active, such as a server running in another thread.
         self._tracer = attempt(_active_tracer)
@@ -319,35 +327,57 @@ class McpObserver:
         """Keeps what each listed tool declares, before injection changes it."""
         for name, schema in tools or ():
             tool = getattr(self._tool_manager, "_tools", {}).get(name)
-            model = getattr(getattr(tool, "fn_metadata", None), "arg_model", None)
-            function = getattr(tool, "fn", None)
-            closed = (
-                model.model_config.get("extra") != "allow"
-                if model is not None
-                else callable(function)
-                and all(
-                    parameter.kind != inspect.Parameter.VAR_KEYWORD
-                    for parameter in inspect.signature(function).parameters.values()
-                )
+            self._remember_tool(name, schema, tool)
+
+    def _remember_tool(self, name: str, schema: Any, tool: Any) -> None:
+        model = getattr(getattr(tool, "fn_metadata", None), "arg_model", None)
+        function = getattr(tool, "fn", None)
+        closed = (
+            model.model_config.get("extra") != "allow"
+            if model is not None
+            else callable(function)
+            and all(
+                parameter.kind != inspect.Parameter.VAR_KEYWORD
+                for parameter in inspect.signature(function).parameters.values()
             )
-            # FastMCP's generated Pydantic models ignore extras by default;
-            # raw JSON-schema servers must explicitly declare closed inputs.
-            if closed and isinstance(schema, Mapping):
-                schema = {**schema, "additionalProperties": False}
-            self._contracts[name] = tool_contract(schema, self.argument_names)
+        )
+        # Python function tools ignore extras by default; raw JSON-schema
+        # tools must explicitly declare closed inputs.
+        if closed and isinstance(schema, Mapping):
+            schema = {**schema, "additionalProperties": False}
+        contract = tool_contract(schema, self.argument_names)
+        if contract is not None and tool is not None:
+            output = getattr(tool, "output_schema", None)
+            contract = replace(
+                contract,
+                structured_output=output is None
+                or conversation_output_schema(output) is not None,
+            )
+        self._contracts[name] = contract
+
+    async def _remember_native_tool(self, name: str) -> None:
+        if self._tool_lookup is not None:
+            tool = self._tool_lookup(name)
+            if inspect.isawaitable(tool):
+                tool = await tool
+            schema = getattr(tool, "parameters", getattr(tool, "input_schema", None))
+            if schema is not None:
+                self._remember_tool(name, schema, tool)
 
     async def contract_for(
         self, name: str, list_tools: Optional[ListTools]
     ) -> Optional[ToolContract]:
-        """The current caller's contract, listing tools within this request.
+        """Looks up just this tool when possible; raw servers use caller-scoped lists.
 
         A call can reach a server that never listed its tools, such as another
         replica of a stateless server.
         """
+        if name not in self._contracts:
+            await attempt_async(lambda: self._remember_native_tool(name))
         if name not in self._contracts and list_tools is not None:
             cursor: Optional[str] = None
             seen: Set[str] = set()
-            for _ in range(_MAX_LISTING_PAGES):
+            while True:
                 tools, cursor = await list_tools(cursor)
                 self.remember_listing(tools)
                 # A server that repeats a cursor would otherwise be listed again.
@@ -479,12 +509,19 @@ class McpObserver:
     ) -> Any:
         if facts.method == "tools/list":
             return self.shape_listing(result, adapter)
-        if minted_conversation_id is not None:
+        if minted_conversation_id is not None and not adapter.is_error(result):
             prompt = conversation_id_prompt(
                 minted_conversation_id, self.argument_names.names[2]
             )
+            name = facts.params.get("name")
+            contract = self._contracts.get(name) if isinstance(name, str) else None
             shaped = attempt(
-                lambda: adapter.with_text(result, prompt, facts.params.get("name"))
+                lambda: adapter.with_text(
+                    result,
+                    prompt,
+                    name,
+                    contract,
+                )
             )
             return result if shaped is None else shaped
         return result
@@ -580,7 +617,7 @@ class McpObserver:
             and self.options.inject_conversation_id
             # A tool's own conversation_id argument isn't one the agent can echo.
             and self.argument_names.names[2] not in declared
-            and session is None
+            and logical_session is None
             else None
         )
         client = (

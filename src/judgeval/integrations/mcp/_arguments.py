@@ -100,11 +100,12 @@ class ReportedArguments:
 
 @dataclass(frozen=True)
 class ToolContract:
-    """What a tool's input schema declares, as far as injection is concerned."""
+    """Which arguments and structured handoff a tool can safely accept."""
 
     declared: FrozenSet[str]
     # Accepts unknown keys, so an added argument could reach the tool's own code.
     open: bool
+    structured_output: Optional[bool] = None
 
 
 def mint_conversation_id(now_ms: Optional[int] = None) -> str:
@@ -261,6 +262,10 @@ def conversation_output_schema(schema: Any) -> Optional[Dict[str, Any]]:
     ):
         return None
     properties = schema.get("properties", {})
+    # Adding a named property changes how clients decode a dictionary result:
+    # some construct a model containing only that property and drop real keys.
+    if not properties or isinstance(schema.get("additionalProperties"), Mapping):
+        return None
     if RESPONSE_CONTEXT in properties or RESPONSE_CONTEXT in schema.get("required", []):
         return None
     return {

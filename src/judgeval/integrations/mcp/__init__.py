@@ -62,12 +62,13 @@ def instrument_mcp_server(
     starts. It changes your server in one way by default: each tool's published
     schema gets optional ``intent``, ``llm_model`` and ``conversation_id``
     arguments, which are removed before your tool runs. When a call has no
-    application, echoed or transport session, its result gets an ID in
+    application or echoed conversation session, its successful result gets an ID in
     supplemental text and compatible existing ``structuredContent._judgment``.
     Compatible output schemas gain
     the matching optional property. Text-only/unsupported/colliding outputs
     retain text handoff. Transport session IDs are used only when no application
-    or conversation session is available.
+    or conversation session is available, including while waiting for the agent
+    to echo a newly offered ID.
 
     Args:
         server: A ``FastMCP``, ``MCPServer`` or low-level ``Server`` from `mcp`,
@@ -152,6 +153,8 @@ def _instrument(server: Any, options: McpOptions) -> bool:
         server_name=_text(getattr(lowlevel, "name", None)),
         server_version=_text(getattr(lowlevel, "version", None)),
         tool_manager=getattr(server, "_tool_manager", None),
+        tool_lookup=getattr(server, "get_tool", None)
+        or getattr(getattr(server, "_tool_manager", None), "get_tool", None),
     )
     from . import _v1, _v2
 

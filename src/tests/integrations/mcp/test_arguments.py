@@ -217,10 +217,17 @@ def test_session_ids_require_uuid_v7_and_valid_variant(session):
         {"maxProperties": 1},
         {"const": {"ok": True}},
         {"enum": [{"ok": True}]},
+        {"properties": {}, "additionalProperties": {"type": "integer"}},
+        {"additionalProperties": {"type": "integer"}},
     ],
 )
 def test_incompatible_output_schema_is_preserved(constraints):
-    assert conversation_output_schema({"type": "object", **constraints}) is None
+    assert (
+        conversation_output_schema(
+            {"type": "object", "properties": {"ok": {"type": "boolean"}}, **constraints}
+        )
+        is None
+    )
 
 
 @pytest.mark.parametrize("structured", [None, {"_judgment": "developer-owned"}])

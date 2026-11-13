@@ -21,6 +21,63 @@ from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
 
 
 @pytest.mark.asyncio
+async def test_native_lookup_avoids_full_listing_and_keeps_structured_handoff(tracer):
+    from mcp.types import CallToolResult
+
+    lookups = []
+    listings = []
+    received = []
+
+    async def lookup(name):
+        lookups.append(name)
+        return SimpleNamespace(
+            parameters={"type": "object", "additionalProperties": False},
+            output_schema={"type": "object", "properties": {"ok": {"type": "boolean"}}},
+        )
+
+    async def listing(cursor):
+        listings.append(cursor)
+        raise AssertionError("Call path must not list tools")
+
+    async def invoke(arguments):
+        received.append(arguments)
+        return CallToolResult(content=[], structuredContent={"ok": True})
+
+    observer = McpObserver(McpOptions(), "test", None, tool_lookup=lookup)
+    facts = RequestFacts(
+        "tools/call",
+        {"name": "lookup", "arguments": {"intent": "Searching"}},
+        None,
+        None,
+        {},
+        {},
+        None,
+        None,
+        None,
+    )
+    adapter_type = (
+        WireResults if "is_error" in CallToolResult.model_fields else ModelResults
+    )
+    results = [
+        await observer.observe(facts, invoke, adapter_type(), listing) for _ in range(2)
+    ]
+    assert (
+        lookups,
+        listings,
+        received,
+        [
+            sorted(result.model_dump(by_alias=True)["structuredContent"])
+            for result in results
+        ],
+    ) == (
+        ["lookup", "lookup"],
+        [],
+        [{}, {}],
+        [["_judgment", "ok"], ["_judgment", "ok"]],
+    )
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("inject", [True, False])
 async def test_explicit_arguments_record_business_values_without_changing_calls(
     inject, tracer
@@ -123,7 +180,10 @@ def test_structured_only_handoff_preserves_output_without_content(style):
 async def test_call_contracts_follow_current_caller_and_fail_open(tracer):
     from mcp.types import CallToolResult
 
-    observer = McpObserver(McpOptions(), "test", None)
+    async def unavailable_tool(_):
+        raise RuntimeError("lookup unavailable")
+
+    observer = McpObserver(McpOptions(), "test", None, tool_lookup=unavailable_tool)
     forwarded = []
     facts = RequestFacts(
         "tools/call",
@@ -163,6 +223,113 @@ async def test_call_contracts_follow_current_caller_and_fail_open(tracer):
     await observer.observe(facts, invoke, ModelResults(), second_caller)
     await observer.observe(facts, invoke, ModelResults(), unavailable)
     assert forwarded == [{}, {"intent": "business"}, None]
+
+
+@pytest.mark.asyncio
+async def test_stateful_calls_offer_handoff_until_echo_and_leave_errors_unchanged(
+    tracer, collecting_exporter
+):
+    from dataclasses import replace
+    from mcp.types import CallToolResult
+
+    adapter_type = (
+        WireResults if "is_error" in CallToolResult.model_fields else ModelResults
+    )
+
+    observer = McpObserver(McpOptions(), "test", None)
+    facts = RequestFacts(
+        "tools/call",
+        {"name": "lookup", "arguments": {}},
+        None,
+        "transport",
+        {},
+        {},
+        None,
+        None,
+        None,
+    )
+
+    async def listing(_):
+        return [("lookup", {"type": "object", "additionalProperties": False})], None
+
+    async def succeed(_):
+        return CallToolResult(content=[])
+
+    error = CallToolResult(content=[], isError=True)
+
+    async def fail(_):
+        return error
+
+    first = await observer.observe(facts, succeed, adapter_type(), listing)
+    handle = (
+        json.loads(first.content[-1].text)["conversation_id"] if first.content else None
+    )
+    second = await observer.observe(
+        replace(
+            facts, params={"name": "lookup", "arguments": {"conversation_id": handle}}
+        ),
+        succeed,
+        adapter_type(),
+        listing,
+    )
+    failed = await observer.observe(facts, fail, adapter_type(), listing)
+    tracer.force_flush()
+    assert {
+        "handoff": isinstance(handle, str),
+        "echo_handoff": second.content,
+        "error_unchanged": failed is error,
+        "sessions": [
+            (
+                s.attributes.get("judgment.session_id"),
+                s.attributes.get("judgment.mcp.conversation_id_source"),
+            )
+            for s in collecting_exporter.spans
+        ],
+    } == {
+        "handoff": True,
+        "echo_handoff": [],
+        "error_unchanged": True,
+        "sessions": [
+            ("transport", "transport"),
+            (handle, "echoed"),
+            ("transport", "transport"),
+        ],
+    }
+
+
+@pytest.mark.asyncio
+async def test_paginated_tools_remain_callable_after_twenty_pages(tracer):
+    from mcp.types import CallToolResult
+
+    observer = McpObserver(McpOptions(), "test", None)
+    facts = RequestFacts(
+        "tools/call",
+        {"name": "lookup", "arguments": {"intent": "find tickets"}},
+        None,
+        None,
+        {},
+        {},
+        None,
+        None,
+        None,
+    )
+    forwarded = []
+
+    async def listing(cursor):
+        page = int(cursor or 0)
+        return [
+            (
+                "lookup" if page == 21 else str(page),
+                {"type": "object", "additionalProperties": False},
+            )
+        ], (None if page == 21 else str(page + 1))
+
+    async def invoke(arguments):
+        forwarded.append(arguments)
+        return CallToolResult(content=[])
+
+    await observer.observe(facts, invoke, ModelResults(), listing)
+    assert forwarded == [{}]
 
 
 @pytest.mark.asyncio

@@ -8,6 +8,39 @@ from tests.integrations.mcp.harness import build_server, connect, styles
 
 
 @pytest.mark.asyncio
+async def test_fastmcp_dictionary_output_preserves_client_data(tracer):
+    fastmcp = pytest.importorskip("fastmcp")
+    server = fastmcp.FastMCP("dictionary")
+
+    @server.tool()
+    def counts() -> dict[str, int]:
+        return {"open": 3, "closed": 2}
+
+    instrument_mcp_server(server)
+    async with fastmcp.Client(server) as client:
+        tools = await client.list_tools()
+        result = await client.call_tool("counts", {"intent": "Counting"})
+    assert {
+        "data": result.data,
+        "structured": result.structured_content,
+        "output_schema": tools[0].outputSchema,
+        "handoff": any(
+            '"conversation_id"' in item.text
+            for item in result.content
+            if item.type == "text"
+        ),
+    } == {
+        "data": {"open": 3, "closed": 2},
+        "structured": {"open": 3, "closed": 2},
+        "output_schema": {
+            "type": "object",
+            "additionalProperties": {"type": "integer"},
+        },
+        "handoff": True,
+    }
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("style", styles())
 async def test_custom_injected_names_are_stripped_and_conversation_handoff_uses_alias(
     style, tracer, collecting_exporter
