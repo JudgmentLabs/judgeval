@@ -85,10 +85,10 @@ from judgeval.internal.api.models import (
     SetConversationDisplayRulesResponse,
     SetJudgeActionGroupsRequest,
     SetJudgeActionGroupsResponse,
-    SetJudgeOptimisticEvalEnabledRequest,
-    SetJudgeOptimisticEvalEnabledResponse,
-    SetJudgePreprocessorArtifactRevisionRequest,
-    SetJudgePreprocessorArtifactRevisionResponse,
+    SetJudgeJevOptimizationEnabledRequest,
+    SetJudgeJevOptimizationEnabledResponse,
+    SetJudgePreprocessingScriptRequest,
+    SetJudgePreprocessingScriptResponse,
     StartTestRunRequest,
     StartTestRunResponse,
     TestCaseInput,
@@ -521,7 +521,11 @@ class JudgmentApiClient(JudgmentSyncClient):
         )
 
     def list_judges(
-        self, project_id: str, *, version: str | None = None
+        self,
+        project_id: str,
+        *,
+        version: str | None = None,
+        summary: bool | None = None,
     ) -> ListJudgesResponse:
         """List judges (`GET /v1/projects/{projectId}/judges`)."""
         return self._request(
@@ -530,7 +534,7 @@ class JudgmentApiClient(JudgmentSyncClient):
                 f"/v1/projects/{encode_path_segment(project_id)}/judges", self.base_url
             ),
             {},
-            _drop_none({"version": version}),
+            _drop_none({"version": version, "summary": summary}),
         )
 
     def create_judge(
@@ -600,13 +604,13 @@ class JudgmentApiClient(JudgmentSyncClient):
             None,
         )
 
-    def set_judge_optimistic_eval_enabled(
+    def set_judge_jev_optimization_enabled(
         self,
         project_id: str,
         judge_id: str,
         judge_version_id: str,
-        payload: SetJudgeOptimisticEvalEnabledRequest,
-    ) -> SetJudgeOptimisticEvalEnabledResponse:
+        payload: SetJudgeJevOptimizationEnabledRequest,
+    ) -> SetJudgeJevOptimizationEnabledResponse:
         """Set judge version optimistic eval (`PUT /v1/projects/{projectId}/judges/{judgeId}/versions/{judgeVersionId}/optimistic-eval`)."""
         return self._request(
             "PUT",
@@ -618,13 +622,49 @@ class JudgmentApiClient(JudgmentSyncClient):
             None,
         )
 
+    def set_judge_optimistic_eval_enabled(
+        self,
+        project_id: str,
+        judge_id: str,
+        judge_version_id: str,
+        payload: SetJudgeJevOptimizationEnabledRequest,
+    ) -> SetJudgeJevOptimizationEnabledResponse:
+        """Set judge version optimistic eval (`PUT /v1/projects/{projectId}/judges/{judgeId}/versions/{judgeVersionId}/optimistic-eval`)."""
+        return self._request(
+            "PUT",
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/judges/{encode_path_segment(judge_id)}/versions/{encode_path_segment(judge_version_id)}/optimistic-eval",
+                self.base_url,
+            ),
+            payload,
+            None,
+        )
+
+    def set_judge_preprocessing_script(
+        self,
+        project_id: str,
+        judge_id: str,
+        judge_version_id: str,
+        payload: SetJudgePreprocessingScriptRequest,
+    ) -> SetJudgePreprocessingScriptResponse:
+        """Set judge version preprocessing artifact (`PUT /v1/projects/{projectId}/judges/{judgeId}/versions/{judgeVersionId}/preprocessor-artifact-revision`)."""
+        return self._request(
+            "PUT",
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/judges/{encode_path_segment(judge_id)}/versions/{encode_path_segment(judge_version_id)}/preprocessor-artifact-revision",
+                self.base_url,
+            ),
+            payload,
+            None,
+        )
+
     def set_judge_preprocessor_artifact_revision(
         self,
         project_id: str,
         judge_id: str,
         judge_version_id: str,
-        payload: SetJudgePreprocessorArtifactRevisionRequest,
-    ) -> SetJudgePreprocessorArtifactRevisionResponse:
+        payload: SetJudgePreprocessingScriptRequest,
+    ) -> SetJudgePreprocessingScriptResponse:
         """Set judge version preprocessing artifact (`PUT /v1/projects/{projectId}/judges/{judgeId}/versions/{judgeVersionId}/preprocessor-artifact-revision`)."""
         return self._request(
             "PUT",

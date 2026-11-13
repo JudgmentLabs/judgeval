@@ -465,6 +465,18 @@ class JudgmentSyncClient:
             payload,
         )
 
+    def post_projects_judge_results(
+        self, project_id: str, payload: "SubmitExternalJudgeResult"
+    ) -> "SubmitExternalJudgeResultResponse":
+        return self._request(
+            "POST",
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/judge-results",
+                self.base_url,
+            ),
+            payload,
+        )
+
     def patch_projects_judges_by_judge_id(
         self, project_id: str, judge_id: str, payload: UpdateJudgeRequest
     ) -> UpdateJudgeResponse:

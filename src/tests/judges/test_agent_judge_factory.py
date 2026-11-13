@@ -316,3 +316,15 @@ class TestAgentJudgeFactoryUpdate:
         factory, client = _make_factory(project_id=None)
         assert factory.update(judge_id="judge-1", prompt="x") is None
         client.patch_projects_judges_by_judge_id.assert_not_called()
+
+
+def test_rejects_external_judges_with_no_executable_type():
+    factory, _ = _make_factory(
+        lookups=[
+            _judge_detail(execution_mode="external", judge_type=None, definition=None)
+        ]
+    )
+    with pytest.raises(
+        ValueError, match="only prompt-based agent judges are supported"
+    ):
+        factory.update(judge_id="judge-1", prompt="Updated rubric")

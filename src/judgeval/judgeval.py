@@ -478,3 +478,14 @@ class Judgeval:
             project_id=self._project_id,
             project_name=self._project_name,
         )
+
+    @property
+    def external_judges(self):
+        """Creates external judges and submits feedback from your application."""
+        from judgeval.external_judges.external_judge_factory import ExternalJudgeFactory
+
+        return ExternalJudgeFactory(
+            client=self._internal_client,
+            project_id=self._project_id,
+            project_name=self._project_name,
+        )

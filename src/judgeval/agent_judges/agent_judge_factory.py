@@ -292,7 +292,9 @@ class AgentJudgeFactory:
             judge_id=judge_id,
             payload={"version": version},
         )["judge"]
-        if judge["judge_type"] != "prompt":
+        if (
+            "execution_mode" in judge and judge["execution_mode"] == "external"
+        ) or judge["judge_type"] != "prompt":
             raise ValueError(
                 f"Judge {judge_id} is a {judge['judge_type']} judge; only "
                 "prompt-based agent judges are supported."
