@@ -35,7 +35,9 @@ from ._observer import (
     set_mcp_caller,
 )
 
-_instrumented: "weakref.WeakSet[Any]" = weakref.WeakSet()
+_instrumented: "weakref.WeakKeyDictionary[Any, weakref.ReferenceType[McpOptions]]" = (
+    weakref.WeakKeyDictionary()
+)
 
 
 def instrument_mcp_server(
@@ -100,7 +102,8 @@ def instrument_mcp_server(
         capture_output: Capture the original MCP result as-is; defaults to False.
         redact_payload: Transform a detached JSON input/output snapshot.
             Raise or return OMITTED to omit it; None captures JSON null.
-            Non-JSON/oversized payloads (128 KiB) are omitted.
+            Non-JSON/oversized payloads (128 KiB) are omitted. Oversized source
+            payloads are omitted before this callback runs.
         session_id: Returns an authoritative application session ID without
             relying on agent echo. Receives McpRequestInfo. Existing
             set_session_id baggage is also authoritative; scope it to each
@@ -146,7 +149,13 @@ def _lowlevel_server(server: Any) -> Any:
 
 def _instrument(server: Any, options: McpOptions) -> bool:
     lowlevel = _lowlevel_server(server)
-    if lowlevel in _instrumented:
+    previous = _instrumented.get(lowlevel)
+    if previous is not None:
+        if previous() != options:
+            judgeval_logger.warning(
+                "MCP server is already instrumented with different options; "
+                "keeping the original configuration."
+            )
         return True
     observer = McpObserver(
         options,
@@ -162,7 +171,7 @@ def _instrument(server: Any, options: McpOptions) -> bool:
         # Both adapters already skip handlers they wrapped, so a server that
         # can't be remembered here is still safe to instrument twice.
         try:
-            _instrumented.add(lowlevel)
+            _instrumented[lowlevel] = weakref.ref(options)
         except TypeError:
             pass
         return True

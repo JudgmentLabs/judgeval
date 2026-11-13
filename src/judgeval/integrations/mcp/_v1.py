@@ -26,6 +26,7 @@ from ._observer import (
     request_headers,
     transport_session_id,
 )
+from ._payload import result_payload
 
 _WRAPPED_MARKER = "__judgeval_mcp_wrapped__"
 
@@ -46,7 +47,7 @@ class ModelResults:
         return getattr(_root(result), "isError", None) is True
 
     def payload(self, result: Any) -> Any:
-        return _root(result).model_dump(mode="json", by_alias=True, exclude_none=True)
+        return result_payload(_root(result))
 
     def first_text(self, result: Any) -> Optional[str]:
         content = getattr(_root(result), "content", None)

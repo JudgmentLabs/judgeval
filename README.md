@@ -91,7 +91,15 @@ instrument_mcp_server(server, intent_argument="intent", model_argument="judgment
 
 Explicit names reuse existing tool arguments without changing their schemas or removing them from handler inputs; when absent, they are injected into compatible schemas and stripped before execution. Defaults are `intent`, `llm_model`, and `conversation_id`. Without explicit configuration, same-name business arguments are preserved but not interpreted as telemetry. Explicit fields can be read with `inject_agent_arguments=False`; missing/non-string values are omitted. Existing conversation fields supply application sessions, while injected ones use generated UUIDv7 handles. Names must be non-empty and distinct.
 
+Injection changes the advertised tool contract, including an optional `_judgment` property on compatible output schemas. During a mixed instrumented/uninstrumented rollout, strict clients holding an older output schema may reject structured results containing this property. Keep replica schemas consistent and refresh client tool discovery after rollout; gateways caching tool lists must refresh too.
+
+Injection is independent of telemetry availability: installing instrumentation before `Tracer.init()`, or disabling export, does not disable schema changes or conversation handoff. Injected fields and descriptions add model-context overhead per tool when clients expose the listing to an agent. Set `inject_agent_arguments=False` to disable automatic argument injection and handoff while retaining tracing, or `inject_conversation_id=False` to disable only conversation-ID injection and handoff.
+
 With conversation injection enabled, successful calls without an application or echoed conversation session offer a new ID even on stateful HTTP. The transport session groups calls until the agent echoes that ID. Error results receive no handoff; dictionary outputs stay unchanged and use supplemental text for handoff. Native per-tool lookup avoids full discovery where available; custom low-level servers retain caller-scoped listing.
+
+Repeated instrumentation keeps the original configuration and warns if options differ. Optional input/output capture is limited to 128 KiB; oversized source payloads are omitted before model conversion or the redaction callback.
+
+The SDK can record the original exception type when the exception reaches its wrapper or is supplied through `mark_mcp_call_error` before conversion to a public tool error. MCP frameworks may instead convert exceptions into `isError` results before the wrapper sees them; these generally use `error.type = "tool_error"`, since the original exception type is no longer available. Recognized refusals use `unknown_tool`, `tool_disabled`, or `invalid_input`; a structured public error code may also be used when error-message capture is enabled.
 
 ### SQL
 

@@ -27,6 +27,7 @@ from ._observer import (
     request_headers,
     transport_session_id,
 )
+from ._payload import result_payload
 
 
 class WireResults:
@@ -42,11 +43,7 @@ class WireResults:
         self._structured_tools: set[str] = set()
 
     def payload(self, result: Any) -> Any:
-        return (
-            dict(result)
-            if isinstance(result, Mapping)
-            else result.model_dump(mode="json", by_alias=True, exclude_none=True)
-        )
+        return result_payload(result)
 
     def is_error(self, result: Any) -> bool:
         if isinstance(result, Mapping):

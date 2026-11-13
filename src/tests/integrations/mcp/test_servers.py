@@ -8,6 +8,41 @@ from tests.integrations.mcp.harness import build_server, connect, styles
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("style", styles())
+async def test_reinstrumentation_warns_on_changed_options_and_keeps_original(
+    style, tracer, collecting_exporter, monkeypatch
+):
+    from judgeval.logger import judgeval_logger
+
+    orders = build_server(style)
+    warnings = []
+    monkeypatch.setattr(judgeval_logger, "warning", warnings.append)
+    results = [
+        instrument_mcp_server(orders.server),
+        instrument_mcp_server(orders.server),
+        instrument_mcp_server(orders.server, capture_input=True),
+    ]
+    async with connect(orders) as client:
+        await client.call("add", {"a": 1, "b": 2})
+    tracer.force_flush()
+    assert {
+        "results": results,
+        "warnings": warnings,
+        "captured": [
+            "judgment.input" in span.attributes
+            for span in collecting_exporter.spans
+            if span.name == "tools/call add"
+        ],
+    } == {
+        "results": [True, True, True],
+        "warnings": [
+            "MCP server is already instrumented with different options; keeping the original configuration."
+        ],
+        "captured": [False],
+    }
+
+
+@pytest.mark.asyncio
 async def test_fastmcp_dictionary_output_preserves_client_data(tracer):
     fastmcp = pytest.importorskip("fastmcp")
     server = fastmcp.FastMCP("dictionary")
