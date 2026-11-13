@@ -12,10 +12,10 @@ import json
 import math
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, cast
 
-from judgeval.internal.api import JudgmentSyncClient
-from judgeval.utils.url import url_for
+from judgeval.api import JudgmentApiClient
+from judgeval.internal.api.models import CreateJudgeRequest, UpdateJudgeRequest
 
 OutputType = Literal["binary", "numeric", "categorical", "arbitrary"]
 
@@ -111,10 +111,14 @@ def run_judge(source: str, example: Dict[str, Any]) -> Any:
 
 
 def _value_problem(value: Any, output: OutputType, labels: List[str]) -> Optional[str]:
-    is_number = isinstance(value, (int, float)) and not isinstance(value, bool)
+    is_number = (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+    )
     if output == "binary" and not isinstance(value, bool):
         return "value must be True or False"
-    if output == "numeric" and not (is_number and math.isfinite(value)):
+    if output == "numeric" and not is_number:
         return "value must be a finite number"
     if output == "categorical" and value not in labels:
         return f"value must be one of {labels}"
@@ -179,7 +183,7 @@ def load_spans(path: Path) -> List[Dict[str, Any]]:
 
 
 def upload_function_judge(
-    client: JudgmentSyncClient,
+    client: JudgmentApiClient,
     project_id: str,
     name: str,
     source: str,
@@ -191,8 +195,7 @@ def upload_function_judge(
     A new judge is categorical and needs at least two categories. A new version
     keeps the judge's score type and outputs; `categories` are ignored.
     """
-    judges_url = url_for(f"/v1/projects/{project_id}/judges", client.base_url)
-    listed = client._request("GET", judges_url, {"summary": "true"})["judges"]
+    listed = client.list_judges(project_id)["judges"]
     existing = next((judge for judge in listed if judge["name"] == name), None)
 
     if existing is None:
@@ -201,43 +204,51 @@ def upload_function_judge(
                 "A new function judge needs at least two categories, e.g. "
                 "--category Pass --category Fail"
             )
-        client._request(
-            "POST",
-            judges_url,
-            {
-                "judge": {
-                    "name": name,
-                    "judgeType": "custom",
-                    "initialVersion": {
-                        "scoreType": "categorical",
-                        "outputs": [{"name": c, "description": ""} for c in categories],
-                    },
-                    "config": {"functionSource": source},
-                }
-            },
+        # Casts: the committed spec predates mono #7025's `functionSource`.
+        client.create_judge(
+            project_id,
+            cast(
+                CreateJudgeRequest,
+                {
+                    "judge": {
+                        "name": name,
+                        "judgeType": "custom",
+                        "initialVersion": {
+                            "scoreType": "categorical",
+                            "outputs": [
+                                {"name": c, "description": ""} for c in categories
+                            ],
+                        },
+                        "config": {"functionSource": source},
+                    }
+                },
+            ),
         )
         return f"Created function judge '{name}'"
 
     if existing["judge_type"] != "custom":
-        raise ValueError(f"Judge '{name}' exists and is not a code judge")
+        raise ValueError(f"Judge '{name}' exists and is not a Code judge")
     major, minor = existing["judge_major_version"], existing["judge_minor_version"]
     target = (
         {"major": major + 1, "minor": 0}
         if bump_major
         else {"major": major, "minor": minor + 1}
     )
-    client._request(
-        "PATCH",
-        f"{judges_url}/{existing['id']}",
-        {
-            "update": {
-                "newVersionFromSource": {
-                    "sourceVersion": {"major": major, "minor": minor},
-                    "targetVersion": target,
-                    "promoteToProduction": True,
-                    "config": {"functionSource": source},
+    client.update_judge(
+        project_id,
+        existing["id"],
+        cast(
+            UpdateJudgeRequest,
+            {
+                "update": {
+                    "newVersionFromSource": {
+                        "sourceVersion": {"major": major, "minor": minor},
+                        "targetVersion": target,
+                        "promoteToProduction": True,
+                        "config": {"functionSource": source},
+                    }
                 }
-            }
-        },
+            },
+        ),
     )
     return f"Uploaded '{name}' as version {target['major']}.{target['minor']}"
