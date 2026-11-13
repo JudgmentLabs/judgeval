@@ -78,6 +78,19 @@ def run_agent(question: str) -> str:
 run_agent("What is the capital of the United States?")
 ```
 
+### MCP tool instrumentation
+
+After `Tracer.init()`, instrument your MCP server with optional argument-name overrides:
+
+```python
+from judgeval.integrations.mcp import instrument_mcp_server
+
+instrument_mcp_server(server, intent_argument="intent", model_argument="judgment_llm_model",
+                      conversation_id_argument="chat_id")
+```
+
+Explicit names reuse existing tool arguments without changing their schemas or removing them from handler inputs; when absent, they are injected into compatible schemas and stripped before execution. Defaults are `intent`, `llm_model`, and `conversation_id`. Without explicit configuration, same-name business arguments are preserved but not interpreted as telemetry. Explicit fields can be read with `inject_agent_arguments=False`; missing/non-string values are omitted. Existing conversation fields supply application sessions, while injected ones use generated UUIDv7 handles. Names must be non-empty and distinct.
+
 ### SQL
 
 Use `Judgeval.sql(sql_text)` for read-only queries against Judgment's virtual

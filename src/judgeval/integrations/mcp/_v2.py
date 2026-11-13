@@ -31,8 +31,13 @@ from ._observer import (
 class WireResults:
     """Results in the shape the 2.x runner sends: dicts with wire names."""
 
-    def __init__(self, inject_conversation_id: bool = True) -> None:
+    def __init__(
+        self,
+        inject_conversation_id: bool = True,
+        conversation_argument: str = CONVERSATION_ARGUMENT,
+    ) -> None:
         self._inject_conversation_id = inject_conversation_id
+        self._conversation_argument = conversation_argument
         self._structured_tools: set[str] = set()
 
     def payload(self, result: Any) -> Any:
@@ -137,7 +142,12 @@ class WireResults:
                     or not isinstance(name, str)
                     else {
                         **tool,
-                        **self._schema_updates(name, schema, tool.get("outputSchema")),
+                        **self._schema_updates(
+                            name,
+                            schema,
+                            tool.get("outputSchema"),
+                            tool.get("inputSchema"),
+                        ),
                     }
                 )
             return {**result, "tools": tools}
@@ -153,7 +163,10 @@ class WireResults:
                         update={
                             key.replace("Schema", "_schema"): value
                             for key, value in self._schema_updates(
-                                tool.name, schema, getattr(tool, "output_schema", None)
+                                tool.name,
+                                schema,
+                                getattr(tool, "output_schema", None),
+                                getattr(tool, "input_schema", None),
                             ).items()
                         }
                     )
@@ -161,11 +174,15 @@ class WireResults:
             return result.model_copy(update={"tools": updated})
         return result
 
-    def _schema_updates(self, name: str, schema: Any, output: Any) -> Dict[str, Any]:
+    def _schema_updates(
+        self, name: str, schema: Any, output: Any, original: Any
+    ) -> Dict[str, Any]:
         extended = (
             conversation_output_schema(output)
             if self._inject_conversation_id
-            and CONVERSATION_ARGUMENT in schema.get("properties", {})
+            and self._conversation_argument in schema.get("properties", {})
+            and self._conversation_argument
+            not in ((original or {}).get("properties", {}))
             else None
         )
         self._structured_tools.discard(name)
@@ -188,7 +205,10 @@ class JudgmentMcpMiddleware:
 
     def __init__(self, observer: McpObserver) -> None:
         self._observer = observer
-        self._results = WireResults(observer.options.inject_conversation_id)
+        self._results = WireResults(
+            observer.options.inject_conversation_id,
+            observer.argument_names.names[2],
+        )
 
     async def __call__(
         self, ctx: Any, call_next: Callable[[Any], Awaitable[Any]]

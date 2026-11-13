@@ -60,12 +60,12 @@ async def test_stdio_server_writes_only_protocol_messages(style, caplog):
                 client = McpClient(session)
                 tools = await client.all_tools()
                 outcome = await client.call(
-                    "add", {"a": 1, "b": 2, "context": "Adding numbers"}
+                    "add", {"a": 1, "b": 2, "intent": "Adding numbers"}
                 )
         stderr.seek(0)
         logged = stderr.read()
     assert {
-        "injected": "context" in tools["add"].get("properties", {}),
+        "injected": "intent" in tools["add"].get("properties", {}),
         "result": (outcome.is_error, outcome.texts[0]),
         "handoff": outcome.texts[-1].startswith(CONVERSATION_PROMPT_PREFIX),
         "warning_on_stderr": "judgeval warning before the server starts" in logged,

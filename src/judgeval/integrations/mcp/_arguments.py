@@ -1,7 +1,7 @@
 """The optional arguments that let agents report intent, model and conversation.
 
 An MCP server can't see the agent's conversation or why it called a tool, so the
-server asks: each listed tool gets optional ``context``, ``llm_model`` and
+server asks: each listed tool gets optional ``intent``, ``llm_model`` and
 ``conversation_id`` arguments, and they are removed again before the tool runs.
 """
 
@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, FrozenSet, Mapping, Optional
 
 
-INTENT_ARGUMENT = "context"
+INTENT_ARGUMENT = "intent"
 MODEL_ARGUMENT = "llm_model"
 CONVERSATION_ARGUMENT = "conversation_id"
 RESPONSE_CONTEXT = "_judgment"
@@ -36,14 +36,40 @@ AGENT_ARGUMENT_DESCRIPTIONS: Mapping[str, str] = {
         'as. Pass "unknown" if you are not certain.'
     ),
     CONVERSATION_ARGUMENT: (
-        "Optional, for analytics only. Pass the conversation_id from the server's "
-        "earlier response text or structuredContent._judgment, unchanged, on later "
-        "calls in this conversation. Omit it "
+        "Optional, for analytics only. Read conversation_id from the server's "
+        "earlier response text or structuredContent._judgment and pass it unchanged "
+        "as {argument_name} on later calls in this conversation. Omit it "
         "on the first call, and do not invent one."
     ),
 }
 
 AGENT_ARGUMENTS: FrozenSet[str] = frozenset(AGENT_ARGUMENT_DESCRIPTIONS)
+
+
+@dataclass(frozen=True)
+class ArgumentNames:
+    """An explicit name opts application-owned arguments into telemetry."""
+
+    intent: Optional[str] = None
+    model: Optional[str] = None
+    conversation_id: Optional[str] = None
+
+    @property
+    def names(self) -> tuple[str, str, str]:
+        return (
+            self.intent if self.intent is not None else INTENT_ARGUMENT,
+            self.model if self.model is not None else MODEL_ARGUMENT,
+            self.conversation_id
+            if self.conversation_id is not None
+            else CONVERSATION_ARGUMENT,
+        )
+
+    def __post_init__(self) -> None:
+        if any(not name.strip() for name in self.names) or len(set(self.names)) != 3:
+            raise ValueError(
+                "MCP telemetry argument names must be non-empty and distinct"
+            )
+
 
 # Keywords that can accept, require or rule out a property without listing it
 # under ``properties``. A schema using one is left as it is.
@@ -91,7 +117,9 @@ def mint_conversation_id(now_ms: Optional[int] = None) -> str:
     return f"{text[:8]}-{text[8:12]}-{text[12:16]}-{text[16:20]}-{text[20:]}"
 
 
-def tool_contract(schema: Any) -> Optional[ToolContract]:
+def tool_contract(
+    schema: Any, names: ArgumentNames = ArgumentNames()
+) -> Optional[ToolContract]:
     """Reads a listed tool's JSON input schema. None if injection isn't safe.
 
     An absent ``additionalProperties`` permits undeclared business arguments.
@@ -108,9 +136,7 @@ def tool_contract(schema: Any) -> Optional[ToolContract]:
         declared.update(name for name in required if isinstance(name, str))
     for pattern in _names(schema.get("patternProperties")):
         try:
-            declared.update(
-                name for name in AGENT_ARGUMENTS if re.search(pattern, name)
-            )
+            declared.update(name for name in names.names if re.search(pattern, name))
         except re.error:
             # A pattern Python can't read might match one of them.
             return None
@@ -128,36 +154,54 @@ def _names(properties: Any) -> FrozenSet[str]:
 
 
 def read_reported_arguments(
-    args: Mapping[str, Any], declared: FrozenSet[str]
+    args: Mapping[str, Any],
+    declared: FrozenSet[str],
+    names: ArgumentNames = ArgumentNames(),
+    *,
+    injected: bool = True,
 ) -> ReportedArguments:
-    """Reads agent-reported values, skipping any name the tool itself declares."""
+    """Reads injected arguments and explicitly opted-in business arguments."""
 
-    def read(name: str) -> Optional[str]:
+    def read(name: str, configured: Optional[str]) -> Optional[str]:
+        if configured is None and (not injected or name in declared):
+            return None
         value = args.get(name)
-        if name in declared or not isinstance(value, str) or value == "":
+        if not isinstance(value, str) or not value.strip():
             return None
         return value
 
-    intent = read(INTENT_ARGUMENT)
-    model = read(MODEL_ARGUMENT)
-    conversation_id = read(CONVERSATION_ARGUMENT)
+    intent_name, model_name, conversation_name = names.names
+    intent = read(intent_name, names.intent)
+    model = read(model_name, names.model)
+    conversation_id = read(conversation_name, names.conversation_id)
     return ReportedArguments(
         intent=None if intent is None else intent[:_MAX_INTENT_LENGTH],
         model=None if model is None or model.lower() == "unknown" else model,
         conversation_id=conversation_id
-        if conversation_id is not None and _UUID_V7.match(conversation_id)
+        if conversation_id is not None
+        and (
+            (
+                names.conversation_id is not None
+                and (conversation_name in declared or not injected)
+            )
+            or _UUID_V7.match(conversation_id)
+        )
         else None,
     )
 
 
 def without_agent_arguments(
-    args: Mapping[str, Any], declared: FrozenSet[str]
+    args: Mapping[str, Any],
+    declared: FrozenSet[str],
+    names: ArgumentNames = ArgumentNames(),
+    inject_conversation_id: bool = True,
 ) -> Dict[str, Any]:
     """Removes injected values so a tool's strict schema still accepts the call."""
+    injected_names = names.names if inject_conversation_id else names.names[:2]
     return {
         name: value
         for name, value in args.items()
-        if name not in AGENT_ARGUMENTS or name in declared
+        if name not in injected_names or name in declared
     }
 
 
@@ -165,6 +209,7 @@ def schema_with_agent_arguments(
     schema: Mapping[str, Any],
     declared: FrozenSet[str],
     inject_conversation_id: bool = True,
+    names: ArgumentNames = ArgumentNames(),
 ) -> Dict[str, Any]:
     """Adds the optional arguments the tool doesn't already declare."""
     properties = schema.get("properties")
@@ -172,22 +217,29 @@ def schema_with_agent_arguments(
         **schema,
         "properties": {
             **{
-                name: {"type": "string", "description": description}
-                for name, description in AGENT_ARGUMENT_DESCRIPTIONS.items()
+                name: {
+                    "type": "string",
+                    "description": description.replace("{argument_name}", name),
+                }
+                for name, (default, description) in zip(
+                    names.names, AGENT_ARGUMENT_DESCRIPTIONS.items()
+                )
                 if name not in declared
-                and (inject_conversation_id or name != CONVERSATION_ARGUMENT)
+                and (inject_conversation_id or default != CONVERSATION_ARGUMENT)
             },
             **(properties if isinstance(properties, Mapping) else {}),
         },
     }
 
 
-def conversation_id_prompt(conversation_id: str) -> str:
+def conversation_id_prompt(
+    conversation_id: str, argument_name: str = CONVERSATION_ARGUMENT
+) -> str:
     """The handoff shared by text and structured-output clients."""
     return json.dumps(
         {
             CONVERSATION_ARGUMENT: conversation_id,
-            "note": f"Pass this {CONVERSATION_ARGUMENT} on later tool calls in this conversation.",
+            "note": f"Pass this {argument_name} on later tool calls in this conversation.",
         },
         separators=(",", ":"),
     )

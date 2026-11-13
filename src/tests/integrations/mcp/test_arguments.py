@@ -4,6 +4,7 @@ from dataclasses import asdict
 import pytest
 
 from judgeval.integrations.mcp._arguments import (
+    ArgumentNames,
     conversation_output_schema,
     conversation_id_prompt,
     mint_conversation_id,
@@ -13,6 +14,54 @@ from judgeval.integrations.mcp._arguments import (
     tool_contract,
     without_agent_arguments,
 )
+
+
+@pytest.mark.parametrize("intent_name", ["intent", "context"])
+def test_explicit_argument_names_reuse_owned_fields_and_inject_missing_fields(
+    intent_name,
+):
+    names = ArgumentNames(
+        intent=intent_name, model="agent_model", conversation_id="chat_id"
+    )
+    args = {
+        intent_name: "Find tickets",
+        "agent_model": "agent-model",
+        "chat_id": "customer-chat",
+    }
+    schema = {
+        "type": "object",
+        "properties": {name: {"type": "string"} for name in args},
+    }
+    declared = tool_contract(schema, names).declared
+    empty = {"type": "object", "properties": {}}
+    injected = schema_with_agent_arguments(empty, frozenset(), names=names)
+    assert {
+        "reused_schema": schema_with_agent_arguments(schema, declared, names=names),
+        "reported": asdict(
+            read_reported_arguments(args, declared, names, injected=False)
+        ),
+        "missing": asdict(read_reported_arguments({intent_name: 42}, declared, names)),
+        "preserved": without_agent_arguments(args, declared, names),
+        "injected_keys": sorted(injected["properties"]),
+        "stripped": without_agent_arguments(args, frozenset(), names),
+        "disabled_handoff": without_agent_arguments(args, frozenset(), names, False),
+        "unverified_echo": read_reported_arguments(
+            args, frozenset(), names
+        ).conversation_id,
+    } == {
+        "reused_schema": schema,
+        "reported": {
+            "intent": "Find tickets",
+            "model": "agent-model",
+            "conversation_id": "customer-chat",
+        },
+        "missing": {"intent": None, "model": None, "conversation_id": None},
+        "preserved": args,
+        "injected_keys": sorted(args),
+        "stripped": {},
+        "disabled_handoff": {"chat_id": "customer-chat"},
+        "unverified_echo": None,
+    }
 
 
 def test_session_ids_are_unique_time_ordered_uuid_v7():
@@ -29,11 +78,11 @@ def test_session_ids_are_unique_time_ordered_uuid_v7():
 def test_injection_preserves_business_schema_and_input():
     schema = {
         "type": "object",
-        "properties": {"context": {"type": "integer"}},
-        "required": ["context"],
+        "properties": {"intent": {"type": "integer"}},
+        "required": ["intent"],
         "additionalProperties": False,
     }
-    arguments = {"context": 42, "llm_model": "m", "conversation_id": "invented"}
+    arguments = {"intent": 42, "llm_model": "m", "conversation_id": "invented"}
     declared = tool_contract(schema).declared
     updated = schema_with_agent_arguments(schema, declared)
     assert {
@@ -46,21 +95,21 @@ def test_injection_preserves_business_schema_and_input():
         "schema": schema,
         "arguments": arguments,
     } == {
-        "required": ["context"],
+        "required": ["intent"],
         "additional": False,
         "properties": {
-            "context": "integer",
+            "intent": "integer",
             "llm_model": "string",
             "conversation_id": "string",
         },
-        "business": {"context": 42},
+        "business": {"intent": 42},
         "schema": {
             "type": "object",
-            "properties": {"context": {"type": "integer"}},
-            "required": ["context"],
+            "properties": {"intent": {"type": "integer"}},
+            "required": ["intent"],
             "additionalProperties": False,
         },
-        "arguments": {"context": 42, "llm_model": "m", "conversation_id": "invented"},
+        "arguments": {"intent": 42, "llm_model": "m", "conversation_id": "invented"},
     }
 
 
@@ -68,10 +117,10 @@ def test_injection_preserves_business_schema_and_input():
     "schema, declared, open_schema",
     [
         ({"type": "object"}, set(), True),
-        ({"type": "object", "required": ["context"]}, {"context"}, True),
+        ({"type": "object", "required": ["intent"]}, {"intent"}, True),
         (
             {"type": "object", "patternProperties": {"^con": {}}},
-            {"context", "conversation_id"},
+            {"conversation_id"},
             True,
         ),
         ({"type": "object", "additionalProperties": True}, set(), True),
@@ -109,14 +158,14 @@ def test_unsafe_schemas_are_not_injected(schema):
 def test_reported_values_preserve_text_and_business_fields_are_not_telemetry():
     session = mint_conversation_id()
     arguments = {
-        "context": "Email a@b.co",
+        "intent": "Email a@b.co",
         "llm_model": "gpt-6",
         "conversation_id": session,
     }
     assert {
         "reported": asdict(read_reported_arguments(arguments, frozenset())),
         "owned": asdict(read_reported_arguments(arguments, frozenset(arguments))),
-        "bounded": read_reported_arguments({"context": "a" * 1000}, frozenset()).intent,
+        "bounded": read_reported_arguments({"intent": "a" * 1000}, frozenset()).intent,
     } == {
         "reported": {
             "intent": "Email a@b.co",
@@ -130,7 +179,7 @@ def test_reported_values_preserve_text_and_business_fields_are_not_telemetry():
 
 @pytest.mark.parametrize("value", [None, "", 1, ["x"], {"a": 1}])
 def test_non_text_telemetry_is_ignored(value):
-    arguments = dict.fromkeys(("context", "llm_model", "conversation_id"), value)
+    arguments = dict.fromkeys(("intent", "llm_model", "conversation_id"), value)
     assert asdict(read_reported_arguments(arguments, frozenset())) == {
         "intent": None,
         "model": None,

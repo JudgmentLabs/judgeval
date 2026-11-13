@@ -9,6 +9,51 @@ from tests.integrations.mcp.harness import build_server, connect, styles
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("style", styles())
+async def test_custom_injected_names_are_stripped_and_conversation_handoff_uses_alias(
+    style, tracer, collecting_exporter
+):
+    orders = build_server(style)
+    instrument_mcp_server(
+        orders.server,
+        intent_argument="goal",
+        model_argument="agent_model",
+        conversation_id_argument="chat_id",
+    )
+    async with connect(orders) as client:
+        listing = (await client.all_tools())["add"]
+        first = await client.call(
+            "add", {"a": 1, "b": 2, "goal": "Adding", "agent_model": "agent-model"}
+        )
+        handle = first.conversation_id
+        second = await client.call("add", {"a": 2, "b": 3, "chat_id": handle})
+    tracer.force_flush()
+    calls = [
+        span.attributes
+        for span in collecting_exporter.spans
+        if span.attributes.get("mcp.method.name") == "tools/call"
+    ]
+    assert {
+        "fields": sorted(listing["properties"]),
+        "received": orders.calls,
+        "intent": calls[0].get("judgment.mcp.intent"),
+        "model": calls[0].get("judgment.llm.model"),
+        "continuity": bool(handle)
+        and calls[0].get("judgment.session_id") == calls[1].get("judgment.session_id"),
+        "note": any("Pass this chat_id" in text for text in first.texts),
+        "second_id": second.conversation_id,
+    } == {
+        "fields": ["a", "agent_model", "b", "chat_id", "goal"],
+        "received": [{"a": 1, "b": 2}, {"a": 2, "b": 3}],
+        "intent": "Adding",
+        "model": "agent-model",
+        "continuity": True,
+        "note": True,
+        "second_id": None,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("style", styles())
 async def test_session_handoff_records_calls_as_separate_traces(
     style, tracer, collecting_exporter
 ):
@@ -17,7 +62,7 @@ async def test_session_handoff_records_calls_as_separate_traces(
     async with connect(orders) as client:
         await client.list_tools()
         first = await client.call(
-            "add", {"a": 1, "b": 2, "context": "Adding", "llm_model": "gpt-6"}
+            "add", {"a": 1, "b": 2, "intent": "Adding", "llm_model": "gpt-6"}
         )
         session = (
             first.structured["_judgment"]["conversation_id"]
@@ -89,7 +134,7 @@ async def test_callbacks_fail_open_and_instrumentation_is_idempotent(style, trac
     first = instrument_mcp_server(orders.server, identify=fail, redact=fail)
     second = instrument_mcp_server(orders.server)
     async with connect(orders) as client:
-        result = await client.call("add", {"a": 1, "b": 2, "context": "Adding"})
+        result = await client.call("add", {"a": 1, "b": 2, "intent": "Adding"})
     assert (first, second, result.texts[0], orders.calls) == (
         True,
         True,
@@ -116,7 +161,7 @@ async def test_explicit_parent_and_application_session_with_conversation_injecti
     with provider.get_tracer("server").start_as_current_span("ambient"):
         async with connect(orders) as client:
             listing = (await client.all_tools())["add"]
-            first = await client.call("add", {"a": 1, "b": 2, "context": "Adding"})
+            first = await client.call("add", {"a": 1, "b": 2, "intent": "Adding"})
             await client.send(
                 "tools/call",
                 {
@@ -146,7 +191,7 @@ async def test_explicit_parent_and_application_session_with_conversation_injecti
             for span in calls
         ],
     } == {
-        "arguments": ["a", "b", "context", "llm_model"],
+        "arguments": ["a", "b", "intent", "llm_model"],
         "handoff": None,
         "received": [{"a": 1, "b": 2}, {"a": 2, "b": 3}],
         "root": None,

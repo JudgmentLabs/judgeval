@@ -20,6 +20,71 @@ from judgeval.integrations.mcp._v2 import WireResults
 from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("inject", [True, False])
+async def test_explicit_arguments_record_business_values_without_changing_calls(
+    inject, tracer
+):
+    from dataclasses import replace
+
+    observer = McpObserver(
+        McpOptions(
+            inject_agent_arguments=inject,
+            intent_argument="context",
+            model_argument="llm_model",
+            conversation_id_argument="chat_id",
+            redact=lambda text: text.upper(),
+        ),
+        "test",
+        None,
+    )
+    args = {
+        "context": "find tickets",
+        "llm_model": "agent-model",
+        "chat_id": "customer-chat",
+    }
+    schema = {
+        "type": "object",
+        "properties": {name: {"type": "string"} for name in args},
+        "additionalProperties": False,
+    }
+    observer.remember_listing([("lookup", schema)])
+    facts = RequestFacts(
+        "tools/call",
+        {"name": "lookup", "arguments": args},
+        None,
+        None,
+        {},
+        {},
+        None,
+        None,
+        None,
+    )
+    prepared = await observer._prepare(facts, None)
+    missing = await observer._prepare(
+        replace(facts, params={"name": "lookup", "arguments": {}}), None
+    )
+    keys = (
+        "judgment.mcp.intent",
+        "judgment.llm.model",
+        "judgment.session_id",
+        "judgment.mcp.conversation_id_source",
+    )
+    assert {
+        "telemetry": [prepared.attributes.get(key) for key in keys],
+        "forwarded": prepared.arguments if prepared.arguments is not None else args,
+        "minted": prepared.minted_conversation_id,
+        "missing": [missing.attributes.get(key) for key in keys],
+        "missing_minted": missing.minted_conversation_id,
+    } == {
+        "telemetry": ["FIND TICKETS", "agent-model", "customer-chat", "provided"],
+        "forwarded": args,
+        "minted": None,
+        "missing": [None] * 4,
+        "missing_minted": None,
+    }
+
+
 @pytest.mark.parametrize("style", ["model-v1", "wire-v2", "model-v2"])
 def test_structured_only_handoff_preserves_output_without_content(style):
     from pydantic import create_model
@@ -62,7 +127,7 @@ async def test_call_contracts_follow_current_caller_and_fail_open(tracer):
     forwarded = []
     facts = RequestFacts(
         "tools/call",
-        {"name": "lookup", "arguments": {"context": "business"}},
+        {"name": "lookup", "arguments": {"intent": "business"}},
         None,
         None,
         {},
@@ -86,7 +151,7 @@ async def test_call_contracts_follow_current_caller_and_fail_open(tracer):
                 {
                     "type": "object",
                     "additionalProperties": False,
-                    "properties": {"context": {"type": "string"}},
+                    "properties": {"intent": {"type": "string"}},
                 },
             )
         ], None
@@ -97,7 +162,7 @@ async def test_call_contracts_follow_current_caller_and_fail_open(tracer):
     await observer.observe(facts, invoke, ModelResults(), first_caller)
     await observer.observe(facts, invoke, ModelResults(), second_caller)
     await observer.observe(facts, invoke, ModelResults(), unavailable)
-    assert forwarded == [{}, {"context": "business"}, None]
+    assert forwarded == [{}, {"intent": "business"}, None]
 
 
 @pytest.mark.asyncio

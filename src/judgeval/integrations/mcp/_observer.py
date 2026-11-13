@@ -44,8 +44,7 @@ from judgeval.version import get_version
 
 from ._arguments import (
     AGENT_ARGUMENTS,
-    CONVERSATION_ARGUMENT,
-    ReportedArguments,
+    ArgumentNames,
     ToolContract,
     conversation_id_prompt,
     mint_conversation_id,
@@ -117,6 +116,9 @@ class McpOptions:
     server_build: Optional[str] = None
     inject_agent_arguments: bool = True
     inject_conversation_id: bool = True
+    intent_argument: Optional[str] = None
+    model_argument: Optional[str] = None
+    conversation_id_argument: Optional[str] = None
     identify: Optional[Identify] = None
     capture_error_messages: bool = False
     redact: Optional[Redact] = None
@@ -286,6 +288,11 @@ class McpObserver:
         tool_manager: Any = None,
     ) -> None:
         self.options = options
+        self.argument_names = ArgumentNames(
+            options.intent_argument,
+            options.model_argument,
+            options.conversation_id_argument,
+        )
         self._server_name = options.server_name or server_name
         self._server_version = server_version
         self._request_contracts: contextvars.ContextVar[
@@ -327,7 +334,7 @@ class McpObserver:
             # raw JSON-schema servers must explicitly declare closed inputs.
             if closed and isinstance(schema, Mapping):
                 schema = {**schema, "additionalProperties": False}
-            self._contracts[name] = tool_contract(schema)
+            self._contracts[name] = tool_contract(schema, self.argument_names)
 
     async def contract_for(
         self, name: str, list_tools: Optional[ListTools]
@@ -358,7 +365,12 @@ class McpObserver:
         arguments = params.get("arguments")
         if contract is None or contract.open or not isinstance(arguments, Mapping):
             return None
-        return without_agent_arguments(arguments, contract.declared)
+        return without_agent_arguments(
+            arguments,
+            contract.declared,
+            self.argument_names,
+            self.options.inject_conversation_id,
+        )
 
     async def observe(
         self,
@@ -468,7 +480,9 @@ class McpObserver:
         if facts.method == "tools/list":
             return self.shape_listing(result, adapter)
         if minted_conversation_id is not None:
-            prompt = conversation_id_prompt(minted_conversation_id)
+            prompt = conversation_id_prompt(
+                minted_conversation_id, self.argument_names.names[2]
+            )
             shaped = attempt(
                 lambda: adapter.with_text(result, prompt, facts.params.get("name"))
             )
@@ -487,7 +501,10 @@ class McpObserver:
         if contract is None or contract.open or not isinstance(schema, Mapping):
             return None
         return schema_with_agent_arguments(
-            schema, contract.declared, self.options.inject_conversation_id
+            schema,
+            contract.declared,
+            self.options.inject_conversation_id,
+            self.argument_names,
         )
 
     async def _prepare(
@@ -504,16 +521,23 @@ class McpObserver:
         tool_name = name if method == "tools/call" else None
 
         contract: Optional[ToolContract] = None
-        if tool_name is not None and self.inject:
+        if tool_name is not None and (
+            self.inject
+            or any(
+                (
+                    self.options.intent_argument,
+                    self.options.model_argument,
+                    self.options.conversation_id_argument,
+                )
+            )
+        ):
             contract = await attempt_async(
                 lambda: self.contract_for(tool_name, list_tools)
             )
-        injected = contract is not None and not contract.open
+        injected = self.inject and contract is not None and not contract.open
         declared: FrozenSet[str] = contract.declared if contract else frozenset()
-        reported = (
-            read_reported_arguments(args, declared)
-            if injected
-            else ReportedArguments(None, None, None)
+        reported = read_reported_arguments(
+            args, declared, self.argument_names, injected=injected
         )
         session_id = self.options.session_id
         provided_session = (
@@ -530,10 +554,19 @@ class McpObserver:
         from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
         from judgeval.trace.baggage import get_baggage
 
-        configured_session = _text(provided_session) or _text(
-            get_baggage(
-                AttributeKeys.JUDGMENT_SESSION_ID.value,
-                context=JudgmentTracerProvider.get_instance().get_current_context(),
+        configured_session = (
+            _text(provided_session)
+            or _text(
+                get_baggage(
+                    AttributeKeys.JUDGMENT_SESSION_ID.value,
+                    context=JudgmentTracerProvider.get_instance().get_current_context(),
+                )
+            )
+            or (
+                reported.conversation_id
+                if self.options.conversation_id_argument is not None
+                and (self.argument_names.names[2] in declared or not injected)
+                else None
             )
         )
         conversation_id = (
@@ -546,7 +579,7 @@ class McpObserver:
             if injected
             and self.options.inject_conversation_id
             # A tool's own conversation_id argument isn't one the agent can echo.
-            and CONVERSATION_ARGUMENT not in declared
+            and self.argument_names.names[2] not in declared
             and session is None
             else None
         )
@@ -581,7 +614,11 @@ class McpObserver:
                 "judgment.mcp.client_name": _text(client.get("name")),
                 "judgment.mcp.client.version": _text(client.get("version")),
                 "judgment.mcp.argument_keys": _recorded_keys(
-                    args, declared if injected else None
+                    args,
+                    declared if injected else None,
+                    self.argument_names.names
+                    if self.options.inject_conversation_id
+                    else self.argument_names.names[:2],
                 )
                 if tool_name
                 else None,
@@ -602,8 +639,10 @@ class McpObserver:
         )
         return _PreparedCall(
             attributes=attributes,
-            arguments=without_agent_arguments(args, declared)
-            if injected and any(key in AGENT_ARGUMENTS for key in args)
+            arguments=without_agent_arguments(
+                args, declared, self.argument_names, self.options.inject_conversation_id
+            )
+            if injected and any(key in self.argument_names.names for key in args)
             else None,
             minted_conversation_id=minted,
         )
@@ -876,14 +915,16 @@ def _without_uri_secrets(uri: str) -> str:
 
 
 def _recorded_keys(
-    args: Mapping[str, Any], declared: Optional[FrozenSet[str]]
+    args: Mapping[str, Any],
+    declared: Optional[FrozenSet[str]],
+    names: Sequence[str] = tuple(AGENT_ARGUMENTS),
 ) -> Optional[str]:
     """Lists a call's argument names, leaving out injected ones."""
     keys: List[str] = [
         key[:_MAX_RECORDED_KEY_LENGTH]
         for key in args
         if isinstance(key, str)
-        and (declared is None or key not in AGENT_ARGUMENTS or key in declared)
+        and (declared is None or key not in names or key in declared)
     ][:_MAX_RECORDED_KEYS]
     return json.dumps(keys) if keys else None
 

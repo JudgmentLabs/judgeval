@@ -45,6 +45,9 @@ def instrument_mcp_server(
     server_build: Optional[str] = None,
     inject_agent_arguments: bool = True,
     inject_conversation_id: bool = True,
+    intent_argument: Optional[str] = None,
+    model_argument: Optional[str] = None,
+    conversation_id_argument: Optional[str] = None,
     identify: Optional[Identify] = None,
     capture_error_messages: bool = False,
     redact: Optional[Redact] = None,
@@ -57,7 +60,7 @@ def instrument_mcp_server(
 
     Call it once per server, after ``Tracer.init()`` and before the server
     starts. It changes your server in one way by default: each tool's published
-    schema gets optional ``context``, ``llm_model`` and ``conversation_id``
+    schema gets optional ``intent``, ``llm_model`` and ``conversation_id``
     arguments, which are removed before your tool runs. When a call has no
     application, echoed or transport session, its result gets an ID in
     supplemental text and compatible existing ``structuredContent._judgment``.
@@ -76,6 +79,14 @@ def instrument_mcp_server(
             and model, and of sessions for clients that send no session ID.
         inject_conversation_id: Set to False to disable conversation-ID schema
             injection and handoff independently of intent/model injection.
+        intent_argument: Name to use instead of intent. Explicitly opts a tool's
+            existing argument into telemetry; otherwise injects an optional field.
+            Existing arguments are never stripped or changed. Missing/non-string
+            values are omitted. Explicit names can be read with injection off.
+        model_argument: Same behavior for the calling model; defaults to llm_model.
+        conversation_id_argument: Same behavior for conversation_id. Existing
+            fields supply application session IDs; injected fields use generated
+            UUIDv7 handles. Callback/baggage sessions still take priority.
         identify: Returns the end user or customer of a request. Called once
             the request finishes. Exceptions are ignored.
         capture_error_messages: Opt in to failure text; defaults to False.
@@ -106,6 +117,9 @@ def instrument_mcp_server(
                 server_build=server_build,
                 inject_agent_arguments=inject_agent_arguments,
                 inject_conversation_id=inject_conversation_id,
+                intent_argument=intent_argument,
+                model_argument=model_argument,
+                conversation_id_argument=conversation_id_argument,
                 identify=identify,
                 capture_error_messages=capture_error_messages,
                 redact=redact,

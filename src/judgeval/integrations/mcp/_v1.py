@@ -32,8 +32,13 @@ _WRAPPED_MARKER = "__judgeval_mcp_wrapped__"
 class ModelResults:
     """Results as 1.x handlers return them: ``ServerResult`` wrapping a model."""
 
-    def __init__(self, inject_conversation_id: bool = True) -> None:
+    def __init__(
+        self,
+        inject_conversation_id: bool = True,
+        conversation_argument: str = CONVERSATION_ARGUMENT,
+    ) -> None:
         self._inject_conversation_id = inject_conversation_id
+        self._conversation_argument = conversation_argument
         self._structured_tools: set[str] = set()
 
     def is_error(self, result: Any) -> bool:
@@ -96,7 +101,9 @@ class ModelResults:
                 conversation_output_schema(output)
                 if self._inject_conversation_id
                 and schema is not None
-                and CONVERSATION_ARGUMENT in schema.get("properties", {})
+                and self._conversation_argument in schema.get("properties", {})
+                and self._conversation_argument
+                not in (getattr(tool, "inputSchema", {}).get("properties", {}))
                 else None
             )
             self._structured_tools.discard(tool.name)
@@ -152,7 +159,10 @@ def instrument(observer: McpObserver, lowlevel: Any) -> bool:
             return False
     except Exception:
         return False
-    results = ModelResults(observer.options.inject_conversation_id)
+    results = ModelResults(
+        observer.options.inject_conversation_id,
+        observer.argument_names.names[2],
+    )
     list_request = getattr(types, "ListToolsRequest", None)
 
     async def list_tools(cursor: Optional[str]) -> Tuple[ListedTools, Optional[str]]:
