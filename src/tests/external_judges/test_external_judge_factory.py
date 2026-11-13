@@ -204,7 +204,7 @@ def test_session_score_can_be_resubmitted_without_a_trace():
                 "implementation_id": None,
             }
             if request.url.path.endswith("/judges")
-            else {"id": "result-1"},
+            else {"id": f"result-{len(requests)}"},
         )
 
     client = JudgmentSyncClient("https://api.test", "key", "org")
@@ -215,18 +215,16 @@ def test_session_score_can_be_resubmitted_without_a_trace():
         judge_id="judge-1",
         target={"type": "session", "session_id": "session-1"},
         value=4.5,
-        idempotency_key="fa000000-0000-0000-0000-000000000011",
     )
     updated = factory.submit_result(
         judge_id="judge-1",
         target={"type": "session", "session_id": "session-1"},
         value=3,
-        idempotency_key="fa000000-0000-0000-0000-000000000012",
     )
     assert (judge, result, updated, requests) == (
         ExternalJudge("judge-1", "version-1", "rating", "numeric"),
-        "result-1",
-        "result-1",
+        "result-2",
+        "result-3",
         [
             (
                 "POST",
@@ -246,7 +244,6 @@ def test_session_score_can_be_resubmitted_without_a_trace():
                     "judge_id": "judge-1",
                     "target": {"type": "session", "session_id": "session-1"},
                     "value": 4.5,
-                    "idempotency_key": "fa000000-0000-0000-0000-000000000011",
                 },
             ),
             (
@@ -256,7 +253,6 @@ def test_session_score_can_be_resubmitted_without_a_trace():
                     "judge_id": "judge-1",
                     "target": {"type": "session", "session_id": "session-1"},
                     "value": 3,
-                    "idempotency_key": "fa000000-0000-0000-0000-000000000012",
                 },
             ),
         ],
@@ -331,32 +327,3 @@ def test_rejects_ambiguous_targets_before_sending_feedback():
             target={"type": "session", "session_id": "session", "trace_id": "trace"},
             value=True,
         )
-
-
-def test_retrying_a_correction_reuses_its_submission_identity():
-    factory, client = _make_factory()
-    request_key = "fa000000-0000-0000-0000-000000000001"
-    result_id = "fa000000-0000-0000-0000-000000000002"
-    accepted = {}
-
-    def accept(*, project_id, payload):
-        assert project_id == "proj-1"
-        accepted[payload["idempotency_key"]] = payload["result_id"]
-        return {"id": accepted[payload["idempotency_key"]]}
-
-    client.post_projects_judge_results.side_effect = accept
-    first = factory.submit_result(
-        judge_id="judge-1",
-        target={"type": "session", "session_id": "session-1"},
-        value=False,
-        idempotency_key=request_key,
-        result_id=result_id,
-    )
-    retry = factory.submit_result(
-        judge_id="judge-1",
-        target={"type": "session", "session_id": "session-1"},
-        value=False,
-        idempotency_key=request_key,
-        result_id=result_id,
-    )
-    assert (first, retry, accepted) == (result_id, result_id, {request_key: result_id})

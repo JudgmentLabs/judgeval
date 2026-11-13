@@ -27342,7 +27342,7 @@
       "post": {
         "tags": ["V1"],
         "summary": "Submit a customer judge result",
-        "description": "Submit a customer score for one trace or session under any judge. Reuse idempotency_key to retry the same request. Supply result_id with a new key to correct a result; otherwise create an independent result. The latest accepted result is current for that judge and target. Hosted results are preserved. Validates against the production version and derives attribution from the target.",
+        "description": "Submit a customer score for one trace or session under any judge. Resubmitting for the same judge and target replaces its current customer score. Each submission, including a retry, writes a new result row. Hosted results are preserved. Validates against the production version and derives attribution from the target.",
         "parameters": [
           {
             "name": "projectId",
@@ -27363,16 +27363,6 @@
                   {
                     "type": "object",
                     "properties": {
-                      "idempotency_key": {
-                        "type": "string",
-                        "format": "uuid",
-                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                      },
-                      "result_id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                      },
                       "target": {
                         "oneOf": [
                           {
@@ -27422,16 +27412,6 @@
                   {
                     "type": "object",
                     "properties": {
-                      "idempotency_key": {
-                        "type": "string",
-                        "format": "uuid",
-                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                      },
-                      "result_id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                      },
                       "target": {
                         "oneOf": [
                           {
