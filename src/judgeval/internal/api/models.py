@@ -5799,6 +5799,8 @@ class SubmitExternalJudgeResultSubmitExternalJudgeResultTarget1(TypedDict):
 
 
 class SubmitExternalJudgeResultSubmitExternalJudgeResult(TypedDict):
+    idempotency_key: NotRequired[str]
+    result_id: NotRequired[str]
     target: (
         SubmitExternalJudgeResultSubmitExternalJudgeResultTarget
         | SubmitExternalJudgeResultSubmitExternalJudgeResultTarget1
@@ -5819,6 +5821,8 @@ class SubmitExternalJudgeResultSubmitExternalJudgeResult1Target1(TypedDict):
 
 
 class SubmitExternalJudgeResultSubmitExternalJudgeResult1(TypedDict):
+    idempotency_key: NotRequired[str]
+    result_id: NotRequired[str]
     target: (
         SubmitExternalJudgeResultSubmitExternalJudgeResult1Target
         | SubmitExternalJudgeResultSubmitExternalJudgeResult1Target1

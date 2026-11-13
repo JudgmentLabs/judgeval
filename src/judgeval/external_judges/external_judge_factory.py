@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import List, Optional, Union
+from uuid import uuid4
 
 from judgeval.external_judges.external_judge import (
     ExternalJudge,
@@ -174,10 +175,13 @@ class ExternalJudgeFactory:
         judge_id: Optional[str] = None,
         judge_name: Optional[str] = None,
         reason: Optional[str] = None,
+        idempotency_key: Optional[str] = None,
+        result_id: Optional[str] = None,
     ) -> Optional[str]:
-        """Set the current externally computed score for a trace or session.
+        """Submit a customer score under any judge for a trace or session.
 
-        Resubmitting for the same judge and target replaces its current score.
+        Each call retains an independent result; the newest result is current.
+        Supply result_id to correct a result and reuse idempotency_key to retry.
 
         Exactly one of `judge_id` or `judge_name` must be provided; the
         score is attached to that judge's production version. `value`
@@ -191,6 +195,8 @@ class ExternalJudgeFactory:
             judge_id: ID of the judge to submit under.
             judge_name: Name of the judge to submit under.
             reason: Optional free-text explanation for the score.
+            idempotency_key: Reuse this UUID when retrying the same request.
+            result_id: Correct an existing result with a new idempotency key.
 
         Returns:
             The id of the persisted score result, or `None` if the
@@ -233,6 +239,9 @@ class ExternalJudgeFactory:
         else:
             assert judge_name is not None
             payload = {"target": target, "value": value, "judge_name": judge_name}
+        payload["idempotency_key"] = idempotency_key or str(uuid4())
+        if result_id is not None:
+            payload["result_id"] = result_id
         if reason is not None:
             payload["reason"] = reason
 
