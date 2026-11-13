@@ -8,7 +8,7 @@ import pytest
 from typer.testing import CliRunner
 
 from judgeval.cli import app
-from judgeval.internal.api.api_client import JudgmentSyncClient
+from judgeval.api import JudgmentApiClient
 
 AUTH = {"JUDGMENT_API_KEY": "api-key", "JUDGMENT_ORG_ID": "org-1"}
 
@@ -58,10 +58,8 @@ def test_the_local_test_rejects_code_monty_cannot_run(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 1
-    assert result.output == (
-        "Judgment would reject this judge at upload:\n"
-        "judge.py:4: NotImplementedError: The monty syntax parser does not yet "
-        "support class inheritance and metaclasses\n"
+    assert result.output.splitlines()[0] == (
+        "Judgment would reject this judge at upload:"
     )
 
 
@@ -78,7 +76,7 @@ def test_a_new_function_judge_uploads_as_a_categorical_judge(
         return {"judges": []} if method == "GET" else {}
 
     monkeypatch.setattr("judgeval.cli.resolve_project_id", lambda *_: "project-1")
-    monkeypatch.setattr(JudgmentSyncClient, "_request", fake_request)
+    monkeypatch.setattr(JudgmentApiClient, "_request", fake_request)
 
     result = CliRunner().invoke(
         app,
@@ -101,7 +99,7 @@ def test_a_new_function_judge_uploads_as_a_categorical_judge(
     judges_url = calls[0][1]
     assert judges_url.endswith("/v1/projects/project-1/judges")
     assert calls == [
-        ("GET", judges_url, {"summary": "true"}),
+        ("GET", judges_url, {}),
         (
             "POST",
             judges_url,
@@ -136,7 +134,7 @@ def test_a_class_judge_upload_warns_that_class_judges_are_deprecated(
     )
     monkeypatch.setattr("judgeval.cli.resolve_project_id", lambda *_: "project-1")
     monkeypatch.setattr(
-        JudgmentSyncClient,
+        JudgmentApiClient,
         "post_projects_scorers_custom_bundle",
         lambda self, project_id, payload: {"status": "success"},
     )

@@ -12,6 +12,7 @@ import shlex
 from dotenv import load_dotenv
 from judgeval.utils import resolve_project_id
 from judgeval.internal.api import JudgmentSyncClient
+from judgeval.api import JudgmentApiClient
 from judgeval.env import JUDGMENT_API_URL
 from judgeval.logger import judgeval_logger
 from judgeval.exceptions import JudgmentAPIError
@@ -111,25 +112,28 @@ def upload(
     organization_id: str = typer.Option(None, envvar="JUDGMENT_ORG_ID"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ):
-    """Upload a code judge to Judgment."""
+    """Upload a Code judge to Judgment."""
     from judgeval.cli.function_judge import is_function_judge, upload_function_judge
     from judgeval.cli.upload_judge import upload_judge
 
     scorer_path = Path(entrypoint_path)
     if not scorer_path.exists():
-        raise typer.BadParameter(f"Scorer file not found: {entrypoint_path}")
+        raise typer.BadParameter(f"Code judge file not found: {entrypoint_path}")
 
     if not api_key or not organization_id:
         raise typer.BadParameter("JUDGMENT_API_KEY and JUDGMENT_ORG_ID required")
 
     source = scorer_path.read_text()
-    function_judge = is_function_judge(source)
+    try:
+        function_judge = is_function_judge(source)
+    except SyntaxError as e:
+        raise typer.BadParameter(f"{entrypoint_path}:{e.lineno}: {e.msg}")
     if function_judge and (requirements_file_path or included_files_paths):
         raise typer.BadParameter(
             "A function judge is one file; --requirements and --included-files are for class judges"
         )
 
-    client = JudgmentSyncClient(JUDGMENT_API_URL, api_key, organization_id)
+    client = JudgmentApiClient(JUDGMENT_API_URL, api_key, organization_id)
     project_id = resolve_project_id(client, project_name)
     if not project_id:
         raise typer.BadParameter(f"Project '{project_name}' not found")
@@ -166,7 +170,7 @@ def upload(
         )
         if not result:
             raise typer.Abort()
-        typer.echo(f"Custom scorer uploaded successfully to project '{project_name}'!")
+        typer.echo(f"Code judge uploaded successfully to project '{project_name}'!")
     except JudgmentAPIError as e:
         if e.status_code in (400, 409, 422):
             judgeval_logger.error(e.detail)
@@ -267,16 +271,23 @@ def init(
 @scorer_app.command()
 def test(
     judge_path: Path = typer.Argument(
-        help="Function judge file defining judge(example)"
+        exists=True, dir_okay=False, help="Function judge file defining judge(example)"
     ),
     trace_path: Path = typer.Option(
         None,
         "--trace",
         "-t",
+        exists=True,
+        dir_okay=False,
         help="Saved trace: a JSON list of spans, {'spans': [...]}, or NDJSON",
     ),
     example_path: Path = typer.Option(
-        None, "--example", "-e", help="JSON object of example fields"
+        None,
+        "--example",
+        "-e",
+        exists=True,
+        dir_okay=False,
+        help="JSON object of example fields",
     ),
     output: Optional[OutputType] = typer.Option(
         None,
@@ -305,12 +316,11 @@ def test(
     if trace_path is None and example_path is None:
         raise typer.BadParameter("Give --trace, --example, or both")
 
-    example = json.loads(example_path.read_text()) if example_path else {}
-    if trace_path:
-        example["trace"] = {"spans": load_spans(trace_path)}
-
     source = judge_path.read_text()
     try:
+        example = json.loads(example_path.read_text()) if example_path else {}
+        if trace_path:
+            example["trace"] = {"spans": load_spans(trace_path)}
         problems = source_problems(source)
         if problems:
             typer.echo(
@@ -318,7 +328,7 @@ def test(
             )
             raise typer.Exit(1)
         result = check_result(run_judge(source, example), output, categories)
-    except JudgeFailed as e:
+    except (JudgeFailed, RuntimeError, ValueError) as e:
         typer.echo(str(e), err=True)
         raise typer.Exit(1)
     typer.echo(json.dumps(result, indent=2))
