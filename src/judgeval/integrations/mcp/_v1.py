@@ -93,7 +93,11 @@ class ModelResults:
         if not isinstance(tools, list):
             return None
         return [
-            (tool.name, getattr(tool, "inputSchema", None))
+            (
+                tool.name,
+                getattr(tool, "inputSchema", None),
+                getattr(tool, "outputSchema", None),
+            )
             for tool in tools
             if isinstance(getattr(tool, "name", None), str)
         ]
@@ -185,8 +189,21 @@ def instrument(observer: McpObserver, lowlevel: Any) -> bool:
             return [], None
         original = getattr(handler, _WRAPPED_MARKER, handler)
         request: Dict[str, Any] = {"method": "tools/list"}
+        context = request_ctx.get(None)
+        incoming = getattr(context, "meta", None)
+        meta = (
+            incoming.model_dump(by_alias=True, exclude_none=True)
+            if incoming is not None
+            else {}
+        )
+        params: Dict[str, Any] = {
+            "_meta": {
+                key: value for key, value in meta.items() if key != "progressToken"
+            }
+        }
         if cursor is not None:
-            request["params"] = {"cursor": cursor}
+            params["cursor"] = cursor
+        request["params"] = params
         result = await original(types.ListToolsRequest.model_validate(request))
         observer.shape_listing(result, results)
         next_cursor = getattr(_root(result), "nextCursor", None)

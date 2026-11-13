@@ -123,13 +123,15 @@ class WireResults:
         for tool in tools:
             if isinstance(tool, Mapping):
                 name, schema = tool.get("name"), tool.get("inputSchema")
+                output = tool.get("outputSchema")
             else:
                 name, schema = (
                     getattr(tool, "name", None),
                     getattr(tool, "input_schema", None),
                 )
+                output = getattr(tool, "output_schema", None)
             if isinstance(name, str):
-                listed.append((name, schema))
+                listed.append((name, schema, output))
         return listed
 
     def with_tool_schemas(

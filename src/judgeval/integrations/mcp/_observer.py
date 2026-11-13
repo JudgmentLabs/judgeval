@@ -149,7 +149,7 @@ class RequestFacts:
     request: Any
 
 
-ListedTools = Sequence[Tuple[str, Any]]
+ListedTools = Sequence[Tuple[str, Any, Any]]
 
 
 class ResultAdapter(Protocol):
@@ -330,11 +330,11 @@ class McpObserver:
 
     def remember_listing(self, tools: Optional[ListedTools]) -> None:
         """Keeps what each listed tool declares, before injection changes it."""
-        for name, schema in tools or ():
+        for name, schema, output in tools or ():
             tool = getattr(self._tool_manager, "_tools", {}).get(name)
-            self._remember_tool(name, schema, tool)
+            self._remember_tool(name, schema, tool, output)
 
-    def _remember_tool(self, name: str, schema: Any, tool: Any) -> None:
+    def _remember_tool(self, name: str, schema: Any, tool: Any, output: Any) -> None:
         model = getattr(getattr(tool, "fn_metadata", None), "arg_model", None)
         function = getattr(tool, "fn", None)
         closed = (
@@ -351,8 +351,7 @@ class McpObserver:
         if closed and isinstance(schema, Mapping):
             schema = {**schema, "additionalProperties": False}
         contract = tool_contract(schema, self.argument_names)
-        if contract is not None and tool is not None:
-            output = getattr(tool, "output_schema", None)
+        if contract is not None:
             contract = replace(
                 contract,
                 structured_output=output is None
@@ -367,7 +366,9 @@ class McpObserver:
                 tool = await tool
             schema = getattr(tool, "parameters", getattr(tool, "input_schema", None))
             if schema is not None:
-                self._remember_tool(name, schema, tool)
+                self._remember_tool(
+                    name, schema, tool, getattr(tool, "output_schema", None)
+                )
 
     async def contract_for(
         self, name: str, list_tools: Optional[ListTools]

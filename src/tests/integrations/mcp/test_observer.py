@@ -105,7 +105,7 @@ async def test_explicit_arguments_record_business_values_without_changing_calls(
         "properties": {name: {"type": "string"} for name in args},
         "additionalProperties": False,
     }
-    observer.remember_listing([("lookup", schema)])
+    observer.remember_listing([("lookup", schema, None)])
     facts = RequestFacts(
         "tools/call",
         {"name": "lookup", "arguments": args},
@@ -185,6 +185,11 @@ async def test_call_contracts_follow_current_caller_and_fail_open(tracer):
 
     observer = McpObserver(McpOptions(), "test", None, tool_lookup=unavailable_tool)
     forwarded = []
+    adapter = (
+        WireResults if "is_error" in CallToolResult.model_fields else ModelResults
+    )()
+    schema = {"type": "object", "additionalProperties": False}
+    output = {"type": "object", "properties": {"ok": {"type": "boolean"}}}
     facts = RequestFacts(
         "tools/call",
         {"name": "lookup", "arguments": {"intent": "business"}},
@@ -199,30 +204,39 @@ async def test_call_contracts_follow_current_caller_and_fail_open(tracer):
 
     async def invoke(arguments):
         forwarded.append(arguments)
-        return CallToolResult(content=[])
+        # Another caller's incompatible listing clears the shared adapter hint.
+        adapter._structured_tools.clear()
+        return CallToolResult.model_validate(
+            {"content": [], "structuredContent": {"ok": True}}
+        )
 
     async def first_caller(_):
-        return [("lookup", {"type": "object", "additionalProperties": False})], None
+        return [("lookup", schema, output)], None
 
     async def second_caller(_):
         return [
             (
                 "lookup",
-                {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {"intent": {"type": "string"}},
-                },
+                {**schema, "properties": {"intent": {"type": "string"}}},
+                {"type": "object", "properties": {"_judgment": {}}},
             )
         ], None
 
     async def unavailable(_):
         raise RuntimeError("listing unavailable")
 
-    await observer.observe(facts, invoke, ModelResults(), first_caller)
-    await observer.observe(facts, invoke, ModelResults(), second_caller)
-    await observer.observe(facts, invoke, ModelResults(), unavailable)
-    assert forwarded == [{}, {"intent": "business"}, None]
+    results = [
+        await observer.observe(facts, invoke, adapter, listing)
+        for listing in (first_caller, second_caller, unavailable)
+    ]
+    handoffs = [
+        "_judgment" in result.model_dump(by_alias=True)["structuredContent"]
+        for result in results
+    ]
+    assert (forwarded, handoffs) == (
+        [{}, {"intent": "business"}, None],
+        [True, False, False],
+    )
 
 
 @pytest.mark.asyncio
@@ -250,7 +264,9 @@ async def test_stateful_calls_offer_handoff_until_echo_and_leave_errors_unchange
     )
 
     async def listing(_):
-        return [("lookup", {"type": "object", "additionalProperties": False})], None
+        return [
+            ("lookup", {"type": "object", "additionalProperties": False}, None)
+        ], None
 
     async def succeed(_):
         return CallToolResult(content=[])
@@ -321,6 +337,7 @@ async def test_paginated_tools_remain_callable_after_twenty_pages(tracer):
             (
                 "lookup" if page == 21 else str(page),
                 {"type": "object", "additionalProperties": False},
+                None,
             )
         ], (None if page == 21 else str(page + 1))
 
@@ -398,7 +415,9 @@ async def test_transport_session_survives_failed_outcome_detection(
     )
 
     async def listing(_):
-        return [("lookup", {"type": "object", "additionalProperties": False})], None
+        return [
+            ("lookup", {"type": "object", "additionalProperties": False}, None)
+        ], None
 
     original = CallToolResult(content=[], isError=True)
 

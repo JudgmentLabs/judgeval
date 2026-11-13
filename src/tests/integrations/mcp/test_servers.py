@@ -4,7 +4,37 @@ import pytest
 
 from judgeval.integrations.mcp import instrument_mcp_server
 from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
-from tests.integrations.mcp.harness import build_server, connect, styles
+from tests.integrations.mcp.harness import MCP_MAJOR, build_server, connect, styles
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(MCP_MAJOR != 1, reason="MCP 1.x adapter")
+async def test_lowlevel_discovery_preserves_metadata_without_progress_token(tracer):
+    from mcp import types
+
+    orders = build_server("mcp1-lowlevel")
+    seen = []
+    original = orders.server.request_handlers[types.ListToolsRequest]
+
+    async def listing(request):
+        if request is not None:
+            seen.append(
+                request.params.meta.model_dump(by_alias=True, exclude_none=True)
+            )
+        return await original(request)
+
+    orders.server.request_handlers[types.ListToolsRequest] = listing
+    instrument_mcp_server(orders.server)
+    async with connect(orders) as client:
+        await client.send(
+            "tools/call",
+            {
+                "name": "add",
+                "arguments": {"a": 1, "b": 2},
+                "_meta": {"tenant": "caller", "progressToken": "progress"},
+            },
+        )
+    assert (seen, orders.calls) == ([{"tenant": "caller"}], [{"a": 1, "b": 2}])
 
 
 @pytest.mark.asyncio
