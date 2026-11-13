@@ -97,6 +97,14 @@ Injection is independent of telemetry availability: installing instrumentation b
 
 With conversation injection enabled, successful calls without an application or echoed conversation session offer a new ID even on stateful HTTP. The transport session groups calls until the agent echoes that ID. Error results receive no handoff; dictionary outputs stay unchanged and use supplemental text for handoff. Native per-tool lookup avoids full discovery where available; custom low-level servers retain caller-scoped listing.
 
+Low-level servers can avoid full discovery by supplying `resolve_original_tool(name)`, a sync or async callback returning the original wire tool descriptor (`inputSchema` and optional `outputSchema`):
+
+```python
+instrument_mcp_server(server, resolve_original_tool=lambda name: original_tools.get(name))
+```
+
+Use the same original schemas as your `tools/list` handler, before Judgment injection, and scope the lookup to the current caller if tools vary by authorization or request. The SDK does not cache resolver results across calls. When configured, the resolver replaces discovery: returning `None`, raising, or returning an unsupported schema leaves arguments untouched and omits generated handoff. High-level servers still prefer their native lookup. Without a resolver, low-level calls may traverse the full paginated listing; avoid that path for expensive lists by providing a direct lookup.
+
 Repeated instrumentation keeps the original configuration and warns if options differ. Optional input/output capture is limited to 128 KiB; oversized source payloads are omitted before model conversion or the redaction callback.
 
 The SDK can record the original exception type when the exception reaches its wrapper or is supplied through `mark_mcp_call_error` before conversion to a public tool error. MCP frameworks may instead convert exceptions into `isError` results before the wrapper sees them; these generally use `error.type = "tool_error"`, since the original exception type is no longer available. Recognized refusals use `unknown_tool`, `tool_disabled`, or `invalid_input`; a structured public error code may also be used when error-message capture is enabled.

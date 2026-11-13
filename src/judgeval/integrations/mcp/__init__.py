@@ -31,6 +31,7 @@ from ._observer import (
     McpOptions,
     McpRequestInfo,
     Redact,
+    ResolveOriginalTool,
     mark_mcp_call_error,
     set_mcp_caller,
 )
@@ -57,6 +58,7 @@ def instrument_mcp_server(
     capture_output: bool = False,
     redact_payload: Optional[RedactPayload] = None,
     session_id: Optional[Callable[[McpRequestInfo], Optional[str]]] = None,
+    resolve_original_tool: Optional[ResolveOriginalTool] = None,
 ) -> bool:
     """Traces MCP tool calls using the active tracer's settings.
 
@@ -108,6 +110,12 @@ def instrument_mcp_server(
             relying on agent echo. Receives McpRequestInfo. Existing
             set_session_id baggage is also authoritative; scope it to each
             request rather than the lifetime of the server.
+        resolve_original_tool: Optional sync/async lookup by tool name for low-level
+            servers. Returns the original wire descriptor (inputSchema and optional
+            outputSchema), before injection. Runs in the current request context;
+            keep it caller-scoped. Replaces full tools/list discovery when supplied.
+            Returning None or raising leaves arguments and results unchanged.
+            High-level servers still prefer their native tool lookup.
 
     Returns:
         True if the server is traced. On an unsupported server it logs a
@@ -131,6 +139,7 @@ def instrument_mcp_server(
                 capture_output=capture_output,
                 redact_payload=redact_payload,
                 session_id=session_id,
+                resolve_original_tool=resolve_original_tool,
             ),
         )
     except Exception as error:

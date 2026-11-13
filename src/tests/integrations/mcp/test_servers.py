@@ -9,6 +9,37 @@ from tests.integrations.mcp.harness import build_server, connect, styles
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("style", styles())
+async def test_original_tool_resolver_on_lowlevel_and_native_lookup_priority(
+    style, tracer
+):
+    from tests.integrations.mcp.harness import LOW_LEVEL
+
+    orders = build_server(style)
+    resolved = []
+
+    async def resolve(name):
+        resolved.append(name)
+        return {
+            "inputSchema": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {"a": {"type": "integer"}, "b": {"type": "integer"}},
+            }
+        }
+
+    instrument_mcp_server(orders.server, resolve_original_tool=resolve)
+    async with connect(orders) as client:
+        result = await client.call("add", {"a": 1, "b": 2, "intent": "Adding"})
+    assert (orders.calls, resolved, result.texts[0], bool(result.conversation_id)) == (
+        [{"a": 1, "b": 2}],
+        ["add"] if style in LOW_LEVEL else [],
+        "3",
+        True,
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("style", styles())
 async def test_reinstrumentation_warns_on_changed_options_and_keeps_original(
     style, tracer, collecting_exporter, monkeypatch
 ):

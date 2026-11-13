@@ -108,6 +108,10 @@ class McpRequestInfo:
 
 Identify = Callable[[McpRequestInfo], Optional[McpCaller]]
 Redact = Callable[[str], str]
+ResolveOriginalTool = Callable[
+    [str],
+    Optional[Mapping[str, Any]] | Awaitable[Optional[Mapping[str, Any]]],
+]
 
 
 @dataclass(frozen=True)
@@ -126,6 +130,7 @@ class McpOptions:
     capture_output: bool = False
     redact_payload: Optional[RedactPayload] = None
     session_id: Optional[Callable[[McpRequestInfo], Optional[str]]] = None
+    resolve_original_tool: Optional[ResolveOriginalTool] = None
 
 
 @dataclass(frozen=True)
@@ -374,6 +379,21 @@ class McpObserver:
         """
         if name not in self._contracts:
             await attempt_async(lambda: self._remember_native_tool(name))
+        resolver = self.options.resolve_original_tool
+        if name not in self._contracts and resolver is not None:
+            tool = resolver(name)
+            if inspect.isawaitable(tool):
+                tool = await tool
+            if isinstance(tool, Mapping):
+                contract = tool_contract(tool.get("inputSchema"), self.argument_names)
+                if contract is not None:
+                    output = tool.get("outputSchema")
+                    self._contracts[name] = replace(
+                        contract,
+                        structured_output=output is None
+                        or conversation_output_schema(output) is not None,
+                    )
+            return self._contracts.get(name)
         if name not in self._contracts and list_tools is not None:
             cursor: Optional[str] = None
             seen: Set[str] = set()
