@@ -39,51 +39,67 @@ class ObservationExporter:
         self._reported: set[int] = set()
 
     def export(self, batch: list[IngestObservationsRequestObservation]) -> None:
+        rejection = self._send(batch)
+        if rejection is None:
+            return
+        if len(batch) > 1:
+            self._drop_invalid(batch)
+        else:
+            self._log_dropped(1, rejection)
+
+    def _drop_invalid(self, batch: list[IngestObservationsRequestObservation]) -> None:
+        """The server rejects a request when any observation in it does not
+        fit the format; this finds which by halving the batch. When both
+        halves are rejected, the fault is most likely in the request as a
+        whole, such as a clock more than five minutes fast, so the batch is
+        dropped rather than split further."""
+        middle = len(batch) // 2
+        halves = (batch[:middle], batch[middle:])
+        rejections = [self._send(half) for half in halves]
+        if rejections[0] is not None and rejections[1] is not None:
+            self._log_dropped(len(batch), rejections[0])
+            return
+        for half, rejection in zip(halves, rejections):
+            if rejection is None:
+                continue
+            if len(half) > 1:
+                self._drop_invalid(half)
+            else:
+                self._log_dropped(1, rejection)
+
+    def _send(self, batch: list[IngestObservationsRequestObservation]) -> Optional[str]:
+        """Sends a batch, retrying temporary failures. Returns the reason when
+        the batch is invalid: the server rejects it (400), or it holds a value
+        JSON cannot represent, such as NaN. Handles every other outcome."""
         for attempt in range(MAX_ATTEMPTS):
             try:
                 self._client.post_projects_observations(
                     self._project_id, {"observations": batch}
                 )
-                return
+                return None
             except JudgmentAPIError as error:
                 status = error.status_code
-                if status == 400 and len(batch) > 1:
-                    # The server rejects a request when any observation in it
-                    # does not fit the format; find which by halving it.
-                    self._split(batch)
-                    return
+                if status == 400:
+                    return f"{status} {error.detail}"
                 if status in (402, 404):
                     self._report_once(status)
-                    return
+                    return None
                 if not _is_retryable(status) or attempt == MAX_ATTEMPTS - 1:
-                    judgeval_logger.error(
-                        f"[Trajectory] Dropped {len(batch)} observations: "
-                        f"{status} {error.detail}"
-                    )
-                    return
+                    self._log_dropped(len(batch), f"{status} {error.detail}")
+                    return None
                 _backoff(attempt, error.retry_after_seconds)
             except httpx.TransportError as error:
                 if attempt == MAX_ATTEMPTS - 1:
-                    judgeval_logger.error(
-                        f"[Trajectory] Dropped {len(batch)} observations: {error!r}"
-                    )
-                    return
+                    self._log_dropped(len(batch), repr(error))
+                    return None
                 _backoff(attempt, None)
             except Exception as error:
-                # Raised before anything is sent, when an observation holds a
-                # value JSON cannot represent, such as NaN.
-                if len(batch) > 1:
-                    self._split(batch)
-                else:
-                    judgeval_logger.error(
-                        f"[Trajectory] Dropped 1 observation: {error!r}"
-                    )
-                return
+                # Raised before anything is sent.
+                return repr(error)
+        return None
 
-    def _split(self, batch: list[IngestObservationsRequestObservation]) -> None:
-        middle = len(batch) // 2
-        self.export(batch[:middle])
-        self.export(batch[middle:])
+    def _log_dropped(self, count: int, reason: str) -> None:
+        judgeval_logger.error(f"[Trajectory] Dropped {count} observations: {reason}")
 
     def _report_once(self, status: int) -> None:
         if status in self._reported:

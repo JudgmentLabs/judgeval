@@ -78,8 +78,9 @@ def test_sends_the_call_as_it_was_when_recorded():
     processor = use()
     recorded = call()
     Trajectory.record(recorded)
-    recorded["conversation_id"] = "changed"
-    assert processor.emitted[0]["observation"]["conversation_id"] == "ticket-1"
+    # As a shared message history grows after the call.
+    recorded["input"].append(recorded["input"][0])
+    assert len(processor.emitted[0]["observation"]["input"]) == 1
 
 
 def test_recording_before_init_does_nothing():

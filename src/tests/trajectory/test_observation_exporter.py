@@ -127,3 +127,13 @@ def test_an_observation_json_cannot_hold_does_not_drop_the_others(waits):
         for item in batch
     )
     assert (stored, waits) == (["a", "b", "c"], [])
+
+
+def test_a_request_the_server_rejects_whole_is_dropped_after_one_split(waits):
+    # For example, a clock more than five minutes fast.
+    def reject(batch: list[Any]) -> None:
+        raise api_error(400)
+
+    fake = FakeClient(reject)
+    export(fake, [sent(str(index)) for index in range(100)])
+    assert (fake.attempts, fake.batches) == (3, [])
