@@ -370,7 +370,8 @@ async def test_paginated_tools_remain_callable_after_twenty_pages(tracer):
 async def test_lowlevel_ownership_reuse_and_bounded_discovery(mode, monkeypatch):
     from judgeval.integrations.mcp import _observer
 
-    monkeypatch.setattr(_observer, "_DISCOVERY_TIMEOUT_SECONDS", 0.02)
+    if mode == "timeout":
+        monkeypatch.setattr(_observer, "_DISCOVERY_TIMEOUT_SECONDS", 0.02)
     observer = McpObserver(McpOptions(), "test", None)
     schema = {
         "type": "object",
