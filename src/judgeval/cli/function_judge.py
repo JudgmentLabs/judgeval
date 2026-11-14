@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Literal, Optional, cast
 from judgeval.api import JudgmentApiClient
 from judgeval.internal.api.models import CreateJudgeRequest, UpdateJudgeRequest
 
-OutputType = Literal["binary", "numeric", "categorical", "arbitrary"]
+OutputType = Literal["binary", "numeric", "categorical"]
 
 # Matches the eval worker's sandbox (judgment-mono evaluator/function-judge.ts).
 _LIMITS = {
@@ -122,8 +122,6 @@ def _value_problem(value: Any, output: OutputType, labels: List[str]) -> Optiona
         return "value must be a finite number"
     if output == "categorical" and value not in labels:
         return f"value must be one of {labels}"
-    if output == "arbitrary" and not (isinstance(value, (bool, str)) or is_number):
-        return "value must be a bool, number or string"
     return None
 
 
