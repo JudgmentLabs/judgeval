@@ -74,6 +74,7 @@ _MAX_DISCOVERY_PAGES = 100
 _DISCOVERY_TIMEOUT_SECONDS = 1.0
 _MISSING_TOOL_CACHE_SECONDS = 1.0
 _MAX_CACHED_TOOLS = 1_000
+_MAX_DISCOVERY_ATTEMPTS = 2
 _INVALID_PARAMS_CODE = -32602
 # How each SDK words a call to a tool it doesn't have, or has turned off.
 _UNKNOWN_TOOL = re.compile(
@@ -320,8 +321,10 @@ class _ToolDiscoveryCache:
 
     def __init__(self) -> None:
         self._entries: OrderedDict[str, _CachedContract] = OrderedDict()
+        self._generation = 0
 
     def clear(self) -> None:
+        self._generation += 1
         self._entries.clear()
 
     def remember(self, name: str, contract: Optional[ToolContract]) -> None:
@@ -338,18 +341,24 @@ class _ToolDiscoveryCache:
         name: str,
         lookup: Callable[[], Coroutine[Any, Any, Optional[ToolContract]]],
     ) -> Optional[ToolContract]:
-        entry = self._entries.get(name)
-        if entry is None or entry.expires_at <= time.monotonic():
-            entry = _CachedContract(pending=asyncio.create_task(lookup()))
-            self._store(name, entry)
-        if entry.pending is not None:
-            # One cancelled request must not cancel discovery for other waiters.
-            entry.value = await asyncio.shield(entry.pending)
-            entry.pending = None
-            if entry.value is None:
-                entry.expires_at = time.monotonic() + _MISSING_TOOL_CACHE_SECONDS
-        # An invalidation or newer listing supersedes in-flight discovery.
-        return entry.value if self._entries.get(name) is entry else None
+        for _ in range(_MAX_DISCOVERY_ATTEMPTS):
+            generation = self._generation
+            entry = self._entries.get(name)
+            if entry is None or entry.expires_at <= time.monotonic():
+                entry = _CachedContract(pending=asyncio.create_task(lookup()))
+                self._store(name, entry)
+            if entry.pending is not None:
+                # One cancelled request must not cancel discovery for other waiters.
+                entry.value = await asyncio.shield(entry.pending)
+                entry.pending = None
+                if entry.value is None:
+                    entry.expires_at = time.monotonic() + _MISSING_TOOL_CACHE_SECONDS
+            current = self._entries.get(name)
+            # Eviction affects retention, not ownership for the waiting call.
+            if generation == self._generation and (current is None or current is entry):
+                return entry.value
+            # Prefer a newer listing, or retry once after a schema invalidation.
+        return None
 
 
 class McpObserver:

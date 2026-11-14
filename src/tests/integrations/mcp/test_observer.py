@@ -476,12 +476,11 @@ async def test_discovery_cache_coalesces_bounds_and_expires_misses(monkeypatch):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("method", ["notify", "send_notification"])
-async def test_notification_invalidates_inflight_and_advertised_contracts(method):
+async def test_notification_invalidates_advertised_contracts(method):
     from judgeval.integrations.mcp import _observer
 
     observer = McpObserver(McpOptions(), "test", None)
     cache = observer._listed_contracts
-    started, finish = asyncio.Event(), asyncio.Event()
     contract = _observer.tool_contract(
         {"type": "object", "additionalProperties": False}, observer.argument_names
     )
@@ -490,17 +489,10 @@ async def test_notification_invalidates_inflight_and_advertised_contracts(method
     async def notify(**kwargs):
         sent.append(next(iter(kwargs.values())))
 
-    async def lookup():
-        started.set()
-        await finish.wait()
-        return contract
-
     target = SimpleNamespace(**{method: notify})
     observer.watch_tool_changes(target)
     observer.watch_tool_changes(target)
     cache.remember("listed", contract)
-    pending = asyncio.create_task(cache.resolve("cold", lookup))
-    await started.wait()
     notification = "notifications/tools/list_changed"
     value = (
         SimpleNamespace(root=SimpleNamespace(method=notification))
@@ -510,11 +502,59 @@ async def test_notification_invalidates_inflight_and_advertised_contracts(method
     await getattr(target, method)(
         **{"notification" if method == "send_notification" else "method": value}
     )
-    finish.set()
-    assert (await pending, list(cache._entries), sent) == (
+    assert (list(cache._entries), sent) == ([], [value])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("change", ["eviction", "listing", "notification", "unstable"])
+async def test_inflight_discovery_preserves_call_ownership(change, monkeypatch):
+    from judgeval.integrations.mcp import _observer
+
+    monkeypatch.setattr(_observer, "_MAX_CACHED_TOOLS", 1)
+    observer = McpObserver(McpOptions(), "test", None)
+    schema = {"type": "object", "properties": {}, "additionalProperties": False}
+    listings, received = [], []
+
+    async def listing(cursor):
+        original = {**schema, "properties": dict(schema["properties"])}
+        listings.append(cursor)
+        if len(listings) == 1:
+            if change == "eviction":
+                observer._listed_contracts.remember("other", None)
+            else:
+                schema["properties"]["intent"] = {"type": "string"}
+                if change == "listing":
+                    observer.shape_listing(
+                        {"tools": [{"name": "lookup", "inputSchema": schema}]},
+                        WireResults(),
+                    )
+                else:
+                    observer.invalidate_tools()
+        elif change == "unstable":
+            observer.invalidate_tools()
+        return [("lookup", original, None)], None
+
+    async def invoke(arguments):
+        received.append(
+            arguments if arguments is not None else facts.params["arguments"]
+        )
+        return {"content": []}
+
+    facts = RequestFacts(
+        "tools/call",
+        {"name": "lookup", "arguments": {"intent": "business"}},
         None,
-        [],
-        [value],
+        None,
+        {},
+        {},
+        None,
+        None,
+        None,
+    )
+    await observer.observe(facts, invoke, WireResults(), listing)
+    assert (received, len(listings)) == (
+        [{}] if change == "eviction" else [{"intent": "business"}],
+        1 if change in ("eviction", "listing") else 2,
     )
 
 
