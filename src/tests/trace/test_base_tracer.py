@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 from unittest.mock import patch, MagicMock
 
 from judgeval.judgment_attribute_keys import AttributeKeys
 from judgeval.trace.tracer import Tracer
+from judgeval.trace import ConversationObservation
 from judgeval.trace.base_tracer import BaseTracer
 
 
@@ -100,6 +103,27 @@ class TestAttributes:
             span.attributes[AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS] == 10
         )
         assert span.attributes[AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS] == 20
+
+    def test_set_conversation_observation(self, tracer, collecting_exporter):
+        observation: ConversationObservation = {
+            "conversation_id": "refund-4812",
+            "model": "my-model",
+            "input": [
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "text", "text": "Where is my order?"}],
+                }
+            ],
+            "output": [
+                {"type": "tool_call", "name": "lookup_order", "arguments": {"id": 1}}
+            ],
+        }
+        with BaseTracer.start_as_current_span("model-call"):
+            BaseTracer.set_conversation_observation(observation)
+        span = next(s for s in collecting_exporter.spans if s.name == "model-call")
+        recorded = span.attributes[AttributeKeys.JUDGMENT_CONVERSATION_OBSERVATION]
+        assert json.loads(recorded) == observation
 
 
 class TestContextPropagation:

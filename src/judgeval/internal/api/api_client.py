@@ -454,6 +454,18 @@ class JudgmentSyncClient:
             payload,
         )
 
+    def post_projects_observations(
+        self, project_id: str, payload: IngestObservationsRequest
+    ) -> IngestObservationsResponse:
+        return self._request(
+            "POST",
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/observations",
+                self.base_url,
+            ),
+            payload,
+        )
+
     def post_projects_judges(
         self, project_id: str, payload: CreateJudgeRequest
     ) -> CreateJudgeResponse:

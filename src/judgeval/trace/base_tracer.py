@@ -22,6 +22,8 @@ from typing import (
     overload,
 )
 from uuid import uuid4
+
+import orjson
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.trace import (
     Span,
@@ -30,6 +32,7 @@ from opentelemetry.trace import (
     Tracer as OTELTracer,
 )
 
+from judgeval.internal.api.models import ConversationObservation
 from judgeval.judgment_attribute_keys import AttributeKeys, InternalAttributeKeys
 from judgeval.utils.decorators.debug_time import debug_time
 from judgeval.utils.decorators.dont_throw import dont_throw
@@ -1122,6 +1125,56 @@ class BaseTracer(ABC):
             current_span.set_attribute(
                 AttributeKeys.JUDGMENT_USAGE_TOTAL_COST_USD, metadata["total_cost_usd"]
             )
+
+    @staticmethod
+    @dont_throw
+    def set_conversation_observation(observation: ConversationObservation) -> None:
+        """Record the current model call in the conversation format.
+
+        Writes ``observation`` as JSON to the current span's
+        ``judgment.conversation.observation`` attribute, which the
+        Conversation view reads. Use it for model calls no integration
+        records. ``conversation_id``, ``customer_id``, ``user_id``, and
+        ``usage`` default to the span's session, customer, customer user, and
+        ``judgment.usage.*`` attributes. One span holds one observation;
+        calling this again replaces it.
+
+        Judgment does not store an observation that does not fit the format;
+        it sets ``judgment.conversation.warnings`` on the span instead.
+
+        Args:
+            observation: The call: ``input`` is everything the model was
+                given, including history from earlier calls; ``output`` is
+                what it produced.
+
+        Examples:
+            ```python
+            @Tracer.observe(span_type="llm")
+            def reply(question: str) -> str:
+                answer = my_model.generate(question)
+                Tracer.set_conversation_observation({
+                    "model": "my-model-v2",
+                    "input": [{
+                        "type": "message",
+                        "role": "user",
+                        "content": [{"type": "text", "text": question}],
+                    }],
+                    "output": [{
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [{"type": "text", "text": answer}],
+                    }],
+                })
+                return answer
+            ```
+        """
+        current_span = BaseTracer._get_proxy_provider().get_current_span()
+        if current_span is None or not current_span.is_recording():
+            return
+        current_span.set_attribute(
+            AttributeKeys.JUDGMENT_CONVERSATION_OBSERVATION,
+            orjson.dumps(observation).decode(),
+        )
 
     # ------------------------------------------------------------------ #
     #  Static: Context Propagation                                       #
