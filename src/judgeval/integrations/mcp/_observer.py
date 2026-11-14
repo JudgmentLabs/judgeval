@@ -13,11 +13,14 @@ import contextvars
 import inspect
 import json
 import re
+import time
+from collections import OrderedDict
 from dataclasses import dataclass, field, replace
 from typing import (
     Any,
     Awaitable,
     Callable,
+    Coroutine,
     Dict,
     FrozenSet,
     List,
@@ -69,6 +72,8 @@ _MAX_RECORDED_KEYS = 30
 _MAX_RECORDED_KEY_LENGTH = 64
 _MAX_DISCOVERY_PAGES = 100
 _DISCOVERY_TIMEOUT_SECONDS = 1.0
+_MISSING_TOOL_CACHE_SECONDS = 1.0
+_MAX_CACHED_TOOLS = 1_000
 _INVALID_PARAMS_CODE = -32602
 # How each SDK words a call to a tool it doesn't have, or has turned off.
 _UNKNOWN_TOOL = re.compile(
@@ -118,10 +123,15 @@ class OriginalTool(Protocol):
     def inputSchema(self) -> Mapping[str, Any]: ...
 
 
+class OriginalToolV2(Protocol):
+    @property
+    def input_schema(self) -> Mapping[str, Any]: ...
+
+
 ResolveOriginalTool = Callable[
     [str],
-    Optional[Mapping[str, Any] | OriginalTool]
-    | Awaitable[Optional[Mapping[str, Any] | OriginalTool]],
+    Optional[Mapping[str, Any] | OriginalTool | OriginalToolV2]
+    | Awaitable[Optional[Mapping[str, Any] | OriginalTool | OriginalToolV2]],
 ]
 
 
@@ -176,8 +186,7 @@ class ResultAdapter(Protocol):
         self,
         result: Any,
         text: str,
-        tool_name: Any,
-        contract: Optional[ToolContract] = None,
+        contract: Optional[ToolContract],
     ) -> Any: ...
 
     def listed_tools(self, result: Any) -> Optional[ListedTools]: ...
@@ -299,6 +308,50 @@ def is_cancellation(error: BaseException) -> bool:
     return isinstance(error, asyncio.CancelledError)
 
 
+@dataclass
+class _CachedContract:
+    value: Optional[ToolContract] = None
+    pending: Optional[asyncio.Task[Optional[ToolContract]]] = None
+    expires_at: float = float("inf")
+
+
+class _ToolDiscoveryCache:
+    """Bounds server-local contracts and coalesces cold discovery attempts."""
+
+    def __init__(self) -> None:
+        self._entries: OrderedDict[str, _CachedContract] = OrderedDict()
+
+    def clear(self) -> None:
+        self._entries.clear()
+
+    def remember(self, name: str, contract: Optional[ToolContract]) -> None:
+        self._store(name, _CachedContract(value=contract))
+
+    def _store(self, name: str, entry: _CachedContract) -> None:
+        self._entries.pop(name, None)
+        self._entries[name] = entry
+        if len(self._entries) > _MAX_CACHED_TOOLS:
+            self._entries.popitem(last=False)
+
+    async def resolve(
+        self,
+        name: str,
+        lookup: Callable[[], Coroutine[Any, Any, Optional[ToolContract]]],
+    ) -> Optional[ToolContract]:
+        entry = self._entries.get(name)
+        if entry is None or entry.expires_at <= time.monotonic():
+            entry = _CachedContract(pending=asyncio.create_task(lookup()))
+            self._store(name, entry)
+        if entry.pending is not None:
+            # One cancelled request must not cancel discovery for other waiters.
+            entry.value = await asyncio.shield(entry.pending)
+            entry.pending = None
+            if entry.value is None:
+                entry.expires_at = time.monotonic() + _MISSING_TOOL_CACHE_SECONDS
+        # An invalidation or newer listing supersedes in-flight discovery.
+        return entry.value if self._entries.get(name) is entry else None
+
+
 class McpObserver:
     """Traces the requests of one server and applies its injection settings."""
 
@@ -321,7 +374,7 @@ class McpObserver:
         self._request_contracts: contextvars.ContextVar[
             Optional[Dict[str, Optional[ToolContract]]]
         ] = contextvars.ContextVar("mcp_tool_contracts", default=None)
-        self._listed_contracts: Dict[str, Optional[ToolContract]] = {}
+        self._listed_contracts = _ToolDiscoveryCache()
         self._tool_manager = tool_manager
         self._tool_lookup = tool_lookup
         # Requests can run where the tracer set by `Tracer.init()` isn't
@@ -331,6 +384,31 @@ class McpObserver:
     @property
     def inject(self) -> bool:
         return self.options.inject_agent_arguments
+
+    def invalidate_tools(self) -> None:
+        self._listed_contracts.clear()
+
+    def watch_tool_changes(self, target: Any) -> None:
+        """Invalidates contracts when this session advertises changed tools."""
+        method = (
+            "send_notification" if hasattr(target, "send_notification") else "notify"
+        )
+        original = getattr(target, method, None)
+        if not callable(original) or getattr(original, "__judgment_tools__", False):
+            return
+
+        async def notify(*args: Any, **kwargs: Any) -> Any:
+            notification = (
+                args[0] if args else kwargs.get("notification", kwargs.get("method"))
+            )
+            root = getattr(notification, "root", notification)
+            name = root if isinstance(root, str) else getattr(root, "method", None)
+            if name == "notifications/tools/list_changed":
+                self.invalidate_tools()
+            return await original(*args, **kwargs)
+
+        setattr(notify, "__judgment_tools__", True)
+        setattr(target, method, notify)
 
     @property
     def _contracts(self) -> Dict[str, Optional[ToolContract]]:
@@ -389,13 +467,32 @@ class McpObserver:
         if name not in self._contracts:
             await attempt_async(lambda: self._remember_native_tool(name))
         if name not in self._contracts:
+
+            async def lookup() -> Optional[ToolContract]:
+                return await self._lookup_contract(name, list_tools)
+
+            self._contracts[name] = (
+                await lookup()
+                if self.options.resolve_original_tool is not None
+                or self._tool_lookup is not None
+                else await self._listed_contracts.resolve(name, lookup)
+            )
+        return self._contracts.get(name)
+
+    async def _lookup_contract(
+        self, name: str, list_tools: Optional[ListTools]
+    ) -> Optional[ToolContract]:
+        token = self._request_contracts.set({})
+        try:
             await attempt_async(
                 lambda: asyncio.wait_for(
                     self._discover_contract(name, list_tools),
                     timeout=_DISCOVERY_TIMEOUT_SECONDS,
                 )
             )
-        return self._contracts.get(name)
+            return self._contracts.get(name)
+        finally:
+            self._request_contracts.reset(token)
 
     async def _discover_contract(
         self, name: str, list_tools: Optional[ListTools]
@@ -408,14 +505,16 @@ class McpObserver:
             schema = (
                 tool.get("inputSchema")
                 if isinstance(tool, Mapping)
-                else getattr(tool, "inputSchema", None)
+                else getattr(tool, "input_schema", getattr(tool, "inputSchema", None))
             )
             contract = tool_contract(schema, self.argument_names)
             if contract is not None:
                 output = (
                     tool.get("outputSchema")
                     if isinstance(tool, Mapping)
-                    else getattr(tool, "outputSchema", None)
+                    else getattr(
+                        tool, "output_schema", getattr(tool, "outputSchema", None)
+                    )
                 )
                 self._contracts[name] = replace(
                     contract,
@@ -434,8 +533,6 @@ class McpObserver:
                 if cursor is None or cursor in seen or name in self._contracts:
                     break
                 seen.add(cursor)
-            if name in self._contracts:
-                self._listed_contracts[name] = self._contracts[name]
 
     def strip_known(self, method: str, params: Mapping[str, Any]) -> Optional[Dict]:
         """Removes injected arguments using only what is already known."""
@@ -465,14 +562,7 @@ class McpObserver:
             result = await invoke(None)
             return self._shaped(facts, result, adapter, None)
         token = attempt(self._activate_tracer)
-        tool_name = facts.params.get("name")
-        contracts_token = self._request_contracts.set(
-            {tool_name: self._listed_contracts[tool_name]}
-            if self.options.resolve_original_tool is None
-            and self._tool_lookup is None
-            and tool_name in self._listed_contracts
-            else {}
-        )
+        contracts_token = self._request_contracts.set({})
         try:
             return await self._observe(facts, invoke, adapter, list_tools)
         finally:
@@ -567,7 +657,7 @@ class McpObserver:
     ) -> Any:
         if facts.method == "tools/list":
             return self.shape_listing(result, adapter)
-        if minted_conversation_id is not None and not adapter.is_error(result):
+        if minted_conversation_id is not None:
             prompt = conversation_id_prompt(
                 minted_conversation_id, self.argument_names.names[2]
             )
@@ -577,7 +667,6 @@ class McpObserver:
                 lambda: adapter.with_text(
                     result,
                     prompt,
-                    name,
                     contract,
                 )
             )
@@ -588,7 +677,7 @@ class McpObserver:
         tools = attempt(lambda: adapter.listed_tools(result))
         self.remember_listing(tools)
         for name, _, _ in tools or ():
-            self._listed_contracts[name] = self._contracts.get(name)
+            self._listed_contracts.remember(name, self._contracts.get(name))
         if not self.inject:
             return result
         shaped = attempt(lambda: adapter.with_tool_schemas(result, self._listed_schema))

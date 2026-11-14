@@ -73,6 +73,37 @@ async def test_original_tool_resolver_on_lowlevel_and_native_lookup_priority(
 
 
 @pytest.mark.asyncio
+async def test_fastmcp_proxy_reuses_advertised_contracts(tracer):
+    from unittest.mock import patch
+
+    fastmcp = pytest.importorskip("fastmcp")
+    proxy_module = pytest.importorskip("fastmcp.server.proxy")
+    if not hasattr(proxy_module, "ProxyToolManager"):
+        pytest.skip("FastMCP 2 proxy manager")
+    upstream = fastmcp.FastMCP("upstream")
+
+    @upstream.tool()
+    def add(a: int, b: int) -> int:
+        return a + b
+
+    counts, values = {}, []
+    for instrumented in (False, True):
+        proxy = fastmcp.FastMCP.as_proxy(fastmcp.Client(upstream))
+        if instrumented:
+            instrument_mcp_server(proxy)
+        manager = proxy._tool_manager
+        with patch.object(manager, "get_tools", wraps=manager.get_tools) as lookup:
+            async with fastmcp.Client(proxy) as client:
+                await client.list_tools()
+                initial = lookup.call_count
+                for _ in range(2):
+                    result = await client.call_tool("add", {"a": 1, "b": 2})
+                    values.append(result.data)
+                counts[instrumented] = lookup.call_count - initial
+    assert (counts[True], values) == (counts[False], [3, 3, 3, 3])
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("style", styles())
 async def test_reinstrumentation_warns_on_changed_options_and_keeps_original(
     style, tracer, collecting_exporter, monkeypatch

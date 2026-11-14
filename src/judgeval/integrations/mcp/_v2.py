@@ -40,7 +40,6 @@ class WireResults:
     ) -> None:
         self._inject_conversation_id = inject_conversation_id
         self._conversation_argument = conversation_argument
-        self._structured_tools: set[str] = set()
 
     def payload(self, result: Any) -> Any:
         return result_payload(result)
@@ -70,14 +69,8 @@ class WireResults:
         self,
         result: Any,
         text: str,
-        tool_name: Any,
-        contract: Optional[ToolContract] = None,
+        contract: Optional[ToolContract],
     ) -> Any:
-        annotate = (
-            contract.structured_output
-            if contract is not None and contract.structured_output is not None
-            else tool_name in self._structured_tools
-        )
         if isinstance(result, Mapping):
             content = result.get("content")
             if content is None:
@@ -85,7 +78,7 @@ class WireResults:
             if not isinstance(content, list):
                 return result
             updates = {}
-            if annotate:
+            if contract is not None and contract.structured_output:
                 structured = structured_with_prompt(
                     result.get("structuredContent"), text
                 )
@@ -102,7 +95,7 @@ class WireResults:
         if isinstance(content, list) and hasattr(result, "model_copy"):
             item = _text_item(text)
             updates = {"content": [*content, item]}
-            if annotate:
+            if contract is not None and contract.structured_output:
                 structured = structured_with_prompt(
                     getattr(result, "structured_content", None), text
                 )
@@ -154,7 +147,6 @@ class WireResults:
                     else {
                         **tool,
                         **self._schema_updates(
-                            name,
                             schema,
                             tool.get("outputSchema"),
                             tool.get("inputSchema"),
@@ -174,7 +166,6 @@ class WireResults:
                         update={
                             key.replace("Schema", "_schema"): value
                             for key, value in self._schema_updates(
-                                tool.name,
                                 schema,
                                 getattr(tool, "output_schema", None),
                                 getattr(tool, "input_schema", None),
@@ -186,7 +177,7 @@ class WireResults:
         return result
 
     def _schema_updates(
-        self, name: str, schema: Any, output: Any, original: Any
+        self, schema: Any, output: Any, original: Any
     ) -> Dict[str, Any]:
         extended = (
             conversation_output_schema(output)
@@ -196,9 +187,6 @@ class WireResults:
             not in ((original or {}).get("properties", {}))
             else None
         )
-        self._structured_tools.discard(name)
-        if output is None or extended is not None:
-            self._structured_tools.add(name)
         return {
             "inputSchema": schema,
             **({"outputSchema": extended} if extended is not None else {}),
@@ -226,6 +214,13 @@ class JudgmentMcpMiddleware:
     ) -> Any:
         if getattr(ctx, "request_id", None) is None:
             return await call_next(ctx)
+        session = getattr(ctx, "session", None)
+        attempt(lambda: self._observer.watch_tool_changes(session))
+        attempt(
+            lambda: self._observer.watch_tool_changes(
+                getattr(session, "_connection", None)
+            )
+        )
         facts = attempt(lambda: _facts(ctx))
         if facts is None:
             return await call_next(ctx)
@@ -274,7 +269,6 @@ class JudgmentMcpMiddleware:
             dataclasses.replace(ctx, method="tools/list", params=params)
         )
         tools = self._results.listed_tools(result) or []
-        self._observer.shape_listing(result, self._results)
         next_cursor = (
             result.get("nextCursor")
             if isinstance(result, Mapping)
@@ -324,5 +318,15 @@ def instrument(observer: McpObserver, lowlevel: Any) -> bool:
     kept = [
         entry for entry in middleware if not isinstance(entry, JudgmentMcpMiddleware)
     ]
+    original = getattr(lowlevel, "add_request_handler", None)
+
+    if callable(original):
+
+        def add_request_handler(method: str, *args: Any, **kwargs: Any) -> Any:
+            if method in ("tools/list", "tools/call"):
+                observer.invalidate_tools()
+            return original(method, *args, **kwargs)
+
+        lowlevel.add_request_handler = add_request_handler
     middleware[:] = [JudgmentMcpMiddleware(observer), *kept]
     return True

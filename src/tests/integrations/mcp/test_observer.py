@@ -145,7 +145,10 @@ async def test_explicit_arguments_record_business_values_without_changing_calls(
 @pytest.mark.parametrize("style", ["model-v1", "wire-v2", "model-v2"])
 def test_structured_only_handoff_preserves_output_without_content(style):
     from pydantic import create_model
-    from judgeval.integrations.mcp._arguments import conversation_id_prompt
+    from judgeval.integrations.mcp._arguments import (
+        ToolContract,
+        conversation_id_prompt,
+    )
 
     payload = {"ok": True}
     if style == "model-v1":
@@ -159,9 +162,8 @@ def test_structured_only_handoff_preserves_output_without_content(style):
         adapter = WireResults()
         model = create_model("StructuredResult", structured_content=(dict, ...))
         original = model(structured_content=payload)
-    adapter._structured_tools.add("lookup")
     prompt = conversation_id_prompt("id")
-    result = adapter.with_text(original, prompt, "lookup")
+    result = adapter.with_text(original, prompt, ToolContract(frozenset(), False, True))
     if style == "wire-v2":
         structured, content = result["structuredContent"], result["content"]
     else:
@@ -204,8 +206,6 @@ async def test_call_contracts_follow_current_caller_and_fail_open(tracer):
 
     async def invoke(arguments):
         forwarded.append(arguments)
-        # Another caller's incompatible listing clears the shared adapter hint.
-        adapter._structured_tools.clear()
         return CallToolResult.model_validate(
             {"content": [], "structuredContent": {"ok": True}}
         )
@@ -240,7 +240,7 @@ async def test_call_contracts_follow_current_caller_and_fail_open(tracer):
 
 
 @pytest.mark.asyncio
-async def test_stateful_calls_offer_handoff_until_echo_and_leave_errors_unchanged(
+async def test_stateful_calls_offer_handoff_on_success_and_error_until_echo(
     tracer, collecting_exporter
 ):
     from dataclasses import replace
@@ -271,7 +271,9 @@ async def test_stateful_calls_offer_handoff_until_echo_and_leave_errors_unchange
     async def succeed(_):
         return CallToolResult(content=[])
 
-    error = CallToolResult(content=[], isError=True)
+    error = CallToolResult.model_validate(
+        {"content": [{"type": "text", "text": "declined"}], "isError": True}
+    )
 
     async def fail(_):
         return error
@@ -289,25 +291,40 @@ async def test_stateful_calls_offer_handoff_until_echo_and_leave_errors_unchange
         listing,
     )
     failed = await observer.observe(facts, fail, adapter_type(), listing)
+    failed_handle = json.loads(failed.content[-1].text)["conversation_id"]
+    await observer.observe(
+        replace(
+            facts,
+            params={"name": "lookup", "arguments": {"conversation_id": failed_handle}},
+        ),
+        succeed,
+        adapter_type(),
+        listing,
+    )
     tracer.force_flush()
     assert {
         "handoff": isinstance(handle, str),
         "echo_handoff": second.content,
-        "error_unchanged": failed is error,
+        "error_preserved": failed.model_dump(by_alias=True)["isError"]
+        and failed.content[:-1] == error.content,
+        "original_content": len(error.content),
         "sessions": [
             (
                 s.attributes.get("judgment.session_id"),
                 s.attributes.get("judgment.mcp.conversation_id_source"),
             )
-            for s in collecting_exporter.spans[:2]
+            for s in collecting_exporter.spans
         ],
     } == {
         "handoff": True,
         "echo_handoff": [],
-        "error_unchanged": True,
+        "error_preserved": True,
+        "original_content": 1,
         "sessions": [
             (handle, "minted"),
             (handle, "echoed"),
+            (failed_handle, "minted"),
+            (failed_handle, "echoed"),
         ],
     }
 
@@ -349,7 +366,7 @@ async def test_paginated_tools_remain_callable_after_twenty_pages(tracer):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("mode", ["cached", "pages", "timeout"])
+@pytest.mark.parametrize("mode", ["cached", "discovered", "pages", "timeout"])
 async def test_lowlevel_ownership_reuse_and_bounded_discovery(mode, monkeypatch):
     from judgeval.integrations.mcp import _observer
 
@@ -373,6 +390,8 @@ async def test_lowlevel_ownership_reuse_and_bounded_discovery(mode, monkeypatch)
             raise RuntimeError("listing unavailable")
         if mode == "timeout":
             await asyncio.Event().wait()
+        if mode == "discovered":
+            return [("lookup", schema, None)], None
         return [], str(len(pages))
 
     async def invoke(arguments):
@@ -392,10 +411,110 @@ async def test_lowlevel_ownership_reuse_and_bounded_discovery(mode, monkeypatch)
         None,
         None,
     )
-    await observer.observe(facts, invoke, WireResults(), listing)
+    for _ in range(2):
+        await observer.observe(facts, invoke, WireResults(), listing)
     assert (received, len(pages)) == (
-        [{"intent": "business"} if mode == "cached" else facts.params["arguments"]],
-        {"cached": 0, "pages": 100, "timeout": 1}[mode],
+        [
+            {"intent": "business"}
+            if mode in ("cached", "discovered")
+            else facts.params["arguments"]
+        ]
+        * 2,
+        {"cached": 0, "discovered": 1, "pages": 100, "timeout": 1}[mode],
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("field_style", ["wire", "model"])
+async def test_resolver_tool_models_preserve_output_eligibility(field_style):
+    from mcp.types import Tool
+
+    descriptor = {
+        "name": "lookup",
+        "inputSchema": {"type": "object", "additionalProperties": False},
+        "outputSchema": {"type": "object", "maxProperties": 1},
+    }
+    observer = McpObserver(
+        McpOptions(
+            resolve_original_tool=lambda _: Tool(**descriptor)
+            if field_style == "model"
+            else descriptor
+        ),
+        "test",
+        None,
+    )
+    contract = await observer.contract_for("lookup", None)
+    assert (contract.declared, contract.structured_output) == (frozenset(), False)
+
+
+@pytest.mark.asyncio
+async def test_discovery_cache_coalesces_bounds_and_expires_misses(monkeypatch):
+    from judgeval.integrations.mcp import _observer
+
+    monkeypatch.setattr(_observer, "_MAX_CACHED_TOOLS", 2)
+    clock = [0.0]
+    monkeypatch.setattr(_observer.time, "monotonic", lambda: clock[0])
+    cache = _observer._ToolDiscoveryCache()
+    lookups = []
+
+    async def missing():
+        lookups.append("lookup")
+        await asyncio.sleep(0)
+        return None
+
+    await asyncio.gather(*(cache.resolve("missing", missing) for _ in range(10)))
+    await cache.resolve("missing", missing)
+    coalesced = len(lookups)
+    clock[0] = 2.0
+    await cache.resolve("missing", missing)
+    expired = len(lookups)
+    cache.remember("a", None)
+    cache.remember("b", None)
+    await cache.resolve("missing", missing)
+    assert (coalesced, expired, len(lookups), len(cache._entries)) == (1, 2, 3, 2)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("method", ["notify", "send_notification"])
+async def test_notification_invalidates_inflight_and_advertised_contracts(method):
+    from judgeval.integrations.mcp import _observer
+
+    observer = McpObserver(McpOptions(), "test", None)
+    cache = observer._listed_contracts
+    started, finish = asyncio.Event(), asyncio.Event()
+    contract = _observer.tool_contract(
+        {"type": "object", "additionalProperties": False}, observer.argument_names
+    )
+    sent = []
+
+    async def notify(**kwargs):
+        sent.append(next(iter(kwargs.values())))
+
+    async def lookup():
+        started.set()
+        await finish.wait()
+        return contract
+
+    target = SimpleNamespace(**{method: notify})
+    observer.watch_tool_changes(target)
+    observer.watch_tool_changes(target)
+    cache.remember("listed", contract)
+    pending = asyncio.create_task(cache.resolve("cold", lookup))
+    await started.wait()
+    notification = "notifications/tools/list_changed"
+    value = (
+        SimpleNamespace(root=SimpleNamespace(method=notification))
+        if method == "send_notification"
+        else notification
+    )
+    await getattr(target, method)(
+        **{"notification" if method == "send_notification" else "method": value}
+    )
+    finish.set()
+    assert (await pending, list(cache._entries), sent) == (
+        None,
+        [],
+        [value],
     )
 
 

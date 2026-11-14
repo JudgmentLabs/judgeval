@@ -66,13 +66,14 @@ def instrument_mcp_server(
     starts. It changes your server in one way by default: each tool's published
     schema gets optional ``intent``, ``llm_model`` and ``conversation_id``
     arguments, which are removed before your tool runs. When a call has no
-    application or echoed conversation session, its successful result gets an ID in
+    application or echoed conversation session, its returned result gets an ID in
     supplemental text and compatible existing ``structuredContent._judgment``.
     Compatible output schemas gain
     the matching optional property. Text-only/unsupported/colliding outputs
-    retain text handoff. Transport session IDs are used only when no application
-    or conversation session is available, including while waiting for the agent
-    to echo a newly offered ID.
+    retain text handoff. Returned tool-error results also get handoff while
+    preserving their content and error flag; thrown exceptions and protocol
+    errors propagate unchanged. Transport session IDs are used only when no
+    application or conversation session is available.
 
     Args:
         server: A ``FastMCP``, ``MCPServer`` or low-level ``Server`` from `mcp`,
@@ -172,8 +173,7 @@ def _instrument(server: Any, options: McpOptions) -> bool:
         server_name=_text(getattr(lowlevel, "name", None)),
         server_version=_text(getattr(lowlevel, "version", None)),
         tool_manager=getattr(server, "_tool_manager", None),
-        tool_lookup=getattr(server, "get_tool", None)
-        or getattr(getattr(server, "_tool_manager", None), "get_tool", None),
+        tool_lookup=_native_tool_lookup(server),
     )
     from . import _v1, _v2
 
@@ -190,6 +190,19 @@ def _instrument(server: Any, options: McpOptions) -> bool:
         "Calls still run, but aren't traced."
     )
     return False
+
+
+def _native_tool_lookup(server: Any) -> Optional[Callable[[str], Any]]:
+    manager = getattr(server, "_tool_manager", None)
+    try:
+        from fastmcp.server.proxy import ProxyToolManager  # type: ignore[import-not-found]
+    except ImportError:
+        pass
+    else:
+        if isinstance(manager, ProxyToolManager):
+            # Proxy get_tool lists upstream tools; reuse advertised contracts instead.
+            return None
+    return getattr(server, "get_tool", None) or getattr(manager, "get_tool", None)
 
 
 def _text(value: Any) -> Optional[str]:

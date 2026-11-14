@@ -41,7 +41,6 @@ class ModelResults:
     ) -> None:
         self._inject_conversation_id = inject_conversation_id
         self._conversation_argument = conversation_argument
-        self._structured_tools: set[str] = set()
 
     def is_error(self, result: Any) -> bool:
         return getattr(_root(result), "isError", None) is True
@@ -60,14 +59,8 @@ class ModelResults:
         self,
         result: Any,
         text: str,
-        tool_name: Any,
-        contract: Optional[ToolContract] = None,
+        contract: Optional[ToolContract],
     ) -> Any:
-        annotate = (
-            contract.structured_output
-            if contract is not None and contract.structured_output is not None
-            else tool_name in self._structured_tools
-        )
         root = _root(result)
         content = getattr(root, "content", None)
         if content is None:
@@ -79,7 +72,7 @@ class ModelResults:
         updates: Dict[str, Any] = {
             "content": [*content, types.TextContent(type="text", text=text)]
         }
-        if annotate:
+        if contract is not None and contract.structured_output:
             structured = structured_with_prompt(
                 getattr(root, "structuredContent", None), text
             )
@@ -123,9 +116,6 @@ class ModelResults:
                 not in (getattr(tool, "inputSchema", {}).get("properties", {}))
                 else None
             )
-            self._structured_tools.discard(tool.name)
-            if schema is not None and (output is None or extended is not None):
-                self._structured_tools.add(tool.name)
             if extended is not None:
                 updates["outputSchema"] = extended
             # A copy, so a tool object the server reuses keeps its own schema.
@@ -205,13 +195,14 @@ def instrument(observer: McpObserver, lowlevel: Any) -> bool:
             params["cursor"] = cursor
         request["params"] = params
         result = await original(types.ListToolsRequest.model_validate(request))
-        observer.shape_listing(result, results)
         next_cursor = getattr(_root(result), "nextCursor", None)
         return results.listed_tools(result) or [], (
             next_cursor if isinstance(next_cursor, str) else None
         )
 
     def wrap(request_type: Any, handler: Any) -> Any:
+        if request_type in (list_request, getattr(types, "CallToolRequest", None)):
+            observer.invalidate_tools()
         if not callable(handler) or getattr(handler, _WRAPPED_MARKER, None) is not None:
             return handler
 
@@ -225,6 +216,9 @@ def instrument(observer: McpObserver, lowlevel: Any) -> bool:
                     )
                 return result
             context = request_ctx.get(None)
+            attempt(
+                lambda: observer.watch_tool_changes(getattr(context, "session", None))
+            )
             facts = attempt(lambda: _facts(req, context))
             if facts is None:
                 return await handler(req)
