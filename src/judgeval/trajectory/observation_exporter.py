@@ -38,8 +38,8 @@ def _read_rejection(detail: str, count: int) -> tuple[set[int], str]:
     path such as ``["observations", 3, "input", 0, "role"]``. The positions
     are empty when no issue names an observation, as when the request as a
     whole is malformed or the detail is not in this format. The reason lists
-    each issue by path and leaves out the echoed request, which holds the
-    caller's conversation content."""
+    each issue by path. It never includes the detail itself, which can echo
+    the request and so the caller's conversation content."""
     try:
         issues = json.loads(detail)["errors"]
         paths = [issue["path"] for issue in issues]
@@ -48,7 +48,7 @@ def _read_rejection(detail: str, count: int) -> tuple[set[int], str]:
             for issue in issues
         )
     except Exception:
-        return set(), detail[:MAX_REASON_LENGTH]
+        return set(), "the request was rejected as invalid"
     invalid = {
         path[1]
         for path in paths
