@@ -455,7 +455,7 @@ def _to_agent_judge(judge: GetJudgeResponseJudge) -> AgentJudge:
         judge_id=judge["id"],
         name=judge["name"],
         prompt=definition["prompt"],
-        model=definition["model"],
+        model=None,
         reasoning_level=definition["reasoning_level"],
         score_type=judge["score_type"],
         description=definition["description"],
