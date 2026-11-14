@@ -12,7 +12,7 @@ import json
 import math
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, cast
+from typing import Any, Dict, List, Literal, Optional
 
 from judgeval.api import JudgmentApiClient
 from judgeval.internal.api.models import CreateJudgeRequest, UpdateJudgeRequest
@@ -84,6 +84,11 @@ def source_problems(source: str) -> Optional[str]:
                 return f"judge.py:{line}: {error.display('type-msg')}"
             except monty.MontySyntaxError as error:
                 return str(error.display("traceback"))
+            except monty.MontyCrashedError as error:
+                # The same answer the hosted check gives; any other crash is ours.
+                if error.timed_out:
+                    return "Module-level code exceeded its time limit"
+                raise
     return None
 
 
@@ -202,51 +207,35 @@ def upload_function_judge(
                 "A new function judge needs at least two categories, e.g. "
                 "--category Pass --category Fail"
             )
-        # Casts: the committed spec predates mono #7025's `functionSource`.
-        client.create_judge(
-            project_id,
-            cast(
-                CreateJudgeRequest,
-                {
-                    "judge": {
-                        "name": name,
-                        "judgeType": "custom",
-                        "initialVersion": {
-                            "scoreType": "categorical",
-                            "outputs": [
-                                {"name": c, "description": ""} for c in categories
-                            ],
-                        },
-                        "config": {"functionSource": source},
-                    }
+        create: CreateJudgeRequest = {
+            "judge": {
+                "name": name,
+                "judgeType": "custom",
+                "initialVersion": {
+                    "scoreType": "categorical",
+                    "outputs": [{"name": c, "description": ""} for c in categories],
                 },
-            ),
-        )
+                "config": {"functionSource": source},
+            }
+        }
+        client.create_judge(project_id, create)
         return f"Created function judge '{name}'"
 
     if existing["judge_type"] != "custom":
         raise ValueError(f"Judge '{name}' exists and is not a Code judge")
-    major, minor = existing["judge_major_version"], existing["judge_minor_version"]
-    target = (
-        {"major": major + 1, "minor": 0}
-        if bump_major
-        else {"major": major, "minor": minor + 1}
-    )
-    client.update_judge(
-        project_id,
-        existing["id"],
-        cast(
-            UpdateJudgeRequest,
-            {
-                "update": {
-                    "newVersionFromSource": {
-                        "sourceVersion": {"major": major, "minor": minor},
-                        "targetVersion": target,
-                        "promoteToProduction": True,
-                        "config": {"functionSource": source},
-                    }
-                }
-            },
-        ),
-    )
-    return f"Uploaded '{name}' as version {target['major']}.{target['minor']}"
+    # The list endpoint types versions as numbers; the update needs integers.
+    major = int(existing["judge_major_version"])
+    minor = int(existing["judge_minor_version"])
+    target_major, target_minor = (major + 1, 0) if bump_major else (major, minor + 1)
+    update: UpdateJudgeRequest = {
+        "update": {
+            "newVersionFromSource": {
+                "sourceVersion": {"major": major, "minor": minor},
+                "targetVersion": {"major": target_major, "minor": target_minor},
+                "promoteToProduction": True,
+                "config": {"functionSource": source},
+            }
+        }
+    }
+    client.update_judge(project_id, existing["id"], update)
+    return f"Uploaded '{name}' as version {target_major}.{target_minor}"

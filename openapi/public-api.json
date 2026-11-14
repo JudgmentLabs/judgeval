@@ -5409,7 +5409,7 @@
             "enum": ["manual", "ci", "schedule", "api"]
           },
           "stored_traces": {
-            "description": "Score each case's stored trace, named by its metadata.trace_id, instead of running the agent. Every published case needs a trace in this project.",
+            "description": "Score what each case stores instead of running the agent: the trace in its metadata.trace_id, the conversation in its metadata.conversation_id, or both. Every published case needs one that is in this project. A case with only a conversation can only use conversation judges.",
             "type": "boolean"
           }
         }
@@ -5522,7 +5522,7 @@
             "type": "integer"
           },
           "cases_with_output": {
-            "description": "Cases whose trace arrived.",
+            "description": "Cases whose trace arrived, or that have a stored conversation.",
             "type": "integer"
           },
           "cases_scored": {
@@ -5575,6 +5575,7 @@
               "required": [
                 "case_id",
                 "trace_id",
+                "conversation_id",
                 "scored_at",
                 "passed",
                 "checks",
@@ -5588,7 +5589,18 @@
                 "trace_id": {
                   "anyOf": [
                     {
-                      "description": "The case's output; NULL until it arrives.",
+                      "description": "The case's trace; NULL until it arrives, and for a case scored from a stored conversation.",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "conversation_id": {
+                  "anyOf": [
+                    {
+                      "description": "The conversation the case's conversation judges graded: the stored one the case names, or the conversation of its trace. NULL when no conversation judge has needed one.",
                       "type": "string"
                     },
                     {
@@ -11325,7 +11337,7 @@
           "tool": "create_judge",
           "toolset": "judges"
         },
-        "description": "Create an Agent judge (wire value `prompt`), a Code judge (wire value `custom`), a deterministic judge with categorical outputs, or an external judge with executionMode external and binary, numeric, or categorical outputs, with its initial production version. Deterministic judges require two outputs ordered match, then miss. This call fixes the judge type for its lifetime. Agent judges require prompt configuration; Code judges require a base64-encoded tar.gz bundle and Python entrypoint metadata.",
+        "description": "Create an Agent judge (wire value `prompt`), a Code judge (wire value `custom`), a deterministic judge with categorical outputs, or an external judge with executionMode external and binary, numeric, or categorical outputs, with its initial production version. Deterministic judges require two outputs ordered match, then miss. This call fixes the judge type for its lifetime. Agent judges require prompt configuration; Code judges take a base64-encoded tar.gz bundle with Python entrypoint metadata, or functionSource: one Python file defining judge(example).",
         "parameters": [
           {
             "name": "projectId",
@@ -11871,501 +11883,966 @@
                             "description": "Code judge (wire value `custom`)"
                           },
                           "initialVersion": {
-                            "type": "object",
-                            "properties": {
-                              "actionConfig": {
-                                "anyOf": [
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "action_groups": {
-                                        "type": "array",
-                                        "items": {
-                                          "type": "object",
-                                          "properties": {
-                                            "id": {
-                                              "type": "string",
-                                              "minLength": 1
-                                            },
-                                            "name": {
-                                              "type": "string",
-                                              "description": "Action group display name; an empty string uses Action group 1, 2, etc."
-                                            },
-                                            "enabled": {
-                                              "type": "boolean"
-                                            },
-                                            "environment_names": {
-                                              "type": "array",
-                                              "items": {
-                                                "type": "string"
-                                              },
-                                              "description": "Empty runs the group in every environment"
-                                            },
-                                            "when": {
-                                              "oneOf": [
-                                                {
-                                                  "type": "object",
-                                                  "properties": {
-                                                    "kind": {
-                                                      "type": "string",
-                                                      "const": "any"
-                                                    }
-                                                  },
-                                                  "required": ["kind"]
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "actionConfig": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "action_groups": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "id": {
+                                                  "type": "string",
+                                                  "minLength": 1
                                                 },
-                                                {
-                                                  "type": "object",
-                                                  "properties": {
-                                                    "kind": {
-                                                      "type": "string",
-                                                      "const": "binary"
-                                                    },
-                                                    "value": {
-                                                      "type": "boolean"
-                                                    }
-                                                  },
-                                                  "required": ["kind", "value"]
+                                                "name": {
+                                                  "type": "string",
+                                                  "description": "Action group display name; an empty string uses Action group 1, 2, etc."
                                                 },
-                                                {
-                                                  "type": "object",
-                                                  "properties": {
-                                                    "kind": {
-                                                      "type": "string",
-                                                      "const": "categorical"
-                                                    },
-                                                    "values": {
-                                                      "minItems": 1,
-                                                      "type": "array",
-                                                      "items": {
-                                                        "type": "string",
-                                                        "minLength": 1
-                                                      }
-                                                    }
-                                                  },
-                                                  "required": ["kind", "values"]
+                                                "enabled": {
+                                                  "type": "boolean"
                                                 },
-                                                {
-                                                  "type": "object",
-                                                  "properties": {
-                                                    "kind": {
-                                                      "type": "string",
-                                                      "const": "numeric"
+                                                "environment_names": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": "string"
+                                                  },
+                                                  "description": "Empty runs the group in every environment"
+                                                },
+                                                "when": {
+                                                  "oneOf": [
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "kind": {
+                                                          "type": "string",
+                                                          "const": "any"
+                                                        }
+                                                      },
+                                                      "required": ["kind"]
                                                     },
-                                                    "operator": {
-                                                      "type": "string",
-                                                      "enum": [
-                                                        "lt",
-                                                        "lte",
-                                                        "eq",
-                                                        "gte",
-                                                        "gt"
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "kind": {
+                                                          "type": "string",
+                                                          "const": "binary"
+                                                        },
+                                                        "value": {
+                                                          "type": "boolean"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "kind",
+                                                        "value"
                                                       ]
                                                     },
-                                                    "value": {
-                                                      "type": "number"
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "kind": {
+                                                          "type": "string",
+                                                          "const": "categorical"
+                                                        },
+                                                        "values": {
+                                                          "minItems": 1,
+                                                          "type": "array",
+                                                          "items": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          }
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "kind",
+                                                        "values"
+                                                      ]
+                                                    },
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "kind": {
+                                                          "type": "string",
+                                                          "const": "numeric"
+                                                        },
+                                                        "operator": {
+                                                          "type": "string",
+                                                          "enum": [
+                                                            "lt",
+                                                            "lte",
+                                                            "eq",
+                                                            "gte",
+                                                            "gt"
+                                                          ]
+                                                        },
+                                                        "value": {
+                                                          "type": "number"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "kind",
+                                                        "operator",
+                                                        "value"
+                                                      ]
+                                                    }
+                                                  ],
+                                                  "description": "Judge result that runs the group. Categorical groups run when the result is any listed output name."
+                                                },
+                                                "frequency": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "count": {
+                                                      "type": "integer",
+                                                      "minimum": 1,
+                                                      "maximum": 9007199254740991
+                                                    },
+                                                    "window_seconds": {
+                                                      "type": "integer",
+                                                      "minimum": 1,
+                                                      "maximum": 9007199254740991
                                                     }
                                                   },
                                                   "required": [
-                                                    "kind",
-                                                    "operator",
-                                                    "value"
+                                                    "count",
+                                                    "window_seconds"
                                                   ]
-                                                }
-                                              ],
-                                              "description": "Judge result that runs the group. Categorical groups run when the result is any listed output name."
-                                            },
-                                            "frequency": {
-                                              "type": "object",
-                                              "properties": {
-                                                "count": {
+                                                },
+                                                "cooldown_seconds": {
                                                   "type": "integer",
-                                                  "minimum": 1,
+                                                  "minimum": 0,
                                                   "maximum": 9007199254740991
                                                 },
-                                                "window_seconds": {
-                                                  "type": "integer",
-                                                  "minimum": 1,
-                                                  "maximum": 9007199254740991
+                                                "actions": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "oneOf": [
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "id": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          },
+                                                          "enabled": {
+                                                            "type": "boolean"
+                                                          },
+                                                          "type": {
+                                                            "type": "string",
+                                                            "const": "webhook"
+                                                          },
+                                                          "config": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "url": {
+                                                                "type": "string",
+                                                                "minLength": 1
+                                                              },
+                                                              "secret": {
+                                                                "type": "string",
+                                                                "minLength": 1
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "url",
+                                                              "secret"
+                                                            ]
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "id",
+                                                          "enabled",
+                                                          "type",
+                                                          "config"
+                                                        ],
+                                                        "description": "Signed HTTPS webhook; requires the automation_webhooks feature flag."
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "id": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          },
+                                                          "enabled": {
+                                                            "type": "boolean"
+                                                          },
+                                                          "type": {
+                                                            "type": "string",
+                                                            "const": "email"
+                                                          },
+                                                          "config": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "email_address": {
+                                                                "type": "string",
+                                                                "minLength": 1
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "email_address"
+                                                            ]
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "id",
+                                                          "enabled",
+                                                          "type",
+                                                          "config"
+                                                        ]
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "id": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          },
+                                                          "enabled": {
+                                                            "type": "boolean"
+                                                          },
+                                                          "type": {
+                                                            "type": "string",
+                                                            "const": "slack"
+                                                          },
+                                                          "config": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "team_id": {
+                                                                "type": "string",
+                                                                "minLength": 1
+                                                              },
+                                                              "channel_id": {
+                                                                "type": "string",
+                                                                "minLength": 1
+                                                              },
+                                                              "message": {
+                                                                "type": "string"
+                                                              },
+                                                              "custom_attribute_keys": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                  "type": "string",
+                                                                  "minLength": 1
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "id",
+                                                          "enabled",
+                                                          "type",
+                                                          "config"
+                                                        ]
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "id": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          },
+                                                          "enabled": {
+                                                            "type": "boolean"
+                                                          },
+                                                          "type": {
+                                                            "type": "string",
+                                                            "const": "dataset"
+                                                          },
+                                                          "config": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "dataset_id": {
+                                                                "type": "string",
+                                                                "minLength": 1
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "dataset_id"
+                                                            ]
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "id",
+                                                          "enabled",
+                                                          "type",
+                                                          "config"
+                                                        ]
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "id": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          },
+                                                          "enabled": {
+                                                            "type": "boolean"
+                                                          },
+                                                          "type": {
+                                                            "type": "string",
+                                                            "const": "run_behavior"
+                                                          },
+                                                          "config": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "judge_ids": {
+                                                                "minItems": 1,
+                                                                "type": "array",
+                                                                "items": {
+                                                                  "type": "string",
+                                                                  "minLength": 1
+                                                                }
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "judge_ids"
+                                                            ]
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "id",
+                                                          "enabled",
+                                                          "type",
+                                                          "config"
+                                                        ]
+                                                      }
+                                                    ]
+                                                  }
                                                 }
                                               },
                                               "required": [
-                                                "count",
-                                                "window_seconds"
+                                                "id",
+                                                "name",
+                                                "enabled",
+                                                "environment_names",
+                                                "when",
+                                                "frequency",
+                                                "cooldown_seconds",
+                                                "actions"
                                               ]
-                                            },
-                                            "cooldown_seconds": {
-                                              "type": "integer",
-                                              "minimum": 0,
-                                              "maximum": 9007199254740991
-                                            },
-                                            "actions": {
-                                              "type": "array",
-                                              "items": {
-                                                "oneOf": [
-                                                  {
-                                                    "type": "object",
-                                                    "properties": {
-                                                      "id": {
-                                                        "type": "string",
-                                                        "minLength": 1
-                                                      },
-                                                      "enabled": {
-                                                        "type": "boolean"
-                                                      },
-                                                      "type": {
-                                                        "type": "string",
-                                                        "const": "webhook"
-                                                      },
-                                                      "config": {
-                                                        "type": "object",
-                                                        "properties": {
-                                                          "url": {
-                                                            "type": "string",
-                                                            "minLength": 1
-                                                          },
-                                                          "secret": {
-                                                            "type": "string",
-                                                            "minLength": 1
-                                                          }
-                                                        },
-                                                        "required": [
-                                                          "url",
-                                                          "secret"
-                                                        ]
-                                                      }
-                                                    },
-                                                    "required": [
-                                                      "id",
-                                                      "enabled",
-                                                      "type",
-                                                      "config"
-                                                    ],
-                                                    "description": "Signed HTTPS webhook; requires the automation_webhooks feature flag."
-                                                  },
-                                                  {
-                                                    "type": "object",
-                                                    "properties": {
-                                                      "id": {
-                                                        "type": "string",
-                                                        "minLength": 1
-                                                      },
-                                                      "enabled": {
-                                                        "type": "boolean"
-                                                      },
-                                                      "type": {
-                                                        "type": "string",
-                                                        "const": "email"
-                                                      },
-                                                      "config": {
-                                                        "type": "object",
-                                                        "properties": {
-                                                          "email_address": {
-                                                            "type": "string",
-                                                            "minLength": 1
-                                                          }
-                                                        },
-                                                        "required": [
-                                                          "email_address"
-                                                        ]
-                                                      }
-                                                    },
-                                                    "required": [
-                                                      "id",
-                                                      "enabled",
-                                                      "type",
-                                                      "config"
-                                                    ]
-                                                  },
-                                                  {
-                                                    "type": "object",
-                                                    "properties": {
-                                                      "id": {
-                                                        "type": "string",
-                                                        "minLength": 1
-                                                      },
-                                                      "enabled": {
-                                                        "type": "boolean"
-                                                      },
-                                                      "type": {
-                                                        "type": "string",
-                                                        "const": "slack"
-                                                      },
-                                                      "config": {
-                                                        "type": "object",
-                                                        "properties": {
-                                                          "team_id": {
-                                                            "type": "string",
-                                                            "minLength": 1
-                                                          },
-                                                          "channel_id": {
-                                                            "type": "string",
-                                                            "minLength": 1
-                                                          },
-                                                          "message": {
-                                                            "type": "string"
-                                                          },
-                                                          "custom_attribute_keys": {
-                                                            "type": "array",
-                                                            "items": {
-                                                              "type": "string",
-                                                              "minLength": 1
-                                                            }
-                                                          }
-                                                        }
-                                                      }
-                                                    },
-                                                    "required": [
-                                                      "id",
-                                                      "enabled",
-                                                      "type",
-                                                      "config"
-                                                    ]
-                                                  },
-                                                  {
-                                                    "type": "object",
-                                                    "properties": {
-                                                      "id": {
-                                                        "type": "string",
-                                                        "minLength": 1
-                                                      },
-                                                      "enabled": {
-                                                        "type": "boolean"
-                                                      },
-                                                      "type": {
-                                                        "type": "string",
-                                                        "const": "dataset"
-                                                      },
-                                                      "config": {
-                                                        "type": "object",
-                                                        "properties": {
-                                                          "dataset_id": {
-                                                            "type": "string",
-                                                            "minLength": 1
-                                                          }
-                                                        },
-                                                        "required": [
-                                                          "dataset_id"
-                                                        ]
-                                                      }
-                                                    },
-                                                    "required": [
-                                                      "id",
-                                                      "enabled",
-                                                      "type",
-                                                      "config"
-                                                    ]
-                                                  },
-                                                  {
-                                                    "type": "object",
-                                                    "properties": {
-                                                      "id": {
-                                                        "type": "string",
-                                                        "minLength": 1
-                                                      },
-                                                      "enabled": {
-                                                        "type": "boolean"
-                                                      },
-                                                      "type": {
-                                                        "type": "string",
-                                                        "const": "run_behavior"
-                                                      },
-                                                      "config": {
-                                                        "type": "object",
-                                                        "properties": {
-                                                          "judge_ids": {
-                                                            "minItems": 1,
-                                                            "type": "array",
-                                                            "items": {
-                                                              "type": "string",
-                                                              "minLength": 1
-                                                            }
-                                                          }
-                                                        },
-                                                        "required": [
-                                                          "judge_ids"
-                                                        ]
-                                                      }
-                                                    },
-                                                    "required": [
-                                                      "id",
-                                                      "enabled",
-                                                      "type",
-                                                      "config"
-                                                    ]
-                                                  }
-                                                ]
-                                              }
                                             }
-                                          },
-                                          "required": [
-                                            "id",
-                                            "name",
-                                            "enabled",
-                                            "environment_names",
-                                            "when",
-                                            "frequency",
-                                            "cooldown_seconds",
-                                            "actions"
-                                          ]
-                                        }
-                                      }
-                                    },
-                                    "required": ["action_groups"]
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ]
-                              },
-                              "scoreType": {
-                                "type": "string",
-                                "const": "categorical"
-                              },
-                              "outputs": {
-                                "minItems": 2,
-                                "type": "array",
-                                "items": {
-                                  "type": "object",
-                                  "properties": {
-                                    "name": {
-                                      "type": "string"
-                                    },
-                                    "description": {
-                                      "type": "string"
-                                    }
-                                  },
-                                  "required": ["name", "description"]
-                                }
-                              },
-                              "advancedSettings": {
-                                "type": "object",
-                                "properties": {
-                                  "online_environment_names": {
-                                    "anyOf": [
-                                      {
-                                        "type": "array",
-                                        "items": {
-                                          "type": "string"
-                                        }
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
-                                    ],
-                                    "description": "null leaves on-demand evaluation unconfigured; online evaluation requires [] for All or selected names."
-                                  },
-                                  "online_evaluation_mode": {
-                                    "type": "string",
-                                    "enum": ["continuous", "on_demand"],
-                                    "description": "continuous checks new traces; on_demand checks only traces evaluations are requested on. Both apply environments, run conditions, and sampling."
-                                  },
-                                  "online_sampling_rate": {
-                                    "type": "number",
-                                    "minimum": 0,
-                                    "maximum": 100,
-                                    "description": "Percent of matching traces (or sessions, with session scoring on) scored, including evaluations requested on traces."
-                                  },
-                                  "online_span_triggers": {
-                                    "type": "object",
-                                    "properties": {
-                                      "kind": {
-                                        "type": "string",
-                                        "enum": ["and", "or"]
-                                      },
-                                      "conditions": {
-                                        "type": "array",
-                                        "items": {}
-                                      }
-                                    },
-                                    "required": ["kind", "conditions"]
-                                  },
-                                  "online_session_scoring": {
-                                    "type": "boolean"
-                                  },
-                                  "session_evaluation_count_enabled": {
-                                    "type": ["boolean", "null"]
-                                  },
-                                  "session_evaluation_idle_enabled": {
-                                    "type": ["boolean", "null"]
-                                  },
-                                  "session_evaluation_min_candidate_traces": {
-                                    "type": ["number", "null"]
-                                  },
-                                  "session_evaluation_max_wait_minutes": {
-                                    "anyOf": [
-                                      {
-                                        "type": "number",
-                                        "minimum": 1
+                                          }
+                                        },
+                                        "required": ["action_groups"]
                                       },
                                       {
                                         "type": "null"
                                       }
                                     ]
+                                  },
+                                  "scoreType": {
+                                    "type": "string",
+                                    "const": "categorical"
+                                  },
+                                  "outputs": {
+                                    "minItems": 2,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string"
+                                        },
+                                        "description": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": ["name", "description"]
+                                    }
+                                  },
+                                  "advancedSettings": {
+                                    "type": "object",
+                                    "properties": {
+                                      "online_environment_names": {
+                                        "anyOf": [
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "description": "null leaves on-demand evaluation unconfigured; online evaluation requires [] for All or selected names."
+                                      },
+                                      "online_evaluation_mode": {
+                                        "type": "string",
+                                        "enum": ["continuous", "on_demand"],
+                                        "description": "continuous checks new traces; on_demand checks only traces evaluations are requested on. Both apply environments, run conditions, and sampling."
+                                      },
+                                      "online_sampling_rate": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 100,
+                                        "description": "Percent of matching traces (or sessions, with session scoring on) scored, including evaluations requested on traces."
+                                      },
+                                      "online_span_triggers": {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["and", "or"]
+                                          },
+                                          "conditions": {
+                                            "type": "array",
+                                            "items": {}
+                                          }
+                                        },
+                                        "required": ["kind", "conditions"]
+                                      },
+                                      "online_session_scoring": {
+                                        "type": "boolean"
+                                      },
+                                      "session_evaluation_count_enabled": {
+                                        "type": ["boolean", "null"]
+                                      },
+                                      "session_evaluation_idle_enabled": {
+                                        "type": ["boolean", "null"]
+                                      },
+                                      "session_evaluation_min_candidate_traces": {
+                                        "type": ["number", "null"]
+                                      },
+                                      "session_evaluation_max_wait_minutes": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number",
+                                            "minimum": 1
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "online_environment_names",
+                                      "online_evaluation_mode",
+                                      "online_sampling_rate",
+                                      "online_span_triggers",
+                                      "online_session_scoring"
+                                    ]
+                                  }
+                                },
+                                "required": ["scoreType", "outputs"]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "actionConfig": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "action_groups": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "id": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "name": {
+                                                  "type": "string",
+                                                  "description": "Action group display name; an empty string uses Action group 1, 2, etc."
+                                                },
+                                                "enabled": {
+                                                  "type": "boolean"
+                                                },
+                                                "environment_names": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": "string"
+                                                  },
+                                                  "description": "Empty runs the group in every environment"
+                                                },
+                                                "when": {
+                                                  "oneOf": [
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "kind": {
+                                                          "type": "string",
+                                                          "const": "any"
+                                                        }
+                                                      },
+                                                      "required": ["kind"]
+                                                    },
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "kind": {
+                                                          "type": "string",
+                                                          "const": "binary"
+                                                        },
+                                                        "value": {
+                                                          "type": "boolean"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "kind",
+                                                        "value"
+                                                      ]
+                                                    },
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "kind": {
+                                                          "type": "string",
+                                                          "const": "categorical"
+                                                        },
+                                                        "values": {
+                                                          "minItems": 1,
+                                                          "type": "array",
+                                                          "items": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          }
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "kind",
+                                                        "values"
+                                                      ]
+                                                    },
+                                                    {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "kind": {
+                                                          "type": "string",
+                                                          "const": "numeric"
+                                                        },
+                                                        "operator": {
+                                                          "type": "string",
+                                                          "enum": [
+                                                            "lt",
+                                                            "lte",
+                                                            "eq",
+                                                            "gte",
+                                                            "gt"
+                                                          ]
+                                                        },
+                                                        "value": {
+                                                          "type": "number"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "kind",
+                                                        "operator",
+                                                        "value"
+                                                      ]
+                                                    }
+                                                  ],
+                                                  "description": "Judge result that runs the group. Categorical groups run when the result is any listed output name."
+                                                },
+                                                "frequency": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "count": {
+                                                      "type": "integer",
+                                                      "minimum": 1,
+                                                      "maximum": 9007199254740991
+                                                    },
+                                                    "window_seconds": {
+                                                      "type": "integer",
+                                                      "minimum": 1,
+                                                      "maximum": 9007199254740991
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "count",
+                                                    "window_seconds"
+                                                  ]
+                                                },
+                                                "cooldown_seconds": {
+                                                  "type": "integer",
+                                                  "minimum": 0,
+                                                  "maximum": 9007199254740991
+                                                },
+                                                "actions": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "oneOf": [
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "id": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          },
+                                                          "enabled": {
+                                                            "type": "boolean"
+                                                          },
+                                                          "type": {
+                                                            "type": "string",
+                                                            "const": "webhook"
+                                                          },
+                                                          "config": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "url": {
+                                                                "type": "string",
+                                                                "minLength": 1
+                                                              },
+                                                              "secret": {
+                                                                "type": "string",
+                                                                "minLength": 1
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "url",
+                                                              "secret"
+                                                            ]
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "id",
+                                                          "enabled",
+                                                          "type",
+                                                          "config"
+                                                        ],
+                                                        "description": "Signed HTTPS webhook; requires the automation_webhooks feature flag."
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "id": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          },
+                                                          "enabled": {
+                                                            "type": "boolean"
+                                                          },
+                                                          "type": {
+                                                            "type": "string",
+                                                            "const": "email"
+                                                          },
+                                                          "config": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "email_address": {
+                                                                "type": "string",
+                                                                "minLength": 1
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "email_address"
+                                                            ]
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "id",
+                                                          "enabled",
+                                                          "type",
+                                                          "config"
+                                                        ]
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "id": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          },
+                                                          "enabled": {
+                                                            "type": "boolean"
+                                                          },
+                                                          "type": {
+                                                            "type": "string",
+                                                            "const": "slack"
+                                                          },
+                                                          "config": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "team_id": {
+                                                                "type": "string",
+                                                                "minLength": 1
+                                                              },
+                                                              "channel_id": {
+                                                                "type": "string",
+                                                                "minLength": 1
+                                                              },
+                                                              "message": {
+                                                                "type": "string"
+                                                              },
+                                                              "custom_attribute_keys": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                  "type": "string",
+                                                                  "minLength": 1
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "id",
+                                                          "enabled",
+                                                          "type",
+                                                          "config"
+                                                        ]
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "id": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          },
+                                                          "enabled": {
+                                                            "type": "boolean"
+                                                          },
+                                                          "type": {
+                                                            "type": "string",
+                                                            "const": "dataset"
+                                                          },
+                                                          "config": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "dataset_id": {
+                                                                "type": "string",
+                                                                "minLength": 1
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "dataset_id"
+                                                            ]
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "id",
+                                                          "enabled",
+                                                          "type",
+                                                          "config"
+                                                        ]
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "id": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          },
+                                                          "enabled": {
+                                                            "type": "boolean"
+                                                          },
+                                                          "type": {
+                                                            "type": "string",
+                                                            "const": "run_behavior"
+                                                          },
+                                                          "config": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                              "judge_ids": {
+                                                                "minItems": 1,
+                                                                "type": "array",
+                                                                "items": {
+                                                                  "type": "string",
+                                                                  "minLength": 1
+                                                                }
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "judge_ids"
+                                                            ]
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "id",
+                                                          "enabled",
+                                                          "type",
+                                                          "config"
+                                                        ]
+                                                      }
+                                                    ]
+                                                  }
+                                                }
+                                              },
+                                              "required": [
+                                                "id",
+                                                "name",
+                                                "enabled",
+                                                "environment_names",
+                                                "when",
+                                                "frequency",
+                                                "cooldown_seconds",
+                                                "actions"
+                                              ]
+                                            }
+                                          }
+                                        },
+                                        "required": ["action_groups"]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "scoreType": {
+                                    "type": "string",
+                                    "enum": ["binary", "numeric"]
+                                  },
+                                  "advancedSettings": {
+                                    "type": "object",
+                                    "properties": {
+                                      "online_environment_names": {
+                                        "anyOf": [
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "description": "null leaves on-demand evaluation unconfigured; online evaluation requires [] for All or selected names."
+                                      },
+                                      "online_evaluation_mode": {
+                                        "type": "string",
+                                        "enum": ["continuous", "on_demand"],
+                                        "description": "continuous checks new traces; on_demand checks only traces evaluations are requested on. Both apply environments, run conditions, and sampling."
+                                      },
+                                      "online_sampling_rate": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 100,
+                                        "description": "Percent of matching traces (or sessions, with session scoring on) scored, including evaluations requested on traces."
+                                      },
+                                      "online_span_triggers": {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["and", "or"]
+                                          },
+                                          "conditions": {
+                                            "type": "array",
+                                            "items": {}
+                                          }
+                                        },
+                                        "required": ["kind", "conditions"]
+                                      },
+                                      "online_session_scoring": {
+                                        "type": "boolean"
+                                      },
+                                      "session_evaluation_count_enabled": {
+                                        "type": ["boolean", "null"]
+                                      },
+                                      "session_evaluation_idle_enabled": {
+                                        "type": ["boolean", "null"]
+                                      },
+                                      "session_evaluation_min_candidate_traces": {
+                                        "type": ["number", "null"]
+                                      },
+                                      "session_evaluation_max_wait_minutes": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number",
+                                            "minimum": 1
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "online_environment_names",
+                                      "online_evaluation_mode",
+                                      "online_sampling_rate",
+                                      "online_span_triggers",
+                                      "online_session_scoring"
+                                    ]
+                                  }
+                                },
+                                "required": ["scoreType"]
+                              }
+                            ],
+                            "description": "Categorical with at least two outputs. A function judge (config.functionSource) may instead be binary or numeric, with no outputs."
+                          },
+                          "config": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "bundleBase64": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 1398104,
+                                    "description": "Base64-encoded tar.gz bundle. Decoded size must be at most 1 MiB."
+                                  },
+                                  "entrypointPath": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "description": "Path to the Python entrypoint inside the tar.gz bundle"
+                                  },
+                                  "requirementsPath": {
+                                    "description": "Optional requirements file path inside the bundle",
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "className": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "description": "Python scorer class name exported by the entrypoint"
+                                  },
+                                  "scorerType": {
+                                    "description": "Input format expected by the Code judge. Defaults to 'example'.",
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "enum": ["example", "trace"]
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "sdkVersion": {
+                                    "default": 4,
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991,
+                                    "description": "judgeval SDK major version targeted by the Code judge"
+                                  },
+                                  "description": {
+                                    "description": "Description stored on the Code judge version",
+                                    "type": ["string", "null"]
                                   }
                                 },
                                 "required": [
-                                  "online_environment_names",
-                                  "online_evaluation_mode",
-                                  "online_sampling_rate",
-                                  "online_span_triggers",
-                                  "online_session_scoring"
+                                  "bundleBase64",
+                                  "entrypointPath",
+                                  "className"
                                 ]
-                              }
-                            },
-                            "required": ["scoreType", "outputs"]
-                          },
-                          "config": {
-                            "type": "object",
-                            "properties": {
-                              "bundleBase64": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 1398104,
-                                "description": "Base64-encoded tar.gz bundle. Decoded size must be at most 1 MiB."
                               },
-                              "entrypointPath": {
-                                "type": "string",
-                                "minLength": 1,
-                                "description": "Path to the Python entrypoint inside the tar.gz bundle"
-                              },
-                              "requirementsPath": {
-                                "description": "Optional requirements file path inside the bundle",
-                                "type": "string",
-                                "minLength": 1
-                              },
-                              "className": {
-                                "type": "string",
-                                "minLength": 1,
-                                "description": "Python scorer class name exported by the entrypoint"
-                              },
-                              "scorerType": {
-                                "description": "Input format expected by the Code judge. Defaults to 'example'.",
-                                "anyOf": [
-                                  {
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "functionSource": {
                                     "type": "string",
-                                    "enum": ["example", "trace"]
+                                    "minLength": 1,
+                                    "maxLength": 1048576,
+                                    "description": "One Python file defining judge(example), run in Monty. example holds the example's fields and example['trace']['spans']. Return a value matching the judge's outputs, or a dict with value and optional reason. No classes with inheritance, del, or third-party packages; it is checked at upload."
                                   },
-                                  {
-                                    "type": "null"
+                                  "description": {
+                                    "description": "Description stored on the Code judge version",
+                                    "type": ["string", "null"]
                                   }
-                                ]
-                              },
-                              "sdkVersion": {
-                                "default": 4,
-                                "type": "integer",
-                                "exclusiveMinimum": 0,
-                                "maximum": 9007199254740991,
-                                "description": "judgeval SDK major version targeted by the Code judge"
-                              },
-                              "description": {
-                                "description": "Description stored on the Code judge version",
-                                "type": ["string", "null"]
+                                },
+                                "required": ["functionSource"]
                               }
-                            },
-                            "required": [
-                              "bundleBase64",
-                              "entrypointPath",
-                              "className"
                             ]
                           }
                         },
@@ -12975,7 +13452,7 @@
           "tool": "update_judge",
           "toolset": "judges"
         },
-        "description": "Update a judge description and/or create one complete immutable judge version. A new version requires an explicit target version, the existing judge and score types, a complete implementation config, outputs, and monitoring-settings snapshot. Categorical outputs may reference existing labels by ID or define new labels. Code judge versions take a base64-encoded tar.gz bundle, or a sourceVersion whose stored code to reuse. Alternatively, newVersionFromSource copies sourceVersion and changes only the fields you set. Set promoteToProduction to make the new version production; latest is inferred automatically. Judge and score types cannot change.",
+        "description": "Update a judge description and/or create one complete immutable judge version. A new version requires an explicit target version, the existing judge and score types, a complete implementation config, outputs, and monitoring-settings snapshot. Categorical outputs may reference existing labels by ID or define new labels. Code judge versions take a base64-encoded tar.gz bundle, functionSource (one Python file defining judge(example)), or a sourceVersion whose stored code to reuse. Alternatively, newVersionFromSource copies sourceVersion and changes only the fields you set. Set promoteToProduction to make the new version production; latest is inferred automatically. Judge and score types cannot change.",
         "parameters": [
           {
             "name": "projectId",
@@ -15045,57 +15522,77 @@
                                   "config": {
                                     "anyOf": [
                                       {
-                                        "type": "object",
-                                        "properties": {
-                                          "bundleBase64": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "maxLength": 1398104,
-                                            "description": "Base64-encoded tar.gz bundle. Decoded size must be at most 1 MiB."
-                                          },
-                                          "entrypointPath": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "description": "Path to the Python entrypoint inside the tar.gz bundle"
-                                          },
-                                          "requirementsPath": {
-                                            "description": "Optional requirements file path inside the bundle",
-                                            "type": "string",
-                                            "minLength": 1
-                                          },
-                                          "className": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "description": "Python scorer class name exported by the entrypoint"
-                                          },
-                                          "scorerType": {
-                                            "description": "Input format expected by the Code judge. Defaults to 'example'.",
-                                            "anyOf": [
-                                              {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "bundleBase64": {
                                                 "type": "string",
-                                                "enum": ["example", "trace"]
+                                                "minLength": 1,
+                                                "maxLength": 1398104,
+                                                "description": "Base64-encoded tar.gz bundle. Decoded size must be at most 1 MiB."
                                               },
-                                              {
-                                                "type": "null"
+                                              "entrypointPath": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "Path to the Python entrypoint inside the tar.gz bundle"
+                                              },
+                                              "requirementsPath": {
+                                                "description": "Optional requirements file path inside the bundle",
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "className": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "Python scorer class name exported by the entrypoint"
+                                              },
+                                              "scorerType": {
+                                                "description": "Input format expected by the Code judge. Defaults to 'example'.",
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string",
+                                                    "enum": ["example", "trace"]
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
+                                              },
+                                              "sdkVersion": {
+                                                "default": 4,
+                                                "type": "integer",
+                                                "exclusiveMinimum": 0,
+                                                "maximum": 9007199254740991,
+                                                "description": "judgeval SDK major version targeted by the Code judge"
+                                              },
+                                              "description": {
+                                                "description": "Description stored on the Code judge version",
+                                                "type": ["string", "null"]
                                               }
+                                            },
+                                            "required": [
+                                              "bundleBase64",
+                                              "entrypointPath",
+                                              "className"
                                             ]
                                           },
-                                          "sdkVersion": {
-                                            "default": 4,
-                                            "type": "integer",
-                                            "exclusiveMinimum": 0,
-                                            "maximum": 9007199254740991,
-                                            "description": "judgeval SDK major version targeted by the Code judge"
-                                          },
-                                          "description": {
-                                            "description": "Description stored on the Code judge version",
-                                            "type": ["string", "null"]
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "functionSource": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 1048576,
+                                                "description": "One Python file defining judge(example), run in Monty. example holds the example's fields and example['trace']['spans']. Return a value matching the judge's outputs, or a dict with value and optional reason. No classes with inheritance, del, or third-party packages; it is checked at upload."
+                                              },
+                                              "description": {
+                                                "description": "Description stored on the Code judge version",
+                                                "type": ["string", "null"]
+                                              }
+                                            },
+                                            "required": ["functionSource"]
                                           }
-                                        },
-                                        "required": [
-                                          "bundleBase64",
-                                          "entrypointPath",
-                                          "className"
                                         ]
                                       },
                                       {
@@ -15598,57 +16095,77 @@
                                   "config": {
                                     "anyOf": [
                                       {
-                                        "type": "object",
-                                        "properties": {
-                                          "bundleBase64": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "maxLength": 1398104,
-                                            "description": "Base64-encoded tar.gz bundle. Decoded size must be at most 1 MiB."
-                                          },
-                                          "entrypointPath": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "description": "Path to the Python entrypoint inside the tar.gz bundle"
-                                          },
-                                          "requirementsPath": {
-                                            "description": "Optional requirements file path inside the bundle",
-                                            "type": "string",
-                                            "minLength": 1
-                                          },
-                                          "className": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "description": "Python scorer class name exported by the entrypoint"
-                                          },
-                                          "scorerType": {
-                                            "description": "Input format expected by the Code judge. Defaults to 'example'.",
-                                            "anyOf": [
-                                              {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "bundleBase64": {
                                                 "type": "string",
-                                                "enum": ["example", "trace"]
+                                                "minLength": 1,
+                                                "maxLength": 1398104,
+                                                "description": "Base64-encoded tar.gz bundle. Decoded size must be at most 1 MiB."
                                               },
-                                              {
-                                                "type": "null"
+                                              "entrypointPath": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "Path to the Python entrypoint inside the tar.gz bundle"
+                                              },
+                                              "requirementsPath": {
+                                                "description": "Optional requirements file path inside the bundle",
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "className": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "Python scorer class name exported by the entrypoint"
+                                              },
+                                              "scorerType": {
+                                                "description": "Input format expected by the Code judge. Defaults to 'example'.",
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string",
+                                                    "enum": ["example", "trace"]
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
+                                              },
+                                              "sdkVersion": {
+                                                "default": 4,
+                                                "type": "integer",
+                                                "exclusiveMinimum": 0,
+                                                "maximum": 9007199254740991,
+                                                "description": "judgeval SDK major version targeted by the Code judge"
+                                              },
+                                              "description": {
+                                                "description": "Description stored on the Code judge version",
+                                                "type": ["string", "null"]
                                               }
+                                            },
+                                            "required": [
+                                              "bundleBase64",
+                                              "entrypointPath",
+                                              "className"
                                             ]
                                           },
-                                          "sdkVersion": {
-                                            "default": 4,
-                                            "type": "integer",
-                                            "exclusiveMinimum": 0,
-                                            "maximum": 9007199254740991,
-                                            "description": "judgeval SDK major version targeted by the Code judge"
-                                          },
-                                          "description": {
-                                            "description": "Description stored on the Code judge version",
-                                            "type": ["string", "null"]
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "functionSource": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 1048576,
+                                                "description": "One Python file defining judge(example), run in Monty. example holds the example's fields and example['trace']['spans']. Return a value matching the judge's outputs, or a dict with value and optional reason. No classes with inheritance, del, or third-party packages; it is checked at upload."
+                                              },
+                                              "description": {
+                                                "description": "Description stored on the Code judge version",
+                                                "type": ["string", "null"]
+                                              }
+                                            },
+                                            "required": ["functionSource"]
                                           }
-                                        },
-                                        "required": [
-                                          "bundleBase64",
-                                          "entrypointPath",
-                                          "className"
                                         ]
                                       },
                                       {
@@ -16151,57 +16668,77 @@
                                   "config": {
                                     "anyOf": [
                                       {
-                                        "type": "object",
-                                        "properties": {
-                                          "bundleBase64": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "maxLength": 1398104,
-                                            "description": "Base64-encoded tar.gz bundle. Decoded size must be at most 1 MiB."
-                                          },
-                                          "entrypointPath": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "description": "Path to the Python entrypoint inside the tar.gz bundle"
-                                          },
-                                          "requirementsPath": {
-                                            "description": "Optional requirements file path inside the bundle",
-                                            "type": "string",
-                                            "minLength": 1
-                                          },
-                                          "className": {
-                                            "type": "string",
-                                            "minLength": 1,
-                                            "description": "Python scorer class name exported by the entrypoint"
-                                          },
-                                          "scorerType": {
-                                            "description": "Input format expected by the Code judge. Defaults to 'example'.",
-                                            "anyOf": [
-                                              {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "bundleBase64": {
                                                 "type": "string",
-                                                "enum": ["example", "trace"]
+                                                "minLength": 1,
+                                                "maxLength": 1398104,
+                                                "description": "Base64-encoded tar.gz bundle. Decoded size must be at most 1 MiB."
                                               },
-                                              {
-                                                "type": "null"
+                                              "entrypointPath": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "Path to the Python entrypoint inside the tar.gz bundle"
+                                              },
+                                              "requirementsPath": {
+                                                "description": "Optional requirements file path inside the bundle",
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "className": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "description": "Python scorer class name exported by the entrypoint"
+                                              },
+                                              "scorerType": {
+                                                "description": "Input format expected by the Code judge. Defaults to 'example'.",
+                                                "anyOf": [
+                                                  {
+                                                    "type": "string",
+                                                    "enum": ["example", "trace"]
+                                                  },
+                                                  {
+                                                    "type": "null"
+                                                  }
+                                                ]
+                                              },
+                                              "sdkVersion": {
+                                                "default": 4,
+                                                "type": "integer",
+                                                "exclusiveMinimum": 0,
+                                                "maximum": 9007199254740991,
+                                                "description": "judgeval SDK major version targeted by the Code judge"
+                                              },
+                                              "description": {
+                                                "description": "Description stored on the Code judge version",
+                                                "type": ["string", "null"]
                                               }
+                                            },
+                                            "required": [
+                                              "bundleBase64",
+                                              "entrypointPath",
+                                              "className"
                                             ]
                                           },
-                                          "sdkVersion": {
-                                            "default": 4,
-                                            "type": "integer",
-                                            "exclusiveMinimum": 0,
-                                            "maximum": 9007199254740991,
-                                            "description": "judgeval SDK major version targeted by the Code judge"
-                                          },
-                                          "description": {
-                                            "description": "Description stored on the Code judge version",
-                                            "type": ["string", "null"]
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "functionSource": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 1048576,
+                                                "description": "One Python file defining judge(example), run in Monty. example holds the example's fields and example['trace']['spans']. Return a value matching the judge's outputs, or a dict with value and optional reason. No classes with inheritance, del, or third-party packages; it is checked at upload."
+                                              },
+                                              "description": {
+                                                "description": "Description stored on the Code judge version",
+                                                "type": ["string", "null"]
+                                              }
+                                            },
+                                            "required": ["functionSource"]
                                           }
-                                        },
-                                        "required": [
-                                          "bundleBase64",
-                                          "entrypointPath",
-                                          "className"
                                         ]
                                       },
                                       {
@@ -17449,7 +17986,7 @@
                             }
                           },
                           "config": {
-                            "description": "Only the fields to change, from the judge type's fields: prompt, description, reasoningLevel, minScore, maxScore for Agent judges; expression for deterministic judges. Code judges: omit to reuse the stored bundle; to upload new code, set bundleBase64, entrypointPath, and className.",
+                            "description": "Only the fields to change, from the judge type's fields: prompt, description, reasoningLevel, minScore, maxScore for Agent judges; expression for deterministic judges. Code judges: omit to reuse the stored code; to upload new code, set functionSource, or bundleBase64, entrypointPath, and className.",
                             "type": "object",
                             "properties": {
                               "prompt": {
@@ -17505,6 +18042,12 @@
                                 "exclusiveMinimum": 0,
                                 "maximum": 9007199254740991,
                                 "description": "judgeval SDK major version targeted by the Code judge"
+                              },
+                              "functionSource": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 1048576,
+                                "description": "One Python file defining judge(example), run in Monty. example holds the example's fields and example['trace']['spans']. Return a value matching the judge's outputs, or a dict with value and optional reason. No classes with inheritance, del, or third-party packages; it is checked at upload."
                               },
                               "expression": {}
                             }
@@ -19230,6 +19773,10 @@
                                 "sdk_version": {
                                   "type": "number"
                                 },
+                                "function_source": {
+                                  "description": "A function judge's Python source, defining judge(example); null for a class judge.",
+                                  "type": ["string", "null"]
+                                },
                                 "code_url": {
                                   "description": "Presigned tar.gz bundle URL, present only when include_code_url is true. Download promptly; the URL lasts at most 55 minutes. Extract the archive to read individual source files.",
                                   "type": "string",
@@ -19243,7 +19790,8 @@
                                 "entrypoint_path",
                                 "requirements_path",
                                 "scorer_type",
-                                "sdk_version"
+                                "sdk_version",
+                                "function_source"
                               ]
                             }
                           },

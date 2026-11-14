@@ -1853,7 +1853,7 @@ requires-dist = [
     { name = "orjson", specifier = ">=3.9.0" },
     { name = "packaging", specifier = ">=25.0" },
     { name = "pathspec", specifier = ">=1.0.4" },
-    { name = "pydantic-monty", marker = "extra == 'monty'", specifier = ">=1.6.0" },
+    { name = "pydantic-monty", marker = "extra == 'monty'", specifier = "==1.6.0" },
     { name = "requests", specifier = ">=2.0" },
     { name = "typer", specifier = ">=0.9.0" },
 ]
@@ -1873,7 +1873,7 @@ dev = [
     { name = "openai", specifier = ">=1.92.0" },
     { name = "opentelemetry-instrumentation-openai", specifier = ">=0.44.1" },
     { name = "pre-commit", specifier = ">=4.2.0" },
-    { name = "pydantic-monty", specifier = ">=1.6.0" },
+    { name = "pydantic-monty", specifier = "==1.6.0" },
     { name = "pytest", specifier = ">=8.4.1" },
     { name = "pytest-asyncio", specifier = ">=1.1.0" },
     { name = "pytest-cov", specifier = ">=6.2.1" },
