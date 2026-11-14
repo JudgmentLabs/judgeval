@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import atexit
-import copy
+import json
 from datetime import datetime, timezone
 from typing import ClassVar, Optional
 
@@ -155,8 +155,10 @@ class Trajectory:
             return
         sent: IngestObservationsRequestObservation = {
             # Sent later, so copy it: changes the caller makes afterwards, such
-            # as appending to a shared message history, are not sent.
-            "observation": copy.deepcopy(observation),
+            # as appending to a shared message history, are not sent. Copying
+            # through JSON also fails here, for this call only, on a value
+            # JSON cannot hold, such as NaN or a datetime.
+            "observation": json.loads(json.dumps(observation, allow_nan=False)),
             "observed_at": (observed_at or datetime.now(timezone.utc))
             .astimezone(timezone.utc)
             .isoformat(),

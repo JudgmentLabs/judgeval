@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any, Callable, Optional
 
 import httpx
@@ -99,41 +100,60 @@ def test_does_not_retry_a_request_the_server_will_not_accept(waits, status):
     assert (fake.attempts, waits) == (1, [])
 
 
-def test_one_observation_that_does_not_fit_the_format_does_not_drop_the_others(waits):
-    def reject_bad(batch: list[Any]) -> None:
-        if any(item["observation"]["conversation_id"] == "bad" for item in batch):
-            raise api_error(400)
-
-    fake = FakeClient(reject_bad)
-    export(fake, [sent(name) for name in ["a", "bad", "b", "c"]])
-    stored = sorted(
-        item["observation"]["conversation_id"]
-        for batch in fake.batches
-        for item in batch
+def rejection(*paths: list[Any]) -> JudgmentAPIError:
+    """A 400 as the observations route sends it, with one issue per path."""
+    issues = [{"path": path, "message": "Invalid input"} for path in paths]
+    return JudgmentAPIError(
+        400, json.dumps({"errors": issues, "found": "the request"}), None
     )
-    assert stored == ["a", "b", "c"]
 
 
-def test_an_observation_json_cannot_hold_does_not_drop_the_others(waits):
-    def encode(batch: list[Any]) -> None:
-        if any(item["observation"]["conversation_id"] == "bad" for item in batch):
-            raise ValueError("Out of range float values are not JSON compliant")
+def reject_named(*names: str) -> Callable[[list[Any]], None]:
+    """Rejects a batch that holds any of `names`, naming each by position."""
 
-    fake = FakeClient(encode)
-    export(fake, [sent(name) for name in ["a", "bad", "b", "c"]])
-    stored = sorted(
-        item["observation"]["conversation_id"]
-        for batch in fake.batches
-        for item in batch
+    def respond(batch: list[Any]) -> None:
+        paths = [
+            ["observations", index, "input"]
+            for index, item in enumerate(batch)
+            if item["observation"]["conversation_id"] in names
+        ]
+        if paths:
+            raise rejection(*paths)
+
+    return respond
+
+
+def test_drops_only_the_observations_the_server_names(waits):
+    # In both halves, which a binary search could not tell from a fault in
+    # the request as a whole.
+    fake = FakeClient(reject_named("bad-1", "bad-2"))
+    batch = [sent(name) for name in ["bad-1", "a", "b", "c", "d", "bad-2"]]
+    export(fake, batch)
+    assert (fake.attempts, fake.batches) == (
+        2,
+        [[sent(name) for name in ["a", "b", "c", "d"]]],
     )
-    assert (stored, waits) == (["a", "b", "c"], [])
 
 
-def test_a_request_the_server_rejects_whole_is_dropped_after_one_split(waits):
-    # For example, a clock more than five minutes fast.
+def test_logs_each_issue_without_the_echoed_request(waits, caplog):
+    export(FakeClient(reject_named("bad")), [sent("a"), sent("bad")])
+    assert "observations.1.input: Invalid input" in caplog.text
+    assert "the request" not in caplog.text
+
+
+def test_drops_a_batch_the_server_rejects_without_naming_an_observation(waits):
     def reject(batch: list[Any]) -> None:
-        raise api_error(400)
+        raise rejection(["observations"])
 
     fake = FakeClient(reject)
     export(fake, [sent(str(index)) for index in range(100)])
-    assert (fake.attempts, fake.batches) == (3, [])
+    assert (fake.attempts, fake.batches) == (1, [])
+
+
+def test_drops_a_batch_that_cannot_be_encoded(waits):
+    def encode(batch: list[Any]) -> None:
+        raise ValueError("Out of range float values are not JSON compliant")
+
+    fake = FakeClient(encode)
+    export(fake, [sent("a"), sent("b")])
+    assert (fake.attempts, fake.batches, waits) == (1, [], [])

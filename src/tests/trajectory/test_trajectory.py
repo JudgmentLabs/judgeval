@@ -83,6 +83,15 @@ def test_sends_the_call_as_it_was_when_recorded():
     assert len(processor.emitted[0]["observation"]["input"]) == 1
 
 
+def test_a_value_json_cannot_hold_fails_only_its_own_call():
+    processor = use()
+    Trajectory.record({**call("nan"), "metadata": {"score": float("nan")}})
+    Trajectory.record(call("ok"))
+    assert [item["observation"]["conversation_id"] for item in processor.emitted] == [
+        "ok"
+    ]
+
+
 def test_recording_before_init_does_nothing():
     Trajectory.record(call())
     assert Trajectory.flush()

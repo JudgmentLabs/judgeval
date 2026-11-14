@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 from typing import Optional
 
@@ -14,6 +15,8 @@ from judgeval.logger import judgeval_logger
 MAX_ATTEMPTS = 3
 # The longest wait between attempts, whatever the server's Retry-After says.
 MAX_BACKOFF_SECONDS = 30
+# The longest rejection reason logged.
+MAX_REASON_LENGTH = 2000
 
 
 def _is_retryable(status: int) -> bool:
@@ -29,6 +32,34 @@ def _backoff(attempt: int, retry_after_seconds: Optional[int]) -> None:
     time.sleep(max(min(2**attempt, MAX_BACKOFF_SECONDS), retry_after))
 
 
+def _read_rejection(detail: str, count: int) -> tuple[set[int], str]:
+    """Reads a 400 from the observations route: the positions of the
+    observations it names, and a reason to log. Each validation issue has a
+    path such as ``["observations", 3, "input", 0, "role"]``. The positions
+    are empty when no issue names an observation, as when the request as a
+    whole is malformed or the detail is not in this format. The reason lists
+    each issue by path and leaves out the echoed request, which holds the
+    caller's conversation content."""
+    try:
+        issues = json.loads(detail)["errors"]
+        paths = [issue["path"] for issue in issues]
+        reason = "; ".join(
+            f"{'.'.join(map(str, issue['path']))}: {issue['message']}"
+            for issue in issues
+        )
+    except Exception:
+        return set(), detail[:MAX_REASON_LENGTH]
+    invalid = {
+        path[1]
+        for path in paths
+        if len(path) > 1
+        and path[0] == "observations"
+        and type(path[1]) is int
+        and 0 <= path[1] < count
+    }
+    return invalid, reason[:MAX_REASON_LENGTH]
+
+
 class ObservationExporter:
     """Sends one batch of observations to Judgment. Never raises: a batch
     that cannot be stored is logged and dropped."""
@@ -42,35 +73,24 @@ class ObservationExporter:
         rejection = self._send(batch)
         if rejection is None:
             return
-        if len(batch) > 1:
-            self._drop_invalid(batch)
-        else:
-            self._log_dropped(1, rejection)
-
-    def _drop_invalid(self, batch: list[IngestObservationsRequestObservation]) -> None:
-        """The server rejects a request when any observation in it does not
-        fit the format; this finds which by halving the batch. When both
-        halves are rejected, the fault is most likely in the request as a
-        whole, such as a clock more than five minutes fast, so the batch is
-        dropped rather than split further."""
-        middle = len(batch) // 2
-        halves = (batch[:middle], batch[middle:])
-        rejections = [self._send(half) for half in halves]
-        if rejections[0] is not None and rejections[1] is not None:
-            self._log_dropped(len(batch), rejections[0])
+        invalid, reason = _read_rejection(rejection, len(batch))
+        if not invalid:
+            self._log_dropped(len(batch), reason)
             return
-        for half, rejection in zip(halves, rejections):
-            if rejection is None:
-                continue
-            if len(half) > 1:
-                self._drop_invalid(half)
-            else:
-                self._log_dropped(1, rejection)
+        # The server stores nothing from a rejected request, so the
+        # observations it did not name are sent again, once.
+        self._log_dropped(len(invalid), reason)
+        rest = [item for index, item in enumerate(batch) if index not in invalid]
+        if not rest:
+            return
+        rejection = self._send(rest)
+        if rejection is not None:
+            self._log_dropped(len(rest), _read_rejection(rejection, len(rest))[1])
 
     def _send(self, batch: list[IngestObservationsRequestObservation]) -> Optional[str]:
-        """Sends a batch, retrying temporary failures. Returns the reason when
-        the batch is invalid: the server rejects it (400), or it holds a value
-        JSON cannot represent, such as NaN. Handles every other outcome."""
+        """Sends a batch, retrying temporary failures. Returns the server's
+        detail when it rejects the batch as invalid (400), or the error when
+        the batch cannot be encoded. Handles every other outcome."""
         for attempt in range(MAX_ATTEMPTS):
             try:
                 self._client.post_projects_observations(
@@ -80,7 +100,7 @@ class ObservationExporter:
             except JudgmentAPIError as error:
                 status = error.status_code
                 if status == 400:
-                    return f"{status} {error.detail}"
+                    return error.detail
                 if status in (402, 404):
                     self._report_once(status)
                     return None
