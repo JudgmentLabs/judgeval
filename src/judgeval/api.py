@@ -13,9 +13,9 @@ from judgeval.internal.api.models import (
     AddProjectResponse,
     AddTestCasesRequest,
     AddTestCasesResponse,
+    AddTraceTagsRequest,
+    AddTraceTagsResponse,
     CancelTestRunResponse,
-    CreateArtifactRequest,
-    CreateArtifactResponse,
     CreateIssueRequest,
     CreateIssueResponse,
     CreateJudgeRequest,
@@ -24,10 +24,12 @@ from judgeval.internal.api.models import (
     CreateMapperResponse,
     CreateOfflineDatasetRequest,
     CreateOfflineDatasetResponse,
+    CreatePreprocessingScriptRequest,
+    CreatePreprocessingScriptResponse,
+    CreatePreprocessingScriptVersionRequest,
+    CreatePreprocessingScriptVersionResponse,
     CreateScheduledTaskRequest,
     CreateScheduledTaskResponse,
-    CreateSupabaseArtifactRevisionRequest,
-    CreateSupabaseArtifactRevisionResponse,
     CreateTestConfigRequest,
     CreateTestRunRequest,
     CreateTestSuiteDraftResponse,
@@ -42,13 +44,13 @@ from judgeval.internal.api.models import (
     EvaluateAllTracesResponse,
     EvaluateTracesRequest,
     EvaluateTracesResponse,
-    GetArtifactRevisionResponse,
     GetConversationDisplayRulesResponse,
     GetIssueResponse,
     GetJudgeLabelResponse,
     GetJudgeRequest,
     GetJudgeResponse,
     GetMapperResponse,
+    GetPreprocessingScriptVersionResponse,
     GetScheduledTaskResponse,
     GetTraceHealthResponse,
     GetTraceHealthSummaryResponse,
@@ -58,7 +60,6 @@ from judgeval.internal.api.models import (
     ListJudgesResponse,
     ListMappersResponse,
     ListMemoryEntriesResponse,
-    ListOrganizationsResponse,
     ListProjectsResponse,
     ListScheduledTasksResponse,
     ListTestCasesResponse,
@@ -84,20 +85,21 @@ from judgeval.internal.api.models import (
     SetConversationDisplayRulesResponse,
     SetJudgeActionGroupsRequest,
     SetJudgeActionGroupsResponse,
-    SetJudgeOptimisticEvalEnabledRequest,
-    SetJudgeOptimisticEvalEnabledResponse,
-    SetJudgePreprocessorArtifactRevisionRequest,
-    SetJudgePreprocessorArtifactRevisionResponse,
+    SetJudgeJevOptimizationEnabledRequest,
+    SetJudgeJevOptimizationEnabledResponse,
+    SetJudgePreprocessingScriptRequest,
+    SetJudgePreprocessingScriptResponse,
     StartTestRunRequest,
     StartTestRunResponse,
     TestCaseInput,
     TestConfigResponse,
     TestConfigsResponse,
-    TestOptimisticEvalCandidateRequest,
-    TestOptimisticEvalCandidateResponse,
-    TestPreprocessingCandidateRequest,
-    TestPreprocessingCandidateResponse,
+    TestJevOptimizationCandidateRequest,
+    TestJevOptimizationCandidateResponse,
+    TestPreprocessingScriptCandidateRequest,
+    TestPreprocessingScriptCandidateResponse,
     TestResultsResponse,
+    TestRun,
     TestRunItemsResponse,
     TestRunResponse,
     TestRunsResponse,
@@ -155,21 +157,6 @@ class JudgmentApiClient(JudgmentSyncClient):
 
     __slots__ = ()
 
-    def list_organizations(self) -> ListOrganizationsResponse:
-        """List organization memberships (`GET /v1/organizations/memberships`).
-
-        Examples:
-            ```python
-            client.api.list_organizations()
-            ```
-        """
-        return self._request(
-            "GET",
-            url_for("/v1/organizations/memberships", self.base_url),
-            {},
-            None,
-        )
-
     def create_project(self, payload: AddProjectRequest) -> AddProjectResponse:
         """Add new project (`POST /v1/projects`).
 
@@ -185,19 +172,19 @@ class JudgmentApiClient(JudgmentSyncClient):
             None,
         )
 
-    def get_artifact_revision(
+    def get_preprocessing_script_version(
         self,
         project_id: str,
         *,
         revision_id: str | None = None,
         artifact_id: str | None = None,
         version: int | None = None,
-    ) -> GetArtifactRevisionResponse:
+    ) -> GetPreprocessingScriptVersionResponse:
         """Get artifact revision (`GET /v1/projects/{projectId}/artifact-revisions`).
 
         Examples:
             ```python
-            client.api.get_artifact_revision(project_id)
+            client.api.get_preprocessing_script_version(project_id)
             ```
         """
         return self._request(
@@ -216,14 +203,14 @@ class JudgmentApiClient(JudgmentSyncClient):
             ),
         )
 
-    def create_artifact(
-        self, project_id: str, payload: CreateArtifactRequest
-    ) -> CreateArtifactResponse:
+    def create_preprocessing_script(
+        self, project_id: str, payload: CreatePreprocessingScriptRequest
+    ) -> CreatePreprocessingScriptResponse:
         """Create artifact (`POST /v1/projects/{projectId}/artifacts`).
 
         Examples:
             ```python
-            client.api.create_artifact(project_id, {"scope": ..., "name": ..., "filename": ..., "source_code": ...})
+            client.api.create_preprocessing_script(project_id, {"scope": ..., "name": ..., "filename": ..., "source_code": ...})
             ```
         """
         return self._request(
@@ -236,17 +223,17 @@ class JudgmentApiClient(JudgmentSyncClient):
             None,
         )
 
-    def create_supabase_artifact_revision(
+    def create_preprocessing_script_version(
         self,
         project_id: str,
         artifact_id: str,
-        payload: CreateSupabaseArtifactRevisionRequest,
-    ) -> CreateSupabaseArtifactRevisionResponse:
+        payload: CreatePreprocessingScriptVersionRequest,
+    ) -> CreatePreprocessingScriptVersionResponse:
         """Create artifact revision (`POST /v1/projects/{projectId}/artifacts/{artifactId}/revisions`).
 
         Examples:
             ```python
-            client.api.create_supabase_artifact_revision(project_id, artifact_id, {"version": ..., "filename": ..., "source_code": ...})
+            client.api.create_preprocessing_script_version(project_id, artifact_id, {"version": ..., "filename": ..., "source_code": ...})
             ```
         """
         return self._request(
@@ -259,14 +246,14 @@ class JudgmentApiClient(JudgmentSyncClient):
             None,
         )
 
-    def test_optimistic_eval_candidate(
-        self, project_id: str, payload: TestOptimisticEvalCandidateRequest
-    ) -> TestOptimisticEvalCandidateResponse:
+    def test_jev_optimization_candidate(
+        self, project_id: str, payload: TestJevOptimizationCandidateRequest
+    ) -> TestJevOptimizationCandidateResponse:
         """Test optimistic eval candidate (`POST /v1/projects/{projectId}/artifacts/optimistic-eval-tests`).
 
         Examples:
             ```python
-            client.api.test_optimistic_eval_candidate(project_id, {"trace_id": ..., "source_code": ..., "judge_id": ..., "judge_version_id": ...})
+            client.api.test_jev_optimization_candidate(project_id, {"trace_id": ..., "source_code": ..., "judge_id": ..., "judge_version_id": ...})
             ```
         """
         return self._request(
@@ -279,14 +266,14 @@ class JudgmentApiClient(JudgmentSyncClient):
             None,
         )
 
-    def test_preprocessing_candidate(
-        self, project_id: str, payload: TestPreprocessingCandidateRequest
-    ) -> TestPreprocessingCandidateResponse:
+    def test_preprocessing_script_candidate(
+        self, project_id: str, payload: TestPreprocessingScriptCandidateRequest
+    ) -> TestPreprocessingScriptCandidateResponse:
         """Test preprocessing candidate (`POST /v1/projects/{projectId}/artifacts/preprocessing-tests`).
 
         Examples:
             ```python
-            client.api.test_preprocessing_candidate(project_id, {"trace_id": ..., "source_code": ...})
+            client.api.test_preprocessing_script_candidate(project_id, {"trace_id": ..., "source_code": ...})
             ```
         """
         return self._request(
@@ -620,9 +607,12 @@ class JudgmentApiClient(JudgmentSyncClient):
         self,
         project_id: str,
         *,
+        evidence_source: str | None = None,
         user_status: str | None = None,
         production_activity: str | None = None,
         priority: str | None = None,
+        offset: int | None = None,
+        limit: int | None = None,
     ) -> ListIssuesResponse:
         """List issues (`GET /v1/projects/{projectId}/issues`).
 
@@ -639,9 +629,12 @@ class JudgmentApiClient(JudgmentSyncClient):
             {},
             _drop_none(
                 {
+                    "evidence_source": evidence_source,
                     "user_status": user_status,
                     "production_activity": production_activity,
                     "priority": priority,
+                    "offset": offset,
+                    "limit": limit,
                 }
             ),
         )
@@ -665,7 +658,9 @@ class JudgmentApiClient(JudgmentSyncClient):
             None,
         )
 
-    def get_issue(self, project_id: str, issue_id: str) -> GetIssueResponse:
+    def get_issue(
+        self, project_id: str, issue_id: str, *, evidence_source: str | None = None
+    ) -> GetIssueResponse:
         """Get issue (`GET /v1/projects/{projectId}/issues/{issueId}`).
 
         Examples:
@@ -680,7 +675,7 @@ class JudgmentApiClient(JudgmentSyncClient):
                 self.base_url,
             ),
             {},
-            None,
+            _drop_none({"evidence_source": evidence_source}),
         )
 
     def update_issue(
@@ -704,7 +699,11 @@ class JudgmentApiClient(JudgmentSyncClient):
         )
 
     def list_judges(
-        self, project_id: str, *, version: str | None = None
+        self,
+        project_id: str,
+        *,
+        version: str | None = None,
+        summary: bool | None = None,
     ) -> ListJudgesResponse:
         """List judges (`GET /v1/projects/{projectId}/judges`).
 
@@ -719,7 +718,7 @@ class JudgmentApiClient(JudgmentSyncClient):
                 f"/v1/projects/{encode_path_segment(project_id)}/judges", self.base_url
             ),
             {},
-            _drop_none({"version": version}),
+            _drop_none({"version": version, "summary": summary}),
         )
 
     def create_judge(
@@ -819,18 +818,18 @@ class JudgmentApiClient(JudgmentSyncClient):
             None,
         )
 
-    def set_judge_optimistic_eval_enabled(
+    def set_judge_jev_optimization_enabled(
         self,
         project_id: str,
         judge_id: str,
         judge_version_id: str,
-        payload: SetJudgeOptimisticEvalEnabledRequest,
-    ) -> SetJudgeOptimisticEvalEnabledResponse:
+        payload: SetJudgeJevOptimizationEnabledRequest,
+    ) -> SetJudgeJevOptimizationEnabledResponse:
         """Set judge version optimistic eval (`PUT /v1/projects/{projectId}/judges/{judgeId}/versions/{judgeVersionId}/optimistic-eval`).
 
         Examples:
             ```python
-            client.api.set_judge_optimistic_eval_enabled(project_id, judge_id, judge_version_id, {"enabled": ...})
+            client.api.set_judge_jev_optimization_enabled(project_id, judge_id, judge_version_id, {"enabled": ...})
             ```
         """
         return self._request(
@@ -843,18 +842,18 @@ class JudgmentApiClient(JudgmentSyncClient):
             None,
         )
 
-    def set_judge_preprocessor_artifact_revision(
+    def set_judge_preprocessing_script(
         self,
         project_id: str,
         judge_id: str,
         judge_version_id: str,
-        payload: SetJudgePreprocessorArtifactRevisionRequest,
-    ) -> SetJudgePreprocessorArtifactRevisionResponse:
+        payload: SetJudgePreprocessingScriptRequest,
+    ) -> SetJudgePreprocessingScriptResponse:
         """Set judge version preprocessing artifact (`PUT /v1/projects/{projectId}/judges/{judgeId}/versions/{judgeVersionId}/preprocessor-artifact-revision`).
 
         Examples:
             ```python
-            client.api.set_judge_preprocessor_artifact_revision(project_id, judge_id, judge_version_id, {"preprocessor_artifact_revision_id": ...})
+            client.api.set_judge_preprocessing_script(project_id, judge_id, judge_version_id, {"preprocessor_artifact_revision_id": ...})
             ```
         """
         return self._request(
@@ -1150,6 +1149,7 @@ class JudgmentApiClient(JudgmentSyncClient):
         dataset_id: str | None = None,
         status: str | None = None,
         limit: float | None = None,
+        offset: float | None = None,
     ) -> TestRunsResponse:
         """Fetch test runs (`GET /v1/projects/{projectId}/test-runs`).
 
@@ -1171,6 +1171,7 @@ class JudgmentApiClient(JudgmentSyncClient):
                     "dataset_id": dataset_id,
                     "status": status,
                     "limit": limit,
+                    "offset": offset,
                 }
             ),
         )
@@ -1509,8 +1510,33 @@ class JudgmentApiClient(JudgmentSyncClient):
             _drop_none({"offset": offset, "limit": limit}),
         )
 
+    def get_test_suite_run(self, project_id: str, run_id: str) -> TestRun:
+        """Get a test run (`GET /v1/projects/{projectId}/test-suites/runs/{runId}`).
+
+        Examples:
+            ```python
+            client.api.get_test_suite_run(project_id, run_id)
+            ```
+        """
+        return self._request(
+            "GET",
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/test-suites/runs/{encode_path_segment(run_id)}",
+                self.base_url,
+            ),
+            {},
+            None,
+        )
+
     def get_test_suite_run_results(
-        self, project_id: str, run_id: str
+        self,
+        project_id: str,
+        run_id: str,
+        *,
+        failed_only: bool | None = None,
+        judge_id: str | None = None,
+        offset: int | None = None,
+        limit: int | None = None,
     ) -> TestResultsResponse:
         """Get test run results (`GET /v1/projects/{projectId}/test-suites/runs/{runId}/results`).
 
@@ -1526,15 +1552,24 @@ class JudgmentApiClient(JudgmentSyncClient):
                 self.base_url,
             ),
             {},
-            None,
+            _drop_none(
+                {
+                    "failed_only": failed_only,
+                    "judge_id": judge_id,
+                    "offset": offset,
+                    "limit": limit,
+                }
+            ),
         )
 
-    def score_test_run(self, project_id: str, run_id: str) -> ScoreTestRunResponse:
+    def score_test_suite_run(
+        self, project_id: str, run_id: str
+    ) -> ScoreTestRunResponse:
         """Score a test run (`POST /v1/projects/{projectId}/test-suites/runs/{runId}/score`).
 
         Examples:
             ```python
-            client.api.score_test_run(project_id, run_id)
+            client.api.score_test_suite_run(project_id, run_id)
             ```
         """
         return self._request(
@@ -1552,9 +1587,9 @@ class JudgmentApiClient(JudgmentSyncClient):
         project_id: str,
         check_id: str,
         *,
-        start_time: str,
-        end_time: str,
         category: str | None = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
         limit: int | None = None,
         cursor_trace_started_at: str | None = None,
         cursor_trace_id: str | None = None,
@@ -1563,7 +1598,7 @@ class JudgmentApiClient(JudgmentSyncClient):
 
         Examples:
             ```python
-            client.api.list_trace_health_failures(project_id, check_id, start_time=..., end_time=...)
+            client.api.list_trace_health_failures(project_id, check_id)
             ```
         """
         return self._request(
@@ -1589,15 +1624,15 @@ class JudgmentApiClient(JudgmentSyncClient):
         self,
         project_id: str,
         *,
-        start_time: str,
-        end_time: str,
         category: str | None = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
     ) -> GetTraceHealthSummaryResponse:
         """Get trace health summary (`GET /v1/projects/{projectId}/trace-health/summary`).
 
         Examples:
             ```python
-            client.api.get_trace_health_summary(project_id, start_time=..., end_time=...)
+            client.api.get_trace_health_summary(project_id)
             ```
         """
         return self._request(
@@ -1630,6 +1665,26 @@ class JudgmentApiClient(JudgmentSyncClient):
             ),
             {},
             _drop_none({"category": category}),
+        )
+
+    def add_trace_tags(
+        self, project_id: str, trace_id: str, payload: AddTraceTagsRequest
+    ) -> AddTraceTagsResponse:
+        """Add trace tags (`POST /v1/projects/{projectId}/traces/{traceId}/tags`).
+
+        Examples:
+            ```python
+            client.api.add_trace_tags(project_id, trace_id, {"tags": ...})
+            ```
+        """
+        return self._request(
+            "POST",
+            url_for(
+                f"/v1/projects/{encode_path_segment(project_id)}/traces/{encode_path_segment(trace_id)}/tags",
+                self.base_url,
+            ),
+            payload,
+            None,
         )
 
     def evaluate_traces(

@@ -12,6 +12,27 @@ from judgeval.trace.processors import (
 from judgeval.trace.id_generator import IsolatedRandomIdGenerator
 from judgeval.trace import propagation
 from judgeval.instrumentation.llm import wrap_provider as wrap
+from judgeval.internal.api.models import (
+    ConversationBase64Source,
+    ConversationCustomItem,
+    ConversationCustomPart,
+    ConversationError,
+    ConversationItem,
+    ConversationJson,
+    ConversationJsonPart,
+    ConversationMediaPart,
+    ConversationMediaSource,
+    ConversationMessage,
+    ConversationObservation,
+    ConversationPart,
+    ConversationReasoning,
+    ConversationTextPart,
+    ConversationTool,
+    ConversationToolCall,
+    ConversationToolResult,
+    ConversationUrlSource,
+    ConversationUsage,
+)
 
 __all__ = [
     "BaseTracer",
@@ -25,4 +46,23 @@ __all__ = [
     "IsolatedRandomIdGenerator",
     "propagation",
     "wrap",
+    "ConversationBase64Source",
+    "ConversationCustomItem",
+    "ConversationCustomPart",
+    "ConversationError",
+    "ConversationItem",
+    "ConversationJson",
+    "ConversationJsonPart",
+    "ConversationMediaPart",
+    "ConversationMediaSource",
+    "ConversationMessage",
+    "ConversationObservation",
+    "ConversationPart",
+    "ConversationReasoning",
+    "ConversationTextPart",
+    "ConversationTool",
+    "ConversationToolCall",
+    "ConversationToolResult",
+    "ConversationUrlSource",
+    "ConversationUsage",
 ]
