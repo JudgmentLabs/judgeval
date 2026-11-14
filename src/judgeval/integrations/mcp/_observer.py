@@ -8,6 +8,7 @@ is decided here, so both `mcp` versions behave the same.
 
 from __future__ import annotations
 
+import asyncio
 import contextvars
 import inspect
 import json
@@ -66,6 +67,8 @@ PROTOCOL_VERSION_META_KEY = "io.modelcontextprotocol/protocolVersion"
 _MAX_ERROR_MESSAGE_LENGTH = 1_000
 _MAX_RECORDED_KEYS = 30
 _MAX_RECORDED_KEY_LENGTH = 64
+_MAX_DISCOVERY_PAGES = 100
+_DISCOVERY_TIMEOUT_SECONDS = 1.0
 _INVALID_PARAMS_CODE = -32602
 # How each SDK words a call to a tool it doesn't have, or has turned off.
 _UNKNOWN_TOOL = re.compile(
@@ -108,9 +111,17 @@ class McpRequestInfo:
 
 Identify = Callable[[McpRequestInfo], Optional[McpCaller]]
 Redact = Callable[[str], str]
+
+
+class OriginalTool(Protocol):
+    @property
+    def inputSchema(self) -> Mapping[str, Any]: ...
+
+
 ResolveOriginalTool = Callable[
     [str],
-    Optional[Mapping[str, Any]] | Awaitable[Optional[Mapping[str, Any]]],
+    Optional[Mapping[str, Any] | OriginalTool]
+    | Awaitable[Optional[Mapping[str, Any] | OriginalTool]],
 ]
 
 
@@ -310,6 +321,7 @@ class McpObserver:
         self._request_contracts: contextvars.ContextVar[
             Optional[Dict[str, Optional[ToolContract]]]
         ] = contextvars.ContextVar("mcp_tool_contracts", default=None)
+        self._listed_contracts: Dict[str, Optional[ToolContract]] = {}
         self._tool_manager = tool_manager
         self._tool_lookup = tool_lookup
         # Requests can run where the tracer set by `Tracer.init()` isn't
@@ -373,39 +385,57 @@ class McpObserver:
     async def contract_for(
         self, name: str, list_tools: Optional[ListTools]
     ) -> Optional[ToolContract]:
-        """Looks up just this tool when possible; raw servers use caller-scoped lists.
-
-        A call can reach a server that never listed its tools, such as another
-        replica of a stateless server.
-        """
+        """Uses advertised contracts first, with bounded lookup on fresh replicas."""
         if name not in self._contracts:
             await attempt_async(lambda: self._remember_native_tool(name))
+        if name not in self._contracts:
+            await attempt_async(
+                lambda: asyncio.wait_for(
+                    self._discover_contract(name, list_tools),
+                    timeout=_DISCOVERY_TIMEOUT_SECONDS,
+                )
+            )
+        return self._contracts.get(name)
+
+    async def _discover_contract(
+        self, name: str, list_tools: Optional[ListTools]
+    ) -> None:
         resolver = self.options.resolve_original_tool
         if name not in self._contracts and resolver is not None:
             tool = resolver(name)
             if inspect.isawaitable(tool):
                 tool = await tool
-            if isinstance(tool, Mapping):
-                contract = tool_contract(tool.get("inputSchema"), self.argument_names)
-                if contract is not None:
-                    output = tool.get("outputSchema")
-                    self._contracts[name] = replace(
-                        contract,
-                        structured_output=output is None
-                        or conversation_output_schema(output) is not None,
-                    )
-            return self._contracts.get(name)
+            schema = (
+                tool.get("inputSchema")
+                if isinstance(tool, Mapping)
+                else getattr(tool, "inputSchema", None)
+            )
+            contract = tool_contract(schema, self.argument_names)
+            if contract is not None:
+                output = (
+                    tool.get("outputSchema")
+                    if isinstance(tool, Mapping)
+                    else getattr(tool, "outputSchema", None)
+                )
+                self._contracts[name] = replace(
+                    contract,
+                    structured_output=output is None
+                    or conversation_output_schema(output) is not None,
+                )
+            return
         if name not in self._contracts and list_tools is not None:
             cursor: Optional[str] = None
             seen: Set[str] = set()
-            while True:
+            for _ in range(_MAX_DISCOVERY_PAGES):
+                await asyncio.sleep(0)
                 tools, cursor = await list_tools(cursor)
                 self.remember_listing(tools)
                 # A server that repeats a cursor would otherwise be listed again.
                 if cursor is None or cursor in seen or name in self._contracts:
                     break
                 seen.add(cursor)
-        return self._contracts.get(name)
+            if name in self._contracts:
+                self._listed_contracts[name] = self._contracts[name]
 
     def strip_known(self, method: str, params: Mapping[str, Any]) -> Optional[Dict]:
         """Removes injected arguments using only what is already known."""
@@ -435,7 +465,14 @@ class McpObserver:
             result = await invoke(None)
             return self._shaped(facts, result, adapter, None)
         token = attempt(self._activate_tracer)
-        contracts_token = self._request_contracts.set({})
+        tool_name = facts.params.get("name")
+        contracts_token = self._request_contracts.set(
+            {tool_name: self._listed_contracts[tool_name]}
+            if self.options.resolve_original_tool is None
+            and self._tool_lookup is None
+            and tool_name in self._listed_contracts
+            else {}
+        )
         try:
             return await self._observe(facts, invoke, adapter, list_tools)
         finally:
@@ -548,7 +585,10 @@ class McpObserver:
         return result
 
     def shape_listing(self, result: Any, adapter: ResultAdapter) -> Any:
-        self.remember_listing(attempt(lambda: adapter.listed_tools(result)))
+        tools = attempt(lambda: adapter.listed_tools(result))
+        self.remember_listing(tools)
+        for name, _, _ in tools or ():
+            self._listed_contracts[name] = self._contracts.get(name)
         if not self.inject:
             return result
         shaped = attempt(lambda: adapter.with_tool_schemas(result, self._listed_schema))
@@ -631,7 +671,6 @@ class McpObserver:
             reported.conversation_id if self.options.inject_conversation_id else None
         )
         logical_session = configured_session or conversation_id
-        session = logical_session or facts.session_id
         minted = (
             mint_conversation_id()
             if injected
@@ -666,7 +705,7 @@ class McpObserver:
                 "user_agent.original": facts.headers.get("user-agent"),
                 "judgment.mcp.server_name": self._server_name or "mcp",
                 "judgment.mcp.tool_name": tool_name,
-                "judgment.session_id": session or minted,
+                "judgment.session_id": logical_session or minted or facts.session_id,
                 "judgment.mcp.server.version": self._server_version,
                 "judgment.mcp.server.build": self.options.server_build,
                 "judgment.mcp.client_name": _text(client.get("name")),
@@ -685,10 +724,10 @@ class McpObserver:
                 if configured_session
                 else "echoed"
                 if conversation_id
-                else "transport"
-                if facts.session_id
                 else "minted"
                 if minted
+                else "transport"
+                if facts.session_id
                 else None,
                 "judgment.mcp.intent": intent,
                 "judgment.llm.model": reported.model,

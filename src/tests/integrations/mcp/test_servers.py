@@ -39,9 +39,11 @@ async def test_lowlevel_discovery_preserves_metadata_without_progress_token(trac
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("style", styles())
+@pytest.mark.parametrize("descriptor", ["mapping", "tool"])
 async def test_original_tool_resolver_on_lowlevel_and_native_lookup_priority(
-    style, tracer
+    style, descriptor, tracer
 ):
+    from mcp.types import Tool
     from tests.integrations.mcp.harness import LOW_LEVEL
 
     orders = build_server(style)
@@ -49,13 +51,15 @@ async def test_original_tool_resolver_on_lowlevel_and_native_lookup_priority(
 
     async def resolve(name):
         resolved.append(name)
-        return {
+        wire = {
+            "name": name,
             "inputSchema": {
                 "type": "object",
                 "additionalProperties": False,
                 "properties": {"a": {"type": "integer"}, "b": {"type": "integer"}},
-            }
+            },
         }
+        return Tool(**wire) if descriptor == "tool" else wire
 
     instrument_mcp_server(orders.server, resolve_original_tool=resolve)
     async with connect(orders) as client:

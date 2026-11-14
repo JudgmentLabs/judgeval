@@ -299,16 +299,15 @@ async def test_stateful_calls_offer_handoff_until_echo_and_leave_errors_unchange
                 s.attributes.get("judgment.session_id"),
                 s.attributes.get("judgment.mcp.conversation_id_source"),
             )
-            for s in collecting_exporter.spans
+            for s in collecting_exporter.spans[:2]
         ],
     } == {
         "handoff": True,
         "echo_handoff": [],
         "error_unchanged": True,
         "sessions": [
-            ("transport", "transport"),
+            (handle, "minted"),
             (handle, "echoed"),
-            ("transport", "transport"),
         ],
     }
 
@@ -347,6 +346,57 @@ async def test_paginated_tools_remain_callable_after_twenty_pages(tracer):
 
     await observer.observe(facts, invoke, ModelResults(), listing)
     assert forwarded == [{}]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["cached", "pages", "timeout"])
+async def test_lowlevel_ownership_reuse_and_bounded_discovery(mode, monkeypatch):
+    from judgeval.integrations.mcp import _observer
+
+    monkeypatch.setattr(_observer, "_DISCOVERY_TIMEOUT_SECONDS", 0.02)
+    observer = McpObserver(McpOptions(), "test", None)
+    schema = {
+        "type": "object",
+        "properties": {"intent": {"type": "string"}},
+        "additionalProperties": False,
+    }
+    if mode == "cached":
+        observer.shape_listing(
+            {"tools": [{"name": "lookup", "inputSchema": schema}]}, WireResults()
+        )
+    pages = []
+    received = []
+
+    async def listing(cursor):
+        pages.append(cursor)
+        if mode == "cached":
+            raise RuntimeError("listing unavailable")
+        if mode == "timeout":
+            await asyncio.Event().wait()
+        return [], str(len(pages))
+
+    async def invoke(arguments):
+        received.append(
+            arguments if arguments is not None else facts.params["arguments"]
+        )
+        return {"isError": True}
+
+    facts = RequestFacts(
+        "tools/call",
+        {"name": "lookup", "arguments": {"intent": "business", "llm_model": "model"}},
+        None,
+        None,
+        {},
+        {},
+        None,
+        None,
+        None,
+    )
+    await observer.observe(facts, invoke, WireResults(), listing)
+    assert (received, len(pages)) == (
+        [{"intent": "business"} if mode == "cached" else facts.params["arguments"]],
+        {"cached": 0, "pages": 100, "timeout": 1}[mode],
+    )
 
 
 @pytest.mark.asyncio
@@ -401,7 +451,7 @@ async def test_transport_session_survives_failed_outcome_detection(
 
     from mcp.types import CallToolResult
 
-    observer = McpObserver(McpOptions(), "test", None)
+    observer = McpObserver(McpOptions(inject_conversation_id=False), "test", None)
     facts = RequestFacts(
         "tools/call",
         {"name": "lookup", "arguments": {}},

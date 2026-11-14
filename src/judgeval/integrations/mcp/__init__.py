@@ -111,9 +111,10 @@ def instrument_mcp_server(
             set_session_id baggage is also authoritative; scope it to each
             request rather than the lifetime of the server.
         resolve_original_tool: Optional sync/async lookup by tool name for low-level
-            servers. Returns the original wire descriptor (inputSchema and optional
-            outputSchema), before injection. Runs in the current request context;
-            keep it caller-scoped. Replaces full tools/list discovery when supplied.
+            servers. Returns an MCP Tool object or wire descriptor (inputSchema
+            and optional outputSchema), before injection. Runs in the current
+            request context; keep it caller-scoped. Replaces full tools/list
+            discovery when supplied.
             Returning None or raising leaves arguments and results unchanged.
             High-level servers still prefer their native tool lookup.
 
