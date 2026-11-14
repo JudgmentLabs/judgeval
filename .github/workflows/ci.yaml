@@ -105,6 +105,58 @@ jobs:
         working-directory: src
         run: uv run coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
 
+  mcp-integration:
+    needs: [validate-branch]
+    if: needs.validate-branch.result == 'success' || needs.validate-branch.result == 'skipped'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # FastMCP in mcp 1.6 doesn't import with pydantic 2.12 or later.
+          - name: mcp 1.6
+            python-version: "3.10"
+            packages: mcp==1.6.0 pydantic<2.12
+          - name: mcp 1.x
+            python-version: "3.13"
+            packages: mcp>=1.6,<2
+          - name: mcp 2.x
+            python-version: "3.10"
+            packages: mcp>=2,<3
+          - name: fastmcp 2.x
+            python-version: "3.11"
+            packages: fastmcp>=2.10,<3
+          - name: fastmcp 3.x
+            python-version: "3.12"
+            packages: fastmcp>=3,<4
+          - name: fastmcp 4.x
+            python-version: "3.13"
+            packages: fastmcp>=4,<5
+    name: MCP integration (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    env:
+      MCP_PACKAGES: ${{ matrix.packages }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install judgeval with ${{ matrix.name }}
+        run: |
+          pip install uv
+          uv venv .mcp-venv --python "${{ matrix.python-version }}"
+          # Unquoted so each requirement is its own argument.
+          uv pip install --python .mcp-venv/bin/python -e . pytest pytest-asyncio $MCP_PACKAGES
+          uv pip list --python .mcp-venv/bin/python | grep -iE '^(mcp|fastmcp|pydantic) '
+
+      - name: Run MCP integration tests
+        working-directory: src
+        run: ../.mcp-venv/bin/python -m pytest tests/integrations/mcp -v
+
   run-e2e-tests:
     needs: [validate-branch]
     if: "(github.base_ref == 'staging' || github.base_ref == 'main') && !contains(github.actor, '[bot]') && (needs.validate-branch.result == 'success' || needs.validate-branch.result == 'skipped')"
