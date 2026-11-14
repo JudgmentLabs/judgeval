@@ -50,6 +50,7 @@ include = [
 
 [project.optional-dependencies]
 s3 = ["boto3>=1.40.11"]
+monty = ["pydantic-monty==1.6.0"]
 
 
 [dependency-groups]
@@ -60,6 +61,7 @@ dev = [
     "groq>=0.30.0",
     "mypy>=1.17.1",
     "openai>=1.92.0",
+    "pydantic-monty==1.6.0",
     "opentelemetry-instrumentation-openai>=0.44.1",
     "ruff>=0.9.1,<0.10.0",
     "together>=1.5.21",

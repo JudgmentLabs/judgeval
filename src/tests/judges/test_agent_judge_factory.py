@@ -167,7 +167,7 @@ class TestAgentJudgeFactoryCreate:
             judge_id="judge-1",
             name="helpfulness",
             prompt="Rate helpfulness 0-1.",
-            model="gpt-5.2",
+            model=None,
             reasoning_level="lite",
             score_type="numeric",
             description=None,
