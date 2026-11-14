@@ -78,42 +78,29 @@ def run_agent(question: str) -> str:
 run_agent("What is the capital of the United States?")
 ```
 
-### MCP tool instrumentation
+### Trace your MCP server
 
-After `Tracer.init()`, instrument your MCP server with optional argument-name overrides:
+See which tools agents call, investigate failures, and group related calls into conversations. Supports the official Python MCP SDK and standalone FastMCP.
+
+After initializing your tracer, instrument your existing server before serving requests:
 
 ```python
 from judgeval.integrations.mcp import instrument_mcp_server
 
-instrument_mcp_server(server, intent_argument="intent", model_argument="judgment_llm_model",
-                      conversation_id_argument="chat_id")
+instrument_mcp_server(server)
 ```
 
-Explicit names reuse existing tool arguments without changing their schemas or removing them from handler inputs; when absent, they are injected into compatible schemas and stripped before execution. Defaults are `intent`, `llm_model`, and `conversation_id`. Without explicit configuration, same-name business arguments are preserved but not interpreted as telemetry. Explicit fields can be read with `inject_agent_arguments=False`; missing/non-string values are omitted. Existing conversation fields supply application sessions, while injected ones use generated UUIDv7 handles. Names must be non-empty and distinct.
+Tool calls appear as standard Judgment traces, with instrumented work inside each tool captured as child spans. Input/output and error-message capture are opt-in.
 
-Injection changes the advertised tool contract, including an optional `_judgment` property on compatible output schemas. During a mixed instrumented/uninstrumented rollout, strict clients holding an older output schema may reject structured results containing this property. Keep replica schemas consistent and refresh client tool discovery after rollout; gateways caching tool lists must refresh too.
-
-Injection is independent of telemetry availability: installing instrumentation before `Tracer.init()`, or disabling export, does not disable schema changes or conversation handoff. Injected fields and descriptions add model-context overhead per tool when clients expose the listing to an agent. Set `inject_agent_arguments=False` to disable automatic argument injection and handoff while retaining tracing, or `inject_conversation_id=False` to disable only conversation-ID injection and handoff.
-
-With conversation injection enabled, returned tool results without an application or echoed conversation session offer a new ID even on stateful HTTP, including `isError: true` results. Session priority is an explicit application session, then an echoed conversation ID, then a newly minted ID, then the transport session. The first call and later calls echoing its ID share the same session; clients that never echo receive fresh IDs on each call. Set `inject_conversation_id=False` to use transport grouping when no explicit session is supplied. The transport ID remains recorded separately as `mcp.session.id`. Handoff preserves existing error content and flags; thrown exceptions and protocol errors propagate unchanged without handoff. Dictionary outputs stay unchanged and use supplemental text for handoff. Native per-tool lookup avoids full discovery where available; custom low-level servers retain caller-scoped listing.
-
-Low-level servers can avoid full discovery by supplying `resolve_original_tool(name)`, a sync or async callback returning an MCP `Tool` object or the original wire tool descriptor (`inputSchema` and optional `outputSchema`):
+By default, the SDK adds optional `intent`, `llm_model`, and `conversation_id` arguments to compatible tool schemas and removes them before your tool runs. Results include a conversation ID for the agent to reuse. To trace without changing tool schemas or results:
 
 ```python
-instrument_mcp_server(server, resolve_original_tool=lambda name: original_tools.get(name))
+instrument_mcp_server(server, inject_agent_arguments=False)
 ```
 
-Use the same original schemas as your `tools/list` handler, before Judgment injection, and scope the lookup to the current caller if tools vary by authorization or request. The SDK does not cache resolver results across calls. When configured, the resolver bypasses the listing cache and replaces discovery: returning `None`, raising, timing out, or returning an unsupported schema leaves arguments untouched and omits generated handoff. High-level servers still prefer their native lookup.
+Call `Tracer.force_flush()` before a serverless return, or `Tracer.shutdown()` when stopping. Export is best-effort and uses your existing tracer.
 
-Without a resolver, low-level servers cache up to 1,000 original contracts by tool name, refreshing them when listings are served and clearing them on outgoing tool-list-change notifications or tool handler replacement. Concurrent misses share discovery, and missing or failed lookups are cached for one second. Calls reuse known contracts to strip only SDK-owned arguments, even if discovery later fails. This assumes a named tool's schema is consistent across callers and schema changes are announced; use a caller-aware resolver otherwise. Fresh replicas and cache misses fall back to caller-scoped discovery, capped at 100 pages and one second; unknown ownership remains untouched if discovery fails. Async resolver lookup has the same timeout. These limits cannot preempt blocking synchronous callbacks or forcibly stop cancellation-resistant coroutines. No cache is shared across processes.
-
-Capacity eviction does not discard a successful lookup for a waiting call. A newer listing takes precedence; a schema invalidation during lookup allows one retry, with the same per-attempt page and time limits. Repeated invalidation can still leave ownership unknown.
-
-FastMCP 2 proxy servers use the same contract cache and discovery policy instead of native per-tool lookup, which would list upstream tools on every call. Successful entries have no time-based expiry; schema changes must be announced or supplied by a caller-aware `resolve_original_tool` callback. Ordinary local FastMCP servers keep fresh native lookups.
-
-Repeated instrumentation keeps the original configuration and warns if options differ. Optional input/output capture is limited to 128 KiB; oversized source payloads are omitted before model conversion or the redaction callback.
-
-The SDK can record the original exception type when the exception reaches its wrapper or is supplied through `mark_mcp_call_error` before conversion to a public tool error. MCP frameworks may instead convert exceptions into `isError` results before the wrapper sees them; these generally use `error.type = "tool_error"`, since the original exception type is no longer available. Recognized refusals use `unknown_tool`, `tool_disabled`, or `invalid_input`; a structured public error code may also be used when error-message capture is enabled.
+See the [Judgment documentation](https://docs.judgmentlabs.ai/documentation) for more on tracing and integrations.
 
 ### SQL
 
