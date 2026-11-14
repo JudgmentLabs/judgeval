@@ -1,6 +1,6 @@
 """Function judges: one Python file defining `judge(example)`, run in Monty.
 
-The local test runs a judge the way Judgment's eval worker does, with the same
+The local test runs a judge the way Judgment's code-judge runner does, with the same
 Monty limits, upload check and result check, so a judge that passes here
 behaves the same once uploaded.
 """
@@ -19,7 +19,8 @@ from judgeval.internal.api.models import CreateJudgeRequest, UpdateJudgeRequest
 
 OutputType = Literal["binary", "numeric", "categorical"]
 
-# Matches the eval worker's sandbox (judgment-mono evaluator/function-judge.ts).
+# Keep in step with judgment-mono services/code-judge-runner/src/sandbox.ts:
+# the limits, type-check stubs, judge-call check and result rules must match.
 _LIMITS = {
     "max_memory": 256 * 1024 * 1024,
     "max_feed_duration_secs": 10,
@@ -80,8 +81,9 @@ def source_problems(source: str) -> Optional[str]:
             except monty.MontyTypingError as error:
                 return str(error.display()).strip()
             except monty.MontyRuntimeError as error:
-                line = error.traceback()[-1].line
-                return f"judge.py:{line}: {error.display('type-msg')}"
+                frames = error.traceback()
+                where = f"judge.py:{frames[-1].line}" if frames else "judge.py"
+                return f"{where}: {error.display('type-msg')}"
             except monty.MontySyntaxError as error:
                 return str(error.display("traceback"))
             except monty.MontyCrashedError as error:
@@ -158,7 +160,7 @@ def _fields_problem(fields: Dict[str, Any]) -> Optional[str]:
 def check_result(
     returned: Any, output: OutputType, labels: List[str]
 ) -> Dict[str, Any]:
-    """Checks a judge's return value as the eval worker does.
+    """Checks a judge's return value as the code-judge runner does.
 
     A judge returns its value, or a dict with `value` and optional `reason`,
     `citations` and `metrics`.
