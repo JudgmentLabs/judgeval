@@ -33,6 +33,7 @@ _TYPE_CHECK_STUBS = "from typing import Any\nexample: dict[str, Any]\n"
 _JUDGE_CALL_CHECK = "\ndef _check_judge_call():\n    judge(example)\n"
 _RESULT_KEYS = {"value", "reason", "citations", "metrics"}
 _MAX_METRICS = 50
+_MAX_RESULT_BYTES = 256 * 1024
 
 
 class JudgeFailed(Exception):
@@ -171,6 +172,10 @@ def check_result(
     problem = _value_problem(fields["value"], output, labels) or _fields_problem(fields)
     if problem:
         raise JudgeFailed(f"Judge returned an invalid result: {problem}")
+    # Measured as compact UTF-8 JSON, as the runner's JSON.stringify does.
+    size = len(json.dumps(fields, separators=(",", ":"), ensure_ascii=False).encode())
+    if size > _MAX_RESULT_BYTES:
+        raise JudgeFailed(f"Judge returned more than {_MAX_RESULT_BYTES // 1024} KiB")
     return fields
 
 
