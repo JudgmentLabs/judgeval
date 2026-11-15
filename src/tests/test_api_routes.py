@@ -26,4 +26,4 @@ def test_client_routes_exist_in_committed_spec():
         )
     }
 
-    assert client_routes and client_routes <= spec_routes
+    assert (bool(client_routes), sorted(client_routes - spec_routes)) == (True, [])
