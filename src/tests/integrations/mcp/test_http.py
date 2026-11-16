@@ -79,6 +79,8 @@ async def test_legacy_stateless_http_retains_each_clients_identity(
     else:
         app = orders.server.streamable_http_app(stateless_http=True, json_response=True)
 
+    stream_statuses = []
+
     async def call(client, name):
         headers = {
             "Accept": "application/json, text/event-stream",
@@ -111,6 +113,11 @@ async def test_legacy_stateless_http_retains_each_clients_identity(
                 },
             )
             result.raise_for_status()
+        for method in ("GET", "DELETE"):
+            async with client.stream(method, "/mcp", headers=headers) as response:
+                stream_statuses.append(
+                    (response.status_code, response.headers.get("allow"))
+                )
 
     with serve(app) as url, anyio.fail_after(30):
         async with (
@@ -130,7 +137,10 @@ async def test_legacy_stateless_http_retains_each_clients_identity(
                 for span in collecting_exporter.spans
                 if span.attributes.get("mcp.method.name") == "tools/call"
             ]
-        )
-        == [("client-a", "client-1", "2025-06-18")] * 2
-        + [("client-b", "client-1", "2025-06-18")] * 2
+        ),
+        sorted(stream_statuses),
+    ) == (
+        [("client-a", "client-1", "2025-06-18")] * 2
+        + [("client-b", "client-1", "2025-06-18")] * 2,
+        [(405, "POST")] * 4,
     )

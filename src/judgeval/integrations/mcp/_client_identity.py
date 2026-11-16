@@ -45,6 +45,20 @@ class McpClientIdentityMiddleware:
     async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
         headers = dict(scope.get("headers", []))
         if (
+            scope["type"] == "http"
+            and scope.get("method") in ("GET", "DELETE")
+            and headers.get(b"mcp-session-id", b"").startswith(PREFIX.encode("ascii"))
+        ):
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 405,
+                    "headers": [(b"allow", b"POST")],
+                }
+            )
+            await send({"type": "http.response.body", "body": b""})
+            return
+        if (
             scope["type"] != "http"
             or scope.get("method") != "POST"
             or b"mcp-session-id" in headers
