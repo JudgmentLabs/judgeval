@@ -78,6 +78,30 @@ def run_agent(question: str) -> str:
 run_agent("What is the capital of the United States?")
 ```
 
+### Trace your MCP server
+
+See which tools agents call, investigate failures, and group related calls into conversations. Supports the official Python MCP SDK and standalone FastMCP.
+
+After initializing your tracer, instrument your existing server before serving requests:
+
+```python
+from judgeval.integrations.mcp import instrument_mcp_server
+
+instrument_mcp_server(server)
+```
+
+Tool calls appear as standard Judgment traces, with instrumented work inside each tool captured as child spans. Input/output and error-message capture are opt-in.
+
+By default, the SDK adds optional `intent`, `llm_model`, and `conversation_id` arguments to compatible tool schemas and removes them before your tool runs. Results include a conversation ID for the agent to reuse. To trace without changing tool schemas or results:
+
+```python
+instrument_mcp_server(server, inject_agent_arguments=False)
+```
+
+Call `Tracer.force_flush()` before a serverless return, or `Tracer.shutdown()` when stopping. Export is best-effort and uses your existing tracer.
+
+See the [Judgment documentation](https://docs.judgmentlabs.ai/documentation) for more on tracing and integrations.
+
 ### SQL
 
 Use `Judgeval.sql(sql_text)` for read-only queries against Judgment's virtual

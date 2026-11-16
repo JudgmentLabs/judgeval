@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, TypeAlias
+from typing import Any, Literal, Optional, TypeAlias, Union
 from typing_extensions import NotRequired, TypedDict
 
 
@@ -27,6 +27,134 @@ class PendingEvalPayload(TypedDict):
     is_behavior: bool
 
 
+ConversationJson: TypeAlias = Optional[
+    Union[str, float, bool, list["ConversationJson"], dict[str, "ConversationJson"]]
+]
+
+
+class ConversationError(TypedDict, closed=True):
+    type: NotRequired[str]
+    message: NotRequired[str]
+    stacktrace: NotRequired[str]
+
+
+class ConversationUrlSource(TypedDict, closed=True):
+    type: Literal["url"]
+    url: str
+
+
+class ConversationBase64Source(TypedDict, closed=True):
+    type: Literal["base64"]
+    data: str
+
+
+ConversationMediaSource: TypeAlias = ConversationUrlSource | ConversationBase64Source
+
+
+class ConversationTextPart(TypedDict, closed=True):
+    type: Literal["text"]
+    text: str
+
+
+class ConversationMediaPart(TypedDict, closed=True):
+    type: Literal["image", "audio", "file"]
+    source: ConversationMediaSource
+    media_type: NotRequired[str]
+
+
+class ConversationJsonPart(TypedDict, closed=True):
+    type: Literal["json"]
+    value: ConversationJson
+
+
+class ConversationCustomPart(TypedDict, closed=True):
+    type: Literal["custom"]
+    kind: str
+    data: ConversationJson
+
+
+ConversationPart: TypeAlias = (
+    ConversationTextPart
+    | ConversationMediaPart
+    | ConversationJsonPart
+    | ConversationCustomPart
+)
+
+
+class ConversationMessage(TypedDict, closed=True):
+    type: Literal["message"]
+    role: Literal["system", "user", "assistant"]
+    content: list[ConversationPart]
+
+
+class ConversationToolCall(TypedDict, closed=True):
+    type: Literal["tool_call"]
+    call_id: NotRequired[str]
+    name: str
+    arguments: ConversationJson
+
+
+class ConversationToolResult(TypedDict, closed=True):
+    type: Literal["tool_result"]
+    call_id: NotRequired[str]
+    output: list[ConversationPart]
+    error: NotRequired[ConversationError]
+
+
+class ConversationReasoning(TypedDict, closed=True):
+    type: Literal["reasoning"]
+    text: str
+
+
+class ConversationCustomItem(TypedDict, closed=True):
+    type: Literal["custom"]
+    kind: str
+    data: ConversationJson
+
+
+ConversationItem: TypeAlias = (
+    ConversationMessage
+    | ConversationToolCall
+    | ConversationToolResult
+    | ConversationReasoning
+    | ConversationCustomItem
+)
+
+
+class ConversationTool(TypedDict, closed=True):
+    name: str
+    description: NotRequired[str]
+    parameters: NotRequired[ConversationJson]
+    metadata: NotRequired[dict[str, ConversationJson]]
+
+
+class ConversationUsage(TypedDict, closed=True):
+    non_cached_input_tokens: NotRequired[int]
+    non_cached_input_image_tokens: NotRequired[int]
+    cache_read_input_tokens: NotRequired[int]
+    cache_creation_input_tokens: NotRequired[int]
+    output_tokens: NotRequired[int]
+    output_image_tokens: NotRequired[int]
+    reasoning_tokens: NotRequired[int]
+    total_cost_usd: NotRequired[float]
+
+
+class ConversationObservation(TypedDict, closed=True):
+    conversation_id: NotRequired[str]
+    customer_id: NotRequired[str]
+    user_id: NotRequired[str]
+    input: list[ConversationItem]
+    output: NotRequired[list[ConversationItem]]
+    tools: NotRequired[list[ConversationTool]]
+    model: NotRequired[str]
+    response_id: NotRequired[str]
+    finish_reason: NotRequired[str]
+    usage: NotRequired[ConversationUsage]
+    error: NotRequired[ConversationError]
+    truncated: NotRequired[bool]
+    metadata: NotRequired[dict[str, ConversationJson]]
+
+
 class AddProjectRequest(TypedDict):
     project_name: str
 
@@ -48,7 +176,7 @@ class DeleteProjectResponse(TypedDict):
     message: str
 
 
-T1: TypeAlias = bool | float | str | list[Any] | dict[str, Any] | None
+T0: TypeAlias = bool | float | str | list[Any] | dict[str, Any] | None
 
 
 class CreateOfflineDatasetRequest(TypedDict):
@@ -656,6 +784,42 @@ class FetchTestRunViaExperimentAliasResponse(TypedDict):
     ui_results_url: str | None
 
 
+class ObservationError(TypedDict):
+    type: NotRequired[str]
+    message: NotRequired[str]
+    stacktrace: NotRequired[str]
+
+
+class Observation(TypedDict):
+    conversation_id: str
+    customer_id: NotRequired[str]
+    user_id: NotRequired[str]
+    input: list[ConversationItem]
+    output: NotRequired[list[ConversationItem]]
+    tools: NotRequired[list[ConversationTool]]
+    model: NotRequired[str]
+    response_id: NotRequired[str]
+    finish_reason: NotRequired[str]
+    usage: NotRequired[ConversationUsage]
+    error: NotRequired[ObservationError]
+    truncated: NotRequired[bool]
+    metadata: NotRequired[dict[str, Any]]
+
+
+class IngestObservationsRequestObservation(TypedDict):
+    observation: Observation
+    observed_at: str
+    environment: NotRequired[str]
+
+
+class IngestObservationsRequest(TypedDict):
+    observations: list[IngestObservationsRequestObservation]
+
+
+class IngestObservationsResponse(TypedDict):
+    status: Literal["success"]
+
+
 class InsertPromptRequest(TypedDict):
     name: str
     prompt: str
@@ -764,6 +928,7 @@ class UploadCustomScorerBundleMetadata(TypedDict):
     response_type: Literal["binary", "categorical", "numeric"]
     version: NotRequired[float]
     bump_major: NotRequired[bool]
+    conversation: NotRequired[bool]
     categories: NotRequired[list[UploadCustomScorerBundleMetadataCategory] | None]
 
 
@@ -1176,7 +1341,9 @@ class TestCase(TypedDict):
 
 class ListTestCasesResponse(TypedDict):
     version: int
+    draft: bool
     cases: list[TestCase]
+    judge_names: dict[str, str]
     next_offset: int | None
 
 
@@ -1231,6 +1398,7 @@ class StartTestRunRequest(TypedDict, closed=True):
     candidate: NotRequired[str]
     candidate_meta: NotRequired[dict[str, Any]]
     trigger: NotRequired[Literal["manual", "ci", "schedule", "api"]]
+    stored_traces: NotRequired[bool]
 
 
 class StartTestRunResponseCase(TypedDict):
@@ -1269,6 +1437,7 @@ class ListTestRunsResponse(TypedDict):
 
 class TestResultsResponseResultCheck(TypedDict):
     judge_id: str
+    judge_name: str | None
     judge_major_version: float
     judge_minor_version: float
     op: Literal["eq", "ne", "lt", "lte", "gt", "gte", "in", "not_in"]
@@ -1277,10 +1446,12 @@ class TestResultsResponseResultCheck(TypedDict):
     passed: bool
     reason: str | None
     error_message: str | None
+    metrics: dict[str, float]
 
 
 class TestResultsResponseResultPendingCheck(TypedDict):
     judge_id: str
+    judge_name: str | None
     judge_major_version: float
     judge_minor_version: float
     status: Literal[
@@ -1302,6 +1473,7 @@ class TestResultsResponseResult(TypedDict):
 
 class TestResultsResponse(TypedDict):
     results: list[TestResultsResponseResult]
+    next_offset: int | None
 
 
 class ScoreTestRunResponse(TypedDict):
@@ -1328,38 +1500,7 @@ class PublicSqlSchemaResponse(TypedDict):
     schema: str
 
 
-class ListOrganizationsResponseOrganizationDetailProject(TypedDict):
-    count: float
-
-
-class ListOrganizationsResponseOrganizationDetailUserOrganization(TypedDict):
-    count: float
-
-
-class ListOrganizationsResponseOrganizationDetail(TypedDict):
-    name: str
-    created_at: str
-    projects: list[ListOrganizationsResponseOrganizationDetailProject]
-    user_organizations: list[
-        ListOrganizationsResponseOrganizationDetailUserOrganization
-    ]
-
-
-class ListOrganizationsResponseOrganization(TypedDict):
-    created_at: str
-    agentic_tour_completed_at: str | None
-    onboarded: bool
-    organization_id: str
-    role: Literal["admin", "developer", "owner", "viewer"]
-    user_id: str
-    detail: ListOrganizationsResponseOrganizationDetail
-
-
-class ListOrganizationsResponse(TypedDict):
-    organizations: list[ListOrganizationsResponseOrganization]
-
-
-class GetArtifactRevisionResponseRevision(TypedDict):
+class GetPreprocessingScriptVersionResponseRevision(TypedDict):
     id: str
     artifact_id: str
     version: int
@@ -1371,18 +1512,18 @@ class GetArtifactRevisionResponseRevision(TypedDict):
     source_code: str | None
 
 
-class GetArtifactRevisionResponse(TypedDict):
-    revision: GetArtifactRevisionResponseRevision | None
+class GetPreprocessingScriptVersionResponse(TypedDict):
+    revision: GetPreprocessingScriptVersionResponseRevision | None
 
 
-class CreateArtifactRequest(TypedDict):
+class CreatePreprocessingScriptRequest(TypedDict):
     scope: Literal["judge_preprocessor"]
     name: str
     filename: str
     source_code: str
 
 
-class CreateArtifactResponseRevision(TypedDict):
+class CreatePreprocessingScriptResponseRevision(TypedDict):
     id: str
     artifact_id: str
     version: int
@@ -1393,7 +1534,7 @@ class CreateArtifactResponseRevision(TypedDict):
     created_at: str
 
 
-class CreateArtifactResponseArtifact(TypedDict):
+class CreatePreprocessingScriptResponseArtifact(TypedDict):
     id: str
     organization_id: str
     project_id: str
@@ -1403,18 +1544,18 @@ class CreateArtifactResponseArtifact(TypedDict):
     created_at: str
 
 
-class CreateArtifactResponse(TypedDict):
-    revision: CreateArtifactResponseRevision
-    artifact: CreateArtifactResponseArtifact
+class CreatePreprocessingScriptResponse(TypedDict):
+    revision: CreatePreprocessingScriptResponseRevision
+    artifact: CreatePreprocessingScriptResponseArtifact
 
 
-class CreateSupabaseArtifactRevisionRequest(TypedDict):
+class CreatePreprocessingScriptVersionRequest(TypedDict):
     version: int
     filename: str
     source_code: str
 
 
-class CreateSupabaseArtifactRevisionResponseRevision(TypedDict):
+class CreatePreprocessingScriptVersionResponseRevision(TypedDict):
     id: str
     artifact_id: str
     version: int
@@ -1425,18 +1566,18 @@ class CreateSupabaseArtifactRevisionResponseRevision(TypedDict):
     created_at: str
 
 
-class CreateSupabaseArtifactRevisionResponse(TypedDict):
-    revision: CreateSupabaseArtifactRevisionResponseRevision
+class CreatePreprocessingScriptVersionResponse(TypedDict):
+    revision: CreatePreprocessingScriptVersionResponseRevision
 
 
-class TestOptimisticEvalCandidateRequest(TypedDict):
+class TestJevOptimizationCandidateRequest(TypedDict):
     trace_id: str
     source_code: str
     judge_id: str
     judge_version_id: str
 
 
-class TestOptimisticEvalCandidateResponseResult(TypedDict):
+class TestJevOptimizationCandidateResponseResult(TypedDict):
     status: Literal["accepted"]
     verdict: bool | str
     reason: None
@@ -1447,7 +1588,7 @@ class TestOptimisticEvalCandidateResponseResult(TypedDict):
     evidence_size_bytes: int
 
 
-class TestOptimisticEvalCandidateResponseResult1(TypedDict):
+class TestJevOptimizationCandidateResponseResult1(TypedDict):
     status: Literal["fallback"]
     verdict: None
     reason: Literal[
@@ -1464,7 +1605,7 @@ class TestOptimisticEvalCandidateResponseResult1(TypedDict):
     evidence_size_bytes: int | None
 
 
-class TestOptimisticEvalCandidateResponseResult2(TypedDict):
+class TestJevOptimizationCandidateResponseResult2(TypedDict):
     status: Literal["failed"]
     verdict: None
     reason: None
@@ -1475,7 +1616,7 @@ class TestOptimisticEvalCandidateResponseResult2(TypedDict):
     evidence_size_bytes: None
 
 
-class TestOptimisticEvalCandidateResponseOrdinaryAgent(TypedDict):
+class TestJevOptimizationCandidateResponseOrdinaryAgent(TypedDict):
     status: Literal["completed"]
     verdict: bool | str
     reason: str
@@ -1483,7 +1624,7 @@ class TestOptimisticEvalCandidateResponseOrdinaryAgent(TypedDict):
     duration_ms: float
 
 
-class TestOptimisticEvalCandidateResponseOrdinaryAgent1(TypedDict):
+class TestJevOptimizationCandidateResponseOrdinaryAgent1(TypedDict):
     status: Literal["failed"]
     verdict: None
     reason: None
@@ -1491,7 +1632,13 @@ class TestOptimisticEvalCandidateResponseOrdinaryAgent1(TypedDict):
     duration_ms: float
 
 
-class TestOptimisticEvalCandidateResponse(TypedDict):
+class TestJevOptimizationCandidateResponse(TypedDict):
+    ordinary_agent_model: str
+    candidate_catalog_model_cost_usd: float | None
+    ordinary_catalog_model_cost_usd: float | None
+    optimized_catalog_model_cost_usd: float | None
+    catalog_model_cost_savings_usd: float | None
+    catalog_model_cost_savings_percent: float | None
     judge_id: str
     judge_version_id: str
     judge_major_version: int
@@ -1499,30 +1646,30 @@ class TestOptimisticEvalCandidateResponse(TypedDict):
     score_type: Literal["binary", "categorical"]
     trace_id: str
     result: (
-        TestOptimisticEvalCandidateResponseResult
-        | TestOptimisticEvalCandidateResponseResult1
-        | TestOptimisticEvalCandidateResponseResult2
+        TestJevOptimizationCandidateResponseResult
+        | TestJevOptimizationCandidateResponseResult1
+        | TestJevOptimizationCandidateResponseResult2
     )
     ordinary_agent: (
-        TestOptimisticEvalCandidateResponseOrdinaryAgent
-        | TestOptimisticEvalCandidateResponseOrdinaryAgent1
+        TestJevOptimizationCandidateResponseOrdinaryAgent
+        | TestJevOptimizationCandidateResponseOrdinaryAgent1
     )
     matches: bool | None
 
 
-class TestPreprocessingCandidateRequest(TypedDict):
+class TestPreprocessingScriptCandidateRequest(TypedDict):
     trace_id: str
     source_code: str
 
 
-class TestPreprocessingCandidateResponseResult(TypedDict):
+class TestPreprocessingScriptCandidateResponseResult(TypedDict):
     status: Literal["succeeded"]
     artifact_duration_ms: float
     evidence_size_bytes: int
     evidence: Any
 
 
-class TestPreprocessingCandidateResponseResult1(TypedDict):
+class TestPreprocessingScriptCandidateResponseResult1(TypedDict):
     status: Literal["failed"]
     reason: Literal["artifact_failed", "timeout", "evidence_too_large"]
     error: str
@@ -1530,10 +1677,10 @@ class TestPreprocessingCandidateResponseResult1(TypedDict):
     evidence_size_bytes: int | None
 
 
-class TestPreprocessingCandidateResponse(TypedDict):
+class TestPreprocessingScriptCandidateResponse(TypedDict):
     result: (
-        TestPreprocessingCandidateResponseResult
-        | TestPreprocessingCandidateResponseResult1
+        TestPreprocessingScriptCandidateResponseResult
+        | TestPreprocessingScriptCandidateResponseResult1
     )
 
 
@@ -1747,6 +1894,7 @@ class ListIssuesResponseIssue(TypedDict):
     production_activity: Literal["new", "ongoing", "increasing", "recurring"]
     first_seen_at: str | None
     last_seen_at: str | None
+    evidence_source: Literal["traces", "conversations"]
     evidence_count: float
     agent_reasoning: str | None
     monitoring_judge_id: str | None
@@ -1757,6 +1905,7 @@ class ListIssuesResponseIssue(TypedDict):
 
 class ListIssuesResponse(TypedDict):
     issues: list[ListIssuesResponseIssue]
+    next_offset: int | None
 
 
 class CreateIssueRequestCitedItem(TypedDict):
@@ -1825,6 +1974,7 @@ class GetIssueResponseIssue(TypedDict):
     production_activity: Literal["new", "ongoing", "increasing", "recurring"]
     first_seen_at: str | None
     last_seen_at: str | None
+    evidence_source: Literal["traces", "conversations"]
     evidence_count: float
     agent_reasoning: str | None
     monitoring_judge_id: str | None
@@ -1832,6 +1982,8 @@ class GetIssueResponseIssue(TypedDict):
     created_at: str
     updated_at: str
     cited_items: list[GetIssueResponseIssueCitedItem]
+    cited_items_total: int
+    events_total: int
     events: list[GetIssueResponseIssueEvent]
 
 
@@ -1872,6 +2024,7 @@ class UpdateIssueResponseIssue(TypedDict):
     production_activity: Literal["new", "ongoing", "increasing", "recurring"]
     first_seen_at: str | None
     last_seen_at: str | None
+    evidence_source: Literal["traces", "conversations"]
     evidence_count: float
     agent_reasoning: str | None
     monitoring_judge_id: str | None
@@ -1882,6 +2035,56 @@ class UpdateIssueResponseIssue(TypedDict):
 
 class UpdateIssueResponse(TypedDict):
     issue: UpdateIssueResponseIssue
+
+
+class SubmitExternalJudgeResultSubmitExternalJudgeResultTarget(TypedDict):
+    type: Literal["trace"]
+    trace_id: str
+
+
+class SubmitExternalJudgeResultSubmitExternalJudgeResultTarget1(TypedDict):
+    type: Literal["session"]
+    session_id: str
+
+
+class SubmitExternalJudgeResultSubmitExternalJudgeResult(TypedDict):
+    target: (
+        SubmitExternalJudgeResultSubmitExternalJudgeResultTarget
+        | SubmitExternalJudgeResultSubmitExternalJudgeResultTarget1
+    )
+    value: bool | float | str
+    reason: NotRequired[str]
+    judge_id: str
+
+
+class SubmitExternalJudgeResultSubmitExternalJudgeResult1Target(TypedDict):
+    type: Literal["trace"]
+    trace_id: str
+
+
+class SubmitExternalJudgeResultSubmitExternalJudgeResult1Target1(TypedDict):
+    type: Literal["session"]
+    session_id: str
+
+
+class SubmitExternalJudgeResultSubmitExternalJudgeResult1(TypedDict):
+    target: (
+        SubmitExternalJudgeResultSubmitExternalJudgeResult1Target
+        | SubmitExternalJudgeResultSubmitExternalJudgeResult1Target1
+    )
+    value: bool | float | str
+    reason: NotRequired[str]
+    judge_name: str
+
+
+SubmitExternalJudgeResult: TypeAlias = (
+    SubmitExternalJudgeResultSubmitExternalJudgeResult
+    | SubmitExternalJudgeResultSubmitExternalJudgeResult1
+)
+
+
+class SubmitExternalJudgeResultResponse(TypedDict):
+    id: str
 
 
 class ListJudgesResponseJudge(TypedDict):
@@ -2028,10 +2231,10 @@ class ListJudgesResponseJudge1OnlineSpanTriggers(TypedDict):
 
 
 class ListJudgesResponseJudge1(TypedDict):
+    execution_mode: Literal["internal", "external"]
     id: str
     name: str
     judge_description: str | None
-    execution_mode: Literal["internal", "external"]
     judge_type: Literal["prompt", "custom", "agent", "deterministic"] | None
     knowledge_file_id: str | None
     score_type: Literal["numeric", "binary", "categorical"]
@@ -4477,7 +4680,6 @@ class GetJudgeResponseJudgeDefinition(TypedDict):
     reasoning_level: Literal["lite", "normal", "high"]
     min_score: float
     max_score: float
-    model: str
     threshold: float
 
 
@@ -5662,6 +5864,8 @@ class ListTraceHealthFailuresResponseNextCursor(TypedDict):
 
 
 class ListTraceHealthFailuresResponse(TypedDict):
+    start_time: str
+    end_time: str
     traces: list[ListTraceHealthFailuresResponseTrace]
     has_more: bool
     next_cursor: ListTraceHealthFailuresResponseNextCursor | None
@@ -5699,7 +5903,8 @@ class GetTraceHealthSummaryResponseSummary(TypedDict):
     start_time: str
     end_time: str
     sampling_interval_seconds: float
-    status: Literal["healthy", "unhealthy"]
+    status: Literal["healthy", "unhealthy", "no_data"]
+    latest_trace_at: NotRequired[str | None]
     checks: list[GetTraceHealthSummaryResponseSummaryCheck]
 
 
@@ -5721,6 +5926,7 @@ GetTraceHealthResponseTraceHealthCheckImpactReasons = TypedDict(
 class GetTraceHealthResponseTraceHealthCheck(TypedDict):
     check_id: str
     is_muted: bool
+    is_dismissed: bool
     check_version: float
     scope: Literal["trace", "span"]
     label: str
@@ -5755,9 +5961,32 @@ class EvaluateTracesRequest(TypedDict):
     judge_names: NotRequired[list[str]]
 
 
+class EvaluateTracesResponseTraceSkippedItem(TypedDict):
+    judge: str
+    reason: Literal[
+        "on_demand_not_requested",
+        "sampled_out",
+        "trigger_not_matched",
+        "environment_not_matched",
+        "no_session",
+        "session_already_claimed",
+        "usage_limited",
+        "rate_limited",
+    ]
+
+
+class EvaluateTracesResponseTrace(TypedDict):
+    trace_id: str
+    admitted: list[str]
+    skipped: list[EvaluateTracesResponseTraceSkippedItem]
+
+
 class EvaluateTracesResponse(TypedDict):
     enqueued: bool
     trace_count: float
+    traces: list[EvaluateTracesResponseTrace]
+    unknown_trace_ids: list[str]
+    unknown_judge_names: list[str]
 
 
 class EvaluateAllTracesRequest(TypedDict):
@@ -5765,9 +5994,31 @@ class EvaluateAllTracesRequest(TypedDict):
     limit: NotRequired[int]
 
 
+class EvaluateAllTracesResponseTraceSkippedItem(TypedDict):
+    judge: str
+    reason: Literal[
+        "on_demand_not_requested",
+        "sampled_out",
+        "trigger_not_matched",
+        "environment_not_matched",
+        "no_session",
+        "session_already_claimed",
+        "usage_limited",
+        "rate_limited",
+    ]
+
+
+class EvaluateAllTracesResponseTrace(TypedDict):
+    trace_id: str
+    admitted: list[str]
+    skipped: list[EvaluateAllTracesResponseTraceSkippedItem]
+
+
 class EvaluateAllTracesResponse(TypedDict):
     enqueued: bool
     limit: float
+    traces: list[EvaluateAllTracesResponseTrace]
+    unknown_judge_names: list[str]
 
 
 class ListProjectsResponseProject(TypedDict):
@@ -5786,53 +6037,3 @@ class ListProjectsResponseProject(TypedDict):
 
 class ListProjectsResponse(TypedDict):
     projects: list[ListProjectsResponseProject]
-
-
-class SubmitExternalJudgeResultSubmitExternalJudgeResultTarget(TypedDict):
-    type: Literal["trace"]
-    trace_id: str
-
-
-class SubmitExternalJudgeResultSubmitExternalJudgeResultTarget1(TypedDict):
-    type: Literal["session"]
-    session_id: str
-
-
-class SubmitExternalJudgeResultSubmitExternalJudgeResult(TypedDict):
-    target: (
-        SubmitExternalJudgeResultSubmitExternalJudgeResultTarget
-        | SubmitExternalJudgeResultSubmitExternalJudgeResultTarget1
-    )
-    value: bool | float | str
-    reason: NotRequired[str]
-    judge_id: str
-
-
-class SubmitExternalJudgeResultSubmitExternalJudgeResult1Target(TypedDict):
-    type: Literal["trace"]
-    trace_id: str
-
-
-class SubmitExternalJudgeResultSubmitExternalJudgeResult1Target1(TypedDict):
-    type: Literal["session"]
-    session_id: str
-
-
-class SubmitExternalJudgeResultSubmitExternalJudgeResult1(TypedDict):
-    target: (
-        SubmitExternalJudgeResultSubmitExternalJudgeResult1Target
-        | SubmitExternalJudgeResultSubmitExternalJudgeResult1Target1
-    )
-    value: bool | float | str
-    reason: NotRequired[str]
-    judge_name: str
-
-
-SubmitExternalJudgeResult: TypeAlias = (
-    SubmitExternalJudgeResultSubmitExternalJudgeResult
-    | SubmitExternalJudgeResultSubmitExternalJudgeResult1
-)
-
-
-class SubmitExternalJudgeResultResponse(TypedDict):
-    id: str

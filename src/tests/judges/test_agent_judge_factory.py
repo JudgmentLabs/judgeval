@@ -328,3 +328,14 @@ def test_rejects_external_judges_with_no_executable_type():
         ValueError, match="only prompt-based agent judges are supported"
     ):
         factory.update(judge_id="judge-1", prompt="Updated rubric")
+
+
+def test_create_preserves_judge_metadata_when_server_omits_model():
+    definition = dict(DEFINITION)
+    del definition["model"]
+    factory, _ = _make_factory(lookups=[_judge_detail(definition=definition)])
+    judge = factory.create(
+        name="helpfulness", prompt="Check helpfulness.", score_type="binary"
+    )
+    assert judge is not None
+    assert (judge.model, judge.reasoning_level) == (None, "lite")

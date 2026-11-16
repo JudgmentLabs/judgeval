@@ -453,11 +453,12 @@ def _warn_if_model(model: Optional[str]) -> None:
 
 def _to_agent_judge(judge: GetJudgeResponseJudge) -> AgentJudge:
     definition = judge["definition"]
+    model = definition.get("model")
     return AgentJudge(
         judge_id=judge["id"],
         name=judge["name"],
         prompt=definition["prompt"],
-        model=definition["model"],
+        model=model if isinstance(model, str) else None,
         reasoning_level=definition["reasoning_level"],
         score_type=judge["score_type"],
         description=definition["description"],

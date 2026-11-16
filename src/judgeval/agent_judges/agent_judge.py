@@ -21,7 +21,8 @@ class AgentJudge:
         judge_id: Unique judge identifier on the Judgment platform.
         name: Human-readable name of the judge (unique per project).
         prompt: Rubric prompt template used by the Agent judge.
-        model: Model the platform resolved from `reasoning_level`.
+        model: Legacy resolved model when supplied by the server, otherwise None.
+            The platform selects the model from `reasoning_level`.
         score_type: One of `"numeric"`, `"binary"`, or `"categorical"`.
         description: Optional description stored on the judge version.
         judge_description: Optional human-readable description shown in the UI.
@@ -52,7 +53,7 @@ class AgentJudge:
     judge_id: str
     name: str
     prompt: str
-    model: str
+    model: Optional[str]
     score_type: ScoreType
     description: Optional[str] = None
     judge_description: Optional[str] = None
