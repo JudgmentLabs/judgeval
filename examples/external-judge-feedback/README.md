@@ -10,7 +10,7 @@ uv run python main.py trace-feedback message-123 false
 uv run python main.py session-feedback conversation-456 4.5
 ```
 
-Run `setup` once per project. `request` captures the active span's 32-character trace ID and retains it in `feedback-targets.json`, keyed by your unique message ID. `trace-feedback` looks up that mapping after the request process has exited; it does not need an active span or a trace search. Keep the same working directory between commands.
+Run `setup` once per project. A request fails before saving a feedback target if tracing cannot resolve the project. `request` captures the active span's 32-character trace ID and retains it in `feedback-targets.json`, keyed by your unique message ID. `trace-feedback` looks up that mapping after the request process has exited; it does not need an active span or a trace search. Keep the same working directory between commands.
 
 Use trace feedback for one response/run. Use session feedback only for an overall conversation rating. Attach your customer-owned session/conversation ID to every traced request with `Tracer.set_session_id`; an arbitrary ID without ingested traces is not a session in Judgment.
 

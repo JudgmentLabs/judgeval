@@ -57,7 +57,11 @@ def main():
     if args.command == "request":
         if not args.detail:
             parser.error("request requires MESSAGE_ID SESSION_ID")
-        Tracer.init(project_name=PROJECT_NAME)
+        tracer = Tracer.init(project_name=PROJECT_NAME)
+        if not tracer.project_id:
+            raise RuntimeError(
+                "Tracing requires valid credentials and an existing project"
+            )
         response = answer(args.target_id, args.detail)
         if not Tracer.force_flush():
             raise RuntimeError(
