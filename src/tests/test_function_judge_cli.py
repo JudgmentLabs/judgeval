@@ -18,8 +18,6 @@ def test_a_scaffolded_judge_passes_its_test_in_monty(tmp_path: Path) -> None:
     init = runner.invoke(
         app, ["scorer", "init", "-n", "ToolUse", "-p", str(tmp_path), "-y"]
     )
-    assert init.exit_code == 0, init.output
-
     result = runner.invoke(
         app,
         [
@@ -35,13 +33,16 @@ def test_a_scaffolded_judge_passes_its_test_in_monty(tmp_path: Path) -> None:
         ],
     )
 
-    assert result.exit_code == 0, result.output
-    assert json.loads(result.output) == {
-        "value": "Pass",
-        "reason": "The agent called search_flights",
-        "citations": [{"span_id": "search", "span_attribute": "span_name"}],
-        "metrics": {"tool_calls": 1},
-    }
+    assert (init.exit_code, result.exit_code, json.loads(result.output)) == (
+        0,
+        0,
+        {
+            "value": "Pass",
+            "reason": "The agent called search_flights",
+            "citations": [{"span_id": "search", "span_attribute": "span_name"}],
+            "metrics": {"tool_calls": 1},
+        },
+    ), result.output
 
 
 def test_a_conversation_judge_reads_the_conversation_it_is_given(
@@ -75,8 +76,10 @@ def test_a_conversation_judge_reads_the_conversation_it_is_given(
         ],
     )
 
-    assert result.exit_code == 0, result.output
-    assert json.loads(result.output) == {"value": True}
+    assert (result.exit_code, json.loads(result.output)) == (
+        0,
+        {"value": True},
+    ), result.output
 
 
 def test_the_local_test_rejects_code_monty_cannot_run(tmp_path: Path) -> None:
@@ -92,9 +95,9 @@ def test_the_local_test_rejects_code_monty_cannot_run(tmp_path: Path) -> None:
         app, ["scorer", "test", str(judge), "--trace", str(trace), "-o", "binary"]
     )
 
-    assert result.exit_code == 1
-    assert result.output.splitlines()[0] == (
-        "Judgment would reject this judge at upload:"
+    assert (result.exit_code, result.output.splitlines()[0]) == (
+        1,
+        "Judgment would reject this judge at upload:",
     )
 
 
@@ -130,30 +133,33 @@ def test_a_new_function_judge_uploads_as_a_categorical_judge(
         env=AUTH,
     )
 
-    assert result.exit_code == 0, result.output
-    judges_url = calls[0][1]
-    assert judges_url.endswith("/v1/projects/project-1/judges")
-    assert calls == [
-        ("GET", judges_url, {}),
-        (
-            "POST",
-            judges_url,
-            {
-                "judge": {
-                    "name": "always_pass",
-                    "judgeType": "custom",
-                    "initialVersion": {
-                        "scoreType": "categorical",
-                        "outputs": [
-                            {"name": "Pass", "description": ""},
-                            {"name": "Fail", "description": ""},
-                        ],
-                    },
-                    "config": {"functionSource": source},
-                }
-            },
-        ),
-    ]
+    # Calls with the base URL dropped.
+    sent = [(method, url[url.index("/v1/") :], body) for method, url, body in calls]
+    judges_url = "/v1/projects/project-1/judges"
+    assert (result.exit_code, sent) == (
+        0,
+        [
+            ("GET", judges_url, {}),
+            (
+                "POST",
+                judges_url,
+                {
+                    "judge": {
+                        "name": "always_pass",
+                        "judgeType": "custom",
+                        "initialVersion": {
+                            "scoreType": "categorical",
+                            "outputs": [
+                                {"name": "Pass", "description": ""},
+                                {"name": "Fail", "description": ""},
+                            ],
+                        },
+                        "config": {"functionSource": source},
+                    }
+                },
+            ),
+        ],
+    ), result.output
 
 
 def test_a_class_judge_upload_warns_that_class_judges_are_deprecated(
@@ -180,8 +186,11 @@ def test_a_class_judge_upload_warns_that_class_judges_are_deprecated(
             app, ["scorer", "upload", str(judge), "-p", "demo", "-y"], env=AUTH
         )
 
-    assert result.exit_code == 0, result.output
-    assert [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING] == [
-        "Class judges are deprecated. Rewrite this one as a function judge, "
-        "`def judge(example)` in one file; run `judgeval scorer init` for an example."
-    ]
+    warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert (result.exit_code, warnings) == (
+        0,
+        [
+            "Class judges are deprecated. Rewrite this one as a function judge, "
+            "`def judge(example)` in one file; run `judgeval scorer init` for an example."
+        ],
+    ), result.output

@@ -118,7 +118,9 @@ def run_judge(source: str, example: Dict[str, Any]) -> Any:
             raise
 
 
-def _value_problem(value: Any, output: OutputType, labels: List[str]) -> Optional[str]:
+def _output_value_problem(
+    value: Any, output: OutputType, labels: List[str]
+) -> Optional[str]:
     is_number = (
         isinstance(value, (int, float))
         and not isinstance(value, bool)
@@ -133,7 +135,7 @@ def _value_problem(value: Any, output: OutputType, labels: List[str]) -> Optiona
     return None
 
 
-def _fields_problem(fields: Dict[str, Any]) -> Optional[str]:
+def _output_fields_problem(fields: Dict[str, Any]) -> Optional[str]:
     unknown = sorted(set(fields) - _RESULT_KEYS)
     if unknown:
         return f"unknown keys {unknown}; allowed: value, reason, citations, metrics"
@@ -169,7 +171,9 @@ def check_result(
     fields = returned if isinstance(returned, dict) else {"value": returned}
     if "value" not in fields:
         raise JudgeFailed("Judge returned an invalid result: missing value")
-    problem = _value_problem(fields["value"], output, labels) or _fields_problem(fields)
+    problem = _output_value_problem(
+        fields["value"], output, labels
+    ) or _output_fields_problem(fields)
     if problem:
         raise JudgeFailed(f"Judge returned an invalid result: {problem}")
     # Measured as compact UTF-8 JSON, as the runner's JSON.stringify does.
@@ -218,7 +222,7 @@ def upload_function_judge(
                 "A new function judge needs at least two categories, e.g. "
                 "--category Pass --category Fail"
             )
-        create: CreateJudgeRequest = {
+        request: CreateJudgeRequest = {
             "judge": {
                 "name": name,
                 "judgeType": "custom",
@@ -229,7 +233,7 @@ def upload_function_judge(
                 "config": {"functionSource": source},
             }
         }
-        client.create_judge(project_id, create)
+        client.create_judge(project_id, request)
         return f"Created function judge '{name}'"
 
     if existing["judge_type"] != "custom":

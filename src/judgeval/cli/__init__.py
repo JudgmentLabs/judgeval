@@ -18,7 +18,7 @@ from judgeval.logger import judgeval_logger
 from judgeval.exceptions import JudgmentAPIError
 from judgeval.version import get_version
 from judgeval.utils.url import url_for
-from judgeval.cli.function_judge import OutputType
+from judgeval.judges.function_judge import OutputType
 
 load_dotenv()
 
@@ -113,7 +113,7 @@ def upload(
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ):
     """Upload a Code judge to Judgment."""
-    from judgeval.cli.function_judge import is_function_judge, upload_function_judge
+    from judgeval.judges.function_judge import is_function_judge, upload_function_judge
     from judgeval.cli.upload_judge import upload_judge
 
     scorer_path = Path(entrypoint_path)
@@ -310,7 +310,7 @@ def test(
     ),
 ):
     """Run a function judge in Monty, as Judgment does, and check its result."""
-    from judgeval.cli.function_judge import (
+    from judgeval.judges.function_judge import (
         JudgeFailed,
         check_result,
         load_rows,
