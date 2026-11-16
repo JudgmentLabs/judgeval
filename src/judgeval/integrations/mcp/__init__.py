@@ -22,6 +22,7 @@ import weakref
 from typing import Any, Optional, Callable
 
 from judgeval.logger import judgeval_logger
+from ._client_identity import McpClientIdentityMiddleware, instrument_http_app
 from ._payload import RedactPayload, OMITTED
 
 from ._observer import (
@@ -178,6 +179,7 @@ def _instrument(server: Any, options: McpOptions) -> bool:
     from . import _v1, _v2
 
     if _v2.instrument(observer, lowlevel) or _v1.instrument(observer, lowlevel):
+        instrument_http_app(server)
         # Both adapters already skip handlers they wrapped, so a server that
         # can't be remembered here is still safe to instrument twice.
         try:
@@ -212,6 +214,7 @@ def _text(value: Any) -> Optional[str]:
 __all__ = [
     "OMITTED",
     "McpCaller",
+    "McpClientIdentityMiddleware",
     "McpRequestInfo",
     "instrument_mcp_server",
     "mark_mcp_call_error",
