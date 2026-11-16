@@ -281,6 +281,16 @@ def test(
         dir_okay=False,
         help="Saved trace: a JSON list of spans, {'spans': [...]}, or NDJSON",
     ),
+    conversation_path: Path = typer.Option(
+        None,
+        "--conversation",
+        exists=True,
+        dir_okay=False,
+        help=(
+            "Saved conversation: a JSON list of its calls and items, "
+            "{'conversation': [...]}, or NDJSON"
+        ),
+    ),
     example_path: Path = typer.Option(
         None,
         "--example",
@@ -303,7 +313,7 @@ def test(
     from judgeval.cli.function_judge import (
         JudgeFailed,
         check_result,
-        load_spans,
+        load_rows,
         run_judge,
         source_problems,
     )
@@ -313,14 +323,20 @@ def test(
         raise typer.BadParameter("Give --output, or --category for a categorical judge")
     if output == "categorical" and len(categories) < 2:
         raise typer.BadParameter("A categorical judge needs at least two --category")
-    if trace_path is None and example_path is None:
-        raise typer.BadParameter("Give --trace, --example, or both")
+    if trace_path and conversation_path:
+        raise typer.BadParameter("A judge scores a trace or a conversation, not both")
+    if trace_path is None and conversation_path is None and example_path is None:
+        raise typer.BadParameter("Give --trace or --conversation, --example, or both")
 
     source = judge_path.read_text()
     try:
         example = json.loads(example_path.read_text()) if example_path else {}
+        # The shapes Judgment passes: example["trace"]["spans"] or
+        # example["conversation"].
         if trace_path:
-            example["trace"] = {"spans": load_spans(trace_path)}
+            example["trace"] = {"spans": load_rows(trace_path, "spans")}
+        if conversation_path:
+            example["conversation"] = load_rows(conversation_path, "conversation")
         problems = source_problems(source)
         if problems:
             typer.echo(

@@ -44,6 +44,41 @@ def test_a_scaffolded_judge_passes_its_test_in_monty(tmp_path: Path) -> None:
     }
 
 
+def test_a_conversation_judge_reads_the_conversation_it_is_given(
+    tmp_path: Path,
+) -> None:
+    judge = tmp_path / "asked_twice.py"
+    judge.write_text(
+        "def judge(example):\n"
+        "    asks = [row for row in example['conversation']\n"
+        "            if row['content']['role'] == 'user']\n"
+        "    return len(asks) > 1\n"
+    )
+    conversation = tmp_path / "conversation.ndjson"
+    conversation.write_text(
+        "\n".join(
+            json.dumps({"kind": "item", "content": {"role": role, "text": "hi"}})
+            for role in ("user", "assistant", "user")
+        )
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "scorer",
+            "test",
+            str(judge),
+            "--conversation",
+            str(conversation),
+            "-o",
+            "binary",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output) == {"value": True}
+
+
 def test_the_local_test_rejects_code_monty_cannot_run(tmp_path: Path) -> None:
     judge = tmp_path / "judge.py"
     judge.write_text(

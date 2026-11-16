@@ -179,17 +179,21 @@ def check_result(
     return fields
 
 
-def load_spans(path: Path) -> List[Dict[str, Any]]:
-    """Reads a saved trace: a JSON list of spans, {"spans": [...]}, or NDJSON."""
+def load_rows(path: Path, key: str) -> List[Dict[str, Any]]:
+    """Reads saved records: a JSON list, {key: [...]}, or NDJSON.
+
+    Spans for a trace (key "spans"), or a conversation's log (key
+    "conversation"): each model call and item, item content as objects.
+    """
     text = path.read_text()
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
         return [json.loads(line) for line in text.splitlines() if line.strip()]
-    spans = data.get("spans") if isinstance(data, dict) else data
-    if not isinstance(spans, list):
-        raise ValueError(f"{path} must hold a list of spans or {{'spans': [...]}}")
-    return spans
+    rows = data.get(key) if isinstance(data, dict) else data
+    if not isinstance(rows, list):
+        raise ValueError(f"{path} must hold a list or {{'{key}': [...]}}")
+    return rows
 
 
 def upload_function_judge(
