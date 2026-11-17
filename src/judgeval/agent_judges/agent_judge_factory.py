@@ -292,7 +292,9 @@ class AgentJudgeFactory:
             judge_id=judge_id,
             payload={"version": version},
         )["judge"]
-        if judge["judge_type"] != "prompt":
+        if (
+            "execution_mode" in judge and judge["execution_mode"] == "external"
+        ) or judge["judge_type"] != "prompt":
             raise ValueError(
                 f"Judge {judge_id} is a {judge['judge_type']} judge; only "
                 "prompt-based agent judges are supported."
@@ -451,11 +453,12 @@ def _warn_if_model(model: Optional[str]) -> None:
 
 def _to_agent_judge(judge: GetJudgeResponseJudge) -> AgentJudge:
     definition = judge["definition"]
+    model = definition.get("model")
     return AgentJudge(
         judge_id=judge["id"],
         name=judge["name"],
         prompt=definition["prompt"],
-        model=definition["model"],
+        model=model if isinstance(model, str) else None,
         reasoning_level=definition["reasoning_level"],
         score_type=judge["score_type"],
         description=definition["description"],
