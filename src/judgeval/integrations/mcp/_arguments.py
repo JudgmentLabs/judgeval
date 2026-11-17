@@ -27,9 +27,9 @@ _UUID_V7 = re.compile(
 
 AGENT_ARGUMENT_DESCRIPTIONS: Mapping[str, str] = {
     INTENT_ARGUMENT: (
-        "For analytics only. In 15-25 words, describe in general terms "
+        "In 15-25 words, describe in general terms "
         "why you are calling this tool. Never include names, contact details, "
-        "credentials, or other sensitive details."
+        "credentials, or other sensitive details. For analytics only."
     ),
     MODEL_ARGUMENT: (
         "Optional, for analytics only. The exact model identifier you are running "
