@@ -9,6 +9,7 @@ from typer.testing import CliRunner
 
 from judgeval.cli import app
 from judgeval.api import JudgmentApiClient
+from judgeval.judges.function_judge import load_rows
 
 AUTH = {"JUDGMENT_API_KEY": "api-key", "JUDGMENT_ORG_ID": "org-1"}
 
@@ -194,3 +195,20 @@ def test_a_class_judge_upload_warns_that_class_judges_are_deprecated(
             "`def judge(example)` in one file; run `judgeval scorer init` for an example."
         ],
     ), result.output
+
+
+def test_a_single_record_ndjson_trace_is_one_span(tmp_path: Path) -> None:
+    trace = tmp_path / "trace.ndjson"
+    trace.write_text('{"span_id": "root", "span_kind": "agent"}\n')
+
+    assert load_rows(trace, "spans") == [{"span_id": "root", "span_kind": "agent"}]
+
+
+def test_init_prints_a_test_command_that_runs_from_the_current_directory(
+    tmp_path: Path,
+) -> None:
+    result = CliRunner().invoke(
+        app, ["scorer", "init", "-n", "ToolUse", "-p", str(tmp_path), "-y"]
+    )
+
+    assert f"--trace {tmp_path / 'tool_use_trace.json'}" in result.output

@@ -194,6 +194,12 @@ def load_rows(path: Path, key: str) -> List[Dict[str, Any]]:
         data = json.loads(text)
     except json.JSONDecodeError:
         return [json.loads(line) for line in text.splitlines() if line.strip()]
+    if (
+        isinstance(data, dict)
+        and key not in data
+        and len(text.strip().splitlines()) == 1
+    ):
+        return [data]  # NDJSON with a single record
     rows = data.get(key) if isinstance(data, dict) else data
     if not isinstance(rows, list):
         raise ValueError(f"{path} must hold a list or {{'{key}': [...]}}")

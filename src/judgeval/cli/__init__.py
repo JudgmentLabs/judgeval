@@ -252,7 +252,7 @@ def init(
             raise typer.BadParameter(f"File already exists: {path}")
 
     category_flags = " ".join(f"-c {shlex.quote(c)}" for c in categories)
-    test_command = f"judgeval scorer test {judge_path.name} --trace {trace_path.name} {category_flags}"
+    test_command = f"judgeval scorer test {shlex.quote(str(judge_path))} --trace {shlex.quote(str(trace_path))} {category_flags}"
     if not yes:
         typer.confirm(
             f"Write a function judge to {judge_path.resolve()} and a sample trace to {trace_path.resolve()}?",
