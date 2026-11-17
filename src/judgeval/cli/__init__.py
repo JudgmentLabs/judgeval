@@ -186,10 +186,10 @@ def upload(
             raise typer.Abort()
         typer.echo(f"Code judge uploaded successfully to project '{project_name}'!")
     except JudgmentAPIError as e:
-        if e.status_code in (400, 409, 422):
-            judgeval_logger.error(e.detail)
-            raise typer.Exit(1)
-        raise
+        # The status and the API's message say what went wrong; a traceback
+        # adds nothing.
+        judgeval_logger.error(str(e))
+        raise typer.Exit(1)
     except ValueError as e:
         judgeval_logger.error(str(e))
         raise typer.Exit(1)
