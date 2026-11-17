@@ -5409,7 +5409,7 @@
             "enum": ["manual", "ci", "schedule", "api"]
           },
           "stored_traces": {
-            "description": "Score each case's stored trace, named by its metadata.trace_id, instead of running the agent. Every published case needs a trace in this project.",
+            "description": "Score what each case stores instead of running the agent: the trace in its metadata.trace_id, the conversation in its metadata.conversation_id, or both. Every published case needs one that is in this project. A case with only a conversation can only use conversation judges.",
             "type": "boolean"
           }
         }
@@ -5522,7 +5522,7 @@
             "type": "integer"
           },
           "cases_with_output": {
-            "description": "Cases whose trace arrived.",
+            "description": "Cases whose trace arrived, or that have a stored conversation.",
             "type": "integer"
           },
           "cases_scored": {
@@ -5575,6 +5575,7 @@
               "required": [
                 "case_id",
                 "trace_id",
+                "conversation_id",
                 "scored_at",
                 "passed",
                 "checks",
@@ -5588,7 +5589,18 @@
                 "trace_id": {
                   "anyOf": [
                     {
-                      "description": "The case's output; NULL until it arrives.",
+                      "description": "The case's trace; NULL until it arrives, and for a case scored from a stored conversation.",
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "conversation_id": {
+                  "anyOf": [
+                    {
+                      "description": "The conversation the case's conversation judges graded: the stored one the case names, or the conversation of its trace. NULL when no conversation judge has needed one.",
                       "type": "string"
                     },
                     {
@@ -10514,7 +10526,7 @@
       "post": {
         "tags": ["V1"],
         "summary": "Submit a customer judge result",
-        "description": "Submit a customer score for one trace or session under any judge. Resubmitting for the same judge and target replaces its current customer score. Each submission, including a retry, writes a new result row. Hosted results are preserved. Validates against the production version and derives attribution from the target.",
+        "description": "Submit a customer score for one trace, session, or conversation under any judge. Resubmitting for the same judge and target replaces its current customer score. Each submission, including a retry, writes a new result row. Hosted results are preserved. Validates against the production version and derives attribution from the target.",
         "parameters": [
           {
             "name": "projectId",
@@ -10564,6 +10576,21 @@
                               }
                             },
                             "required": ["type", "session_id"]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "conversation"
+                              },
+                              "conversation_id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 512
+                              }
+                            },
+                            "required": ["type", "conversation_id"]
                           }
                         ]
                       },
@@ -10613,6 +10640,21 @@
                               }
                             },
                             "required": ["type", "session_id"]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "conversation"
+                              },
+                              "conversation_id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 512
+                              }
+                            },
+                            "required": ["type", "conversation_id"]
                           }
                         ]
                       },

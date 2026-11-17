@@ -175,7 +175,7 @@ class ExternalJudgeFactory:
         judge_name: Optional[str] = None,
         reason: Optional[str] = None,
     ) -> Optional[str]:
-        """Submit a customer score under any judge for a trace or session.
+        """Submit a customer score under any judge for a trace, session, or conversation.
 
         Resubmitting for the same judge and target replaces its current customer
         score. To correct a value, submit again for that judge and target.
@@ -188,7 +188,7 @@ class ExternalJudgeFactory:
         names for `categorical`).
 
         Args:
-            target: A trace or session target with its corresponding ID.
+            target: A trace, session, or conversation target with its corresponding ID.
             value: The externally computed score.
             judge_id: ID of the judge to submit under.
             judge_name: Name of the judge to submit under.
@@ -216,14 +216,20 @@ class ExternalJudgeFactory:
         if (judge_id is None) == (judge_name is None):
             raise ValueError("Exactly one of judge_id or judge_name must be provided")
 
-        target_key = "trace_id" if target.get("type") == "trace" else "session_id"
+        target_key = {
+            "trace": "trace_id",
+            "session": "session_id",
+            "conversation": "conversation_id",
+        }.get(target.get("type", ""), "")
         if (
-            target.get("type") not in ("trace", "session")
+            target.get("type") not in ("trace", "session", "conversation")
             or set(target) != {"type", target_key}
             or not isinstance(target.get(target_key), str)
             or not target.get(target_key)
         ):
-            raise ValueError("target must contain exactly one trace or session ID")
+            raise ValueError(
+                "target must contain exactly one trace, session, or conversation ID"
+            )
 
         project_id = expect_project_id(self._project_id)
         if not project_id:

@@ -28,7 +28,18 @@ class ExternalJudgeSessionTarget(TypedDict):
     session_id: str
 
 
-ExternalJudgeTarget = Union[ExternalJudgeTraceTarget, ExternalJudgeSessionTarget]
+class ExternalJudgeConversationTarget(TypedDict):
+    """A recorded conversation/trajectory, independent of trace or session IDs."""
+
+    type: Literal["conversation"]
+    conversation_id: str
+
+
+ExternalJudgeTarget = Union[
+    ExternalJudgeTraceTarget,
+    ExternalJudgeSessionTarget,
+    ExternalJudgeConversationTarget,
+]
 
 
 @dataclass
