@@ -66,6 +66,14 @@ def test_explicit_argument_names_reuse_owned_fields_and_inject_missing_fields(
     }
 
 
+@pytest.mark.parametrize("required", [None, "intent"])
+def test_malformed_required_is_ignored(required):
+    schema = {"type": "object", "properties": {}, "required": required}
+    contract = tool_contract(schema)
+    updated = schema_with_agent_arguments(schema, contract.declared)
+    assert updated["required"] == ["intent", "llm_model"]
+
+
 def test_session_ids_are_unique_time_ordered_uuid_v7():
     minted = [mint_conversation_id(now_ms=1000 + index) for index in range(3)]
     pattern = r"[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
