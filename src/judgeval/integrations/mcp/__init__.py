@@ -65,8 +65,9 @@ def instrument_mcp_server(
 
     Call it once per server, after ``Tracer.init()`` and before the server
     starts. It changes your server in one way by default: each tool's published
-    schema gets optional ``intent``, ``llm_model`` and ``conversation_id``
-    arguments, which are removed before your tool runs. When a call has no
+    schema gets required ``intent`` and optional ``llm_model`` and
+    ``conversation_id`` arguments, removed before your tool runs. Missing injected
+    intent does not fail execution. When a call has no
     application or echoed conversation session, its returned result gets an ID in
     supplemental text and compatible existing ``structuredContent._judgment``.
     Compatible output schemas gain

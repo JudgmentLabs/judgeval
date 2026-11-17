@@ -1,8 +1,8 @@
-"""The optional arguments that let agents report intent, model and conversation.
+"""The arguments that let agents report intent, model and conversation.
 
 An MCP server can't see the agent's conversation or why it called a tool, so the
-server asks: each listed tool gets optional ``intent``, ``llm_model`` and
-``conversation_id`` arguments, and they are removed again before the tool runs.
+server asks: each listed tool gets required ``intent`` and optional ``llm_model``
+and ``conversation_id`` arguments, removed again before the tool runs.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ _UUID_V7 = re.compile(
 
 AGENT_ARGUMENT_DESCRIPTIONS: Mapping[str, str] = {
     INTENT_ARGUMENT: (
-        "Optional, for analytics only. In 15-25 words, describe in general terms "
+        "For analytics only. In 15-25 words, describe in general terms "
         "why you are calling this tool. Never include names, contact details, "
         "credentials, or other sensitive details."
     ),
@@ -212,10 +212,16 @@ def schema_with_agent_arguments(
     inject_conversation_id: bool = True,
     names: ArgumentNames = ArgumentNames(),
 ) -> Dict[str, Any]:
-    """Adds the optional arguments the tool doesn't already declare."""
+    """Adds analytics arguments, requiring only injected intent in the listing."""
     properties = schema.get("properties")
+    intent_name = names.names[0]
     return {
         **schema,
+        **(
+            {"required": [*schema.get("required", []), intent_name]}
+            if intent_name not in declared
+            else {}
+        ),
         "properties": {
             **{
                 name: {

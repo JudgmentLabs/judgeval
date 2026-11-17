@@ -95,7 +95,7 @@ Tool calls appear as standard Judgment traces, with instrumented work inside eac
 For legacy stateless Streamable HTTP clients, the SDK returns an opaque `Mcp-Session-Id` to preserve client name/version on later requests. Existing native session IDs are unchanged. This client-reported metadata is not authentication.
 Custom ASGI hosts that bypass the server's HTTP app factory can install `McpClientIdentityMiddleware` from `judgeval.integrations.mcp` on their app.
 
-By default, the SDK adds optional `intent`, `llm_model`, and `conversation_id` arguments to compatible tool schemas and removes them before your tool runs. Results include a conversation ID for the agent to reuse. To trace without changing tool schemas or results:
+By default, the SDK adds required `intent` and optional `llm_model` and `conversation_id` arguments to compatible tool schemas and removes them before your tool runs. Missing injected intent does not fail execution, and existing tool-owned fields keep their original requirements. Clients must refresh their tool list to see the updated schema. Results include a conversation ID for the agent to reuse. To trace without changing tool schemas or results:
 
 ```python
 instrument_mcp_server(server, inject_agent_arguments=False)

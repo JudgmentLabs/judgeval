@@ -43,6 +43,7 @@ def test_explicit_argument_names_reuse_owned_fields_and_inject_missing_fields(
         "missing": asdict(read_reported_arguments({intent_name: 42}, declared, names)),
         "preserved": without_agent_arguments(args, declared, names),
         "injected_keys": sorted(injected["properties"]),
+        "injected_required": injected["required"],
         "stripped": without_agent_arguments(args, frozenset(), names),
         "disabled_handoff": without_agent_arguments(args, frozenset(), names, False),
         "unverified_echo": read_reported_arguments(
@@ -58,6 +59,7 @@ def test_explicit_argument_names_reuse_owned_fields_and_inject_missing_fields(
         "missing": {"intent": None, "model": None, "conversation_id": None},
         "preserved": args,
         "injected_keys": sorted(args),
+        "injected_required": [intent_name],
         "stripped": {},
         "disabled_handoff": {"chat_id": "customer-chat"},
         "unverified_echo": None,
