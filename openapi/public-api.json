@@ -3629,6 +3629,9 @@
           "bump_major": {
             "type": "boolean"
           },
+          "conversation": {
+            "type": "boolean"
+          },
           "categories": {
             "anyOf": [
               {
@@ -3842,7 +3845,14 @@
                             "type": "string"
                           },
                           "judge_type": {
-                            "type": "string"
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           "score_type": {
                             "type": "string"
@@ -3984,7 +3994,14 @@
                           "type": "string"
                         },
                         "judge_type": {
-                          "type": "string"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         },
                         "score_type": {
                           "type": "string"
@@ -5861,24 +5878,18 @@
       "apiKeyAuth": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Your personal API key from Settings > Personal API Keys, sent as `Bearer <key>`.",
-        "x-label": "Personal API key",
-        "x-placeholder": "YOUR_API_KEY"
+        "description": "Your personal API key from Settings > Personal API Keys, sent as `Bearer <key>`."
       },
       "organizationHeader": {
         "type": "apiKey",
         "in": "header",
         "name": "X-Organization-Id",
-        "description": "The organization to act in. Copy it with Copy organization ID in the organization menu or the settings sidebar.",
-        "x-label": "Organization ID",
-        "x-placeholder": "YOUR_ORGANIZATION_ID"
+        "description": "The organization to act in. Copy it with Copy organization ID in the organization menu or the settings sidebar."
       },
       "ingestKeyAuth": {
         "type": "http",
         "scheme": "bearer",
-        "description": "An ingest API key from Settings > Ingest API Keys, sent as `Bearer <key>`. It belongs to one organization, so no X-Organization-Id is needed.",
-        "x-label": "Ingest API key",
-        "x-placeholder": "YOUR_INGEST_API_KEY"
+        "description": "An ingest API key from Settings > Ingest API Keys, sent as `Bearer <key>`. It belongs to one organization, so no X-Organization-Id is needed."
       }
     }
   },
@@ -6931,6 +6942,54 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "ordinary_agent_model": {
+                      "type": "string",
+                      "description": "Model used for the independent Agent Judge comparison baseline."
+                    },
+                    "candidate_catalog_model_cost_usd": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "JEV catalog model cost in USD from reported tokens; excludes preprocessing. Null when usage or pricing is unavailable."
+                    },
+                    "ordinary_catalog_model_cost_usd": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Catalog model cost in USD across recorded Agent Judge generations. Null if any generation usage or pricing is unavailable."
+                    },
+                    "optimized_catalog_model_cost_usd": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "JEV catalog model cost, plus Agent Judge catalog model cost when the candidate falls back or fails."
+                    },
+                    "catalog_model_cost_savings_usd": {
+                      "description": "Agent Judge catalog model cost minus optimized catalog model cost; negative means a cost increase.",
+                      "type": ["number", "null"]
+                    },
+                    "catalog_model_cost_savings_percent": {
+                      "description": "Savings relative to Agent Judge catalog model cost. Null when costs are unknown or the baseline is zero.",
+                      "type": ["number", "null"]
+                    },
                     "judge_id": {
                       "type": "string",
                       "format": "uuid",
@@ -7190,6 +7249,12 @@
                     }
                   },
                   "required": [
+                    "ordinary_agent_model",
+                    "candidate_catalog_model_cost_usd",
+                    "ordinary_catalog_model_cost_usd",
+                    "optimized_catalog_model_cost_usd",
+                    "catalog_model_cost_savings_usd",
+                    "catalog_model_cost_savings_percent",
                     "judge_id",
                     "judge_version_id",
                     "judge_major_version",
@@ -10445,6 +10510,159 @@
         }
       }
     },
+    "/v1/projects/{projectId}/judge-results": {
+      "post": {
+        "tags": ["V1"],
+        "summary": "Submit a customer judge result",
+        "description": "Submit a customer score for one trace or session under any judge. Resubmitting for the same judge and target replaces its current customer score. Each submission, including a retry, writes a new result row. Hosted results are preserved. Validates against the production version and derives attribution from the target.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "YOUR_PROJECT_ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "target": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "trace"
+                              },
+                              "trace_id": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": ["type", "trace_id"]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "session"
+                              },
+                              "session_id": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": ["type", "session_id"]
+                          }
+                        ]
+                      },
+                      "value": {
+                        "type": ["boolean", "number", "string"]
+                      },
+                      "reason": {
+                        "type": "string"
+                      },
+                      "judge_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      }
+                    },
+                    "required": ["target", "value", "judge_id"]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "target": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "trace"
+                              },
+                              "trace_id": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": ["type", "trace_id"]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "session"
+                              },
+                              "session_id": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": ["type", "session_id"]
+                          }
+                        ]
+                      },
+                      "value": {
+                        "type": ["boolean", "number", "string"]
+                      },
+                      "reason": {
+                        "type": "string"
+                      },
+                      "judge_name": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["target", "value", "judge_name"]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    }
+                  },
+                  "required": ["id"]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postV1ProjectsByProjectIdJudge-results",
+        "x-meta": {
+          "security": {
+            "access": "organization",
+            "role": "developer"
+          }
+        }
+      }
+    },
     "/v1/projects/{projectId}/judges": {
       "get": {
         "tags": ["V1"],
@@ -10505,13 +10723,24 @@
                               "name": {
                                 "type": "string"
                               },
-                              "judge_type": {
+                              "execution_mode": {
                                 "type": "string",
-                                "enum": [
-                                  "prompt",
-                                  "custom",
-                                  "agent",
-                                  "deterministic"
+                                "enum": ["internal", "external"]
+                              },
+                              "judge_type": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "prompt",
+                                      "custom",
+                                      "agent",
+                                      "deterministic"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
                                 ]
                               },
                               "score_type": {
@@ -10552,6 +10781,7 @@
                             "required": [
                               "id",
                               "name",
+                              "execution_mode",
                               "judge_type",
                               "score_type",
                               "judge_major_version",
@@ -10568,6 +10798,10 @@
                           "items": {
                             "type": "object",
                             "properties": {
+                              "execution_mode": {
+                                "type": "string",
+                                "enum": ["internal", "external"]
+                              },
                               "id": {
                                 "type": "string"
                               },
@@ -10578,12 +10812,19 @@
                                 "type": ["string", "null"]
                               },
                               "judge_type": {
-                                "type": "string",
-                                "enum": [
-                                  "prompt",
-                                  "custom",
-                                  "agent",
-                                  "deterministic"
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "prompt",
+                                      "custom",
+                                      "agent",
+                                      "deterministic"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
                                 ],
                                 "description": "Agent judge (wire value `prompt`); Code judge (wire value `custom`); legacy Agent judge (wire value `agent`); Condition judge (wire value `deterministic`)"
                               },
@@ -11036,6 +11277,7 @@
                               }
                             },
                             "required": [
+                              "execution_mode",
                               "id",
                               "name",
                               "judge_description",
@@ -11083,7 +11325,7 @@
           "tool": "create_judge",
           "toolset": "judges"
         },
-        "description": "Create an Agent judge (wire value `prompt`), a Code judge (wire value `custom`), or a deterministic judge with categorical outputs and its initial production version. Deterministic judges require two outputs ordered match, then miss. This call fixes the judge type for its lifetime. Agent judges require prompt configuration; Code judges require a base64-encoded tar.gz bundle and Python entrypoint metadata.",
+        "description": "Create an Agent judge (wire value `prompt`), a Code judge (wire value `custom`), a deterministic judge with categorical outputs, or an external judge with executionMode external and binary, numeric, or categorical outputs, with its initial production version. Deterministic judges require two outputs ordered match, then miss. This call fixes the judge type for its lifetime. Agent judges require prompt configuration; Code judges require a base64-encoded tar.gz bundle and Python entrypoint metadata.",
         "parameters": [
           {
             "name": "projectId",
@@ -11103,7 +11345,7 @@
                 "type": "object",
                 "properties": {
                   "judge": {
-                    "oneOf": [
+                    "anyOf": [
                       {
                         "type": "object",
                         "properties": {
@@ -11115,6 +11357,10 @@
                           "judgeDescription": {
                             "description": "Human-readable description shown in the UI",
                             "type": ["string", "null"]
+                          },
+                          "executionMode": {
+                            "type": "string",
+                            "const": "internal"
                           },
                           "judgeType": {
                             "type": "string",
@@ -11614,6 +11860,10 @@
                           "judgeDescription": {
                             "description": "Human-readable description shown in the UI",
                             "type": ["string", "null"]
+                          },
+                          "executionMode": {
+                            "type": "string",
+                            "const": "internal"
                           },
                           "judgeType": {
                             "type": "string",
@@ -12136,6 +12386,10 @@
                           "judgeDescription": {
                             "type": ["string", "null"]
                           },
+                          "executionMode": {
+                            "type": "string",
+                            "const": "internal"
+                          },
                           "judgeType": {
                             "type": "string",
                             "const": "deterministic"
@@ -12600,6 +12854,73 @@
                           "initialVersion",
                           "config"
                         ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "judgeDescription": {
+                            "type": ["string", "null"]
+                          },
+                          "executionMode": {
+                            "type": "string",
+                            "const": "external"
+                          },
+                          "initialVersion": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "scoreType": {
+                                    "type": "string",
+                                    "const": "binary"
+                                  }
+                                },
+                                "required": ["scoreType"]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "scoreType": {
+                                    "type": "string",
+                                    "const": "numeric"
+                                  }
+                                },
+                                "required": ["scoreType"]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "scoreType": {
+                                    "type": "string",
+                                    "const": "categorical"
+                                  },
+                                  "outputs": {
+                                    "minItems": 2,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string"
+                                        },
+                                        "description": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": ["name", "description"]
+                                    }
+                                  }
+                                },
+                                "required": ["scoreType", "outputs"]
+                              }
+                            ]
+                          }
+                        },
+                        "required": ["name", "executionMode", "initialVersion"]
                       }
                     ]
                   }
@@ -12624,7 +12945,7 @@
                       "type": "string"
                     },
                     "implementation_id": {
-                      "type": "string"
+                      "type": ["string", "null"]
                     }
                   },
                   "required": [
@@ -17817,7 +18138,7 @@
                       ]
                     },
                     "judge": {
-                      "oneOf": [
+                      "anyOf": [
                         {
                           "type": "object",
                           "properties": {
@@ -18305,6 +18626,10 @@
                             "session_evaluation_max_wait_minutes": {
                               "type": ["number", "null"]
                             },
+                            "execution_mode": {
+                              "type": "string",
+                              "const": "internal"
+                            },
                             "judge_type": {
                               "type": "string",
                               "const": "prompt",
@@ -18332,9 +18657,6 @@
                                 "max_score": {
                                   "type": "number"
                                 },
-                                "model": {
-                                  "type": "string"
-                                },
                                 "threshold": {
                                   "type": "number"
                                 }
@@ -18346,7 +18668,6 @@
                                 "reasoning_level",
                                 "min_score",
                                 "max_score",
-                                "model",
                                 "threshold"
                               ]
                             }
@@ -18867,6 +19188,10 @@
                             },
                             "session_evaluation_max_wait_minutes": {
                               "type": ["number", "null"]
+                            },
+                            "execution_mode": {
+                              "type": "string",
+                              "const": "internal"
                             },
                             "judge_type": {
                               "type": "string",
@@ -19439,6 +19764,10 @@
                             "session_evaluation_max_wait_minutes": {
                               "type": ["number", "null"]
                             },
+                            "execution_mode": {
+                              "type": "string",
+                              "const": "internal"
+                            },
                             "judge_type": {
                               "type": "string",
                               "const": "deterministic",
@@ -19481,6 +19810,535 @@
                             "session_evaluation_idle_enabled",
                             "session_evaluation_min_candidate_traces",
                             "session_evaluation_max_wait_minutes",
+                            "judge_type",
+                            "definition"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "judge_description": {
+                              "type": ["string", "null"]
+                            },
+                            "knowledge_file_id": {
+                              "type": ["string", "null"]
+                            },
+                            "score_type": {
+                              "type": "string",
+                              "enum": ["numeric", "binary", "categorical"]
+                            },
+                            "outputs": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "behavior_id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "description": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "behavior_id",
+                                  "name",
+                                  "description"
+                                ]
+                              }
+                            },
+                            "judge_version_id": {
+                              "type": "string"
+                            },
+                            "judge_major_version": {
+                              "type": "number"
+                            },
+                            "judge_minor_version": {
+                              "type": "number"
+                            },
+                            "is_latest": {
+                              "type": "boolean"
+                            },
+                            "is_production": {
+                              "type": "boolean"
+                            },
+                            "optimistic_eval_enabled": {
+                              "type": "boolean"
+                            },
+                            "preprocessor_artifact_revision_id": {
+                              "type": ["string", "null"]
+                            },
+                            "version_created_at": {
+                              "type": "string"
+                            },
+                            "version_updated_at": {
+                              "type": "string"
+                            },
+                            "updated_by": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "user_id": {
+                                      "type": "string"
+                                    },
+                                    "first_name": {
+                                      "type": "string"
+                                    },
+                                    "last_name": {
+                                      "type": "string"
+                                    },
+                                    "user_email": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "user_id",
+                                    "first_name",
+                                    "last_name",
+                                    "user_email"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "online_environment_names": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "online_evaluation_mode": {
+                              "type": "string",
+                              "enum": ["continuous", "on_demand"]
+                            },
+                            "action_config": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "action_groups": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "name": {
+                                            "type": "string",
+                                            "description": "Action group display name; an empty string uses Action group 1, 2, etc."
+                                          },
+                                          "enabled": {
+                                            "type": "boolean"
+                                          },
+                                          "environment_names": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            },
+                                            "description": "Empty runs the group in every environment"
+                                          },
+                                          "when": {
+                                            "oneOf": [
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "const": "any"
+                                                  }
+                                                },
+                                                "required": ["kind"]
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "const": "binary"
+                                                  },
+                                                  "value": {
+                                                    "type": "boolean"
+                                                  }
+                                                },
+                                                "required": ["kind", "value"]
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "const": "categorical"
+                                                  },
+                                                  "values": {
+                                                    "minItems": 1,
+                                                    "type": "array",
+                                                    "items": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    }
+                                                  }
+                                                },
+                                                "required": ["kind", "values"]
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "const": "numeric"
+                                                  },
+                                                  "operator": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                      "lt",
+                                                      "lte",
+                                                      "eq",
+                                                      "gte",
+                                                      "gt"
+                                                    ]
+                                                  },
+                                                  "value": {
+                                                    "type": "number"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "kind",
+                                                  "operator",
+                                                  "value"
+                                                ]
+                                              }
+                                            ],
+                                            "description": "Judge result that runs the group. Categorical groups run when the result is any listed output name."
+                                          },
+                                          "frequency": {
+                                            "type": "object",
+                                            "properties": {
+                                              "count": {
+                                                "type": "integer",
+                                                "minimum": 1,
+                                                "maximum": 9007199254740991
+                                              },
+                                              "window_seconds": {
+                                                "type": "integer",
+                                                "minimum": 1,
+                                                "maximum": 9007199254740991
+                                              }
+                                            },
+                                            "required": [
+                                              "count",
+                                              "window_seconds"
+                                            ]
+                                          },
+                                          "cooldown_seconds": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "actions": {
+                                            "type": "array",
+                                            "items": {
+                                              "oneOf": [
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "id": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    },
+                                                    "enabled": {
+                                                      "type": "boolean"
+                                                    },
+                                                    "type": {
+                                                      "type": "string",
+                                                      "const": "webhook"
+                                                    },
+                                                    "config": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "url": {
+                                                          "type": "string",
+                                                          "minLength": 1
+                                                        },
+                                                        "secret": {
+                                                          "type": "string",
+                                                          "minLength": 1
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "url",
+                                                        "secret"
+                                                      ]
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "id",
+                                                    "enabled",
+                                                    "type",
+                                                    "config"
+                                                  ],
+                                                  "description": "Signed HTTPS webhook; requires the automation_webhooks feature flag."
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "id": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    },
+                                                    "enabled": {
+                                                      "type": "boolean"
+                                                    },
+                                                    "type": {
+                                                      "type": "string",
+                                                      "const": "email"
+                                                    },
+                                                    "config": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "email_address": {
+                                                          "type": "string",
+                                                          "minLength": 1
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "email_address"
+                                                      ]
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "id",
+                                                    "enabled",
+                                                    "type",
+                                                    "config"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "id": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    },
+                                                    "enabled": {
+                                                      "type": "boolean"
+                                                    },
+                                                    "type": {
+                                                      "type": "string",
+                                                      "const": "slack"
+                                                    },
+                                                    "config": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "team_id": {
+                                                          "type": "string",
+                                                          "minLength": 1
+                                                        },
+                                                        "channel_id": {
+                                                          "type": "string",
+                                                          "minLength": 1
+                                                        },
+                                                        "message": {
+                                                          "type": "string"
+                                                        },
+                                                        "custom_attribute_keys": {
+                                                          "type": "array",
+                                                          "items": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "id",
+                                                    "enabled",
+                                                    "type",
+                                                    "config"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "id": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    },
+                                                    "enabled": {
+                                                      "type": "boolean"
+                                                    },
+                                                    "type": {
+                                                      "type": "string",
+                                                      "const": "dataset"
+                                                    },
+                                                    "config": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "dataset_id": {
+                                                          "type": "string",
+                                                          "minLength": 1
+                                                        }
+                                                      },
+                                                      "required": ["dataset_id"]
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "id",
+                                                    "enabled",
+                                                    "type",
+                                                    "config"
+                                                  ]
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "id": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    },
+                                                    "enabled": {
+                                                      "type": "boolean"
+                                                    },
+                                                    "type": {
+                                                      "type": "string",
+                                                      "const": "run_behavior"
+                                                    },
+                                                    "config": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "judge_ids": {
+                                                          "minItems": 1,
+                                                          "type": "array",
+                                                          "items": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          }
+                                                        }
+                                                      },
+                                                      "required": ["judge_ids"]
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "id",
+                                                    "enabled",
+                                                    "type",
+                                                    "config"
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "name",
+                                          "enabled",
+                                          "environment_names",
+                                          "when",
+                                          "frequency",
+                                          "cooldown_seconds",
+                                          "actions"
+                                        ]
+                                      }
+                                    }
+                                  },
+                                  "required": ["action_groups"]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "online_sampling_rate": {
+                              "type": "number"
+                            },
+                            "online_span_triggers": {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["and", "or"]
+                                },
+                                "conditions": {
+                                  "type": "array",
+                                  "items": {}
+                                }
+                              },
+                              "required": ["kind", "conditions"]
+                            },
+                            "online_session_scoring": {
+                              "type": "boolean"
+                            },
+                            "session_evaluation_count_enabled": {
+                              "type": ["boolean", "null"]
+                            },
+                            "session_evaluation_idle_enabled": {
+                              "type": ["boolean", "null"]
+                            },
+                            "session_evaluation_min_candidate_traces": {
+                              "type": ["number", "null"]
+                            },
+                            "session_evaluation_max_wait_minutes": {
+                              "type": ["number", "null"]
+                            },
+                            "execution_mode": {
+                              "type": "string",
+                              "const": "external"
+                            },
+                            "judge_type": {
+                              "type": "null"
+                            },
+                            "definition": {
+                              "type": "null"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "judge_description",
+                            "knowledge_file_id",
+                            "score_type",
+                            "outputs",
+                            "judge_version_id",
+                            "judge_major_version",
+                            "judge_minor_version",
+                            "is_latest",
+                            "is_production",
+                            "optimistic_eval_enabled",
+                            "preprocessor_artifact_revision_id",
+                            "version_created_at",
+                            "version_updated_at",
+                            "updated_by",
+                            "online_environment_names",
+                            "online_evaluation_mode",
+                            "online_sampling_rate",
+                            "online_span_triggers",
+                            "online_session_scoring",
+                            "session_evaluation_count_enabled",
+                            "session_evaluation_idle_enabled",
+                            "session_evaluation_min_candidate_traces",
+                            "session_evaluation_max_wait_minutes",
+                            "execution_mode",
                             "judge_type",
                             "definition"
                           ]
@@ -20525,7 +21383,7 @@
             "schema": {
               "type": "string",
               "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
             },
             "example": "YOUR_PROJECT_ID"
           }
