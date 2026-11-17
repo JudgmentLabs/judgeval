@@ -327,3 +327,25 @@ def test_rejects_ambiguous_targets_before_sending_feedback():
             target={"type": "session", "session_id": "session", "trace_id": "trace"},
             value=True,
         )
+
+
+def test_conversation_submission_uses_customer_owned_conversation_id_without_trace_or_session():
+    factory, client = _make_factory()
+    client.post_projects_judge_results.return_value = {"id": "conversation-score"}
+    result = factory.submit_result(
+        judge_name="Quality",
+        target={"type": "conversation", "conversation_id": "customer/trajectory-123"},
+        value=4.5,
+    )
+    assert result == "conversation-score"
+    assert client.post_projects_judge_results.call_args.kwargs == {
+        "project_id": "proj-1",
+        "payload": {
+            "judge_name": "Quality",
+            "target": {
+                "type": "conversation",
+                "conversation_id": "customer/trajectory-123",
+            },
+            "value": 4.5,
+        },
+    }

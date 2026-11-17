@@ -2048,10 +2048,16 @@ class SubmitExternalJudgeResultSubmitExternalJudgeResultTarget1(TypedDict):
     session_id: str
 
 
+class SubmitExternalJudgeResultSubmitExternalJudgeResultTarget2(TypedDict):
+    type: Literal["conversation"]
+    conversation_id: str
+
+
 class SubmitExternalJudgeResultSubmitExternalJudgeResult(TypedDict):
     target: (
         SubmitExternalJudgeResultSubmitExternalJudgeResultTarget
         | SubmitExternalJudgeResultSubmitExternalJudgeResultTarget1
+        | SubmitExternalJudgeResultSubmitExternalJudgeResultTarget2
     )
     value: bool | float | str
     reason: NotRequired[str]
@@ -2068,10 +2074,16 @@ class SubmitExternalJudgeResultSubmitExternalJudgeResult1Target1(TypedDict):
     session_id: str
 
 
+class SubmitExternalJudgeResultSubmitExternalJudgeResult1Target2(TypedDict):
+    type: Literal["conversation"]
+    conversation_id: str
+
+
 class SubmitExternalJudgeResultSubmitExternalJudgeResult1(TypedDict):
     target: (
         SubmitExternalJudgeResultSubmitExternalJudgeResult1Target
         | SubmitExternalJudgeResultSubmitExternalJudgeResult1Target1
+        | SubmitExternalJudgeResultSubmitExternalJudgeResult1Target2
     )
     value: bool | float | str
     reason: NotRequired[str]
