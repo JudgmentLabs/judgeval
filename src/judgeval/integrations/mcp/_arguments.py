@@ -218,7 +218,10 @@ def schema_with_agent_arguments(
 ) -> Dict[str, Any]:
     """Adds analytics arguments, requiring injected intent and model in the listing."""
     properties = schema.get("properties")
-    required_arguments = [name for name in names.names[:2] if name not in declared]
+    intent_name, model_name, _ = names.names
+    required_arguments = [
+        name for name in (intent_name, model_name) if name not in declared
+    ]
     return {
         **schema,
         **(
