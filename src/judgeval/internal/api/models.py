@@ -1465,6 +1465,7 @@ class TestResultsResponseResultPendingCheck(TypedDict):
 class TestResultsResponseResult(TypedDict):
     case_id: str
     trace_id: str | None
+    conversation_id: str | None
     scored_at: str | None
     passed: bool | None
     checks: list[TestResultsResponseResultCheck]
