@@ -150,6 +150,15 @@ def test_schema_ownership(schema, declared, open_schema):
         {"type": "object", "dependentSchemas": {}},
         {"type": "object", "dependencies": {}},
         {"type": "object", "propertyNames": {}},
+        {
+            "type": "object",
+            "properties": {"name": {"type": "string"}},
+            "required": ["name"],
+            "additionalProperties": False,
+            "maxProperties": 1,
+        },
+        {"type": "object", "const": {"name": "Alice"}},
+        {"type": "object", "enum": [{"name": "Alice"}]},
         {"type": "object", "patternProperties": {"(?<name>x)": {}}},
     ],
 )

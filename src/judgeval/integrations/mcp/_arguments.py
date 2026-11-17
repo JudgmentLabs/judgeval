@@ -86,6 +86,9 @@ _UNSUPPORTED_KEYWORDS = (
     "dependentRequired",
     "dependencies",
     "propertyNames",
+    "maxProperties",
+    "const",
+    "enum",
 )
 
 
