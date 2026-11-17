@@ -202,9 +202,16 @@ def resolve_model(
 ) -> Optional[str]:
     if names.model is not None and reported_model is not None:
         return reported_model
+    return _model_from_client_metadata(meta) or reported_model
+
+
+def _model_from_client_metadata(meta: Mapping[str, Any]) -> Optional[str]:
+    return _model_from_codex_metadata(meta)
+
+
+def _model_from_codex_metadata(meta: Mapping[str, Any]) -> Optional[str]:
     turn = meta.get("x-codex-turn-metadata")
-    model = _normalize_model(turn.get("model")) if isinstance(turn, Mapping) else None
-    return model or reported_model
+    return _normalize_model(turn.get("model")) if isinstance(turn, Mapping) else None
 
 
 def _normalize_model(value: Any) -> Optional[str]:
