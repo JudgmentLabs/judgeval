@@ -43,6 +43,7 @@ def test_explicit_argument_names_reuse_owned_fields_and_inject_missing_fields(
         "missing": asdict(read_reported_arguments({intent_name: 42}, declared, names)),
         "preserved": without_agent_arguments(args, declared, names),
         "injected_keys": sorted(injected["properties"]),
+        "injected_required": injected["required"],
         "stripped": without_agent_arguments(args, frozenset(), names),
         "disabled_handoff": without_agent_arguments(args, frozenset(), names, False),
         "unverified_echo": read_reported_arguments(
@@ -58,10 +59,19 @@ def test_explicit_argument_names_reuse_owned_fields_and_inject_missing_fields(
         "missing": {"intent": None, "model": None, "conversation_id": None},
         "preserved": args,
         "injected_keys": sorted(args),
+        "injected_required": [intent_name, "agent_model"],
         "stripped": {},
         "disabled_handoff": {"chat_id": "customer-chat"},
         "unverified_echo": None,
     }
+
+
+@pytest.mark.parametrize("required", [None, "intent"])
+def test_malformed_required_is_ignored(required):
+    schema = {"type": "object", "properties": {}, "required": required}
+    contract = tool_contract(schema)
+    updated = schema_with_agent_arguments(schema, contract.declared)
+    assert updated["required"] == ["intent", "llm_model"]
 
 
 def test_session_ids_are_unique_time_ordered_uuid_v7():
@@ -95,7 +105,7 @@ def test_injection_preserves_business_schema_and_input():
         "schema": schema,
         "arguments": arguments,
     } == {
-        "required": ["intent"],
+        "required": ["intent", "llm_model"],
         "additional": False,
         "properties": {
             "intent": "integer",
@@ -148,6 +158,15 @@ def test_schema_ownership(schema, declared, open_schema):
         {"type": "object", "dependentSchemas": {}},
         {"type": "object", "dependencies": {}},
         {"type": "object", "propertyNames": {}},
+        {
+            "type": "object",
+            "properties": {"name": {"type": "string"}},
+            "required": ["name"],
+            "additionalProperties": False,
+            "maxProperties": 1,
+        },
+        {"type": "object", "const": {"name": "Alice"}},
+        {"type": "object", "enum": [{"name": "Alice"}]},
         {"type": "object", "patternProperties": {"(?<name>x)": {}}},
     ],
 )

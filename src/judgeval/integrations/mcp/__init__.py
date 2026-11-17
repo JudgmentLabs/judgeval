@@ -22,6 +22,7 @@ import weakref
 from typing import Any, Optional, Callable
 
 from judgeval.logger import judgeval_logger
+from ._client_identity import McpClientIdentityMiddleware, instrument_http_app
 from ._payload import RedactPayload, OMITTED
 
 from ._observer import (
@@ -64,8 +65,9 @@ def instrument_mcp_server(
 
     Call it once per server, after ``Tracer.init()`` and before the server
     starts. It changes your server in one way by default: each tool's published
-    schema gets optional ``intent``, ``llm_model`` and ``conversation_id``
-    arguments, which are removed before your tool runs. When a call has no
+    schema gets required ``intent`` and ``llm_model`` and optional
+    ``conversation_id`` arguments, removed before your tool runs. Missing injected
+    telemetry does not fail execution. When a call has no
     application or echoed conversation session, its returned result gets an ID in
     supplemental text and compatible existing ``structuredContent._judgment``.
     Compatible output schemas gain
@@ -178,6 +180,7 @@ def _instrument(server: Any, options: McpOptions) -> bool:
     from . import _v1, _v2
 
     if _v2.instrument(observer, lowlevel) or _v1.instrument(observer, lowlevel):
+        instrument_http_app(server)
         # Both adapters already skip handlers they wrapped, so a server that
         # can't be remembered here is still safe to instrument twice.
         try:
@@ -212,6 +215,7 @@ def _text(value: Any) -> Optional[str]:
 __all__ = [
     "OMITTED",
     "McpCaller",
+    "McpClientIdentityMiddleware",
     "McpRequestInfo",
     "instrument_mcp_server",
     "mark_mcp_call_error",

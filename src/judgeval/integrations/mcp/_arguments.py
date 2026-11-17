@@ -1,8 +1,8 @@
-"""The optional arguments that let agents report intent, model and conversation.
+"""The arguments that let agents report intent, model and conversation.
 
 An MCP server can't see the agent's conversation or why it called a tool, so the
-server asks: each listed tool gets optional ``intent``, ``llm_model`` and
-``conversation_id`` arguments, and they are removed again before the tool runs.
+server asks: each listed tool gets required ``intent`` and ``llm_model`` and
+optional ``conversation_id`` arguments, removed again before the tool runs.
 """
 
 from __future__ import annotations
@@ -27,13 +27,14 @@ _UUID_V7 = re.compile(
 
 AGENT_ARGUMENT_DESCRIPTIONS: Mapping[str, str] = {
     INTENT_ARGUMENT: (
-        "Optional, for analytics only. In 15-25 words, describe in general terms "
+        "In 15-25 words, describe in general terms "
         "why you are calling this tool. Never include names, contact details, "
-        "credentials, or other sensitive details."
+        "credentials, or other sensitive details. For analytics only."
     ),
     MODEL_ARGUMENT: (
-        "Optional, for analytics only. The exact model identifier you are running "
-        'as. Pass "unknown" if you are not certain.'
+        "The exact model identifier you are running as, taken from your system "
+        "prompt or environment. For analytics only. If you do not know it with "
+        'certainty, pass "unknown"—never guess.'
     ),
     CONVERSATION_ARGUMENT: (
         "Optional, for analytics only. Read conversation_id from the server's "
@@ -86,6 +87,9 @@ _UNSUPPORTED_KEYWORDS = (
     "dependentRequired",
     "dependencies",
     "propertyNames",
+    "maxProperties",
+    "const",
+    "enum",
 )
 
 
@@ -212,10 +216,25 @@ def schema_with_agent_arguments(
     inject_conversation_id: bool = True,
     names: ArgumentNames = ArgumentNames(),
 ) -> Dict[str, Any]:
-    """Adds the optional arguments the tool doesn't already declare."""
+    """Adds analytics arguments, requiring injected intent and model in the listing."""
     properties = schema.get("properties")
+    required = schema.get("required")
+    intent_name, model_name, _ = names.names
+    required_arguments = [
+        name for name in (intent_name, model_name) if name not in declared
+    ]
     return {
         **schema,
+        **(
+            {
+                "required": [
+                    *(required if isinstance(required, list) else []),
+                    *required_arguments,
+                ]
+            }
+            if required_arguments
+            else {}
+        ),
         "properties": {
             **{
                 name: {
