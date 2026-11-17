@@ -42,3 +42,30 @@ def test_generated_method_encodes_path_parameters():
         "api.test",
         b"/v1/projects/%2F%2Fevil.test/judges/..%2Ftest-configs%2Fx",
     )
+
+
+def test_previous_judge_configuration_methods_keep_their_http_contracts():
+    requests = []
+
+    def handler(request):
+        requests.append((request.method, request.url.path, json.loads(request.content)))
+        return httpx.Response(200, json={})
+
+    client = JudgmentApiClient("https://api.test", "key", "org")
+    client.client = httpx.Client(transport=httpx.MockTransport(handler))
+    client.set_judge_optimistic_eval_enabled("p", "j", "v", {"enabled": True})
+    client.set_judge_preprocessor_artifact_revision(
+        "p", "j", "v", {"preprocessor_artifact_revision_id": None}
+    )
+    assert requests == [
+        (
+            "PUT",
+            "/v1/projects/p/judges/j/versions/v/optimistic-eval",
+            {"enabled": True},
+        ),
+        (
+            "PUT",
+            "/v1/projects/p/judges/j/versions/v/preprocessor-artifact-revision",
+            {"preprocessor_artifact_revision_id": None},
+        ),
+    ]
