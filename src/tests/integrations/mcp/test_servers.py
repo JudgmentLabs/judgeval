@@ -9,7 +9,7 @@ from tests.integrations.mcp.harness import MCP_MAJOR, build_server, connect, sty
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("style", styles())
-async def test_required_intent_is_advertised_but_older_calls_still_execute(
+async def test_required_intent_and_model_are_advertised_but_older_calls_still_execute(
     style, tracer, collecting_exporter
 ):
     orders = build_server(style)
@@ -17,22 +17,30 @@ async def test_required_intent_is_advertised_but_older_calls_still_execute(
     async with connect(orders) as client:
         schemas = await client.all_tools()
         missing = await client.call("add", {"a": 1, "b": 2})
-        supplied = await client.call("add", {"a": 1, "b": 2, "intent": "Adding"})
+        supplied = await client.call(
+            "add", {"a": 1, "b": 2, "intent": "Adding", "llm_model": "agent-model"}
+        )
     tracer.force_flush()
     assert {
         "required": schemas["add"]["required"],
         "results": [missing.texts[0], supplied.texts[0]],
         "calls": orders.calls,
-        "intents": [
-            span.attributes.get("judgment.mcp.intent")
+        "telemetry": [
+            {
+                "intent": span.attributes.get("judgment.mcp.intent"),
+                "model": span.attributes.get("judgment.llm.model"),
+            }
             for span in collecting_exporter.spans
             if span.name == "tools/call add"
         ],
     } == {
-        "required": ["a", "b", "intent"],
+        "required": ["a", "b", "intent", "llm_model"],
         "results": ["3", "3"],
         "calls": [{"a": 1, "b": 2}, {"a": 1, "b": 2}],
-        "intents": [None, "Adding"],
+        "telemetry": [
+            {"intent": None, "model": None},
+            {"intent": "Adding", "model": "agent-model"},
+        ],
     }
 
 

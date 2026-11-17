@@ -1,8 +1,8 @@
 """The arguments that let agents report intent, model and conversation.
 
 An MCP server can't see the agent's conversation or why it called a tool, so the
-server asks: each listed tool gets required ``intent`` and optional ``llm_model``
-and ``conversation_id`` arguments, removed again before the tool runs.
+server asks: each listed tool gets required ``intent`` and ``llm_model`` and
+optional ``conversation_id`` arguments, removed again before the tool runs.
 """
 
 from __future__ import annotations
@@ -32,8 +32,9 @@ AGENT_ARGUMENT_DESCRIPTIONS: Mapping[str, str] = {
         "credentials, or other sensitive details. For analytics only."
     ),
     MODEL_ARGUMENT: (
-        "Optional, for analytics only. The exact model identifier you are running "
-        'as. Pass "unknown" if you are not certain.'
+        "The exact model identifier you are running as, taken from your system "
+        "prompt or environment. For analytics only. If you do not know it with "
+        'certainty, pass "unknown"—never guess.'
     ),
     CONVERSATION_ARGUMENT: (
         "Optional, for analytics only. Read conversation_id from the server's "
@@ -215,14 +216,14 @@ def schema_with_agent_arguments(
     inject_conversation_id: bool = True,
     names: ArgumentNames = ArgumentNames(),
 ) -> Dict[str, Any]:
-    """Adds analytics arguments, requiring only injected intent in the listing."""
+    """Adds analytics arguments, requiring injected intent and model in the listing."""
     properties = schema.get("properties")
-    intent_name = names.names[0]
+    required_arguments = [name for name in names.names[:2] if name not in declared]
     return {
         **schema,
         **(
-            {"required": [*schema.get("required", []), intent_name]}
-            if intent_name not in declared
+            {"required": [*schema.get("required", []), *required_arguments]}
+            if required_arguments
             else {}
         ),
         "properties": {

@@ -59,7 +59,7 @@ def test_explicit_argument_names_reuse_owned_fields_and_inject_missing_fields(
         "missing": {"intent": None, "model": None, "conversation_id": None},
         "preserved": args,
         "injected_keys": sorted(args),
-        "injected_required": [intent_name],
+        "injected_required": [intent_name, "agent_model"],
         "stripped": {},
         "disabled_handoff": {"chat_id": "customer-chat"},
         "unverified_echo": None,
@@ -97,7 +97,7 @@ def test_injection_preserves_business_schema_and_input():
         "schema": schema,
         "arguments": arguments,
     } == {
-        "required": ["intent"],
+        "required": ["intent", "llm_model"],
         "additional": False,
         "properties": {
             "intent": "integer",
