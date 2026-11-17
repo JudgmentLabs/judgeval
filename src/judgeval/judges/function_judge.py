@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
 from judgeval.api import JudgmentApiClient
-from judgeval.internal.api.models import CreateJudgeRequest, UpdateJudgeRequest
+from judgeval.internal.api.models import CreateJudgeRequestJudge1, UpdateJudgeRequest
 
 OutputType = Literal["binary", "numeric", "categorical"]
 
@@ -213,11 +213,14 @@ def upload_function_judge(
     source: str,
     categories: List[str],
     bump_major: bool,
+    conversation: bool = False,
 ) -> str:
     """Creates the judge, or a new production version of an existing one.
 
-    A new judge is categorical and needs at least two categories. A new version
-    keeps the judge's score type and outputs; `categories` are ignored.
+    A new judge is categorical and needs at least two categories, and grades
+    whole conversations when `conversation` is set. A new version keeps the
+    judge's score type, outputs and what it grades; `categories` are ignored,
+    and `conversation` is refused because what a judge grades can't change.
     """
     listed = client.list_judges(project_id)["judges"]
     existing = next((judge for judge in listed if judge["name"] == name), None)
@@ -228,22 +231,27 @@ def upload_function_judge(
                 "A new function judge needs at least two categories, e.g. "
                 "--category Pass --category Fail"
             )
-        request: CreateJudgeRequest = {
-            "judge": {
-                "name": name,
-                "judgeType": "custom",
-                "initialVersion": {
-                    "scoreType": "categorical",
-                    "outputs": [{"name": c, "description": ""} for c in categories],
-                },
-                "config": {"functionSource": source},
-            }
+        judge: CreateJudgeRequestJudge1 = {
+            "name": name,
+            "judgeType": "custom",
+            "initialVersion": {
+                "scoreType": "categorical",
+                "outputs": [{"name": c, "description": ""} for c in categories],
+            },
+            "config": {"functionSource": source},
         }
-        client.create_judge(project_id, request)
+        if conversation:
+            judge["conversation"] = True
+        client.create_judge(project_id, {"judge": judge})
         return f"Created function judge '{name}'"
 
     if existing["judge_type"] != "custom":
         raise ValueError(f"Judge '{name}' exists and is not a Code judge")
+    if conversation:
+        raise ValueError(
+            f"Judge '{name}' exists; --conversation only applies when creating "
+            "a judge, and what a judge grades can't change"
+        )
     # The list endpoint types versions as numbers; the update needs integers.
     major = int(existing["judge_major_version"])
     minor = int(existing["judge_minor_version"])

@@ -2792,6 +2792,7 @@ class CreateJudgeRequestJudge1(TypedDict):
         CreateJudgeRequestJudge1InitialVersion | CreateJudgeRequestJudge1InitialVersion1
     )
     config: CreateJudgeRequestJudge1Config | CreateJudgeRequestJudge1Config1
+    conversation: NotRequired[bool]
 
 
 class CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupWhen(TypedDict):
