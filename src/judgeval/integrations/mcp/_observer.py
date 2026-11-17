@@ -54,6 +54,7 @@ from ._arguments import (
     conversation_id_prompt,
     mint_conversation_id,
     read_reported_arguments,
+    resolve_model,
     schema_with_agent_arguments,
     tool_contract,
     without_agent_arguments,
@@ -833,7 +834,11 @@ class McpObserver:
                 if facts.session_id
                 else None,
                 "judgment.mcp.intent": intent,
-                "judgment.llm.model": reported.model,
+                "judgment.llm.model": resolve_model(
+                    meta, reported.model, self.argument_names
+                )
+                if method == "tools/call"
+                else reported.model,
                 "judgment.mcp.sdk_version": get_version(),
             }
         )

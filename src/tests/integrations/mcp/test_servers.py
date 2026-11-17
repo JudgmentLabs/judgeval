@@ -3,8 +3,55 @@ import json
 import pytest
 
 from judgeval.integrations.mcp import instrument_mcp_server
+from judgeval.integrations.mcp._arguments import ArgumentNames, resolve_model
 from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
 from tests.integrations.mcp.harness import MCP_MAJOR, build_server, connect, styles
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("style", styles())
+@pytest.mark.parametrize("inject", [True, False])
+async def test_model_metadata(style, inject, tracer, collecting_exporter):
+    orders = build_server(style)
+    instrument_mcp_server(orders.server, inject_agent_arguments=inject)
+    async with connect(orders) as client:
+        for turn in [
+            {"model": " runtime-model "},
+            {"model": " Unknown "},
+            {"model": 42},
+            None,
+            [],
+        ]:
+            await client.send(
+                "tools/call",
+                {
+                    "name": "add",
+                    "arguments": {
+                        "a": 1,
+                        "b": 2,
+                        **({"llm_model": "agent-model"} if inject else {}),
+                    },
+                    "_meta": {"x-codex-turn-metadata": turn},
+                },
+            )
+    tracer.force_flush()
+    assert {
+        "calls": orders.calls,
+        "models": [
+            span.attributes.get("judgment.llm.model")
+            for span in collecting_exporter.spans
+            if span.name == "tools/call add"
+        ],
+        "override": resolve_model(
+            {"x-codex-turn-metadata": {"model": "runtime-model"}},
+            "customer-model",
+            ArgumentNames(model="chosen_model"),
+        ),
+    } == {
+        "calls": [{"a": 1, "b": 2}] * 5,
+        "models": ["runtime-model"] + ["agent-model" if inject else None] * 4,
+        "override": "customer-model",
+    }
 
 
 @pytest.mark.asyncio

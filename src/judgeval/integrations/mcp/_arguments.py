@@ -181,7 +181,7 @@ def read_reported_arguments(
     conversation_id = read(conversation_name, names.conversation_id)
     return ReportedArguments(
         intent=None if intent is None else intent[:_MAX_INTENT_LENGTH],
-        model=None if model is None or model.lower() == "unknown" else model,
+        model=_normalize_model(model),
         conversation_id=conversation_id
         if conversation_id is not None
         and (
@@ -193,6 +193,25 @@ def read_reported_arguments(
         )
         else None,
     )
+
+
+def resolve_model(
+    meta: Mapping[str, Any],
+    reported_model: Optional[str],
+    names: ArgumentNames = ArgumentNames(),
+) -> Optional[str]:
+    if names.model is not None and reported_model is not None:
+        return reported_model
+    turn = meta.get("x-codex-turn-metadata")
+    model = _normalize_model(turn.get("model")) if isinstance(turn, Mapping) else None
+    return model or reported_model
+
+
+def _normalize_model(value: Any) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    model = value.strip()
+    return None if not model or model.lower() == "unknown" else model
 
 
 def without_agent_arguments(
