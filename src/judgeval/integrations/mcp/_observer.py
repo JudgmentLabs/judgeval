@@ -778,11 +778,15 @@ class McpObserver:
             and logical_session is None
             else None
         )
+        from ._client_identity import read_client_identity
+
+        carried = read_client_identity(facts.headers.get("mcp-session-id"))
         client = (
             _mapping(meta.get(CLIENT_INFO_META_KEY))
             or facts.client
             # The session learns who the client is only once this succeeds.
             or (_mapping(params.get("clientInfo")) if method == "initialize" else {})
+            or carried
         )
         intent = None if reported.intent is None else self._redacted(reported.intent)
         uri = params.get("uri")
@@ -791,7 +795,8 @@ class McpObserver:
                 "mcp.method.name": method,
                 "mcp.protocol.version": _text(meta.get(PROTOCOL_VERSION_META_KEY))
                 or facts.headers.get("mcp-protocol-version")
-                or facts.protocol_version,
+                or facts.protocol_version
+                or carried.get("protocolVersion"),
                 "mcp.session.id": facts.session_id,
                 "jsonrpc.request.id": facts.request_id,
                 "gen_ai.operation.name": "execute_tool" if tool_name else None,
