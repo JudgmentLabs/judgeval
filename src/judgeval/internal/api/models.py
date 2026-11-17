@@ -928,6 +928,7 @@ class UploadCustomScorerBundleMetadata(TypedDict):
     response_type: Literal["binary", "categorical", "numeric"]
     version: NotRequired[float]
     bump_major: NotRequired[bool]
+    conversation: NotRequired[bool]
     categories: NotRequired[list[UploadCustomScorerBundleMetadataCategory] | None]
 
 
@@ -969,7 +970,7 @@ class PublicJqlErrorResponse(TypedDict):
 class TestConfigsResponseTestConfigJudgeJudge(TypedDict):
     id: str
     name: str
-    judge_type: str
+    judge_type: str | None
     score_type: str
 
 
@@ -1018,7 +1019,7 @@ class CreateTestConfigRequest(TypedDict):
 class TestConfigResponseTestConfigJudgeJudge(TypedDict):
     id: str
     name: str
-    judge_type: str
+    judge_type: str | None
     score_type: str
 
 
@@ -1464,6 +1465,7 @@ class TestResultsResponseResultPendingCheck(TypedDict):
 class TestResultsResponseResult(TypedDict):
     case_id: str
     trace_id: str | None
+    conversation_id: str | None
     scored_at: str | None
     passed: bool | None
     checks: list[TestResultsResponseResultCheck]
@@ -1632,6 +1634,12 @@ class TestJevOptimizationCandidateResponseOrdinaryAgent1(TypedDict):
 
 
 class TestJevOptimizationCandidateResponse(TypedDict):
+    ordinary_agent_model: str
+    candidate_catalog_model_cost_usd: float | None
+    ordinary_catalog_model_cost_usd: float | None
+    optimized_catalog_model_cost_usd: float | None
+    catalog_model_cost_savings_usd: float | None
+    catalog_model_cost_savings_percent: float | None
     judge_id: str
     judge_version_id: str
     judge_major_version: int
@@ -2030,10 +2038,61 @@ class UpdateIssueResponse(TypedDict):
     issue: UpdateIssueResponseIssue
 
 
+class SubmitExternalJudgeResultSubmitExternalJudgeResultTarget(TypedDict):
+    type: Literal["trace"]
+    trace_id: str
+
+
+class SubmitExternalJudgeResultSubmitExternalJudgeResultTarget1(TypedDict):
+    type: Literal["session"]
+    session_id: str
+
+
+class SubmitExternalJudgeResultSubmitExternalJudgeResult(TypedDict):
+    target: (
+        SubmitExternalJudgeResultSubmitExternalJudgeResultTarget
+        | SubmitExternalJudgeResultSubmitExternalJudgeResultTarget1
+    )
+    value: bool | float | str
+    reason: NotRequired[str]
+    judge_id: str
+
+
+class SubmitExternalJudgeResultSubmitExternalJudgeResult1Target(TypedDict):
+    type: Literal["trace"]
+    trace_id: str
+
+
+class SubmitExternalJudgeResultSubmitExternalJudgeResult1Target1(TypedDict):
+    type: Literal["session"]
+    session_id: str
+
+
+class SubmitExternalJudgeResultSubmitExternalJudgeResult1(TypedDict):
+    target: (
+        SubmitExternalJudgeResultSubmitExternalJudgeResult1Target
+        | SubmitExternalJudgeResultSubmitExternalJudgeResult1Target1
+    )
+    value: bool | float | str
+    reason: NotRequired[str]
+    judge_name: str
+
+
+SubmitExternalJudgeResult: TypeAlias = (
+    SubmitExternalJudgeResultSubmitExternalJudgeResult
+    | SubmitExternalJudgeResultSubmitExternalJudgeResult1
+)
+
+
+class SubmitExternalJudgeResultResponse(TypedDict):
+    id: str
+
+
 class ListJudgesResponseJudge(TypedDict):
     id: str
     name: str
-    judge_type: Literal["prompt", "custom", "agent", "deterministic"]
+    execution_mode: Literal["internal", "external"]
+    judge_type: Literal["prompt", "custom", "agent", "deterministic"] | None
     score_type: Literal["numeric", "binary", "categorical"]
     judge_major_version: float
     judge_minor_version: float
@@ -2173,10 +2232,11 @@ class ListJudgesResponseJudge1OnlineSpanTriggers(TypedDict):
 
 
 class ListJudgesResponseJudge1(TypedDict):
+    execution_mode: Literal["internal", "external"]
     id: str
     name: str
     judge_description: str | None
-    judge_type: Literal["prompt", "custom", "agent", "deterministic"]
+    judge_type: Literal["prompt", "custom", "agent", "deterministic"] | None
     knowledge_file_id: str | None
     score_type: Literal["numeric", "binary", "categorical"]
     updated_at: str
@@ -2372,6 +2432,7 @@ class CreateJudgeRequestJudgeConfig(TypedDict):
 class CreateJudgeRequestJudge(TypedDict):
     name: str
     judgeDescription: NotRequired[str | None]
+    executionMode: NotRequired[Literal["internal"]]
     judgeType: Literal["prompt"]
     initialVersion: CreateJudgeRequestJudgeInitialVersion
     config: CreateJudgeRequestJudgeConfig
@@ -2542,6 +2603,171 @@ class CreateJudgeRequestJudge1InitialVersion(TypedDict):
     ]
 
 
+class CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupWhen(TypedDict):
+    kind: Literal["any"]
+
+
+class CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupWhen1(TypedDict):
+    kind: Literal["binary"]
+    value: bool
+
+
+CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupWhen2Value: TypeAlias = (
+    str
+)
+
+
+class CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupWhen2(TypedDict):
+    kind: Literal["categorical"]
+    values: list[
+        CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupWhen2Value
+    ]
+
+
+class CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupWhen3(TypedDict):
+    kind: Literal["numeric"]
+    operator: Literal["lt", "lte", "eq", "gte", "gt"]
+    value: float
+
+
+class CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupFrequency(
+    TypedDict
+):
+    count: int
+    window_seconds: int
+
+
+class CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupActionsConfig(
+    TypedDict
+):
+    url: str
+    secret: str
+
+
+class CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupActions(TypedDict):
+    id: str
+    enabled: bool
+    type: Literal["webhook"]
+    config: CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupActionsConfig
+
+
+class CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupActions1Config(
+    TypedDict
+):
+    email_address: str
+
+
+class CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupActions1(TypedDict):
+    id: str
+    enabled: bool
+    type: Literal["email"]
+    config: CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupActions1Config
+
+
+class CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupActions2Config(
+    TypedDict
+):
+    team_id: NotRequired[str]
+    channel_id: NotRequired[str]
+    message: NotRequired[str]
+    custom_attribute_keys: NotRequired[list[str]]
+
+
+class CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupActions2(TypedDict):
+    id: str
+    enabled: bool
+    type: Literal["slack"]
+    config: CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupActions2Config
+
+
+class CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupActions3Config(
+    TypedDict
+):
+    dataset_id: str
+
+
+class CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupActions3(TypedDict):
+    id: str
+    enabled: bool
+    type: Literal["dataset"]
+    config: CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupActions3Config
+
+
+CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupActions4ConfigJudgeId: TypeAlias = str
+
+
+class CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupActions4Config(
+    TypedDict
+):
+    judge_ids: list[
+        CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupActions4ConfigJudgeId
+    ]
+
+
+class CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupActions4(TypedDict):
+    id: str
+    enabled: bool
+    type: Literal["run_behavior"]
+    config: CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupActions4Config
+
+
+class CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroup(TypedDict):
+    id: str
+    name: str
+    enabled: bool
+    environment_names: list[str]
+    when: (
+        CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupWhen
+        | CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupWhen1
+        | CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupWhen2
+        | CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupWhen3
+    )
+    frequency: CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupFrequency
+    cooldown_seconds: int
+    actions: list[
+        CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupActions
+        | CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupActions1
+        | CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupActions2
+        | CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupActions3
+        | CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroupActions4
+    ]
+
+
+class CreateJudgeRequestJudge1InitialVersion1ActionConfig(TypedDict):
+    action_groups: list[CreateJudgeRequestJudge1InitialVersion1ActionConfigActionGroup]
+
+
+class CreateJudgeRequestJudge1InitialVersion1AdvancedSettingsOnlineSpanTriggers(
+    TypedDict
+):
+    kind: Literal["and", "or"]
+    conditions: list[Any]
+
+
+class CreateJudgeRequestJudge1InitialVersion1AdvancedSettings(TypedDict):
+    online_environment_names: list[str] | None
+    online_evaluation_mode: Literal["continuous", "on_demand"]
+    online_sampling_rate: float
+    online_span_triggers: (
+        CreateJudgeRequestJudge1InitialVersion1AdvancedSettingsOnlineSpanTriggers
+    )
+    online_session_scoring: bool
+    session_evaluation_count_enabled: NotRequired[bool | None]
+    session_evaluation_idle_enabled: NotRequired[bool | None]
+    session_evaluation_min_candidate_traces: NotRequired[float | None]
+    session_evaluation_max_wait_minutes: NotRequired[float | None]
+
+
+class CreateJudgeRequestJudge1InitialVersion1(TypedDict):
+    actionConfig: NotRequired[
+        CreateJudgeRequestJudge1InitialVersion1ActionConfig | None
+    ]
+    scoreType: Literal["binary", "numeric"]
+    advancedSettings: NotRequired[
+        CreateJudgeRequestJudge1InitialVersion1AdvancedSettings
+    ]
+
+
 class CreateJudgeRequestJudge1Config(TypedDict):
     bundleBase64: str
     entrypointPath: str
@@ -2552,12 +2778,21 @@ class CreateJudgeRequestJudge1Config(TypedDict):
     description: NotRequired[str | None]
 
 
+class CreateJudgeRequestJudge1Config1(TypedDict):
+    functionSource: str
+    description: NotRequired[str | None]
+
+
 class CreateJudgeRequestJudge1(TypedDict):
     name: str
     judgeDescription: NotRequired[str | None]
+    executionMode: NotRequired[Literal["internal"]]
     judgeType: Literal["custom"]
-    initialVersion: CreateJudgeRequestJudge1InitialVersion
-    config: CreateJudgeRequestJudge1Config
+    initialVersion: (
+        CreateJudgeRequestJudge1InitialVersion | CreateJudgeRequestJudge1InitialVersion1
+    )
+    config: CreateJudgeRequestJudge1Config | CreateJudgeRequestJudge1Config1
+    conversation: NotRequired[bool]
 
 
 class CreateJudgeRequestJudge2InitialVersionActionConfigActionGroupWhen(TypedDict):
@@ -2732,19 +2967,54 @@ class CreateJudgeRequestJudge2Config(TypedDict):
 class CreateJudgeRequestJudge2(TypedDict):
     name: str
     judgeDescription: NotRequired[str | None]
+    executionMode: NotRequired[Literal["internal"]]
     judgeType: Literal["deterministic"]
     initialVersion: CreateJudgeRequestJudge2InitialVersion
     config: CreateJudgeRequestJudge2Config
 
 
+class CreateJudgeRequestJudge3InitialVersion(TypedDict):
+    scoreType: Literal["binary"]
+
+
+class CreateJudgeRequestJudge3InitialVersion1(TypedDict):
+    scoreType: Literal["numeric"]
+
+
+class CreateJudgeRequestJudge3InitialVersion2Output(TypedDict):
+    name: str
+    description: str
+
+
+class CreateJudgeRequestJudge3InitialVersion2(TypedDict):
+    scoreType: Literal["categorical"]
+    outputs: list[CreateJudgeRequestJudge3InitialVersion2Output]
+
+
+class CreateJudgeRequestJudge3(TypedDict):
+    name: str
+    judgeDescription: NotRequired[str | None]
+    executionMode: Literal["external"]
+    initialVersion: (
+        CreateJudgeRequestJudge3InitialVersion
+        | CreateJudgeRequestJudge3InitialVersion1
+        | CreateJudgeRequestJudge3InitialVersion2
+    )
+
+
 class CreateJudgeRequest(TypedDict):
-    judge: CreateJudgeRequestJudge | CreateJudgeRequestJudge1 | CreateJudgeRequestJudge2
+    judge: (
+        CreateJudgeRequestJudge
+        | CreateJudgeRequestJudge1
+        | CreateJudgeRequestJudge2
+        | CreateJudgeRequestJudge3
+    )
 
 
 class CreateJudgeResponse(TypedDict):
     judge_id: str
     judge_version_id: str
-    implementation_id: str
+    implementation_id: str | None
 
 
 class UpdateJudgeRequestUpdateNewVersionActionConfigActionGroupWhen(TypedDict):
@@ -3431,13 +3701,18 @@ class UpdateJudgeRequestUpdateNewVersion3Config(TypedDict):
     description: NotRequired[str | None]
 
 
-class UpdateJudgeRequestUpdateNewVersion3Config1SourceVersion(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion3Config1(TypedDict):
+    functionSource: str
+    description: NotRequired[str | None]
+
+
+class UpdateJudgeRequestUpdateNewVersion3Config2SourceVersion(TypedDict):
     major: int
     minor: int
 
 
-class UpdateJudgeRequestUpdateNewVersion3Config1(TypedDict):
-    sourceVersion: UpdateJudgeRequestUpdateNewVersion3Config1SourceVersion
+class UpdateJudgeRequestUpdateNewVersion3Config2(TypedDict):
+    sourceVersion: UpdateJudgeRequestUpdateNewVersion3Config2SourceVersion
 
 
 class UpdateJudgeRequestUpdateNewVersion3(TypedDict):
@@ -3449,6 +3724,7 @@ class UpdateJudgeRequestUpdateNewVersion3(TypedDict):
     config: (
         UpdateJudgeRequestUpdateNewVersion3Config
         | UpdateJudgeRequestUpdateNewVersion3Config1
+        | UpdateJudgeRequestUpdateNewVersion3Config2
     )
     scoreType: Literal["binary"]
 
@@ -3615,13 +3891,18 @@ class UpdateJudgeRequestUpdateNewVersion4Config(TypedDict):
     description: NotRequired[str | None]
 
 
-class UpdateJudgeRequestUpdateNewVersion4Config1SourceVersion(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion4Config1(TypedDict):
+    functionSource: str
+    description: NotRequired[str | None]
+
+
+class UpdateJudgeRequestUpdateNewVersion4Config2SourceVersion(TypedDict):
     major: int
     minor: int
 
 
-class UpdateJudgeRequestUpdateNewVersion4Config1(TypedDict):
-    sourceVersion: UpdateJudgeRequestUpdateNewVersion4Config1SourceVersion
+class UpdateJudgeRequestUpdateNewVersion4Config2(TypedDict):
+    sourceVersion: UpdateJudgeRequestUpdateNewVersion4Config2SourceVersion
 
 
 class UpdateJudgeRequestUpdateNewVersion4(TypedDict):
@@ -3633,6 +3914,7 @@ class UpdateJudgeRequestUpdateNewVersion4(TypedDict):
     config: (
         UpdateJudgeRequestUpdateNewVersion4Config
         | UpdateJudgeRequestUpdateNewVersion4Config1
+        | UpdateJudgeRequestUpdateNewVersion4Config2
     )
     scoreType: Literal["numeric"]
 
@@ -3799,13 +4081,18 @@ class UpdateJudgeRequestUpdateNewVersion5Config(TypedDict):
     description: NotRequired[str | None]
 
 
-class UpdateJudgeRequestUpdateNewVersion5Config1SourceVersion(TypedDict):
+class UpdateJudgeRequestUpdateNewVersion5Config1(TypedDict):
+    functionSource: str
+    description: NotRequired[str | None]
+
+
+class UpdateJudgeRequestUpdateNewVersion5Config2SourceVersion(TypedDict):
     major: int
     minor: int
 
 
-class UpdateJudgeRequestUpdateNewVersion5Config1(TypedDict):
-    sourceVersion: UpdateJudgeRequestUpdateNewVersion5Config1SourceVersion
+class UpdateJudgeRequestUpdateNewVersion5Config2(TypedDict):
+    sourceVersion: UpdateJudgeRequestUpdateNewVersion5Config2SourceVersion
 
 
 class UpdateJudgeRequestUpdateNewVersion5Outputs(TypedDict):
@@ -3827,6 +4114,7 @@ class UpdateJudgeRequestUpdateNewVersion5(TypedDict):
     config: (
         UpdateJudgeRequestUpdateNewVersion5Config
         | UpdateJudgeRequestUpdateNewVersion5Config1
+        | UpdateJudgeRequestUpdateNewVersion5Config2
     )
     scoreType: Literal["categorical"]
     outputs: list[
@@ -4234,6 +4522,7 @@ class UpdateJudgeRequestUpdateNewVersionFromSourceConfig(TypedDict):
     className: NotRequired[str]
     scorerType: NotRequired[Literal["example", "trace"]]
     sdkVersion: NotRequired[int]
+    functionSource: NotRequired[str]
     expression: NotRequired[Any]
 
 
@@ -4584,7 +4873,6 @@ class GetJudgeResponseJudgeDefinition(TypedDict):
     reasoning_level: Literal["lite", "normal", "high"]
     min_score: float
     max_score: float
-    model: str
     threshold: float
 
 
@@ -4615,6 +4903,7 @@ class GetJudgeResponseJudge(TypedDict):
     session_evaluation_idle_enabled: bool | None
     session_evaluation_min_candidate_traces: float | None
     session_evaluation_max_wait_minutes: float | None
+    execution_mode: NotRequired[Literal["internal"]]
     judge_type: Literal["prompt"]
     definition: GetJudgeResponseJudgeDefinition
 
@@ -4761,6 +5050,7 @@ class GetJudgeResponseJudge1Definition(TypedDict):
     requirements_path: str | None
     scorer_type: Literal["example", "trace"] | None
     sdk_version: float
+    function_source: str | None
     code_url: NotRequired[str]
 
 
@@ -4791,6 +5081,7 @@ class GetJudgeResponseJudge1(TypedDict):
     session_evaluation_idle_enabled: bool | None
     session_evaluation_min_candidate_traces: float | None
     session_evaluation_max_wait_minutes: float | None
+    execution_mode: NotRequired[Literal["internal"]]
     judge_type: Literal["custom"]
     definition: GetJudgeResponseJudge1Definition
 
@@ -4961,13 +5252,185 @@ class GetJudgeResponseJudge2(TypedDict):
     session_evaluation_idle_enabled: bool | None
     session_evaluation_min_candidate_traces: float | None
     session_evaluation_max_wait_minutes: float | None
+    execution_mode: NotRequired[Literal["internal"]]
     judge_type: Literal["deterministic"]
     definition: GetJudgeResponseJudge2Definition
 
 
+class GetJudgeResponseJudge3Output(TypedDict):
+    behavior_id: str
+    name: str
+    description: str
+
+
+class GetJudgeResponseJudge3UpdatedBy(TypedDict):
+    user_id: str
+    first_name: str
+    last_name: str
+    user_email: str
+
+
+class GetJudgeResponseJudge3ActionConfigActionGroupWhen(TypedDict):
+    kind: Literal["any"]
+
+
+class GetJudgeResponseJudge3ActionConfigActionGroupWhen1(TypedDict):
+    kind: Literal["binary"]
+    value: bool
+
+
+GetJudgeResponseJudge3ActionConfigActionGroupWhen2Value: TypeAlias = str
+
+
+class GetJudgeResponseJudge3ActionConfigActionGroupWhen2(TypedDict):
+    kind: Literal["categorical"]
+    values: list[GetJudgeResponseJudge3ActionConfigActionGroupWhen2Value]
+
+
+class GetJudgeResponseJudge3ActionConfigActionGroupWhen3(TypedDict):
+    kind: Literal["numeric"]
+    operator: Literal["lt", "lte", "eq", "gte", "gt"]
+    value: float
+
+
+class GetJudgeResponseJudge3ActionConfigActionGroupFrequency(TypedDict):
+    count: int
+    window_seconds: int
+
+
+class GetJudgeResponseJudge3ActionConfigActionGroupActionsConfig(TypedDict):
+    url: str
+    secret: str
+
+
+class GetJudgeResponseJudge3ActionConfigActionGroupActions(TypedDict):
+    id: str
+    enabled: bool
+    type: Literal["webhook"]
+    config: GetJudgeResponseJudge3ActionConfigActionGroupActionsConfig
+
+
+class GetJudgeResponseJudge3ActionConfigActionGroupActions1Config(TypedDict):
+    email_address: str
+
+
+class GetJudgeResponseJudge3ActionConfigActionGroupActions1(TypedDict):
+    id: str
+    enabled: bool
+    type: Literal["email"]
+    config: GetJudgeResponseJudge3ActionConfigActionGroupActions1Config
+
+
+class GetJudgeResponseJudge3ActionConfigActionGroupActions2Config(TypedDict):
+    team_id: NotRequired[str]
+    channel_id: NotRequired[str]
+    message: NotRequired[str]
+    custom_attribute_keys: NotRequired[list[str]]
+
+
+class GetJudgeResponseJudge3ActionConfigActionGroupActions2(TypedDict):
+    id: str
+    enabled: bool
+    type: Literal["slack"]
+    config: GetJudgeResponseJudge3ActionConfigActionGroupActions2Config
+
+
+class GetJudgeResponseJudge3ActionConfigActionGroupActions3Config(TypedDict):
+    dataset_id: str
+
+
+class GetJudgeResponseJudge3ActionConfigActionGroupActions3(TypedDict):
+    id: str
+    enabled: bool
+    type: Literal["dataset"]
+    config: GetJudgeResponseJudge3ActionConfigActionGroupActions3Config
+
+
+GetJudgeResponseJudge3ActionConfigActionGroupActions4ConfigJudgeId: TypeAlias = str
+
+
+class GetJudgeResponseJudge3ActionConfigActionGroupActions4Config(TypedDict):
+    judge_ids: list[GetJudgeResponseJudge3ActionConfigActionGroupActions4ConfigJudgeId]
+
+
+class GetJudgeResponseJudge3ActionConfigActionGroupActions4(TypedDict):
+    id: str
+    enabled: bool
+    type: Literal["run_behavior"]
+    config: GetJudgeResponseJudge3ActionConfigActionGroupActions4Config
+
+
+class GetJudgeResponseJudge3ActionConfigActionGroup(TypedDict):
+    id: str
+    name: str
+    enabled: bool
+    environment_names: list[str]
+    when: (
+        GetJudgeResponseJudge3ActionConfigActionGroupWhen
+        | GetJudgeResponseJudge3ActionConfigActionGroupWhen1
+        | GetJudgeResponseJudge3ActionConfigActionGroupWhen2
+        | GetJudgeResponseJudge3ActionConfigActionGroupWhen3
+    )
+    frequency: GetJudgeResponseJudge3ActionConfigActionGroupFrequency
+    cooldown_seconds: int
+    actions: list[
+        GetJudgeResponseJudge3ActionConfigActionGroupActions
+        | GetJudgeResponseJudge3ActionConfigActionGroupActions1
+        | GetJudgeResponseJudge3ActionConfigActionGroupActions2
+        | GetJudgeResponseJudge3ActionConfigActionGroupActions3
+        | GetJudgeResponseJudge3ActionConfigActionGroupActions4
+    ]
+
+
+class GetJudgeResponseJudge3ActionConfig(TypedDict):
+    action_groups: list[GetJudgeResponseJudge3ActionConfigActionGroup]
+
+
+class GetJudgeResponseJudge3OnlineSpanTriggers(TypedDict):
+    kind: Literal["and", "or"]
+    conditions: list[Any]
+
+
+class GetJudgeResponseJudge3(TypedDict):
+    id: str
+    name: str
+    judge_description: str | None
+    knowledge_file_id: str | None
+    score_type: Literal["numeric", "binary", "categorical"]
+    outputs: list[GetJudgeResponseJudge3Output]
+    judge_version_id: str
+    judge_major_version: float
+    judge_minor_version: float
+    is_latest: bool
+    is_production: bool
+    optimistic_eval_enabled: bool
+    preprocessor_artifact_revision_id: str | None
+    version_created_at: str
+    version_updated_at: str
+    updated_by: GetJudgeResponseJudge3UpdatedBy | None
+    online_environment_names: list[str] | None
+    online_evaluation_mode: Literal["continuous", "on_demand"]
+    action_config: NotRequired[GetJudgeResponseJudge3ActionConfig | None]
+    online_sampling_rate: float
+    online_span_triggers: GetJudgeResponseJudge3OnlineSpanTriggers
+    online_session_scoring: bool
+    session_evaluation_count_enabled: bool | None
+    session_evaluation_idle_enabled: bool | None
+    session_evaluation_min_candidate_traces: float | None
+    session_evaluation_max_wait_minutes: float | None
+    execution_mode: Literal["external"]
+    judge_type: None
+    definition: None
+
+
 class GetJudgeResponse(TypedDict):
     optimistic_eval_eligibility: GetJudgeResponseOptimisticEvalEligibility
-    judge: GetJudgeResponseJudge | GetJudgeResponseJudge1 | GetJudgeResponseJudge2
+    judge: (
+        GetJudgeResponseJudge
+        | GetJudgeResponseJudge1
+        | GetJudgeResponseJudge2
+        | GetJudgeResponseJudge3
+    )
 
 
 class SetJudgeJevOptimizationEnabledRequest(TypedDict):
