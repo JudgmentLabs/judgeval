@@ -12844,6 +12844,10 @@
                                 "required": ["functionSource"]
                               }
                             ]
+                          },
+                          "conversation": {
+                            "description": "true grades the whole conversation; false or omitted grades one trace. Grading conversations needs conversations enabled for the organization. Fixed for the judge’s lifetime.",
+                            "type": "boolean"
                           }
                         },
                         "required": [

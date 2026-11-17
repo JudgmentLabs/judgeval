@@ -108,6 +108,12 @@ def upload(
     bump_major: bool = typer.Option(
         False, "--bump-major", "-m", help="Bump major version"
     ),
+    conversation: bool = typer.Option(
+        False,
+        "--conversation",
+        help="A new function judge grades whole conversations instead of one "
+        "trace. Needs conversations enabled for the organization; fixed once created.",
+    ),
     api_key: str = typer.Option(None, envvar="JUDGMENT_API_KEY"),
     organization_id: str = typer.Option(None, envvar="JUDGMENT_ORG_ID"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
@@ -132,6 +138,8 @@ def upload(
         raise typer.BadParameter(
             "A function judge is one file; --requirements and --included-files are for class judges"
         )
+    if conversation and not function_judge:
+        raise typer.BadParameter("--conversation is for function judges")
 
     client = JudgmentApiClient(JUDGMENT_API_URL, api_key, organization_id)
     project_id = resolve_project_id(client, project_name)
@@ -149,7 +157,13 @@ def upload(
                 )
             typer.echo(
                 upload_function_judge(
-                    client, project_id, name, source, categories, bump_major
+                    client,
+                    project_id,
+                    name,
+                    source,
+                    categories,
+                    bump_major,
+                    conversation,
                 )
             )
             return
@@ -172,10 +186,10 @@ def upload(
             raise typer.Abort()
         typer.echo(f"Code judge uploaded successfully to project '{project_name}'!")
     except JudgmentAPIError as e:
-        if e.status_code in (400, 409, 422):
-            judgeval_logger.error(e.detail)
-            raise typer.Exit(1)
-        raise
+        # The status and the API's message say what went wrong; a traceback
+        # adds nothing.
+        judgeval_logger.error(str(e))
+        raise typer.Exit(1)
     except ValueError as e:
         judgeval_logger.error(str(e))
         raise typer.Exit(1)
