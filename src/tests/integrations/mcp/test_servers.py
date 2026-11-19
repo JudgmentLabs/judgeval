@@ -266,7 +266,7 @@ async def test_session_handoff_records_calls_as_separate_traces(
             "add", {"a": 1, "b": 2, "intent": "Adding", "llm_model": "gpt-6"}
         )
         session = (
-            first.structured["_judgment"]["conversation_id"]
+            first.structured["_mcp_instructions"]["conversation_id"]
             if first.structured
             else first.conversation_id
         )

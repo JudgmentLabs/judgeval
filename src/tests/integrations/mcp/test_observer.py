@@ -73,7 +73,7 @@ async def test_native_lookup_avoids_full_listing_and_keeps_structured_handoff(tr
         ["lookup", "lookup"],
         [],
         [{}, {}],
-        [["_judgment", "ok"], ["_judgment", "ok"]],
+        [["_mcp_instructions", "ok"], ["_mcp_instructions", "ok"]],
     )
 
 
@@ -172,7 +172,7 @@ def test_structured_only_handoff_preserves_output_without_content(style):
         )
         content = [item.model_dump(exclude_none=True) for item in result.content]
     assert (structured, content, payload) == (
-        {"ok": True, "_judgment": json.loads(prompt)},
+        {"ok": True, "_mcp_instructions": json.loads(prompt)},
         [{"type": "text", "text": prompt}],
         {"ok": True},
     )
@@ -218,7 +218,7 @@ async def test_call_contracts_follow_current_caller_and_fail_open(tracer):
             (
                 "lookup",
                 {**schema, "properties": {"intent": {"type": "string"}}},
-                {"type": "object", "properties": {"_judgment": {}}},
+                {"type": "object", "properties": {"_mcp_instructions": {}}},
             )
         ], None
 
@@ -230,7 +230,7 @@ async def test_call_contracts_follow_current_caller_and_fail_open(tracer):
         for listing in (first_caller, second_caller, unavailable)
     ]
     handoffs = [
-        "_judgment" in result.model_dump(by_alias=True)["structuredContent"]
+        "_mcp_instructions" in result.model_dump(by_alias=True)["structuredContent"]
         for result in results
     ]
     assert (forwarded, handoffs) == (

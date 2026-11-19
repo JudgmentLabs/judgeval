@@ -231,7 +231,7 @@ def test_session_ids_require_uuid_v7_and_valid_variant(session):
 @pytest.mark.parametrize(
     "constraints",
     [
-        {"properties": {"_judgment": {"type": "string"}}},
+        {"properties": {"_mcp_instructions": {"type": "string"}}},
         {"oneOf": []},
         {"maxProperties": 1},
         {"const": {"ok": True}},
@@ -249,7 +249,7 @@ def test_incompatible_output_schema_is_preserved(constraints):
     )
 
 
-@pytest.mark.parametrize("structured", [None, {"_judgment": "developer-owned"}])
+@pytest.mark.parametrize("structured", [None, {"_mcp_instructions": "developer-owned"}])
 def test_handoff_preserves_text_only_results_and_developer_fields(structured):
     assert (
         structured_with_prompt(structured, conversation_id_prompt("id")) == structured

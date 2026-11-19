@@ -18,7 +18,7 @@ from typing import Any, Dict, FrozenSet, Mapping, Optional
 INTENT_ARGUMENT = "intent"
 MODEL_ARGUMENT = "llm_model"
 CONVERSATION_ARGUMENT = "conversation_id"
-RESPONSE_CONTEXT = "_judgment"
+RESPONSE_CONTEXT = "_mcp_instructions"
 _MAX_INTENT_LENGTH = 500
 _UUID_V7 = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
@@ -38,7 +38,7 @@ AGENT_ARGUMENT_DESCRIPTIONS: Mapping[str, str] = {
     ),
     CONVERSATION_ARGUMENT: (
         "Optional, for analytics only. Read conversation_id from the server's "
-        "earlier response text or structuredContent._judgment and pass it unchanged "
+        "earlier response text or structuredContent._mcp_instructions and pass it unchanged "
         "as {argument_name} on later calls in this conversation. Omit it "
         "on the first call, and do not invent one."
     ),

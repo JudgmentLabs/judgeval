@@ -69,7 +69,7 @@ def instrument_mcp_server(
     ``conversation_id`` arguments, removed before your tool runs. Missing injected
     telemetry does not fail execution. When a call has no
     application or echoed conversation session, its returned result gets an ID in
-    supplemental text and compatible existing ``structuredContent._judgment``.
+    supplemental text and compatible existing ``structuredContent._mcp_instructions``.
     Compatible output schemas gain
     the matching optional property. Text-only/unsupported/colliding outputs
     retain text handoff. Returned tool-error results also get handoff while
