@@ -242,100 +242,16 @@ class JudgmentSyncClient:
             {},
         )
 
-    def get_projects_test_configs(
-        self, project_id: str, dataset_id: Optional[str] = None
-    ) -> TestConfigsResponse:
-        query_params = {}
-        if dataset_id is not None:
-            query_params["dataset_id"] = dataset_id
-        return self._request(
-            "GET",
-            url_for(
-                f"/v1/projects/{encode_path_segment(project_id)}/test-configs",
-                self.base_url,
-            ),
-            query_params,
-        )
-
-    def post_projects_test_configs(
-        self, project_id: str, payload: CreateTestConfigRequest
-    ) -> TestConfigResponse:
-        return self._request(
-            "POST",
-            url_for(
-                f"/v1/projects/{encode_path_segment(project_id)}/test-configs",
-                self.base_url,
-            ),
-            payload,
-        )
-
-    def get_projects_test_configs_by_test_config_id(
-        self, project_id: str, test_config_id: str
-    ) -> TestConfigResponse:
-        return self._request(
-            "GET",
-            url_for(
-                f"/v1/projects/{encode_path_segment(project_id)}/test-configs/{encode_path_segment(test_config_id)}",
-                self.base_url,
-            ),
-            {},
-        )
-
-    def delete_projects_test_configs_by_test_config_id(
-        self, project_id: str, test_config_id: str
-    ) -> DeleteTestConfigResponse:
-        return self._request(
-            "DELETE",
-            url_for(
-                f"/v1/projects/{encode_path_segment(project_id)}/test-configs/{encode_path_segment(test_config_id)}",
-                self.base_url,
-            ),
-            {},
-        )
-
-    def post_projects_test_runs(
-        self, project_id: str, payload: CreateTestRunRequest
-    ) -> PreparedTestRunResponse:
-        return self._request(
-            "POST",
-            url_for(
-                f"/v1/projects/{encode_path_segment(project_id)}/test-runs",
-                self.base_url,
-            ),
-            payload,
-        )
-
-    def get_projects_test_runs_by_test_run_id(
-        self, project_id: str, test_run_id: str
-    ) -> TestRunResponse:
-        return self._request(
-            "GET",
-            url_for(
-                f"/v1/projects/{encode_path_segment(project_id)}/test-runs/{encode_path_segment(test_run_id)}",
-                self.base_url,
-            ),
-            {},
-        )
-
     def get_projects_experiments_by_run_id(
-        self,
-        project_id: str,
-        run_id: str,
-        limit: Optional[str] = None,
-        cursor: Optional[str] = None,
-    ) -> FetchTestRunViaExperimentAliasResponse:
-        query_params = {}
-        if limit is not None:
-            query_params["limit"] = limit
-        if cursor is not None:
-            query_params["cursor"] = cursor
+        self, project_id: str, run_id: str
+    ) -> FetchExperimentRunResponse:
         return self._request(
             "GET",
             url_for(
                 f"/v1/projects/{encode_path_segment(project_id)}/experiments/{encode_path_segment(run_id)}",
                 self.base_url,
             ),
-            query_params,
+            {},
         )
 
     def post_projects_eval_results_examples(

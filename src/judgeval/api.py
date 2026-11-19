@@ -16,7 +16,6 @@ from judgeval.internal.api.models import (
     AddTestCasesResponse,
     AddTraceTagsRequest,
     AddTraceTagsResponse,
-    CancelTestRunResponse,
     CreateIssueRequest,
     CreateIssueResponse,
     CreateJudgeRequest,
@@ -31,14 +30,11 @@ from judgeval.internal.api.models import (
     CreatePreprocessingScriptVersionResponse,
     CreateScheduledTaskRequest,
     CreateScheduledTaskResponse,
-    CreateTestConfigRequest,
-    CreateTestRunRequest,
     CreateTestSuiteDraftResponse,
     CreateTestSuiteRequest,
     DeleteJudgeResponse,
     DeleteMapperResponse,
     DeleteOfflineDatasetResponse,
-    DeleteTestConfigResponse,
     DeleteTestSuiteResponse,
     DiscardTestSuiteDraftResponse,
     EvaluateAllTracesRequest,
@@ -68,7 +64,6 @@ from judgeval.internal.api.models import (
     ListTestSuitesResponse,
     ListTraceHealthFailuresResponse,
     OfflineDatasetPageResponse,
-    PreparedTestRunResponse,
     PublicSqlRequest,
     PublicSqlResponse,
     PublicSqlSchemaResponse,
@@ -93,17 +88,12 @@ from judgeval.internal.api.models import (
     StartTestRunRequest,
     StartTestRunResponse,
     TestCaseInput,
-    TestConfigResponse,
-    TestConfigsResponse,
     TestJevOptimizationCandidateRequest,
     TestJevOptimizationCandidateResponse,
     TestPreprocessingScriptCandidateRequest,
     TestPreprocessingScriptCandidateResponse,
     TestResultsResponse,
     TestRun,
-    TestRunItemsResponse,
-    TestRunResponse,
-    TestRunsResponse,
     TestSuite,
     UpdateIssueRequest,
     UpdateIssueResponse,
@@ -116,7 +106,6 @@ from judgeval.internal.api.models import (
     UpdateScheduledTaskRequest,
     UpdateScheduledTaskResponse,
     UpdateTestCaseResponse,
-    UpdateTestConfigRequest,
     WriteMemoryFileRequest,
     WriteMemoryFileResponse,
 )
@@ -810,150 +799,6 @@ class JudgmentApiClient(JudgmentSyncClient):
             ),
             payload,
             None,
-        )
-
-    def list_test_configs(
-        self, project_id: str, *, dataset_id: str | None = None
-    ) -> TestConfigsResponse:
-        """Fetch test configs (`GET /v1/projects/{projectId}/test-configs`)."""
-        return self._request(
-            "GET",
-            url_for(
-                f"/v1/projects/{encode_path_segment(project_id)}/test-configs",
-                self.base_url,
-            ),
-            {},
-            _drop_none({"dataset_id": dataset_id}),
-        )
-
-    def create_test_config(
-        self, project_id: str, payload: CreateTestConfigRequest
-    ) -> TestConfigResponse:
-        """Create test config (`POST /v1/projects/{projectId}/test-configs`)."""
-        return self._request(
-            "POST",
-            url_for(
-                f"/v1/projects/{encode_path_segment(project_id)}/test-configs",
-                self.base_url,
-            ),
-            payload,
-            None,
-        )
-
-    def update_test_config(
-        self, project_id: str, test_config_id: str, payload: UpdateTestConfigRequest
-    ) -> TestConfigResponse:
-        """Update test config (`PATCH /v1/projects/{projectId}/test-configs/{testConfigId}`)."""
-        return self._request(
-            "PATCH",
-            url_for(
-                f"/v1/projects/{encode_path_segment(project_id)}/test-configs/{encode_path_segment(test_config_id)}",
-                self.base_url,
-            ),
-            payload,
-            None,
-        )
-
-    def delete_test_config(
-        self, project_id: str, test_config_id: str
-    ) -> DeleteTestConfigResponse:
-        """Delete test config (`DELETE /v1/projects/{projectId}/test-configs/{testConfigId}`)."""
-        return self._request(
-            "DELETE",
-            url_for(
-                f"/v1/projects/{encode_path_segment(project_id)}/test-configs/{encode_path_segment(test_config_id)}",
-                self.base_url,
-            ),
-            {},
-            None,
-        )
-
-    def list_test_runs(
-        self,
-        project_id: str,
-        *,
-        test_config_id: str | None = None,
-        dataset_id: str | None = None,
-        status: str | None = None,
-        limit: float | None = None,
-        offset: float | None = None,
-    ) -> TestRunsResponse:
-        """Fetch test runs (`GET /v1/projects/{projectId}/test-runs`)."""
-        return self._request(
-            "GET",
-            url_for(
-                f"/v1/projects/{encode_path_segment(project_id)}/test-runs",
-                self.base_url,
-            ),
-            {},
-            _drop_none(
-                {
-                    "test_config_id": test_config_id,
-                    "dataset_id": dataset_id,
-                    "status": status,
-                    "limit": limit,
-                    "offset": offset,
-                }
-            ),
-        )
-
-    def run_test(
-        self, project_id: str, payload: CreateTestRunRequest
-    ) -> PreparedTestRunResponse:
-        """Prepare and queue test run (`POST /v1/projects/{projectId}/test-runs`)."""
-        return self._request(
-            "POST",
-            url_for(
-                f"/v1/projects/{encode_path_segment(project_id)}/test-runs",
-                self.base_url,
-            ),
-            payload,
-            None,
-        )
-
-    def get_test_run(self, project_id: str, test_run_id: str) -> TestRunResponse:
-        """Fetch test run (`GET /v1/projects/{projectId}/test-runs/{testRunId}`)."""
-        return self._request(
-            "GET",
-            url_for(
-                f"/v1/projects/{encode_path_segment(project_id)}/test-runs/{encode_path_segment(test_run_id)}",
-                self.base_url,
-            ),
-            {},
-            None,
-        )
-
-    def cancel_test_run(
-        self, project_id: str, test_run_id: str
-    ) -> CancelTestRunResponse:
-        """Cancel test run (`POST /v1/projects/{projectId}/test-runs/{testRunId}/cancel`)."""
-        return self._request(
-            "POST",
-            url_for(
-                f"/v1/projects/{encode_path_segment(project_id)}/test-runs/{encode_path_segment(test_run_id)}/cancel",
-                self.base_url,
-            ),
-            {},
-            None,
-        )
-
-    def get_test_run_items(
-        self,
-        project_id: str,
-        test_run_id: str,
-        *,
-        limit: float | None = None,
-        cursor: str | None = None,
-    ) -> TestRunItemsResponse:
-        """Fetch test run items (`GET /v1/projects/{projectId}/test-runs/{testRunId}/items`)."""
-        return self._request(
-            "GET",
-            url_for(
-                f"/v1/projects/{encode_path_segment(project_id)}/test-runs/{encode_path_segment(test_run_id)}/items",
-                self.base_url,
-            ),
-            {},
-            _drop_none({"limit": limit, "cursor": cursor}),
         )
 
     def create_test_suite(

@@ -95,7 +95,6 @@ class DatasetInfo:
         created_at: ISO-8601 creation timestamp.
         entries: Number of examples in the dataset.
         current_version: Latest dataset version number.
-        test_config_count: Number of test configs referencing the dataset.
         creator_id: ID of the user who created the dataset.
         schema: The dataset's JSON Schema.
     """
@@ -105,7 +104,6 @@ class DatasetInfo:
     created_at: Optional[str] = None
     entries: Optional[float] = None
     current_version: Optional[float] = None
-    test_config_count: Optional[float] = None
     creator_id: Optional[str] = None
     schema: Optional[Dict[str, Any]] = None
 
@@ -117,7 +115,6 @@ class DatasetInfo:
             created_at=data.get("created_at"),
             entries=data.get("entries"),
             current_version=data.get("current_version"),
-            test_config_count=data.get("test_config_count"),
             creator_id=data.get("creator_id"),
             schema=data.get("schema"),
         )
@@ -371,10 +368,7 @@ class Dataset:
         return [DatasetVersion.from_dict(v) for v in response.get("versions", []) or []]
 
     def delete(self) -> None:
-        """Delete this dataset from the platform.
-
-        Dependent test configs are deleted along with the dataset.
-        """
+        """Delete this dataset from the platform."""
         if not self.client:
             return
 

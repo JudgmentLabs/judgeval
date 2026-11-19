@@ -10,7 +10,6 @@ from opentelemetry.sdk.trace.sampling import Sampler
 from judgeval.data.example import Example
 from judgeval.env import JUDGMENT_API_KEY, JUDGMENT_API_URL, JUDGMENT_ORG_ID
 from judgeval.internal.api import JudgmentSyncClient
-from judgeval.offline_tests.deprecation import OFFLINE_TESTS_DEPRECATION
 from judgeval.trace.exporters.judgment_span_exporter import JudgmentSpanExporter
 from judgeval.trace.id_generator import IsolatedRandomIdGenerator
 from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
@@ -24,6 +23,10 @@ from judgeval.version import get_version
 
 
 OFFLINE_TRACES_PATH = "otel/v1/offline-traces"
+OFFLINE_TRACER_DEPRECATION = (
+    "OfflineTracer is deprecated. Use client.test_suites and client.test_runs, "
+    "and tag your normal Tracer's traces with Tracer.test_case."
+)
 
 
 class OfflineTracer(Tracer):
@@ -118,7 +121,7 @@ class OfflineTracer(Tracer):
         """
         # Point the warning at the caller; Python hides DeprecationWarnings raised inside libraries.
         warnings.warn(
-            OFFLINE_TESTS_DEPRECATION, DeprecationWarning, stacklevel=_stacklevel
+            OFFLINE_TRACER_DEPRECATION, DeprecationWarning, stacklevel=_stacklevel
         )
         api_key = api_key or JUDGMENT_API_KEY
         organization_id = organization_id or JUDGMENT_ORG_ID

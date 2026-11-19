@@ -199,7 +199,6 @@ class CreateOfflineDatasetResponseDataset(TypedDict):
     updated_at: NotRequired[str]
     creator_id: str | None
     entries: NotRequired[float]
-    test_config_count: NotRequired[float]
 
 
 class CreateOfflineDatasetResponse(TypedDict):
@@ -219,7 +218,6 @@ class PullAllOfflineDatasetsResponsePullAllOfflineDatasetsResponseItem(TypedDict
     updated_at: NotRequired[str]
     creator_id: str | None
     entries: NotRequired[float]
-    test_config_count: NotRequired[float]
 
 
 PullAllOfflineDatasetsResponse: TypeAlias = list[
@@ -257,7 +255,6 @@ class PullOfflineDatasetResponse(TypedDict):
     updated_at: NotRequired[str]
     creator_id: str | None
     entries: NotRequired[float]
-    test_config_count: NotRequired[float]
     dataset_kind: DatasetKind
     examples: list[PullOfflineDatasetResponseExample]
 
@@ -282,7 +279,6 @@ class OfflineDatasetPageResponseDataset(TypedDict):
     updated_at: NotRequired[str]
     creator_id: str | None
     entries: NotRequired[float]
-    test_config_count: NotRequired[float]
 
 
 class OfflineDatasetPageResponseEntryItem(TypedDict):
@@ -732,55 +728,8 @@ class ExperimentRunItem(TypedDict):
     scorers: list[ExperimentScorer]
 
 
-class FetchTestRunViaExperimentAliasResponseResultExample(TypedDict):
-    example_id: str
-    organization_id: NotRequired[str]
-    project_id: NotRequired[str]
-    data: dict[str, Any]
-    metadata: NotRequired[dict[str, Any] | None]
-    managed_metadata: dict[str, Any]
-    created_at: NotRequired[str]
-    user_id: str
-
-
-class FetchTestRunViaExperimentAliasResponseResultScorer(TypedDict):
-    judge_id: str
-    judge_name: str | None
-    judge_major_version: float
-    judge_minor_version: float
-    score_type: str
-    num_value: float
-    bool_value: bool
-    str_value: str
-    reason: Any
-    metadata: Any
-    success: bool | None
-    error: str | None
-    created_at: str
-
-
-class FetchTestRunViaExperimentAliasResponseResult(TypedDict):
-    organization_id: str
-    project_id: str
-    test_run_id: str
-    dataset_id: str
-    dataset_version_id: str
-    example_id: str
-    agent_offline_trace_id: str | None
-    created_at: str
-    example: FetchTestRunViaExperimentAliasResponseResultExample | None
-    data: dict[str, Any]
-    scorers: list[FetchTestRunViaExperimentAliasResponseResultScorer]
-
-
-class FetchTestRunViaExperimentAliasResponse(TypedDict):
-    results: (
-        list[FetchTestRunViaExperimentAliasResponseResult]
-        | list[ExperimentRunItem]
-        | None
-    )
-    has_more: NotRequired[bool]
-    next_cursor: NotRequired[str | None]
+class FetchExperimentRunResponse(TypedDict):
+    results: list[ExperimentRunItem] | None
     ui_results_url: str | None
 
 
@@ -967,340 +916,6 @@ class PublicJqlErrorResponse(TypedDict):
     hint: NotRequired[str]
 
 
-class TestConfigsResponseTestConfigJudgeJudge(TypedDict):
-    id: str
-    name: str
-    judge_type: str | None
-    score_type: str
-
-
-class TestConfigsResponseTestConfigJudge(TypedDict):
-    id: NotRequired[str]
-    organization_id: NotRequired[str]
-    project_id: NotRequired[str]
-    test_config_id: NotRequired[str]
-    judge_id: str
-    created_at: NotRequired[str]
-    user_id: str
-    judge: NotRequired[TestConfigsResponseTestConfigJudgeJudge]
-
-
-class TestConfigsResponseTestConfig(TypedDict):
-    id: str
-    organization_id: NotRequired[str]
-    project_id: str
-    dataset_id: str
-    name: str
-    description: NotRequired[str | None]
-    created_at: NotRequired[str]
-    updated_at: NotRequired[str]
-    user_id: str
-    judges: NotRequired[list[TestConfigsResponseTestConfigJudge]]
-
-
-class TestConfigsResponse(TypedDict):
-    test_configs: list[TestConfigsResponseTestConfig]
-
-
-class CreateTestConfigRequestJudge(TypedDict):
-    judge_id: NotRequired[str]
-    name: NotRequired[str]
-
-
-class CreateTestConfigRequest(TypedDict):
-    name: str
-    description: NotRequired[str | None]
-    dataset_id: NotRequired[str]
-    dataset_name: NotRequired[str]
-    judge_ids: NotRequired[list[str]]
-    judges: NotRequired[list[CreateTestConfigRequestJudge]]
-
-
-class TestConfigResponseTestConfigJudgeJudge(TypedDict):
-    id: str
-    name: str
-    judge_type: str | None
-    score_type: str
-
-
-class TestConfigResponseTestConfigJudge(TypedDict):
-    id: NotRequired[str]
-    organization_id: NotRequired[str]
-    project_id: NotRequired[str]
-    test_config_id: NotRequired[str]
-    judge_id: str
-    created_at: NotRequired[str]
-    user_id: str
-    judge: NotRequired[TestConfigResponseTestConfigJudgeJudge]
-
-
-class TestConfigResponseTestConfig(TypedDict):
-    id: str
-    organization_id: NotRequired[str]
-    project_id: str
-    dataset_id: str
-    name: str
-    description: NotRequired[str | None]
-    created_at: NotRequired[str]
-    updated_at: NotRequired[str]
-    user_id: str
-    judges: NotRequired[list[TestConfigResponseTestConfigJudge]]
-
-
-class TestConfigResponse(TypedDict):
-    test_config: TestConfigResponseTestConfig
-
-
-class UpdateTestConfigRequest(TypedDict):
-    name: NotRequired[str]
-    description: NotRequired[str | None]
-
-
-class DeleteTestConfigResponse(TypedDict):
-    status: str
-    message: str
-
-
-class TestRunsResponseTestRun(TypedDict):
-    id: str
-    organization_id: NotRequired[str]
-    project_id: str
-    user_id: str
-    test_config_id: str
-    dataset_id: str
-    dataset_version_id: str
-    source: Literal["sdk", "cli", "mcp", "platform", "legacy"]
-    status: Literal["pending", "running", "completed", "error", "cancelled"]
-    name: str
-    error_message: NotRequired[str | None]
-    created_at: NotRequired[str]
-    updated_at: NotRequired[str]
-    started_at: NotRequired[str | None]
-    completed_at: NotRequired[str | None]
-
-
-class TestRunsResponse(TypedDict):
-    test_runs: list[TestRunsResponseTestRun]
-
-
-class CreateTestRunRequestJudgeVersion(TypedDict):
-    judge_id: NotRequired[str]
-    name: NotRequired[str]
-    version: NotRequired[str]
-    major_version: NotRequired[float]
-    minor_version: NotRequired[float]
-
-
-class CreateTestRunRequestAgentError(TypedDict):
-    example_id: str
-    error: str
-
-
-class CreateTestRunRequestAgentTrace(TypedDict):
-    example_id: str
-    agent_offline_trace_id: str
-
-
-class CreateTestRunRequest(TypedDict):
-    test_run_id: NotRequired[str]
-    test_config_id: str
-    name: NotRequired[str]
-    dataset_version_id: NotRequired[str]
-    dataset_version_number: NotRequired[float]
-    judge_versions: NotRequired[list[CreateTestRunRequestJudgeVersion]]
-    source: NotRequired[Literal["sdk", "cli", "mcp", "platform", "legacy"]]
-    agent_errors: NotRequired[list[CreateTestRunRequestAgentError]]
-    agent_traces: NotRequired[list[CreateTestRunRequestAgentTrace]]
-
-
-class PreparedTestRunResponseTestRun(TypedDict):
-    id: str
-    organization_id: NotRequired[str]
-    project_id: str
-    user_id: str
-    test_config_id: str
-    dataset_id: str
-    dataset_version_id: str
-    source: Literal["sdk", "cli", "mcp", "platform", "legacy"]
-    status: Literal["pending", "running", "completed", "error", "cancelled"]
-    name: str
-    error_message: NotRequired[str | None]
-    created_at: NotRequired[str]
-    updated_at: NotRequired[str]
-    started_at: NotRequired[str | None]
-    completed_at: NotRequired[str | None]
-
-
-class PreparedTestRunResponseDataset(TypedDict):
-    dataset_id: str
-    organization_id: NotRequired[str]
-    project_id: NotRequired[str]
-    name: str
-    schema: NotRequired[dict[str, Any] | None]
-    current_version: NotRequired[float]
-    created_at: NotRequired[str]
-    updated_at: NotRequired[str]
-    creator_id: str | None
-    entries: NotRequired[float]
-    test_config_count: NotRequired[float]
-
-
-class PreparedTestRunResponseDatasetVersion(TypedDict):
-    version_id: str
-    dataset_id: str
-    organization_id: str
-    project_id: str
-    version_number: float
-    created_at: str
-    user_id: str | None
-    item_count: float
-
-
-class PreparedTestRunResponseExample(TypedDict):
-    example_id: str
-    organization_id: NotRequired[str]
-    project_id: NotRequired[str]
-    data: dict[str, Any]
-    metadata: NotRequired[dict[str, Any] | None]
-    managed_metadata: dict[str, Any]
-    created_at: NotRequired[str]
-    user_id: str
-
-
-class PreparedTestRunResponseJudge(TypedDict):
-    judge_id: str
-    judge_name: str
-    judge_type: str
-    score_type: str
-    judge_major_version: float
-    judge_minor_version: float
-
-
-class PreparedTestRunResponseEvaluationRun(TypedDict):
-    run_id: str
-    judge_name: str
-    example_id: str
-    test_run_id: str
-    judge_id: str
-    judge_major_version: float
-    judge_minor_version: float
-
-
-class PreparedTestRunResponse(TypedDict):
-    test_run: PreparedTestRunResponseTestRun
-    dataset: PreparedTestRunResponseDataset
-    dataset_version: PreparedTestRunResponseDatasetVersion
-    examples: list[PreparedTestRunResponseExample]
-    judges: list[PreparedTestRunResponseJudge]
-    evaluation_runs: list[PreparedTestRunResponseEvaluationRun]
-    ui_results_url: str
-
-
-class TestRunResponseTestRun(TypedDict):
-    id: str
-    organization_id: NotRequired[str]
-    project_id: str
-    user_id: str
-    test_config_id: str
-    dataset_id: str
-    dataset_version_id: str
-    source: Literal["sdk", "cli", "mcp", "platform", "legacy"]
-    status: Literal["pending", "running", "completed", "error", "cancelled"]
-    name: str
-    error_message: NotRequired[str | None]
-    created_at: NotRequired[str]
-    updated_at: NotRequired[str]
-    started_at: NotRequired[str | None]
-    completed_at: NotRequired[str | None]
-
-
-class TestRunResponse(TypedDict):
-    test_run: TestRunResponseTestRun
-    ui_results_url: NotRequired[str | None]
-
-
-class TestRunGraphResponseGraph(TypedDict):
-    judge_id: str
-    judge_name: str | None
-    judge_major_version: float
-    judge_minor_version: float
-    score_type: str
-    score_distribution: list[float]
-    true_count: float
-    false_count: float
-    value_counts: dict[str, float]
-
-
-class TestRunGraphResponse(TypedDict):
-    graph: dict[str, TestRunGraphResponseGraph]
-
-
-class TestRunItemsResponseResultExample(TypedDict):
-    example_id: str
-    organization_id: NotRequired[str]
-    project_id: NotRequired[str]
-    data: dict[str, Any]
-    metadata: NotRequired[dict[str, Any] | None]
-    managed_metadata: dict[str, Any]
-    created_at: NotRequired[str]
-    user_id: str
-
-
-class TestRunItemsResponseResultScorer(TypedDict):
-    judge_id: str
-    judge_name: str | None
-    judge_major_version: float
-    judge_minor_version: float
-    score_type: str
-    num_value: float
-    bool_value: bool
-    str_value: str
-    reason: Any
-    metadata: Any
-    success: bool | None
-    error: str | None
-    created_at: str
-
-
-class TestRunItemsResponseResult(TypedDict):
-    organization_id: str
-    project_id: str
-    test_run_id: str
-    dataset_id: str
-    dataset_version_id: str
-    example_id: str
-    agent_offline_trace_id: str | None
-    created_at: str
-    example: TestRunItemsResponseResultExample | None
-    data: dict[str, Any]
-    scorers: list[TestRunItemsResponseResultScorer]
-
-
-class TestRunItemsResponse(TypedDict):
-    results: list[TestRunItemsResponseResult]
-    has_more: bool
-    next_cursor: str | None
-    ui_results_url: NotRequired[str | None]
-
-
-class UpdateTestRunStatusRequest(TypedDict):
-    status: Literal["pending", "running", "completed", "error", "cancelled"]
-    error_message: NotRequired[str | None]
-
-
-class ApplyTestRunSuccessRequestSuccess(TypedDict):
-    evaluation_run_id: str
-    success: bool | None
-
-
-class ApplyTestRunSuccessRequest(TypedDict):
-    successes: list[ApplyTestRunSuccessRequestSuccess]
-
-
-class ApplyTestRunSuccessResponse(TypedDict):
-    updated: float
-
-
 class CreateTestSuiteRequest(TypedDict, closed=True):
     name: str
     description: NotRequired[str]
@@ -1327,6 +942,7 @@ class TestCaseExpected(TypedDict, closed=True):
     judge_minor_version: float
     op: Literal["eq", "ne", "lt", "lte", "gt", "gte", "in", "not_in"]
     expected: Any
+    rationale: NotRequired[str]
 
 
 class TestCase(TypedDict):
@@ -1352,6 +968,7 @@ class TestCaseInputExpected(TypedDict, closed=True):
     judge_minor_version: float
     op: Literal["eq", "ne", "lt", "lte", "gt", "gte", "in", "not_in"]
     expected: Any
+    rationale: NotRequired[str]
 
 
 class TestCaseInput(TypedDict, closed=True):
@@ -1442,6 +1059,7 @@ class TestResultsResponseResultCheck(TypedDict):
     judge_minor_version: float
     op: Literal["eq", "ne", "lt", "lte", "gt", "gte", "in", "not_in"]
     expected: Any
+    rationale: str | None
     judge_output: Any
     passed: bool
     reason: str | None
@@ -4740,6 +4358,7 @@ class GetJudgeResponseOptimisticEvalEligibility(TypedDict):
             "unsupported_output_type",
             "missing_categorical_outputs",
             "session_scope",
+            "uses_connections",
         ]
     ]
 
@@ -6003,28 +5622,6 @@ class UpdateScheduledTaskResponseTask(TypedDict):
 class UpdateScheduledTaskResponse(TypedDict):
     task: UpdateScheduledTaskResponseTask
     message: str
-
-
-class CancelTestRunResponseTestRun(TypedDict):
-    id: str
-    organization_id: str
-    project_id: str
-    user_id: str
-    test_config_id: str
-    dataset_id: str
-    dataset_version_id: str
-    source: Literal["sdk", "cli", "mcp", "platform", "legacy"]
-    status: Literal["pending", "running", "completed", "error", "cancelled"]
-    error_message: str | None
-    started_at: str | None
-    completed_at: str | None
-    created_at: str
-    updated_at: str
-    name: str
-
-
-class CancelTestRunResponse(TypedDict):
-    test_run: CancelTestRunResponseTestRun
 
 
 class DeleteTestSuiteResponse(TypedDict):

@@ -160,7 +160,6 @@ class TestDatasetFactoryList:
                 "created_at": "2024-01-01",
                 "entries": 5,
                 "current_version": 2,
-                "test_config_count": 1,
                 "creator_id": "user-1",
                 "schema": {"type": "object", "properties": {}},
             }
@@ -170,7 +169,6 @@ class TestDatasetFactoryList:
         assert isinstance(result[0], DatasetInfo)
         assert result[0].name == "ds1"
         assert result[0].entries == 5
-        assert result[0].test_config_count == 1
 
     def test_list_tolerates_missing_fields(self):
         factory, client = _make_factory()

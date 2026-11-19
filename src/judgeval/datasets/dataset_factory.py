@@ -306,7 +306,6 @@ class DatasetFactory:
                 `examples` are provided to infer one from.
             examples: Examples to upload with the dataset.
             overwrite: Replace an existing dataset with the same name.
-                Rejected by the server if the dataset has test configs.
 
         Returns:
             The new `Dataset`, or `None` if the project is not resolved.
@@ -317,7 +316,7 @@ class DatasetFactory:
             JudgmentConflictError: If a dataset with this name exists and
                 `overwrite` is False.
             JudgmentValidationError: If the schema is invalid, examples
-                fail validation, or overwrite is blocked by test configs.
+                fail validation.
 
         Examples:
             ```python
@@ -452,8 +451,6 @@ class DatasetFactory:
 
     def delete(self, name: str) -> bool:
         """Delete a dataset from the platform.
-
-        Dependent test configs are deleted along with the dataset.
 
         Args:
             name: The dataset name (or dataset ID).
