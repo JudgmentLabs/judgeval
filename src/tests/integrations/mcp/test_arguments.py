@@ -42,6 +42,14 @@ def test_explicit_argument_names_reuse_owned_fields_and_inject_missing_fields(
         ),
         "missing": asdict(read_reported_arguments({intent_name: 42}, declared, names)),
         "preserved": without_agent_arguments(args, declared, names),
+        "mapped_without_injection": asdict(
+            read_reported_arguments(
+                args, declared, names, inject_intent=False, inject_model=False
+            )
+        ),
+        "disabled_fields": without_agent_arguments(
+            args, frozenset(), names, inject_intent=False, inject_model=False
+        ),
         "injected_keys": sorted(injected["properties"]),
         "injected_required": injected["required"],
         "stripped": without_agent_arguments(args, frozenset(), names),
@@ -58,6 +66,12 @@ def test_explicit_argument_names_reuse_owned_fields_and_inject_missing_fields(
         },
         "missing": {"intent": None, "model": None, "conversation_id": None},
         "preserved": args,
+        "mapped_without_injection": {
+            "intent": "Find tickets",
+            "model": "agent-model",
+            "conversation_id": "customer-chat",
+        },
+        "disabled_fields": {intent_name: "Find tickets", "agent_model": "agent-model"},
         "injected_keys": sorted(args),
         "injected_required": [intent_name, "agent_model"],
         "stripped": {},

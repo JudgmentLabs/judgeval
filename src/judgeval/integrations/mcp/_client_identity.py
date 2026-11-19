@@ -8,16 +8,22 @@ import json
 import uuid
 from typing import Any, Dict, Optional
 
-PREFIX = "judgment-mcp-v1."
+PREFIX = "mcp-session-v1."
+ACCEPTED_PREFIXES = (PREFIX, "judgment-mcp-v1.")
 MAX_TOKEN_LENGTH = 4096
 MAX_INITIALIZE_BYTES = 8192
 
 
 def read_client_identity(token: Optional[str]) -> Dict[str, str]:
-    if not token or not token.startswith(PREFIX) or len(token) > MAX_TOKEN_LENGTH:
+    if not token or len(token) > MAX_TOKEN_LENGTH:
+        return {}
+    prefix = next(
+        (prefix for prefix in ACCEPTED_PREFIXES if token.startswith(prefix)), None
+    )
+    if prefix is None:
         return {}
     try:
-        encoded = token[len(PREFIX) :]
+        encoded = token[len(prefix) :]
         value = json.loads(
             base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4))
         )
@@ -47,7 +53,9 @@ class McpClientIdentityMiddleware:
         if (
             scope["type"] == "http"
             and scope.get("method") in ("GET", "DELETE")
-            and headers.get(b"mcp-session-id", b"").startswith(PREFIX.encode("ascii"))
+            and headers.get(b"mcp-session-id", b"").startswith(
+                tuple(prefix.encode("ascii") for prefix in ACCEPTED_PREFIXES)
+            )
         ):
             await send(
                 {

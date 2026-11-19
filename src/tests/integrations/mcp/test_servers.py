@@ -9,6 +9,61 @@ from tests.integrations.mcp.harness import MCP_MAJOR, build_server, connect, sty
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("style", styles())
+@pytest.mark.parametrize(
+    "intent,model", [(True, False), (False, True), (False, False), (True, True)]
+)
+async def test_independent_injection_preserves_conversation_handoff(
+    style, intent, model, tracer, collecting_exporter
+):
+    orders = build_server(style)
+    instrument_mcp_server(orders.server, inject_intent=intent, inject_model=model)
+    async with connect(orders) as client:
+        schemas = await client.all_tools()
+        first = await client.call(
+            "add",
+            {
+                "a": 1,
+                "b": 2,
+                **({"intent": "Adding"} if intent else {}),
+                **({"llm_model": "agent-model"} if model else {}),
+            },
+        )
+        session = json.loads(first.texts[-1])["conversation_id"]
+        await client.call("add", {"a": 2, "b": 3, "conversation_id": session})
+    tracer.force_flush()
+    spans = [
+        span for span in collecting_exporter.spans if span.name == "tools/call add"
+    ]
+    assert {
+        "fields": set(schemas["add"]["properties"]),
+        "required": schemas["add"]["required"],
+        "calls": orders.calls,
+        "intent": spans[0].attributes.get("judgment.mcp.intent"),
+        "model": spans[0].attributes.get("judgment.llm.model"),
+        "sessions": [span.attributes.get("judgment.session_id") for span in spans],
+    } == {
+        "fields": {
+            "a",
+            "b",
+            "conversation_id",
+            *(["intent"] if intent else []),
+            *(["llm_model"] if model else []),
+        },
+        "required": [
+            "a",
+            "b",
+            *(["intent"] if intent else []),
+            *(["llm_model"] if model else []),
+        ],
+        "calls": [{"a": 1, "b": 2}, {"a": 2, "b": 3}],
+        "intent": "Adding" if intent else None,
+        "model": "agent-model" if model else None,
+        "sessions": [session, session],
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("style", styles())
 async def test_required_intent_and_model_are_advertised_but_older_calls_still_execute(
     style, tracer, collecting_exporter
 ):
