@@ -57,6 +57,7 @@ class CheckResult(TypedDict):
     judge_minor_version: int
     op: str
     expected: Any
+    rationale: Optional[str]
     judge_output: Any
     passed: bool
     reason: Optional[str]
@@ -288,6 +289,7 @@ class TestSuitesFactory(ProjectScopedFactory):
                             "judge_minor_version": 0,
                             "op": "eq",
                             "expected": "refund",
+                            "rationale": "Refund requests go to billing.",
                         }
                     },
                     "tags": ["billing"],
@@ -348,7 +350,9 @@ class TestSuitesFactory(ProjectScopedFactory):
         Each case is ``{"input": ..., "expected": {judge_id: check}, "tags": [...],
         "name": ..., "metadata": {...}}``; only ``input`` is required. A check is
         ``{"judge_major_version", "judge_minor_version", "op", "expected"}``,
-        where ``op`` is one of eq, ne, lt, lte, gt, gte, in, not_in.
+        where ``op`` is one of eq, ne, lt, lte, gt, gte, in, not_in, plus an
+        optional ``rationale``: why the check expects this value, shown next to
+        its verdict. Judges never read it.
         """
         return self._api.post_projects_test_suites_by_test_suite_id_cases(
             self._project, test_suite_id, {"cases": cases}
