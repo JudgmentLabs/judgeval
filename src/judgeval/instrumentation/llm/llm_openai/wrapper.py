@@ -5,6 +5,8 @@ import typing
 from judgeval.instrumentation.llm.llm_openai.chat_completions import (
     wrap_chat_completions_create_sync,
     wrap_chat_completions_create_async,
+    wrap_chat_completions_stream_sync,
+    wrap_chat_completions_stream_async,
 )
 from judgeval.instrumentation.llm.llm_openai.responses import (
     wrap_responses_create_sync,
@@ -33,6 +35,7 @@ if TYPE_CHECKING:
 
 def wrap_openai_client_sync(client: OpenAI) -> OpenAI:
     wrap_chat_completions_create_sync(client)
+    wrap_chat_completions_stream_sync(client)
     wrap_responses_create_sync(client)
     wrap_beta_chat_completions_parse_sync(client)
     wrap_chat_with_streaming_response_sync(client)
@@ -43,6 +46,7 @@ def wrap_openai_client_sync(client: OpenAI) -> OpenAI:
 
 def wrap_openai_client_async(client: AsyncOpenAI) -> AsyncOpenAI:
     wrap_chat_completions_create_async(client)
+    wrap_chat_completions_stream_async(client)
     wrap_responses_create_async(client)
     wrap_beta_chat_completions_parse_async(client)
     wrap_chat_with_streaming_response_async(client)
