@@ -50,6 +50,7 @@ from ._arguments import (
     AGENT_ARGUMENTS,
     ArgumentNames,
     ToolContract,
+    injected_argument_names,
     conversation_output_schema,
     conversation_id_prompt,
     mint_conversation_id,
@@ -141,6 +142,8 @@ class McpOptions:
     server_name: Optional[str] = None
     server_build: Optional[str] = None
     inject_agent_arguments: bool = True
+    inject_intent: bool = True
+    inject_model: bool = True
     inject_conversation_id: bool = True
     intent_argument: Optional[str] = None
     model_argument: Optional[str] = None
@@ -557,6 +560,8 @@ class McpObserver:
             contract.declared,
             self.argument_names,
             self.options.inject_conversation_id,
+            inject_intent=self.options.inject_intent,
+            inject_model=self.options.inject_model,
         )
 
     async def observe(
@@ -701,6 +706,8 @@ class McpObserver:
             contract.declared,
             self.options.inject_conversation_id,
             self.argument_names,
+            inject_intent=self.options.inject_intent,
+            inject_model=self.options.inject_model,
         )
 
     async def _prepare(
@@ -733,7 +740,12 @@ class McpObserver:
         injected = self.inject and contract is not None and not contract.open
         declared: FrozenSet[str] = contract.declared if contract else frozenset()
         reported = read_reported_arguments(
-            args, declared, self.argument_names, injected=injected
+            args,
+            declared,
+            self.argument_names,
+            injected=injected,
+            inject_intent=self.options.inject_intent,
+            inject_model=self.options.inject_model,
         )
         session_id = self.options.session_id
         provided_session = (
@@ -816,9 +828,14 @@ class McpObserver:
                 "judgment.mcp.argument_keys": _recorded_keys(
                     args,
                     declared if injected else None,
-                    self.argument_names.names
-                    if self.options.inject_conversation_id
-                    else self.argument_names.names[:2],
+                    tuple(
+                        injected_argument_names(
+                            self.argument_names,
+                            self.options.inject_conversation_id,
+                            inject_intent=self.options.inject_intent,
+                            inject_model=self.options.inject_model,
+                        )
+                    ),
                 )
                 if tool_name
                 else None,
@@ -840,7 +857,12 @@ class McpObserver:
         return _PreparedCall(
             attributes=attributes,
             arguments=without_agent_arguments(
-                args, declared, self.argument_names, self.options.inject_conversation_id
+                args,
+                declared,
+                self.argument_names,
+                self.options.inject_conversation_id,
+                inject_intent=self.options.inject_intent,
+                inject_model=self.options.inject_model,
             )
             if injected and any(key in self.argument_names.names for key in args)
             else None,

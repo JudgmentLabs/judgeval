@@ -48,6 +48,8 @@ def instrument_mcp_server(
     server_name: Optional[str] = None,
     server_build: Optional[str] = None,
     inject_agent_arguments: bool = True,
+    inject_intent: bool = True,
+    inject_model: bool = True,
     inject_conversation_id: bool = True,
     intent_argument: Optional[str] = None,
     model_argument: Optional[str] = None,
@@ -69,7 +71,7 @@ def instrument_mcp_server(
     ``conversation_id`` arguments, removed before your tool runs. Missing injected
     telemetry does not fail execution. When a call has no
     application or echoed conversation session, its returned result gets an ID in
-    supplemental text and compatible existing ``structuredContent._judgment``.
+    supplemental text and compatible existing ``structuredContent._mcp_instructions``.
     Compatible output schemas gain
     the matching optional property. Text-only/unsupported/colliding outputs
     retain text handoff. Returned tool-error results also get handoff while
@@ -87,8 +89,12 @@ def instrument_mcp_server(
             and model, and of sessions for clients that send no session ID.
         inject_conversation_id: Set to False to disable conversation-ID schema
             injection and handoff independently of intent/model injection.
+        inject_intent: Disable intent schema injection independently. Defaults True.
+            Explicit intent_argument mappings remain readable.
+        inject_model: Disable model schema injection independently. Defaults True.
+            Explicit model_argument mappings remain readable.
         intent_argument: Name to use instead of intent. Explicitly opts a tool's
-            existing argument into telemetry; otherwise injects an optional field.
+            existing argument into telemetry; otherwise injects a field.
             Existing arguments are never stripped or changed. Missing/non-string
             values are omitted. Explicit names can be read with injection off.
         model_argument: Same behavior for the calling model; defaults to llm_model.
@@ -132,6 +138,8 @@ def instrument_mcp_server(
                 server_name=server_name,
                 server_build=server_build,
                 inject_agent_arguments=inject_agent_arguments,
+                inject_intent=inject_intent,
+                inject_model=inject_model,
                 inject_conversation_id=inject_conversation_id,
                 intent_argument=intent_argument,
                 model_argument=model_argument,

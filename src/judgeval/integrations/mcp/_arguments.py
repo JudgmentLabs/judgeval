@@ -18,7 +18,7 @@ from typing import Any, Dict, FrozenSet, Mapping, Optional
 INTENT_ARGUMENT = "intent"
 MODEL_ARGUMENT = "llm_model"
 CONVERSATION_ARGUMENT = "conversation_id"
-RESPONSE_CONTEXT = "_judgment"
+RESPONSE_CONTEXT = "_mcp_instructions"
 _MAX_INTENT_LENGTH = 500
 _UUID_V7 = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
@@ -38,7 +38,7 @@ AGENT_ARGUMENT_DESCRIPTIONS: Mapping[str, str] = {
     ),
     CONVERSATION_ARGUMENT: (
         "Optional, for analytics only. Read conversation_id from the server's "
-        "earlier response text or structuredContent._judgment and pass it unchanged "
+        "earlier response text or structuredContent._mcp_instructions and pass it unchanged "
         "as {argument_name} on later calls in this conversation. Omit it "
         "on the first call, and do not invent one."
     ),
@@ -164,6 +164,8 @@ def read_reported_arguments(
     names: ArgumentNames = ArgumentNames(),
     *,
     injected: bool = True,
+    inject_intent: bool = True,
+    inject_model: bool = True,
 ) -> ReportedArguments:
     """Reads injected arguments and explicitly opted-in business arguments."""
 
@@ -176,8 +178,16 @@ def read_reported_arguments(
         return value
 
     intent_name, model_name, conversation_name = names.names
-    intent = read(intent_name, names.intent)
-    model = read(model_name, names.model)
+    intent = (
+        read(intent_name, names.intent)
+        if inject_intent or names.intent is not None
+        else None
+    )
+    model = (
+        read(model_name, names.model)
+        if inject_model or names.model is not None
+        else None
+    )
     conversation_id = read(conversation_name, names.conversation_id)
     return ReportedArguments(
         intent=None if intent is None else intent[:_MAX_INTENT_LENGTH],
@@ -200,9 +210,17 @@ def without_agent_arguments(
     declared: FrozenSet[str],
     names: ArgumentNames = ArgumentNames(),
     inject_conversation_id: bool = True,
+    *,
+    inject_intent: bool = True,
+    inject_model: bool = True,
 ) -> Dict[str, Any]:
     """Removes injected values so a tool's strict schema still accepts the call."""
-    injected_names = names.names if inject_conversation_id else names.names[:2]
+    injected_names = injected_argument_names(
+        names,
+        inject_conversation_id,
+        inject_intent=inject_intent,
+        inject_model=inject_model,
+    )
     return {
         name: value
         for name, value in args.items()
@@ -210,18 +228,46 @@ def without_agent_arguments(
     }
 
 
+def injected_argument_names(
+    names: ArgumentNames,
+    inject_conversation_id: bool = True,
+    *,
+    inject_intent: bool = True,
+    inject_model: bool = True,
+) -> FrozenSet[str]:
+    intent, model, conversation_id = names.names
+    return frozenset(
+        [
+            *([intent] if inject_intent else []),
+            *([model] if inject_model else []),
+            *([conversation_id] if inject_conversation_id else []),
+        ]
+    )
+
+
 def schema_with_agent_arguments(
     schema: Mapping[str, Any],
     declared: FrozenSet[str],
     inject_conversation_id: bool = True,
     names: ArgumentNames = ArgumentNames(),
+    *,
+    inject_intent: bool = True,
+    inject_model: bool = True,
 ) -> Dict[str, Any]:
     """Adds analytics arguments, requiring injected intent and model in the listing."""
     properties = schema.get("properties")
     required = schema.get("required")
     intent_name, model_name, _ = names.names
+    enabled = injected_argument_names(
+        names,
+        inject_conversation_id,
+        inject_intent=inject_intent,
+        inject_model=inject_model,
+    )
     required_arguments = [
-        name for name in (intent_name, model_name) if name not in declared
+        name
+        for name in (intent_name, model_name)
+        if name in enabled and name not in declared
     ]
     return {
         **schema,
@@ -241,11 +287,10 @@ def schema_with_agent_arguments(
                     "type": "string",
                     "description": description.replace("{argument_name}", name),
                 }
-                for name, (default, description) in zip(
-                    names.names, AGENT_ARGUMENT_DESCRIPTIONS.items()
+                for name, description in zip(
+                    names.names, AGENT_ARGUMENT_DESCRIPTIONS.values()
                 )
-                if name not in declared
-                and (inject_conversation_id or default != CONVERSATION_ARGUMENT)
+                if name not in declared and name in enabled
             },
             **(properties if isinstance(properties, Mapping) else {}),
         },
