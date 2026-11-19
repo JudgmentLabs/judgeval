@@ -5169,6 +5169,11 @@
                   },
                   "expected": {
                     "description": "Passes when output <op> expected."
+                  },
+                  "rationale": {
+                    "minLength": 1,
+                    "description": "Why the check expects this value, shown next to its verdict. Judges never read it.",
+                    "type": "string"
                   }
                 }
               }
@@ -5282,6 +5287,11 @@
                   },
                   "expected": {
                     "description": "Passes when output <op> expected."
+                  },
+                  "rationale": {
+                    "minLength": 1,
+                    "description": "Why the check expects this value, shown next to its verdict. Judges never read it.",
+                    "type": "string"
                   }
                 }
               }
@@ -5641,6 +5651,7 @@
                       "judge_minor_version",
                       "op",
                       "expected",
+                      "rationale",
                       "judge_output",
                       "passed",
                       "reason",
@@ -5686,6 +5697,17 @@
                       },
                       "expected": {
                         "description": "The golden value."
+                      },
+                      "rationale": {
+                        "anyOf": [
+                          {
+                            "description": "Why the case's check expects this value, at the run's test suite version.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       },
                       "judge_output": {
                         "description": "What the judge returned; NULL when it errored."
@@ -10526,7 +10548,7 @@
       "post": {
         "tags": ["V1"],
         "summary": "Submit a customer judge result",
-        "description": "Submit a customer score for one trace or session under any judge. Resubmitting for the same judge and target replaces its current customer score. Each submission, including a retry, writes a new result row. Hosted results are preserved. Validates against the production version and derives attribution from the target.",
+        "description": "Submit a customer score for one trace, session, or conversation under any judge. Resubmitting for the same judge and target replaces its current customer score. Each submission, including a retry, writes a new result row. Hosted results are preserved. Validates against the production version and derives attribution from the target.",
         "parameters": [
           {
             "name": "projectId",
@@ -10576,6 +10598,21 @@
                               }
                             },
                             "required": ["type", "session_id"]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "conversation"
+                              },
+                              "conversation_id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 512
+                              }
+                            },
+                            "required": ["type", "conversation_id"]
                           }
                         ]
                       },
@@ -10625,6 +10662,21 @@
                               }
                             },
                             "required": ["type", "session_id"]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "const": "conversation"
+                              },
+                              "conversation_id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 512
+                              }
+                            },
+                            "required": ["type", "conversation_id"]
                           }
                         ]
                       },
@@ -12834,7 +12886,7 @@
                                     "type": "string",
                                     "minLength": 1,
                                     "maxLength": 1048576,
-                                    "description": "One Python file defining judge(example), run in Monty. example holds the example's fields and example['trace']['spans']. Return a value matching the judge's outputs, or a dict with value and optional reason. No classes with inheritance, del, or third-party packages; it is checked at upload."
+                                    "description": "One Python file defining judge(example), run in Monty. example holds the example's fields, plus example['trace']['spans'] for a trace judge or example['conversation'] (the conversation's model calls and items in order) when conversation is true. Return a value matching the judge's outputs, or a dict with value and optional reason. No classes with inheritance, del, or third-party packages; it is checked at upload."
                                   },
                                   "description": {
                                     "description": "Description stored on the Code judge version",
@@ -15588,7 +15640,7 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 1048576,
-                                                "description": "One Python file defining judge(example), run in Monty. example holds the example's fields and example['trace']['spans']. Return a value matching the judge's outputs, or a dict with value and optional reason. No classes with inheritance, del, or third-party packages; it is checked at upload."
+                                                "description": "One Python file defining judge(example), run in Monty. example holds the example's fields, plus example['trace']['spans'] for a trace judge or example['conversation'] (the conversation's model calls and items in order) when conversation is true. Return a value matching the judge's outputs, or a dict with value and optional reason. No classes with inheritance, del, or third-party packages; it is checked at upload."
                                               },
                                               "description": {
                                                 "description": "Description stored on the Code judge version",
@@ -16161,7 +16213,7 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 1048576,
-                                                "description": "One Python file defining judge(example), run in Monty. example holds the example's fields and example['trace']['spans']. Return a value matching the judge's outputs, or a dict with value and optional reason. No classes with inheritance, del, or third-party packages; it is checked at upload."
+                                                "description": "One Python file defining judge(example), run in Monty. example holds the example's fields, plus example['trace']['spans'] for a trace judge or example['conversation'] (the conversation's model calls and items in order) when conversation is true. Return a value matching the judge's outputs, or a dict with value and optional reason. No classes with inheritance, del, or third-party packages; it is checked at upload."
                                               },
                                               "description": {
                                                 "description": "Description stored on the Code judge version",
@@ -16734,7 +16786,7 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 1048576,
-                                                "description": "One Python file defining judge(example), run in Monty. example holds the example's fields and example['trace']['spans']. Return a value matching the judge's outputs, or a dict with value and optional reason. No classes with inheritance, del, or third-party packages; it is checked at upload."
+                                                "description": "One Python file defining judge(example), run in Monty. example holds the example's fields, plus example['trace']['spans'] for a trace judge or example['conversation'] (the conversation's model calls and items in order) when conversation is true. Return a value matching the judge's outputs, or a dict with value and optional reason. No classes with inheritance, del, or third-party packages; it is checked at upload."
                                               },
                                               "description": {
                                                 "description": "Description stored on the Code judge version",
@@ -18051,7 +18103,7 @@
                                 "type": "string",
                                 "minLength": 1,
                                 "maxLength": 1048576,
-                                "description": "One Python file defining judge(example), run in Monty. example holds the example's fields and example['trace']['spans']. Return a value matching the judge's outputs, or a dict with value and optional reason. No classes with inheritance, del, or third-party packages; it is checked at upload."
+                                "description": "One Python file defining judge(example), run in Monty. example holds the example's fields, plus example['trace']['spans'] for a trace judge or example['conversation'] (the conversation's model calls and items in order) when conversation is true. Return a value matching the judge's outputs, or a dict with value and optional reason. No classes with inheritance, del, or third-party packages; it is checked at upload."
                               },
                               "expression": {}
                             }
@@ -18672,9 +18724,11 @@
                               "unsupported_judge_type",
                               "unsupported_output_type",
                               "missing_categorical_outputs",
-                              "session_scope"
+                              "session_scope",
+                              "uses_connections"
                             ]
-                          }
+                          },
+                          "description": "Configuration incompatibilities. uses_connections means the judge uses selected connections with both connection feature flags enabled; extracted trace evidence cannot replace checks against connected systems."
                         }
                       },
                       "required": [

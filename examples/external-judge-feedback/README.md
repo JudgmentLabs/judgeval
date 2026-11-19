@@ -17,3 +17,15 @@ Use trace feedback for one response/run. Use session feedback only for an overal
 The local file is a single-process demo. Use an organization/project-scoped database mapping and unique message IDs in production; authorize feedback against that message and never repoint its saved trace ID. Keep mappings on your server. Trace export completion does not guarantee immediate query visibility: if submission returns target-not-found during ingestion, wait and retry the same target. Do not fall back to a session or a search match.
 
 There is one current customer score per judge and target. Another submission replaces it, so a delayed retry can overwrite a newer correction. Judgment-generated scores remain separate.
+
+Conversation/trajectory feedback uses its recorded `conversation_id` directly:
+
+```python
+client.external_judges.submit_result(
+    judge_name="Session quality",
+    target={"type": "conversation", "conversation_id": "conversation-456"},
+    value=4.5,
+)
+```
+
+This target requires recorded conversation observations (for example, from `Trajectory.record`). It does not require a trace or a traced session. Wait for ingestion visibility before submitting. The same judge may rate a session and a conversation; their results remain independent. The supporting conversation-feedback API must be deployed before using this target.

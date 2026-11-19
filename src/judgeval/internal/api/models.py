@@ -1327,6 +1327,7 @@ class TestCaseExpected(TypedDict, closed=True):
     judge_minor_version: float
     op: Literal["eq", "ne", "lt", "lte", "gt", "gte", "in", "not_in"]
     expected: Any
+    rationale: NotRequired[str]
 
 
 class TestCase(TypedDict):
@@ -1352,6 +1353,7 @@ class TestCaseInputExpected(TypedDict, closed=True):
     judge_minor_version: float
     op: Literal["eq", "ne", "lt", "lte", "gt", "gte", "in", "not_in"]
     expected: Any
+    rationale: NotRequired[str]
 
 
 class TestCaseInput(TypedDict, closed=True):
@@ -1442,6 +1444,7 @@ class TestResultsResponseResultCheck(TypedDict):
     judge_minor_version: float
     op: Literal["eq", "ne", "lt", "lte", "gt", "gte", "in", "not_in"]
     expected: Any
+    rationale: str | None
     judge_output: Any
     passed: bool
     reason: str | None
@@ -2048,10 +2051,16 @@ class SubmitExternalJudgeResultSubmitExternalJudgeResultTarget1(TypedDict):
     session_id: str
 
 
+class SubmitExternalJudgeResultSubmitExternalJudgeResultTarget2(TypedDict):
+    type: Literal["conversation"]
+    conversation_id: str
+
+
 class SubmitExternalJudgeResultSubmitExternalJudgeResult(TypedDict):
     target: (
         SubmitExternalJudgeResultSubmitExternalJudgeResultTarget
         | SubmitExternalJudgeResultSubmitExternalJudgeResultTarget1
+        | SubmitExternalJudgeResultSubmitExternalJudgeResultTarget2
     )
     value: bool | float | str
     reason: NotRequired[str]
@@ -2068,10 +2077,16 @@ class SubmitExternalJudgeResultSubmitExternalJudgeResult1Target1(TypedDict):
     session_id: str
 
 
+class SubmitExternalJudgeResultSubmitExternalJudgeResult1Target2(TypedDict):
+    type: Literal["conversation"]
+    conversation_id: str
+
+
 class SubmitExternalJudgeResultSubmitExternalJudgeResult1(TypedDict):
     target: (
         SubmitExternalJudgeResultSubmitExternalJudgeResult1Target
         | SubmitExternalJudgeResultSubmitExternalJudgeResult1Target1
+        | SubmitExternalJudgeResultSubmitExternalJudgeResult1Target2
     )
     value: bool | float | str
     reason: NotRequired[str]
@@ -4728,6 +4743,7 @@ class GetJudgeResponseOptimisticEvalEligibility(TypedDict):
             "unsupported_output_type",
             "missing_categorical_outputs",
             "session_scope",
+            "uses_connections",
         ]
     ]
 
