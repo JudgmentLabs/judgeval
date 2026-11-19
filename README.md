@@ -101,6 +101,10 @@ By default, the SDK adds required `intent` and `llm_model` and optional `convers
 instrument_mcp_server(server, inject_agent_arguments=False)
 ```
 
+To keep conversation tracking while omitting model or intent arguments, set `inject_model=False` or `inject_intent=False`. `inject_conversation_id=False` disables the conversation argument and handoff. These switches do not disable explicitly configured argument mappings.
+
+Conversation handoff uses the provider-neutral `structuredContent._mcp_instructions` field when supported. Refresh cached tool definitions after upgrading and deploy consistently across replicas. New HTTP identity carriers use `mcp-session-v1.`; existing carriers remain accepted.
+
 Call `Tracer.force_flush()` before a serverless return, or `Tracer.shutdown()` when stopping. Export is best-effort and uses your existing tracer.
 
 See the [Judgment documentation](https://docs.judgmentlabs.ai/documentation) for more on tracing and integrations.

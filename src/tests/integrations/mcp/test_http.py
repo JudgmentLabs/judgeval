@@ -80,6 +80,7 @@ async def test_legacy_stateless_http_retains_each_clients_identity(
         app = orders.server.streamable_http_app(stateless_http=True, json_response=True)
 
     stream_statuses = []
+    neutral_tokens = []
 
     async def call(client, name):
         headers = {
@@ -100,7 +101,13 @@ async def test_legacy_stateless_http_retains_each_clients_identity(
                 },
             },
         )
-        headers["Mcp-Session-Id"] = response.headers["mcp-session-id"]
+        token = response.headers["mcp-session-id"]
+        neutral_tokens.append(token.startswith("mcp-session-v1."))
+        headers["Mcp-Session-Id"] = (
+            token.replace("mcp-session-v1.", "judgment-mcp-v1.")
+            if name == "client-b"
+            else token
+        )
         for request_id in (2, 3):
             result = await client.post(
                 "/mcp",
@@ -139,8 +146,10 @@ async def test_legacy_stateless_http_retains_each_clients_identity(
             ]
         ),
         sorted(stream_statuses),
+        neutral_tokens,
     ) == (
         [("client-a", "client-1", "2025-06-18")] * 2
         + [("client-b", "client-1", "2025-06-18")] * 2,
         [(405, "POST")] * 4,
+        [True, True],
     )
