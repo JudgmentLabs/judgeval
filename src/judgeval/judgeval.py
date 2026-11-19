@@ -1,5 +1,4 @@
 from __future__ import annotations
-import warnings
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -342,49 +341,6 @@ class Judgeval:
         from judgeval.testing import TestRunsFactory
 
         return TestRunsFactory(
-            client=self._internal_client,
-            project_id=self._project_id,
-            project_name=self._project_name,
-        )
-
-    @property
-    def offline_tests(self):
-        """**Deprecated.** Use `test_suites` and `test_runs` instead.
-
-        Access offline tests: test configs and dataset-backed test runs.
-
-        Returns:
-            OfflineTestsFactory: Use `.create_config()` to bind a dataset
-                to judges, and `.run()` to execute a test run (optionally
-                driving an agent entrypoint and asserting a pass
-                condition).
-
-        Examples:
-            ```python
-            config = client.offline_tests.create_config(
-                name="nightly-regression",
-                dataset="golden-set",
-                judges=["helpfulness"],
-            )
-
-            result = client.offline_tests.run(
-                test_config="nightly-regression",
-                agent_function=my_agent,
-                pass_condition_fn=lambda fields, scorers: all(
-                    s.error is None for s in scorers
-                ),
-                assert_test=True,
-            )
-            ```
-        """
-        from judgeval.offline_tests import (
-            OFFLINE_TESTS_DEPRECATION,
-            OfflineTestsFactory,
-        )
-
-        warnings.warn(OFFLINE_TESTS_DEPRECATION, DeprecationWarning, stacklevel=2)
-
-        return OfflineTestsFactory(
             client=self._internal_client,
             project_id=self._project_id,
             project_name=self._project_name,

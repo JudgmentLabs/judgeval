@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import warnings
 from unittest.mock import MagicMock
 
 import pytest
 
 from judgeval import testing
 from judgeval.exceptions import JudgmentProjectNotFoundError
-from judgeval.offline_tests import OFFLINE_TESTS_DEPRECATION
 
 
 def _client(response=None):
@@ -48,18 +46,3 @@ def test_a_missing_project_raises_before_calling_the_api():
     with pytest.raises(JudgmentProjectNotFoundError):
         tests.list()
     client._request.assert_not_called()
-
-
-def test_offline_tests_warn_that_they_are_deprecated(monkeypatch):
-    from judgeval.judgeval import Judgeval
-
-    judgeval = Judgeval.__new__(Judgeval)
-    monkeypatch.setattr(judgeval, "_internal_client", _client(), raising=False)
-    monkeypatch.setattr(judgeval, "_project_id", "p1", raising=False)
-    monkeypatch.setattr(judgeval, "_project_name", "proj", raising=False)
-
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        judgeval.offline_tests
-
-    assert [str(w.message) for w in caught] == [OFFLINE_TESTS_DEPRECATION]
