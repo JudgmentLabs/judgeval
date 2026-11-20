@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 from judgeval.instrumentation.llm.llm_google.generate_content import (
     wrap_generate_content_sync,
+    wrap_generate_content_stream_async,
 )
 
 if TYPE_CHECKING:
@@ -24,6 +25,7 @@ def wrap_google_client(client: Client) -> Client:
 
     if isinstance(client, Client):
         wrap_generate_content_sync(client)
+        wrap_generate_content_stream_async(client)
         return client
     else:
         raise TypeError(f"Invalid client type: {type(client)}")
