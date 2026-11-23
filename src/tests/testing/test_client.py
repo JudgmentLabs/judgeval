@@ -63,3 +63,25 @@ def test_offline_tests_warn_that_they_are_deprecated(monkeypatch):
         judgeval.offline_tests
 
     assert [str(w.message) for w in caught] == [OFFLINE_TESTS_DEPRECATION]
+
+
+def test_canned_tool_result_returns_the_first_matching_rule():
+    definition = {
+        "tools": {
+            "lookup_order": [
+                {"match": {"order_id": "A1", "fields": ["status"]}, "return": None},
+                {"match": {"order_id": "A1"}, "return": {"status": "shipped"}},
+                {"return": {"error": "not found"}},
+            ]
+        }
+    }
+
+    def result(tool_name, arguments):
+        return testing.canned_tool_result(definition, tool_name, arguments)
+
+    assert [
+        result("lookup_order", {"order_id": "A1", "fields": ["status"]}),
+        result("lookup_order", {"order_id": "A1", "fields": []}),
+        result("lookup_order", {"order_id": "B2"}),
+        result("create_ticket", {"order_id": "A1"}),
+    ] == [None, {"status": "shipped"}, {"error": "not found"}, testing.NO_MATCH]
