@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextvars import ContextVar, Token
-from typing import TYPE_CHECKING, ClassVar, Optional, Sequence
+from typing import TYPE_CHECKING, ClassVar, NamedTuple, Optional, Sequence
 from weakref import WeakSet
 
 from opentelemetry import context as context_api
@@ -23,6 +23,19 @@ _Links = Optional[Sequence[Link]]
 _active_tracer_var: ContextVar[Optional[JudgmentTracer]] = ContextVar(
     "active_tracer", default=None
 )
+
+
+class _ContextToken(NamedTuple):
+    """Tokens returned when a context is attached.
+
+    ``local`` always refers to Judgment's private runtime context. ``global_``
+    is only set when this provider owns the global OTel context, in which case
+    the same context is mirrored there so third-party instrumentation can read
+    the active Judgment span.
+    """
+
+    local: Token[Context]
+    global_: Optional[object] = None
 
 
 class ProxyTracer(Tracer):
@@ -228,10 +241,24 @@ class JudgmentTracerProvider(TracerProvider):
         return _active_tracer_var.get()
 
     def get_current_context(self) -> Context:
-        """Return the current OpenTelemetry context."""
-        if self._use_global_context:
-            return context_api.get_current()
+        """Return the context new Judgment spans are parented from.
+
+        This always reads Judgment's private runtime context, never the global
+        one. Owning the global provider means we *write* active spans there so
+        third-party instrumentation can see them, but it must not drive
+        parenting: whatever span happens to be current globally is often
+        foreign (host application, unrelated instrumentation), and adopting it
+        as a parent silently reroots Judgment spans onto another trace.
+        """
         return self._runtime_context.get_current()
+
+    def get_global_context(self) -> Context:
+        """Return the global OpenTelemetry context.
+
+        Only useful for interoperating with third-party instrumentation.
+        Parenting decisions should use ``get_current_context``.
+        """
+        return context_api.get_current()
 
     def get_current_span(self) -> Span:
         """Return the span that is active in the current context."""
@@ -316,16 +343,23 @@ class JudgmentTracerProvider(TracerProvider):
             if end_on_exit:
                 span.end()
 
-    def attach_context(self, ctx: Context) -> Token[Context]:
-        if self._use_global_context:
-            return context_api.attach(ctx)
-        return self._runtime_context.attach(ctx)
+    def attach_context(self, ctx: Context) -> _ContextToken:
+        """Make ``ctx`` current.
 
-    def detach_context(self, token: Token[Context]) -> None:
-        if self._use_global_context:
-            context_api.detach(token)
-        else:
-            self._runtime_context.detach(token)
+        The context is always attached to Judgment's private runtime context,
+        which is what parenting reads. When this provider owns the global
+        provider the context is mirrored into the global OTel context as well,
+        so third-party instrumentation calling ``trace.get_current_span()``
+        sees the live Judgment span.
+        """
+        local = self._runtime_context.attach(ctx)
+        global_ = context_api.attach(ctx) if self._use_global_context else None
+        return _ContextToken(local, global_)
+
+    def detach_context(self, token: _ContextToken) -> None:
+        if token.global_ is not None:
+            context_api.detach(token.global_)
+        self._runtime_context.detach(token.local)
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         """Flush pending spans from all registered tracers."""
