@@ -240,6 +240,12 @@ def _process_message(ctx: Ctx, message: Any) -> None:
             final_results.append({"content": content, "role": "user"})
         llm_tracker.mark_next_llm_start()
 
+    elif message_type == "ConversationResetMessage":
+        # e.g. /clear: the model starts over, so later inputs drop everything before.
+        ctx["conversation_history"] = []
+        ctx["prompt"] = None
+        final_results.clear()
+
     elif message_type == "ResultMessage":
         if hasattr(message, "usage"):
             usage_metrics = _extract_usage_from_result_message(message)
@@ -252,13 +258,19 @@ def _process_message(ctx: Ctx, message: Any) -> None:
             }.items()
             if v is not None
         }
+        # Recorded here rather than after the stream ends, because callers
+        # commonly stop iterating at the ResultMessage.
+        history = _build_llm_input(
+            ctx.get("prompt"), final_results, ctx["conversation_history"]
+        )
+        client_state: Optional[_ClientTracingState] = ctx.get("client_state")
+        if client_state is not None:
+            client_state.conversation_history = history
         session_id = result_metadata.get("session_id")
         if session_id:
             # Re-insert so eviction drops the least recently finished session.
             _session_histories.pop(session_id, None)
-            _session_histories[session_id] = _build_llm_input(
-                ctx.get("prompt"), final_results, ctx["conversation_history"]
-            )
+            _session_histories[session_id] = history
             if len(_session_histories) > _MAX_REMEMBERED_SESSIONS:
                 del _session_histories[next(iter(_session_histories))]
         if result_metadata:
@@ -276,6 +288,7 @@ def _init_agent_span(
     start_time: Optional[float],
     span_name: str,
     conversation_history: Optional[List[Dict[str, Any]]] = None,
+    client_state: Optional[_ClientTracingState] = None,
 ) -> None:
     ctx.update(
         agent_span=None,
@@ -285,6 +298,7 @@ def _init_agent_span(
         final_results=[],
         prompt=prompt,
         conversation_history=conversation_history or [],
+        client_state=client_state,
     )
 
     agent_span_context = Tracer.start_as_current_span(
@@ -312,21 +326,14 @@ def _yield_hook(ctx: Ctx, message: Any) -> None:
     _process_message(ctx, message)
 
 
-def _make_post_hook(cs: Optional[_ClientTracingState] = None) -> Callable[[Ctx], None]:
-    def hook(ctx: Ctx) -> None:
-        final_results: Optional[List[Dict[str, Any]]] = ctx.get("final_results")
-        agent_span: Optional[Span] = ctx.get("agent_span")
-        if agent_span and final_results:
-            agent_span.set_attribute(
-                AttributeKeys.JUDGMENT_OUTPUT,
-                serialize_attribute(final_results[-1], safe_serialize),
-            )
-        if cs is not None and final_results:
-            cs.conversation_history = _build_llm_input(
-                ctx.get("prompt"), final_results, ctx["conversation_history"]
-            )
-
-    return hook
+def _post_hook(ctx: Ctx) -> None:
+    final_results: Optional[List[Dict[str, Any]]] = ctx.get("final_results")
+    agent_span: Optional[Span] = ctx.get("agent_span")
+    if agent_span and final_results:
+        agent_span.set_attribute(
+            AttributeKeys.JUDGMENT_OUTPUT,
+            serialize_attribute(final_results[-1], safe_serialize),
+        )
 
 
 def _error_hook(ctx: Ctx, error: Exception) -> None:
@@ -369,9 +376,15 @@ def _create_client_wrapper_class(
     class WrappedClaudeSDKClient(original_client_class):  # type: ignore
         def __init__(self, *args: Any, **kwargs: Any):
             super().__init__(*args, **kwargs)
-            options = kwargs.get("options") or (args[0] if args else None)
-            cs = _ClientTracingState(
-                conversation_history=_resumed_history(options),
+            cs = _ClientTracingState()
+
+            def connect_pre(ctx: Ctx, *args: Any, **kwargs: Any) -> None:
+                # Each connection is its own session: a new one, or the one
+                # its options resume.
+                cs.conversation_history = _resumed_history(self.options)
+
+            self.connect = immutable_wrap_async(  # type: ignore[assignment]
+                super().connect, pre_hook=connect_pre
             )
 
             orig_query = super().query
@@ -388,6 +401,7 @@ def _create_client_wrapper_class(
                     cs.query_start_time,
                     "Claude_Agent",
                     conversation_history=cs.conversation_history,
+                    client_state=cs,
                 )
 
             orig_receive = super().receive_response
@@ -395,7 +409,7 @@ def _create_client_wrapper_class(
                 orig_receive,
                 pre_hook=response_pre,
                 yield_hook=_yield_hook,
-                post_hook=_make_post_hook(cs),
+                post_hook=_post_hook,
                 error_hook=_error_hook,
                 finally_hook=finally_hook,
             )
@@ -424,7 +438,7 @@ def _wrap_query_function(
         original_query_fn,
         pre_hook=pre_hook,
         yield_hook=_yield_hook,
-        post_hook=_make_post_hook(),
+        post_hook=_post_hook,
         error_hook=_error_hook,
         finally_hook=finally_hook,
     )
@@ -469,9 +483,16 @@ def _serialize_content_blocks(content: Any) -> Any:
 
 
 def _resumed_history(options: Any) -> List[Dict[str, Any]]:
-    """Returns the recorded earlier turns of the session these options resume."""
+    """Returns the recorded earlier turns of the session these options resume.
+
+    Resuming at a checkpoint (resume_session_at) loads only part of the
+    session, and the recorded history has no message IDs to cut it at, so
+    nothing is returned rather than turns the model never sees.
+    """
     resume = getattr(options, "resume", None)
-    return _session_histories.get(resume, []) if resume else []
+    if not resume or getattr(options, "resume_session_at", None):
+        return []
+    return _session_histories.get(resume, [])
 
 
 def _build_llm_input(
