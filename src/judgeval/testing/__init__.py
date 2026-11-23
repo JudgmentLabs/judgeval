@@ -9,7 +9,9 @@ publish a version, then start runs against it.
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Literal, Optional, TypedDict, cast
+from typing import Any, Dict, List, Literal, Mapping, Optional, TypedDict, cast
+
+from typing_extensions import NotRequired
 
 from judgeval.exceptions import (
     JudgmentAPIError,
@@ -22,17 +24,39 @@ from judgeval.utils.url import url_for
 Method = Literal["GET", "POST", "PUT", "PATCH", "DELETE"]
 
 
+class EnvironmentDefinition(TypedDict, total=False):
+    """What a test environment holds: data only, never code."""
+
+    #: Canned results by tool name: a list of ``{"match": {...}, "return": ...}``
+    #: rules, where the first rule that matches a call answers it.
+    tools: Dict[str, List[Dict[str, Any]]]
+    #: Starting data, in whatever shape your test runner applies before a case.
+    seed: Dict[str, Any]
+
+
+class StartedEnvironment(TypedDict):
+    description: Optional[str]
+    definition: EnvironmentDefinition
+
+
 class StartedCase(TypedDict):
     case_id: str
     input: Any
     #: Headers that tag a deployed agent's trace with this run and case.
     headers: Dict[str, str]
+    #: The test environment the case names in ``metadata.environment``, as
+    #: ``name@version`` and a key of the run's ``environments``; ``None`` when
+    #: it names none. Present only when test environments are enabled.
+    environment: NotRequired[Optional[str]]
 
 
 class StartedRun(TypedDict):
     run_id: str
     test_suite_version: int
     cases: List[StartedCase]
+    #: The test environments the run's cases name, by ``name@version``.
+    #: Present only when test environments are enabled.
+    environments: NotRequired[Dict[str, StartedEnvironment]]
 
 
 class RunSummary(TypedDict):
@@ -83,11 +107,38 @@ def _segment(value: str) -> str:
     return value
 
 
+#: What ``canned_tool_result`` returns when no rule answers the call.
+NO_MATCH: Any = object()
+
+
+def canned_tool_result(
+    definition: Mapping[str, Any], tool_name: str, arguments: Mapping[str, Any]
+) -> Any:
+    """Return what a test environment says a tool call returns, or ``NO_MATCH``.
+
+    The first rule for ``tool_name`` whose ``match`` is a subset of
+    ``arguments`` answers the call with its ``return``; a rule with no
+    ``match`` answers every call. Compare the result to ``NO_MATCH`` with
+    ``is``, since a rule may return ``None``.
+
+    ```python
+    result = canned_tool_result(definition, name, arguments)
+    if result is NO_MATCH:
+        result = real_tools[name](**arguments)
+    ```
+    """
+    for rule in definition.get("tools", {}).get(tool_name, []):
+        if rule.get("match", {}).items() <= arguments.items():
+            return rule["return"]
+    return NO_MATCH
+
+
 class TestSuitesClient:
     """HTTP calls for the test suite routes, named as the generated client names them.
 
     TODO: delete once ``JudgmentSyncClient`` is generated from the committed /v1
     spec (judgeval#805); the factories then call its methods directly.
+    The test environment methods stay until their routes are in that spec.
     """
 
     __slots__ = ("_client",)
@@ -236,6 +287,32 @@ class TestSuitesClient:
         return self._call(
             "POST",
             f"{_segment(project_id)}/test-suites/runs/{_segment(run_id)}/score",
+        )
+
+    def post_projects_test_environments(
+        self, project_id: str, payload: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        return self._call("POST", f"{_segment(project_id)}/test-environments", payload)
+
+    def get_projects_test_environments(self, project_id: str) -> Dict[str, Any]:
+        return self._call("GET", f"{_segment(project_id)}/test-environments")
+
+    def post_projects_test_environments_by_name_versions(
+        self, project_id: str, name: str, payload: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        return self._call(
+            "POST",
+            f"{_segment(project_id)}/test-environments/{_segment(name)}/versions",
+            payload,
+        )
+
+    def get_projects_test_environments_by_name_versions_by_version(
+        self, project_id: str, name: str, version: int
+    ) -> Dict[str, Any]:
+        return self._call(
+            "GET",
+            f"{_segment(project_id)}/test-environments/{_segment(name)}"
+            f"/versions/{_segment(str(version))}",
         )
 
 
@@ -391,6 +468,87 @@ class TestSuitesFactory(ProjectScopedFactory):
         )
 
 
+class TestEnvironmentsFactory(ProjectScopedFactory):
+    """Create and read test environments. Access via ``client.test_environments``.
+
+    A test environment is the world a test case runs in: canned tool results
+    and starting data, stored as an immutable ``name@version``. A case names
+    one in its ``metadata.environment``; ``client.test_runs.start`` then
+    returns the definition for your test runner to apply.
+
+    Test environments must be enabled for your organization.
+
+    Examples:
+        ```python
+        client.test_environments.create(
+            name="ticket-service-down",
+            definition={
+                "tools": {
+                    "create_ticket": [{"return": {"error": "service unavailable"}}],
+                    "lookup_order": [
+                        {"match": {"order_id": "A1"}, "return": {"status": "shipped"}}
+                    ],
+                },
+                "seed": {"orders": [{"order_id": "A1"}]},
+            },
+        )
+        client.test_suites.add_cases(
+            test_suite_id,
+            [
+                {
+                    "input": {"prompt": "Where is order A1?"},
+                    "metadata": {"environment": "ticket-service-down@1"},
+                }
+            ],
+        )
+        ```
+    """
+
+    __slots__ = ()
+    __test__ = False  # not a pytest test class
+
+    def create(
+        self,
+        name: str,
+        definition: EnvironmentDefinition,
+        description: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a test environment as its version 1.
+
+        ``name`` takes lowercase letters, digits, ``-`` and ``_``. Do not
+        store credentials in ``definition``.
+        """
+        return self._api.post_projects_test_environments(
+            self._project,
+            _without_none(
+                {"name": name, "description": description, "definition": definition}
+            ),
+        )
+
+    def add_version(
+        self,
+        name: str,
+        definition: EnvironmentDefinition,
+        description: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Add the next version. Earlier versions never change."""
+        return self._api.post_projects_test_environments_by_name_versions(
+            self._project,
+            name,
+            _without_none({"description": description, "definition": definition}),
+        )
+
+    def list(self) -> Dict[str, Any]:
+        """List the latest version of each environment, without definitions."""
+        return self._api.get_projects_test_environments(self._project)
+
+    def get(self, name: str, version: int) -> Dict[str, Any]:
+        """Get one version of an environment with its ``definition``."""
+        return self._api.get_projects_test_environments_by_name_versions_by_version(
+            self._project, name, version
+        )
+
+
 class TestRunsFactory(ProjectScopedFactory):
     """Run test suites and read results. Access via ``client.test_runs``.
 
@@ -412,6 +570,10 @@ class TestRunsFactory(ProjectScopedFactory):
 
         results = client.test_runs.results(run["run_id"])
         ```
+
+    A case that names a test environment carries it as ``case["environment"]``,
+    a key of ``run["environments"]``. Load that definition's ``seed`` before
+    the case, and answer its tool calls with ``canned_tool_result``.
     """
 
     __slots__ = ()
@@ -429,7 +591,9 @@ class TestRunsFactory(ProjectScopedFactory):
         """Start a run of the test suite's latest published version.
 
         Returns ``run_id``, ``test_suite_version`` and ``cases`` (each with
-        ``case_id``, ``input`` and tagging ``headers``).
+        ``case_id``, ``input`` and tagging ``headers``). When test environments
+        are enabled, each case also has its ``environment`` and the run has
+        the ``environments`` its cases name.
 
         With ``stored_traces=True`` each case's stored trace, named by its
         ``metadata.trace_id``, is scored instead of running the agent, so
@@ -487,14 +651,19 @@ class TestRunsFactory(ProjectScopedFactory):
 
 
 __all__ = (
+    "NO_MATCH",
     "CaseResult",
     "CheckResult",
+    "EnvironmentDefinition",
     "RunResults",
     "RunSummary",
     "StartedCase",
+    "StartedEnvironment",
     "StartedRun",
     "ProjectScopedFactory",
+    "TestEnvironmentsFactory",
     "TestRunsFactory",
     "TestSuitesClient",
     "TestSuitesFactory",
+    "canned_tool_result",
 )
