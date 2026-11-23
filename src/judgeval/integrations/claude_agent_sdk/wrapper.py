@@ -24,6 +24,13 @@ from judgeval.utils.wrappers import immutable_wrap_async, immutable_wrap_async_i
 
 Ctx = Dict[str, Any]
 
+# Recorded history of finished turns, by session ID. The SDK reloads earlier
+# turns itself when options.resume names a session, so they never pass through
+# here. Kept in this process only and capped: a session resumed elsewhere, or
+# evicted, records just its own turn.
+_MAX_REMEMBERED_SESSIONS = 1024
+_session_histories: Dict[str, List[Dict[str, Any]]] = {}
+
 
 @dataclasses.dataclass(slots=True)
 class TracingState:
@@ -130,7 +137,8 @@ class LLMSpanTracker:
         self,
         message: Any,
         prompt: Optional[str],
-        conversation_history: List[Dict[str, Any]],
+        turn_messages: List[Dict[str, Any]],
+        earlier_turns: List[Dict[str, Any]],
     ) -> Optional[Dict[str, Any]]:
         """Start a new LLM span, ending the previous one if it exists."""
         start_time = (
@@ -141,7 +149,7 @@ class LLMSpanTracker:
             self.current_span_context.__exit__(None, None, None)
 
         model = getattr(message, "model", None)
-        input_messages = _build_llm_input(prompt, conversation_history)
+        input_messages = _build_llm_input(prompt, turn_messages, earlier_turns)
 
         outputs: List[Dict[str, Any]] = []
         if hasattr(message, "content"):
@@ -216,7 +224,10 @@ def _process_message(ctx: Ctx, message: Any) -> None:
 
     if message_type == "AssistantMessage":
         final_content = llm_tracker.start_llm_span(
-            message, ctx.get("prompt"), final_results
+            message,
+            ctx.get("prompt"),
+            final_results,
+            ctx["conversation_history"],
         )
         if final_content:
             final_results.append(final_content)
@@ -241,6 +252,15 @@ def _process_message(ctx: Ctx, message: Any) -> None:
             }.items()
             if v is not None
         }
+        session_id = result_metadata.get("session_id")
+        if session_id:
+            # Re-insert so eviction drops the least recently finished session.
+            _session_histories.pop(session_id, None)
+            _session_histories[session_id] = _build_llm_input(
+                ctx.get("prompt"), final_results, ctx["conversation_history"]
+            )
+            if len(_session_histories) > _MAX_REMEMBERED_SESSIONS:
+                del _session_histories[next(iter(_session_histories))]
         if result_metadata:
             for key, value in result_metadata.items():
                 agent_span.set_attribute(
@@ -302,10 +322,9 @@ def _make_post_hook(cs: Optional[_ClientTracingState] = None) -> Callable[[Ctx],
                 serialize_attribute(final_results[-1], safe_serialize),
             )
         if cs is not None and final_results:
-            prompt = ctx.get("prompt")
-            if prompt:
-                cs.conversation_history.append({"content": prompt, "role": "user"})
-            cs.conversation_history.extend(final_results)
+            cs.conversation_history = _build_llm_input(
+                ctx.get("prompt"), final_results, ctx["conversation_history"]
+            )
 
     return hook
 
@@ -350,7 +369,10 @@ def _create_client_wrapper_class(
     class WrappedClaudeSDKClient(original_client_class):  # type: ignore
         def __init__(self, *args: Any, **kwargs: Any):
             super().__init__(*args, **kwargs)
-            cs = _ClientTracingState()
+            options = kwargs.get("options") or (args[0] if args else None)
+            cs = _ClientTracingState(
+                conversation_history=_resumed_history(options),
+            )
 
             orig_query = super().query
             self.query = immutable_wrap_async(  # type: ignore[assignment]
@@ -365,7 +387,7 @@ def _create_client_wrapper_class(
                     cs.last_prompt,
                     cs.query_start_time,
                     "Claude_Agent",
-                    conversation_history=list(cs.conversation_history),
+                    conversation_history=cs.conversation_history,
                 )
 
             orig_receive = super().receive_response
@@ -395,6 +417,7 @@ def _wrap_query_function(
             prompt if isinstance(prompt, str) else None,
             time.time(),
             "Claude_Agent_Query",
+            conversation_history=_resumed_history(kwargs.get("options")),
         )
 
     return immutable_wrap_async_iterator(
@@ -445,17 +468,20 @@ def _serialize_content_blocks(content: Any) -> Any:
     return content
 
 
-def _build_llm_input(
-    prompt: Any, conversation_history: List[Dict[str, Any]]
-) -> Optional[List[Dict[str, Any]]]:
-    """Builds the input array for an LLM span from the initial prompt and conversation history."""
-    if isinstance(prompt, str):
-        if len(conversation_history) == 0:
-            return [{"content": prompt, "role": "user"}]
-        else:
-            return [{"content": prompt, "role": "user"}] + conversation_history
+def _resumed_history(options: Any) -> List[Dict[str, Any]]:
+    """Returns the recorded earlier turns of the session these options resume."""
+    resume = getattr(options, "resume", None)
+    return _session_histories.get(resume, []) if resume else []
 
-    return conversation_history if conversation_history else None
+
+def _build_llm_input(
+    prompt: Any,
+    turn_messages: List[Dict[str, Any]],
+    earlier_turns: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Builds an LLM span's input: earlier turns, this turn's prompt, then its messages so far."""
+    this_turn = [{"content": prompt, "role": "user"}] if isinstance(prompt, str) else []
+    return [*earlier_turns, *this_turn, *turn_messages]
 
 
 def _extract_usage_from_result_message(result_message: Any) -> Dict[str, Any]:
