@@ -332,6 +332,22 @@ class Judgeval:
         )
 
     @property
+    def test_environments(self):
+        """Create and read the test environments that test cases run in.
+
+        Returns:
+            TestEnvironmentsFactory: create an environment, add a version,
+                list environments, or get one version's definition.
+        """
+        from judgeval.testing import TestEnvironmentsFactory
+
+        return TestEnvironmentsFactory(
+            client=self._internal_client,
+            project_id=self._project_id,
+            project_name=self._project_name,
+        )
+
+    @property
     def test_runs(self):
         """Run test suites and read their results.
 
