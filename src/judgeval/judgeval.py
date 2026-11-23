@@ -234,7 +234,7 @@ class Judgeval:
         Call `discover_schema()` for supported tables and columns. Requires
         viewer access.
 
-        Results are capped by the server at 1,000 rows and 5 MiB; exceeding
+        Results are capped by the server at 10,000 rows and 25 MiB; exceeding
         either cap returns an error. Use SQL predicates and LIMIT to narrow
         results.
 
