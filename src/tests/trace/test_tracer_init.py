@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import inspect
 from unittest.mock import patch
+
+import pytest
 
 from judgeval.trace.tracer import Tracer
 from judgeval.trace.offline_tracer import OfflineTracer
@@ -45,6 +48,39 @@ class TestTracerInitDisabled:
             )
         assert t._enable_monitoring is False
 
+    @pytest.mark.parametrize("project_id", ["", None])
+    def test_neither_identifier(self, project_id):
+        with patch("judgeval.trace.tracer.resolve_project_id") as resolve:
+            t = Tracer.init(
+                project_id=project_id,
+                api_key="k",
+                organization_id="o",
+                api_url="http://x",
+            )
+        assert t._enable_monitoring is False
+        assert not t.project_id
+        assert isinstance(t.get_span_exporter(), NoOpJudgmentSpanExporter)
+        resolve.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "missing,const",
+        [
+            ("api_key", "JUDGMENT_API_KEY"),
+            ("organization_id", "JUDGMENT_ORG_ID"),
+            ("api_url", "JUDGMENT_API_URL"),
+        ],
+    )
+    def test_project_id_missing_credential(self, missing, const):
+        kwargs = {"api_key": "k", "organization_id": "o", "api_url": "http://x"}
+        kwargs[missing] = None
+        with (
+            patch("judgeval.trace.tracer.resolve_project_id") as resolve,
+            patch(f"judgeval.trace.tracer.{const}", None),
+        ):
+            t = Tracer.init(project_id="pid", **kwargs)
+        assert t._enable_monitoring is False
+        resolve.assert_not_called()
+
 
 class TestTracerInitEnabled:
     def test_full_config(self):
@@ -60,6 +96,62 @@ class TestTracerInitEnabled:
         assert t.project_name == "proj"
         assert isinstance(t.get_span_exporter(), JudgmentSpanExporter)
         assert isinstance(t.get_span_processor(), JudgmentSpanProcessor)
+
+    def test_project_id_only(self):
+        with patch("judgeval.trace.tracer.resolve_project_id") as resolve:
+            t = Tracer.init(
+                project_id="supplied-pid",
+                api_key="k",
+                organization_id="o",
+                api_url="http://x",
+            )
+        assert t._enable_monitoring is True
+        assert t.project_id == "supplied-pid"
+        assert t.project_name is None
+        assert isinstance(t.get_span_exporter(), JudgmentSpanExporter)
+        resolve.assert_not_called()
+        assert t._tracer_provider.resource.attributes.get("service.name") == "unknown"
+
+    def test_project_id_wins_over_name(self):
+        with patch("judgeval.trace.tracer.resolve_project_id") as resolve:
+            t = Tracer.init(
+                project_name="proj",
+                project_id="supplied-pid",
+                api_key="k",
+                organization_id="o",
+                api_url="http://x",
+            )
+        assert t._enable_monitoring is True
+        assert t.project_id == "supplied-pid"
+        assert t.project_name == "proj"
+        resolve.assert_not_called()
+        assert t._tracer_provider.resource.attributes.get("service.name") == "proj"
+
+    @pytest.mark.parametrize("project_id", ["", None])
+    def test_empty_or_none_project_id_falls_back_to_name(self, project_id):
+        with patch(
+            "judgeval.trace.tracer.resolve_project_id", return_value="resolved"
+        ) as resolve:
+            t = Tracer.init(
+                project_name="proj",
+                project_id=project_id,
+                api_key="k",
+                organization_id="o",
+                api_url="http://x",
+            )
+        assert t._enable_monitoring is True
+        assert t.project_id == "resolved"
+        resolve.assert_called_once()
+        assert resolve.call_args.args[1] == "proj"
+
+    def test_positional_compatibility(self):
+        with patch("judgeval.trace.tracer.resolve_project_id", return_value="pid"):
+            t = Tracer.init("proj", "k", "o", "http://x", "staging")
+        assert t.environment == "staging"
+        assert (
+            inspect.signature(Tracer.init).parameters["project_id"].kind
+            is inspect.Parameter.KEYWORD_ONLY
+        )
 
     def test_endpoint_with_trailing_slash(self):
         with patch("judgeval.trace.tracer.resolve_project_id", return_value="p"):
