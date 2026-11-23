@@ -154,7 +154,7 @@ def issue_id_from_description(description: Optional[str]) -> Optional[str]:
 
 
 class TestSuitesClient:
-    """HTTP calls for the test suite routes, named as the generated client names them.
+    """HTTP calls for the test suite and issue routes, named as the generated client names them.
 
     TODO: delete once ``JudgmentSyncClient`` is generated from the committed /v1
     spec (judgeval#805); the factories then call its methods directly.
@@ -645,11 +645,9 @@ class IssuesFactory(ProjectScopedFactory):
             ),
         )
 
-    def unlink_pull_request(
-        self, issue_id: str, repo: str, number: int
-    ) -> Dict[str, Any]:
+    def unlink_pull_request(self, issue_id: str, repo: str, number: int) -> None:
         """Remove a pull request from an issue it no longer names. Succeeds if it was not linked."""
-        return self._api.delete_projects_issues_by_issue_id_pull_requests(
+        self._api.delete_projects_issues_by_issue_id_pull_requests(
             self._project, issue_id, {"repo": repo, "number": number}
         )
 
