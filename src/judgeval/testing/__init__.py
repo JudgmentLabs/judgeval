@@ -138,6 +138,7 @@ class TestSuitesClient:
 
     TODO: delete once ``JudgmentSyncClient`` is generated from the committed /v1
     spec (judgeval#805); the factories then call its methods directly.
+    The test environment methods stay until their routes are in that spec.
     """
 
     __slots__ = ("_client",)
