@@ -85,3 +85,11 @@ def test_canned_tool_result_returns_the_first_matching_rule():
         result("lookup_order", {"order_id": "B2"}),
         result("create_ticket", {"order_id": "A1"}),
     ] == [None, {"status": "shipped"}, {"error": "not found"}, testing.NO_MATCH]
+
+
+def test_canned_tool_result_returns_a_copy_that_does_not_share_the_rules_objects():
+    canned = {"orders": [{"id": "A1"}]}
+    definition = {"tools": {"list_orders": [{"return": canned}]}}
+    result = testing.canned_tool_result(definition, "list_orders", {})
+    canned["orders"][0]["id"] = "changed"
+    assert result == {"orders": [{"id": "A1"}]}

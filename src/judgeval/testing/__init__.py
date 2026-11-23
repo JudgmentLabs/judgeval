@@ -8,6 +8,7 @@ publish a version, then start runs against it.
 
 from __future__ import annotations
 
+import copy
 import re
 from typing import Any, Dict, List, Literal, Mapping, Optional, TypedDict, cast
 
@@ -119,7 +120,8 @@ def canned_tool_result(
     The first rule for ``tool_name`` whose ``match`` is a subset of
     ``arguments`` answers the call with its ``return``; a rule with no
     ``match`` answers every call. Compare the result to ``NO_MATCH`` with
-    ``is``, since a rule may return ``None``.
+    ``is``, since a rule may return ``None``. Each call returns a fresh copy,
+    so callers may mutate it.
 
     ```python
     result = canned_tool_result(definition, name, arguments)
@@ -129,7 +131,7 @@ def canned_tool_result(
     """
     for rule in definition.get("tools", {}).get(tool_name, []):
         if rule.get("match", {}).items() <= arguments.items():
-            return rule["return"]
+            return copy.deepcopy(rule["return"])
     return NO_MATCH
 
 

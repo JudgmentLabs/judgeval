@@ -106,9 +106,12 @@ class TestJudgmentSpanExporter:
                     "POST", "https://example.com/otel/v1/traces"
                 ).prepare()
             responses.append(response)
+        session = exporter._delegate._session
+        send = MagicMock(side_effect=responses)
         try:
             with (
-                patch("requests.adapters.HTTPAdapter.send", side_effect=responses),
+                patch.object(session.get_adapter("http://"), "send", send),
+                patch.object(session.get_adapter("https://"), "send", send),
                 patch(
                     "judgeval.trace.exporters.judgment_span_exporter.judgeval_logger.error"
                 ) as log,
