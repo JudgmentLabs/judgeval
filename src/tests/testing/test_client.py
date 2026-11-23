@@ -93,3 +93,45 @@ def test_canned_tool_result_returns_a_copy_that_does_not_share_the_rules_objects
     result = testing.canned_tool_result(definition, "list_orders", {})
     canned["orders"][0]["id"] = "changed"
     assert result == {"orders": [{"id": "A1"}]}
+
+
+def test_link_and_unlink_pull_request_call_the_issue_routes():
+    client = _client()
+    issues = testing.IssuesFactory(client, "p1", "proj")
+    issue = "0b6f6a1e-1c2d-4e5f-8a9b-0c1d2e3f4a5b"
+
+    issues.link_pull_request(
+        issue, repo="acme/agent", number=7, url="https://github.com/acme/agent/pull/7"
+    )
+    issues.unlink_pull_request(issue, repo="acme/agent", number=7)
+
+    url = f"https://api.example.com/v1/projects/p1/issues/{issue}/pull-requests"
+    assert client._request.call_args_list == [
+        (
+            (
+                "PUT",
+                url,
+                {
+                    "repo": "acme/agent",
+                    "number": 7,
+                    "url": "https://github.com/acme/agent/pull/7",
+                    "state": "open",
+                },
+                None,
+            ),
+        ),
+        (("DELETE", url, {}, {"repo": "acme/agent", "number": 7}),),
+    ]
+
+
+def test_issue_id_from_description_reads_the_judgment_issue_line():
+    issue = "0b6f6a1e-1c2d-4e5f-8a9b-0c1d2e3f4a5b"
+
+    assert [
+        testing.issue_id_from_description(f"Fix.\n\nJudgment-Issue: {issue}"),
+        testing.issue_id_from_description(
+            f"judgment-issue: https://app.judgmentlabs.ai/org/o/project/p/issues/{issue.upper()}\n"
+        ),
+        testing.issue_id_from_description(f"See Judgment-Issue: {issue}"),
+        testing.issue_id_from_description(None),
+    ] == [issue, issue, None, None]
