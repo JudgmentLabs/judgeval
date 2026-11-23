@@ -348,6 +348,21 @@ class Judgeval:
         )
 
     @property
+    def issues(self):
+        """Link the pull requests that fix an issue.
+
+        Returns:
+            IssuesFactory: link a pull request to an issue, or remove the link.
+        """
+        from judgeval.testing import IssuesFactory
+
+        return IssuesFactory(
+            client=self._internal_client,
+            project_id=self._project_id,
+            project_name=self._project_name,
+        )
+
+    @property
     def test_runs(self):
         """Run test suites and read their results.
 

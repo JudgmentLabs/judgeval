@@ -135,8 +135,26 @@ def canned_tool_result(
     return NO_MATCH
 
 
+_ISSUE_LINE = re.compile(
+    r"^Judgment-Issue:\s*(?:\S*/)?([0-9a-f-]{36})\s*$", re.MULTILINE | re.IGNORECASE
+)
+
+
+def issue_id_from_description(description: Optional[str]) -> Optional[str]:
+    """Return the issue ID a pull request description names, or ``None``.
+
+    The description names an issue with a line ``Judgment-Issue: <issue URL or ID>``.
+
+    ```python
+    issue_id_from_description("Fixes refunds.\n\nJudgment-Issue: https://app.judgmentlabs.ai/.../issues/<id>")
+    ```
+    """
+    line = _ISSUE_LINE.search(description or "")
+    return line.group(1).lower() if line else None
+
+
 class TestSuitesClient:
-    """HTTP calls for the test suite routes, named as the generated client names them.
+    """HTTP calls for the test suite and issue routes, named as the generated client names them.
 
     TODO: delete once ``JudgmentSyncClient`` is generated from the committed /v1
     spec (judgeval#805); the factories then call its methods directly.
@@ -315,6 +333,24 @@ class TestSuitesClient:
             "GET",
             f"{_segment(project_id)}/test-environments/{_segment(name)}"
             f"/versions/{_segment(str(version))}",
+        )
+
+    def put_projects_issues_by_issue_id_pull_requests(
+        self, project_id: str, issue_id: str, payload: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        return self._call(
+            "PUT",
+            f"{_segment(project_id)}/issues/{_segment(issue_id)}/pull-requests",
+            payload,
+        )
+
+    def delete_projects_issues_by_issue_id_pull_requests(
+        self, project_id: str, issue_id: str, params: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        return self._call(
+            "DELETE",
+            f"{_segment(project_id)}/issues/{_segment(issue_id)}/pull-requests",
+            params=params,
         )
 
 
@@ -551,6 +587,71 @@ class TestEnvironmentsFactory(ProjectScopedFactory):
         )
 
 
+class IssuesFactory(ProjectScopedFactory):
+    """Link the pull requests that fix an issue. Access via ``client.issues``.
+
+    A linked pull request shows on the issue's page, with the test runs that
+    carry the same ``repo`` and ``pr`` in their ``candidate_meta``. Call
+    ``link_pull_request`` from CI when a pull request's description names the
+    issue (see ``issue_id_from_description``), and again with
+    ``state="merged"`` and ``merged_sha`` when it merges.
+
+    The issue lifecycle must be enabled for your organization.
+
+    Examples:
+        ```python
+        issue_id = issue_id_from_description(pull["body"])
+        if issue_id:
+            client.issues.link_pull_request(
+                issue_id,
+                repo="acme/support-agent",
+                number=pull["number"],
+                url=pull["html_url"],
+                title=pull["title"],
+            )
+        ```
+    """
+
+    __slots__ = ()
+
+    def link_pull_request(
+        self,
+        issue_id: str,
+        repo: str,
+        number: int,
+        url: str,
+        title: Optional[str] = None,
+        state: Literal["open", "merged", "closed"] = "open",
+        merged_sha: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Link a pull request to the issue it fixes, or update its link.
+
+        ``repo`` is ``owner/name``. Calling it again for the same ``repo`` and
+        ``number`` updates the link; a ``title`` or ``merged_sha`` left out
+        keeps its stored value.
+        """
+        return self._api.put_projects_issues_by_issue_id_pull_requests(
+            self._project,
+            issue_id,
+            _without_none(
+                {
+                    "repo": repo,
+                    "number": number,
+                    "url": url,
+                    "title": title,
+                    "state": state,
+                    "merged_sha": merged_sha,
+                }
+            ),
+        )
+
+    def unlink_pull_request(self, issue_id: str, repo: str, number: int) -> None:
+        """Remove a pull request from an issue it no longer names. Succeeds if it was not linked."""
+        self._api.delete_projects_issues_by_issue_id_pull_requests(
+            self._project, issue_id, {"repo": repo, "number": number}
+        )
+
+
 class TestRunsFactory(ProjectScopedFactory):
     """Run test suites and read results. Access via ``client.test_runs``.
 
@@ -657,6 +758,7 @@ __all__ = (
     "CaseResult",
     "CheckResult",
     "EnvironmentDefinition",
+    "IssuesFactory",
     "RunResults",
     "RunSummary",
     "StartedCase",
@@ -668,4 +770,5 @@ __all__ = (
     "TestSuitesClient",
     "TestSuitesFactory",
     "canned_tool_result",
+    "issue_id_from_description",
 )
