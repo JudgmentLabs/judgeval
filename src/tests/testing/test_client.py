@@ -32,6 +32,21 @@ def test_start_posts_to_the_test_and_drops_unset_fields():
     )
 
 
+def test_repin_checks_posts_the_judge_and_target_version():
+    client = _client({"case_ids": ["c1"], "skipped_case_ids": []})
+    suites = testing.TestSuitesFactory(client, "p1", "proj")
+
+    result = suites.repin_checks("t1", "j1", 2, 1)
+
+    assert result == {"case_ids": ["c1"], "skipped_case_ids": []}
+    client._request.assert_called_once_with(
+        "POST",
+        "https://api.example.com/v1/projects/p1/test-suites/t1/repin",
+        {"judge_id": "j1", "judge_major_version": 2, "judge_minor_version": 1},
+        None,
+    )
+
+
 def test_an_id_that_leaves_the_test_suites_route_is_rejected():
     client = _client()
     suites = testing.TestSuitesFactory(client, "p1", "proj")
