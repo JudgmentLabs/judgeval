@@ -13,6 +13,7 @@ from opentelemetry import trace
 from opentelemetry.trace import Span, Status, StatusCode
 
 from judgeval.judgment_attribute_keys import AttributeKeys
+from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
 from judgeval.utils.serialize import serialize_attribute
 
 R = TypeVar("R")
@@ -67,7 +68,7 @@ class _ObservedGeneratorBase:
     def _emit_yield_span(self, item: Any) -> None:
         if self._disable_generator_yield_span:
             return
-        with trace.use_span(self._span):
+        with JudgmentTracerProvider.get_instance().use_span(self._span):
             span_name = str(getattr(self._span, "name", "generator_item"))
             with self._tracer.start_as_current_span(
                 span_name,
