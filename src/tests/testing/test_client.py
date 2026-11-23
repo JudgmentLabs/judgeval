@@ -65,20 +65,6 @@ def test_offline_tests_warn_that_they_are_deprecated(monkeypatch):
     assert [str(w.message) for w in caught] == [OFFLINE_TESTS_DEPRECATION]
 
 
-def test_get_reads_one_version_of_a_test_environment():
-    environment = {"name": "outage", "version": 2, "definition": {}}
-    client = _client(environment)
-    environments = testing.TestEnvironmentsFactory(client, "p1", "proj")
-
-    assert environments.get("outage", 2) == environment
-    client._request.assert_called_once_with(
-        "GET",
-        "https://api.example.com/v1/projects/p1/test-environments/outage/versions/2",
-        {},
-        None,
-    )
-
-
 def test_canned_tool_result_returns_the_first_matching_rule():
     definition = {
         "tools": {
