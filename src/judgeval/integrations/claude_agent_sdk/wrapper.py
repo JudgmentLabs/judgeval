@@ -316,8 +316,11 @@ def _make_post_hook(cs: Optional[_ClientTracingState] = None) -> Callable[[Ctx],
             )
         if not final_results:
             return
-        history = _build_llm_input(
-            ctx.get("prompt"), final_results, ctx.get("conversation_history") or []
+        history = (
+            _build_llm_input(
+                ctx.get("prompt"), final_results, ctx.get("conversation_history") or []
+            )
+            or []
         )
         session_id = ctx.get("session_id")
         if cs is not None:
@@ -416,7 +419,7 @@ def _wrap_query_function(
             prompt if isinstance(prompt, str) else None,
             time.time(),
             "Claude_Agent_Query",
-            conversation_history=_session_histories.get(resume),
+            conversation_history=_session_histories.get(resume) if resume else None,
         )
 
     return immutable_wrap_async_iterator(
