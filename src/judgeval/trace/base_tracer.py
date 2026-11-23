@@ -496,6 +496,9 @@ class BaseTracer(ABC):
             with Tracer.test_case(run["run_id"], case["case_id"]):
                 support_agent(case["input"])
         ```
+
+        For a case that names a test environment, see
+        ``judgeval.testing.canned_tool_result``.
         """
         with BaseTracer.scoped_context(
             attributes={
