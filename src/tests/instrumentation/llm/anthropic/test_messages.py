@@ -8,7 +8,7 @@ from judgeval.instrumentation.llm.llm_anthropic.messages import (
     wrap_messages_create_sync,
     wrap_messages_create_async,
 )
-from tests.instrumentation.llm.anthropic.conftest import make_message
+from tests.instrumentation.llm.anthropic.conftest import make_message, make_stream_chunks
 
 
 class TestSyncNonStreaming:
@@ -108,3 +108,115 @@ class TestAsyncNonStreaming:
             s for s in collecting_exporter.spans if s.name == "ANTHROPIC_API_CALL"
         )
         assert span.status.status_code.name == "ERROR"
+
+
+class TestSyncStreaming:
+    def test_creates_span(self, tracer, collecting_exporter, sync_anthropic_client):
+        chunks = make_stream_chunks()
+        sync_anthropic_client.messages.create = MagicMock(return_value=iter(chunks))
+        wrap_messages_create_sync(sync_anthropic_client)
+        list(
+            sync_anthropic_client.messages.create(
+                model="claude-3-5-sonnet-latest",
+                messages=[],
+                max_tokens=100,
+                stream=True,
+            )
+        )
+        assert any(s.name == "ANTHROPIC_API_CALL" for s in collecting_exporter.spans)
+
+    def test_records_input_tokens_from_message_start(
+        self, tracer, collecting_exporter, sync_anthropic_client
+    ):
+        chunks = make_stream_chunks(input_tokens=15)
+        sync_anthropic_client.messages.create = MagicMock(return_value=iter(chunks))
+        wrap_messages_create_sync(sync_anthropic_client)
+        list(
+            sync_anthropic_client.messages.create(
+                model="claude-3-5-sonnet-latest",
+                messages=[],
+                max_tokens=100,
+                stream=True,
+            )
+        )
+        span = next(
+            s for s in collecting_exporter.spans if s.name == "ANTHROPIC_API_CALL"
+        )
+        assert (
+            span.attributes.get(AttributeKeys.JUDGMENT_USAGE_NON_CACHED_INPUT_TOKENS)
+            == 15
+        )
+
+    def test_records_final_output_tokens_from_message_delta(
+        self, tracer, collecting_exporter, sync_anthropic_client
+    ):
+        # message_start carries an early output estimate (5), message_delta carries
+        # the authoritative final count (42). The span must reflect the final count.
+        chunks = make_stream_chunks(start_output_tokens=5, final_output_tokens=42)
+        sync_anthropic_client.messages.create = MagicMock(return_value=iter(chunks))
+        wrap_messages_create_sync(sync_anthropic_client)
+        list(
+            sync_anthropic_client.messages.create(
+                model="claude-3-5-sonnet-latest",
+                messages=[],
+                max_tokens=100,
+                stream=True,
+            )
+        )
+        span = next(
+            s for s in collecting_exporter.spans if s.name == "ANTHROPIC_API_CALL"
+        )
+        assert span.attributes.get(AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS) == 42
+
+
+class TestAsyncStreaming:
+    @pytest.mark.asyncio
+    async def test_creates_span(
+        self, tracer, collecting_exporter, async_anthropic_client
+    ):
+        chunks = make_stream_chunks()
+
+        async def fake_aiter():
+            for chunk in chunks:
+                yield chunk
+
+        async_anthropic_client.messages.create = AsyncMock(
+            return_value=fake_aiter()
+        )
+        wrap_messages_create_async(async_anthropic_client)
+        stream = await async_anthropic_client.messages.create(
+            model="claude-3-5-sonnet-latest",
+            messages=[],
+            max_tokens=100,
+            stream=True,
+        )
+        async for _ in stream:
+            pass
+        assert any(s.name == "ANTHROPIC_API_CALL" for s in collecting_exporter.spans)
+
+    @pytest.mark.asyncio
+    async def test_records_final_output_tokens_from_message_delta(
+        self, tracer, collecting_exporter, async_anthropic_client
+    ):
+        chunks = make_stream_chunks(start_output_tokens=5, final_output_tokens=37)
+
+        async def fake_aiter():
+            for chunk in chunks:
+                yield chunk
+
+        async_anthropic_client.messages.create = AsyncMock(
+            return_value=fake_aiter()
+        )
+        wrap_messages_create_async(async_anthropic_client)
+        stream = await async_anthropic_client.messages.create(
+            model="claude-3-5-sonnet-latest",
+            messages=[],
+            max_tokens=100,
+            stream=True,
+        )
+        async for _ in stream:
+            pass
+        span = next(
+            s for s in collecting_exporter.spans if s.name == "ANTHROPIC_API_CALL"
+        )
+        assert span.attributes.get(AttributeKeys.JUDGMENT_USAGE_OUTPUT_TOKENS) == 37
