@@ -135,6 +135,13 @@ class TestRuns:
         assert isinstance(config_arg, TestConfig)
         assert config_arg.id == "cfg-1"
 
+    def test_run_passes_concurrency_through(self):
+        factory, _ = _make_factory()
+        config = TestConfig(id="cfg-1", name="nightly", dataset_id="d1")
+        with patch.object(OfflineTestRunner, "run", return_value=None) as run_mock:
+            factory.run(test_config=config, concurrency=3)
+        assert run_mock.call_args.kwargs["concurrency"] == 3
+
     def test_run_accepts_test_config_object(self):
         factory, client = _make_factory()
         config = TestConfig(id="cfg-1", name="nightly", dataset_id="d1")

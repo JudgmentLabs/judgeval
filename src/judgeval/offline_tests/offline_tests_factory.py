@@ -227,6 +227,7 @@ class OfflineTestsFactory:
         timeout_seconds: int = 600,
         run_name: Optional[str] = None,
         field_mapping: Optional[Dict[str, str]] = None,
+        concurrency: int = 1,
     ) -> Optional[OfflineTestResult]:
         """Run an offline test for a test config.
 
@@ -279,6 +280,11 @@ class OfflineTestsFactory:
                 field ``question``). Unmapped parameters fall back to the field
                 of the same name. Example fields the agent does not declare are
                 ignored.
+            concurrency: Maximum number of examples the agent runs over at a
+                time. Defaults to 1 (sequential, on the calling thread). Above
+                1, calls run on worker threads; an async agent runs each
+                example under its own event loop. Only affects the agent
+                execution loop; judge scoring happens server-side.
 
         Returns:
             An `OfflineTestResult`, or `None` if the project is not
@@ -286,8 +292,8 @@ class OfflineTestsFactory:
 
         Raises:
             ValueError: If `assert_test` is set without `pass_condition_fn`,
-                or if `dataset_version` does not match any version of the
-                config's dataset.
+                if `dataset_version` does not match any version of the
+                config's dataset, or if `concurrency` is less than 1.
             TypeError: If the agent entrypoint cannot accept an example's
                 fields.
             JudgmentValidationError: If the server rejects the run (e.g.
@@ -321,4 +327,5 @@ class OfflineTestsFactory:
             timeout_seconds=timeout_seconds,
             run_name=run_name,
             field_mapping=field_mapping,
+            concurrency=concurrency,
         )

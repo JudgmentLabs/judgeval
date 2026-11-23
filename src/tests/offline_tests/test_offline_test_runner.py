@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import random
+import threading
+import time
+from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
 import pytest
+from opentelemetry.sdk.trace.export import SpanExportResult
 
 from judgeval.data.example import Example
 from judgeval.data.scorer_data import ScorerData
@@ -18,6 +24,9 @@ from judgeval.offline_tests.offline_test_runner import (
     normalize_judge_versions,
 )
 from judgeval.offline_tests.types import OfflineTestResult, TestConfig
+from judgeval.trace.exporters.judgment_span_exporter import JudgmentSpanExporter
+from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
+from judgeval.trace.offline_tracer import OfflineTracer
 
 CONFIG = TestConfig(id="cfg-1", name="nightly", dataset_id="d1")
 
@@ -127,6 +136,43 @@ def _make_runner():
         client=client, project_id="proj-1", project_name="test-project"
     )
     return runner, client
+
+
+def _agent_runner():
+    runner, client = _make_runner()
+    client.api_key = "key"
+    client.organization_id = "org"
+    client.base_url = "http://localhost"
+    return runner
+
+
+def _examples(count):
+    return [{"example_id": f"ex-{i}", "data": {"input": f"q{i}"}} for i in range(count)]
+
+
+def _trace_id():
+    span = JudgmentTracerProvider.get_instance().get_current_span()
+    return format(span.get_span_context().trace_id, "032x")
+
+
+@contextmanager
+def _offline_spans():
+    """Run with a real, network-free OfflineTracer.
+
+    Project lookup and OTLP export are stubbed; exported spans land in the
+    yielded list.
+    """
+    spans = []
+
+    def fake_export(self, batch):
+        spans.extend(batch)
+        return SpanExportResult.SUCCESS
+
+    with (
+        patch("judgeval.trace.offline_tracer.resolve_project_id", return_value="p1"),
+        patch.object(JudgmentSpanExporter, "export", fake_export),
+    ):
+        yield spans
 
 
 def _stub_raw_request(client, items_pages=None):
@@ -816,7 +862,9 @@ class TestRunOrchestration:
             calls.append(input)
             return f"answer to {input}"
 
-        def fake_run_agent(agent_function, examples, progress=None, field_mapping=None):
+        def fake_run_agent(
+            agent_function, examples, progress=None, field_mapping=None, concurrency=1
+        ):
             # examples come from the dataset fetch, not the prepare response
             assert [e["example_id"] for e in examples] == ["ex-1"]
             for example in examples:
@@ -837,7 +885,9 @@ class TestRunOrchestration:
         runner, client = _make_runner()
         _stub_lifecycle(client)
 
-        def fake_run_agent(agent_function, examples, progress=None, field_mapping=None):
+        def fake_run_agent(
+            agent_function, examples, progress=None, field_mapping=None, concurrency=1
+        ):
             return {"ex-1": "trace-abc"}
 
         with patch.object(OfflineTestRunner, "run_agent", side_effect=fake_run_agent):
@@ -861,7 +911,9 @@ class TestRunOrchestration:
         _stub_lifecycle(client)
         order = []
 
-        def fake_run_agent(agent_function, examples, progress=None, field_mapping=None):
+        def fake_run_agent(
+            agent_function, examples, progress=None, field_mapping=None, concurrency=1
+        ):
             order.append("agent")
             assert client.post_projects_test_runs.call_count == 0
             return {"ex-1": "trace-abc"}
@@ -911,38 +963,39 @@ class TestRunOrchestration:
         client.organization_id = "org"
         client.base_url = "http://localhost"
 
-        tracer = MagicMock()
+        shutdowns = []
+        real_create = OfflineTracer.create
 
-        def fake_create(**kwargs):
-            dataset = kwargs["dataset"]
-
-            def observe(func, span_type=None):
-                def wrapper(**call_kwargs):
-                    result = func(**call_kwargs)
-                    dataset.append(Example.create(offline_trace_id="trace-abc"))
-                    return result
-
-                return wrapper
-
-            tracer.observe = observe
+        def spy_create(**kwargs):
+            tracer = real_create(**kwargs)
+            original_shutdown = tracer._tracer_provider.shutdown
+            tracer._tracer_provider.shutdown = lambda: (
+                shutdowns.append(True),
+                original_shutdown(),
+            )
             return tracer
 
         def fake_post(**kwargs):
-            # by the time the run is created, the offline tracer has been
-            # flushed and its provider shut down
-            tracer.force_flush.assert_called_once()
-            tracer._tracer_provider.shutdown.assert_called_once()
+            # by the time the run is created, the offline tracer's provider
+            # has been shut down (which flushes its spans)
+            assert shutdowns == [True]
             return dict(PREPARED)
 
         client.post_projects_test_runs.side_effect = fake_post
 
-        with patch(
-            "judgeval.trace.offline_tracer.OfflineTracer.create",
-            side_effect=fake_create,
+        with (
+            _offline_spans() as spans,
+            patch(
+                "judgeval.trace.offline_tracer.OfflineTracer.create",
+                side_effect=spy_create,
+            ),
         ):
             outcome = runner.run(CONFIG, agent_function=lambda input: input)
 
-        assert outcome.agent_offline_trace_ids == {"ex-1": "trace-abc"}
+        root = next(span for span in spans if span.parent is None)
+        assert outcome.agent_offline_trace_ids == {
+            "ex-1": format(root.context.trace_id, "032x")
+        }
         client.post_projects_test_runs.assert_called_once()
 
     def test_timeout_raises(self):
@@ -953,121 +1006,139 @@ class TestRunOrchestration:
 
 
 class TestRunAgentLoop:
-    def test_run_agent_wraps_with_offline_tracer(self):
-        runner, client = _make_runner()
-        client.api_key = "key"
-        client.organization_id = "org"
-        client.base_url = "http://localhost"
-
-        tracer = MagicMock()
-        captured_examples = []
-
-        def fake_create(**kwargs):
-            captured_examples.append(kwargs["dataset"])
-            dataset = kwargs["dataset"]
-
-            def observe(func, span_type=None):
-                def wrapper(**call_kwargs):
-                    result = func(**call_kwargs)
-                    dataset.append(
-                        Example.create(offline_trace_id=f"trace-{len(dataset)}")
-                    )
-                    return result
-
-                return wrapper
-
-            tracer.observe = observe
-            return tracer
-
-        examples = [
-            {"example_id": "ex-1", "data": {"input": "q1"}},
-            {"example_id": "ex-2", "data": {"input": "q2"}},
-        ]
-
-        seen = []
+    def test_default_is_sequential_and_maps_each_example_to_its_trace(self):
+        runner = _agent_runner()
+        order, seen, in_flight, max_in_flight = [], {}, [0], [0]
 
         def agent(input):
-            seen.append(input)
+            in_flight[0] += 1
+            max_in_flight[0] = max(max_in_flight[0], in_flight[0])
+            order.append(input)
+            seen[input] = _trace_id()
+            time.sleep(0.005)
+            in_flight[0] -= 1
             return input
 
-        with patch(
-            "judgeval.trace.offline_tracer.OfflineTracer.create",
-            side_effect=fake_create,
-        ):
-            traces = runner.run_agent(agent, examples)
+        with _offline_spans() as spans:
+            traces = runner.run_agent(agent, _examples(3))
 
-        assert seen == ["q1", "q2"]
-        assert traces == {"ex-1": "trace-0", "ex-2": "trace-1"}
-        tracer.force_flush.assert_called_once()
+        assert order == ["q0", "q1", "q2"]
+        assert max_in_flight[0] == 1
+        assert traces == {f"ex-{i}": seen[f"q{i}"] for i in range(3)}
+        assert len([span for span in spans if span.parent is None]) == 3
 
-    def test_run_agent_continues_after_agent_error(self):
-        runner, client = _make_runner()
-        client.api_key = "key"
-        client.organization_id = "org"
-        client.base_url = "http://localhost"
+    def test_concurrent_calls_map_to_their_own_trace(self):
+        runner = _agent_runner()
+        seen = {}
 
-        tracer = MagicMock()
+        def agent(input):
+            seen[input] = _trace_id()
+            # Randomize completion order to stress correlation.
+            time.sleep(random.random() * 0.02)
+            return input
 
-        def fake_create(**kwargs):
-            tracer.observe = lambda func, span_type=None: func
-            return tracer
+        with _offline_spans():
+            traces = runner.run_agent(agent, _examples(8), concurrency=4)
+
+        assert traces == {f"ex-{i}": seen[f"q{i}"] for i in range(8)}
+        assert len(set(traces.values())) == 8
+
+    def test_runs_examples_concurrently(self):
+        runner = _agent_runner()
+        # Only opens once all 4 calls are in flight; raises BrokenBarrierError
+        # (timeout) if execution regresses to sequential.
+        barrier = threading.Barrier(4, timeout=5)
+
+        def agent(input):
+            barrier.wait()
+            return input
+
+        with _offline_spans():
+            traces = runner.run_agent(agent, _examples(4), concurrency=4)
+
+        assert len(traces) == 4
+
+    def test_async_agent_under_concurrency(self):
+        runner = _agent_runner()
+
+        async def agent(input):
+            await asyncio.sleep(0.01)
+            return input
+
+        with _offline_spans():
+            traces = runner.run_agent(agent, _examples(4), concurrency=2)
+
+        assert sorted(traces) == ["ex-0", "ex-1", "ex-2", "ex-3"]
+        assert len(set(traces.values())) == 4
+
+    def test_agent_error_does_not_abort_remaining_examples(self):
+        runner = _agent_runner()
 
         def agent(input):
             if input == "q1":
                 raise RuntimeError("boom")
             return input
 
-        examples = [
-            {"example_id": "ex-1", "data": {"input": "q1"}},
-            {"example_id": "ex-2", "data": {"input": "q2"}},
-        ]
+        with _offline_spans():
+            traces = runner.run_agent(agent, _examples(3), concurrency=2)
 
-        with patch(
-            "judgeval.trace.offline_tracer.OfflineTracer.create",
-            side_effect=fake_create,
-        ):
-            traces = runner.run_agent(agent, examples)
+        # The failing example still produced a trace (error recorded on it).
+        assert sorted(traces) == ["ex-0", "ex-1", "ex-2"]
 
+    def test_records_input_under_agent_param_name(self):
+        runner = _agent_runner()
+
+        with _offline_spans() as spans:
+            traces = runner.run_agent(
+                lambda question: question,
+                [{"example_id": "ex-1", "data": {"question": "q1"}}],
+            )
+
+        root = next(span for span in spans if span.parent is None)
+        assert json.loads(root.attributes["judgment.input"]) == {"question": "q1"}
+        assert traces == {"ex-1": format(root.context.trace_id, "032x")}
+
+    def test_skips_examples_without_id(self):
+        runner = _agent_runner()
+        with _offline_spans():
+            traces = runner.run_agent(
+                lambda input: input, [{"example_id": "", "data": {"input": "q"}}]
+            )
         assert traces == {}
 
-    def test_run_agent_restores_previous_active_tracer(self):
-        from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
+    def test_rejects_concurrency_below_one(self):
+        runner = _agent_runner()
+        with pytest.raises(ValueError, match="concurrency"):
+            runner.run_agent(lambda input: input, [], concurrency=0)
 
-        runner, client = _make_runner()
-        client.api_key = "key"
-        client.organization_id = "org"
-        client.base_url = "http://localhost"
-
+    def test_restores_previous_tracer_and_releases_offline_tracer(self):
+        runner = _agent_runner()
         proxy = JudgmentTracerProvider.get_instance()
         original = proxy.get_active_tracer()
         previous = MagicMock()
         proxy.set_active(previous)
+        created = []
+        real_create = OfflineTracer.create
 
-        tracer = MagicMock()
-
-        def fake_create(**kwargs):
-            assert kwargs["set_active"] is True
-            proxy.set_active(tracer)
-            tracer.observe = lambda func, span_type=None: func
+        def spy_create(**kwargs):
+            tracer = real_create(**kwargs)
+            created.append(tracer)
             return tracer
 
         try:
-            with patch(
-                "judgeval.trace.offline_tracer.OfflineTracer.create",
-                side_effect=fake_create,
+            with (
+                _offline_spans(),
+                patch(
+                    "judgeval.trace.offline_tracer.OfflineTracer.create",
+                    side_effect=spy_create,
+                ),
             ):
-                runner.run_agent(
-                    lambda input: input,
-                    [{"example_id": "ex-1", "data": {"input": "q1"}}],
-                )
+                runner.run_agent(lambda input: input, _examples(1))
             assert proxy.get_active_tracer() is previous
-            tracer._tracer_provider.shutdown.assert_called_once()
+            assert created[0] not in proxy._judgment_tracers
 
             # restored even when the agent loop raises
-            with patch(
-                "judgeval.trace.offline_tracer.OfflineTracer.create",
-                side_effect=fake_create,
-            ):
+            with _offline_spans():
                 with pytest.raises(TypeError, match="requires example field"):
                     runner.run_agent(
                         lambda input: input,
@@ -1076,25 +1147,35 @@ class TestRunAgentLoop:
             assert proxy.get_active_tracer() is previous
         finally:
             proxy.deregister(previous)
-            proxy.deregister(tracer)
             proxy.restore_active(original)
 
-    def test_run_agent_signature_mismatch_raises(self):
-        runner, client = _make_runner()
-        client.api_key = "key"
-        client.organization_id = "org"
-        client.base_url = "http://localhost"
+    def test_refused_activation_raises_and_cleans_up(self):
+        runner = _agent_runner()
+        proxy = JudgmentTracerProvider.get_instance()
+        original = proxy.get_active_tracer()
+        calls = []
 
-        tracer = MagicMock()
-        tracer.observe = lambda func, span_type=None: func
+        with (
+            _offline_spans(),
+            patch.object(JudgmentTracerProvider, "set_active", return_value=False),
+        ):
+            registered_before = len(proxy._judgment_tracers)
+            with pytest.raises(RuntimeError, match="could not be activated"):
+                runner.run_agent(
+                    lambda input: calls.append(input), _examples(2), concurrency=2
+                )
+
+        assert calls == []
+        assert proxy.get_active_tracer() is original
+        assert len(proxy._judgment_tracers) == registered_before
+
+    def test_signature_mismatch_raises(self):
+        runner = _agent_runner()
 
         def agent(question):
             return question
 
-        with patch(
-            "judgeval.trace.offline_tracer.OfflineTracer.create",
-            return_value=tracer,
-        ):
+        with _offline_spans():
             with pytest.raises(TypeError, match="requires example field"):
                 runner.run_agent(
                     agent, [{"example_id": "ex-1", "data": {"input": "q1"}}]
