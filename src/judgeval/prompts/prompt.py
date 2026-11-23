@@ -42,7 +42,9 @@ class Prompt:
     _template: Template = field(init=False, repr=False)
 
     def __post_init__(self):
-        template_str = re.sub(r"\{\{([^}]+)\}\}", r"$\1", self.prompt)
+        template_str = re.sub(
+            r"\{\{\s*([^}]+?)\s*\}\}", r"$\1", self.prompt.replace("$", "$$")
+        )
         self._template = Template(template_str)
 
     def compile(self, **kwargs) -> str:
