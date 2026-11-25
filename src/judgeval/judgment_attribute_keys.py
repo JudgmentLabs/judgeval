@@ -39,10 +39,6 @@ class AttributeKeys(str, Enum):
     JUDGMENT_SESSION_ID = "judgment.session_id"
     JUDGMENT_CONVERSATION_OBSERVATION = "judgment.conversation.observation"
     JUDGMENT_PROJECT_ID_OVERRIDE = "judgment.project_id_override"
-    JUDGMENT_LINK_SOURCE_TRACE_ID = "judgment.link.source_trace_id"
-    JUDGMENT_LINK_SOURCE_SPAN_ID = "judgment.link.source_span_id"
-    JUDGMENT_LINK_TARGET_TRACE_ID = "judgment.link.target_trace_id"
-    JUDGMENT_LINK_TARGET_SPAN_ID = "judgment.link.target_span_id"
     JUDGMENT_TEST_RUN_ID = "judgment.test.run_id"
     JUDGMENT_TEST_CASE_ID = "judgment.test.case_id"
 

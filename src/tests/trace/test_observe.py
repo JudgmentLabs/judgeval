@@ -86,83 +86,6 @@ class TestObserveSync:
 
         assert double(5) == 10
 
-    def test_linked_trace_creates_linked_root_trace(self, tracer, collecting_exporter):
-        @BaseTracer.observe(span_type="agent")
-        def parent():
-            @BaseTracer.observe(fork=True)
-            def child():
-                return "ok"
-
-            return child()
-
-        parent()
-
-        parent_span = next(s for s in collecting_exporter.spans if s.name == "parent")
-        marker_span = next(
-            s
-            for s in collecting_exporter.spans
-            if s.name == "child" and s.context.trace_id == parent_span.context.trace_id
-        )
-        child_span = next(
-            s
-            for s in collecting_exporter.spans
-            if s.name == "child" and s.context.trace_id != parent_span.context.trace_id
-        )
-        assert parent_span.context.trace_id != child_span.context.trace_id
-        assert marker_span.parent is not None
-        assert marker_span.parent.span_id == parent_span.context.span_id
-        assert marker_span.attributes[
-            AttributeKeys.JUDGMENT_LINK_TARGET_TRACE_ID
-        ] == format(child_span.context.trace_id, "032x")
-        assert "ok" in marker_span.attributes[AttributeKeys.JUDGMENT_OUTPUT]
-        assert child_span.attributes[
-            AttributeKeys.JUDGMENT_LINK_SOURCE_TRACE_ID
-        ] == format(marker_span.context.trace_id, "032x")
-        assert len(child_span.links) == 1
-        assert child_span.links[0].context.span_id == marker_span.context.span_id
-
-    def test_fork_uses_requested_span_type(self, tracer, collecting_exporter):
-        @BaseTracer.observe(span_type="agent")
-        def parent():
-            @BaseTracer.observe(span_type="tool", fork=True)
-            def child():
-                return "ok"
-
-            return child()
-
-        parent()
-
-        marker_span = next(
-            s
-            for s in collecting_exporter.spans
-            if s.name == "child"
-            and AttributeKeys.JUDGMENT_LINK_TARGET_TRACE_ID in s.attributes
-        )
-        linked_root_span = next(
-            s
-            for s in collecting_exporter.spans
-            if s.name == "child"
-            and AttributeKeys.JUDGMENT_LINK_SOURCE_TRACE_ID in s.attributes
-        )
-        assert marker_span.attributes[AttributeKeys.JUDGMENT_SPAN_KIND] == "tool"
-        assert linked_root_span.attributes[AttributeKeys.JUDGMENT_SPAN_KIND] == "tool"
-
-    def test_fork_without_parent_span_falls_back_to_normal_observe(
-        self, tracer, collecting_exporter
-    ):
-        @BaseTracer.observe(span_type="tool", fork=True)
-        def child():
-            return "ok"
-
-        assert child() == "ok"
-
-        child_span = next(s for s in collecting_exporter.spans if s.name == "child")
-        assert child_span.parent is None
-        assert AttributeKeys.JUDGMENT_LINK_TARGET_TRACE_ID not in child_span.attributes
-        assert AttributeKeys.JUDGMENT_LINK_SOURCE_TRACE_ID not in child_span.attributes
-        assert child_span.attributes[AttributeKeys.JUDGMENT_SPAN_KIND] == "tool"
-        assert "ok" in child_span.attributes[AttributeKeys.JUDGMENT_OUTPUT]
-
 
 class TestObserveAsync:
     @pytest.mark.asyncio
@@ -195,60 +118,6 @@ class TestObserveAsync:
 
         span = next(s for s in collecting_exporter.spans if s.name == "bad")
         assert span.status.status_code.name == "ERROR"
-
-    @pytest.mark.asyncio
-    async def test_async_linked_trace_creates_linked_root_trace(
-        self, tracer, collecting_exporter
-    ):
-        @BaseTracer.observe(span_type="agent")
-        async def parent():
-            @BaseTracer.observe(fork=True)
-            async def child():
-                return "ok"
-
-            return await child()
-
-        await parent()
-
-        parent_span = next(s for s in collecting_exporter.spans if s.name == "parent")
-        marker_span = next(
-            s
-            for s in collecting_exporter.spans
-            if s.name == "child" and s.context.trace_id == parent_span.context.trace_id
-        )
-        child_span = next(
-            s
-            for s in collecting_exporter.spans
-            if s.name == "child" and s.context.trace_id != parent_span.context.trace_id
-        )
-        assert parent_span.context.trace_id != child_span.context.trace_id
-        assert marker_span.parent is not None
-        assert marker_span.parent.span_id == parent_span.context.span_id
-        assert marker_span.attributes[
-            AttributeKeys.JUDGMENT_LINK_TARGET_SPAN_ID
-        ] == format(child_span.context.span_id, "016x")
-        assert marker_span.attributes[AttributeKeys.JUDGMENT_INPUT] == "{}"
-        assert "ok" in marker_span.attributes[AttributeKeys.JUDGMENT_OUTPUT]
-        assert child_span.attributes[
-            AttributeKeys.JUDGMENT_LINK_SOURCE_SPAN_ID
-        ] == format(marker_span.context.span_id, "016x")
-
-    @pytest.mark.asyncio
-    async def test_async_fork_without_parent_span_falls_back_to_normal_observe(
-        self, tracer, collecting_exporter
-    ):
-        @BaseTracer.observe(span_type="tool", fork=True)
-        async def child():
-            return "ok"
-
-        assert await child() == "ok"
-
-        child_span = next(s for s in collecting_exporter.spans if s.name == "child")
-        assert child_span.parent is None
-        assert AttributeKeys.JUDGMENT_LINK_TARGET_TRACE_ID not in child_span.attributes
-        assert AttributeKeys.JUDGMENT_LINK_SOURCE_TRACE_ID not in child_span.attributes
-        assert child_span.attributes[AttributeKeys.JUDGMENT_SPAN_KIND] == "tool"
-        assert "ok" in child_span.attributes[AttributeKeys.JUDGMENT_OUTPUT]
 
 
 class TestObserveGenerator:
@@ -284,34 +153,6 @@ class TestObserveGenerator:
 
         assert list(gen()) == [10, 20, 30]
 
-    def test_forked_generator_falls_back_to_same_trace(
-        self, tracer, collecting_exporter
-    ):
-        @BaseTracer.observe(span_type="agent")
-        def parent():
-            @BaseTracer.observe(span_type="tool", fork=True)
-            def child():
-                yield 1
-                yield 2
-
-            return list(child())
-
-        assert parent() == [1, 2]
-
-        parent_span = next(s for s in collecting_exporter.spans if s.name == "parent")
-        child_span = next(
-            s
-            for s in collecting_exporter.spans
-            if s.name == "child"
-            and s.attributes.get(AttributeKeys.JUDGMENT_SPAN_KIND) == "generator"
-        )
-        assert child_span.context.trace_id == parent_span.context.trace_id
-        assert child_span.parent is not None
-        assert child_span.parent.span_id == parent_span.context.span_id
-        assert AttributeKeys.JUDGMENT_LINK_TARGET_TRACE_ID not in child_span.attributes
-        assert AttributeKeys.JUDGMENT_LINK_SOURCE_TRACE_ID not in child_span.attributes
-        assert child_span.attributes[AttributeKeys.JUDGMENT_SPAN_KIND] == ("generator")
-
 
 class TestObserveAsyncGenerator:
     @pytest.mark.asyncio
@@ -334,35 +175,6 @@ class TestObserveAsyncGenerator:
             and s.attributes.get(AttributeKeys.JUDGMENT_SPAN_KIND) == "generator"
         )
         assert root.attributes.get(AttributeKeys.JUDGMENT_OUTPUT) == "<async_generator>"
-
-    @pytest.mark.asyncio
-    async def test_forked_async_generator_falls_back_to_same_trace(
-        self, tracer, collecting_exporter
-    ):
-        @BaseTracer.observe(span_type="agent")
-        async def parent():
-            @BaseTracer.observe(span_type="tool", fork=True)
-            async def child():
-                yield 1
-                yield 2
-
-            return [value async for value in child()]
-
-        assert await parent() == [1, 2]
-
-        parent_span = next(s for s in collecting_exporter.spans if s.name == "parent")
-        child_span = next(
-            s
-            for s in collecting_exporter.spans
-            if s.name == "child"
-            and s.attributes.get(AttributeKeys.JUDGMENT_SPAN_KIND) == "generator"
-        )
-        assert child_span.context.trace_id == parent_span.context.trace_id
-        assert child_span.parent is not None
-        assert child_span.parent.span_id == parent_span.context.span_id
-        assert AttributeKeys.JUDGMENT_LINK_TARGET_TRACE_ID not in child_span.attributes
-        assert AttributeKeys.JUDGMENT_LINK_SOURCE_TRACE_ID not in child_span.attributes
-        assert child_span.attributes[AttributeKeys.JUDGMENT_SPAN_KIND] == ("generator")
 
 
 class TestFormatInputs:
