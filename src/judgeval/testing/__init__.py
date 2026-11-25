@@ -87,6 +87,11 @@ class CheckResult(TypedDict):
     passed: bool
     reason: Optional[str]
     error_message: Optional[str]
+    #: Numbers a Code judge recorded with ``Judge.metric()``, by metric name.
+    metrics: Dict[str, float]
+    #: How long the judge ran on the case, in milliseconds; ``None`` for
+    #: judges that do not report it.
+    duration_ms: Optional[float]
 
 
 class CaseResult(TypedDict):
@@ -99,6 +104,9 @@ class CaseResult(TypedDict):
 
 class RunResults(TypedDict):
     results: List[CaseResult]
+    #: Milliseconds from the first check being queued to the last check
+    #: finishing; ``None`` until a check finishes.
+    run_duration_ms: Optional[float]
 
 
 def _segment(value: str) -> str:
