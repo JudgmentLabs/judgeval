@@ -4,7 +4,6 @@ import contextvars
 import functools
 import inspect
 import json
-from opentelemetry import trace as trace_api
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -39,10 +38,6 @@ from judgeval.utils.decorators.dont_throw import dont_throw
 from judgeval.utils.serialize import serialize_attribute, safe_serialize
 from judgeval.constants import JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
 from judgeval.trace.judgment_tracer_provider import JudgmentTracerProvider
-from judgeval.trace.internal import (
-    LinkedTraceSpans,
-    start_linked_trace as _start_linked_trace_impl,
-)
 import judgeval.trace.baggage as baggage
 from judgeval.trace.generators import (
     _ObservedSyncGenerator,
@@ -321,45 +316,6 @@ class BaseTracer(ABC):
 
     @staticmethod
     @contextmanager
-    def _start_linked_trace_context(
-        name: str,
-        attributes: Optional[Dict[str, Any]] = None,
-        *,
-        span_type: Optional[str] = "span",
-        end_on_exit: bool = True,
-        end_invocation_on_exit: bool = True,
-    ) -> Iterator[LinkedTraceSpans]:
-        proxy = BaseTracer._get_proxy_provider()
-        tracer = proxy.get_active_tracer()
-        if tracer is None:
-            judgeval_logger.warning(
-                "start_linked_trace() called without an active tracer. "
-                "Continuing without linked-trace tracing."
-            )
-            yield LinkedTraceSpans(trace_api.INVALID_SPAN, trace_api.INVALID_SPAN)
-            return
-
-        source_span = proxy.get_current_span()
-        if source_span is None or not source_span.is_recording():
-            judgeval_logger.warning(
-                "start_linked_trace() called without an active parent span. "
-                "Continuing without linked-trace tracing."
-            )
-            yield LinkedTraceSpans(trace_api.INVALID_SPAN, trace_api.INVALID_SPAN)
-            return
-
-        with _start_linked_trace_impl(
-            name,
-            source_span,
-            attributes=attributes,
-            span_type=span_type,
-            end_on_exit=end_on_exit,
-            end_invocation_on_exit=end_invocation_on_exit,
-        ) as spans:
-            yield spans
-
-    @staticmethod
-    @contextmanager
     def start_as_current_span(
         name: str,
         attributes: Optional[Dict[str, Any]] = None,
@@ -510,37 +466,6 @@ class BaseTracer(ABC):
 
     @staticmethod
     @contextmanager
-    def start_linked_trace(
-        name: str,
-        attributes: Optional[Dict[str, Any]] = None,
-        *,
-        span_type: Optional[str] = "span",
-    ) -> Iterator[Span]:
-        """Start a linked trace rooted at a new span.
-
-        The new span is the root of a fresh trace. It links back to the
-        current span via an OpenTelemetry ``Link`` and stores explicit
-        cross-trace source/target IDs on the linked root and invocation spans.
-
-        Args:
-            name: Name for the linked trace root span.
-            attributes: Optional dictionary of initial linked-root-span attributes.
-            span_type: Span kind to apply to both the parent-side invocation span
-                and the linked trace root span. Set to ``None`` to skip setting it.
-
-        Yields:
-            The active linked trace root ``Span``.
-        """
-        with BaseTracer._start_linked_trace_context(
-            name,
-            attributes=attributes,
-            span_type=span_type,
-            end_on_exit=True,
-        ) as spans:
-            yield spans.linked_root_span
-
-    @staticmethod
-    @contextmanager
     def span(span_name: str) -> Iterator[Span]:
         """Open a child span using a `with` block.
 
@@ -581,7 +506,6 @@ class BaseTracer(ABC):
         record_input: bool = True,
         record_output: bool = True,
         disable_generator_yield_span: bool = False,
-        fork: bool = False,
     ) -> C: ...
 
     @staticmethod
@@ -593,7 +517,6 @@ class BaseTracer(ABC):
         record_input: bool = True,
         record_output: bool = True,
         disable_generator_yield_span: bool = False,
-        fork: bool = False,
     ) -> Callable[[C], C]: ...
 
     @staticmethod
@@ -604,16 +527,11 @@ class BaseTracer(ABC):
         record_input: bool = True,
         record_output: bool = True,
         disable_generator_yield_span: bool = False,
-        fork: bool = False,
     ) -> C | Callable[[C], C]:
         """Decorator that automatically traces a function call.
 
-        Wraps any sync or async function in a span. When ``fork=True`` and an
-        active parent span exists, eligible calls run in a fresh linked trace
-        while a parent-side invocation span remains on the current trace.
-        Generator and async-generator functions stay on the normal observation
-        path. Inputs and outputs are captured automatically. Works with or
-        without parentheses.
+        Wraps any sync or async function in a span. Inputs and outputs are
+        captured automatically. Works with or without parentheses.
 
         Args:
             func: The function to wrap (set implicitly when used as
@@ -627,9 +545,6 @@ class BaseTracer(ABC):
             record_output: Capture and store the return value.
             disable_generator_yield_span: Suppress per-yield child spans for
                 generator functions.
-            fork: If True, run the function in a new linked trace instead of
-                the current trace when an active parent span is available.
-                Otherwise, observation falls back to the normal behavior.
 
         Examples:
             Basic usage:
@@ -649,14 +564,6 @@ class BaseTracer(ABC):
                 return await llm.generate(question, context)
             ```
 
-            Fork a call into a linked trace:
-
-            ```python
-            @Tracer.observe(span_type="agent", fork=True)
-            def delegate(task: str) -> str:
-                return run_subsystem(task)
-            ```
-
             Without parentheses (uses default settings):
 
             ```python
@@ -669,65 +576,10 @@ class BaseTracer(ABC):
         def decorator(f: C) -> C:
             proxy = BaseTracer._get_proxy_provider()
             name = span_name or f.__name__
-            prefers_local_generator_observation = inspect.isgeneratorfunction(
-                f
-            ) or inspect.isasyncgenfunction(f)
-
-            def should_use_linked_trace() -> bool:
-                if not fork or proxy.get_active_tracer() is None:
-                    return False
-                current_span = proxy.get_current_span()
-                return bool(current_span is not None and current_span.is_recording())
-
             if inspect.iscoroutinefunction(f):
 
                 @functools.wraps(f)
                 async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-                    if should_use_linked_trace():
-                        spans_cm = BaseTracer._start_linked_trace_context(
-                            name, span_type=span_type
-                        )
-                        with spans_cm as linked_spans:
-                            linked_root_span = linked_spans.linked_root_span
-                            invocation_span = linked_spans.invocation_span
-                            try:
-                                if record_input:
-                                    serialized_input = serialize_attribute(
-                                        _format_inputs(f, args, kwargs),
-                                        BaseTracer._get_serializer(),
-                                    )
-                                    linked_root_span.set_attribute(
-                                        AttributeKeys.JUDGMENT_INPUT, serialized_input
-                                    )
-                                    invocation_span.set_attribute(
-                                        AttributeKeys.JUDGMENT_INPUT, serialized_input
-                                    )
-                                BaseTracer._emit_partial()
-                                result = await f(*args, **kwargs)
-                                if record_output:
-                                    serialized_output = serialize_attribute(
-                                        result, BaseTracer._get_serializer()
-                                    )
-                                    linked_root_span.set_attribute(
-                                        AttributeKeys.JUDGMENT_OUTPUT,
-                                        serialized_output,
-                                    )
-                                    invocation_span.set_attribute(
-                                        AttributeKeys.JUDGMENT_OUTPUT,
-                                        serialized_output,
-                                    )
-                                return result
-                            except Exception as e:
-                                linked_root_span.record_exception(e)
-                                linked_root_span.set_status(
-                                    Status(StatusCode.ERROR, str(e))
-                                )
-                                invocation_span.record_exception(e)
-                                invocation_span.set_status(
-                                    Status(StatusCode.ERROR, str(e))
-                                )
-                                raise
-
                     otel_tracer = proxy.get_tracer(
                         JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
                     )
@@ -765,112 +617,6 @@ class BaseTracer(ABC):
 
                 @functools.wraps(f)
                 def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-                    if (
-                        should_use_linked_trace()
-                        and not prefers_local_generator_observation
-                    ):
-                        spans_cm = BaseTracer._start_linked_trace_context(
-                            name,
-                            span_type=span_type,
-                            end_on_exit=False,
-                            end_invocation_on_exit=False,
-                        )
-                        with spans_cm as linked_spans:
-                            linked_root_span = linked_spans.linked_root_span
-                            invocation_span = linked_spans.invocation_span
-
-                            def finish_invocation_span() -> None:
-                                if invocation_span.is_recording():
-                                    invocation_span.end()
-
-                            try:
-                                if record_input:
-                                    serialized_input = serialize_attribute(
-                                        _format_inputs(f, args, kwargs),
-                                        BaseTracer._get_serializer(),
-                                    )
-                                    linked_root_span.set_attribute(
-                                        AttributeKeys.JUDGMENT_INPUT, serialized_input
-                                    )
-                                    invocation_span.set_attribute(
-                                        AttributeKeys.JUDGMENT_INPUT, serialized_input
-                                    )
-                                BaseTracer._emit_partial()
-                                result = f(*args, **kwargs)
-                            except Exception as e:
-                                linked_root_span.record_exception(e)
-                                linked_root_span.set_status(
-                                    Status(StatusCode.ERROR, str(e))
-                                )
-                                invocation_span.record_exception(e)
-                                invocation_span.set_status(
-                                    Status(StatusCode.ERROR, str(e))
-                                )
-                                try:
-                                    linked_root_span.end()
-                                finally:
-                                    finish_invocation_span()
-                                raise
-
-                            serializer = BaseTracer._get_serializer()
-                            otel_tracer = proxy.get_tracer(
-                                JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
-                            )
-
-                            if inspect.isgenerator(result):
-                                if record_output:
-                                    linked_root_span.set_attribute(
-                                        AttributeKeys.JUDGMENT_OUTPUT, "<generator>"
-                                    )
-                                    invocation_span.set_attribute(
-                                        AttributeKeys.JUDGMENT_OUTPUT,
-                                        "<generator>",
-                                    )
-                                return _ObservedSyncGenerator(
-                                    result,
-                                    linked_root_span,
-                                    serializer,
-                                    otel_tracer,
-                                    contextvars.copy_context(),
-                                    disable_generator_yield_span or not record_output,
-                                    on_finish=finish_invocation_span,
-                                )
-                            if inspect.isasyncgen(result):
-                                if record_output:
-                                    linked_root_span.set_attribute(
-                                        AttributeKeys.JUDGMENT_OUTPUT,
-                                        "<async_generator>",
-                                    )
-                                    invocation_span.set_attribute(
-                                        AttributeKeys.JUDGMENT_OUTPUT,
-                                        "<async_generator>",
-                                    )
-                                return _ObservedAsyncGenerator(
-                                    result,
-                                    linked_root_span,
-                                    serializer,
-                                    otel_tracer,
-                                    contextvars.copy_context(),
-                                    disable_generator_yield_span or not record_output,
-                                    on_finish=finish_invocation_span,
-                                )
-
-                            if record_output:
-                                serialized_output = serialize_attribute(
-                                    result, serializer
-                                )
-                                linked_root_span.set_attribute(
-                                    AttributeKeys.JUDGMENT_OUTPUT, serialized_output
-                                )
-                                invocation_span.set_attribute(
-                                    AttributeKeys.JUDGMENT_OUTPUT, serialized_output
-                                )
-                            try:
-                                linked_root_span.end()
-                            finally:
-                                finish_invocation_span()
-                            return result
-
                     otel_tracer = proxy.get_tracer(
                         JUDGEVAL_TRACER_INSTRUMENTING_MODULE_NAME
                     )
